@@ -1,0 +1,99 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://world/world.tscn" id="2_world"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_main")
+
+[node name="World" parent="." instance=ExtResource("2_world")]
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Menu" type="CenterContainer" parent="UI"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="UI/Menu"]
+custom_minimum_size = Vector2(380, 0)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="UI/Menu/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="Rows" type="VBoxContainer" parent="UI/Menu/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="UI/Menu/Panel/Margin/Rows"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "CheeseStrike: Gouda Overload"
+horizontal_alignment = 1
+
+[node name="HostButton" type="Button" parent="UI/Menu/Panel/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Host a session"
+
+[node name="JoinRow" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
+layout_mode = 2
+
+[node name="TargetEdit" type="LineEdit" parent="UI/Menu/Panel/Margin/Rows/JoinRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Session code"
+
+[node name="JoinButton" type="Button" parent="UI/Menu/Panel/Margin/Rows/JoinRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 44)
+layout_mode = 2
+text = "Join"
+
+[node name="SessionsPanel" type="VBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows/SessionsPanel"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/Menu/Panel/Margin/Rows/SessionsPanel/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Active sessions"
+
+[node name="RefreshButton" type="Button" parent="UI/Menu/Panel/Margin/Rows/SessionsPanel/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Refresh"
+
+[node name="Sessions" type="VBoxContainer" parent="UI/Menu/Panel/Margin/Rows/SessionsPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Status" type="Label" parent="UI/Menu/Panel/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(330, 0)
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Hud" type="Label" parent="UI"]
+unique_name_in_owner = true
+visible = false
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 600.0
+offset_bottom = 40.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
