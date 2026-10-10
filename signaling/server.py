@@ -117,8 +117,8 @@ async def handle(ws):
         pass
     finally:
         if session is None:
-            return
-        if peer_id == HOST_ID:
+            pass  # Never hosted or joined, so there is nothing to clean up.
+        elif peer_id == HOST_ID:
             # WebRTC links between host and players are already up and survive
             # this; the session just stops being listed or joinable.
             sessions.pop(session.code, None)
