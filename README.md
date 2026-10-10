@@ -42,4 +42,6 @@ Game tests use [GUT](https://github.com/bitwes/Gut), vendored in `game/addons/gu
 python tools/run_tests.py
 ```
 
+Behavior that these can't cover, such as input devices, real browsers and phones, is listed as manual tests in [docs/manual-tests.md](docs/manual-tests.md).
+
 CI runs the same script on every pull request and push to `main`, with the versions pinned in `tools/versions.env` and `signaling/requirements.txt`. A local run uses whatever you have installed, and the script warns when that differs from the pins. It can also be started by hand for any branch from the Tests workflow in the repository's Actions tab, or on a pull request by commenting `buildci`.
