@@ -14,16 +14,17 @@ var _closed := false
 var _heartbeat_age := 0.0
 
 
-## The host isn't running the game right now, but may come back.
-func is_paused() -> bool:
-	return _is_silent()
+## Nothing has been heard from the host for a while. It may be suspended,
+## stalled or cut off, and may yet come back.
+func is_silent() -> bool:
+	return _heartbeat_age > HEARTBEAT_TIMEOUT
 
 
 ## The host has left for good. A closed host page can't say goodbye and WebRTC
 ## takes several seconds to notice, while the signaling server sees the host
 ## drop at once; the silent heartbeat confirms it wasn't just signaling.
 func is_gone() -> bool:
-	return _closed and _is_silent()
+	return _closed and is_silent()
 
 
 func tick(delta: float) -> void:
@@ -37,7 +38,3 @@ func heartbeat_received() -> void:
 
 func signaling_closed() -> void:
 	_closed = true
-
-
-func _is_silent() -> bool:
-	return _heartbeat_age > HEARTBEAT_TIMEOUT

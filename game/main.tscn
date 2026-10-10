@@ -98,7 +98,7 @@ offset_bottom = 40.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 6
 
-[node name="PausedNotice" type="CenterContainer" parent="UI"]
+[node name="WaitingNotice" type="CenterContainer" parent="UI"]
 unique_name_in_owner = true
 visible = false
 anchors_preset = 15
@@ -108,11 +108,11 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Panel" type="PanelContainer" parent="UI/PausedNotice"]
+[node name="Panel" type="PanelContainer" parent="UI/WaitingNotice"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Margin" type="MarginContainer" parent="UI/PausedNotice/Panel"]
+[node name="Margin" type="MarginContainer" parent="UI/WaitingNotice/Panel"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/margin_left = 28
@@ -120,20 +120,27 @@ theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 28
 theme_override_constants/margin_bottom = 20
 
-[node name="Rows" type="VBoxContainer" parent="UI/PausedNotice/Panel/Margin"]
+[node name="Rows" type="VBoxContainer" parent="UI/WaitingNotice/Panel/Margin"]
 layout_mode = 2
 mouse_filter = 2
+theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="UI/PausedNotice/Panel/Margin/Rows"]
+[node name="Title" type="Label" parent="UI/WaitingNotice/Panel/Margin/Rows"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 26
-text = "Host paused"
+text = "Waiting for host…"
 horizontal_alignment = 1
 
-[node name="Detail" type="Label" parent="UI/PausedNotice/Panel/Margin/Rows"]
+[node name="Detail" type="Label" parent="UI/WaitingNotice/Panel/Margin/Rows"]
 layout_mode = 2
-text = "The game resumes when the host comes back."
+text = "Lost contact with the host. The game will resume if they come back."
 horizontal_alignment = 1
+
+[node name="LeaveButton" type="Button" parent="UI/WaitingNotice/Panel/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Leave"
 
 [node name="DisconnectedNotice" type="CenterContainer" parent="UI"]
 unique_name_in_owner = true
