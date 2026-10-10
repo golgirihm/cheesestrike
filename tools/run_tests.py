@@ -60,11 +60,9 @@ def find_godot():
 
 
 def check_python(pins):
-    # Minor version only: an exact patch release often can't be matched
-    # locally, and python.org has no Windows installers for the later ones.
     wanted = pins["PYTHON_VERSION"]
     running = ".".join(str(part) for part in sys.version_info[:3])
-    if wanted.split(".")[:2] != running.split(".")[:2]:
+    if running != wanted:
         warn(f"running Python {running}; CI uses {wanted}")
 
 
