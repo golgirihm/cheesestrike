@@ -36,7 +36,7 @@ jobs:
   prepare:
     name: Read the command
     if: github.event.issue.pull_request && startsWith(github.event.comment.body, 'buildci')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: write
       pull-requests: write
@@ -114,7 +114,7 @@ jobs:
     name: Report results
     needs: [prepare, tests]
     if: always() && needs.prepare.outputs.sha != ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       statuses: write
