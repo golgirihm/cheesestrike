@@ -20,6 +20,7 @@ python tools/run_tests.py
 ## Working in this repo
 
 - **Pull requests only.** `main` is protected: changes arrive through a pull request, merged by rebase, with the "Game tests" and "Signaling tests" checks passing on an up-to-date branch. Keep each commit on a branch meaningful, since every one lands on `main`.
+- **After merging, move on.** Once a pull request's checks have passed on an up-to-date branch, merge it and carry on; don't wait for the test run that the merge starts on `main`. That run tests the same code the pull request just tested. Watch it in the background instead and speak up only if it fails.
 - **No AI attribution.** Don't add "Generated with Claude Code" to pull request descriptions or a `Co-Authored-By` trailer for Claude to commits.
 - **Godot on Windows.** Use `godot_console` in place of `godot` so output reaches the terminal.
 - **Pinned versions.** CI's Python and Godot versions are in `tools/versions.env`; Python packages are pinned in `signaling/requirements.txt`. Change a version there, not in the workflow.
