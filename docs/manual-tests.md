@@ -56,7 +56,7 @@ Setup: two windows. Why manual: this checks what one player sees of another acro
 | PLR-01 | Appearance | 1. Host in A, join in B.<br>2. Turn each view until the other character is visible. | Each sees the other as a colored capsule with a dark visor. The two characters have different colors. |
 | PLR-02 | Movement is shared | 1. In B, walk and jump while watching window A. | A sees B's character move and jump as B does, without long freezes or jumps in position. |
 | PLR-03 | Facing is shared | 1. In B, turn left and right, then look up and down, while watching window A. | The visor on B's character turns and tilts to match where B is looking. |
-| PLR-04 | Starting spots | 1. Host in A, join in B. | Each character starts inside the arena, standing on the floor, and not inside a wall or block. |
+| PLR-04 | Starting spots | 1. Host in A, join in B.<br>2. Before moving, look at where each character is. | The two characters start in different places, each facing the middle of the arena. |
 
 ## Input devices
 

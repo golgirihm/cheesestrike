@@ -19,6 +19,7 @@ import argparse
 import importlib.metadata
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -82,10 +83,31 @@ def game(pins):
         warn(f"running Godot {found or 'of unknown version'}; CI uses {pins['GODOT_VERSION']}")
     # Import first so Godot's class list matches the scripts on disk; a fresh
     # clone has none, and a stale one fails tests that use a new class.
-    return (
-        run(godot, "--headless", "--path", GAME, "--import")
-        and run(godot, "--headless", "--path", GAME, "-s", "addons/gut/gut_cmdln.gd", "-gexit")
+    return run(godot, "--headless", "--path", GAME, "--import") and run_gut(godot)
+
+
+def run_gut(godot):
+    """Runs the GUT tests, and also fails if any test file didn't run. GUT skips
+    a file it can't parse and still reports success, which would let a broken
+    test file pass unnoticed."""
+    command = [godot, "--headless", "--path", GAME, "-s", "addons/gut/gut_cmdln.gd", "-gexit"]
+    print("+", " ".join(str(part) for part in command), flush=True)
+    process = subprocess.Popen(
+        command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace"
     )
+    output = []
+    for line in process.stdout:
+        print(line, end="", flush=True)
+        output.append(line)
+    passed = process.wait() == 0
+
+    expected = len(list((GAME / "test").rglob("test_*.gd")))
+    ran = re.search(r"^Scripts\s+(\d+)\s*$", "".join(output), re.MULTILINE)
+    if ran is None or int(ran.group(1)) != expected:
+        print(f"error: {expected} test files exist but GUT ran {ran.group(1) if ran else 'an unknown number'}.")
+        print("A test file that fails to load is skipped; look for a script error above.")
+        return False
+    return passed
 
 
 def signaling(pins):

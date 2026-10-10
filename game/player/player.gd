@@ -27,6 +27,10 @@ var _look_touch_start_msec := 0
 var _touch_jump := false
 var _mine := false
 
+## Where this player starts, chosen by the host and set before the node enters
+## the tree.
+var spawn_position := Vector3.ZERO
+
 
 func _enter_tree() -> void:
 	set_multiplayer_authority(name.to_int())
@@ -45,7 +49,9 @@ func _ready() -> void:
 	visor.visible = not _mine
 	if _mine:
 		camera.make_current()
-		global_position = get_node("../..").spawn_position(id)
+		global_position = spawn_position
+		# Start facing the middle of the arena, not the wall behind the spot.
+		rotation.y = atan2(spawn_position.x, spawn_position.z)
 
 
 func _input(event: InputEvent) -> void:
