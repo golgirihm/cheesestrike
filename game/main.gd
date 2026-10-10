@@ -15,6 +15,9 @@ extends Node
 @onready var status: Label = %Status
 @onready var hud: Label = %Hud
 @onready var paused_notice: Control = %PausedNotice
+@onready var disconnected_notice: Control = %DisconnectedNotice
+@onready var disconnected_detail: Label = %DisconnectedDetail
+@onready var disconnected_button: Button = %DisconnectedButton
 
 
 func _ready() -> void:
@@ -23,6 +26,7 @@ func _ready() -> void:
 	Net.session_ended.connect(_on_session_ended)
 	Net.sessions_listed.connect(_show_sessions)
 	Net.host_paused_changed.connect(paused_notice.set_visible)
+	disconnected_button.pressed.connect(_dismiss_disconnected)
 	host_button.pressed.connect(_host)
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
 	target_edit.text_submitted.connect(_join)
@@ -75,9 +79,20 @@ func _on_session_failed(reason: String) -> void:
 	_show_menu(reason)
 
 
-func _on_session_ended() -> void:
+func _on_session_ended(reason: String) -> void:
 	world.stop()
-	_show_menu("The session ended.")
+	if reason.is_empty():
+		_show_menu("")
+		return
+	hud.hide()
+	disconnected_detail.text = reason
+	disconnected_notice.show()
+	disconnected_button.grab_focus()
+
+
+func _dismiss_disconnected() -> void:
+	disconnected_notice.hide()
+	_show_menu("")
 
 
 func _show_menu(message: String) -> void:

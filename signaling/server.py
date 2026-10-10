@@ -17,6 +17,7 @@ Protocol: JSON text frames over WebSocket.
     {"type": "hosted", "code": "ABCD"}               to the host
     {"type": "joined", "code": "ABCD", "id": <id>}   to the joiner
     {"type": "peer_joined" | "peer_left", "id": <id>}  to the host
+    {"type": "closed"}                               to joiners, when the host drops
     {"type": "offer" | "answer" | "candidate", "from": <peer id>, ...}
     {"type": "error", "message": "..."}
 
@@ -124,6 +125,7 @@ async def handle(ws):
             print(f"[{session.code}] closed")
             for other_id, other in session.peers.items():
                 if other_id != HOST_ID:
+                    await send(other, type="closed")
                     await other.close()
         else:
             session.peers.pop(peer_id, None)
