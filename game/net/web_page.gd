@@ -14,6 +14,12 @@ class_name WebPage
 ## for players who aren't touching the screen. Browsers only offer it on HTTPS
 ## and localhost, and drop it whenever the page is hidden, so it is re-requested
 ## each time the page comes back.
+##
+## Raw mouse movement: with the mouse captured, Chrome on Windows now and then
+## reports one movement hundreds of pixels long that the mouse never made, which
+## throws the view to a different angle. That comes from how it re-centres the
+## hidden pointer, and asking for movement straight from the mouse avoids it. It
+## also takes the operating system's pointer acceleration out of aiming.
 
 const _SCRIPT := """
 (() => {
@@ -81,6 +87,25 @@ const _SCRIPT := """
 		}
 	};
 	document.addEventListener('visibilitychange', acquireWakeLock);
+
+	// The engine captures the mouse with a plain requestPointerLock(). Ask for
+	// raw movement instead, falling back where the browser doesn't offer it.
+	const nativeLock = Element.prototype.requestPointerLock;
+	if (nativeLock) {
+		Element.prototype.requestPointerLock = function (options) {
+			let result;
+			try {
+				result = nativeLock.call(this, { unadjustedMovement: true, ...options });
+			} catch (error) {
+				return nativeLock.call(this, options);
+			}
+			if (!result || !result.catch) return result;
+			return result.catch((error) => {
+				if (error.name !== 'NotSupportedError') throw error;
+				return nativeLock.call(this, options);
+			});
+		};
+	}
 
 	window.cheeseStrike = {
 		setKeepAlive(on) {

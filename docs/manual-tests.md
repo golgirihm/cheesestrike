@@ -46,6 +46,7 @@ Setup: two windows; do the steps in either one. Why manual: this is how the cont
 | MOV-03 | Jump | 1. Press Space while standing.<br>2. Press Space again while in the air. | The character jumps and lands. The second press does nothing until it is back on the ground. |
 | MOV-04 | Solid world | 1. Walk into a wall, then into a cheese block. | The character stops at walls and blocks and can't pass through them or leave the arena. |
 | MOV-05 | Own body hidden | 1. Look straight down and around. | You don't see your own character's body or visor. |
+| MOV-06 | Fast mouse look | 1. Click in the game.<br>2. For half a minute, sweep the mouse quickly from side to side and in circles, as in a firefight. | The view always follows the mouse smoothly. It never snaps to an angle the mouse didn't move it to. |
 
 ## Other players
 
