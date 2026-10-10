@@ -6,11 +6,17 @@
 Every selected suite runs even if an earlier one fails; the exit code is
 non-zero if any failed.
 
-The game suite needs Godot. It is found through the GODOT environment
-variable, or else as `godot_console` or `godot` on the PATH.
+The game and browser suites need Godot. It is found through the GODOT
+environment variable, or else as `godot_console` or `godot` on the PATH.
 
-CI pins the versions of what it tests with (tools/versions.env and
-signaling/requirements.txt). A local run uses whatever is installed, so this
+The browser suite exports the web build to build/browser-tests and plays it in
+headless browser windows. Besides Godot's Web export template it needs:
+
+    pip install -r browser_tests/requirements.txt
+    python -m playwright install --only-shell chromium
+
+CI pins the versions of what it tests with (tools/versions.env and the
+requirements.txt files). A local run uses whatever is installed, so this
 warns when that differs from the pins. It still runs: the pull request's CI
 run is what decides.
 """
@@ -27,7 +33,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GAME = ROOT / "game"
 VERSIONS = ROOT / "tools" / "versions.env"
-REQUIREMENTS = ROOT / "signaling" / "requirements.txt"
+REQUIREMENTS = [ROOT / "signaling" / "requirements.txt", ROOT / "browser_tests" / "requirements.txt"]
+BROWSER_BUILD = ROOT / "build" / "browser-tests"
 
 warnings = []
 
@@ -39,16 +46,17 @@ def warn(message):
 
 def pinned_versions():
     """The versions CI uses, by name: the entries of versions.env plus each
-    exactly pinned package in the signaling requirements."""
+    exactly pinned package in the requirements files."""
     pins = {}
     for line in VERSIONS.read_text(encoding="utf-8-sig").splitlines():
         name, separator, value = line.strip().partition("=")
         if separator and not name.startswith("#"):
             pins[name] = value
-    for line in REQUIREMENTS.read_text(encoding="utf-8-sig").splitlines():
-        name, separator, value = line.strip().partition("==")
-        if separator:
-            pins[name] = value
+    for requirements in REQUIREMENTS:
+        for line in requirements.read_text(encoding="utf-8-sig").splitlines():
+            name, separator, value = line.strip().partition("==")
+            if separator:
+                pins[name] = value
     return pins
 
 
@@ -72,18 +80,43 @@ def run(*command):
     return subprocess.run(command, cwd=ROOT).returncode == 0
 
 
-def game(pins):
+def checked_godot(pins):
+    """Godot's path, having warned if it isn't the pinned version; None, with
+    a message, if it isn't installed."""
     godot = find_godot()
     if godot is None:
         print("Godot not found. Put it on the PATH or set the GODOT environment variable.")
-        return False
+        return None
     # Reported as e.g. "4.7.2.stable.official.ed1daf0bf".
     found = subprocess.run([godot, "--version"], capture_output=True, text=True).stdout.strip()
     if not found.startswith(pins["GODOT_VERSION"] + "."):
         warn(f"running Godot {found or 'of unknown version'}; CI uses {pins['GODOT_VERSION']}")
+    return godot
+
+
+def checked_package(pins, name, requirements):
+    """Whether the Python package `name` is installed, having warned if it
+    isn't the pinned version."""
+    try:
+        found = importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        print(f"{name} is not installed. Run: pip install -r {requirements}")
+        return False
+    wanted = pins.get(name)
+    if wanted and found != wanted:
+        warn(f"running {name} {found}; CI uses {wanted}")
+    return True
+
+
+def import_project(godot):
     # Import first so Godot's class list matches the scripts on disk; a fresh
     # clone has none, and a stale one fails tests that use a new class.
-    return run(godot, "--headless", "--path", GAME, "--import") and run_gut(godot)
+    return run(godot, "--headless", "--path", GAME, "--import")
+
+
+def game(pins):
+    godot = checked_godot(pins)
+    return godot is not None and import_project(godot) and run_gut(godot)
 
 
 def run_gut(godot):
@@ -111,18 +144,32 @@ def run_gut(godot):
 
 
 def signaling(pins):
-    try:
-        found = importlib.metadata.version("websockets")
-    except importlib.metadata.PackageNotFoundError:
-        print("websockets is not installed. Run: pip install -r signaling/requirements.txt")
+    if not checked_package(pins, "websockets", "signaling/requirements.txt"):
         return False
-    wanted = pins.get("websockets")
-    if wanted and found != wanted:
-        warn(f"running websockets {found}; CI uses {wanted}")
     return run(sys.executable, "-m", "unittest", "discover", "-s", "signaling")
 
 
-SUITES = {"game": game, "signaling": signaling}
+def browser(pins):
+    # The browser tests start the signaling server, so they need its package too.
+    if not checked_package(pins, "websockets", "signaling/requirements.txt"):
+        return False
+    if not checked_package(pins, "playwright", "browser_tests/requirements.txt"):
+        return False
+    godot = checked_godot(pins)
+    if godot is None or not import_project(godot):
+        return False
+    # Export afresh, so the tests never run against a stale or half-made build.
+    shutil.rmtree(BROWSER_BUILD, ignore_errors=True)
+    BROWSER_BUILD.mkdir(parents=True)
+    index = BROWSER_BUILD / "index.html"
+    if not run(godot, "--headless", "--path", GAME, "--export-debug", "Web", index) or not index.exists():
+        print("error: the web export failed. Godot's Web export template may be missing;")
+        print("install the export templates from the editor, or run: python tools/fetch_export_template.py")
+        return False
+    return run(sys.executable, "-m", "unittest", "discover", "-v", "-s", "browser_tests")
+
+
+SUITES = {"game": game, "signaling": signaling, "browser": browser}
 
 
 def main():
