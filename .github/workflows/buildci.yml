@@ -1,0 +1,52 @@
+name: buildci command
+
+# Commenting "buildci" on a pull request starts the Tests workflow on that
+# pull request's branch. The results appear in its checks as usual.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  start:
+    name: Start tests
+    # Pull request comments only, and only from the repository owner: the
+    # repository is public, so anyone can comment on it.
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.author_association == 'OWNER' &&
+      startsWith(github.event.comment.body, 'buildci')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      COMMENT_ID: ${{ github.event.comment.id }}
+      COMMENT_BODY: ${{ github.event.comment.body }}
+    steps:
+      - name: Start the Tests workflow on the pull request's branch
+        run: |
+          # The whole comment must be the command, give or take whitespace.
+          if [ "$(printf '%s' "$COMMENT_BODY" | tr -d '[:space:]')" != "buildci" ]; then
+            echo "Comment is not exactly 'buildci'; ignoring."
+            exit 0
+          fi
+
+          react() {
+            gh api -X POST "repos/$REPO/issues/comments/$COMMENT_ID/reactions" -f content="$1" --silent
+          }
+
+          if [ "$(gh pr view "$PR" --repo "$REPO" --json isCrossRepository --jq .isCrossRepository)" = "true" ]; then
+            echo "::error::Pull request #$PR comes from a fork, whose branch this workflow can't run on."
+            react confused
+            exit 1
+          fi
+
+          branch=$(gh pr view "$PR" --repo "$REPO" --json headRefName --jq .headRefName)
+          gh workflow run tests.yml --repo "$REPO" --ref "$branch"
+          react rocket
