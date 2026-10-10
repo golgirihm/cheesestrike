@@ -1,18 +1,22 @@
 name: buildci command
 
 # Commenting "buildci" on a pull request runs the tests on that pull request's
-# latest commit and reports the results in its checks.
+# latest commit, so that the pull request ends up with one set of results
+# however they were produced.
 #
-# It does not depend on the tests having run automatically. The test jobs run
-# inside this workflow, and each result is reported as a commit status under
-# the same name as the job, which is also the name of the required check. A
-# comment-triggered run is not tied to the pull request, so without the
-# statuses nothing would show there.
+# If the tests already ran automatically for that commit, the command restarts
+# that same run, cancelling it first if it is still going. Its checks are
+# replaced in place.
+#
+# If they never ran for that commit, as when automatic runs are turned off, the
+# test jobs run inside this workflow instead. A comment-triggered run is not
+# tied to the pull request, so each result is reported as a commit status under
+# the job's name, which is also the name of the required check.
 #
 # Anyone may use it, on any pull request including one from a fork. The jobs
 # that run the pull request's code get a read-only token and no secrets, the
-# same as its automatic test runs. The jobs that can write statuses never check
-# the code out.
+# same as its automatic test runs. The jobs that can write statuses or restart
+# runs never check the code out.
 
 on:
   issue_comment:
@@ -34,9 +38,11 @@ jobs:
     if: github.event.issue.pull_request && startsWith(github.event.comment.body, 'buildci')
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       pull-requests: write
       statuses: write
     outputs:
+      # Set only when the tests have to run inside this workflow.
       sha: ${{ steps.command.outputs.sha }}
     env:
       PR: ${{ github.event.issue.number }}
@@ -45,7 +51,7 @@ jobs:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - id: command
-        name: Check the comment and mark the checks as pending
+        name: Restart the pull request's test run, or prepare to run the tests here
         run: |
           # The whole comment must be the command, give or take whitespace.
           if [ "$(printf '%s' "$COMMENT_BODY" | tr -d '[:space:]')" != "buildci" ]; then
@@ -64,13 +70,33 @@ jobs:
           fi
 
           sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+          run=$(gh run list --repo "$REPO" --workflow tests.yml --event pull_request --commit "$sha" \
+            --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+
+          if [ -n "$run" ]; then
+            status=$(gh run view "$run" --repo "$REPO" --json status --jq .status)
+            if [ "$status" != "completed" ]; then
+              echo "Test run $run is $status; cancelling it before restarting."
+              gh run cancel "$run" --repo "$REPO" || true
+              for _ in $(seq 60); do
+                status=$(gh run view "$run" --repo "$REPO" --json status --jq .status)
+                [ "$status" = "completed" ] && break
+                sleep 2
+              done
+            fi
+            gh run rerun "$run" --repo "$REPO"
+            echo "Restarted test run $run."
+            react rocket
+            exit 0
+          fi
+
+          echo "No test run exists for $sha; running the tests in this workflow."
           while IFS= read -r context; do
             [ -n "$context" ] || continue
             gh api -X POST "repos/$REPO/statuses/$sha" --silent \
               -f state=pending -f context="$context" \
               -f description="Running (buildci)" -f target_url="$RUN_URL"
           done <<< "$CONTEXTS"
-
           react rocket
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
@@ -110,6 +136,10 @@ jobs:
             case "$conclusion" in
               success) state=success; description="Passed (buildci)" ;;
               failure) state=failure; description="Failed (buildci)" ;;
+              cancelled)
+                # Superseded by a newer run, which reports for itself.
+                echo "$context: cancelled, leaving its status alone"
+                continue ;;
               *) state=error; description="Did not finish (buildci)" ;;
             esac
             gh api -X POST "repos/$REPO/statuses/$SHA" --silent \
