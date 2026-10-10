@@ -11,6 +11,8 @@ The game is a [Godot 4.7](https://godotengine.org) project in `game/`. Web build
 
 You need Godot 4.7 with the Web export templates installed, and Python 3.10+ with `pip install -r signaling/requirements.txt`.
 
+On Windows, use `godot_console` in place of `godot` in the commands below. Plain `godot` is a windowed program there and prints nothing to the terminal.
+
 Run natively, where host and join use a direct connection on port 7777 and need no signaling server:
 
 ```
@@ -31,9 +33,15 @@ Then open http://localhost:8060 in two browser windows, host in one and join fro
 
 ### Tests
 
-Game tests use [GUT](https://github.com/bitwes/Gut), vendored in `game/addons/gut`, and live in `game/test`. Signaling server tests are in `signaling/test_server.py`. Both run on every pull request.
+Game tests use [GUT](https://github.com/bitwes/Gut), vendored in `game/addons/gut`, and live in `game/test`. Signaling server tests are in `signaling/test_server.py`. Both run on every pull request and push to `main`, and can be started by hand for any branch from the Tests workflow in the repository's Actions tab.
 
 ```
 godot --headless --path game -s addons/gut/gut_cmdln.gd -gexit
 python -m unittest discover -s signaling
+```
+
+In a fresh clone, import the project once before running the game tests, so Godot registers its classes:
+
+```
+godot --headless --path game --import
 ```
