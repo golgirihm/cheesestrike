@@ -10,3 +10,8 @@ updates:
     directory: /signaling
     schedule:
       interval: weekly
+
+  - package-ecosystem: pip
+    directory: /browser_tests
+    schedule:
+      interval: weekly

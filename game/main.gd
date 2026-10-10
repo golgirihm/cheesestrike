@@ -39,6 +39,8 @@ func _ready() -> void:
 	if not Net.use_webrtc:
 		target_edit.placeholder_text = "Host address (blank for this PC)"
 	Net.request_sessions()
+	if TestHook.wanted():
+		add_child(TestHook.new(self))
 
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--host":

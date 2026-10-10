@@ -1,8 +1,8 @@
 # Manual tests
 
-Behavior that the automated tests don't cover and that has to be checked by a person. The automated suites (`python tools/run_tests.py`) cover the rules for detecting a lost host and the signaling server's protocol; everything a player sees, touches or does across a real browser connection is here.
+Behavior that the automated tests don't cover and that has to be checked by a person. The automated suites (`python tools/run_tests.py`) cover the rules for detecting a lost host, the signaling server's protocol and, by playing the game in headless browser windows, hosting, finding, joining and leaving sessions, a late joiner seeing everyone in place, and being told when the host closes the page. What a player sees and feels, input devices, real phones and other browsers are here.
 
-Some of these could be automated later with a browser automation tool. They are listed here because that isn't set up, not because it can't be done.
+More of these could move to the browser tests in `browser_tests/`. A row is here either because it needs a person or real hardware, or because nobody has automated it yet.
 
 **Keeping this current:** when a change adds or alters behavior that an automated test can't cover, add or update a row here in the same pull request. When a row becomes covered by an automated test, delete it.
 
@@ -15,25 +15,8 @@ Each section names the setup it needs. Build and serve the web version first, as
 | Setup | What it is |
 |---|---|
 | **Two windows** | Two browser windows side by side on one PC, both at `http://localhost:8060`. One hosts, the other joins. Both stay visible unless a step says otherwise. |
-| **Three windows** | As above, with a third window that also joins. |
 | **Phone and PC** | A phone on the same Wi-Fi as the PC, at `http://<PC address>:8060`, and one browser window on the PC. |
 | **Native pair** | Two native instances on one PC: `godot --path game -- --host` and `godot --path game -- --join=127.0.0.1`. |
-
-## Sessions
-
-Setup: two windows. Why manual: these go through the real menu, a real signaling connection and a real WebRTC connection between browsers.
-
-| ID | Test | Steps | Expected |
-|---|---|---|---|
-| SES-01 | Host a session | 1. Click "Host a session". | The menu disappears and you are standing in the arena. The top-left reads "Session ABCD · 1 playing", with a four-letter code. |
-| SES-02 | Join from the list | 1. Host in window A.<br>2. In window B, click "Refresh".<br>3. Click the session in the list. | B enters the arena within a few seconds. Both windows read "2 playing". |
-| SES-03 | Join by code | 1. Host in window A and note the code.<br>2. In window B, type the code in lower case and press Enter. | B joins, as in SES-02. The code is accepted in any letter case. |
-| SES-04 | Session list contents | 1. With no sessions hosted, open the menu.<br>2. Host in window A.<br>3. In window B, click "Refresh".<br>4. Close window A, then click "Refresh" in B. | Step 1: "None yet. Host one!"<br>Step 3: the session appears as "ABCD · 1 playing".<br>Step 4: the list is empty again. |
-| SES-05 | Empty code | 1. Leave the code box empty and click "Join". | "Enter a session code." appears and nothing else happens. |
-| SES-06 | Unknown code | 1. Type a code that isn't hosted, such as `ZZZZ`, and click "Join". | The menu stays, showing "No session with that code." The buttons work again. |
-| SES-07 | Session server not running | 1. Stop the signaling server.<br>2. Reload the page and click "Host a session". | The menu stays, showing "Can't reach the session server at ws://…". Starting the server and trying again works without reloading. |
-| SES-08 | A joiner leaves | 1. Host in A, join in B.<br>2. Close window B. | Within a few seconds A reads "1 playing" and B's character is gone. |
-| SES-09 | Late joiner (three windows) | 1. Host in A, join in B, and move both characters away from their starting spots.<br>2. Join in C. | C sees both existing characters where they currently are. A and B see C appear. All read "3 playing". |
 
 ## Movement and view
 
@@ -94,9 +77,6 @@ Why manual: these depend on real connection loss, which behaves differently from
 
 | ID | Test | Setup | Steps | Expected |
 |---|---|---|---|---|
-| LOST-01 | Host closes the page | Two windows | 1. Host in A, join in B.<br>2. Close window A. | B may show "Waiting for host…" briefly. Within a few seconds B shows "Disconnected" with "The host closed the session." |
-| LOST-02 | Back to menu | Two windows | 1. After LOST-01, click "Back to menu" in B.<br>2. Host a new session from B. | The menu returns with no message left over, and hosting works. |
-| LOST-03 | Every joiner is told | Three windows | 1. Host in A, join in B and C.<br>2. Close window A. | B and C both show "Disconnected" within a few seconds of each other. |
 | LOST-04 | Phone host puts the browser away | Phone and PC; host on the phone, join on the PC | 1. On the phone, switch to another app. | Within about two seconds the PC shows "Waiting for host…" with a moving spinner. |
 | LOST-05 | Frozen while waiting | As LOST-04 | 1. While the notice is showing, press movement keys and move the mouse. | The character and the view don't move. The mouse pointer is visible and free. |
 | LOST-06 | Host comes back | As LOST-04 | 1. Within a few seconds, switch back to the browser on the phone. | The notice disappears on the PC and both players can move again. Clicking in the game captures the mouse as before. |
@@ -113,7 +93,7 @@ Why manual: each combination is a different real device or program.
 | DEV-01 | Loads on a phone | Phone and PC | 1. Open the game on the phone. | The game loads to the menu. The menu is large enough to read and tap, in portrait and in landscape. |
 | DEV-02 | Phone joins a PC host | Phone and PC | 1. Host on the PC, join on the phone. | The phone enters the arena and each sees the other move. |
 | DEV-03 | Phone hosts | Phone and PC | 1. Host on the phone, join on the PC. | As DEV-02. |
-| DEV-04 | Each browser | Two windows of the browser under test | 1. Run SES-01, SES-02, MOV-01, MOV-02 and PLR-02 in Chrome, Firefox, Edge and Safari. | All pass in every browser. |
+| DEV-04 | Each browser | Two windows of the browser under test | In each of Chrome, Firefox, Edge and Safari:<br>1. Host a session in one window and join it from the session list in the other.<br>2. Run MOV-01, MOV-02 and PLR-02. | Joining works and the tests pass in every browser. |
 | DEV-05 | Mixed browsers | One window each of two different browsers | 1. Host in one, join in the other, then swap. | Both directions connect and PLR-02 passes. |
 | DEV-06 | Different networks | Two devices on different internet connections, such as home Wi-Fi and mobile data | 1. Host on one, join on the other. | They connect and PLR-02 passes. |
 

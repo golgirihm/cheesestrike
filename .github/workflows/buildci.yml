@@ -31,6 +31,7 @@ env:
   CONTEXTS: |
     Game tests
     Signaling tests
+    Browser tests
 
 jobs:
   prepare:
