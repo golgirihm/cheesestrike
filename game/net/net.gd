@@ -110,22 +110,26 @@ func _process(delta: float) -> void:
 	if _ws == null:
 		return
 	_ws.poll()
-	match _ws.get_ready_state():
-		WebSocketPeer.STATE_OPEN:
-			for text in _outbox:
-				_ws.send_text(text)
-			_outbox.clear()
-			while _ws != null and _ws.get_available_packet_count() > 0:
-				var msg: Variant = JSON.parse_string(_ws.get_packet().get_string_from_utf8())
-				if msg is Dictionary:
-					_handle_signal(msg)
-		WebSocketPeer.STATE_CLOSED:
-			_ws = null
-			_outbox.clear()
-			# An established session keeps running without signaling; it just
-			# can't take new joiners.
-			if _connecting:
-				_fail("Can't reach the session server at %s." % _signaling_url)
+	var state := _ws.get_ready_state()
+	if state == WebSocketPeer.STATE_OPEN:
+		for text in _outbox:
+			_ws.send_text(text)
+		_outbox.clear()
+	if state == WebSocketPeer.STATE_OPEN or state == WebSocketPeer.STATE_CLOSED:
+		# Also when closed: the server's last message and its closing of the
+		# connection can both arrive between two frames, and that message is
+		# the one saying the host has gone.
+		while _ws != null and _ws.get_available_packet_count() > 0:
+			var msg: Variant = JSON.parse_string(_ws.get_packet().get_string_from_utf8())
+			if msg is Dictionary:
+				_handle_signal(msg)
+	if _ws != null and state == WebSocketPeer.STATE_CLOSED:
+		_ws = null
+		_outbox.clear()
+		# An established session keeps running without signaling; it just
+		# can't take new joiners.
+		if _connecting:
+			_fail("Can't reach the session server at %s." % _signaling_url)
 
 
 func _start() -> void:
