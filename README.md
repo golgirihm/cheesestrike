@@ -9,7 +9,7 @@ Copyright (c) 2026 Hamid Golgiri. All rights reserved. The source is public for 
 
 The game is a [Godot 4.7](https://godotengine.org) project in `game/`. Web builds connect players peer-to-peer over WebRTC; `signaling/` is the small server that lists sessions and brokers those connections.
 
-You need Godot 4.7 with the Web export templates installed, and Python 3.10+ with `pip install -r signaling/requirements.txt`.
+You need Godot 4.7 with the Web export templates installed, and Python 3.14 with `pip install -r signaling/requirements.txt`.
 
 On Windows, use `godot_console` in place of `godot` in the commands below. Plain `godot` is a windowed program there and prints nothing to the terminal.
 
