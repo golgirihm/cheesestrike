@@ -8,7 +8,8 @@ extends Node
 
 signal session_started
 signal session_failed(reason: String)
-signal session_ended
+## `reason` is empty when this player chose to leave.
+signal session_ended(reason: String)
 signal sessions_listed(sessions: Array)
 signal host_paused_changed(paused: bool)
 
@@ -37,12 +38,13 @@ var _host_hidden := false
 var _heartbeat_timer := 0.0
 var _heartbeat_age := 0.0
 var _visibility_callback: JavaScriptObject
+var _host_closed := false
 
 
 func _ready() -> void:
 	multiplayer.connected_to_server.connect(_start)
 	multiplayer.connection_failed.connect(_fail.bind("Couldn't connect to the host."))
-	multiplayer.server_disconnected.connect(leave)
+	multiplayer.server_disconnected.connect(leave.bind("The connection to the host was lost."))
 	if OS.has_feature("web"):
 		_signaling_url = _web_signaling_url()
 		# Browsers stop running a hidden tab's game loop, but still deliver
@@ -83,11 +85,11 @@ func join(target: String) -> void:
 	room_code = target
 
 
-func leave() -> void:
+func leave(reason := "") -> void:
 	var was_in_session := in_session
 	_reset()
 	if was_in_session:
-		session_ended.emit()
+		session_ended.emit(reason)
 
 
 func request_sessions() -> void:
@@ -105,6 +107,12 @@ func _process(delta: float) -> void:
 		else:
 			# Capped so a long frame here doesn't read as the host going quiet.
 			_heartbeat_age += minf(delta, HEARTBEAT_INTERVAL)
+			# A closed host page can't say goodbye, and WebRTC takes several
+			# seconds to notice. The signaling server sees the host drop at
+			# once; a silent heartbeat confirms it wasn't just signaling.
+			if _host_closed and _heartbeat_age > HEARTBEAT_TIMEOUT:
+				leave("The host closed the session.")
+				return
 		_update_host_paused()
 	if _connecting and _join_deadline > 0.0 and Time.get_unix_time_from_system() > _join_deadline:
 		_fail("Timed out connecting to the host.")
@@ -153,6 +161,7 @@ func _reset() -> void:
 	in_session = false
 	room_code = ""
 	_host_hidden = false
+	_host_closed = false
 	_heartbeat_timer = 0.0
 	_heartbeat_age = 0.0
 	_update_host_paused()
@@ -220,6 +229,8 @@ func _handle_signal(msg: Dictionary) -> void:
 		"candidate":
 			if _rtc != null and _rtc.has_peer(from):
 				_rtc.get_peer(from).connection.add_ice_candidate(msg.mid, int(msg.index), msg.sdp)
+		"closed":
+			_host_closed = true
 		"error":
 			_fail(msg.get("message", "Session server error."))
 
