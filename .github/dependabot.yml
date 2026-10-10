@@ -1,0 +1,12 @@
+# Proposes updates to the pinned versions CI depends on.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: /signaling
+    schedule:
+      interval: weekly
