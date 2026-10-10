@@ -65,6 +65,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if Net.host_paused:
+		return
 	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * delta)
 
 	if not is_on_floor():
@@ -86,6 +88,8 @@ func _exit_tree() -> void:
 
 
 func _look(delta: Vector2) -> void:
+	if Net.host_paused:
+		return
 	rotate_y(-delta.x)
 	head.rotation.x = clampf(head.rotation.x - delta.y, -PITCH_LIMIT, PITCH_LIMIT)
 

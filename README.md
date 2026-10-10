@@ -24,7 +24,7 @@ Build and run the web version:
 mkdir -p build/web
 godot --headless --path game --export-debug Web ../build/web/index.html
 python signaling/server.py
-python -m http.server 8060 --directory build/web
+python tools/serve.py
 ```
 
-Then open http://localhost:8060 in two browser windows, host in one and join from the other. Keep both windows visible: browsers pause the game in a background tab, which stalls a session that tab is hosting. A phone on the same network can join at `http://<this PC's address>:8060`.
+Then open http://localhost:8060 in two browser windows, host in one and join from the other. Browsers pause the game in a background tab. If that tab is hosting, the other players get a "Host paused" notice and are frozen until it comes back, so keep the host's window visible. A phone on the same network can join at `http://<this PC's address>:8060`.

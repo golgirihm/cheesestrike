@@ -97,3 +97,40 @@ offset_right = 600.0
 offset_bottom = 40.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 6
+
+[node name="PausedNotice" type="CenterContainer" parent="UI"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="UI/PausedNotice"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="UI/PausedNotice/Panel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 20
+
+[node name="Rows" type="VBoxContainer" parent="UI/PausedNotice/Panel/Margin"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="UI/PausedNotice/Panel/Margin/Rows"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Host paused"
+horizontal_alignment = 1
+
+[node name="Detail" type="Label" parent="UI/PausedNotice/Panel/Margin/Rows"]
+layout_mode = 2
+text = "The game resumes when the host comes back."
+horizontal_alignment = 1

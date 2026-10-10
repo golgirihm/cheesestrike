@@ -14,6 +14,7 @@ extends Node
 @onready var refresh_button: Button = %RefreshButton
 @onready var status: Label = %Status
 @onready var hud: Label = %Hud
+@onready var paused_notice: Control = %PausedNotice
 
 
 func _ready() -> void:
@@ -21,6 +22,7 @@ func _ready() -> void:
 	Net.session_failed.connect(_on_session_failed)
 	Net.session_ended.connect(_on_session_ended)
 	Net.sessions_listed.connect(_show_sessions)
+	Net.host_paused_changed.connect(paused_notice.set_visible)
 	host_button.pressed.connect(_host)
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
 	target_edit.text_submitted.connect(_join)
