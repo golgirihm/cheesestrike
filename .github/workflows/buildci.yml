@@ -2,6 +2,10 @@ name: buildci command
 
 # Commenting "buildci" on a pull request starts the Tests workflow on that
 # pull request's branch. The results appear in its checks as usual.
+#
+# Anyone may use it. That is safe because it only ever runs the Tests workflow,
+# with that workflow's read-only token, on a branch that already exists in this
+# repository; a comment can't make it run code from a fork.
 
 on:
   issue_comment:
@@ -12,12 +16,7 @@ permissions: {}
 jobs:
   start:
     name: Start tests
-    # Pull request comments only, and only from the repository owner: the
-    # repository is public, so anyone can comment on it.
-    if: >-
-      github.event.issue.pull_request &&
-      github.event.comment.author_association == 'OWNER' &&
-      startsWith(github.event.comment.body, 'buildci')
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, 'buildci')
     runs-on: ubuntu-latest
     permissions:
       actions: write
