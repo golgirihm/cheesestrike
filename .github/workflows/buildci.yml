@@ -1,12 +1,18 @@
 name: buildci command
 
-# Commenting "buildci" on a pull request re-runs the Tests workflow for that
-# pull request's latest commit. It re-runs the pull request's own test run
-# rather than starting a separate one, because GitHub only shows runs made for
-# the pull request in its checks.
+# Commenting "buildci" on a pull request runs the tests on that pull request's
+# latest commit and reports the results in its checks.
 #
-# Anyone may use it. That is safe because a re-run executes the same code with
-# the same read-only token as the run it repeats.
+# It does not depend on the tests having run automatically. The test jobs run
+# inside this workflow, and each result is reported as a commit status under
+# the same name as the job, which is also the name of the required check. A
+# comment-triggered run is not tied to the pull request, so without the
+# statuses nothing would show there.
+#
+# Anyone may use it, on any pull request including one from a fork. The jobs
+# that run the pull request's code get a read-only token and no secrets, the
+# same as its automatic test runs. The jobs that can write statuses never check
+# the code out.
 
 on:
   issue_comment:
@@ -14,22 +20,32 @@ on:
 
 permissions: {}
 
+env:
+  GH_TOKEN: ${{ github.token }}
+  REPO: ${{ github.repository }}
+  # Must match the job names in tests.yml.
+  CONTEXTS: |
+    Game tests
+    Signaling tests
+
 jobs:
-  start:
-    name: Re-run tests
+  prepare:
+    name: Read the command
     if: github.event.issue.pull_request && startsWith(github.event.comment.body, 'buildci')
     runs-on: ubuntu-latest
     permissions:
-      actions: write
       pull-requests: write
+      statuses: write
+    outputs:
+      sha: ${{ steps.command.outputs.sha }}
     env:
-      GH_TOKEN: ${{ github.token }}
-      REPO: ${{ github.repository }}
       PR: ${{ github.event.issue.number }}
       COMMENT_ID: ${{ github.event.comment.id }}
       COMMENT_BODY: ${{ github.event.comment.body }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - name: Re-run the pull request's test run
+      - id: command
+        name: Check the comment and mark the checks as pending
         run: |
           # The whole comment must be the command, give or take whitespace.
           if [ "$(printf '%s' "$COMMENT_BODY" | tr -d '[:space:]')" != "buildci" ]; then
@@ -41,23 +57,63 @@ jobs:
             gh api -X POST "repos/$REPO/issues/comments/$COMMENT_ID/reactions" -f content="$1" --silent
           }
 
-          sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
-          run=$(gh run list --repo "$REPO" --workflow tests.yml --event pull_request --commit "$sha" \
-            --limit 1 --json databaseId,status --jq '.[0] // empty | "\(.databaseId) \(.status)"')
-
-          if [ -z "$run" ]; then
-            echo "::error::No test run exists for the latest commit of pull request #$PR, so there is nothing to re-run."
+          if [ "$(gh pr view "$PR" --repo "$REPO" --json state --jq .state)" != "OPEN" ]; then
+            echo "::error::Pull request #$PR is not open."
             react confused
             exit 1
           fi
 
-          id=${run%% *}
-          status=${run##* }
-          if [ "$status" != "completed" ]; then
-            echo "Test run $id is already $status; leaving it alone."
-            react eyes
-            exit 0
-          fi
+          sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+          while IFS= read -r context; do
+            [ -n "$context" ] || continue
+            gh api -X POST "repos/$REPO/statuses/$sha" --silent \
+              -f state=pending -f context="$context" \
+              -f description="Running (buildci)" -f target_url="$RUN_URL"
+          done <<< "$CONTEXTS"
 
-          gh run rerun "$id" --repo "$REPO"
           react rocket
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  tests:
+    name: tests
+    needs: prepare
+    if: needs.prepare.outputs.sha != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/tests.yml
+    with:
+      ref: ${{ needs.prepare.outputs.sha }}
+
+  report:
+    name: Report results
+    needs: [prepare, tests]
+    if: always() && needs.prepare.outputs.sha != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      statuses: write
+    env:
+      SHA: ${{ needs.prepare.outputs.sha }}
+      RUN_ID: ${{ github.run_id }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Report each test job's result as a commit status
+        run: |
+          # This run's jobs, as "<name><tab><conclusion>". The test jobs appear
+          # as "tests / <job name>".
+          jobs=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" --paginate --jq '.jobs[] | "\(.name)\t\(.conclusion)"')
+          echo "$jobs"
+
+          while IFS= read -r context; do
+            [ -n "$context" ] || continue
+            conclusion=$(printf '%s\n' "$jobs" | awk -F '\t' -v name="tests / $context" '$1 == name { print $2 }' | tail -n 1)
+            case "$conclusion" in
+              success) state=success; description="Passed (buildci)" ;;
+              failure) state=failure; description="Failed (buildci)" ;;
+              *) state=error; description="Did not finish (buildci)" ;;
+            esac
+            gh api -X POST "repos/$REPO/statuses/$SHA" --silent \
+              -f state="$state" -f context="$context" \
+              -f description="$description" -f target_url="$RUN_URL"
+            echo "$context: $state"
+          done <<< "$CONTEXTS"
