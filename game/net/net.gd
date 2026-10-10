@@ -10,16 +10,22 @@ signal session_started
 signal session_failed(reason: String)
 signal session_ended
 signal sessions_listed(sessions: Array)
+signal host_paused_changed(paused: bool)
 
 const ENET_PORT := 7777
 const MAX_PLAYERS := 16
 const SIGNALING_PORT := 9080
 const JOIN_TIMEOUT := 30.0
+const HEARTBEAT_INTERVAL := 0.25
+const HEARTBEAT_TIMEOUT := 1.5
 const ICE_SERVERS := [{"urls": ["stun:stun.l.google.com:19302"]}]
 
 var use_webrtc := OS.has_feature("web")
 var in_session := false
 var room_code := ""
+## True while the host isn't running the game: either it announced that its
+## tab went into the background, or its heartbeat has stopped arriving.
+var host_paused := false
 
 var _signaling_url := "ws://localhost:%d" % SIGNALING_PORT
 var _ws: WebSocketPeer
@@ -27,6 +33,10 @@ var _outbox: Array[String] = []
 var _rtc: WebRTCMultiplayerPeer
 var _connecting := false
 var _join_deadline := 0.0
+var _host_hidden := false
+var _heartbeat_timer := 0.0
+var _heartbeat_age := 0.0
+var _visibility_callback: JavaScriptObject
 
 
 func _ready() -> void:
@@ -35,6 +45,10 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(leave)
 	if OS.has_feature("web"):
 		_signaling_url = _web_signaling_url()
+		# Browsers stop running a hidden tab's game loop, but still deliver
+		# this event, which is the host's one chance to tell the others.
+		_visibility_callback = JavaScriptBridge.create_callback(_on_visibility_changed)
+		JavaScriptBridge.get_interface("document").addEventListener("visibilitychange", _visibility_callback)
 
 
 func host() -> void:
@@ -81,7 +95,17 @@ func request_sessions() -> void:
 		_send({"type": "list"})
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if in_session:
+		if multiplayer.is_server():
+			_heartbeat_timer += delta
+			if _heartbeat_timer >= HEARTBEAT_INTERVAL:
+				_heartbeat_timer = 0.0
+				_heartbeat.rpc()
+		else:
+			# Capped so a long frame here doesn't read as the host going quiet.
+			_heartbeat_age += minf(delta, HEARTBEAT_INTERVAL)
+		_update_host_paused()
 	if _connecting and _join_deadline > 0.0 and Time.get_unix_time_from_system() > _join_deadline:
 		_fail("Timed out connecting to the host.")
 	if _ws == null:
@@ -128,6 +152,34 @@ func _reset() -> void:
 	_join_deadline = 0.0
 	in_session = false
 	room_code = ""
+	_host_hidden = false
+	_heartbeat_timer = 0.0
+	_heartbeat_age = 0.0
+	_update_host_paused()
+
+
+func _on_visibility_changed(_args: Array) -> void:
+	if in_session and multiplayer.is_server():
+		_set_host_hidden.rpc(JavaScriptBridge.eval("document.hidden"))
+
+
+@rpc("authority", "call_local", "reliable")
+func _set_host_hidden(hidden: bool) -> void:
+	_host_hidden = hidden
+	_heartbeat_age = 0.0
+	_update_host_paused()
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _heartbeat() -> void:
+	_heartbeat_age = 0.0
+
+
+func _update_host_paused() -> void:
+	var paused := _host_hidden or _heartbeat_age > HEARTBEAT_TIMEOUT
+	if paused != host_paused:
+		host_paused = paused
+		host_paused_changed.emit(paused)
 
 
 func _send(msg: Dictionary) -> void:
