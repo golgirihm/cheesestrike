@@ -52,24 +52,6 @@ func test_one_long_frame_does_not_pause() -> void:
 	assert_false(watch.is_paused())
 
 
-func test_host_hidden_pauses_at_once() -> void:
-	watch.host_hidden_changed(true)
-	assert_true(watch.is_paused())
-
-
-func test_host_hidden_stays_paused_while_heartbeats_arrive() -> void:
-	watch.host_hidden_changed(true)
-	_advance(3.0, true)
-	assert_true(watch.is_paused())
-
-
-func test_host_shown_ends_the_pause() -> void:
-	watch.host_hidden_changed(true)
-	_advance(5.0)
-	watch.host_hidden_changed(false)
-	assert_false(watch.is_paused())
-
-
 func test_silence_alone_is_a_pause_not_a_departure() -> void:
 	_advance(60.0)
 	assert_true(watch.is_paused())
@@ -95,12 +77,4 @@ func test_gone_when_signaling_closes_after_heartbeats_stopped() -> void:
 	_advance(HostWatch.HEARTBEAT_TIMEOUT + 0.1)
 	assert_false(watch.is_gone())
 	watch.signaling_closed()
-	assert_true(watch.is_gone())
-
-
-func test_hidden_host_that_closes_is_gone_after_the_timeout() -> void:
-	watch.host_hidden_changed(true)
-	watch.signaling_closed()
-	assert_false(watch.is_gone())
-	_advance(HostWatch.HEARTBEAT_TIMEOUT + 0.1)
 	assert_true(watch.is_gone())

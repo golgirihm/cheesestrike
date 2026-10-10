@@ -1,8 +1,8 @@
 class_name HostWatch
 extends RefCounted
 ## Works out, from what a player hears, whether the host is still running the
-## game. Three things feed it: the host's regular heartbeat, the host saying its
-## tab was hidden or shown, and the signaling server saying the host dropped.
+## game. Two things feed it: the host's regular heartbeat, and the signaling
+## server saying the host dropped.
 ##
 ## Kept free of any networking so the rules can be tested on their own; Net
 ## feeds it and acts on the answers.
@@ -10,14 +10,13 @@ extends RefCounted
 const HEARTBEAT_INTERVAL := 0.25
 const HEARTBEAT_TIMEOUT := 1.5
 
-var _hidden := false
 var _closed := false
 var _heartbeat_age := 0.0
 
 
 ## The host isn't running the game right now, but may come back.
 func is_paused() -> bool:
-	return _hidden or _is_silent()
+	return _is_silent()
 
 
 ## The host has left for good. A closed host page can't say goodbye and WebRTC
@@ -33,11 +32,6 @@ func tick(delta: float) -> void:
 
 
 func heartbeat_received() -> void:
-	_heartbeat_age = 0.0
-
-
-func host_hidden_changed(hidden: bool) -> void:
-	_hidden = hidden
 	_heartbeat_age = 0.0
 
 

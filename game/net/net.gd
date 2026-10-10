@@ -42,8 +42,7 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(leave.bind("The connection to the host was lost."))
 	if OS.has_feature("web"):
 		_signaling_url = _web_signaling_url()
-		# Browsers stop running a hidden tab's game loop, but still deliver
-		# this event, which is the host's one chance to tell the others.
+		WebPage.install()
 		_visibility_callback = JavaScriptBridge.create_callback(_on_visibility_changed)
 		JavaScriptBridge.get_interface("document").addEventListener("visibilitychange", _visibility_callback)
 
@@ -132,6 +131,9 @@ func _start() -> void:
 	_connecting = false
 	_join_deadline = 0.0
 	in_session = true
+	WebPage.set_wake_lock(true)
+	# Only the host: everyone else's session survives their own tab freezing.
+	WebPage.set_keep_alive(multiplayer.is_server())
 	session_started.emit()
 
 
@@ -141,6 +143,8 @@ func _fail(reason: String) -> void:
 
 
 func _reset() -> void:
+	WebPage.set_wake_lock(false)
+	WebPage.set_keep_alive(false)
 	multiplayer.multiplayer_peer = null
 	_rtc = null
 	if _ws != null:
@@ -156,15 +160,9 @@ func _reset() -> void:
 	_update_host_paused()
 
 
+## A hidden page may keep simulating (see WebPage), but drawing it is wasted work.
 func _on_visibility_changed(_args: Array) -> void:
-	if in_session and multiplayer.is_server():
-		_set_host_hidden.rpc(JavaScriptBridge.eval("document.hidden"))
-
-
-@rpc("authority", "call_local", "reliable")
-func _set_host_hidden(hidden: bool) -> void:
-	_host_watch.host_hidden_changed(hidden)
-	_update_host_paused()
+	RenderingServer.render_loop_enabled = not JavaScriptBridge.eval("document.hidden")
 
 
 @rpc("authority", "call_remote", "unreliable")

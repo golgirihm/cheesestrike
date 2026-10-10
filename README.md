@@ -27,7 +27,7 @@ python signaling/server.py
 python tools/serve.py
 ```
 
-Then open http://localhost:8060 in two browser windows, host in one and join from the other. Browsers pause the game in a background tab. If that tab is hosting, the other players get a "Host paused" notice and are frozen until it comes back, so keep the host's window visible. A phone on the same network can join at `http://<this PC's address>:8060`.
+Then open http://localhost:8060 in two browser windows, host in one and join from the other. A host's tab keeps the session running when it is in the background. If the host stops anyway, as a phone does when its browser is put away, the other players get a "Host paused" notice and are frozen until it comes back. A phone on the same network can join at `http://<this PC's address>:8060`.
 
 ### Tests
 
