@@ -11,7 +11,7 @@ signal session_failed(reason: String)
 ## `reason` is empty when this player chose to leave.
 signal session_ended(reason: String)
 signal sessions_listed(sessions: Array)
-signal host_paused_changed(paused: bool)
+signal host_silent_changed(silent: bool)
 
 const ENET_PORT := 7777
 const MAX_PLAYERS := 16
@@ -22,8 +22,9 @@ const ICE_SERVERS := [{"urls": ["stun:stun.l.google.com:19302"]}]
 var use_webrtc := OS.has_feature("web")
 var in_session := false
 var room_code := ""
-## True while the host isn't running the game; see HostWatch.
-var host_paused := false
+## True while nothing is being heard from the host; see HostWatch. The game
+## holds still until the host is heard from again or the session ends.
+var host_silent := false
 
 var _signaling_url := "ws://localhost:%d" % SIGNALING_PORT
 var _ws: WebSocketPeer
@@ -103,7 +104,7 @@ func _process(delta: float) -> void:
 			if _host_watch.is_gone():
 				leave("The host closed the session.")
 				return
-		_update_host_paused()
+		_update_host_silent()
 	if _connecting and _join_deadline > 0.0 and Time.get_unix_time_from_system() > _join_deadline:
 		_fail("Timed out connecting to the host.")
 	if _ws == null:
@@ -132,8 +133,7 @@ func _start() -> void:
 	_join_deadline = 0.0
 	in_session = true
 	WebPage.set_wake_lock(true)
-	# Only the host: everyone else's session survives their own tab freezing.
-	WebPage.set_keep_alive(multiplayer.is_server())
+	WebPage.set_keep_alive(true)
 	session_started.emit()
 
 
@@ -157,7 +157,7 @@ func _reset() -> void:
 	room_code = ""
 	_host_watch = HostWatch.new()
 	_heartbeat_timer = 0.0
-	_update_host_paused()
+	_update_host_silent()
 
 
 ## A hidden page may keep simulating (see WebPage), but drawing it is wasted work.
@@ -170,11 +170,11 @@ func _heartbeat() -> void:
 	_host_watch.heartbeat_received()
 
 
-func _update_host_paused() -> void:
-	var paused := _host_watch.is_paused()
-	if paused != host_paused:
-		host_paused = paused
-		host_paused_changed.emit(paused)
+func _update_host_silent() -> void:
+	var silent := _host_watch.is_silent()
+	if silent != host_silent:
+		host_silent = silent
+		host_silent_changed.emit(silent)
 
 
 func _send(msg: Dictionary) -> void:

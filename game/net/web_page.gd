@@ -3,10 +3,12 @@ class_name WebPage
 ## Every call is a no-op outside a web build.
 ##
 ## Keep-alive: browsers stop delivering animation frames to a page that is
-## hidden or covered, which freezes the game loop, and a frozen host freezes the
-## session for everyone. While keep-alive is on, a Web Worker timer (which
-## browsers leave running) drives the loop whenever frames stop arriving. It
-## can't help once a phone suspends the page outright.
+## hidden or covered, which freezes the game loop. A frozen host freezes the
+## session for everyone, and any frozen player stops reading the network while
+## messages keep arriving, until the buffer overflows and drops them. While
+## keep-alive is on, a Web Worker timer (which browsers leave running) drives
+## the loop whenever frames stop arriving. It can't help once a phone suspends
+## the page outright.
 ##
 ## Wake lock: stops the screen dimming and locking while the game is visible,
 ## for players who aren't touching the screen. Browsers only offer it on HTTPS

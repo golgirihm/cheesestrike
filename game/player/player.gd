@@ -56,7 +56,8 @@ func _input(event: InputEvent) -> void:
 	elif event.device == InputEvent.DEVICE_ID_EMULATION:
 		return  # Mouse events synthesized from touches; handled above.
 	elif event is InputEventMouseButton and event.pressed:
-		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		# Not while waiting on the host: the pointer is needed for its notice.
+		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not Net.host_silent:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_look(event.relative * MOUSE_SENSITIVITY)
@@ -65,7 +66,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if Net.host_paused:
+	if Net.host_silent:
 		return
 	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * delta)
 
@@ -88,7 +89,7 @@ func _exit_tree() -> void:
 
 
 func _look(delta: Vector2) -> void:
-	if Net.host_paused:
+	if Net.host_silent:
 		return
 	rotate_y(-delta.x)
 	head.rotation.x = clampf(head.rotation.x - delta.y, -PITCH_LIMIT, PITCH_LIMIT)

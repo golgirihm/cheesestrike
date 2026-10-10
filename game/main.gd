@@ -14,7 +14,8 @@ extends Node
 @onready var refresh_button: Button = %RefreshButton
 @onready var status: Label = %Status
 @onready var hud: Label = %Hud
-@onready var paused_notice: Control = %PausedNotice
+@onready var waiting_notice: Control = %WaitingNotice
+@onready var leave_button: Button = %LeaveButton
 @onready var disconnected_notice: Control = %DisconnectedNotice
 @onready var disconnected_detail: Label = %DisconnectedDetail
 @onready var disconnected_button: Button = %DisconnectedButton
@@ -25,7 +26,8 @@ func _ready() -> void:
 	Net.session_failed.connect(_on_session_failed)
 	Net.session_ended.connect(_on_session_ended)
 	Net.sessions_listed.connect(_show_sessions)
-	Net.host_paused_changed.connect(paused_notice.set_visible)
+	Net.host_silent_changed.connect(_on_host_silent_changed)
+	leave_button.pressed.connect(Net.leave)
 	disconnected_button.pressed.connect(_dismiss_disconnected)
 	host_button.pressed.connect(_host)
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
@@ -73,6 +75,12 @@ func _on_session_started() -> void:
 	menu.hide()
 	hud.show()
 	world.start()
+
+
+func _on_host_silent_changed(silent: bool) -> void:
+	waiting_notice.visible = silent
+	if silent:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
 func _on_session_failed(reason: String) -> void:
