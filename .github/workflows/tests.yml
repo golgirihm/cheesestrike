@@ -5,25 +5,37 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Lets the buildci command workflow run these jobs on a pull request's commit.
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to test. Defaults to the one that triggered the workflow.
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
-# A newer run on the same branch or pull request replaces one still in
-# progress, so repeated triggers can't pile up. Runs on main always finish.
+# A newer run for the same branch, pull request or commit replaces one still in
+# progress, so repeated triggers can't pile up. Runs for a push to main always
+# finish.
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: tests-${{ github.event_name }}-${{ inputs.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 env:
   GODOT_VERSION: 4.7.2
 
+# The job names are the names of the required checks on main, and the buildci
+# command workflow reports results under the same names.
 jobs:
   game:
     name: Game tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - name: Install Godot
         run: |
           wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
@@ -36,6 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
