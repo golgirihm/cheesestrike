@@ -39,4 +39,4 @@ Game tests use [GUT](https://github.com/bitwes/Gut), vendored in `game/addons/gu
 python tools/run_tests.py
 ```
 
-CI runs the same script on every pull request and push to `main`. It can also be started by hand for any branch from the Tests workflow in the repository's Actions tab, or on a pull request by commenting `buildci`.
+CI runs the same script on every pull request and push to `main`, with the versions pinned in `tools/versions.env` and `signaling/requirements.txt`. A local run uses whatever you have installed, and the script warns when that differs from the pins. It can also be started by hand for any branch from the Tests workflow in the repository's Actions tab, or on a pull request by commenting `buildci`.
