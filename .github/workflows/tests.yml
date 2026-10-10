@@ -23,10 +23,7 @@ jobs:
           wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
-      - name: Import project
-        run: godot --headless --path game --import
-      - name: Run tests
-        run: godot --headless --path game -s addons/gut/gut_cmdln.gd -gexit
+      - run: python3 tools/run_tests.py game
 
   signaling:
     name: Signaling tests
@@ -37,4 +34,4 @@ jobs:
         with:
           python-version: "3.10"
       - run: pip install -r signaling/requirements.txt
-      - run: python -m unittest discover -s signaling -v
+      - run: python tools/run_tests.py signaling
