@@ -16,11 +16,11 @@ on:
 permissions:
   contents: read
 
-# A newer run for the same branch, pull request or commit replaces one still in
-# progress, so repeated triggers can't pile up. Runs for a push to main always
-# finish.
+# One run at a time per pull request, whether it was started automatically or
+# by the buildci command: a newer one cancels one still in progress. Elsewhere
+# it is one per branch. Runs for a push to main always finish.
 concurrency:
-  group: tests-${{ github.event_name }}-${{ inputs.ref || github.ref }}
+  group: tests-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 env:
