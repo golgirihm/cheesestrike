@@ -41,6 +41,14 @@ jobs:
           ref: ${{ inputs.ref }}
       - name: Load pinned versions
         run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
+      # The pinned Python is rarely the release the runner image ships, and
+      # downloading it takes several seconds, so it is kept in a cache.
+      - name: Restore cached Python
+        id: python-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.tool_cache }}/Python/${{ env.PYTHON_VERSION }}
+          key: python-${{ env.PYTHON_VERSION }}-ubuntu-24.04-${{ runner.arch }}
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -61,8 +69,28 @@ jobs:
           ref: ${{ inputs.ref }}
       - name: Load pinned versions
         run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
+      # The pinned Python is rarely the release the runner image ships, and
+      # downloading it takes several seconds, so it is kept in a cache.
+      - name: Restore cached Python
+        id: python-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.tool_cache }}/Python/${{ env.PYTHON_VERSION }}
+          key: python-${{ env.PYTHON_VERSION }}-ubuntu-24.04-${{ runner.arch }}
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      # Only trusted runs on main write the cache, and before any repository
+      # code has run. Pull request code, including a fork's run through the
+      # buildci command, can read the cache but never fill it.
+      - name: Save Python to the cache
+        if: >-
+          steps.python-cache.outputs.cache-hit != 'true' &&
+          github.ref == 'refs/heads/main' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.tool_cache }}/Python/${{ env.PYTHON_VERSION }}
+          key: python-${{ env.PYTHON_VERSION }}-ubuntu-24.04-${{ runner.arch }}
       - run: pip install -r signaling/requirements.txt
       - run: python tools/run_tests.py signaling
