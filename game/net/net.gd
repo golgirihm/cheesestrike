@@ -17,15 +17,12 @@ const ENET_PORT := 7777
 const MAX_PLAYERS := 16
 const SIGNALING_PORT := 9080
 const JOIN_TIMEOUT := 30.0
-const HEARTBEAT_INTERVAL := 0.25
-const HEARTBEAT_TIMEOUT := 1.5
 const ICE_SERVERS := [{"urls": ["stun:stun.l.google.com:19302"]}]
 
 var use_webrtc := OS.has_feature("web")
 var in_session := false
 var room_code := ""
-## True while the host isn't running the game: either it announced that its
-## tab went into the background, or its heartbeat has stopped arriving.
+## True while the host isn't running the game; see HostWatch.
 var host_paused := false
 
 var _signaling_url := "ws://localhost:%d" % SIGNALING_PORT
@@ -34,11 +31,9 @@ var _outbox: Array[String] = []
 var _rtc: WebRTCMultiplayerPeer
 var _connecting := false
 var _join_deadline := 0.0
-var _host_hidden := false
+var _host_watch := HostWatch.new()
 var _heartbeat_timer := 0.0
-var _heartbeat_age := 0.0
 var _visibility_callback: JavaScriptObject
-var _host_closed := false
 
 
 func _ready() -> void:
@@ -101,16 +96,12 @@ func _process(delta: float) -> void:
 	if in_session:
 		if multiplayer.is_server():
 			_heartbeat_timer += delta
-			if _heartbeat_timer >= HEARTBEAT_INTERVAL:
+			if _heartbeat_timer >= HostWatch.HEARTBEAT_INTERVAL:
 				_heartbeat_timer = 0.0
 				_heartbeat.rpc()
 		else:
-			# Capped so a long frame here doesn't read as the host going quiet.
-			_heartbeat_age += minf(delta, HEARTBEAT_INTERVAL)
-			# A closed host page can't say goodbye, and WebRTC takes several
-			# seconds to notice. The signaling server sees the host drop at
-			# once; a silent heartbeat confirms it wasn't just signaling.
-			if _host_closed and _heartbeat_age > HEARTBEAT_TIMEOUT:
+			_host_watch.tick(delta)
+			if _host_watch.is_gone():
 				leave("The host closed the session.")
 				return
 		_update_host_paused()
@@ -160,10 +151,8 @@ func _reset() -> void:
 	_join_deadline = 0.0
 	in_session = false
 	room_code = ""
-	_host_hidden = false
-	_host_closed = false
+	_host_watch = HostWatch.new()
 	_heartbeat_timer = 0.0
-	_heartbeat_age = 0.0
 	_update_host_paused()
 
 
@@ -174,18 +163,17 @@ func _on_visibility_changed(_args: Array) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _set_host_hidden(hidden: bool) -> void:
-	_host_hidden = hidden
-	_heartbeat_age = 0.0
+	_host_watch.host_hidden_changed(hidden)
 	_update_host_paused()
 
 
 @rpc("authority", "call_remote", "unreliable")
 func _heartbeat() -> void:
-	_heartbeat_age = 0.0
+	_host_watch.heartbeat_received()
 
 
 func _update_host_paused() -> void:
-	var paused := _host_hidden or _heartbeat_age > HEARTBEAT_TIMEOUT
+	var paused := _host_watch.is_paused()
 	if paused != host_paused:
 		host_paused = paused
 		host_paused_changed.emit(paused)
@@ -230,7 +218,7 @@ func _handle_signal(msg: Dictionary) -> void:
 			if _rtc != null and _rtc.has_peer(from):
 				_rtc.get_peer(from).connection.add_ice_candidate(msg.mid, int(msg.index), msg.sdp)
 		"closed":
-			_host_closed = true
+			_host_watch.signaling_closed()
 		"error":
 			_fail(msg.get("message", "Session server error."))
 

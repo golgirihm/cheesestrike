@@ -28,3 +28,12 @@ python tools/serve.py
 ```
 
 Then open http://localhost:8060 in two browser windows, host in one and join from the other. Browsers pause the game in a background tab. If that tab is hosting, the other players get a "Host paused" notice and are frozen until it comes back, so keep the host's window visible. A phone on the same network can join at `http://<this PC's address>:8060`.
+
+### Tests
+
+Game tests use [GUT](https://github.com/bitwes/Gut), vendored in `game/addons/gut`, and live in `game/test`. Signaling server tests are in `signaling/test_server.py`. Both run on every pull request.
+
+```
+godot --headless --path game -s addons/gut/gut_cmdln.gd -gexit
+python -m unittest discover -s signaling
+```

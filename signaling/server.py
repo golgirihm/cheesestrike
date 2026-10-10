@@ -123,7 +123,7 @@ async def handle(ws):
             # this; the session just stops being listed or joinable.
             sessions.pop(session.code, None)
             print(f"[{session.code}] closed")
-            for other_id, other in session.peers.items():
+            for other_id, other in list(session.peers.items()):
                 if other_id != HOST_ID:
                     await send(other, type="closed")
                     await other.close()
