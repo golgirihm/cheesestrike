@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# A newer run on the same branch or pull request replaces one still in
+# progress, so repeated triggers can't pile up. Runs on main always finish.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   GODOT_VERSION: 4.7.2
 
