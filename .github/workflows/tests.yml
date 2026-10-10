@@ -23,15 +23,11 @@ concurrency:
   group: tests-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
-# The runner image, the actions, Python and the Python packages are pinned so
-# that a commit is tested the same way each time. Dependabot proposes updates
-# to the actions and packages; the versions below are changed by hand. To
-# change Godot's, update both of its values: the hash is the SHA-256 of the
-# Linux x86_64 zip, shown on the release's page on GitHub.
-env:
-  PYTHON_VERSION: 3.10.22
-  GODOT_VERSION: 4.7.2
-  GODOT_SHA256: cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4
+# The runner image, the actions, Python, Godot and the Python packages are
+# pinned so that a commit is tested the same way each time. The Python and
+# Godot versions come from tools/versions.env, which tools/run_tests.py also
+# reads to warn about a local run that differs. Dependabot proposes updates to
+# the actions and packages.
 
 # The job names are the names of the required checks on main, and the buildci
 # command workflow reports results under the same names.
@@ -43,6 +39,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.ref }}
+      - name: Load pinned versions
+        run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -61,6 +59,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.ref }}
+      - name: Load pinned versions
+        run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
