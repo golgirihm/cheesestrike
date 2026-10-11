@@ -56,6 +56,12 @@ var _clock := 0.0
 var _rules := {}
 # Where each player has lately been, as the host saw them, by id.
 var _histories := {}
+# The host's check on each player's movement, by id, and when it last put
+# each back.
+var _checks := {}
+var _put_back_at := {}
+## How many times the host has put a player back, for the browser tests.
+var put_backs := 0
 # The host's measure of each player's round trip, by id.
 var _pings := {}
 var _since_ping := 0.0
@@ -82,6 +88,8 @@ func start(settings := MatchSettings.new()) -> void:
 		_rules.clear()
 		_projectiles.clear()
 		_histories.clear()
+		_checks.clear()
+		_put_back_at.clear()
 		state_changed.emit()
 	else:
 		introduce(Settings.get_value("name"))
@@ -121,6 +129,8 @@ func remove_player(id: int) -> void:
 	_rules.erase(id)
 	_pings.erase(id)
 	_histories.erase(id)
+	_checks.erase(id)
+	_put_back_at.erase(id)
 	_changed()
 
 
@@ -329,6 +339,51 @@ func rewind_for(shooter: int) -> float:
 	return minf(round_trip(shooter) + InterpolationBuffer.DELAY, MAX_REWIND)
 
 
+## Shortest time between two put-backs of the same player, so that a player
+## whose updates are all rejected isn't flooded with them.
+const PUT_BACK_INTERVAL := 0.5
+
+
+func _check_for(id: int) -> MovementCheck:
+	if not _checks.has(id):
+		_checks[id] = MovementCheck.new()
+	return _checks[id]
+
+
+## Host only: player `id`'s update arrived at `time` placing them at `at`,
+## after being moved at once `teleports` times. Movement that couldn't have
+## happened is ignored, and the player is put back where they last were.
+func on_moved(time: float, at: Vector3, teleports: int, id: int) -> void:
+	if not is_host():
+		return
+	var space := world.get_world_3d().direct_space_state
+	var waist := Vector3.UP * MIDDLE
+	var blocked := func(from: Vector3, to: Vector3) -> bool:
+		return not space.intersect_ray(PhysicsRayQueryParameters3D.create(from + waist, to + waist, WORLD_MASK)).is_empty()
+	var ground := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.1, at + Vector3.DOWN * 0.6, WORLD_MASK)
+	var on_ground := not space.intersect_ray(ground).is_empty()
+	var check := _check_for(id)
+	if check.check(time, at, teleports, blocked, on_ground):
+		record_position(time, at, id)
+		return
+	if time - _put_back_at.get(id, -INF) < PUT_BACK_INTERVAL:
+		return
+	_put_back_at[id] = time
+	put_backs += 1
+	var back := check.last_position()
+	check.expect_move(back)
+	if multiplayer.get_peers().has(id):
+		_put_back.rpc_id(id, back)
+
+
+## The host put this player back where they last were.
+@rpc("authority", "call_remote", "reliable")
+func _put_back(at: Vector3) -> void:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own != null:
+		own.put_back(at)
+
+
 ## Player `id` has moved at once to somewhere new; where they were before
 ## says nothing about where they are, so it is forgotten.
 func forget_positions(id: int) -> void:
@@ -459,6 +514,7 @@ func _burst(projectile: Projectile, at: Vector3) -> void:
 func _tell_push(id: int, push: Vector3) -> void:
 	if push == Vector3.ZERO:
 		return
+	_check_for(id).pushed(now(), push)
 	if id == multiplayer.get_unique_id():
 		_pushed(push)
 	elif multiplayer.get_peers().has(id):
@@ -580,6 +636,7 @@ func _new_match() -> void:
 
 func _bring_back(id: int, at: Vector3) -> void:
 	forget_positions(id)
+	_check_for(id).expect_move(at)
 	state.respawn(id)
 	_rules_for(id).refill()
 	_changed()

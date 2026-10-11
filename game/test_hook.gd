@@ -114,6 +114,7 @@ func snapshot() -> Dictionary:
 		"notice": _main.disconnected_detail.text if _main.disconnected_notice.visible else "",
 		"players": players,
 		"sounds": Sounds.counts,
+		"put_backs": _main.world.match_.put_backs,
 		"music": Sounds.is_music_playing(),
 		"pickups": range(_main.world.pickup_pads().size()).map(func(index: int) -> bool: return _main.world.match_.state.pickup_ready(index)),
 		"combat": {
