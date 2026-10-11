@@ -52,7 +52,7 @@ class ScoresTest(GameTestCase):
         target.page.keyboard.down("Tab")
         state = target.wait_for("s.combat.scoreboard.length === 3")
         heading, first, second = state["combat"]["scoreboard"]
-        self.assertEqual(heading, ["Player", "Knock-outs", "Times out"])
+        self.assertEqual(heading, ["Player", "Knock-outs", "Times out", "Ping"])
         self.assertEqual(first[:2], ["Hunter", "1"])
         self.assertEqual(second[0], "Target")
         self.assertGreaterEqual(int(second[2]), 1)

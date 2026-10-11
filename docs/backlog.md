@@ -37,9 +37,8 @@ Once there is real combat, the shortcuts from earlier milestones start to show.
    *Tests:* GUT tests for the history and rewind.
 2. **Movement sanity checks.** Since players move themselves, have the host reject impossible movement (too fast, through walls, flying) and put the player back.
    *Tests:* GUT tests for the checks.
-3. **Ping display and network load.** Show each player's ping on the scoreboard. Measure bandwidth and the host's CPU with 16 players, tune the sync rate, and add a browser test with many players to catch regressions.
-4. **Reconnect.** A player whose connection drops can rejoin the same session within a short window and keep their score.
-5. **Host leaving.** Decide between host migration (hand the session to another player, which is hard with a host-decided game) and ending the match gracefully with final scores. Ending gracefully is the likely first step.
+3. **Reconnect.** A player whose connection drops can rejoin the same session within a short window and keep their score.
+4. **Host leaving.** Decide between host migration (hand the session to another player, which is hard with a host-decided game) and ending the match gracefully with final scores. Ending gracefully is the likely first step.
 
 ## Milestone 6: Polish and release
 

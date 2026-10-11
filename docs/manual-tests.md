@@ -142,6 +142,14 @@ Why manual: these depend on real connection loss, which behaves differently from
 | LOST-08 | Host loses its network | Phone and PC; host on the phone, join on the PC | 1. Turn off Wi-Fi on the phone and leave it off. | The PC shows "Waiting for host…" within about two seconds. Within about a minute it shows "Disconnected". |
 | LOST-09 | Joining a host that is away | Phone and PC; host on the phone | 1. Switch the phone to another app.<br>2. On the PC, refresh the list and join the session. | The PC shows "Joining…" and, after about 30 seconds, returns to the menu with "Timed out connecting to the host." |
 
+## Load
+
+Why manual: these need many real devices, and measure the host's machine.
+
+| ID | Test | Setup | Steps | Expected |
+|---|---|---|---|---|
+| LOAD-01 | A full session | 16 browser windows across several PCs and phones, one hosting on a phone | 1. Join everyone to one session and fight for five minutes, with the host's browser task manager (or the phone's developer tools) open. | Everyone stays connected and sees everyone else move smoothly. The host keeps a steady frame rate and its network upload stays under about 1 MB/s. The scoreboard's Ping column shows each player's round trip, "host" for the host. |
+
 ## Phones, browsers and networks
 
 Why manual: each combination is a different real device or program.

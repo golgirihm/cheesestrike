@@ -67,8 +67,11 @@ func test_the_state_survives_the_trip_to_other_players() -> void:
 
 
 func test_a_malformed_state_gives_what_it_can() -> void:
-	var copy := MatchState.from_dict({"players": [{"id": 3, "name": 7}, "junk", {"id": 4, "name": "Edam"}]})
-	assert_eq(copy.name_of(3), PlayerName.FALLBACK)
+	var good := PlayerRecord.new(4)
+	good.name = "Edam"
+	var packed := good.to_packed()
+	var copy := MatchState.from_dict({"players": [[7, packed[1]], "junk", packed, ["Short", PackedInt32Array([3, 2])]]})
+	assert_eq(copy.players.size(), 1)
 	assert_eq(copy.name_of(4), "Edam")
 	assert_eq(MatchState.from_dict({"players": "nope"}).players.size(), 0)
 	assert_eq(MatchState.from_dict({}).players.size(), 0)
@@ -225,3 +228,52 @@ func test_carried_weapons_survive_the_trip_and_nonsense_is_dropped() -> void:
 	var odd := PlayerRecord.from_dict({"id": 3, "weapons": ["spoon", 4], "weapon": "spoon"})
 	assert_eq(odd.weapons, [Weapons.STARTING])
 	assert_eq(odd.weapon, Weapons.STARTING)
+
+
+func test_every_part_of_a_record_survives_packing() -> void:
+	var record := PlayerRecord.new(1987654321)
+	record.name = "Packed Paneer"
+	record.health = 37
+	record.alive = false
+	record.respawn_in = 2.345
+	record.protected_for = 1.5
+	record.kills = 12
+	record.deaths = 9
+	record.last_attacker = 1234567
+	record.weapons = ["blaster", "grater", "launcher"]
+	record.weapon = "grater"
+	record.team = MatchState.BRIE
+	record.overload = 66.25
+	record.overload_left = 4.5
+	record.melted_for = 0.75
+	record.ping = 123
+	var copy := PlayerRecord.from_packed(bytes_to_var(var_to_bytes(record.to_packed())))
+	assert_eq(copy.to_dict(), record.to_dict())
+
+
+func test_a_packed_record_with_nonsense_is_set_right() -> void:
+	var numbers := PackedInt32Array()
+	numbers.resize(15)
+	numbers.fill(-5)
+	var copy := PlayerRecord.from_packed(["X", numbers])
+	assert_eq(copy.health, 0)
+	assert_eq(copy.respawn_in, 0.0)
+	assert_eq(copy.team, MatchState.NO_TEAM)
+	assert_eq(copy.overload, 0.0)
+	assert_has(Weapons.ORDER, copy.weapon)
+	assert_true(copy.weapons.has(copy.weapon))
+	assert_null(PlayerRecord.from_packed("nope"))
+
+
+func test_a_full_session_is_small_enough_to_send_often() -> void:
+	# The host sends this to each of up to fifteen others, up to ten times a
+	# second; at this size that is under 400 kB/s in all.
+	var full := MatchState.new()
+	full.set_pickup_count(6)
+	for i in MatchSettings.MAX_PLAYERS:
+		var record := full.add_player(2000000000 + i)
+		record.name = "Mozzarella %d" % i
+		record.weapons = ["blaster", "shotgun", "grater", "launcher"]
+		record.respawn_in = 1.234
+		record.overload = 55.5
+	assert_lt(var_to_bytes(full.to_dict()).size(), 2500)
