@@ -37,8 +37,9 @@ VERSIONS = ROOT / "tools" / "versions.env"
 REQUIREMENTS = [ROOT / "signaling" / "requirements.txt", ROOT / "browser_tests" / "requirements.txt"]
 BROWSER_TESTS = ROOT / "browser_tests"
 BROWSER_BUILD = ROOT / "build" / "browser-tests"
-# How many browsers run tests at once. CI's machines have four processors.
-BROWSER_WORKERS = 4
+# How many browsers run tests at once: one per processor, which is four on
+# CI's machines. The tests are limited by processor time, so more wouldn't help.
+BROWSER_WORKERS = os.cpu_count() or 4
 
 warnings = []
 
@@ -175,8 +176,7 @@ def browser(pins):
 
 def run_browser_tests():
     """Runs the browser tests several at a time, each group in a process with
-    a browser of its own. They spend most of their time waiting on the game,
-    so this takes about half as long as running them one after another."""
+    a browser of its own."""
     sys.path.insert(0, str(BROWSER_TESTS))
     tests = []
 
@@ -200,6 +200,8 @@ def run_browser_tests():
         subprocess.Popen(
             [sys.executable, "-m", "unittest", "-v", *group],
             cwd=BROWSER_TESTS,
+            # So that the game's text, such as "…", survives the pipe.
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -228,6 +230,8 @@ def main():
     if unknown:
         parser.error(f"unknown suite: {', '.join(unknown)}")
 
+    # Test output can hold characters the terminal's encoding lacks.
+    sys.stdout.reconfigure(errors="replace")
     pins = pinned_versions()
     check_python(pins)
 

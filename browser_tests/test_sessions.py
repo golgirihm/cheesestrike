@@ -66,9 +66,18 @@ class JoiningTest(GameTestCase):
         other = self.open_game()
         other.wait_for(f"s.sessions.length === 1 && s.sessions[0].text.startsWith('{code}')")
         host.close()
-        # The list is only asked for on request, so keep asking until it's gone.
-        other.click("RefreshButton")
-        other.wait_for(f"s.sessions.length === 1 && s.sessions[0].text === '{NO_SESSIONS}'")
+        # The list only updates on request, and a request can reach the server
+        # before it has noticed the host leave, so keep asking.
+        gone = f"s.sessions.length === 1 && s.sessions[0].text === '{NO_SESSIONS}'"
+        for attempt in range(20):
+            other.click("RefreshButton")
+            try:
+                other.wait_for(gone, timeout=1_000)
+                break
+            except AssertionError:
+                continue
+        else:
+            self.fail("the closed session stayed in the list")
 
     def test_an_empty_code_is_refused(self):
         game = self.open_game()
