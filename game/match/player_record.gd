@@ -20,6 +20,8 @@ var deaths := 0
 var last_attacker := 0
 ## The weapon in their hands.
 var weapon := Weapons.STARTING
+## Their team in a team match, or MatchState.NO_TEAM.
+var team := -1
 
 
 func _init(player_id := 0) -> void:
@@ -42,6 +44,7 @@ func to_dict() -> Dictionary:
 		"deaths": deaths,
 		"last_attacker": last_attacker,
 		"weapon": weapon,
+		"team": team,
 	}
 
 
@@ -58,6 +61,7 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.deaths = _int(data, "deaths", record.deaths)
 	record.last_attacker = _int(data, "last_attacker", record.last_attacker)
 	record.weapon = _string(data, "weapon", record.weapon)
+	record.team = clampi(_int(data, "team", record.team), -1, 1)
 	return record
 
 

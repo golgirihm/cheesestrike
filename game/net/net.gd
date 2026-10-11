@@ -48,13 +48,13 @@ func _ready() -> void:
 		JavaScriptBridge.get_interface("document").addEventListener("visibilitychange", _visibility_callback)
 
 
-func host() -> void:
+func host(settings := MatchSettings.new()) -> void:
 	_connecting = true
 	if use_webrtc:
-		_send({"type": "host"})
+		_send({"type": "host", "settings": settings.to_dict()})
 		return
 	var enet := ENetMultiplayerPeer.new()
-	if enet.create_server(ENET_PORT, MAX_PLAYERS - 1) != OK:
+	if enet.create_server(ENET_PORT, settings.max_players - 1) != OK:
 		_fail("Couldn't open port %d." % ENET_PORT)
 		return
 	multiplayer.multiplayer_peer = enet

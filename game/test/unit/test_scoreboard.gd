@@ -56,3 +56,28 @@ func test_the_board_shows_a_heading_and_a_row_per_player() -> void:
 	board.show_state(state, 1)
 	assert_eq(board.rows_shown()[1], ["Edam", "7", "2"], "refilled, not added to")
 	assert_eq(board.rows_shown().size(), 3)
+
+
+func test_a_team_match_lists_each_team_under_its_score() -> void:
+	state = MatchState.new(MatchSettings.from_dict({"mode": "teams"}))
+	for id in [1, 2, 3, 4]:
+		state.add_player(id)
+		state.player(id).name = "P%d" % id
+	state.team_kills = [3, 5]
+	var board: PanelContainer = BOARD.new()
+	add_child_autofree(board)
+	board.show_state(state, 1)
+	var shown: Array = board.rows_shown()
+	assert_eq(shown[1], ["Cheddar", "3", ""])
+	assert_eq(shown.size(), 1 + 2 + 4, "a heading, two teams and four players")
+	var brie_at := shown.find(["Brie", "5", ""])
+	assert_eq(brie_at, 4, "Cheddar's two players come before Brie")
+
+
+func test_teams_come_first_in_the_rows() -> void:
+	state = MatchState.new(MatchSettings.from_dict({"mode": "teams"}))
+	for id in [1, 2]:
+		state.add_player(id)
+	state.player(2).kills = 9
+	var rows := BOARD.rows(state)
+	assert_eq(rows[0].team, MatchState.CHEDDAR)

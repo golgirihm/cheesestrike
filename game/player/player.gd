@@ -52,6 +52,9 @@ var weapon := WeaponState.new(Weapons.find(Weapons.STARTING))
 var alive := true
 
 var _mouse_fire_held := false
+var _body_material: StandardMaterial3D
+var _team := -2
+var _badge: MeshInstance3D
 # Presses noted as their events arrive, so that a click or tap that begins and
 # ends between two physics frames isn't missed.
 var _fire_pressed := false
@@ -64,14 +67,14 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
-	var id := name.to_int()
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color.from_hsv(fmod(id * 0.618034, 1.0), 0.65, 0.95)
-	body.material_override = material
+	_body_material = StandardMaterial3D.new()
+	body.material_override = _body_material
+	_show_team(MatchState.NO_TEAM)
 
 	_mine = is_multiplayer_authority()
 	set_physics_process(_mine)
 	set_process_input(_mine)
+	set_process_unhandled_input(_mine)
 	body.visible = not _mine
 	visor.visible = not _mine
 	name_tag.visible = not _mine
@@ -107,6 +110,48 @@ func _on_match_state_changed() -> void:
 	var own := record()
 	name_tag.text = match_.state.name_of(name.to_int())
 	_set_alive(own == null or own.alive)
+	_show_team(own.team if own != null else MatchState.NO_TEAM)
+
+
+## A player's own colour when not on a team: spread round the colour wheel by id.
+static func colour_for(id: int) -> Color:
+	return Color.from_hsv(fmod(id * 0.618034, 1.0), 0.65, 0.95)
+
+
+# Team colours on the body and name, and a badge over the head whose shape
+# also tells the teams apart: a wedge for Cheddar, a round wheel for Brie.
+func _show_team(team: int) -> void:
+	if team == _team:
+		return
+	_team = team
+	_body_material.albedo_color = TeamColors.of(team) if team != MatchState.NO_TEAM else colour_for(name.to_int())
+	name_tag.modulate = TeamColors.of(team)
+	if _badge != null:
+		_badge.queue_free()
+		_badge = null
+	if team == MatchState.NO_TEAM:
+		return
+	_badge = MeshInstance3D.new()
+	_badge.name = "TeamBadge"
+	var material := StandardMaterial3D.new()
+	material.albedo_color = TeamColors.of(team)
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if team == MatchState.CHEDDAR:
+		var wedge := PrismMesh.new()
+		wedge.size = Vector3(0.3, 0.26, 0.08)
+		wedge.material = material
+		_badge.mesh = wedge
+	else:
+		var wheel := CylinderMesh.new()
+		wheel.top_radius = 0.15
+		wheel.bottom_radius = 0.15
+		wheel.height = 0.08
+		wheel.material = material
+		_badge.mesh = wheel
+		_badge.rotation.x = PI / 2.0
+	_badge.position = Vector3(0, 2.5, 0)
+	_badge.visible = not _mine and alive
+	add_child(_badge)
 
 
 func _set_alive(now_alive: bool) -> void:
@@ -118,6 +163,8 @@ func _set_alive(now_alive: bool) -> void:
 		body.visible = alive
 		visor.visible = alive
 		name_tag.visible = alive
+		if _badge != null:
+			_badge.visible = alive
 	gun.visible = alive
 	if not alive:
 		_release_controls()
@@ -137,9 +184,6 @@ func _input(event: InputEvent) -> void:
 		elif event.pressed and captured and event.button_index == MOUSE_BUTTON_LEFT:
 			_mouse_fire_held = true
 			_fire_pressed = true
-		# Not while waiting on the host: the pointer is needed for its notice.
-		elif event.pressed and not captured and not Net.host_silent:
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		# A web build takes the movement from the browser instead; see WebPage.
 		if not OS.has_feature("web"):
@@ -175,10 +219,36 @@ func _process(_delta: float) -> void:
 			_look(page_to_view(moved, view, window, DisplayServer.screen_get_scale()) * MOUSE_SENSITIVITY)
 
 
+## Whether the in-game menu is open, so this player's controls are set aside.
+func _menu_open() -> bool:
+	var menu := get_tree().get_first_node_in_group("pause_menu")
+	return menu != null and menu.visible
+
+
+# Clicking the game takes the mouse. Handled after the interface has had the
+# click, so that clicking a button, such as the menu's, doesn't.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.device != InputEvent.DEVICE_ID_EMULATION:
+		# Not while waiting on the host or in the menu: the pointer is needed there.
+		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not Net.host_silent and not _menu_open():
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
 func _physics_process(delta: float) -> void:
 	if Net.host_silent:
 		return
 	weapon.tick(delta)
+	if _menu_open():
+		_release_controls()
+		_jump_pressed = false
+		_touch_jump = false
+		_reload_pressed = false
+		velocity.x = 0.0
+		velocity.z = 0.0
+		if not is_on_floor():
+			velocity += get_gravity() * delta
+		move_and_slide()
+		return
 	if not alive:
 		_jump_pressed = false
 		_touch_jump = false
@@ -250,6 +320,9 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 	var controls := _touch_controls()
 	if controls != null:
 		controls.notice_touch()
+	# A touch on the menu button or in the menu is the interface's, not a move.
+	if event.pressed and controls != null and controls.blocked_at(event.position):
+		return
 	if event.pressed:
 		var button: String = controls.button_at(event.position) if controls != null else ""
 		if button == "reload":

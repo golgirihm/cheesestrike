@@ -6,7 +6,7 @@ The plan for taking CheeseStrike from where it is now to a game people can play 
 
 ## Where the game is now
 
-Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. There is a crosshair, hit markers, a kill feed and a scoreboard, but no rounds, no winner and no sound yet.
+Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. Matches run to a kill limit or a time limit, free-for-all or in two teams (Cheddar and Brie), as the host chose on the menu, with a winner and then a fresh match; the session list shows each host's settings. There is a crosshair, hit markers, a kill feed, a scoreboard and an in-game menu, but only one weapon, one grey-box arena, capsules for players and no sound.
 
 Things about how it works that shape the plan:
 
@@ -28,21 +28,6 @@ Before there is much more game, make it possible for people on different network
 4. **Publish the web build.** A workflow that exports the web build on every push to `main` and deploys it to a static host (GitHub Pages or itch.io), so there is always a current build to share.
 5. **Version check on join.** Send the game's version with `host` and `join`, and have the signaling server refuse a join between different versions with a clear message ("This session is running an older version. Reload the page."). Once builds are deployed continuously, mismatched tabs will happen.
    *Tests:* signaling tests for the refusal; a browser test that the message reaches the menu.
-
-## Milestone 3: A match
-
-Turn shooting around into rounds with a winner.
-
-1. **Free-for-all deathmatch.** First to a kill limit, or most kills when the time runs out. A match timer on the HUD, an end screen with the scoreboard and the winner, and a new match starting automatically after a short break. Put the match rules in a plain class.
-   *Tests:* GUT tests for the rules, including ties and a player leaving mid-match. Browser test for a full short match with a low kill limit.
-2. **Joining mid-match.** A late joiner gets the current scores, time and everyone's health, not just positions, and spawns straight into the match.
-   *Tests:* extend the existing late-joiner browser test.
-3. **Host match settings.** Before hosting, choose the kill limit, time limit and maximum players; show them in the session list.
-   *Tests:* signaling tests if the session list carries them; browser test for a setting taking effect.
-4. **Team deathmatch: Cheddar versus Brie.** Two teams with team colors that don't rely on color alone (an outline or icon too), balanced on join, no friendly fire, and team scores.
-   *Tests:* GUT tests for team assignment and the friendly-fire rule.
-5. **An in-game menu.** Esc (or Start, or a corner button on touch) opens a menu with Resume, Settings and Leave, so leaving no longer means closing the tab. Esc currently only releases the mouse; keep that as the first press.
-   *Tests:* browser test for leaving through the menu.
 
 ## Milestone 4: Gouda Overload
 

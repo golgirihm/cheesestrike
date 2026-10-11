@@ -59,6 +59,15 @@ func button_at(point: Vector2) -> String:
 	return ""
 
 
+## Whether `point` is on an interface control that takes touches itself, such
+## as the menu button, so the touch shouldn't move or turn the player.
+func blocked_at(point: Vector2) -> bool:
+	for node in get_tree().get_nodes_in_group("touch_blockers"):
+		if node is Control and node.is_visible_in_tree() and node.get_global_rect().has_point(point):
+			return true
+	return false
+
+
 func _draw() -> void:
 	if not shown:
 		return

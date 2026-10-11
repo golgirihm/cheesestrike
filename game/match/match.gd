@@ -22,6 +22,9 @@ signal shot_shown(shooter: int, ends: Array)
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
 
 const SYNC_INTERVAL := 0.1
+## The host sends the state at least this often, even unchanged, so that
+## everyone's clocks stay in step with its own.
+const RESYNC_INTERVAL := 2.0
 ## Physics layer of the arena's walls, floor and cover, which stop shots.
 const WORLD_MASK := 1
 
@@ -41,10 +44,11 @@ var _dirty := false
 var _since_sync := 0.0
 
 
-func start() -> void:
+## Begins the session's matches; on the host, with `settings`.
+func start(settings := MatchSettings.new()) -> void:
 	# A player other than the host keeps whatever the host has already sent.
 	if is_host():
-		state = MatchState.new()
+		state = MatchState.new(settings)
 		_pending_names.clear()
 		_rules.clear()
 		state_changed.emit()
@@ -115,11 +119,18 @@ func _process(delta: float) -> void:
 	_clock += delta
 	# Everyone runs the clocks, so countdowns show smoothly between updates;
 	# only the host acts on them.
+	var was_playing := state.is_playing()
 	var due := state.tick(delta)
 	if is_host():
 		for id in due:
 			_respawn(id)
+		if was_playing != state.is_playing():
+			_changed()
+		if state.match_due():
+			_new_match()
 	_since_sync += delta
+	if _since_sync >= RESYNC_INTERVAL:
+		_dirty = true
 	if _dirty and _since_sync >= SYNC_INTERVAL and is_host():
 		_dirty = false
 		_since_sync = 0.0
@@ -254,16 +265,32 @@ func _reload(id: int) -> void:
 		_rules_for(id).reload(weapon, _clock)
 
 
-## The host brings a knocked-out player back, at the spot farthest from
-## everyone else.
+## The host brings a knocked-out player back, at the spot farthest from the
+## players who could hurt them.
 func _respawn(id: int) -> void:
 	var others: Array[Vector3] = []
 	for node: Node3D in world.players.get_children():
 		var other := state.player(node.name.to_int())
-		if other != null and other.id != id and other.alive:
+		if other != null and other.id != id and other.alive and not state.are_allies(id, other.id):
 			others.append(node.global_position)
 	var spots: Array[Vector3] = world.spawn_positions()
-	var at := spots[SpawnChooser.farthest(spots, others)]
+	_bring_back(id, spots[SpawnChooser.farthest(spots, others)])
+
+
+## The host starts the next match, with everyone back in play at a spot of
+## their own.
+func _new_match() -> void:
+	state.start_match()
+	var spots: Array[Vector3] = world.spawn_positions()
+	spots.shuffle()
+	var index := 0
+	for id: int in state.players:
+		_bring_back(id, spots[index % spots.size()])
+		index += 1
+	_changed()
+
+
+func _bring_back(id: int, at: Vector3) -> void:
 	state.respawn(id)
 	_rules_for(id).refill()
 	_changed()

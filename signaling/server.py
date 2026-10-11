@@ -8,12 +8,12 @@ Protocol: JSON text frames over WebSocket.
 
   client -> server
     {"type": "list"}
-    {"type": "host"}
+    {"type": "host", "settings": {...}}              settings optional; see below
     {"type": "join", "code": "ABCD"}
     {"type": "offer" | "answer" | "candidate", "to": <peer id>, ...}
 
   server -> client
-    {"type": "sessions", "sessions": [{"code": "ABCD", "players": 3}]}
+    {"type": "sessions", "sessions": [{"code": "ABCD", "players": 3, "settings": {...}}]}
     {"type": "hosted", "code": "ABCD"}               to the host
     {"type": "joined", "code": "ABCD", "id": <id>}   to the joiner
     {"type": "peer_joined" | "peer_left", "id": <id>}  to the host
@@ -22,11 +22,18 @@ Protocol: JSON text frames over WebSocket.
     {"type": "error", "message": "..."}
 
 The host is always peer 1. Joiners only ever exchange messages with the host.
+
+A host's settings are how its matches are set up, which players see in the list
+before joining: {"mode": "ffa" | "teams", "kill_limit": n, "minutes": n,
+"max_players": n}. The server only checks them and passes them on, apart from
+max_players, which it enforces. Anything missing or out of range is replaced by
+the default, as the game itself does.
 """
 
 import argparse
 import asyncio
 import json
+import math
 import random
 
 from websockets.asyncio.server import serve
@@ -38,12 +45,33 @@ MAX_SESSIONS = 1000
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # no I or O
 CODE_LENGTH = 4
 RELAYED = ("offer", "answer", "candidate")
+MODES = ("ffa", "teams")
+DEFAULT_SETTINGS = {"mode": "ffa", "kill_limit": 20, "minutes": 8, "max_players": MAX_PLAYERS}
+# Allowed range of each number in a host's settings.
+SETTING_RANGES = {"kill_limit": (1, 999), "minutes": (1, 60), "max_players": (2, MAX_PLAYERS)}
+
+
+def clean_settings(given):
+    """A host's settings with anything missing, of the wrong kind or out of
+    range replaced by the default."""
+    settings = dict(DEFAULT_SETTINGS)
+    if not isinstance(given, dict):
+        return settings
+    if given.get("mode") in MODES:
+        settings["mode"] = given["mode"]
+    for key, (low, high) in SETTING_RANGES.items():
+        value = given.get(key)
+        # bool is an int to Python, but not a number of anything here.
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+            settings[key] = max(low, min(high, int(value)))
+    return settings
 
 
 class Session:
-    def __init__(self, code, host):
+    def __init__(self, code, host, settings=None):
         self.code = code
         self.peers = {HOST_ID: host}  # peer id -> websocket
+        self.settings = clean_settings(settings)
 
 
 sessions = {}  # code -> Session
@@ -76,14 +104,14 @@ async def handle(ws):
                 continue
 
             if kind == "list":
-                listing = [{"code": s.code, "players": len(s.peers)} for s in sessions.values()]
+                listing = [{"code": s.code, "players": len(s.peers), "settings": s.settings} for s in sessions.values()]
                 await send(ws, type="sessions", sessions=listing)
 
             elif kind == "host" and session is None:
                 if len(sessions) >= MAX_SESSIONS:
                     await send(ws, type="error", message="The session server is full.")
                     continue
-                session = Session(new_code(), ws)
+                session = Session(new_code(), ws, msg.get("settings"))
                 peer_id = HOST_ID
                 sessions[session.code] = session
                 print(f"[{session.code}] hosted")
@@ -94,7 +122,7 @@ async def handle(ws):
                 if target is None:
                     await send(ws, type="error", message="No session with that code.")
                     continue
-                if len(target.peers) >= MAX_PLAYERS:
+                if len(target.peers) >= target.settings["max_players"]:
                     await send(ws, type="error", message="That session is full.")
                     continue
                 session = target

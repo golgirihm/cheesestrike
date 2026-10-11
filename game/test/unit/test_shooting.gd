@@ -209,3 +209,43 @@ func test_a_knock_out_is_announced_with_both_names() -> void:
 		_shoot(shooter, Vector3(0, 1.65, -5))
 	assert_signal_emit_count(match_, "knocked_out", 1)
 	assert_signal_emitted_with_parameters(match_, "knocked_out", ["Shooter", "Target", "blaster", true])
+
+
+func _teams() -> void:
+	match_.start(MatchSettings.from_dict({"mode": "teams", "kill_limit": 3}))
+
+
+func test_teammates_shots_pass_without_hurting() -> void:
+	_teams()
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(10, 0, 0))
+	_add(3, Vector3(0, 0, -5))
+	assert_eq(match_.state.player(1).team, match_.state.player(3).team, "1 and 3 share a team")
+	_shoot(shooter, Vector3(0, 1.0, -5))
+	assert_eq(match_.state.player(3).health, 100)
+
+
+func test_a_new_match_brings_everyone_back_with_scores_cleared() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	for i in 3:
+		_shoot(shooter, Vector3(0, 1.65, -5))
+	match_.state.end_match()
+	match_._process(MatchState.INTERMISSION + 0.01)
+	assert_true(match_.state.is_playing())
+	for id in [1, 2]:
+		var record := match_.state.player(id)
+		assert_true(record.alive)
+		assert_eq(record.kills, 0)
+		assert_eq(record.deaths, 0)
+		assert_true(record.is_protected())
+
+
+func test_the_match_ends_when_the_kill_limit_is_reached() -> void:
+	match_.start(MatchSettings.from_dict({"kill_limit": 1}))
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	for i in 3:
+		_shoot(shooter, Vector3(0, 1.65, -5))
+	assert_false(match_.state.is_playing())
+	assert_eq(match_.state.winners, [1] as Array[int])
