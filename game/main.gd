@@ -27,6 +27,7 @@ extends Node
 @onready var disconnected_notice: Control = %DisconnectedNotice
 @onready var disconnected_detail: Label = %DisconnectedDetail
 @onready var disconnected_button: Button = %DisconnectedButton
+@onready var rejoin_button: Button = %RejoinButton
 @onready var menu_button: Button = %MenuButton
 @onready var pause_menu: Control = %PauseMenu
 @onready var resume_button: Button = %ResumeButton
@@ -47,6 +48,7 @@ func _ready() -> void:
 	Net.host_silent_changed.connect(_on_host_silent_changed)
 	leave_button.pressed.connect(Net.leave)
 	disconnected_button.pressed.connect(_dismiss_disconnected)
+	rejoin_button.pressed.connect(_rejoin)
 	host_button.pressed.connect(_host)
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
 	target_edit.text_submitted.connect(_join)
@@ -212,8 +214,21 @@ func _on_session_ended(reason: String) -> void:
 		return
 	hud.hide()
 	disconnected_detail.text = reason
+	rejoin_button.visible = can_rejoin(reason, Net.last_joined)
 	disconnected_notice.show()
 	disconnected_button.grab_focus()
+
+
+## Whether a player who lost their session for `reason` can try joining it
+## again: a joiner whose connection failed, not one whose host closed it.
+static func can_rejoin(reason: String, joined: String) -> bool:
+	return not joined.is_empty() and not reason.is_empty() and reason != "The host closed the session."
+
+
+func _rejoin() -> void:
+	disconnected_notice.hide()
+	menu.show()
+	_join(Net.last_joined)
 
 
 func _dismiss_disconnected() -> void:

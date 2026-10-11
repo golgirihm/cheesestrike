@@ -22,6 +22,9 @@ const ICE_SERVERS := [{"urls": ["stun:stun.l.google.com:19302"]}]
 var use_webrtc := OS.has_feature("web")
 var in_session := false
 var room_code := ""
+## The session this player last joined, as given to join(), kept after
+## leaving so they can rejoin it.
+var last_joined := ""
 ## True while nothing is being heard from the host; see HostWatch. The game
 ## holds still until the host is heard from again or the session ends.
 var host_silent := false
@@ -49,6 +52,7 @@ func _ready() -> void:
 
 
 func host(settings := MatchSettings.new()) -> void:
+	last_joined = ""
 	_connecting = true
 	if use_webrtc:
 		_send({"type": "host", "settings": settings.to_dict()})
@@ -65,6 +69,7 @@ func host(settings := MatchSettings.new()) -> void:
 ## `target` is a session code on WebRTC, or an address on ENet.
 func join(target: String) -> void:
 	target = target.strip_edges()
+	last_joined = target
 	_connecting = true
 	_join_deadline = Time.get_unix_time_from_system() + JOIN_TIMEOUT
 	if use_webrtc:

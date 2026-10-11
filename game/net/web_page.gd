@@ -191,3 +191,33 @@ static func take_mouse_movement() -> Vector2:
 		return Vector2.ZERO
 	var parts: PackedStringArray = moved.split(" ")
 	return Vector2(parts[0].to_float(), parts[1].to_float()) if parts.size() == 2 else Vector2.ZERO
+
+
+static var _native_key := ""
+
+
+## A key that stays the same for this tab, through reloads, but differs between
+## tabs: in a browser, kept in the tab's session storage; natively, made once
+## per run. The host uses it to know a player who comes back after losing
+## their connection.
+static func player_key() -> String:
+	if OS.has_feature("web"):
+		var key: Variant = JavaScriptBridge.eval("""(() => {
+			try {
+				let key = sessionStorage.getItem('cheeseStrikeKey');
+				if (!key) {
+					key = Math.random().toString(36).slice(2) + Date.now().toString(36);
+					sessionStorage.setItem('cheeseStrikeKey', key);
+				}
+				return key;
+			} catch (error) {
+				return '';
+			}
+		})()""", true)
+		if key is String and not key.is_empty():
+			return key
+	if _native_key.is_empty():
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		_native_key = "%x%x" % [rng.randi(), rng.randi()]
+	return _native_key

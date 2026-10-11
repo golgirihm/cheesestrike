@@ -74,5 +74,50 @@ class NetworkTest(GameTestCase):
         self.assertEqual(host.state()["put_backs"], 0)
 
 
+class ReconnectTest(GameTestCase):
+    def test_a_player_who_reloads_and_rejoins_keeps_their_score(self):
+        host = self.open_game()
+        code = host.host()
+        joiner = self.open_game()
+        joiner.join(code)
+        old_id = joiner.own_player()["id"]
+        host.wait_for("s.players.length === 2")
+        host.page.wait_for_timeout(500)
+        host.capture_mouse()
+        host.page.mouse.down()
+        host.wait_for(f"s.players.some((p) => p.id === {old_id} && p.deaths >= 1)")
+        host.page.mouse.up()
+        deaths = host.player(old_id)["deaths"]
+
+        joiner.page.reload()
+        joiner.wait_for("s.screen === 'menu'")
+        host.wait_for(f"!s.players.some((p) => p.id === {old_id})")
+        joiner.join(code)
+        new_id = joiner.own_player()["id"]
+        self.assertNotEqual(new_id, old_id)
+        host.wait_for(f"s.players.some((p) => p.id === {new_id} && p.deaths === {deaths})")
+
+    def test_a_different_player_does_not_take_anyones_score(self):
+        host = self.open_game()
+        code = host.host()
+        joiner = self.open_game()
+        joiner.join(code)
+        old_id = joiner.own_player()["id"]
+        host.wait_for("s.players.length === 2")
+        host.page.wait_for_timeout(500)
+        host.capture_mouse()
+        host.page.mouse.down()
+        host.wait_for(f"s.players.some((p) => p.id === {old_id} && p.deaths >= 1)")
+        host.page.mouse.up()
+        joiner.close()
+        host.wait_for(f"!s.players.some((p) => p.id === {old_id})")
+
+        stranger = self.open_game()
+        stranger.join(code)
+        new_id = stranger.own_player()["id"]
+        state = host.wait_for(f"s.players.some((p) => p.id === {new_id})")
+        self.assertEqual(next(p for p in state["players"] if p["id"] == new_id)["deaths"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

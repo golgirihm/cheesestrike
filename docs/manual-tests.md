@@ -141,6 +141,7 @@ Why manual: these depend on real connection loss, which behaves differently from
 | LOST-06 | Host comes back | As LOST-04 | 1. Within a few seconds, switch back to the browser on the phone. | The notice disappears on the PC and both players can move again. Clicking in the game captures the mouse as before. |
 | LOST-07 | Leave while waiting | As LOST-04 | 1. While the notice is showing, click "Leave". | The PC returns to the menu with no "Disconnected" notice. |
 | LOST-08 | Host loses its network | Phone and PC; host on the phone, join on the PC | 1. Turn off Wi-Fi on the phone and leave it off. | The PC shows "Waiting for host…" within about two seconds. Within about a minute it shows "Disconnected". |
+| LOST-10 | Rejoining after a dropped connection | Phone and PC; host on the PC, join on the phone | 1. Knock the phone's player out once.<br>2. Turn off Wi-Fi on the phone until it shows "Disconnected", then turn it back on.<br>3. Tap Rejoin. | The notice offers Rejoin (it doesn't when the host closed the session). Rejoining puts the phone back in the same session, and the scoreboard still counts the earlier knock-out against it. |
 | LOST-09 | Joining a host that is away | Phone and PC; host on the phone | 1. Switch the phone to another app.<br>2. On the PC, refresh the list and join the session. | The PC shows "Joining…" and, after about 30 seconds, returns to the menu with "Timed out connecting to the host." |
 
 ## Load

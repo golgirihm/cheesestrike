@@ -70,6 +70,11 @@ var _projectiles := {}
 var _next_projectile := 1
 # Names asked for by players the host hasn't seen join yet, by player id.
 var _pending_names := {}
+# Each player's key (see WebPage.player_key), by id, including keys sent
+# before the host saw the player join; and the records of players who left,
+# by key, kept for a while in case they come back.
+var _keys := {}
+var _departed := {}
 var _dirty := false
 var _since_sync := 0.0
 # Whether this machine has the host's decisions yet: at once on the host, and
@@ -85,6 +90,8 @@ func start(settings := MatchSettings.new()) -> void:
 		_has_state = true
 		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
 		_pending_names.clear()
+		_keys.clear()
+		_departed.clear()
 		_rules.clear()
 		_projectiles.clear()
 		_histories.clear()
@@ -111,6 +118,11 @@ func is_host() -> bool:
 	return multiplayer.multiplayer_peer != null and multiplayer.is_server()
 
 
+## Seconds the host keeps a departed player's score, for if they come back.
+const REJOIN_WINDOW := 120.0
+const MAX_KEY_LENGTH := 64
+
+
 ## Host only: a player has joined the session.
 func add_player(id: int) -> void:
 	state.add_player(id)
@@ -119,11 +131,18 @@ func add_player(id: int) -> void:
 	elif _pending_names.has(id):
 		state.rename(id, _pending_names[id])
 	_pending_names.erase(id)
+	if _keys.has(id):
+		_welcome_back(id)
 	_changed()
 
 
-## Host only: a player has left.
+## Host only: a player has left. Their score is kept for a while, in case
+## they come back.
 func remove_player(id: int) -> void:
+	var record := state.player(id)
+	if record != null and _keys.has(id):
+		_departed[_keys[id]] = {"record": record, "at": now()}
+	_keys.erase(id)
 	state.remove_player(id)
 	_pending_names.erase(id)
 	_rules.erase(id)
@@ -134,12 +153,42 @@ func remove_player(id: int) -> void:
 	_changed()
 
 
-## Tells the host what this player wants to be called.
-func introduce(wanted: String) -> void:
+## Tells the host what this player wants to be called, and the key by which
+## the host can know them if they come back after losing their connection.
+func introduce(wanted: String, key := WebPage.player_key()) -> void:
 	if is_host():
 		_rename(1, wanted)
 	elif multiplayer.multiplayer_peer != null:
-		_introduce.rpc_id(1, wanted)
+		_introduce.rpc_id(1, wanted, key)
+
+
+## Host only: a player whose key is `key` has said who they are. If they left
+## lately, their score is theirs again.
+func _known_as(id: int, key: String) -> void:
+	if key.is_empty() or key.length() > MAX_KEY_LENGTH or _keys.values().has(key):
+		return
+	_keys[id] = key
+	if state.player(id) != null:
+		_welcome_back(id)
+
+
+func _welcome_back(id: int) -> void:
+	var cutoff := now() - REJOIN_WINDOW
+	for key: String in _departed.keys():
+		if _departed[key].at < cutoff:
+			_departed.erase(key)
+	var key: String = _keys[id]
+	if not _departed.has(key):
+		return
+	var old: PlayerRecord = _departed[key].record
+	_departed.erase(key)
+	var record := state.player(id)
+	record.kills = old.kills
+	record.deaths = old.deaths
+	record.overload = old.overload
+	if old.team != MatchState.NO_TEAM:
+		record.team = old.team
+	_changed()
 
 
 ## This player fires `weapon` from `origin` along `direction`. `seed` decides
@@ -624,6 +673,8 @@ func _respawn(id: int) -> void:
 ## The host starts the next match, with everyone back in play at a spot of
 ## their own.
 func _new_match() -> void:
+	# Scores start again, so there are none to give back.
+	_departed.clear()
 	state.start_match()
 	var spots: Array[Vector3] = world.spawn_positions()
 	spots.shuffle()
@@ -674,9 +725,14 @@ func _request_select(weapon: Variant) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _introduce(wanted: Variant) -> void:
-	if is_host() and wanted is String:
-		_rename(multiplayer.get_remote_sender_id(), wanted)
+func _introduce(wanted: Variant, key: Variant = "") -> void:
+	if not is_host():
+		return
+	var id := multiplayer.get_remote_sender_id()
+	if key is String:
+		_known_as(id, key)
+	if wanted is String:
+		_rename(id, wanted)
 
 
 @rpc("authority", "call_remote", "reliable")
