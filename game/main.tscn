@@ -39,6 +39,21 @@ theme_override_font_sizes/font_size = 26
 text = "CheeseStrike: Gouda Overload"
 horizontal_alignment = 1
 
+[node name="NameRow" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="UI/Menu/Panel/Margin/Rows/NameRow"]
+layout_mode = 2
+text = "Your name"
+
+[node name="NameEdit" type="LineEdit" parent="UI/Menu/Panel/Margin/Rows/NameRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+max_length = 16
+select_all_on_focus = true
+
 [node name="HostButton" type="Button" parent="UI/Menu/Panel/Margin/Rows"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)

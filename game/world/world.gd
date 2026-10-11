@@ -8,6 +8,7 @@ const PLAYER := preload("res://player/player.tscn")
 @onready var spawn_points: Node3D = $SpawnPoints
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var menu_camera: Camera3D = $MenuCamera
+@onready var match_: Node = $Match
 
 # Which starting spot each player holds. Only the host uses it.
 var _spawn_slots: SpawnSlots
@@ -19,10 +20,12 @@ func _ready() -> void:
 
 func start() -> void:
 	if not multiplayer.is_server():
+		match_.start()
 		return
 	_spawn_slots = SpawnSlots.new(spawn_points.get_child_count())
 	multiplayer.peer_connected.connect(_add_player)
 	multiplayer.peer_disconnected.connect(_remove_player)
+	match_.start()
 	_add_player(1)
 
 
@@ -32,16 +35,19 @@ func stop() -> void:
 		multiplayer.peer_disconnected.disconnect(_remove_player)
 	for player in players.get_children():
 		player.queue_free()
+	match_.stop()
 	menu_camera.make_current()
 
 
 func _add_player(id: int) -> void:
+	match_.add_player(id)
 	spawner.spawn([id, _spawn_slots.assign(id)])
 	print("player joined: %d (%d in session)" % [id, players.get_child_count()])
 
 
 func _remove_player(id: int) -> void:
 	_spawn_slots.release(id)
+	match_.remove_player(id)
 	var player := players.get_node_or_null(str(id))
 	if player != null:
 		player.queue_free()
@@ -53,5 +59,6 @@ func _remove_player(id: int) -> void:
 func _create_player(data: Array) -> Node:
 	var player := PLAYER.instantiate()
 	player.name = str(data[0])
+	player.match_ = match_
 	player.spawn_position = spawn_points.get_child(data[1]).global_position
 	return player

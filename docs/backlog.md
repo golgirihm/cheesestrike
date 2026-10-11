@@ -28,8 +28,6 @@ Before there is much more game, make it possible for people on different network
 4. **Publish the web build.** A workflow that exports the web build on every push to `main` and deploys it to a static host (GitHub Pages or itch.io), so there is always a current build to share.
 5. **Version check on join.** Send the game's version with `host` and `join`, and have the signaling server refuse a join between different versions with a clear message ("This session is running an older version. Reload the page."). Once builds are deployed continuously, mismatched tabs will happen.
    *Tests:* signaling tests for the refusal; a browser test that the message reaches the menu.
-6. **Player names.** A name box on the menu, remembered between visits, shown above each character and on the scoreboard once there is one. Limit the length and strip control characters on the host.
-   *Tests:* GUT test for the name cleaning; browser test that a joiner sees the host's name.
 
 ## Milestone 2: First shot
 

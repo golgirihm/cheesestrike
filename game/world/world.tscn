@@ -1,7 +1,8 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://world/world.gd" id="1_world"]
 [ext_resource type="PackedScene" path="res://world/cheese_block.tscn" id="2_block"]
+[ext_resource type="Script" path="res://match/match.gd" id="3_match"]
 
 [sub_resource type="Environment" id="Environment_sky"]
 background_mode = 1
@@ -177,3 +178,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0.1, 6)
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
 spawn_path = NodePath("../Players")
+
+[node name="Match" type="Node" parent="."]
+script = ExtResource("3_match")

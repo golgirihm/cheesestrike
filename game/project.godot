@@ -17,6 +17,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 [autoload]
 
 Net="*res://net/net.gd"
+Settings="*res://settings/settings.gd"
 
 [display]
 
