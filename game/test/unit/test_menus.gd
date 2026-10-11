@@ -8,7 +8,7 @@ var saved := {}
 
 
 func before_each() -> void:
-	for key in ["host_mode", "host_kill_limit", "host_minutes", "host_max_players", "host_map"]:
+	for key in ["host_mode", "host_kill_limit", "host_minutes", "host_max_players", "host_map", "host_private"]:
 		saved[key] = Settings.get_value(key)
 	main = MAIN.instantiate()
 	add_child_autofree(main)
@@ -44,6 +44,16 @@ func test_hosting_uses_the_chosen_settings() -> void:
 	Settings.set_value("host_max_players", 4)
 	Settings.set_value("host_map", "box")
 	assert_eq(main.host_settings().to_dict(), {"mode": "teams", "kill_limit": 50, "minutes": 15, "max_players": 4, "map": "box"})
+
+
+func test_the_private_button_switches_between_listed_and_invite_only() -> void:
+	Settings.set_value("host_private", false)
+	assert_eq(main.private_button.text, "Listed for everyone")
+	main.private_button.pressed.emit()
+	assert_true(Settings.get_value("host_private"))
+	assert_eq(main.private_button.text, "Private: invite only")
+	main.private_button.pressed.emit()
+	assert_false(Settings.get_value("host_private"))
 
 
 func test_a_session_reads_with_its_players_limit_and_mode() -> void:

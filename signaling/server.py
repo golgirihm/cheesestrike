@@ -8,7 +8,7 @@ Protocol: JSON text frames over WebSocket.
 
   client -> server
     {"type": "list"}
-    {"type": "host", "settings": {...}}              settings optional; see below
+    {"type": "host", "settings": {...}, "private": true}   both optional; see below
     {"type": "join", "code": "ABCD"}
     {"type": "offer" | "answer" | "candidate", "to": <peer id>, ...}
 
@@ -28,6 +28,9 @@ before joining: {"mode": "ffa" | "teams", "kill_limit": n, "minutes": n,
 "max_players": n, "map": "canyon" | "box"}. The server only checks them and passes them on, apart from
 max_players, which it enforces. Anything missing or out of range is replaced by
 the default, as the game itself does.
+
+A private session is left out of the list; players join it by its code, given
+to them by the host, usually in an invite link.
 """
 
 import argparse
@@ -71,10 +74,11 @@ def clean_settings(given):
 
 
 class Session:
-    def __init__(self, code, host, settings=None):
+    def __init__(self, code, host, settings=None, private=False):
         self.code = code
         self.peers = {HOST_ID: host}  # peer id -> websocket
         self.settings = clean_settings(settings)
+        self.private = private is True
 
 
 sessions = {}  # code -> Session
@@ -107,17 +111,17 @@ async def handle(ws):
                 continue
 
             if kind == "list":
-                listing = [{"code": s.code, "players": len(s.peers), "settings": s.settings} for s in sessions.values()]
+                listing = [{"code": s.code, "players": len(s.peers), "settings": s.settings} for s in sessions.values() if not s.private]
                 await send(ws, type="sessions", sessions=listing)
 
             elif kind == "host" and session is None:
                 if len(sessions) >= MAX_SESSIONS:
                     await send(ws, type="error", message="The session server is full.")
                     continue
-                session = Session(new_code(), ws, msg.get("settings"))
+                session = Session(new_code(), ws, msg.get("settings"), msg.get("private"))
                 peer_id = HOST_ID
                 sessions[session.code] = session
-                print(f"[{session.code}] hosted")
+                print(f"[{session.code}] hosted{' (private)' if session.private else ''}")
                 await send(ws, type="hosted", code=session.code)
 
             elif kind == "join" and session is None:
