@@ -1,6 +1,6 @@
 # Manual tests
 
-Behavior that the automated tests don't cover and that has to be checked by a person. The automated suites (`python tools/run_tests.py`) cover the rules for detecting a lost host, the signaling server's protocol and, by playing the game in headless browser windows, hosting, finding, joining and leaving sessions, a late joiner seeing everyone in place, and being told when the host closes the page. What a player sees and feels, input devices, real phones and other browsers are here.
+Behavior that the automated tests don't cover and that has to be checked by a person. The automated suites (`python tools/run_tests.py`) cover the rules for detecting a lost host, the signaling server's protocol and, by playing the game in headless browser windows, hosting, finding, joining and leaving sessions, a late joiner seeing everyone in place, being told when the host closes the page, players' names, and shooting: hits, damage, knock-outs, respawning and reloading. What a player sees and feels, input devices, real phones and other browsers are here.
 
 More of these could move to the browser tests in `browser_tests/`. A row is here either because it needs a person or real hardware, or because nobody has automated it yet.
 
@@ -43,6 +43,16 @@ Setup: two windows. Why manual: this checks what one player sees of another acro
 | PLR-04 | Starting spots | 1. Host in A, join in B.<br>2. Before moving, look at where each character is. | The two characters start in different places, each facing the middle of the arena. |
 | PLR-05 | Name tags | 1. Host in A, join in B, each with a different name.<br>2. Turn each view until the other character is visible, then walk away from it. | A name floats above the other character, readable from near and far and through walls, and turns to face you. Your own name is not shown over your own head. |
 
+## Combat
+
+Setup: two windows. Why manual: these check what the fighting looks and feels like; the automated tests check that hits, damage and score are right.
+
+| ID | Test | Steps | Expected |
+|---|---|---|---|
+| CMB-01 | The weapon in view | 1. Host in A, join in B.<br>2. In each, look at your own view, then at the other character. | Your own weapon shows at the lower right of your view and moves with it. The other character holds theirs in front of them. |
+| CMB-02 | Holding the trigger | 1. In A, click to take the mouse, then hold the left button for a few seconds while looking around. | Shots keep coming at a steady rate while the button is held, and stop when it is released. The view never jumps when you click or hold. |
+| CMB-03 | Knocked out and back | 1. In A, shoot B until B is knocked out, watching both windows. | In A, B's character disappears and you can walk through where it stood. In B, the view stops responding to movement and firing. A few seconds later B is back, at a spot far from A, and both can see each other again. |
+
 ## Input devices
 
 Why manual: these need physical hardware.
@@ -50,11 +60,13 @@ Why manual: these need physical hardware.
 | ID | Test | Setup | Steps | Expected |
 |---|---|---|---|---|
 | INP-01 | Gamepad | Two windows, a controller connected to the PC | 1. Enter a session and press any controller button.<br>2. Move the left stick.<br>3. Move the right stick.<br>4. Press the bottom face button (A on Xbox, B on Nintendo, Cross on PlayStation). | The left stick walks and the right stick looks, both with no drift when the sticks are at rest. The button jumps. |
+| INP-08 | Gamepad: fire and reload | As INP-01 | 1. Hold the right trigger.<br>2. Fire a few shots, then press the left face button (X on Xbox, Y on Nintendo, Square on PlayStation). | The trigger fires while held. The button reloads. |
 | INP-02 | Gamepad types | As INP-01, repeated with each controller you have: Xbox, PlayStation, Nintendo | Repeat INP-01. | Each controller behaves the same way. |
 | INP-03 | Touch: move | Phone and PC; join or host on the phone | 1. Put a thumb on the left half of the screen and drag. | The character walks in the direction of the drag, faster the further the thumb is from where it first touched, and stops when the thumb lifts. |
 | INP-04 | Touch: look | As INP-03 | 1. Drag on the right half of the screen. | The view follows the drag. |
 | INP-05 | Touch: jump | As INP-03 | 1. Tap the right half of the screen quickly. | The character jumps. A slow drag on the right half does not jump. |
 | INP-06 | Touch: both thumbs | As INP-03 | 1. Walk with the left thumb while looking with the right. | Both work at once and neither interrupts the other. |
+| INP-09 | Touch: fire and reload | As INP-03 | 1. Touch the screen once. Two round buttons, FIRE and R, appear at the lower right.<br>2. Hold FIRE, then lift.<br>3. Tap R.<br>4. Hold FIRE while dragging on the right half to look. | FIRE fires while held and stops when lifted. R reloads. Touching a button doesn't turn the view or jump, and looking still works while FIRE is held. |
 | INP-07 | Touch: menu | Phone and PC | 1. On the phone, use the menu to host, then reload and join by tapping a listed session and by typing a code. | Every button and the code box respond to taps, and the on-screen keyboard appears for the code box. |
 
 ## Background tabs and screen sleep

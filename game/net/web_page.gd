@@ -15,6 +15,15 @@ class_name WebPage
 ## and localhost, and drop it whenever the page is hidden, so it is re-requested
 ## each time the page comes back.
 ##
+## Mouse look: with the pointer locked, Chrome sometimes reports a movement the
+## mouse never made, as the pointer locks and with clicks after that: exactly
+## the size of the pointer's position on the page, as if measured from the
+## corner, sometimes along with the position reset to the corner. Taken as
+## real, it throws the view to a random angle. The game takes the mouse's
+## movement from here, gathered between frames, with those left out, rather
+## than from the engine, which passes them on. A real movement matching the
+## pointer's position to the pixel in both directions is next to impossible.
+##
 ## Raw mouse movement: with the mouse captured, Chrome on Windows now and then
 ## reports one movement hundreds of pixels long that the mouse never made, which
 ## throws the view to a different angle. That comes from how it re-centres the
@@ -107,7 +116,40 @@ const _SCRIPT := """
 		};
 	}
 
+	let lookX = 0;
+	let lookY = 0;
+	// Where the pointer last was on the page, by any mouse event.
+	let pointerX = 0;
+	let pointerY = 0;
+	const sameSize = (movement, position) => Math.abs(movement) === Math.abs(position);
+	document.addEventListener('mousemove', (event) => {
+		const lastX = pointerX;
+		const lastY = pointerY;
+		pointerX = event.clientX;
+		pointerY = event.clientY;
+		if (!document.pointerLockElement) return;
+		const moved = event.movementX !== 0 || event.movementY !== 0;
+		const phantom = moved && (
+			(sameSize(event.movementX, event.clientX) && sameSize(event.movementY, event.clientY))
+			|| (sameSize(event.movementX, lastX) && sameSize(event.movementY, lastY)));
+		if (phantom) return;
+		lookX += event.movementX;
+		lookY += event.movementY;
+	}, true);
+	for (const type of ['mousedown', 'mouseup']) {
+		document.addEventListener(type, (event) => {
+			pointerX = event.clientX;
+			pointerY = event.clientY;
+		}, true);
+	}
+
 	window.cheeseStrike = {
+		takeMouseMovement() {
+			const moved = lookX + ' ' + lookY;
+			lookX = 0;
+			lookY = 0;
+			return moved;
+		},
 		setKeepAlive(on) {
 			keepAlive = on;
 			stalled = false;
@@ -137,3 +179,15 @@ static func set_keep_alive(on: bool) -> void:
 static func set_wake_lock(on: bool) -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.cheeseStrike.setWakeLock(%s)" % ("true" if on else "false"), true)
+
+
+## How far the mouse has moved with the pointer locked since the last call, in
+## the page's own pixels. Always zero outside a web build.
+static func take_mouse_movement() -> Vector2:
+	if not OS.has_feature("web"):
+		return Vector2.ZERO
+	var moved: Variant = JavaScriptBridge.eval("window.cheeseStrike.takeMouseMovement()", true)
+	if not moved is String:
+		return Vector2.ZERO
+	var parts: PackedStringArray = moved.split(" ")
+	return Vector2(parts[0].to_float(), parts[1].to_float()) if parts.size() == 2 else Vector2.ZERO

@@ -1,0 +1,96 @@
+class_name HitScan
+## Where a shot goes and whom it hits, worked out from positions alone, without
+## the physics engine, so that the host can test a shot against where players
+## are (or, later, where they were) and so it can be tested on its own.
+##
+## A player's body is a vertical capsule standing on their position, the same
+## size as their collision shape; the top part of it counts as the head.
+
+const BODY_RADIUS := 0.4
+const BODY_HEIGHT := 1.8
+## Hits this high above the feet or higher are headshots.
+const HEAD_FROM := 1.4
+
+
+## How far along the ray from `origin` in direction `direction` (normalized) it
+## first touches the capsule standing at `feet`, or INF if it misses. A ray that
+## starts inside the capsule doesn't hit it.
+static func ray_capsule(origin: Vector3, direction: Vector3, feet: Vector3,
+		radius := BODY_RADIUS, height := BODY_HEIGHT) -> float:
+	var local := origin - feet
+	var bottom := radius
+	var top := height - radius
+	var nearest := INF
+
+	# The straight middle part: an upright cylinder, tested across the floor plane.
+	var a := direction.x * direction.x + direction.z * direction.z
+	var b := 2.0 * (local.x * direction.x + local.z * direction.z)
+	var c := local.x * local.x + local.z * local.z - radius * radius
+	if a > 1e-9:
+		var discriminant := b * b - 4.0 * a * c
+		if discriminant >= 0.0:
+			var t := (-b - sqrt(discriminant)) / (2.0 * a)
+			var y := local.y + t * direction.y
+			if t >= 0.0 and y >= bottom and y <= top:
+				nearest = t
+
+	# The rounded ends.
+	for centre_y: float in [bottom, top]:
+		var t := _ray_sphere(local - Vector3(0.0, centre_y, 0.0), direction, radius)
+		if t < nearest:
+			var y := local.y + t * direction.y
+			# Only the outer half of each end sphere is part of the capsule.
+			if (centre_y == bottom and y <= bottom) or (centre_y == top and y >= top):
+				nearest = t
+	return nearest
+
+
+## The first of `targets` (player id -> feet position) that the ray hits within
+## `max_distance`, as {id, distance, point, head}, or an empty dictionary.
+static func first_hit(origin: Vector3, direction: Vector3, max_distance: float, targets: Dictionary) -> Dictionary:
+	var best := {}
+	var best_distance := max_distance
+	for id: int in targets:
+		var feet: Vector3 = targets[id]
+		var t := ray_capsule(origin, direction, feet)
+		if t <= best_distance:
+			best_distance = t
+			var point := origin + direction * t
+			best = {"id": id, "distance": t, "point": point, "head": point.y - feet.y >= HEAD_FROM}
+	return best
+
+
+## The direction of each pellet of a shot aimed along `direction`, spread evenly
+## at random over a cone `spread_degrees` wide. The same `seed` always gives the
+## same directions, so the shooter and the host agree on where pellets went.
+static func pellet_directions(direction: Vector3, pellets: int, spread_degrees: float, seed: int) -> Array[Vector3]:
+	var result: Array[Vector3] = []
+	direction = direction.normalized()
+	if pellets <= 1 and spread_degrees <= 0.0:
+		result.append(direction)
+		return result
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var half_angle := deg_to_rad(spread_degrees) / 2.0
+	# Any two directions at right angles to the aim and to each other.
+	var side := direction.cross(Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT).normalized()
+	var up := side.cross(direction).normalized()
+	for i in maxi(pellets, 1):
+		# Uniform over the cone's opening, not bunched at its centre.
+		var off := half_angle * sqrt(rng.randf())
+		var around := rng.randf() * TAU
+		var tilt := (side * cos(around) + up * sin(around)) * tan(off)
+		result.append((direction + tilt).normalized())
+	return result
+
+
+static func _ray_sphere(local: Vector3, direction: Vector3, radius: float) -> float:
+	var b := local.dot(direction)
+	var c := local.dot(local) - radius * radius
+	if c <= 0.0:
+		return INF  # Starts inside.
+	var discriminant := b * b - c
+	if discriminant < 0.0:
+		return INF
+	var t := -b - sqrt(discriminant)
+	return t if t >= 0.0 else INF

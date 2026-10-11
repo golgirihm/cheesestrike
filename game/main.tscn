@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://world/world.tscn" id="2_world"]
 [ext_resource type="Script" path="res://ui/spinner.gd" id="3_spinner"]
+[ext_resource type="Script" path="res://ui/touch_controls.gd" id="4_touch"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -103,6 +104,17 @@ custom_minimum_size = Vector2(330, 0)
 layout_mode = 2
 horizontal_alignment = 1
 autowrap_mode = 3
+
+[node name="TouchControls" type="Control" parent="UI"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_touch")
 
 [node name="Hud" type="Label" parent="UI"]
 unique_name_in_owner = true

@@ -47,12 +47,23 @@ func snapshot() -> Dictionary:
 			continue
 		var at := player.global_position
 		var id := player.name.to_int()
-		players.append({
+		var record: PlayerRecord = _main.world.match_.state.player(id)
+		var described := {
 			"id": id,
 			"mine": player.is_multiplayer_authority(),
 			"name": _main.world.match_.state.name_of(id),
 			"position": [at.x, at.y, at.z],
-		})
+			"health": record.health if record != null else null,
+			"alive": record.alive if record != null else null,
+			"kills": record.kills if record != null else null,
+			"deaths": record.deaths if record != null else null,
+		}
+		if player.is_multiplayer_authority():
+			described.ammo = player.weapon.ammo
+			described.reloads = player.weapon.reloads
+			described.facing = [player.rotation.y, player.head.rotation.x]
+			described.reloading = player.weapon.is_reloading()
+		players.append(described)
 
 	# Each line of the session list: a session to click, or the note shown when
 	# there are none.
@@ -77,7 +88,9 @@ func snapshot() -> Dictionary:
 	return {
 		"screen": _screen(),
 		"status": _main.status.text,
+		"frame": Engine.get_process_frames(),
 		"name_box": _main.name_edit.text,
+		"mouse_captured": Input.mouse_mode == Input.MOUSE_MODE_CAPTURED,
 		"hud": _main.hud.text if _main.hud.visible else "",
 		"code": Net.room_code,
 		"notice": _main.disconnected_detail.text if _main.disconnected_notice.visible else "",

@@ -139,6 +139,29 @@ class Game:
         self.press("Enter")
         self.wait_for("s.screen === 'game'")
 
+    def capture_mouse(self):
+        """Clicks the game so it takes the mouse, as a player does before they
+        can look around or fire.
+
+        The click is at the top-left corner of the page. With the pointer
+        locked, the browser can report a movement the mouse never made, as large
+        as the pointer's position on the page (see game/net/web_page.gd), which
+        turns the view. The game leaves most of those out, but events made up
+        by the test tool vary more than a real mouse's, so the pointer is kept
+        where any that get through are too small to matter."""
+        self.page.mouse.click(1, 1)
+        self.wait_for("s.mouse_captured")
+
+    def hold_fire(self, milliseconds):
+        self.page.mouse.down()
+        self.page.wait_for_timeout(milliseconds)
+        self.page.mouse.up()
+
+    def player(self, player_id):
+        """Player `player_id` as this window sees them."""
+        state = self.wait_for(f"s.players.some((p) => p.id === {player_id})")
+        return next(player for player in state["players"] if player["id"] == player_id)
+
     def own_player(self):
         """This window's own character, as published: id, mine, position."""
         state = self.wait_for("s.players.some((player) => player.mine)")
@@ -188,12 +211,23 @@ class GameTestCase(unittest.TestCase):
         self._games = []
 
     def tearDown(self):
+        if self._failed():
+            # A failure shows one window's state; the others often explain it.
+            for number, game in enumerate(self._games, start=1):
+                if not game.page.is_closed():
+                    print(f"\nwindow {number} at the end: {game._state_or_none()}")
         errors = [error for game in self._games for error in game.errors]
         for game in self._games:
             if not game.page.is_closed():
                 game.close()
         self.signaling.stop()
         self.assertEqual(errors, [], "a page raised a JavaScript error")
+
+    def _failed(self):
+        result = getattr(getattr(self, "_outcome", None), "result", None)
+        if result is None:
+            return False
+        return any(test is self for test, _ in result.failures + result.errors)
 
     def open_game(self):
         """Opens the game in a new window and waits for its menu."""
