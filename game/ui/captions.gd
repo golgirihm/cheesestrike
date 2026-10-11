@@ -1,0 +1,122 @@
+extends VBoxContainer
+## Captions: important sounds written at the bottom of the screen, with where
+## they came from, such as "Footsteps, behind", for players who can't hear
+## them. Off unless the "captions" setting is on.
+##
+## Only sounds made somewhere else in the arena are written; what this player
+## does themselves, and what the rest of the screen already shows, is not.
+
+## How long a caption stays after its sound was last heard.
+const LIFE := 2.5
+## Most captions at once; the oldest goes first.
+const MOST := 4
+## Sounds closer than this to the player are their own.
+const OWN_DISTANCE := 1.5
+## What each sound is called; sounds not here get no caption.
+const TEXTS := {
+	"blaster": "Blaster fire",
+	"shotgun": "Shotgun blast",
+	"grater": "Grater fire",
+	"launcher": "Launcher shot",
+	"burst": "Cheese burst",
+	"step": "Footsteps",
+	"pickup": "Pickup taken",
+	"overload": "Gouda Overload",
+}
+
+var world: Node3D
+# Each entry: {"text": String, "left": seconds}, oldest first.
+var _entries: Array[Dictionary] = []
+
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	alignment = BoxContainer.ALIGNMENT_END
+	Sounds.played.connect(_on_played)
+
+
+## The caption for the sound `name` made at `at`, heard by a player at
+## `listener` facing `yaw`, or "" for none.
+static func caption(name: String, at: Variant, listener: Vector3, yaw: float) -> String:
+	if not TEXTS.has(name) or not at is Vector3:
+		return ""
+	if listener.distance_to(at) < OWN_DISTANCE:
+		return ""
+	return "%s, %s" % [TEXTS[name], direction_word(CombatHud.damage_direction(listener, yaw, at))]
+
+
+## A word for a direction from straight ahead, as damage_direction gives it.
+static func direction_word(angle: float) -> String:
+	var turned := wrapf(angle, -PI, PI)
+	if absf(turned) <= PI / 4.0:
+		return "ahead"
+	if absf(turned) >= PI * 3.0 / 4.0:
+		return "behind"
+	return "right" if turned > 0.0 else "left"
+
+
+## Adds `text`, or keeps it longer if it is already showing.
+func add(text: String) -> void:
+	for entry in _entries:
+		if entry.text == text:
+			entry.left = LIFE
+			_entries.erase(entry)
+			_entries.append(entry)
+			_show()
+			return
+	_entries.append({"text": text, "left": LIFE})
+	while _entries.size() > MOST:
+		_entries.pop_front()
+	_show()
+
+
+func clear() -> void:
+	_entries.clear()
+	_show()
+
+
+## The captions showing, oldest first.
+func showing() -> Array[String]:
+	var texts: Array[String] = []
+	for entry in _entries:
+		texts.append(entry.text)
+	return texts
+
+
+func _process(delta: float) -> void:
+	if _entries.is_empty():
+		return
+	var before := _entries.size()
+	for entry in _entries:
+		entry.left -= delta
+	_entries = _entries.filter(func(entry: Dictionary) -> bool: return entry.left > 0.0)
+	if _entries.size() != before:
+		_show()
+
+
+func _on_played(name: String, at: Variant) -> void:
+	if not Settings.get_value("captions") or world == null or not is_visible_in_tree():
+		return
+	if multiplayer.multiplayer_peer == null:
+		return
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own == null:
+		return
+	var text := caption(name, at, own.global_position, own.rotation.y)
+	if not text.is_empty():
+		add(text)
+
+
+func _show() -> void:
+	for child in get_children():
+		remove_child(child)
+		child.queue_free()
+	for entry in _entries:
+		var label := Label.new()
+		label.text = "[%s]" % entry.text
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", CombatHud.text_size(15))
+		label.add_theme_color_override("font_outline_color", Color.BLACK)
+		label.add_theme_constant_override("outline_size", 5)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(label)

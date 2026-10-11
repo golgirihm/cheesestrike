@@ -81,5 +81,6 @@ func _add_cell(text: String, color: Color) -> void:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_color_override("font_color", color)
+	label.add_theme_font_size_override("font_size", CombatHud.text_size(16))
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_grid.add_child(label)

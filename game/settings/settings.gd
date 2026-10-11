@@ -44,6 +44,11 @@ const DEFAULTS := {
 	"touch_fullscreen": true,
 	# Whether the controls have been shown, as they are on entering a first session.
 	"seen_help": false,
+	# Seeing and hearing: how much the view shakes (0 for not at all), the size
+	# of the fight's text, and whether important sounds are written on screen.
+	"screen_shake": 1.0,
+	"hud_scale": 1.0,
+	"captions": false,
 }
 
 ## The allowed range of each number setting. A value outside is brought in.
@@ -56,6 +61,8 @@ const RANGES := {
 	"music_volume": [0.0, 1.0],
 	"effects_volume": [0.0, 1.0],
 	"touch_size": [0.7, 1.5],
+	"screen_shake": [0.0, 1.0],
+	"hud_scale": [0.75, 1.5],
 }
 ## The allowed choices of a setting that is one of a few.
 const CHOICES := {

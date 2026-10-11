@@ -26,6 +26,8 @@ const PITCH_LIMIT := deg_to_rad(85.0)
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
+## How much the view is shaking, from hits and nearby bursts.
+var shake := Shake.new()
 @onready var body: Node3D = $Body
 @onready var visor: Node3D = $Head/Visor
 @onready var gun: Node3D = $Head/Gun
@@ -148,9 +150,22 @@ func _ready() -> void:
 		camera.fov = Settings.get_value("fov")
 		Settings.changed.connect(_on_setting_changed)
 	_show_weapon(Weapons.STARTING)
+	if match_ != null and _mine:
+		match_.hurt.connect(_on_hurt)
+		match_.projectile_burst.connect(_on_burst)
 	if match_ != null:
 		match_.state_changed.connect(_on_match_state_changed)
 		_on_match_state_changed()
+
+
+func _on_hurt(_attacker: int, _from: Vector3, dealt: int) -> void:
+	shake.add(Shake.from_damage(dealt))
+
+
+func _on_burst(_id: int, weapon_id: String, at: Vector3) -> void:
+	var stats := Weapons.find(weapon_id)
+	if stats != null:
+		shake.add(Shake.from_burst(global_position.distance_to(at), stats.splash_radius * 2.0))
 
 
 func _on_setting_changed(key: String) -> void:
@@ -453,6 +468,9 @@ func _process(delta: float) -> void:
 	if not _mine:
 		_show_smoothed()
 	_animate(delta)
+	if _mine:
+		var tip := shake.tick(delta, Settings.get_value("screen_shake"))
+		camera.rotation = Vector3(tip.x, 0.0, tip.y)
 	if OS.has_feature("web") and _mine:
 		var moved := WebPage.take_mouse_movement()
 		if moved != Vector2.ZERO and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -554,7 +572,8 @@ func _use_weapon() -> void:
 		_fire_pressed = false
 	if wants and weapon.fire():
 		var origin := camera.global_position
-		var direction := -camera.global_basis.z
+		# The head's facing, not the camera's, which may be shaking.
+		var direction := -head.global_basis.z
 		var seed := randi()
 		match_.fire(origin, direction, seed, weapon.stats.id)
 		kick()
