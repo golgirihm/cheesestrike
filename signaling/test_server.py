@@ -69,7 +69,7 @@ class SignalingTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_hosts_settings_are_listed(self):
         ws = await self.client()
-        settings = {"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6}
+        settings = {"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6, "map": "box"}
         await self.send(ws, type="host", settings=settings)
         await self.recv(ws)
         self.assertEqual((await self.list_sessions())[0]["settings"], settings)
@@ -80,12 +80,12 @@ class SignalingTest(unittest.IsolatedAsyncioTestCase):
         await self.recv(ws)
         self.assertEqual(
             (await self.list_sessions())[0]["settings"],
-            {"mode": "teams", "kill_limit": 1, "minutes": 60, "max_players": server.MAX_PLAYERS},
+            {"mode": "teams", "kill_limit": 1, "minutes": 60, "max_players": server.MAX_PLAYERS, "map": "canyon"},
         )
 
     async def test_settings_of_the_wrong_kind_are_replaced_by_the_defaults(self):
         ws = await self.client()
-        await self.send(ws, type="host", settings={"mode": "hide and seek", "kill_limit": "lots", "minutes": True, "max_players": None, "extra": 1})
+        await self.send(ws, type="host", settings={"mode": "hide and seek", "kill_limit": "lots", "minutes": True, "max_players": None, "map": "moon", "extra": 1})
         await self.recv(ws)
         self.assertEqual((await self.list_sessions())[0]["settings"], server.DEFAULT_SETTINGS)
 

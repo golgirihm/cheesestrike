@@ -44,8 +44,9 @@ var _mine := false
 ## Where this player starts, chosen by the host and set before the node enters
 ## the tree.
 var spawn_position := Vector3.ZERO
-## The world's Match node, set with spawn_position.
+## The world's Match node and the world, set with spawn_position.
 var match_: Node
+var world: Node3D
 
 ## Seconds a weapon takes to come up after switching to it.
 const SWITCH_TIME := 0.35
@@ -348,7 +349,9 @@ static func _weapon_key(event: InputEvent) -> String:
 
 
 func _physics_process(delta: float) -> void:
-	if Net.host_silent:
+	# Not until the arena the host chose is here, or the player could fall
+	# through where its floor will be.
+	if Net.host_silent or (world != null and not world.ready_to_play()):
 		return
 	weapon.tick(delta)
 	if _menu_open():

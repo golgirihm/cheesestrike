@@ -1,0 +1,394 @@
+[gd_scene load_steps=21 format=3]
+
+[sub_resource type="StandardMaterial3D" id="S1"]
+albedo_color = Color(0.98, 0.88, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="S2"]
+material = SubResource("S1")
+size = Vector3(48, 1, 48)
+
+[sub_resource type="BoxShape3D" id="S3"]
+size = Vector3(48, 1, 48)
+
+[sub_resource type="StandardMaterial3D" id="S4"]
+albedo_color = Color(1, 0.8, 0.2, 1)
+
+[sub_resource type="BoxMesh" id="S5"]
+material = SubResource("S4")
+size = Vector3(50, 18, 1)
+
+[sub_resource type="BoxShape3D" id="S6"]
+size = Vector3(50, 18, 1)
+
+[sub_resource type="BoxMesh" id="S7"]
+material = SubResource("S4")
+size = Vector3(1, 18, 48)
+
+[sub_resource type="BoxShape3D" id="S8"]
+size = Vector3(1, 18, 48)
+
+[sub_resource type="StandardMaterial3D" id="S9"]
+albedo_color = Color(0.95, 0.75, 0.2, 1)
+
+[sub_resource type="BoxMesh" id="S10"]
+material = SubResource("S9")
+size = Vector3(16, 3, 8)
+
+[sub_resource type="BoxShape3D" id="S11"]
+size = Vector3(16, 3, 8)
+
+[sub_resource type="StandardMaterial3D" id="S12"]
+albedo_color = Color(0.93, 0.7, 0.25, 1)
+
+[sub_resource type="BoxMesh" id="S13"]
+material = SubResource("S12")
+size = Vector3(8.544, 0.4, 6)
+
+[sub_resource type="BoxShape3D" id="S14"]
+size = Vector3(8.544, 0.4, 6)
+
+[sub_resource type="StandardMaterial3D" id="S15"]
+albedo_color = Color(0.99, 0.95, 0.82, 1)
+
+[sub_resource type="BoxMesh" id="S16"]
+material = SubResource("S15")
+size = Vector3(1.2, 2.2, 5)
+
+[sub_resource type="BoxShape3D" id="S17"]
+size = Vector3(1.2, 2.2, 5)
+
+[sub_resource type="StandardMaterial3D" id="S18"]
+albedo_color = Color(1, 0.62, 0.15, 1)
+
+[sub_resource type="BoxMesh" id="S19"]
+material = SubResource("S18")
+size = Vector3(2, 2, 2)
+
+[sub_resource type="BoxShape3D" id="S20"]
+size = Vector3(2, 2, 2)
+
+[node name="CheddarCanyon" type="Node3D"]
+
+[node name="Geometry" type="Node3D" parent="."]
+
+[node name="Floor" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Floor"]
+mesh = SubResource("S2")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Floor"]
+shape = SubResource("S3")
+
+[node name="WallNorth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, -24.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/WallNorth"]
+mesh = SubResource("S5")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/WallNorth"]
+shape = SubResource("S6")
+
+[node name="WallSouth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, 24.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/WallSouth"]
+mesh = SubResource("S5")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/WallSouth"]
+shape = SubResource("S6")
+
+[node name="WallEast" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.5, 9, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/WallEast"]
+mesh = SubResource("S7")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/WallEast"]
+shape = SubResource("S8")
+
+[node name="WallWest" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24.5, 9, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/WallWest"]
+mesh = SubResource("S7")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/WallWest"]
+shape = SubResource("S8")
+
+[node name="MesaNorth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -18)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/MesaNorth"]
+mesh = SubResource("S10")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/MesaNorth"]
+shape = SubResource("S11")
+
+[node name="RampNorthEast" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(0.936329, 0.351123, 0, -0.351123, 0.936329, 0, 0, 0, 1, 12, 1.31273, -18)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/RampNorthEast"]
+mesh = SubResource("S13")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/RampNorthEast"]
+shape = SubResource("S14")
+
+[node name="RampNorthWest" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(0.936329, -0.351123, 0, 0.351123, 0.936329, 0, 0, 0, 1, -12, 1.31273, -18)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/RampNorthWest"]
+mesh = SubResource("S13")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/RampNorthWest"]
+shape = SubResource("S14")
+
+[node name="MesaSouth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 18)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/MesaSouth"]
+mesh = SubResource("S10")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/MesaSouth"]
+shape = SubResource("S11")
+
+[node name="RampSouthEast" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(0.936329, 0.351123, 0, -0.351123, 0.936329, 0, 0, 0, 1, 12, 1.31273, 18)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/RampSouthEast"]
+mesh = SubResource("S13")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/RampSouthEast"]
+shape = SubResource("S14")
+
+[node name="RampSouthWest" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(0.936329, -0.351123, 0, 0.351123, 0.936329, 0, 0, 0, 1, -12, 1.31273, 18)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/RampSouthWest"]
+mesh = SubResource("S13")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/RampSouthWest"]
+shape = SubResource("S14")
+
+[node name="RidgeEastNorth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1.1, -4.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/RidgeEastNorth"]
+mesh = SubResource("S16")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/RidgeEastNorth"]
+shape = SubResource("S17")
+
+[node name="RidgeEastSouth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1.1, 4.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/RidgeEastSouth"]
+mesh = SubResource("S16")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/RidgeEastSouth"]
+shape = SubResource("S17")
+
+[node name="RidgeWestNorth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1.1, -4.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/RidgeWestNorth"]
+mesh = SubResource("S16")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/RidgeWestNorth"]
+shape = SubResource("S17")
+
+[node name="RidgeWestSouth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1.1, 4.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/RidgeWestSouth"]
+mesh = SubResource("S16")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/RidgeWestSouth"]
+shape = SubResource("S17")
+
+[node name="Block1" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, -2)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block1"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block1"]
+shape = SubResource("S20")
+
+[node name="Block2" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, 2)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block2"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block2"]
+shape = SubResource("S20")
+
+[node name="Block3" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1, -11)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block3"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block3"]
+shape = SubResource("S20")
+
+[node name="Block4" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, 11)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block4"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block4"]
+shape = SubResource("S20")
+
+[node name="Block5" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 1, 5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block5"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block5"]
+shape = SubResource("S20")
+
+[node name="Block6" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 1, -5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block6"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block6"]
+shape = SubResource("S20")
+
+[node name="Block7" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, -6)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block7"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block7"]
+shape = SubResource("S20")
+
+[node name="Block8" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, 6)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block8"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block8"]
+shape = SubResource("S20")
+
+[node name="Block9" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 1, -3)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block9"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block9"]
+shape = SubResource("S20")
+
+[node name="Block10" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 1, 3)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block10"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block10"]
+shape = SubResource("S20")
+
+[node name="Block11" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 3, -3)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block11"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block11"]
+shape = SubResource("S20")
+
+[node name="Block12" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 3, 3)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block12"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block12"]
+shape = SubResource("S20")
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0.1, -12)
+
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0.1, 12)
+
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0.1, 12)
+
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0.1, -12)
+
+[node name="Spawn5" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0.1, 0)
+
+[node name="Spawn6" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0.1, 0)
+
+[node name="Spawn7" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -9)
+
+[node name="Spawn8" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 9)
+
+[node name="Spawn9" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0.1, -9)
+
+[node name="Spawn10" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0.1, 9)
+
+[node name="Spawn11" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0.1, 9)
+
+[node name="Spawn12" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0.1, -9)
+
+[node name="Spawn13" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 3.1, -18)
+
+[node name="Spawn14" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 3.1, 18)
+
+[node name="Spawn15" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 3.1, -18)
+
+[node name="Spawn16" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 3.1, 18)
+
+[node name="Pickups" type="Node3D" parent="."]
+
+[node name="Launcher" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+metadata/kind = "launcher"
+
+[node name="HealthNorth" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, -18)
+metadata/kind = "health"
+
+[node name="HealthSouth" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 18)
+metadata/kind = "health"
+
+[node name="Shotgun" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0, -21)
+metadata/kind = "shotgun"
+
+[node name="Grater" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0, 21)
+metadata/kind = "grater"
+
+[node name="HealthWest" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 0)
+metadata/kind = "health"
+
+[node name="MenuCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, -0, -0, 0.83957, 0.543251, 0, -0.543251, 0.83957, 0, 22, 34)

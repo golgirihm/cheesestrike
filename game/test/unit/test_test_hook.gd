@@ -59,7 +59,7 @@ func test_it_names_the_notice_that_is_showing() -> void:
 
 func test_a_player_is_reported_with_its_position() -> void:
 	# Offline, this process is peer 1, so a player named "1" is its own.
-	var player: CharacterBody3D = main.world._create_player([1, 0])
+	var player: CharacterBody3D = main.world._create_player([1, Vector3.ZERO])
 	main.world.players.add_child(player)
 	var players: Array = hook.snapshot().players
 	assert_eq(players.size(), 1)

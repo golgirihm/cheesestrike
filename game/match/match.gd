@@ -54,6 +54,9 @@ var _next_projectile := 1
 var _pending_names := {}
 var _dirty := false
 var _since_sync := 0.0
+# Whether this machine has the host's decisions yet: at once on the host, and
+# with the first state that arrives elsewhere.
+var _has_state := false
 
 
 ## Begins the session's matches; on the host, with `settings`.
@@ -61,6 +64,7 @@ func start(settings := MatchSettings.new()) -> void:
 	# A player other than the host keeps whatever the host has already sent.
 	if is_host():
 		state = MatchState.new(settings)
+		_has_state = true
 		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
 		_pending_names.clear()
 		_rules.clear()
@@ -72,8 +76,14 @@ func start(settings := MatchSettings.new()) -> void:
 
 func stop() -> void:
 	state = MatchState.new()
+	_has_state = false
 	_dirty = false
 	state_changed.emit()
+
+
+## Whether the host's decisions have reached this machine yet.
+func has_state() -> bool:
+	return _has_state or is_host()
 
 
 func is_host() -> bool:
@@ -535,4 +545,5 @@ func _introduce(wanted: Variant) -> void:
 func _receive_state(data: Variant) -> void:
 	if data is Dictionary:
 		state = MatchState.from_dict(data)
+		_has_state = true
 		state_changed.emit()

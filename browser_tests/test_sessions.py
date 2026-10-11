@@ -54,7 +54,7 @@ class JoiningTest(GameTestCase):
         host = self.open_game()
         code = host.host()
         joiner.click("RefreshButton")
-        listed = f"{code}  ·  1/16 playing  ·  Free-for-all"
+        listed = f"{code}  ·  1/16  ·  Free-for-all  ·  Cheddar Canyon"
         state = joiner.wait_for(f"s.sessions.length === 1 && s.sessions[0].text === '{listed}'")
         joiner.click_at(state["sessions"][0]["at"])
         for game in (host, joiner):

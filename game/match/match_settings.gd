@@ -19,6 +19,8 @@ var mode := FREE_FOR_ALL
 var kill_limit := 20
 var minutes := 8
 var max_players := MAX_PLAYERS
+## Which of the Maps to play on.
+var map := Maps.DEFAULT
 
 
 func is_teams() -> bool:
@@ -36,16 +38,18 @@ static func from_dict(data: Variant) -> MatchSettings:
 	settings.kill_limit = _whole(data.get("kill_limit"), settings.kill_limit, 1, 999)
 	settings.minutes = _whole(data.get("minutes"), settings.minutes, 1, 60)
 	settings.max_players = _whole(data.get("max_players"), settings.max_players, MIN_PLAYERS, MAX_PLAYERS)
+	if Maps.exists(data.get("map")):
+		settings.map = data.map
 	return settings
 
 
 func to_dict() -> Dictionary:
-	return {"mode": mode, "kill_limit": kill_limit, "minutes": minutes, "max_players": max_players}
+	return {"mode": mode, "kill_limit": kill_limit, "minutes": minutes, "max_players": max_players, "map": map}
 
 
-## A short description for the session list, such as "Free-for-all · first to 20".
+## A short description, such as "Free-for-all · first to 20 · 8 min · Cheddar Canyon".
 func describe() -> String:
-	return "%s · first to %d · %d min" % [MODE_NAMES[mode], kill_limit, minutes]
+	return "%s · first to %d · %d min · %s" % [MODE_NAMES[mode], kill_limit, minutes, Maps.NAMES[map]]
 
 
 static func _whole(value: Variant, default: int, low: int, high: int) -> int:
