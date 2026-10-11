@@ -1,0 +1,115 @@
+# Backlog
+
+The plan for taking CheeseStrike from where it is now to a game people can play with each other. It is ordered: each milestone builds on the ones before it, and within a milestone the items are roughly in the order they should be done. Each item is sized to be one pull request, or a few.
+
+**Keeping this current:** when a pull request finishes an item, delete the item in the same pull request; the commit history is the record of what was done. Add, reorder or rewrite items whenever the plan changes. Every item follows the testing rules in [CLAUDE.md](../CLAUDE.md); the *Tests* notes below say where an item's tests are likely to go, not that they are the only ones needed.
+
+## Where the game is now
+
+Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. There is nothing to shoot yet, no health, no score and no sound.
+
+Things about how it works that shape the plan:
+
+- **Each player simulates their own movement** (`game/player/player.gd`) and a `MultiplayerSynchronizer` sends position and facing to everyone else. That is fine for movement, but anything that decides who wins, such as hits, damage and score, has to be decided by the host, or any player could award themselves kills.
+- **The host is a browser tab**, possibly on a phone. Whatever the host simulates for everyone has to stay cheap, and the session ends when the host leaves.
+- **The signaling server only runs on the development PC**, and the game looks for it on the same machine as the page, at port 9080. Nobody outside the local network can play yet.
+- **The web export is single-threaded** (`thread_support=false`), which lets it run on any static host without special headers. Keep it that way unless something needs threads badly enough to justify the hosting requirements.
+
+## Milestone 1: Playable from anywhere
+
+Before there is much more game, make it possible for people on different networks to reach it, so every later milestone can be playtested with real players.
+
+1. **Host the signaling server publicly.** Run `signaling/server.py` behind TLS (`wss://`) on a small server or a container platform, with automatic restarts and a health check. Add a log line per session hosted and closed so problems can be traced.
+   *Tests:* signaling tests for anything added to the server, such as a health endpoint. Manual: DEV-06 becomes runnable.
+2. **Point the web build at the public server.** Replace the same-host-port-9080 guess in `Net._web_signaling_url()` with a URL set at export time, keeping the `?signal=` override and falling back to the current behavior for local development.
+   *Tests:* pull the URL choice into a plain function and cover it with a GUT test.
+3. **Add a TURN server.** STUN alone fails between players behind strict NATs, which is common on mobile data. Run a TURN server (coturn, or a hosted one) and hand out short-lived credentials from the signaling server rather than putting a fixed secret in the build.
+   *Tests:* signaling tests for issuing credentials. Manual: a DEV row for a phone on mobile data joining a PC on home Wi-Fi.
+4. **Publish the web build.** A workflow that exports the web build on every push to `main` and deploys it to a static host (GitHub Pages or itch.io), so there is always a current build to share.
+5. **Version check on join.** Send the game's version with `host` and `join`, and have the signaling server refuse a join between different versions with a clear message ("This session is running an older version. Reload the page."). Once builds are deployed continuously, mismatched tabs will happen.
+   *Tests:* signaling tests for the refusal; a browser test that the message reaches the menu.
+6. **Player names.** A name box on the menu, remembered between visits, shown above each character and on the scoreboard once there is one. Limit the length and strip control characters on the host.
+   *Tests:* GUT test for the name cleaning; browser test that a joiner sees the host's name.
+
+## Milestone 2: First shot
+
+The smallest version of the game that is actually a shooter: one weapon, health, death and respawn, with the host deciding every hit.
+
+1. **Host-decided hits.** Pressing fire sends the shot's origin and direction to the host, which checks it against the shooter's synced head position, casts the ray itself and announces the hit. Put the rules (fire rate, range, damage, whether a reported origin is believable) in a plain class like `HostWatch` so they can be tested without a network. Start without lag compensation; Milestone 5 adds it.
+   *Tests:* GUT tests for the rules class. Browser test: a player in one window shoots a player standing still in another and the hit is reported.
+2. **The first weapon: the Cheddar Blaster.** A hitscan rifle with a fire rate, a magazine and a reload. Fire on left click, right trigger and a fire button on the touch layout (which also needs a reload button). Bind a reload key.
+   *Tests:* GUT tests for ammo and reload timing. Manual: INP rows for firing and reloading on each input device.
+3. **Health, death and respawn.** 100 health, owned by the host and synced to everyone. At zero the player is out for a few seconds, then respawns at the free spot farthest from other players, with a moment of protection. Extend `SpawnSlots`, or add a sibling class, for choosing the spot.
+   *Tests:* GUT tests for damage, death and spawn choice. Browser test: shoot a player until they respawn somewhere else.
+4. **Combat feedback.** Crosshair, a hit marker for the shooter, a red edge on screen showing which way damage came from, a health bar, a muzzle flash and tracer that everyone sees, and a brief death screen saying who did it.
+   *Tests:* expose health and the last hit through `TestHook` and check them in the browser tests. Manual: rows for how the effects look.
+5. **Kill feed and scoreboard.** Kills appear in a corner for everyone; holding Tab (or a button on gamepad and touch) shows each player's kills and deaths. Score is kept by the host.
+   *Tests:* GUT test for score keeping; browser test that a kill shows up for a third player.
+
+## Milestone 3: A match
+
+Turn shooting around into rounds with a winner.
+
+1. **Free-for-all deathmatch.** First to a kill limit, or most kills when the time runs out. A match timer on the HUD, an end screen with the scoreboard and the winner, and a new match starting automatically after a short break. Put the match rules in a plain class.
+   *Tests:* GUT tests for the rules, including ties and a player leaving mid-match. Browser test for a full short match with a low kill limit.
+2. **Joining mid-match.** A late joiner gets the current scores, time and everyone's health, not just positions, and spawns straight into the match.
+   *Tests:* extend the existing late-joiner browser test.
+3. **Host match settings.** Before hosting, choose the kill limit, time limit and maximum players; show them in the session list.
+   *Tests:* signaling tests if the session list carries them; browser test for a setting taking effect.
+4. **Team deathmatch: Cheddar versus Brie.** Two teams with team colors that don't rely on color alone (an outline or icon too), balanced on join, no friendly fire, and team scores.
+   *Tests:* GUT tests for team assignment and the friendly-fire rule.
+5. **An in-game menu.** Esc (or Start, or a corner button on touch) opens a menu with Resume, Settings and Leave, so leaving no longer means closing the tab. Esc currently only releases the mouse; keep that as the first press.
+   *Tests:* browser test for leaving through the menu.
+
+## Milestone 4: Gouda Overload
+
+What makes it this game rather than any shooter: cheese weapons, a real arena, and the Overload.
+
+1. **Weapon roster.** Two or three more weapons with different jobs, each needing projectile or spread support as it goes:
+   - **Swiss Shotgun**: a spread of pellets, strong up close.
+   - **Gouda Launcher**: a slow rolling wheel of cheese that explodes, with splash damage and knockback. The first projectile, simulated by the host.
+   - **Parmesan Grater**: a fast, weak spray.
+
+   Weapon switching with number keys, the mouse wheel, a shoulder button and a touch button. Weapon stats live in resources so they can be tuned without code changes.
+   *Tests:* GUT tests for spread, splash falloff and switching.
+2. **Weapon and health pickups.** Weapons and cheese-wedge health packs that sit on pads around the arena and come back after a delay. The host decides who picked one up.
+   *Tests:* GUT tests for pickup and respawn timing.
+3. **Gouda Overload.** The signature mechanic: dealing damage fills a meter, and when it's full the player can trigger a short Overload, such as faster movement and a melting-cheese effect that slows anyone they hit. Tune it so it rewards playing well without deciding matches on its own.
+   *Tests:* GUT tests for the meter and its effects.
+4. **A real arena.** Replace the grey box with a designed map: cover, height, several routes, sight lines that suit both the rifle and the shotgun, and enough spawn points for 16. Keep geometry and lighting cheap enough for a phone host. Then a second, smaller map for few players, and map choice in the host settings.
+   *Tests:* GUT test that every spawn point is on the floor and clear of walls, generalizing `test_world_spawn_points.gd`. Manual: rows for walking every route.
+5. **Characters.** Replace the capsules with cheese characters, with walk, jump, shoot and death animations, and first-person arms holding the weapon.
+6. **Sound.** Footsteps, weapon sounds, hits, deaths, pickups and the Overload, positioned in 3D, plus menu music. Browsers block audio until the first click or tap, so start it then.
+   *Manual:* rows for hearing direction and the first-click start in each browser.
+
+## Milestone 5: Fair and smooth online
+
+Once there is real combat, the shortcuts from earlier milestones start to show.
+
+1. **Smooth other players.** Interpolate remote players between received positions instead of placing them at each update, so they don't stutter on a poor connection. Put the buffer in a plain class.
+   *Tests:* GUT tests for the interpolation buffer. Manual: PLR-02 on a throttled connection.
+2. **Lag compensation.** The host keeps a short history of player positions and checks each shot against where targets were when the shooter fired, so players with higher latency can still hit what they see.
+   *Tests:* GUT tests for the history and rewind.
+3. **Movement sanity checks.** Since players move themselves, have the host reject impossible movement (too fast, through walls, flying) and put the player back.
+   *Tests:* GUT tests for the checks.
+4. **Ping display and network load.** Show each player's ping on the scoreboard. Measure bandwidth and the host's CPU with 16 players, tune the sync rate, and add a browser test with many players to catch regressions.
+5. **Reconnect.** A player whose connection drops can rejoin the same session within a short window and keep their score.
+6. **Host leaving.** Decide between host migration (hand the session to another player, which is hard with a host-decided game) and ending the match gracefully with final scores. Ending gracefully is the likely first step.
+
+## Milestone 6: Polish and release
+
+1. **Settings.** Look sensitivity for mouse, stick and touch, invert look, field of view, volume levels and graphics quality, saved between visits. Then key rebinding.
+   *Tests:* GUT tests for loading and saving settings.
+2. **Phone experience.** Fullscreen and landscape lock on touch devices, a touch layout that can be adjusted, graphics settings that keep 60 frames per second on a mid-range phone, and an install-to-home-screen option.
+   *Manual:* DEV rows for each.
+3. **Invite links.** A Copy Link button that gives `…/?join=ABCD`; opening it goes straight to joining. Optionally, private sessions that are not in the list.
+   *Tests:* browser test for joining by link; signaling tests for private sessions.
+4. **First-time help.** A short controls overlay for the device being used, shown on the first visit.
+5. **Accessibility.** Colorblind-safe team and hit colors, scalable HUD text, captions for important sounds and reduced screen shake.
+6. **Signaling server protection.** Rate limiting per address, message size limits, and filtering of names, so the public server can't be easily flooded or abused.
+   *Tests:* signaling tests for each limit.
+7. **Release.** Version number on the menu, a changelog, a page on itch.io, and a round of playtests with people outside the project, running the full manual test list first.
+
+## Later
+
+Ideas worth keeping that aren't planned yet: more modes (capture the cheese wheel, last mouse standing), cosmetics, a map editor, bots for practicing alone, desktop builds on Steam, and a dedicated server option for large or competitive matches.
