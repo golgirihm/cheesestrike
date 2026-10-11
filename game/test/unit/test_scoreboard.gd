@@ -51,10 +51,13 @@ func test_the_board_shows_a_heading_and_a_row_per_player() -> void:
 	var board: PanelContainer = BOARD.new()
 	add_child_autofree(board)
 	board.show_state(state, 1)
-	assert_eq(board.rows_shown(), [BOARD.COLUMNS, ["Brie", "2", "1"], ["Edam", "0", "2"]])
+	state.player(1).ping = 0
+	state.player(2).ping = 48
+	board.show_state(state, 1)
+	assert_eq(board.rows_shown(), [BOARD.COLUMNS, ["Brie", "2", "1", "host"], ["Edam", "0", "2", "48 ms"]])
 	state.player(2).kills = 7
 	board.show_state(state, 1)
-	assert_eq(board.rows_shown()[1], ["Edam", "7", "2"], "refilled, not added to")
+	assert_eq(board.rows_shown()[1], ["Edam", "7", "2", "48 ms"], "refilled, not added to")
 	assert_eq(board.rows_shown().size(), 3)
 
 
@@ -68,9 +71,9 @@ func test_a_team_match_lists_each_team_under_its_score() -> void:
 	add_child_autofree(board)
 	board.show_state(state, 1)
 	var shown: Array = board.rows_shown()
-	assert_eq(shown[1], ["Cheddar", "3", ""])
+	assert_eq(shown[1], ["Cheddar", "3", "", ""])
 	assert_eq(shown.size(), 1 + 2 + 4, "a heading, two teams and four players")
-	var brie_at := shown.find(["Brie", "5", ""])
+	var brie_at := shown.find(["Brie", "5", "", ""])
 	assert_eq(brie_at, 4, "Cheddar's two players come before Brie")
 
 

@@ -2,7 +2,7 @@ extends PanelContainer
 ## Everyone's score, shown while the scoreboard button is held: Tab, the
 ## gamepad's Back or View button, or SCORES on a touch screen.
 
-const COLUMNS := ["Player", "Knock-outs", "Times out"]
+const COLUMNS := ["Player", "Knock-outs", "Times out", "Ping"]
 const OWN_COLOR := Color(1.0, 0.85, 0.35)
 
 var _grid: GridContainer
@@ -38,6 +38,11 @@ static func rows(state: MatchState) -> Array[PlayerRecord]:
 	return sorted
 
 
+## How a player's ping reads: "host" for the host, which has none.
+static func ping_text(record: PlayerRecord, _state: MatchState) -> String:
+	return "host" if record.id == 1 else "%d ms" % record.ping
+
+
 ## Fills the board from `state`, marking the row of player `own`.
 func show_state(state: MatchState, own: int) -> void:
 	for child in _grid.get_children():
@@ -53,10 +58,12 @@ func show_state(state: MatchState, own: int) -> void:
 			_add_cell(MatchState.TEAM_NAMES[team], team_color)
 			_add_cell(str(state.team_kills[team]), team_color)
 			_add_cell("", team_color)
+			_add_cell("", team_color)
 		var color := OWN_COLOR if record.id == own else Color.WHITE
 		_add_cell(record.name, color)
 		_add_cell(str(record.kills), color)
 		_add_cell(str(record.deaths), color)
+		_add_cell(ping_text(record, state), color)
 
 
 ## The board as text, row by row, for the browser tests.

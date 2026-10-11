@@ -281,7 +281,7 @@ func _leaders() -> Array[int]:
 func to_dict() -> Dictionary:
 	var listed := []
 	for record: PlayerRecord in players.values():
-		listed.append(record.to_dict())
+		listed.append(record.to_packed())
 	return {
 		"settings": settings.to_dict(),
 		"players": listed,
@@ -298,8 +298,8 @@ static func from_dict(data: Dictionary) -> MatchState:
 	var listed: Variant = data.get("players")
 	if listed is Array:
 		for entry: Variant in listed:
-			if entry is Dictionary:
-				var record := PlayerRecord.from_dict(entry)
+			var record := PlayerRecord.from_packed(entry)
+			if record != null:
 				state.players[record.id] = record
 	if data.get("phase") in [PLAYING, ENDED]:
 		state.phase = data.phase

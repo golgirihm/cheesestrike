@@ -36,6 +36,10 @@ const RESYNC_INTERVAL := 2.0
 const WORLD_MASK := 1
 ## Height of a player's middle above their feet, where bursts aim their harm.
 const MIDDLE := 0.9
+## Seconds between the host's pings to each player.
+const PING_INTERVAL := 1.0
+## A ping that changes by less than this many milliseconds isn't news.
+const PING_CHANGE := 5
 
 ## Everyone's copy of the host's decisions. Replaced, not changed, on players
 ## other than the host, so hold on to it only briefly.
@@ -47,6 +51,9 @@ var state := MatchState.new()
 var _clock := 0.0
 # The host's ShotRules for each player, by id.
 var _rules := {}
+# The host's measure of each player's round trip, by id.
+var _pings := {}
+var _since_ping := 0.0
 # The host's projectiles in flight, by id.
 var _projectiles := {}
 var _next_projectile := 1
@@ -106,6 +113,7 @@ func remove_player(id: int) -> void:
 	state.remove_player(id)
 	_pending_names.erase(id)
 	_rules.erase(id)
+	_pings.erase(id)
 	_changed()
 
 
@@ -132,6 +140,31 @@ func reload(weapon := Weapons.STARTING) -> void:
 		_reload(1, weapon)
 	elif multiplayer.multiplayer_peer != null:
 		_request_reload.rpc_id(1, weapon)
+
+
+## Player `id`'s round trip to the host in seconds, as the host last measured
+## it; 0 for the host itself or before any.
+func round_trip(id: int) -> float:
+	return _pings[id].seconds() if _pings.has(id) else 0.0
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _ping(sent: float) -> void:
+	_pong.rpc_id(1, sent)
+
+
+@rpc("any_peer", "call_remote", "unreliable")
+func _pong(sent: Variant) -> void:
+	if not is_host() or not (sent is float) or sent > _clock:
+		return
+	var id := multiplayer.get_remote_sender_id()
+	if not _pings.has(id):
+		_pings[id] = PingTracker.new()
+	_pings[id].add(_clock - sent)
+	var record := state.player(id)
+	if record != null and absi(record.ping - _pings[id].milliseconds()) >= PING_CHANGE:
+		record.ping = _pings[id].milliseconds()
+		_changed()
 
 
 ## This player sets off their Overload, if it is ready.
@@ -180,6 +213,11 @@ func _process(delta: float) -> void:
 	var was_playing := state.is_playing()
 	var due := state.tick(delta)
 	if is_host():
+		_since_ping += delta
+		if _since_ping >= PING_INTERVAL:
+			_since_ping = 0.0
+			for peer in multiplayer.get_peers():
+				_ping.rpc_id(peer, _clock)
 		for id in due:
 			_respawn(id)
 		if was_playing != state.is_playing():
