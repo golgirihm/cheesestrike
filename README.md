@@ -53,6 +53,8 @@ python tools/run_tests.py
 
   The game draws to a canvas, which a test can't read, so when the page is opened with `?test` the game publishes what is on screen for the tests to check (`game/test_hook.gd`).
 
+The plan for the rest of the game is in [docs/backlog.md](docs/backlog.md).
+
 Behavior that these can't cover, such as input devices, real browsers and phones, is listed as manual tests in [docs/manual-tests.md](docs/manual-tests.md).
 
 CI runs the same script on every pull request and push to `main`, with the versions pinned in `tools/versions.env` and the `requirements.txt` files. A local run uses whatever you have installed, and the script warns when that differs from the pins. It can also be started by hand for any branch from the Tests workflow in the repository's Actions tab, or on a pull request by commenting `buildci`.
