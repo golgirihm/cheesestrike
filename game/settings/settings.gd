@@ -12,6 +12,11 @@ const DEFAULT_PATH := "user://settings.cfg"
 const SECTION := "settings"
 const DEFAULTS := {
 	"name": "",
+	# The match settings last used to host.
+	"host_mode": MatchSettings.FREE_FOR_ALL,
+	"host_kill_limit": 20,
+	"host_minutes": 8,
+	"host_max_players": MatchSettings.MAX_PLAYERS,
 }
 
 ## Where the settings are kept. Tests point their own instances elsewhere.
@@ -30,7 +35,9 @@ func load_settings() -> void:
 	var file := ConfigFile.new()
 	if file.load(path) == OK:
 		for key: String in DEFAULTS:
-			var stored: Variant = file.get_value(SECTION, key, null)
+			if not file.has_section_key(SECTION, key):
+				continue
+			var stored: Variant = file.get_value(SECTION, key)
 			if _same_type(stored, DEFAULTS[key]):
 				_values[key] = type_convert(stored, typeof(DEFAULTS[key]))
 	if PlayerName.clean(_values.name).is_empty():

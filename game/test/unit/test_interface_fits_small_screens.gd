@@ -5,7 +5,7 @@ extends GutTest
 ## square, or it runs off the edge of a narrow screen.
 
 const MAIN := preload("res://main.tscn")
-const PANELS := ["UI/Menu/Panel", "UI/WaitingNotice/Panel", "UI/DisconnectedNotice/Panel"]
+const PANELS := ["UI/Menu/Panel", "UI/WaitingNotice/Panel", "UI/DisconnectedNotice/Panel", "UI/PauseMenu/Panel"]
 # The longest reason the game gives for a lost session.
 const LONGEST_REASON := "The connection to the host was lost."
 

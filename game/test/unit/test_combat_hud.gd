@@ -89,3 +89,41 @@ func test_the_hud_counts_hits_and_hurts_and_shows_the_notice() -> void:
 	assert_string_starts_with(hud.knocked_out_shown(), "Knocked out by")
 	assert_eq(hud.health_text(), "0")
 	main.world.stop()
+
+
+func test_the_clock_reads_minutes_and_seconds() -> void:
+	assert_eq(HUD.clock_text(480.0), "8:00")
+	assert_eq(HUD.clock_text(65.2), "1:06", "rounded up, so 0:00 means time is up")
+	assert_eq(HUD.clock_text(9.0), "0:09")
+	assert_eq(HUD.clock_text(0.0), "0:00")
+	assert_eq(HUD.clock_text(-3.0), "0:00")
+
+
+func test_a_free_for_all_shows_the_goal_and_the_clock() -> void:
+	var state := MatchState.new(MatchSettings.from_dict({"kill_limit": 30, "minutes": 5}))
+	assert_eq(HUD.match_text(state), "First to 30   ·   5:00")
+
+
+func test_a_team_match_shows_the_teams_scores() -> void:
+	var state := MatchState.new(MatchSettings.from_dict({"mode": "teams", "minutes": 3}))
+	state.team_kills = [4, 7]
+	assert_eq(HUD.match_text(state), "Cheddar 4  –  7 Brie   ·   3:00")
+
+
+func test_after_a_match_the_line_says_so() -> void:
+	var state := MatchState.new()
+	state.end_match()
+	assert_eq(HUD.match_text(state), "Match over")
+
+
+func test_the_end_of_a_match_shows_the_result_and_the_scoreboard() -> void:
+	var main: Node = MAIN.instantiate()
+	add_child_autofree(main)
+	main.world.start()
+	main.combat_hud.show()
+	var match_: Match = main.world.match_
+	match_.state.end_match()
+	await wait_process_frames(2)
+	assert_eq(main.combat_hud.result_shown(), "Nobody wins")
+	assert_true(main.combat_hud.scoreboard.visible)
+	main.world.stop()

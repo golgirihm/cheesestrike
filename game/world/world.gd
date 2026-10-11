@@ -20,14 +20,15 @@ func _ready() -> void:
 	match_.shot_shown.connect(_show_others_shot)
 
 
-func start() -> void:
+## Begins the session. `settings` are the host's choice, and only used there.
+func start(settings := MatchSettings.new()) -> void:
 	if not multiplayer.is_server():
 		match_.start()
 		return
 	_spawn_slots = SpawnSlots.new(spawn_points.get_child_count())
 	multiplayer.peer_connected.connect(_add_player)
 	multiplayer.peer_disconnected.connect(_remove_player)
-	match_.start()
+	match_.start(settings)
 	_add_player(1)
 
 

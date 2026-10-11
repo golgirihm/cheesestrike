@@ -22,12 +22,14 @@ func _ready() -> void:
 
 
 ## The rows of the scoreboard, best first: most knock-outs, then fewest times
-## knocked out, then by name.
+## knocked out, then by name. In a team match, team by team, Cheddar first.
 static func rows(state: MatchState) -> Array[PlayerRecord]:
 	var sorted: Array[PlayerRecord] = []
 	for record: PlayerRecord in state.players.values():
 		sorted.append(record)
 	sorted.sort_custom(func(a: PlayerRecord, b: PlayerRecord) -> bool:
+		if a.team != b.team:
+			return a.team < b.team
 		if a.kills != b.kills:
 			return a.kills > b.kills
 		if a.deaths != b.deaths:
@@ -43,7 +45,14 @@ func show_state(state: MatchState, own: int) -> void:
 		child.queue_free()
 	for heading: String in COLUMNS:
 		_add_cell(heading, Color(1, 1, 1, 0.6))
+	var team := MatchState.NO_TEAM
 	for record in rows(state):
+		if state.settings.is_teams() and record.team != team and record.team != MatchState.NO_TEAM:
+			team = record.team
+			var team_color := TeamColors.of(team)
+			_add_cell(MatchState.TEAM_NAMES[team], team_color)
+			_add_cell(str(state.team_kills[team]), team_color)
+			_add_cell("", team_color)
 		var color := OWN_COLOR if record.id == own else Color.WHITE
 		_add_cell(record.name, color)
 		_add_cell(str(record.kills), color)

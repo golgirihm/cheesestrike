@@ -177,6 +177,18 @@ class Game:
         self.page.wait_for_timeout(milliseconds)
         self.page.mouse.up()
 
+    def choose(self, control, text):
+        """Presses one of the menu's match settings buttons, such as
+        "KillLimitButton", until it reads `text`."""
+        for _ in range(20):
+            state = self.wait_for("s.screen === 'menu'")
+            buttons = dict(zip(["ModeButton", "MaxPlayersButton", "KillLimitButton", "MinutesButton"], state["match_buttons"]))
+            if buttons[control] == text:
+                return
+            self.click(control)
+            self.wait_for(f"s.match_buttons.join('|') !== {'|'.join(state['match_buttons'])!r}")
+        raise AssertionError(f"{control} never read {text!r}")
+
     def player(self, player_id):
         """Player `player_id` as this window sees them."""
         state = self.wait_for(f"s.players.some((p) => p.id === {player_id})")

@@ -56,6 +56,7 @@ func snapshot() -> Dictionary:
 			"health": record.health if record != null else null,
 			"alive": record.alive if record != null else null,
 			"kills": record.kills if record != null else null,
+			"team": record.team if record != null else null,
 			"deaths": record.deaths if record != null else null,
 		}
 		if player.is_multiplayer_authority():
@@ -75,12 +76,19 @@ func snapshot() -> Dictionary:
 	var controls := {}
 	for control: Control in [
 		_main.name_edit,
+		_main.mode_button,
+		_main.max_players_button,
+		_main.kill_limit_button,
+		_main.minutes_button,
 		_main.host_button,
 		_main.target_edit,
 		_main.join_button,
 		_main.refresh_button,
 		_main.leave_button,
 		_main.disconnected_button,
+		_main.menu_button,
+		_main.resume_button,
+		_main.menu_leave_button,
 	]:
 		if control.is_visible_in_tree():
 			controls[control.name] = _centre(control)
@@ -90,6 +98,7 @@ func snapshot() -> Dictionary:
 		"status": _main.status.text,
 		"frame": Engine.get_process_frames(),
 		"name_box": _main.name_edit.text,
+		"match_buttons": [_main.mode_button.text, _main.max_players_button.text, _main.kill_limit_button.text, _main.minutes_button.text],
 		"mouse_captured": Input.mouse_mode == Input.MOUSE_MODE_CAPTURED,
 		"hud": _main.hud.text if _main.hud.visible else "",
 		"code": Net.room_code,
@@ -101,6 +110,8 @@ func snapshot() -> Dictionary:
 			"hits_shown": _main.combat_hud.hits_shown,
 			"hurts_shown": _main.combat_hud.hurts_shown,
 			"knocked_out": _main.combat_hud.knocked_out_shown() if _main.combat_hud.visible else "",
+			"match": _main.combat_hud.match_shown() if _main.combat_hud.visible else "",
+			"result": _main.combat_hud.result_shown() if _main.combat_hud.visible else "",
 			"kill_feed": _main.combat_hud.kill_feed.showing(),
 			"knockouts_announced": _main.combat_hud.kill_feed.announced,
 			"latest_knockout": _main.combat_hud.kill_feed.latest,
@@ -116,6 +127,8 @@ func _screen() -> String:
 		return "disconnected"
 	if _main.waiting_notice.visible:
 		return "waiting"
+	if _main.pause_menu.visible:
+		return "paused"
 	if _main.menu.visible:
 		return "menu"
 	return "game"

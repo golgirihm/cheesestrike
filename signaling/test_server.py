@@ -65,7 +65,52 @@ class SignalingTest(unittest.IsolatedAsyncioTestCase):
         await self.send(ws, type="host")
         hosted = await self.recv(ws)
         self.assertEqual(hosted["type"], "hosted")
-        self.assertEqual(await self.list_sessions(), [{"code": hosted["code"], "players": 1}])
+        self.assertEqual(await self.list_sessions(), [{"code": hosted["code"], "players": 1, "settings": server.DEFAULT_SETTINGS}])
+
+    async def test_a_hosts_settings_are_listed(self):
+        ws = await self.client()
+        settings = {"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6}
+        await self.send(ws, type="host", settings=settings)
+        await self.recv(ws)
+        self.assertEqual((await self.list_sessions())[0]["settings"], settings)
+
+    async def test_settings_out_of_range_are_brought_into_it(self):
+        ws = await self.client()
+        await self.send(ws, type="host", settings={"mode": "teams", "kill_limit": 0, "minutes": 1e9, "max_players": 99})
+        await self.recv(ws)
+        self.assertEqual(
+            (await self.list_sessions())[0]["settings"],
+            {"mode": "teams", "kill_limit": 1, "minutes": 60, "max_players": server.MAX_PLAYERS},
+        )
+
+    async def test_settings_of_the_wrong_kind_are_replaced_by_the_defaults(self):
+        ws = await self.client()
+        await self.send(ws, type="host", settings={"mode": "hide and seek", "kill_limit": "lots", "minutes": True, "max_players": None, "extra": 1})
+        await self.recv(ws)
+        self.assertEqual((await self.list_sessions())[0]["settings"], server.DEFAULT_SETTINGS)
+
+    async def test_settings_that_are_not_finite_numbers_give_the_defaults(self):
+        ws = await self.client()
+        # JSON as Python reads it allows these, though the standard doesn't.
+        await ws.send('{"type": "host", "settings": {"kill_limit": Infinity, "minutes": NaN, "max_players": -Infinity}}')
+        await self.recv(ws)
+        self.assertEqual((await self.list_sessions())[0]["settings"], server.DEFAULT_SETTINGS)
+
+    async def test_settings_that_are_not_an_object_give_the_defaults(self):
+        ws = await self.client()
+        await self.send(ws, type="host", settings=["ffa", 20])
+        await self.recv(ws)
+        self.assertEqual((await self.list_sessions())[0]["settings"], server.DEFAULT_SETTINGS)
+
+    async def test_a_session_is_full_at_its_own_player_limit(self):
+        host_ws = await self.client()
+        await self.send(host_ws, type="host", settings={"max_players": 3})
+        code = (await self.recv(host_ws))["code"]
+        for _ in range(2):
+            await self.join(code, host_ws)
+        ws = await self.client()
+        await self.send(ws, type="join", code=code)
+        self.assertEqual(await self.recv(ws), {"type": "error", "message": "That session is full."})
 
     async def test_joining_tells_both_sides_the_new_peer_id(self):
         host_ws, code = await self.host()
