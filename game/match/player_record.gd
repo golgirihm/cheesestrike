@@ -24,6 +24,11 @@ var weapon := Weapons.STARTING
 var weapons: Array = [Weapons.STARTING]
 ## Their team in a team match, or MatchState.NO_TEAM.
 var team := -1
+## The Overload meter, filling to Overload.METER_FULL; seconds left in an
+## Overload set off; and seconds left melted by someone else's.
+var overload := 0.0
+var overload_left := 0.0
+var melted_for := 0.0
 
 
 func _init(player_id := 0) -> void:
@@ -54,6 +59,9 @@ func to_dict() -> Dictionary:
 		"weapon": weapon,
 		"weapons": weapons,
 		"team": team,
+		"overload": overload,
+		"overload_left": overload_left,
+		"melted_for": melted_for,
 	}
 
 
@@ -71,6 +79,9 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.last_attacker = _int(data, "last_attacker", record.last_attacker)
 	record.weapon = _string(data, "weapon", record.weapon)
 	record.team = clampi(_int(data, "team", record.team), -1, 1)
+	record.overload = clampf(_float(data, "overload", 0.0), 0.0, Overload.METER_FULL)
+	record.overload_left = maxf(_float(data, "overload_left", 0.0), 0.0)
+	record.melted_for = maxf(_float(data, "melted_for", 0.0), 0.0)
 	var carried: Variant = data.get("weapons")
 	if carried is Array:
 		record.weapons = carried.filter(func(id: Variant) -> bool: return Weapons.find(id) != null)
@@ -88,7 +99,7 @@ static func _int(data: Dictionary, key: String, default: int) -> int:
 
 static func _float(data: Dictionary, key: String, default: float) -> float:
 	var value: Variant = data.get(key)
-	return float(value) if value is int or value is float else default
+	return float(value) if (value is int or value is float) and is_finite(float(value)) else default
 
 
 static func _bool(data: Dictionary, key: String, default: bool) -> bool:

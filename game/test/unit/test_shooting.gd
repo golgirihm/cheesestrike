@@ -440,3 +440,24 @@ func test_a_new_player_starts_at_their_spot_on_every_machine() -> void:
 	world.players.add_child(other)
 	assert_eq(other.global_position, spot)
 	other.queue_free()
+
+
+func test_setting_off_an_overload_makes_the_owner_faster() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await wait_physics_frames(3)
+	match_.state.player(1).overload = Overload.METER_FULL
+	watch_signals(match_)
+	match_.set_off_overload()
+	assert_signal_emitted_with_parameters(match_, "overloaded", [1])
+	Input.action_press("move_forward")
+	await wait_physics_frames(2)
+	var speed := Vector2(own.velocity.x, own.velocity.z).length()
+	Input.action_release("move_forward")
+	assert_almost_eq(speed, own.SPEED * Overload.SPEED_BOOST, 0.01)
+
+
+func test_an_overload_that_is_not_ready_does_nothing() -> void:
+	_add(1, Vector3(0, 0, 5))
+	watch_signals(match_)
+	match_.set_off_overload()
+	assert_signal_not_emitted(match_, "overloaded")
