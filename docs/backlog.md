@@ -33,12 +33,10 @@ Before there is much more game, make it possible for people on different network
 
 Once there is real combat, the shortcuts from earlier milestones start to show.
 
-1. **Lag compensation.** The host keeps a short history of player positions and checks each shot against where targets were when the shooter fired, so players with higher latency can still hit what they see.
-   *Tests:* GUT tests for the history and rewind.
-2. **Movement sanity checks.** Since players move themselves, have the host reject impossible movement (too fast, through walls, flying) and put the player back.
+1. **Movement sanity checks.** Since players move themselves, have the host reject impossible movement (too fast, through walls, flying) and put the player back.
    *Tests:* GUT tests for the checks.
-3. **Reconnect.** A player whose connection drops can rejoin the same session within a short window and keep their score.
-4. **Host leaving.** Decide between host migration (hand the session to another player, which is hard with a host-decided game) and ending the match gracefully with final scores. Ending gracefully is the likely first step.
+2. **Reconnect.** A player whose connection drops can rejoin the same session within a short window and keep their score.
+3. **Host leaving.** Decide between host migration (hand the session to another player, which is hard with a host-decided game) and ending the match gracefully with final scores. Ending gracefully is the likely first step.
 
 ## Milestone 6: Polish and release
 
