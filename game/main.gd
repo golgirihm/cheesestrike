@@ -15,6 +15,7 @@ extends Node
 @onready var refresh_button: Button = %RefreshButton
 @onready var status: Label = %Status
 @onready var hud: Label = %Hud
+@onready var touch_controls: Control = %TouchControls
 @onready var waiting_notice: Control = %WaitingNotice
 @onready var leave_button: Button = %LeaveButton
 @onready var disconnected_notice: Control = %DisconnectedNotice
@@ -91,6 +92,7 @@ func _set_busy(message: String) -> void:
 func _on_session_started() -> void:
 	menu.hide()
 	hud.show()
+	touch_controls.show()
 	world.start()
 
 
@@ -106,6 +108,7 @@ func _on_session_failed(reason: String) -> void:
 
 func _on_session_ended(reason: String) -> void:
 	world.stop()
+	touch_controls.hide()
 	if reason.is_empty():
 		_show_menu("")
 		return
@@ -122,6 +125,7 @@ func _dismiss_disconnected() -> void:
 
 func _show_menu(message: String) -> void:
 	hud.hide()
+	touch_controls.hide()
 	menu.show()
 	status.text = message
 	host_button.disabled = false

@@ -33,15 +33,9 @@ Before there is much more game, make it possible for people on different network
 
 The smallest version of the game that is actually a shooter: one weapon, health, death and respawn, with the host deciding every hit.
 
-1. **Host-decided hits.** Pressing fire sends the shot's origin and direction to the host, which checks it against the shooter's synced head position, casts the ray itself and announces the hit. Put the rules (fire rate, range, damage, whether a reported origin is believable) in a plain class like `HostWatch` so they can be tested without a network. Start without lag compensation; Milestone 5 adds it.
-   *Tests:* GUT tests for the rules class. Browser test: a player in one window shoots a player standing still in another and the hit is reported.
-2. **The first weapon: the Cheddar Blaster.** A hitscan rifle with a fire rate, a magazine and a reload. Fire on left click, right trigger and a fire button on the touch layout (which also needs a reload button). Bind a reload key.
-   *Tests:* GUT tests for ammo and reload timing. Manual: INP rows for firing and reloading on each input device.
-3. **Health, death and respawn.** 100 health, owned by the host and synced to everyone. At zero the player is out for a few seconds, then respawns at the free spot farthest from other players, with a moment of protection. Extend `SpawnSlots`, or add a sibling class, for choosing the spot.
-   *Tests:* GUT tests for damage, death and spawn choice. Browser test: shoot a player until they respawn somewhere else.
-4. **Combat feedback.** Crosshair, a hit marker for the shooter, a red edge on screen showing which way damage came from, a health bar, a muzzle flash and tracer that everyone sees, and a brief death screen saying who did it.
+1. **Combat feedback.** Crosshair, a hit marker for the shooter, a red edge on screen showing which way damage came from, a health bar, a muzzle flash and tracer that everyone sees, and a brief death screen saying who did it.
    *Tests:* expose health and the last hit through `TestHook` and check them in the browser tests. Manual: rows for how the effects look.
-5. **Kill feed and scoreboard.** Kills appear in a corner for everyone; holding Tab (or a button on gamepad and touch) shows each player's kills and deaths. Score is kept by the host.
+2. **Kill feed and scoreboard.** Kills appear in a corner for everyone; holding Tab (or a button on gamepad and touch) shows each player's kills and deaths. Score is kept by the host.
    *Tests:* GUT test for score keeping; browser test that a kill shows up for a third player.
 
 ## Milestone 3: A match

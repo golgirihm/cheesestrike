@@ -2,6 +2,13 @@ extends CharacterBody3D
 ## One player's character. The node is named after the owning peer's id, and
 ## that peer has authority over it: it simulates movement locally and the
 ## MultiplayerSynchronizer replicates the result to everyone else.
+##
+## The owner also fires its weapon here, showing the shot at once and telling
+## the host (see Match), which decides what it hit. Health and whether the
+## player is in play are the host's to decide, and arrive with the match state.
+
+## A shot this player fired, for effects on this machine.
+signal fired(origin: Vector3, direction: Vector3, seed: int)
 
 const SPEED := 6.0
 const JUMP_VELOCITY := 5.5
@@ -16,16 +23,21 @@ const PITCH_LIMIT := deg_to_rad(85.0)
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var body: MeshInstance3D = $Body
 @onready var visor: MeshInstance3D = $Head/Visor
+@onready var gun: Node3D = $Head/Gun
+@onready var muzzle: Node3D = $Head/Gun/Muzzle
 @onready var name_tag: Label3D = $NameTag
+@onready var collider: CollisionShape3D = $CollisionShape3D
 
 # Touch controls: the left half of the screen is a movement stick, the right
-# half drags to look and taps to jump.
+# half drags to look and taps to jump, and on-screen buttons fire and reload.
 var _move_touch := -1
 var _move_touch_origin := Vector2.ZERO
 var _move_touch_vector := Vector2.ZERO
 var _look_touch := -1
 var _look_touch_start_msec := 0
 var _touch_jump := false
+# Touch index -> name of the on-screen button it is holding.
+var _button_touches := {}
 var _mine := false
 
 ## Where this player starts, chosen by the host and set before the node enters
@@ -33,6 +45,18 @@ var _mine := false
 var spawn_position := Vector3.ZERO
 ## The world's Match node, set with spawn_position.
 var match_: Node
+
+## The weapon in this player's hands. Only the owner fires it.
+var weapon := WeaponState.new(Weapons.find(Weapons.STARTING))
+## Whether the host has this player in play, as opposed to knocked out.
+var alive := true
+
+var _mouse_fire_held := false
+# Presses noted as their events arrive, so that a click or tap that begins and
+# ends between two physics frames isn't missed.
+var _fire_pressed := false
+var _reload_pressed := false
+var _jump_pressed := false
 
 
 func _enter_tree() -> void:
@@ -51,18 +75,52 @@ func _ready() -> void:
 	body.visible = not _mine
 	visor.visible = not _mine
 	name_tag.visible = not _mine
-	if match_ != null:
-		match_.state_changed.connect(_on_match_state_changed)
-		_on_match_state_changed()
 	if _mine:
 		camera.make_current()
 		global_position = spawn_position
-		# Start facing the middle of the arena, not the wall behind the spot.
-		rotation.y = atan2(spawn_position.x, spawn_position.z)
+		_face_middle()
+	if match_ != null:
+		match_.state_changed.connect(_on_match_state_changed)
+		_on_match_state_changed()
+
+
+## The host's record of this player, or null before it has arrived.
+func record() -> PlayerRecord:
+	return match_.state.player(name.to_int()) if match_ != null else null
+
+
+## Puts this player, who has just come back into play, at `at`.
+func respawn_at(at: Vector3) -> void:
+	global_position = at
+	velocity = Vector3.ZERO
+	head.rotation.x = 0.0
+	_face_middle()
+	weapon.refill()
+
+
+func _face_middle() -> void:
+	# Start facing the middle of the arena, not the wall behind the spot.
+	rotation.y = atan2(global_position.x, global_position.z)
 
 
 func _on_match_state_changed() -> void:
+	var own := record()
 	name_tag.text = match_.state.name_of(name.to_int())
+	_set_alive(own == null or own.alive)
+
+
+func _set_alive(now_alive: bool) -> void:
+	if now_alive == alive:
+		return
+	alive = now_alive
+	collider.set_deferred("disabled", not alive)
+	if not _mine:
+		body.visible = alive
+		visor.visible = alive
+		name_tag.visible = alive
+	gun.visible = alive
+	if not alive:
+		_release_controls()
 
 
 func _input(event: InputEvent) -> void:
@@ -72,25 +130,68 @@ func _input(event: InputEvent) -> void:
 		_handle_drag(event)
 	elif event.device == InputEvent.DEVICE_ID_EMULATION:
 		return  # Mouse events synthesized from touches; handled above.
-	elif event is InputEventMouseButton and event.pressed:
+	elif event is InputEventMouseButton:
+		var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+		if event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			_mouse_fire_held = false
+		elif event.pressed and captured and event.button_index == MOUSE_BUTTON_LEFT:
+			_mouse_fire_held = true
+			_fire_pressed = true
 		# Not while waiting on the host: the pointer is needed for its notice.
-		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not Net.host_silent:
+		elif event.pressed and not captured and not Net.host_silent:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		_look(event.relative * MOUSE_SENSITIVITY)
+		# A web build takes the movement from the browser instead; see WebPage.
+		if not OS.has_feature("web"):
+			_look(event.relative * MOUSE_SENSITIVITY)
 	elif event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_mouse_fire_held = false
+	elif event.is_action_pressed("reload"):
+		_reload_pressed = true
+	elif event.is_action_pressed("jump"):
+		_jump_pressed = true
+	elif event.is_action_pressed("fire"):
+		_fire_pressed = true
+
+
+## A mouse movement measured in the page's pixels, as the browser reports it,
+## in the game's own interface pixels, which is what the engine reports
+## natively, so that the mouse feels the same either way. `view` is the size of
+## the game's view in interface pixels, `window` the canvas in the screen's
+## pixels and `pixel_ratio` the screen's pixels per page pixel.
+static func page_to_view(movement: Vector2, view: Vector2, window: Vector2, pixel_ratio: float) -> Vector2:
+	if window.x <= 0.0:
+		return movement
+	return movement * pixel_ratio * view.x / window.x
+
+
+func _process(_delta: float) -> void:
+	if OS.has_feature("web") and _mine:
+		var moved := WebPage.take_mouse_movement()
+		if moved != Vector2.ZERO and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			var view := get_viewport().get_visible_rect().size
+			var window := Vector2(DisplayServer.window_get_size())
+			_look(page_to_view(moved, view, window, DisplayServer.screen_get_scale()) * MOUSE_SENSITIVITY)
 
 
 func _physics_process(delta: float) -> void:
 	if Net.host_silent:
 		return
+	weapon.tick(delta)
+	if not alive:
+		_jump_pressed = false
+		_touch_jump = false
+		_reload_pressed = false
+		_fire_pressed = false
+		return
 	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * delta)
 
 	if not is_on_floor():
 		velocity += get_gravity() * delta
-	elif Input.is_action_just_pressed("jump") or _touch_jump:
+	elif _jump_pressed or _touch_jump:
 		velocity.y = JUMP_VELOCITY
+	_jump_pressed = false
 	_touch_jump = false
 
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back") + _move_touch_vector
@@ -99,10 +200,39 @@ func _physics_process(delta: float) -> void:
 	velocity.z = direction.z * SPEED
 	move_and_slide()
 
+	_use_weapon()
+
+
+func _use_weapon() -> void:
+	if _reload_pressed:
+		_reload_pressed = false
+		if weapon.start_reload():
+			match_.reload()
+	var held := Input.is_action_pressed("fire") or _mouse_fire_held or _button_touches.values().has("fire")
+	var wants := _fire_pressed or (held and weapon.stats.automatic)
+	# A press waits for the weapon to be ready, unless it is empty.
+	if _fire_pressed and (weapon.can_fire() or weapon.is_reloading()):
+		_fire_pressed = false
+	if wants and weapon.fire():
+		var origin := camera.global_position
+		var direction := -camera.global_basis.z
+		var seed := randi()
+		match_.fire(origin, direction, seed)
+		fired.emit(origin, direction, seed)
+		# Firing the last round starts the reload by itself.
+		if weapon.is_reloading():
+			match_.reload()
+
 
 func _exit_tree() -> void:
 	if _mine:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _release_controls() -> void:
+	_mouse_fire_held = false
+	_fire_pressed = false
+	_button_touches.clear()
 
 
 func _look(delta: Vector2) -> void:
@@ -112,15 +242,30 @@ func _look(delta: Vector2) -> void:
 	head.rotation.x = clampf(head.rotation.x - delta.y, -PITCH_LIMIT, PITCH_LIMIT)
 
 
+func _touch_controls() -> Node:
+	return get_tree().get_first_node_in_group("touch_controls")
+
+
 func _handle_touch(event: InputEventScreenTouch) -> void:
+	var controls := _touch_controls()
+	if controls != null:
+		controls.notice_touch()
 	if event.pressed:
-		if event.position.x < get_viewport().get_visible_rect().size.x * 0.5:
+		var button: String = controls.button_at(event.position) if controls != null else ""
+		if button == "reload":
+			_reload_pressed = true
+		elif not button.is_empty():
+			_button_touches[event.index] = button
+			_fire_pressed = true
+		elif event.position.x < get_viewport().get_visible_rect().size.x * 0.5:
 			if _move_touch == -1:
 				_move_touch = event.index
 				_move_touch_origin = event.position
 		elif _look_touch == -1:
 			_look_touch = event.index
 			_look_touch_start_msec = Time.get_ticks_msec()
+	elif _button_touches.has(event.index):
+		_button_touches.erase(event.index)
 	elif event.index == _move_touch:
 		_move_touch = -1
 		_move_touch_vector = Vector2.ZERO
@@ -128,6 +273,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		_look_touch = -1
 		if Time.get_ticks_msec() - _look_touch_start_msec < TOUCH_TAP_MSEC:
 			_touch_jump = true
+	if controls != null:
+		controls.held = _button_touches.values()
 
 
 func _handle_drag(event: InputEventScreenDrag) -> void:

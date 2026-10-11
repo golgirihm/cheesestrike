@@ -58,3 +58,17 @@ func test_every_spot_is_just_above_the_floor() -> void:
 		var from := spot.global_position
 		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 0.5))
 		assert_false(hit.is_empty(), "%s has no floor within half a metre below it" % spot.name)
+
+
+func test_the_first_two_spots_see_each_other() -> void:
+	# The browser tests shoot from the first spot at a player on the second
+	# without aiming, as each starts facing the middle.
+	var space := world.get_world_3d().direct_space_state
+	var eye := Vector3(0, 1.55, 0)
+	var from: Vector3 = world.spawn_points.get_child(0).global_position + eye
+	var to: Vector3 = world.spawn_points.get_child(1).global_position + eye
+	var query := PhysicsRayQueryParameters3D.create(from, to, Match.WORLD_MASK)
+	assert_true(space.intersect_ray(query).is_empty(), "something stands between the first two spots")
+	var facing := (to - from) * Vector3(1, 0, 1)
+	var to_middle := (-from) * Vector3(1, 0, 1)
+	assert_gt(facing.normalized().dot(to_middle.normalized()), 0.999, "the second spot isn't straight ahead of the first")

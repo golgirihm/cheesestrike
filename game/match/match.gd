@@ -1,18 +1,32 @@
+class_name Match
 extends Node
 ## The host's side of the rules, and everyone's copy of what it decided.
 ##
 ## The host keeps the MatchState and sends all of it to every player whenever it
 ## changes, at most SYNC_INTERVAL apart. Players ask the host for things (a new
-## name, and later a shot) by RPC, and the host decides.
+## name, a shot) by RPC, and the host decides.
+##
+## A shot is fired on the shooter's machine, which shows it at once and tells
+## the host where it started and which way it went. The host checks it could
+## have been fired (ShotRules), works out what it hit against where it sees the
+## players (HitScan), and applies the damage.
 
 signal state_changed
 
 const SYNC_INTERVAL := 0.1
+## Physics layer of the arena's walls, floor and cover, which stop shots.
+const WORLD_MASK := 1
 
 ## Everyone's copy of the host's decisions. Replaced, not changed, on players
 ## other than the host, so hold on to it only briefly.
 var state := MatchState.new()
 
+@onready var world := get_parent() as Node3D
+
+# Seconds since this node started, as the host's clock for ShotRules.
+var _clock := 0.0
+# The host's ShotRules for each player, by id.
+var _rules := {}
 # Names asked for by players the host hasn't seen join yet, by player id.
 var _pending_names := {}
 var _dirty := false
@@ -24,6 +38,7 @@ func start() -> void:
 	if is_host():
 		state = MatchState.new()
 		_pending_names.clear()
+		_rules.clear()
 		state_changed.emit()
 	else:
 		introduce(Settings.get_value("name"))
@@ -54,6 +69,7 @@ func add_player(id: int) -> void:
 func remove_player(id: int) -> void:
 	state.remove_player(id)
 	_pending_names.erase(id)
+	_rules.erase(id)
 	_changed()
 
 
@@ -65,7 +81,36 @@ func introduce(wanted: String) -> void:
 		_introduce.rpc_id(1, wanted)
 
 
+## This player fires the weapon in their hands from `origin` along `direction`.
+## `seed` decides where any spread sends each pellet.
+func fire(origin: Vector3, direction: Vector3, seed: int) -> void:
+	if is_host():
+		_shot(1, origin, direction, seed)
+	elif multiplayer.multiplayer_peer != null:
+		_request_shot.rpc_id(1, origin, direction, seed)
+
+
+## This player has started reloading.
+func reload() -> void:
+	if is_host():
+		_reload(1)
+	elif multiplayer.multiplayer_peer != null:
+		_request_reload.rpc_id(1)
+
+
+## This player's own record, or null before the host has sent it.
+func own_record() -> PlayerRecord:
+	return state.player(multiplayer.get_unique_id()) if multiplayer.multiplayer_peer != null else null
+
+
 func _process(delta: float) -> void:
+	_clock += delta
+	# Everyone runs the clocks, so countdowns show smoothly between updates;
+	# only the host acts on them.
+	var due := state.tick(delta)
+	if is_host():
+		for id in due:
+			_respawn(id)
 	_since_sync += delta
 	if _dirty and _since_sync >= SYNC_INTERVAL and is_host():
 		_dirty = false
@@ -83,6 +128,103 @@ func _rename(id: int, wanted: String) -> void:
 		_pending_names[id] = wanted
 	elif state.rename(id, wanted):
 		_changed()
+
+
+func _rules_for(id: int) -> ShotRules:
+	if not _rules.has(id):
+		_rules[id] = ShotRules.new()
+	return _rules[id]
+
+
+## The host checks and carries out a shot that `shooter` reports.
+func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int) -> void:
+	var record := state.player(shooter)
+	var shooter_node: Node3D = world.player_node(shooter)
+	if record == null or not record.alive or shooter_node == null:
+		return
+	var weapon := Weapons.find(record.weapon)
+	if weapon == null or not origin.is_finite() or not direction.is_finite() or direction.length() < 0.5:
+		return
+	if not ShotRules.origin_believable(origin, shooter_node.head.global_position):
+		return
+	if not _rules_for(shooter).allow_shot(weapon, _clock):
+		return
+	if record.is_protected():
+		record.protected_for = 0.0
+		_changed()
+
+	var targets := {}
+	for node: Node3D in world.players.get_children():
+		var id := node.name.to_int()
+		var target := state.player(id)
+		if id != shooter and target != null and target.alive and not node.is_queued_for_deletion():
+			targets[id] = node.global_position
+
+	var damage_to := {}
+	for pellet in HitScan.pellet_directions(direction, weapon.pellets, weapon.spread_degrees, seed):
+		var reach := _distance_to_wall(origin, pellet, weapon.max_range)
+		var hit := HitScan.first_hit(origin, pellet, reach, targets)
+		if not hit.is_empty():
+			var amount := weapon.damage * (weapon.headshot_multiplier if hit.head else 1.0)
+			damage_to[hit.id] = damage_to.get(hit.id, 0.0) + amount
+	for victim: int in damage_to:
+		if state.damage(shooter, victim, damage_to[victim]).dealt > 0:
+			_changed()
+
+
+## How far a shot from `origin` along `direction` travels before the arena
+## stops it, up to `max_range`.
+func _distance_to_wall(origin: Vector3, direction: Vector3, max_range: float) -> float:
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * max_range, WORLD_MASK)
+	var hit := world.get_world_3d().direct_space_state.intersect_ray(query)
+	return origin.distance_to(hit.position) if not hit.is_empty() else max_range
+
+
+func _reload(id: int) -> void:
+	var record := state.player(id)
+	var weapon := Weapons.find(record.weapon) if record != null else null
+	if weapon != null:
+		_rules_for(id).reload(weapon, _clock)
+
+
+## The host brings a knocked-out player back, at the spot farthest from
+## everyone else.
+func _respawn(id: int) -> void:
+	var others: Array[Vector3] = []
+	for node: Node3D in world.players.get_children():
+		var other := state.player(node.name.to_int())
+		if other != null and other.id != id and other.alive:
+			others.append(node.global_position)
+	var spots: Array[Vector3] = world.spawn_positions()
+	var at := spots[SpawnChooser.farthest(spots, others)]
+	state.respawn(id)
+	_rules_for(id).refill()
+	_changed()
+	if id == multiplayer.get_unique_id():
+		_respawned(at)
+	elif multiplayer.get_peers().has(id):
+		_respawned.rpc_id(id, at)
+
+
+## Tells a player where they have come back. Players move themselves, so the
+## host can only ask.
+@rpc("authority", "call_remote", "reliable")
+func _respawned(at: Vector3) -> void:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own != null:
+		own.respawn_at(at)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_shot(origin: Variant, direction: Variant, seed: Variant) -> void:
+	if is_host() and origin is Vector3 and direction is Vector3 and seed is int:
+		_shot(multiplayer.get_remote_sender_id(), origin, direction, seed)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_reload() -> void:
+	if is_host():
+		_reload(multiplayer.get_remote_sender_id())
 
 
 @rpc("any_peer", "call_remote", "reliable")

@@ -54,6 +54,19 @@ func _remove_player(id: int) -> void:
 		print("player left: %d" % id)
 
 
+## The player node for peer `id`, or null.
+func player_node(id: int) -> Node3D:
+	var node := players.get_node_or_null(str(id))
+	return node if node != null and not node.is_queued_for_deletion() else null
+
+
+func spawn_positions() -> Array[Vector3]:
+	var spots: Array[Vector3] = []
+	for spot: Node3D in spawn_points.get_children():
+		spots.append(spot.global_position)
+	return spots
+
+
 ## Runs on every peer, with the data the host passed to `spawner.spawn`: the
 ## player's peer id and the starting spot the host chose for them.
 func _create_player(data: Array) -> Node:
