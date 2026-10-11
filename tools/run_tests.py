@@ -29,12 +29,16 @@ import re
 import shutil
 import subprocess
 import sys
+import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GAME = ROOT / "game"
 VERSIONS = ROOT / "tools" / "versions.env"
 REQUIREMENTS = [ROOT / "signaling" / "requirements.txt", ROOT / "browser_tests" / "requirements.txt"]
+BROWSER_TESTS = ROOT / "browser_tests"
 BROWSER_BUILD = ROOT / "build" / "browser-tests"
+# How many browsers run tests at once. CI's machines have four processors.
+BROWSER_WORKERS = 4
 
 warnings = []
 
@@ -166,7 +170,51 @@ def browser(pins):
         print("error: the web export failed. Godot's Web export template may be missing;")
         print("install the export templates from the editor, or run: python tools/fetch_export_template.py")
         return False
-    return run(sys.executable, "-m", "unittest", "discover", "-v", "-s", "browser_tests")
+    return run_browser_tests()
+
+
+def run_browser_tests():
+    """Runs the browser tests several at a time, each group in a process with
+    a browser of its own. They spend most of their time waiting on the game,
+    so this takes about half as long as running them one after another."""
+    sys.path.insert(0, str(BROWSER_TESTS))
+    tests = []
+
+    def collect(suite):
+        for item in suite:
+            if isinstance(item, unittest.TestSuite):
+                collect(item)
+            else:
+                tests.append(item.id())
+
+    collect(unittest.defaultTestLoader.discover(str(BROWSER_TESTS)))
+    broken = [test for test in tests if test.startswith("unittest.loader.")]
+    if broken or not tests:
+        print(f"error: couldn't load the browser tests: {', '.join(broken) or 'none found'}")
+        return False
+
+    workers = min(BROWSER_WORKERS, len(tests))
+    groups = [tests[index::workers] for index in range(workers)]
+    print(f"running {len(tests)} tests in {workers} groups", flush=True)
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-m", "unittest", "-v", *group],
+            cwd=BROWSER_TESTS,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        for group in groups
+    ]
+    passed = True
+    for number, process in enumerate(processes, start=1):
+        output = process.communicate()[0]
+        print(f"--- group {number} ---")
+        print(output, end="", flush=True)
+        passed = passed and process.returncode == 0
+    return passed
 
 
 SUITES = {"game": game, "signaling": signaling, "browser": browser}
