@@ -1,0 +1,200 @@
+extends Control
+## What a player needs on screen in a fight: a crosshair, their health and
+## ammunition, a mark when their shot hits, a red edge pointing at whoever just
+## hurt them, and a notice while they are knocked out.
+##
+## Drawn over the whole screen. bind() gives it the world, whose Match says what
+## the host decided and who this player is.
+
+const CROSSHAIR_GAP := 5.0
+const CROSSHAIR_LENGTH := 9.0
+const CROSSHAIR_COLOR := Color(1, 1, 1, 0.9)
+const HIT_MARKER_LIFE := 0.25
+const HIT_MARKER_SIZE := 11.0
+const HIT_COLOR := Color(1, 1, 1)
+const HEADSHOT_COLOR := Color(1.0, 0.8, 0.2)
+const KNOCKOUT_COLOR := Color(1.0, 0.3, 0.25)
+const DAMAGE_INDICATOR_LIFE := 1.2
+const DAMAGE_INDICATOR_ARC := deg_to_rad(40.0)
+const DAMAGE_COLOR := Color(1.0, 0.15, 0.1, 0.8)
+const LOW_HEALTH := 30
+
+var world: Node3D
+## Hit markers and damage indicators shown so far, for the browser tests.
+var hits_shown := 0
+var hurts_shown := 0
+
+var _hit_left := 0.0
+var _hit_color := HIT_COLOR
+# Each entry: {"from": Vector3, "left": seconds}.
+var _indicators: Array[Dictionary] = []
+var _health_bar: ProgressBar
+var _health_label: Label
+var _ammo_label: Label
+var _knocked_out: PanelContainer
+var _knocked_out_title: Label
+var _knocked_out_detail: Label
+
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_build()
+
+
+## Shows the fight of the world `of`.
+func bind(of: Node3D) -> void:
+	world = of
+	world.match_.hit_confirmed.connect(_on_hit_confirmed)
+	world.match_.hurt.connect(_on_hurt)
+
+
+## How far round from straight ahead `from` lies, for a player at `at` facing
+## `yaw`: 0 ahead, PI/2 to the right, -PI/2 to the left, PI behind.
+static func damage_direction(at: Vector3, yaw: float, from: Vector3) -> float:
+	var to := (from - at) * Vector3(1, 0, 1)
+	var forward := Vector3(-sin(yaw), 0, -cos(yaw))
+	var right := Vector3(cos(yaw), 0, -sin(yaw))
+	return atan2(to.dot(right), to.dot(forward))
+
+
+static func ammo_text(weapon: WeaponState) -> String:
+	if weapon.is_reloading():
+		return "Reloading…"
+	return "%d / %d" % [weapon.ammo, weapon.stats.magazine]
+
+
+## The notice for a player who is knocked out: who did it and when they're back.
+static func knocked_out_text(state: MatchState, id: int) -> Array:
+	var record := state.player(id)
+	if record == null or record.alive:
+		return ["", ""]
+	var by := "Knocked out by %s" % state.name_of(record.last_attacker) if state.player(record.last_attacker) != null else "Knocked out"
+	return [by, "Back in %d…" % ceili(record.respawn_in) if record.respawn_in > 0.0 else "Coming back…"]
+
+
+func health_text() -> String:
+	return _health_label.text
+
+
+func ammo_shown() -> String:
+	return _ammo_label.text if _ammo_label.visible else ""
+
+
+func knocked_out_shown() -> String:
+	return _knocked_out_title.text if _knocked_out.visible else ""
+
+
+func indicators_showing() -> int:
+	return _indicators.size()
+
+
+func _process(delta: float) -> void:
+	if world == null:
+		return
+	_hit_left = maxf(_hit_left - delta, 0.0)
+	for indicator in _indicators:
+		indicator.left -= delta
+	_indicators = _indicators.filter(func(indicator: Dictionary) -> bool: return indicator.left > 0.0)
+
+	var own: Node3D = world.player_node(multiplayer.get_unique_id()) if multiplayer.multiplayer_peer != null else null
+	var record: PlayerRecord = world.match_.own_record()
+	var health := record.health if record != null else PlayerRecord.MAX_HEALTH
+	_health_bar.value = health
+	_health_label.text = str(health)
+	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
+	if own != null:
+		_ammo_label.text = ammo_text(own.weapon)
+	var notice: Array = knocked_out_text(world.match_.state, multiplayer.get_unique_id()) if record != null else ["", ""]
+	_knocked_out.visible = not notice[0].is_empty()
+	_knocked_out_title.text = notice[0]
+	_knocked_out_detail.text = notice[1]
+	queue_redraw()
+
+
+func _on_hit_confirmed(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
+	hits_shown += 1
+	_hit_left = HIT_MARKER_LIFE
+	_hit_color = KNOCKOUT_COLOR if knocked_out else (HEADSHOT_COLOR if head else HIT_COLOR)
+
+
+func _on_hurt(_attacker: int, from: Vector3, _dealt: int) -> void:
+	hurts_shown += 1
+	_indicators.append({"from": from, "left": DAMAGE_INDICATOR_LIFE})
+
+
+func _draw() -> void:
+	if world == null or _knocked_out.visible:
+		return
+	var centre := size / 2.0
+	for direction in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+		draw_line(centre + direction * CROSSHAIR_GAP, centre + direction * (CROSSHAIR_GAP + CROSSHAIR_LENGTH), CROSSHAIR_COLOR, 2.0, true)
+	if _hit_left > 0.0:
+		var color := _hit_color
+		color.a = _hit_left / HIT_MARKER_LIFE
+		for corner in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
+			draw_line(centre + corner * 4.0, centre + corner * HIT_MARKER_SIZE, color, 2.5, true)
+
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own == null:
+		return
+	var radius := minf(size.x, size.y) * 0.42
+	for indicator in _indicators:
+		var angle := damage_direction(own.global_position, own.rotation.y, indicator.from)
+		var color := DAMAGE_COLOR
+		color.a *= indicator.left / DAMAGE_INDICATOR_LIFE
+		# Angles here run clockwise from straight up.
+		var start := angle - PI / 2.0 - DAMAGE_INDICATOR_ARC / 2.0
+		draw_arc(centre, radius, start, start + DAMAGE_INDICATOR_ARC, 24, color, 10.0, true)
+
+
+func _build() -> void:
+	var health := HBoxContainer.new()
+	health.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 20)
+	health.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	health.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(health)
+	_health_bar = ProgressBar.new()
+	_health_bar.max_value = PlayerRecord.MAX_HEALTH
+	_health_bar.show_percentage = false
+	_health_bar.custom_minimum_size = Vector2(160, 18)
+	_health_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_health_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health.add_child(_health_bar)
+	_health_label = _outlined_label(22)
+	health.add_child(_health_label)
+
+	_ammo_label = _outlined_label(22)
+	_ammo_label.name = "Ammo"
+	_ammo_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)
+	_ammo_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_ammo_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(_ammo_label)
+
+	var middle := CenterContainer.new()
+	middle.set_anchors_preset(Control.PRESET_FULL_RECT)
+	middle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(middle)
+	_knocked_out = PanelContainer.new()
+	_knocked_out.visible = false
+	_knocked_out.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	middle.add_child(_knocked_out)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 6)
+	_knocked_out.add_child(rows)
+	_knocked_out_title = _outlined_label(24)
+	_knocked_out_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rows.add_child(_knocked_out_title)
+	_knocked_out_detail = _outlined_label(18)
+	_knocked_out_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rows.add_child(_knocked_out_detail)
+
+
+static func _outlined_label(font_size: int) -> Label:
+	var label := Label.new()
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 6)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label

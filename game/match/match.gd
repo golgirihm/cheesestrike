@@ -12,6 +12,12 @@ extends Node
 ## players (HitScan), and applies the damage.
 
 signal state_changed
+## This player's shot hit `victim` (on this machine only).
+signal hit_confirmed(victim: int, dealt: int, knocked_out: bool, head: bool)
+## This player was hurt by `attacker`, who fired from `from` (on this machine only).
+signal hurt(attacker: int, from: Vector3, dealt: int)
+## Another player fired a shot whose pellets ended at `ends`, for effects.
+signal shot_shown(shooter: int, ends: Array)
 
 const SYNC_INTERVAL := 0.1
 ## Physics layer of the arena's walls, floor and cover, which stop shots.
@@ -161,15 +167,62 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int) -> void
 			targets[id] = node.global_position
 
 	var damage_to := {}
+	var headshot := {}
+	var ends := []
 	for pellet in HitScan.pellet_directions(direction, weapon.pellets, weapon.spread_degrees, seed):
 		var reach := _distance_to_wall(origin, pellet, weapon.max_range)
 		var hit := HitScan.first_hit(origin, pellet, reach, targets)
-		if not hit.is_empty():
+		if hit.is_empty():
+			ends.append(origin + pellet * reach)
+		else:
+			ends.append(hit.point)
 			var amount := weapon.damage * (weapon.headshot_multiplier if hit.head else 1.0)
 			damage_to[hit.id] = damage_to.get(hit.id, 0.0) + amount
+			headshot[hit.id] = headshot.get(hit.id, false) or hit.head
+	_show_shot_to_others(shooter, ends)
 	for victim: int in damage_to:
-		if state.damage(shooter, victim, damage_to[victim]).dealt > 0:
+		var result := state.damage(shooter, victim, damage_to[victim])
+		if result.dealt > 0:
 			_changed()
+			_tell_hit(shooter, victim, result.dealt, result.knocked_out, headshot[victim])
+			_tell_hurt(victim, shooter, origin, result.dealt)
+
+
+func _show_shot_to_others(shooter: int, ends: Array) -> void:
+	for peer in multiplayer.get_peers():
+		if peer != shooter:
+			_shot_seen.rpc_id(peer, shooter, ends)
+	if shooter != multiplayer.get_unique_id():
+		shot_shown.emit(shooter, ends)
+
+
+func _tell_hit(shooter: int, victim: int, dealt: int, knocked_out: bool, head: bool) -> void:
+	if shooter == multiplayer.get_unique_id():
+		hit_confirmed.emit(victim, dealt, knocked_out, head)
+	elif multiplayer.get_peers().has(shooter):
+		_hit.rpc_id(shooter, victim, dealt, knocked_out, head)
+
+
+func _tell_hurt(victim: int, attacker: int, from: Vector3, dealt: int) -> void:
+	if victim == multiplayer.get_unique_id():
+		hurt.emit(attacker, from, dealt)
+	elif multiplayer.get_peers().has(victim):
+		_hurt.rpc_id(victim, attacker, from, dealt)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _shot_seen(shooter: int, ends: Array) -> void:
+	shot_shown.emit(shooter, ends)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _hit(victim: int, dealt: int, knocked_out: bool, head: bool) -> void:
+	hit_confirmed.emit(victim, dealt, knocked_out, head)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _hurt(attacker: int, from: Vector3, dealt: int) -> void:
+	hurt.emit(attacker, from, dealt)
 
 
 ## How far a shot from `origin` along `direction` travels before the arena

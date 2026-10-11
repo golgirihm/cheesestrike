@@ -156,3 +156,44 @@ func test_a_knocked_out_player_is_hidden_and_not_solid() -> void:
 	await wait_physics_frames(1)
 	assert_true(other.body.visible)
 	assert_false(other.collider.disabled)
+
+
+func test_the_host_is_told_of_its_own_hit() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	watch_signals(match_)
+	_shoot(shooter, Vector3(0, 1.65, -5))
+	assert_signal_emitted_with_parameters(match_, "hit_confirmed", [2, 35, false, true])
+	assert_signal_not_emitted(match_, "shot_shown", "the shooter shows its own shot")
+
+
+func test_the_host_is_told_when_it_is_hurt_and_sees_the_shot() -> void:
+	_add(1, Vector3(0, 0, -5))
+	var shooter := _add(2, Vector3(0, 0, 5))
+	watch_signals(match_)
+	_shoot(shooter, Vector3(0, 1.0, -5))
+	assert_signal_emitted(match_, "hurt")
+	var hurt: Array = get_signal_parameters(match_, "hurt")
+	assert_eq(hurt[0], 2)
+	assert_eq(hurt[1], shooter.head.global_position)
+	assert_eq(hurt[2], 20)
+	assert_signal_emitted(match_, "shot_shown")
+	var ends: Array = get_signal_parameters(match_, "shot_shown")[1]
+	assert_eq(ends.size(), 1)
+	assert_almost_eq(ends[0].z, -5.0 + HitScan.BODY_RADIUS, 0.01, "the tracer stops at the player hit")
+
+
+func test_a_missed_shot_ends_at_the_wall() -> void:
+	_add(1, Vector3(-5, 0, 0))
+	var shooter := _add(2, Vector3(10, 0, 5))
+	watch_signals(match_)
+	_shoot(shooter, Vector3(10, 1.55, -100))
+	var ends: Array = get_signal_parameters(match_, "shot_shown")[1]
+	assert_almost_eq(ends[0].z, -16.0, 0.01, "the north wall's inner face")
+
+
+func test_the_shooters_own_shot_shows_at_once() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	shooter.fired.emit(shooter.head.global_position, Vector3.FORWARD, 1)
+	var tracers: int = world.effects.get_child_count()
+	assert_eq(tracers, 2, "a flash and a tracer")

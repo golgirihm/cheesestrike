@@ -95,6 +95,13 @@ func snapshot() -> Dictionary:
 		"code": Net.room_code,
 		"notice": _main.disconnected_detail.text if _main.disconnected_notice.visible else "",
 		"players": players,
+		"combat": {
+			"health": _main.combat_hud.health_text() if _main.combat_hud.visible else "",
+			"ammo": _main.combat_hud.ammo_shown() if _main.combat_hud.visible else "",
+			"hits_shown": _main.combat_hud.hits_shown,
+			"hurts_shown": _main.combat_hud.hurts_shown,
+			"knocked_out": _main.combat_hud.knocked_out_shown() if _main.combat_hud.visible else "",
+		},
 		"sessions": sessions,
 		"controls": controls,
 	}

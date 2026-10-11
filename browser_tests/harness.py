@@ -49,8 +49,24 @@ class SignalingServer:
     def __init__(self):
         self.port = _free_port()
         self._process = None
+        self._started = False
 
     def start(self):
+        # Tests running at the same time pick free ports too, so another may
+        # take this one first. Until a test has seen the port, a new one will
+        # do; after that the test needs the server back where it was.
+        for attempt in range(5):
+            try:
+                self._start()
+                self._started = True
+                return
+            except RuntimeError as error:
+                if self._started or "address already in use" not in str(error):
+                    raise
+                self.port = _free_port()
+        self._start()
+
+    def _start(self):
         self._process = subprocess.Popen(
             [sys.executable, "-u", str(ROOT / "signaling" / "server.py"), "--host", "127.0.0.1", "--port", str(self.port)],
             stdout=subprocess.PIPE,
@@ -59,7 +75,11 @@ class SignalingServer:
         )
         line = self._process.stdout.readline()
         if "listening" not in line:
-            raise RuntimeError(f"signaling server didn't start: {line}{self._process.stdout.read()}")
+            output = line + self._process.stdout.read()
+            self._process.wait()
+            self._process.stdout.close()
+            self._process = None
+            raise RuntimeError(f"signaling server didn't start: {output}")
         # Keep reading so the server never blocks on a full pipe.
         threading.Thread(target=self._process.stdout.read, daemon=True).start()
 
