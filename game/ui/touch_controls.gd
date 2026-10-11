@@ -33,6 +33,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shown = DisplayServer.is_touchscreen_available()
 	resized.connect(queue_redraw)
+	Settings.changed.connect(func(_key: String) -> void: queue_redraw())
 
 
 ## A touch has been seen, so this is a touch screen whatever it reported.
@@ -43,18 +44,36 @@ func notice_touch() -> void:
 
 
 ## Where each button is on a screen of `screen` size: name -> {centre, radius}.
-static func layout_for(screen: Vector2) -> Dictionary:
+## `size` scales the buttons, and how far they sit from the edge; left-handed,
+## they sit on the left instead.
+static func layout_for(screen: Vector2, size := 1.0, left_handed := false) -> Dictionary:
 	var placed := {}
 	for name: String in BUTTONS:
-		placed[name] = {"centre": screen * BUTTONS[name].anchor + BUTTONS[name].offset, "radius": BUTTONS[name].radius}
+		var anchor: Vector2 = BUTTONS[name].anchor
+		var offset: Vector2 = BUTTONS[name].offset * size
+		if left_handed:
+			anchor.x = 1.0 - anchor.x
+			offset.x = -offset.x
+		placed[name] = {"centre": screen * anchor + offset, "radius": BUTTONS[name].radius * size}
 	return placed
+
+
+## The layout as the player has set it.
+func layout() -> Dictionary:
+	return layout_for(size, Settings.get_value("touch_size"), Settings.get_value("touch_left_handed"))
+
+
+## Whether a touch at `point` is on the side of the screen that moves the
+## player: the left half, or the right for the left-handed.
+static func is_movement_side(point: Vector2, screen: Vector2, left_handed: bool) -> bool:
+	return (point.x >= screen.x * 0.5) if left_handed else (point.x < screen.x * 0.5)
 
 
 ## The name of the button at `point`, or "" if none is there or none are showing.
 func button_at(point: Vector2) -> String:
 	if not shown or not is_visible_in_tree():
 		return ""
-	var placed := layout_for(size)
+	var placed := layout()
 	for name: String in placed:
 		if point.distance_to(placed[name].centre) <= placed[name].radius:
 			return name
@@ -74,13 +93,13 @@ func _draw() -> void:
 	if not shown:
 		return
 	var font := get_theme_default_font()
-	var placed := layout_for(size)
+	var placed := layout()
 	for name: String in placed:
 		var centre: Vector2 = placed[name].centre
 		var radius: float = placed[name].radius
 		draw_circle(centre, radius, HELD_COLOR if held.has(name) else COLOR)
 		draw_arc(centre, radius, 0.0, TAU, 48, LABEL_COLOR, 2.0, true)
 		var label: String = BUTTONS[name].label
-		var font_size: int = BUTTONS[name].font_size
+		var font_size := int(BUTTONS[name].font_size * Settings.get_value("touch_size"))
 		var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 		draw_string(font, centre + Vector2(-width / 2.0, font_size * 0.35), label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, LABEL_COLOR)

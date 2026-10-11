@@ -66,6 +66,8 @@ func _ready() -> void:
 	settings_button.pressed.connect(settings_menu.open)
 	pause_settings_button.pressed.connect(settings_menu.open)
 	Controls.apply(Settings.get_value("bindings"))
+	WebPage.set_fullscreen_on_touch(Settings.get_value("touch_fullscreen"))
+	Settings.changed.connect(_apply_page_setting)
 	name_edit.text = Settings.get_value("name")
 	name_edit.text_submitted.connect(func(_text: String) -> void: _remember_name())
 	name_edit.focus_exited.connect(_remember_name)
@@ -148,6 +150,11 @@ func _cycle(button: Button, key: String, choices: Array, describe: Callable) -> 
 	_show_match_setting(key)
 	button.pressed.connect(func() -> void:
 		Settings.set_value(key, choices[(choices.find(Settings.get_value(key)) + 1) % choices.size()]))
+
+
+func _apply_page_setting(key: String) -> void:
+	if key == "touch_fullscreen":
+		WebPage.set_fullscreen_on_touch(Settings.get_value("touch_fullscreen"))
 
 
 func _show_match_setting(key: String) -> void:

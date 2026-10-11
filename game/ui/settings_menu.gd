@@ -16,6 +16,13 @@ const SLIDERS := [
 	["master_volume", "Volume", 0.0, 1.0, 0.05, "%d%%"],
 	["music_volume", "Music", 0.0, 1.0, 0.05, "%d%%"],
 	["effects_volume", "Effects", 0.0, 1.0, 0.05, "%d%%"],
+	["touch_size", "Touch buttons", 0.7, 1.5, 0.05, "%.2f×"],
+]
+## The settings that are on or off, with what each says.
+const TOGGLES := [
+	["invert_look", "Invert looking up and down"],
+	["touch_left_handed", "Touch buttons on the left"],
+	["touch_fullscreen", "Full screen when touched"],
 ]
 
 var _rows: VBoxContainer
@@ -55,7 +62,8 @@ func refresh() -> void:
 		if slider != null:
 			slider.set_value_no_signal(Settings.get_value(row[0]))
 		_show_value(row[0])
-	(find_child("Setting_invert_look", true, false) as CheckButton).set_pressed_no_signal(Settings.get_value("invert_look"))
+	for row: Array in TOGGLES:
+		(find_child("Setting_" + row[0], true, false) as CheckButton).set_pressed_no_signal(Settings.get_value(row[0]))
 	(find_child("Setting_quality", true, false) as Button).text = "Graphics: %s" % GraphicsQuality.NAMES[GraphicsQuality.level(Settings.get_value("quality"))]
 	for action: String in _key_buttons:
 		_key_buttons[action].text = "Press a key…" if action == _waiting_for else Controls.keys_text(action)
@@ -145,12 +153,13 @@ func _build() -> void:
 
 	for row: Array in SLIDERS:
 		_add_slider(row[0], row[1], row[2], row[3], row[4])
-	var invert := CheckButton.new()
-	invert.name = "Setting_invert_look"
-	invert.text = "Invert looking up and down"
-	invert.custom_minimum_size = Vector2(0, 40)
-	invert.toggled.connect(func(on: bool) -> void: Settings.set_value("invert_look", on))
-	_rows.add_child(invert)
+	for row: Array in TOGGLES:
+		var toggle := CheckButton.new()
+		toggle.name = "Setting_" + row[0]
+		toggle.text = row[1]
+		toggle.custom_minimum_size = Vector2(0, 40)
+		toggle.toggled.connect(func(on: bool) -> void: Settings.set_value(row[0], on))
+		_rows.add_child(toggle)
 	var quality := Button.new()
 	quality.name = "Setting_quality"
 	quality.custom_minimum_size = Vector2(0, 40)

@@ -10,6 +10,10 @@ class_name WebPage
 ## the loop whenever frames stop arriving. It can't help once a phone suspends
 ## the page outright.
 ##
+## Full screen on touch: on a phone, the first touch in the game (browsers only
+## allow it in answer to one) makes the page fill the screen and turns it
+## sideways where the browser can, unless the player has turned that off.
+##
 ## Wake lock: stops the screen dimming and locking while the game is visible,
 ## for players who aren't touching the screen. Browsers only offer it on HTTPS
 ## and localhost, and drop it whenever the page is hidden, so it is re-requested
@@ -143,7 +147,20 @@ const _SCRIPT := """
 		}, true);
 	}
 
+	let fullscreenOnTouch = false;
+	document.addEventListener('touchend', () => {
+		if (!fullscreenOnTouch || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+		document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => {
+			if (screen.orientation && screen.orientation.lock) {
+				return screen.orientation.lock('landscape').catch(() => {});
+			}
+		}).catch(() => {});
+	}, true);
+
 	window.cheeseStrike = {
+		setFullscreenOnTouch(on) {
+			fullscreenOnTouch = on;
+		},
 		takeMouseMovement() {
 			const moved = lookX + ' ' + lookY;
 			lookX = 0;
@@ -174,6 +191,11 @@ static func install() -> void:
 static func set_keep_alive(on: bool) -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.cheeseStrike.setKeepAlive(%s)" % ("true" if on else "false"), true)
+
+
+static func set_fullscreen_on_touch(on: bool) -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.cheeseStrike.setFullscreenOnTouch(%s)" % ("true" if on else "false"), true)
 
 
 static func set_wake_lock(on: bool) -> void:

@@ -239,7 +239,8 @@ class GameTestCase(unittest.TestCase):
             args=["--enable-unsafe-swiftshader", "--use-angle=swiftshader"]
         )
         # One context for the class, so the engine download is cached between tests.
-        cls._context = cls._browser.new_context(viewport=VIEWPORT)
+        # No service worker: it would keep its own copy of the game's files.
+        cls._context = cls._browser.new_context(viewport=VIEWPORT, service_workers="block")
 
     @classmethod
     def tearDownClass(cls):
