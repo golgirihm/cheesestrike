@@ -63,7 +63,7 @@ func _rebuild() -> void:
 		var label := Label.new()
 		label.text = entry.text
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		label.add_theme_font_size_override("font_size", 15)
+		label.add_theme_font_size_override("font_size", CombatHud.text_size(15))
 		label.add_theme_color_override("font_outline_color", Color.BLACK)
 		label.add_theme_constant_override("outline_size", 5)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE

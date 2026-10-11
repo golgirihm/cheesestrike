@@ -17,12 +17,15 @@ const SLIDERS := [
 	["music_volume", "Music", 0.0, 1.0, 0.05, "%d%%"],
 	["effects_volume", "Effects", 0.0, 1.0, 0.05, "%d%%"],
 	["touch_size", "Touch buttons", 0.7, 1.5, 0.05, "%.2f×"],
+	["hud_scale", "Text size", 0.75, 1.5, 0.05, "%.2f×"],
+	["screen_shake", "Screen shake", 0.0, 1.0, 0.05, "%d%%"],
 ]
 ## The settings that are on or off, with what each says.
 const TOGGLES := [
 	["invert_look", "Invert looking up and down"],
 	["touch_left_handed", "Touch buttons on the left"],
 	["touch_fullscreen", "Full screen when touched"],
+	["captions", "Captions for sounds"],
 ]
 
 var _rows: VBoxContainer

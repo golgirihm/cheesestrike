@@ -1,7 +1,12 @@
+class_name CombatHud
 extends Control
 ## What a player needs on screen in a fight: a crosshair, their health and
 ## ammunition, a mark when their shot hits, a red edge pointing at whoever just
 ## hurt them, and a notice while they are knocked out.
+##
+## Hit marks differ in shape as well as colour, so colour is never the only
+## clue: a hit is four ticks, a head hit longer, thicker ticks, and a
+## knock-out the ticks in a ring. Text is sized by the "hud_scale" setting.
 ##
 ## Drawn over the whole screen. bind() gives it the world, whose Match says what
 ## the host decided and who this player is.
@@ -12,8 +17,12 @@ const CROSSHAIR_COLOR := Color(1, 1, 1, 0.9)
 const HIT_MARKER_LIFE := 0.25
 const HIT_MARKER_SIZE := 11.0
 const HIT_COLOR := Color(1, 1, 1)
-const HEADSHOT_COLOR := Color(1.0, 0.8, 0.2)
-const KNOCKOUT_COLOR := Color(1.0, 0.3, 0.25)
+const HEADSHOT_COLOR := Color(0.94, 0.89, 0.26)
+const KNOCKOUT_COLOR := Color(0.84, 0.37, 0.0)
+## The kinds of hit mark.
+const HIT := "hit"
+const HEADSHOT := "head"
+const KNOCKOUT := "knockout"
 const DAMAGE_INDICATOR_LIFE := 1.2
 const DAMAGE_INDICATOR_ARC := deg_to_rad(40.0)
 const DAMAGE_COLOR := Color(1.0, 0.15, 0.1, 0.8)
@@ -24,8 +33,11 @@ var world: Node3D
 var hits_shown := 0
 var hurts_shown := 0
 
+## The kind of the latest hit mark.
+var hit_kind := ""
+var captions: VBoxContainer
+
 var _hit_left := 0.0
-var _hit_color := HIT_COLOR
 # Each entry: {"from": Vector3, "left": seconds}.
 var _indicators: Array[Dictionary] = []
 var _overload_bar: ProgressBar
@@ -53,11 +65,13 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build()
+	Settings.changed.connect(_on_setting_changed)
 
 
 ## Shows the fight of the world `of`.
 func bind(of: Node3D) -> void:
 	world = of
+	captions.world = of
 	world.match_.hit_confirmed.connect(_on_hit_confirmed)
 	world.match_.hurt.connect(_on_hurt)
 	world.match_.knocked_out.connect(kill_feed.add)
@@ -72,6 +86,19 @@ func reset() -> void:
 	_indicators.clear()
 	_hit_left = 0.0
 	scoreboard.hide()
+	captions.clear()
+
+
+## A font size of `base` at the size the player has chosen for text.
+static func text_size(base: int) -> int:
+	return roundi(base * Settings.get_value("hud_scale"))
+
+
+## The kind of hit mark for a hit that `knocked_out` and was to the `head`.
+static func hit_kind_for(knocked_out: bool, head: bool) -> String:
+	if knocked_out:
+		return KNOCKOUT
+	return HEADSHOT if head else HIT
 
 
 ## How far round from straight ahead `from` lies, for a player at `at` facing
@@ -222,7 +249,7 @@ func _on_picked_up(id: int, kind: String) -> void:
 func _on_hit_confirmed(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
 	hits_shown += 1
 	_hit_left = HIT_MARKER_LIFE
-	_hit_color = KNOCKOUT_COLOR if knocked_out else (HEADSHOT_COLOR if head else HIT_COLOR)
+	hit_kind = hit_kind_for(knocked_out, head)
 
 
 func _on_hurt(_attacker: int, from: Vector3, _dealt: int) -> void:
@@ -237,10 +264,14 @@ func _draw() -> void:
 	for direction in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
 		draw_line(centre + direction * CROSSHAIR_GAP, centre + direction * (CROSSHAIR_GAP + CROSSHAIR_LENGTH), CROSSHAIR_COLOR, 2.0, true)
 	if _hit_left > 0.0:
-		var color := _hit_color
+		var color: Color = {HIT: HIT_COLOR, HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[hit_kind]
 		color.a = _hit_left / HIT_MARKER_LIFE
+		var reach := HIT_MARKER_SIZE * (1.0 if hit_kind == HIT else 1.4)
+		var width := 2.5 if hit_kind == HIT else 3.5
 		for corner in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
-			draw_line(centre + corner * 4.0, centre + corner * HIT_MARKER_SIZE, color, 2.5, true)
+			draw_line(centre + corner * 4.0, centre + corner * reach, color, width, true)
+		if hit_kind == KNOCKOUT:
+			draw_arc(centre, reach + 4.0, 0.0, TAU, 32, color, 2.0, true)
 
 	var own: Node3D = world.player_node(multiplayer.get_unique_id())
 	if own == null:
@@ -253,6 +284,14 @@ func _draw() -> void:
 		# Angles here run clockwise from straight up.
 		var start := angle - PI / 2.0 - DAMAGE_INDICATOR_ARC / 2.0
 		draw_arc(centre, radius, start, start + DAMAGE_INDICATOR_ARC, 24, color, 10.0, true)
+
+
+func _on_setting_changed(key: String) -> void:
+	if key != "hud_scale":
+		return
+	for label in find_children("*", "Label", true, false):
+		if label.has_meta("base_font_size"):
+			label.add_theme_font_size_override("font_size", text_size(label.get_meta("base_font_size")))
 
 
 func _build() -> void:
@@ -354,10 +393,17 @@ func _build() -> void:
 	scoreboard.visible = false
 	board_rows.add_child(scoreboard)
 
+	captions = preload("res://ui/captions.gd").new()
+	captions.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 70)
+	captions.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	captions.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(captions)
+
 
 static func _outlined_label(font_size: int) -> Label:
 	var label := Label.new()
-	label.add_theme_font_size_override("font_size", font_size)
+	label.set_meta("base_font_size", font_size)
+	label.add_theme_font_size_override("font_size", text_size(font_size))
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 6)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE

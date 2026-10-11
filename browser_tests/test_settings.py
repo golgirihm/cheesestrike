@@ -47,5 +47,26 @@ class SettingsTest(GameTestCase):
         game.wait_for("s.screen === 'paused'")
 
 
+class CaptionsTest(GameTestCase):
+    def test_turned_on_captions_say_where_another_player_is_walking(self):
+        host = self.open_game()
+        host.host()
+        host.click("MenuButton")
+        host.click("PauseSettingsButton")
+        host.scroll_to("Setting_captions")
+        host.click("Setting_captions")
+        host.wait_for("s.settings.captions === true")
+        host.click("SettingsDone")
+        host.click("ResumeButton")
+
+        joiner = self.open_game()
+        joiner.join(host.state()["code"])
+        host.wait_for("s.players.length === 2")
+        joiner.page.keyboard.down("w")
+        state = host.wait_for("s.combat.captions.some((c) => c.startsWith('Footsteps, '))")
+        joiner.page.keyboard.up("w")
+        self.assertRegex(next(c for c in state["combat"]["captions"] if c.startswith("Footsteps")), r"^Footsteps, (ahead|behind|left|right)$")
+
+
 if __name__ == "__main__":
     unittest.main()

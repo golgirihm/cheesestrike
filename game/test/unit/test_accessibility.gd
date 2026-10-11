@@ -1,0 +1,145 @@
+extends GutTest
+## Seeing and hearing: hit marks that differ by shape, text that can be made
+## bigger, captions for sounds, and a view shake that can be turned down.
+
+const HUD := preload("res://ui/combat_hud.gd")
+const CAPTIONS := preload("res://ui/captions.gd")
+const MAIN := preload("res://main.tscn")
+
+var saved := {}
+
+
+func before_each() -> void:
+	for key in ["hud_scale", "captions", "screen_shake", "seen_help"]:
+		saved[key] = Settings.get_value(key)
+	Settings.set_value("seen_help", true)
+
+
+func after_each() -> void:
+	for key: String in saved:
+		Settings.set_value(key, saved[key])
+
+
+func test_each_kind_of_hit_has_its_own_mark() -> void:
+	assert_eq(HUD.hit_kind_for(false, false), HUD.HIT)
+	assert_eq(HUD.hit_kind_for(false, true), HUD.HEADSHOT)
+	assert_eq(HUD.hit_kind_for(true, false), HUD.KNOCKOUT)
+	assert_eq(HUD.hit_kind_for(true, true), HUD.KNOCKOUT)
+
+
+func test_text_grows_with_the_setting() -> void:
+	Settings.set_value("hud_scale", 1.0)
+	assert_eq(HUD.text_size(20), 20)
+	Settings.set_value("hud_scale", 1.5)
+	assert_eq(HUD.text_size(20), 30)
+	Settings.set_value("hud_scale", 9.0)
+	assert_eq(HUD.text_size(20), 30, "kept within its range")
+
+
+func _main_in_a_session() -> Node:
+	var main: Node = MAIN.instantiate()
+	add_child_autofree(main)
+	main.world.match_.start()
+	main.world.start()
+	main.combat_hud.show()
+	await wait_process_frames(2)
+	return main
+
+
+func test_the_fights_text_resizes_at_once() -> void:
+	Settings.set_value("hud_scale", 1.0)
+	var main: Node = await _main_in_a_session()
+	var ammo: Label = main.combat_hud.find_child("Ammo", true, false)
+	assert_eq(ammo.get_theme_font_size("font_size"), 22)
+	Settings.set_value("hud_scale", 1.5)
+	assert_eq(ammo.get_theme_font_size("font_size"), 33)
+	main.world.stop()
+
+
+func test_the_hud_records_the_kind_of_mark() -> void:
+	var main: Node = await _main_in_a_session()
+	main.world.match_.hit_confirmed.emit(2, 100, false, true)
+	assert_eq(main.combat_hud.hit_kind, HUD.HEADSHOT)
+	main.world.match_.hit_confirmed.emit(2, 100, true, false)
+	assert_eq(main.combat_hud.hit_kind, HUD.KNOCKOUT)
+	main.world.stop()
+
+
+func test_a_caption_says_what_and_where() -> void:
+	assert_eq(CAPTIONS.caption("step", Vector3(0, 0, -10), Vector3.ZERO, 0.0), "Footsteps, ahead")
+	assert_eq(CAPTIONS.caption("shotgun", Vector3(10, 0, 0), Vector3.ZERO, 0.0), "Shotgun blast, right")
+	assert_eq(CAPTIONS.caption("burst", Vector3(-10, 0, 0), Vector3.ZERO, 0.0), "Cheese burst, left")
+	assert_eq(CAPTIONS.caption("blaster", Vector3(0, 0, 10), Vector3.ZERO, 0.0), "Blaster fire, behind")
+	# Turned to face +x, what is at +x is ahead.
+	assert_eq(CAPTIONS.caption("step", Vector3(10, 0, 0), Vector3.ZERO, -PI / 2.0), "Footsteps, ahead")
+
+
+func test_own_sounds_and_sounds_without_a_place_get_no_caption() -> void:
+	assert_eq(CAPTIONS.caption("step", Vector3(0.5, 0, 0), Vector3.ZERO, 0.0), "")
+	assert_eq(CAPTIONS.caption("overload", null, Vector3.ZERO, 0.0), "")
+	assert_eq(CAPTIONS.caption("reload", Vector3(0, 0, -10), Vector3.ZERO, 0.0), "", "the screen shows reloading")
+
+
+func test_captions_repeat_once_fade_and_keep_to_a_few() -> void:
+	var captions: VBoxContainer = CAPTIONS.new()
+	add_child_autofree(captions)
+	captions.add("Footsteps, left")
+	captions.add("Footsteps, left")
+	assert_eq(captions.showing(), ["Footsteps, left"] as Array[String])
+	for index in 6:
+		captions.add("Sound %d" % index)
+	assert_eq(captions.showing().size(), CAPTIONS.MOST)
+	assert_eq(captions.showing()[-1], "Sound 5")
+	captions._process(CAPTIONS.LIFE + 0.1)
+	assert_eq(captions.showing().size(), 0)
+
+
+func test_captions_appear_only_when_turned_on() -> void:
+	var main: Node = await _main_in_a_session()
+	var own: Node3D = main.world.player_node(1)
+	var away: Vector3 = own.global_position + Vector3(8, 0, 0)
+	Settings.set_value("captions", false)
+	Sounds.played.emit("step", away)
+	assert_eq(main.combat_hud.captions.showing().size(), 0)
+	Settings.set_value("captions", true)
+	Sounds.played.emit("step", away)
+	assert_eq(main.combat_hud.captions.showing().size(), 1)
+	main.world.stop()
+
+
+func test_a_jolt_shakes_the_view_then_dies_away() -> void:
+	var shake := Shake.new()
+	assert_eq(shake.tick(0.016, 1.0), Vector2.ZERO)
+	shake.add(0.6)
+	var biggest := 0.0
+	for i in 10:
+		biggest = maxf(biggest, shake.tick(0.016, 1.0).length())
+	assert_gt(biggest, 0.0)
+	assert_lte(biggest, Vector2(Shake.MAX_PITCH, Shake.MAX_ROLL).length())
+	for i in 100:
+		shake.tick(0.016, 1.0)
+	assert_eq(shake.tick(0.016, 1.0), Vector2.ZERO)
+
+
+func test_turned_off_the_view_does_not_shake() -> void:
+	var shake := Shake.new()
+	shake.add(1.0)
+	for i in 10:
+		assert_eq(shake.tick(0.016, 0.0), Vector2.ZERO)
+
+
+func test_harder_jolts_shake_more() -> void:
+	assert_gt(Shake.from_damage(50), Shake.from_damage(10))
+	assert_gt(Shake.from_burst(1.0, 8.0), Shake.from_burst(6.0, 8.0))
+	assert_eq(Shake.from_burst(9.0, 8.0), 0.0)
+
+
+func test_being_hurt_shakes_the_view_but_not_the_aim() -> void:
+	Settings.set_value("screen_shake", 1.0)
+	var main: Node = await _main_in_a_session()
+	var own: Node3D = main.world.player_node(1)
+	main.world.match_.hurt.emit(2, own.global_position + Vector3(5, 0, 0), 40)
+	await wait_process_frames(3)
+	assert_ne(own.camera.rotation, Vector3.ZERO)
+	assert_eq(own.head.rotation, Vector3.ZERO)
+	main.world.stop()

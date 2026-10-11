@@ -253,3 +253,14 @@ func test_touch_buttons_cannot_be_made_too_small_or_too_big() -> void:
 	assert_eq(Settings.get_value("touch_size"), 1.5)
 	Settings.set_value("touch_size", 0.1)
 	assert_eq(Settings.get_value("touch_size"), 0.7)
+
+
+func test_the_seeing_and_hearing_settings_are_on_the_screen() -> void:
+	var menu := _menu()
+	(menu.find_child("Setting_hud_scale", true, false) as HSlider).value = 1.25
+	assert_eq(Settings.get_value("hud_scale"), 1.25)
+	(menu.find_child("Setting_screen_shake", true, false) as HSlider).value = 0.0
+	assert_eq(Settings.get_value("screen_shake"), 0.0)
+	assert_eq(SETTINGS_MENU.value_text("screen_shake", 0.5), "50%")
+	(menu.find_child("Setting_captions", true, false) as CheckButton).button_pressed = true
+	assert_true(Settings.get_value("captions"))
