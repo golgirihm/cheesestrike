@@ -9,6 +9,9 @@ extends CharacterBody3D
 
 ## A shot this player fired, for effects on this machine.
 signal fired(origin: Vector3, direction: Vector3, seed: int)
+## Another player's update arrived at `time` (this machine's clock, seconds)
+## placing them at `at`.
+signal received(time: float, at: Vector3)
 
 const SPEED := 6.0
 const JUMP_VELOCITY := 5.5
@@ -53,6 +56,20 @@ const SWITCH_TIME := 0.35
 ## How quickly a shove from a burst dies away, on the ground and in the air.
 const KNOCKBACK_GROUND_DECAY := 6.0
 const KNOCKBACK_AIR_DECAY := 0.8
+
+## Where this player is and which way they face, as their owner sends it to
+## everyone: [x, y, z, yaw, pitch, teleports]. The last counts the times the
+## player has been moved at once, as on coming back into play, so that the
+## move is shown at once rather than smoothed.
+var net_state := PackedFloat32Array([0, 0, 0, 0, 0, 0]):
+	set(value):
+		net_state = value
+		if not _mine and is_inside_tree():
+			_receive(value)
+
+## Others' movement, drawn smoothly a moment behind (see InterpolationBuffer).
+var smoothing := InterpolationBuffer.new()
+var _teleports := 0
 
 ## The weapon in this player's hands. Only the owner fires it.
 var weapon := WeaponState.new(Weapons.find(Weapons.STARTING))
@@ -123,6 +140,7 @@ func _ready() -> void:
 	global_position = spawn_position
 	_last_position = spawn_position
 	_face_middle()
+	_publish()
 	if _mine:
 		camera.make_current()
 	_show_weapon(Weapons.STARTING)
@@ -139,6 +157,7 @@ func record() -> PlayerRecord:
 ## Puts this player, who has just come back into play, at `at`.
 func respawn_at(at: Vector3) -> void:
 	global_position = at
+	_teleports += 1
 	velocity = Vector3.ZERO
 	head.rotation.x = 0.0
 	_knockback = Vector3.ZERO
@@ -374,12 +393,45 @@ static func page_to_view(movement: Vector2, view: Vector2, window: Vector2, pixe
 	return movement * pixel_ratio * view.x / window.x
 
 
+## The owner's current position and facing, ready to send.
+func _publish() -> void:
+	if _mine:
+		net_state = PackedFloat32Array([global_position.x, global_position.y, global_position.z, rotation.y, head.rotation.x, _teleports])
+
+
+## Another player's update arrived.
+func _receive(state: PackedFloat32Array) -> void:
+	if state.size() < 6:
+		return
+	var now := Time.get_ticks_usec() / 1000000.0
+	if int(state[5]) != _teleports:
+		# Moved at once: show it at once, without sliding there.
+		_teleports = int(state[5])
+		smoothing.clear()
+	smoothing.push(now, state)
+	if smoothing.is_empty():
+		return
+	received.emit(now, Vector3(state[0], state[1], state[2]))
+
+
+## Draws another player where the smoothing says they were a moment ago.
+func _show_smoothed() -> void:
+	var shown := smoothing.sample(Time.get_ticks_usec() / 1000000.0 - InterpolationBuffer.DELAY)
+	if shown.is_empty():
+		return
+	global_position = Vector3(shown[0], shown[1], shown[2])
+	rotation.y = shown[3]
+	head.rotation.x = shown[4]
+
+
 ## A shot just left this player's weapon: it kicks back.
 func kick() -> void:
 	_kick = 1.0
 
 
 func _process(delta: float) -> void:
+	if not _mine:
+		_show_smoothed()
 	_animate(delta)
 	if OS.has_feature("web") and _mine:
 		var moved := WebPage.take_mouse_movement()
@@ -452,6 +504,7 @@ func _physics_process(delta: float) -> void:
 	velocity.x = direction.x * speed + _knockback.x
 	velocity.z = direction.z * speed + _knockback.z
 	move_and_slide()
+	_publish()
 
 	_use_weapon()
 
