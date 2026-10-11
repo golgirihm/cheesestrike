@@ -88,7 +88,7 @@ class OverloadTest(GameTestCase):
         host.page.wait_for_timeout(500)
         host.capture_mouse()
         host.page.mouse.down()
-        host.wait_for("s.players.some((p) => p.mine && p.overload >= 100)", timeout=60_000)
+        host.wait_for("s.players.some((p) => p.mine && p.overload >= 100)")
         host.page.mouse.up()
         host.wait_for("s.combat.overload === 'Overload ready: Q'")
         host.press("q")

@@ -25,9 +25,9 @@ from playwright.sync_api import sync_playwright
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WEB_BUILD = pathlib.Path(os.environ.get("CHEESESTRIKE_WEB_BUILD", ROOT / "build" / "browser-tests"))
 
-# Generous, for a slow CI machine. Waits end as soon as their condition holds,
-# so this costs nothing on success.
-TIMEOUT_MS = 30_000
+# Generous, for a slow CI machine with several windows playing at once. Waits
+# end as soon as their condition holds, so this costs nothing on success.
+TIMEOUT_MS = 60_000
 
 VIEWPORT = {"width": 640, "height": 400}
 
