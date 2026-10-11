@@ -28,6 +28,8 @@ var _hit_left := 0.0
 var _hit_color := HIT_COLOR
 # Each entry: {"from": Vector3, "left": seconds}.
 var _indicators: Array[Dictionary] = []
+var _overload_bar: ProgressBar
+var _overload_label: Label
 var _health_bar: ProgressBar
 var _health_label: Label
 var _ammo_label: Label
@@ -98,6 +100,18 @@ static func match_text(state: MatchState) -> String:
 	return "First to %d   ·   %s" % [state.settings.kill_limit, clock]
 
 
+## What the Overload meter says: how full it is, that it's ready, or how long
+## an Overload has left.
+static func overload_text(record: PlayerRecord) -> String:
+	if record == null:
+		return ""
+	if record.overload_left > 0.0:
+		return "OVERLOAD  %ds" % ceili(record.overload_left)
+	if Overload.is_ready(record):
+		return "Overload ready: Q"
+	return "Overload %d%%" % floori(record.overload / Overload.METER_FULL * 100.0)
+
+
 static func ammo_text(weapon: WeaponState) -> String:
 	if weapon.is_reloading():
 		return "Reloading…"
@@ -129,6 +143,10 @@ func weapon_shown() -> String:
 	return _weapon_label.text
 
 
+func overload_shown() -> String:
+	return _overload_label.text
+
+
 func match_shown() -> String:
 	return _match_label.text
 
@@ -155,6 +173,12 @@ func _process(delta: float) -> void:
 	var record: PlayerRecord = world.match_.own_record()
 	var health := record.health if record != null else PlayerRecord.MAX_HEALTH
 	_health_bar.value = health
+	_overload_label.text = overload_text(record)
+	_overload_bar.value = record.overload if record != null else 0.0
+	if record != null and record.overload_left > 0.0:
+		_overload_bar.value = record.overload_left / Overload.DURATION * Overload.METER_FULL
+	var ready := Overload.is_ready(record) or (record != null and record.overload_left > 0.0)
+	_overload_bar.modulate = Color(1.0, 0.6, 0.15) if ready else Color(1, 1, 1, 0.8)
 	_health_label.text = str(health)
 	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
 	if own != null:
@@ -232,11 +256,22 @@ func _draw() -> void:
 
 
 func _build() -> void:
+	var status := VBoxContainer.new()
+	status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 20)
+	status.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(status)
+	_overload_label = _outlined_label(14)
+	status.add_child(_overload_label)
+	_overload_bar = ProgressBar.new()
+	_overload_bar.max_value = Overload.METER_FULL
+	_overload_bar.show_percentage = false
+	_overload_bar.custom_minimum_size = Vector2(160, 8)
+	_overload_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status.add_child(_overload_bar)
 	var health := HBoxContainer.new()
-	health.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 20)
-	health.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	health.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(health)
+	status.add_child(health)
 	_health_bar = ProgressBar.new()
 	_health_bar.max_value = PlayerRecord.MAX_HEALTH
 	_health_bar.show_percentage = false

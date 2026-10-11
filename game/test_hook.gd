@@ -58,6 +58,8 @@ func snapshot() -> Dictionary:
 			"kills": record.kills if record != null else null,
 			"team": record.team if record != null else null,
 			"holding": record.weapon if record != null else null,
+			"overload": record.overload if record != null else null,
+			"overloaded": record.overload_left > 0.0 if record != null else null,
 			"deaths": record.deaths if record != null else null,
 		}
 		if player.is_multiplayer_authority():
@@ -112,6 +114,7 @@ func snapshot() -> Dictionary:
 			"health": _main.combat_hud.health_text() if _main.combat_hud.visible else "",
 			"ammo": _main.combat_hud.ammo_shown() if _main.combat_hud.visible else "",
 			"weapon": _main.combat_hud.weapon_shown() if _main.combat_hud.visible else "",
+			"overload": _main.combat_hud.overload_shown() if _main.combat_hud.visible else "",
 			"hits_shown": _main.combat_hud.hits_shown,
 			"hurts_shown": _main.combat_hud.hurts_shown,
 			"pickups_shown": _main.combat_hud.pickups_shown,

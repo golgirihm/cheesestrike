@@ -20,6 +20,8 @@ signal hurt(attacker: int, from: Vector3, dealt: int)
 signal shot_shown(shooter: int, ends: Array)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
+## Player `id` set off their Overload (on everyone's machine).
+signal overloaded(id: int)
 ## Player `id` collected a pickup of `kind` (on everyone's machine).
 signal picked_up(id: int, kind: String)
 ## A projectile was launched, or burst, for effects.
@@ -120,6 +122,32 @@ func reload(weapon := Weapons.STARTING) -> void:
 		_reload(1, weapon)
 	elif multiplayer.multiplayer_peer != null:
 		_request_reload.rpc_id(1, weapon)
+
+
+## This player sets off their Overload, if it is ready.
+func set_off_overload() -> void:
+	if is_host():
+		_overload(1)
+	elif multiplayer.multiplayer_peer != null:
+		_request_overload.rpc_id(1)
+
+
+func _overload(id: int) -> void:
+	if state.set_off_overload(id):
+		_changed()
+		_overload_seen.rpc(id)
+		overloaded.emit(id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_overload() -> void:
+	if is_host():
+		_overload(multiplayer.get_remote_sender_id())
+
+
+@rpc("authority", "call_remote", "reliable")
+func _overload_seen(id: int) -> void:
+	overloaded.emit(id)
 
 
 ## This player has taken `weapon` in hand, so others see it.

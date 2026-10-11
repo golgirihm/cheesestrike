@@ -118,13 +118,21 @@ func damage(attacker: int, victim: int, amount: float) -> Dictionary:
 	var dealt := mini(roundi(amount), target.health)
 	target.health -= dealt
 	result.dealt = dealt
+	var scorer := player(attacker)
+	if scorer != null:
+		if scorer.overload_left > 0.0:
+			target.melted_for = Overload.MELT_DURATION
+		else:
+			scorer.overload = minf(scorer.overload + dealt * Overload.CHARGE_PER_DAMAGE, Overload.METER_FULL)
 	if target.health <= 0:
 		target.alive = false
 		target.respawn_in = RESPAWN_DELAY
 		target.deaths += 1
 		target.last_attacker = attacker
 		target.disarm()
-		var scorer := player(attacker)
+		target.overload *= Overload.KEPT_ON_KNOCK_OUT
+		target.overload_left = 0.0
+		target.melted_for = 0.0
 		if scorer != null:
 			scorer.kills += 1
 			if scorer.team != NO_TEAM:
@@ -165,6 +173,8 @@ func tick(delta: float) -> Array[int]:
 	var due: Array[int] = []
 	for record: PlayerRecord in players.values():
 		record.protected_for = maxf(record.protected_for - delta, 0.0)
+		record.overload_left = maxf(record.overload_left - delta, 0.0)
+		record.melted_for = maxf(record.melted_for - delta, 0.0)
 		if not record.alive and record.respawn_in > 0.0:
 			record.respawn_in = maxf(record.respawn_in - delta, 0.0)
 			if record.respawn_in == 0.0:
@@ -175,6 +185,17 @@ func tick(delta: float) -> Array[int]:
 	if is_playing() and time_left == 0.0:
 		end_match()
 	return due
+
+
+## Player `id` sets off their Overload, if their meter is full. Returns
+## whether it began.
+func set_off_overload(id: int) -> bool:
+	var record := player(id)
+	if not is_playing() or not Overload.is_ready(record):
+		return false
+	record.overload = 0.0
+	record.overload_left = Overload.DURATION
+	return true
 
 
 ## Whether the break after a match is over, so the next should start.
@@ -201,6 +222,9 @@ func start_match() -> void:
 		record.deaths = 0
 		record.last_attacker = 0
 		record.disarm()
+		record.overload = 0.0
+		record.overload_left = 0.0
+		record.melted_for = 0.0
 
 
 func respawn(id: int) -> void:

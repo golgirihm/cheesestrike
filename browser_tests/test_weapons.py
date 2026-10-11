@@ -60,5 +60,23 @@ class WeaponsTest(GameTestCase):
         joiner.wait_for(f"s.players.some((p) => p.mine && {hurt}) && s.combat.hurts_shown >= 1")
 
 
+class OverloadTest(GameTestCase):
+    def test_a_full_meter_sets_off_an_overload_on_q(self):
+        host = self.open_game()
+        joiner = self.open_game()
+        joiner.join(host.host())
+        host.wait_for("s.players.length === 2")
+        host.page.wait_for_timeout(500)
+        host.capture_mouse()
+        host.page.mouse.down()
+        host.wait_for("s.players.some((p) => p.mine && p.overload >= 100)", timeout=60_000)
+        host.page.mouse.up()
+        host.wait_for("s.combat.overload === 'Overload ready: Q'")
+        host.press("q")
+        state = host.wait_for("s.players.some((p) => p.mine && p.overloaded)")
+        self.assertTrue(state["combat"]["overload"].startswith("OVERLOAD"))
+        joiner.wait_for("s.players.some((p) => p.id === 1 && p.overloaded)")
+
+
 if __name__ == "__main__":
     unittest.main()

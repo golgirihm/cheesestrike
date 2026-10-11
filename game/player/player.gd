@@ -71,6 +71,7 @@ var _switch_step := 0
 var _switch_to := ""
 var _shown_weapon := ""
 var _body_material: StandardMaterial3D
+var _base_colour := Color.WHITE
 var _team := -2
 var _badge: MeshInstance3D
 # Presses noted as their events arrive, so that a click or tap that begins and
@@ -78,6 +79,7 @@ var _badge: MeshInstance3D
 var _fire_pressed := false
 var _reload_pressed := false
 var _jump_pressed := false
+var _overload_pressed := false
 
 
 func _enter_tree() -> void:
@@ -165,6 +167,7 @@ func _on_match_state_changed() -> void:
 	name_tag.text = match_.state.name_of(name.to_int())
 	_set_alive(own == null or own.alive)
 	_show_team(own.team if own != null else MatchState.NO_TEAM)
+	_show_overload(own)
 	if own == null:
 		return
 	if _mine:
@@ -192,6 +195,17 @@ func _carry(carried: Array) -> void:
 		_show_weapon(Weapons.STARTING)
 
 
+# An Overloaded player glows; a melted one sags and darkens.
+func _show_overload(own: PlayerRecord) -> void:
+	var glowing := own != null and own.overload_left > 0.0
+	var melted := own != null and own.melted_for > 0.0
+	_body_material.emission_enabled = glowing
+	_body_material.emission = Color(1.0, 0.55, 0.1)
+	_body_material.emission_energy_multiplier = 1.2
+	body.scale = Vector3(1.1, 0.85, 1.1) if melted else Vector3.ONE
+	_body_material.albedo_color = _base_colour.darkened(0.35) if melted else _base_colour
+
+
 ## A player's own colour when not on a team: spread round the colour wheel by id.
 static func colour_for(id: int) -> Color:
 	return Color.from_hsv(fmod(id * 0.618034, 1.0), 0.65, 0.95)
@@ -203,7 +217,8 @@ func _show_team(team: int) -> void:
 	if team == _team:
 		return
 	_team = team
-	_body_material.albedo_color = TeamColors.of(team) if team != MatchState.NO_TEAM else colour_for(name.to_int())
+	_base_colour = TeamColors.of(team) if team != MatchState.NO_TEAM else colour_for(name.to_int())
+	_body_material.albedo_color = _base_colour
 	name_tag.modulate = TeamColors.of(team)
 	if _badge != null:
 		_badge.queue_free()
@@ -279,6 +294,8 @@ func _input(event: InputEvent) -> void:
 		_mouse_fire_held = false
 	elif event.is_action_pressed("reload"):
 		_reload_pressed = true
+	elif event.is_action_pressed("overload"):
+		_overload_pressed = true
 	elif _weapon_key(event) != "":
 		_switch_to = _weapon_key(event)
 	elif event.is_action_pressed("jump"):
@@ -363,14 +380,18 @@ func _physics_process(delta: float) -> void:
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back") + _move_touch_vector
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y).limit_length(1.0)
 	_knockback *= exp(-(KNOCKBACK_GROUND_DECAY if is_on_floor() else KNOCKBACK_AIR_DECAY) * delta)
-	velocity.x = direction.x * SPEED + _knockback.x
-	velocity.z = direction.z * SPEED + _knockback.z
+	var speed := SPEED * Overload.speed_factor(record())
+	velocity.x = direction.x * speed + _knockback.x
+	velocity.z = direction.z * speed + _knockback.z
 	move_and_slide()
 
 	_use_weapon()
 
 
 func _use_weapon() -> void:
+	if _overload_pressed:
+		_overload_pressed = false
+		match_.set_off_overload()
 	if _switch_step != 0:
 		equip(Weapons.cycle(arsenal.keys(), weapon.stats.id, signi(_switch_step)))
 	elif not _switch_to.is_empty():
@@ -432,6 +453,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_reload_pressed = true
 		elif button == "swap":
 			_switch_step += 1
+		elif button == "overload":
+			_overload_pressed = true
 		elif not button.is_empty():
 			_button_touches[event.index] = button
 			_fire_pressed = _fire_pressed or button == "fire"
