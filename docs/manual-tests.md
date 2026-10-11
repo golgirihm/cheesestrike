@@ -79,6 +79,16 @@ Setup: two windows. Why manual: these check how a match reads on screen; the aut
 | MAT-07 | Choosing the map | 1. Press the map button on the menu to choose Brie Box, host in A, and join in B.<br>2. Leave, choose Cheddar Canyon, and host again. | Both windows play on the chosen arena; B never falls or starts inside something on joining. The session list shows the map. Behind the menu is a view over the arena last played. |
 | MAT-05 | The in-game menu | 1. In a session, press Esc until the menu shows, then Esc again.<br>2. Click Menu at the top left, then Resume.<br>3. Open it again and click "Leave session". | The first Esc only frees the mouse; the next opens the menu and the one after closes it. Menu opens it too. While it's open your character doesn't move, the game carries on for everyone else, and clicking Resume doesn't fire or take the mouse. Leaving returns to the main menu. |
 
+## Sound
+
+Setup: two windows, with sound on and headphones for SND-02. Why manual: these are about what is heard.
+
+| ID | Test | Steps | Expected |
+|---|---|---|---|
+| SND-01 | Music and the first click | 1. Open the game and wait without clicking.<br>2. Click anywhere on the menu. | Nothing is heard until the click (browsers don't allow it before), then a cheerful tune loops behind the menu. It gets quieter once in a session and comes back up on returning to the menu. |
+| SND-02 | Where sounds come from | 1. Host in A, join in B. In B, turn so A is to your left, then behind you, while A fires and walks. | A's shots and footsteps are heard from A's direction, louder when closer. |
+| SND-03 | Every sound | 1. In a session, fire each weapon, reload, jump, walk, pick something up, set off an Overload, hit and be hit, and be knocked out. | Each has its own sound: a zap for the Blaster, a boom for the Shotgun, a rattle for the Grater, a thump and then a rumbling burst for the Launcher, clicks for reloading, a tick when your shot hits, a thud when you're hurt, a falling tone when knocked out, a chime for pickups and a rising whoosh for the Overload. None crackles or clips. |
+
 ## Input devices
 
 Why manual: these need physical hardware.

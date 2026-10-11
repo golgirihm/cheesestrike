@@ -60,6 +60,22 @@ class WeaponsTest(GameTestCase):
         joiner.wait_for(f"s.players.some((p) => p.mine && {hurt}) && s.combat.hurts_shown >= 1")
 
 
+class SoundTest(GameTestCase):
+    def test_a_shot_is_heard_by_the_shooter_and_the_other_player(self):
+        host = self.open_game()
+        joiner = self.open_game()
+        joiner.join(host.host())
+        host.wait_for("s.players.length === 2")
+        host.capture_mouse()
+        host.hold_fire(50)
+        host.wait_for("(s.sounds.blaster || 0) >= 1")
+        joiner.wait_for("(s.sounds.blaster || 0) >= 1")
+
+    def test_the_menu_has_music(self):
+        game = self.open_game()
+        game.wait_for("s.screen === 'menu' && s.music")
+
+
 class OverloadTest(GameTestCase):
     def test_a_full_meter_sets_off_an_overload_on_q(self):
         host = self.open_game()

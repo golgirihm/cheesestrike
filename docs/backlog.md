@@ -6,7 +6,7 @@ The plan for taking CheeseStrike from where it is now to a game people can play 
 
 ## Where the game is now
 
-Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. Matches run to a kill limit or a time limit, free-for-all or in two teams (Cheddar and Brie), as the host chose on the menu, with a winner and then a fresh match; the session list shows each host's settings. There is a crosshair, hit markers, a kill feed, a scoreboard and an in-game menu, but only one weapon, one grey-box arena, capsules for players and no sound.
+Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. Matches run to a kill limit or a time limit, free-for-all or in two teams (Cheddar and Brie), as the host chose on the menu, with a winner and then a fresh match; the session list shows each host's settings. Players are cheese characters who fight with four weapons (one a lobbed, bursting projectile), pick up weapons and cheese wedges, and fill a Gouda Overload meter, on two arenas, with synthesized sound and music. There is a crosshair, hit markers, a kill feed, a scoreboard and an in-game menu.
 
 Things about how it works that shape the plan:
 
@@ -28,13 +28,6 @@ Before there is much more game, make it possible for people on different network
 4. **Publish the web build.** A workflow that exports the web build on every push to `main` and deploys it to a static host (GitHub Pages or itch.io), so there is always a current build to share.
 5. **Version check on join.** Send the game's version with `host` and `join`, and have the signaling server refuse a join between different versions with a clear message ("This session is running an older version. Reload the page."). Once builds are deployed continuously, mismatched tabs will happen.
    *Tests:* signaling tests for the refusal; a browser test that the message reaches the menu.
-
-## Milestone 4: Gouda Overload
-
-What makes it this game rather than any shooter: cheese weapons, a real arena, and the Overload.
-
-1. **Sound.** Footsteps, weapon sounds, hits, deaths, pickups and the Overload, positioned in 3D, plus menu music. Browsers block audio until the first click or tap, so start it then.
-   *Manual:* rows for hearing direction and the first-click start in each browser.
 
 ## Milestone 5: Fair and smooth online
 

@@ -80,6 +80,9 @@ var _ground_speed := 0.0
 var _kick := 0.0
 var _gun_rest := Vector3.ZERO
 var _bob_phase := 0.0
+## Metres walked since the last footstep sound.
+const STEP_LENGTH := 1.7
+var _since_step := 0.0
 var _team := -2
 var _badge: MeshInstance3D
 # Presses noted as their events arrive, so that a click or tap that begins and
@@ -277,6 +280,8 @@ func _set_alive(now_alive: bool) -> void:
 	gun.visible = alive
 	if not alive:
 		_release_controls()
+		if _mine:
+			Sounds.play("knocked_out")
 
 
 func _input(event: InputEvent) -> void:
@@ -329,6 +334,7 @@ func _animate(delta: float) -> void:
 		if is_on_floor() and across > 0.5:
 			_bob_phase = fmod(_bob_phase + across * delta * 1.8, TAU)
 			bob = Vector3(sin(_bob_phase) * 0.012, absf(cos(_bob_phase)) * 0.012, 0.0)
+			_step(across * delta, Vector3.INF)
 	else:
 		var moved := global_position - _last_position
 		_last_position = global_position
@@ -336,9 +342,25 @@ func _animate(delta: float) -> void:
 			var speed := Vector2(moved.x, moved.z).length() / delta
 			# Updates arrive in steps, so smooth the speed they give.
 			_ground_speed = lerpf(_ground_speed, minf(speed, 12.0), minf(delta * 10.0, 1.0))
-			body.set_motion(_ground_speed, absf(moved.y) / delta > 0.5)
+			var airborne := absf(moved.y) / delta > 0.5
+			body.set_motion(_ground_speed, airborne)
+			if alive and not airborne and _ground_speed > 0.5:
+				_step(_ground_speed * delta, global_position)
 	gun.position = _gun_rest + bob + Vector3(0.0, 0.01, 0.07) * _kick
 	gun.rotation.x = 0.18 * _kick
+
+
+# Counts off distance walked, and makes a footstep sound each stride: at
+# `at` for someone else's, or without a place for this machine's own.
+func _step(distance: float, at: Vector3) -> void:
+	_since_step += distance
+	if _since_step < STEP_LENGTH:
+		return
+	_since_step = 0.0
+	if at == Vector3.INF:
+		Sounds.play("step", -14.0)
+	elif world != null:
+		Sounds.play_at("step", at, world, -8.0)
 
 
 ## A mouse movement measured in the page's pixels, as the browser reports it,
@@ -419,6 +441,7 @@ func _physics_process(delta: float) -> void:
 		velocity += get_gravity() * delta
 	elif _jump_pressed or _touch_jump:
 		velocity.y = JUMP_VELOCITY
+		Sounds.play("jump", -10.0)
 	_jump_pressed = false
 	_touch_jump = false
 
@@ -447,6 +470,7 @@ func _use_weapon() -> void:
 		_reload_pressed = false
 		if weapon.start_reload():
 			match_.reload(weapon.stats.id)
+			Sounds.play("reload", -6.0)
 	var held := Input.is_action_pressed("fire") or _mouse_fire_held or _button_touches.values().has("fire")
 	var wants := _fire_pressed or (held and weapon.stats.automatic)
 	# A press waits for the weapon to be ready, unless it is empty.
