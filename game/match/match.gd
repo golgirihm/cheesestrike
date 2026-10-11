@@ -20,6 +20,8 @@ signal hurt(attacker: int, from: Vector3, dealt: int)
 signal shot_shown(shooter: int, ends: Array)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
+## Player `id` collected a pickup of `kind` (on everyone's machine).
+signal picked_up(id: int, kind: String)
 ## A projectile was launched, or burst, for effects.
 signal projectile_launched(id: int, weapon: String, from: Vector3, velocity: Vector3)
 signal projectile_burst(id: int, weapon: String, at: Vector3)
@@ -57,6 +59,7 @@ func start(settings := MatchSettings.new()) -> void:
 	# A player other than the host keeps whatever the host has already sent.
 	if is_host():
 		state = MatchState.new(settings)
+		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
 		_pending_names.clear()
 		_rules.clear()
 		_projectiles.clear()
@@ -248,7 +251,10 @@ func _launch(shooter: int, weapon: WeaponStats, origin: Vector3, direction: Vect
 
 
 func _physics_process(delta: float) -> void:
-	if not is_host() or _projectiles.is_empty():
+	if not is_host():
+		return
+	_collect_pickups()
+	if _projectiles.is_empty():
 		return
 	var wall := func(from: Vector3, to: Vector3) -> float:
 		var query := PhysicsRayQueryParameters3D.create(from, to, WORLD_MASK)
@@ -260,6 +266,50 @@ func _physics_process(delta: float) -> void:
 		if burst != null:
 			_projectiles.erase(id)
 			_burst(projectile, burst)
+
+
+## The host hands each pickup that is there to the first player in play
+## standing on its pad who has a use for it.
+func _collect_pickups() -> void:
+	var pads: Array = world.pickup_pads()
+	for index in mini(pads.size(), state.pickups.size()):
+		if not state.pickup_ready(index):
+			continue
+		var pad: Dictionary = pads[index]
+		for node: Node3D in world.players.get_children():
+			var id := node.name.to_int()
+			if node.is_queued_for_deletion() or not Pickups.within_reach(pad.position, node.global_position):
+				continue
+			var outcome := state.collect(index, pad.kind, id)
+			if outcome.is_empty():
+				continue
+			if outcome == "refill":
+				_rules_for(id).refill(pad.kind)
+				_tell_refill(id, pad.kind)
+			_changed()
+			_pickup_seen.rpc(id, pad.kind)
+			picked_up.emit(id, pad.kind)
+			break
+
+
+func _tell_refill(id: int, weapon: String) -> void:
+	if id == multiplayer.get_unique_id():
+		_refilled(weapon)
+	elif multiplayer.get_peers().has(id):
+		_refilled.rpc_id(id, weapon)
+
+
+## A pickup refilled a weapon this player already carried.
+@rpc("authority", "call_remote", "reliable")
+func _refilled(weapon: String) -> void:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own != null and own.arsenal.has(weapon):
+		own.arsenal[weapon].refill()
+
+
+@rpc("authority", "call_remote", "reliable")
+func _pickup_seen(id: int, kind: String) -> void:
+	picked_up.emit(id, kind)
 
 
 ## A projectile bursts at `at`, hurting and shoving everyone in reach who

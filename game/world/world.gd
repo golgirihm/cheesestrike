@@ -20,6 +20,8 @@ func _ready() -> void:
 	match_.shot_shown.connect(_show_others_shot)
 	match_.projectile_launched.connect(effects.launch_projectile)
 	match_.projectile_burst.connect(effects.burst_projectile)
+	match_.state_changed.connect(_show_pickups)
+	_build_pickups()
 
 
 ## Begins the session. `settings` are the host's choice, and only used there.
@@ -63,6 +65,27 @@ func _remove_player(id: int) -> void:
 const SHOT_VIEW_MASK := 3
 
 
+# A model floating over each pickup pad, shown while its pickup is there.
+func _build_pickups() -> void:
+	for pad: Node3D in $Pickups.get_children():
+		var kind := String(pad.get_meta("kind", Pickups.HEALTH))
+		var item := PickupModels.build(kind)
+		item.name = "Item"
+		pad.add_child(item)
+		pad.add_child(PickupModels.base())
+
+
+func _show_pickups() -> void:
+	var pads := $Pickups.get_children()
+	for index in pads.size():
+		pads[index].get_node("Item").visible = match_.state.pickup_ready(index) or match_.state.pickups.size() <= index
+
+
+func _process(delta: float) -> void:
+	for pad: Node3D in $Pickups.get_children():
+		pad.get_node("Item").rotate_y(delta * 1.5)
+
+
 ## This machine's own player fired: show the shot at once, without waiting to
 ## hear from the host where it went.
 func _show_own_shot(origin: Vector3, direction: Vector3, seed: int, player: Node3D) -> void:
@@ -84,6 +107,14 @@ func _show_others_shot(shooter: int, ends: Array) -> void:
 	var player := player_node(shooter)
 	if player != null:
 		effects.show_shot(player.muzzle.global_position, ends)
+
+
+## The arena's pickup pads, in order: [{"position": Vector3, "kind": String}].
+func pickup_pads() -> Array:
+	var pads := []
+	for pad: Node3D in $Pickups.get_children():
+		pads.append({"position": pad.global_position, "kind": String(pad.get_meta("kind", Pickups.HEALTH))})
+	return pads
 
 
 ## The player node for peer `id`, or null.

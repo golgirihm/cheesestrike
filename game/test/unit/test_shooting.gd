@@ -376,3 +376,67 @@ func test_switching_weapons_takes_a_moment() -> void:
 	assert_false(own.weapon.can_fire())
 	own.weapon.tick(own.SWITCH_TIME)
 	assert_true(own.weapon.can_fire())
+
+
+func _pad(kind: String) -> Dictionary:
+	for pad: Dictionary in world.pickup_pads():
+		if pad.kind == kind:
+			return pad
+	return {}
+
+
+func test_standing_on_a_weapon_pad_collects_it() -> void:
+	var pad := _pad("launcher")
+	var own := _add(1, pad.position)
+	match_._physics_process(1.0 / 60.0)
+	assert_true(match_.state.player(1).weapons.has("launcher"))
+	assert_eq(own.weapon.stats.id, "launcher", "a new weapon comes into hand")
+
+
+func test_a_hurt_player_heals_on_a_wedge() -> void:
+	var pad := _pad(Pickups.HEALTH)
+	_add(1, pad.position)
+	_add(2, Vector3(10, 0, -10))
+	match_.state.damage(2, 1, 60.0)
+	watch_signals(match_)
+	match_._physics_process(1.0 / 60.0)
+	assert_eq(match_.state.player(1).health, 90)
+	assert_signal_emitted_with_parameters(match_, "picked_up", [1, Pickups.HEALTH])
+
+
+func test_a_weapon_already_carried_is_refilled_on_its_pad() -> void:
+	var pad := _pad("grater")
+	var own := _add(1, Vector3(0, 0, 10))
+	_give(1, "grater")
+	match_.state_changed.emit()
+	own.arsenal["grater"].ammo = 3
+	own.global_position = pad.position
+	match_._physics_process(1.0 / 60.0)
+	assert_eq(own.arsenal["grater"].ammo, Weapons.find("grater").magazine)
+
+
+func test_every_pad_is_on_the_floor_and_holds_a_known_pickup() -> void:
+	var space := world.get_world_3d().direct_space_state
+	assert_gt(world.pickup_pads().size(), 0)
+	for pad: Dictionary in world.pickup_pads():
+		assert_true(pad.kind == Pickups.HEALTH or Weapons.find(pad.kind) != null, pad.kind)
+		var from: Vector3 = pad.position + Vector3.UP * 0.2
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 0.5))
+		assert_false(hit.is_empty(), "%s pad floats" % pad.kind)
+
+
+func test_every_weapon_but_the_first_can_be_picked_up() -> void:
+	var kinds: Array = world.pickup_pads().map(func(pad: Dictionary) -> String: return pad.kind)
+	for id: String in Weapons.ids():
+		if id != Weapons.STARTING:
+			assert_has(kinds, id)
+	assert_has(kinds, Pickups.HEALTH)
+
+
+func test_a_new_player_starts_at_their_spot_on_every_machine() -> void:
+	# Player 2 isn't this process's own, as on the host when someone joins.
+	var spot: Vector3 = world.spawn_positions()[3]
+	var other: Node3D = world._create_player([2, 3])
+	world.players.add_child(other)
+	assert_eq(other.global_position, spot)
+	other.queue_free()

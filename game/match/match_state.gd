@@ -37,6 +37,9 @@ var team_kills := [0, 0]
 ## Who won the last match: player ids, or teams in a team match. More than one
 ## is a draw.
 var winners: Array[int] = []
+## For each of the arena's pickup pads, in order, seconds until its pickup is
+## back: 0 when it is there to collect.
+var pickups: Array[float] = []
 
 
 func _init(with := MatchSettings.new()) -> void:
@@ -133,6 +136,27 @@ func damage(attacker: int, victim: int, amount: float) -> Dictionary:
 	return result
 
 
+## Sets up `count` pickup pads, all full.
+func set_pickup_count(count: int) -> void:
+	pickups.resize(count)
+	pickups.fill(0.0)
+
+
+func pickup_ready(index: int) -> bool:
+	return index >= 0 and index < pickups.size() and pickups[index] <= 0.0
+
+
+## Player `id` collects pad `index`'s pickup of `kind`, if it is there and of
+## use to them. Returns "" if not, "refill" for a weapon they already carry,
+## or "taken".
+func collect(index: int, kind: String, id: int) -> String:
+	var record := player(id)
+	if not is_playing() or not pickup_ready(index) or not Pickups.wanted(kind, record):
+		return ""
+	pickups[index] = Pickups.respawn_time(kind)
+	return "refill" if Pickups.give(kind, record) else "taken"
+
+
 ## Moves the clocks on by `delta` seconds. Returns the ids of players who are
 ## now due to come back; the host brings them back with respawn(). A match
 ## running out of time ends here, and the host starts the next with
@@ -145,6 +169,8 @@ func tick(delta: float) -> Array[int]:
 			record.respawn_in = maxf(record.respawn_in - delta, 0.0)
 			if record.respawn_in == 0.0:
 				due.append(record.id)
+	for index in pickups.size():
+		pickups[index] = maxf(pickups[index] - delta, 0.0)
 	time_left = maxf(time_left - delta, 0.0)
 	if is_playing() and time_left == 0.0:
 		end_match()
@@ -169,6 +195,7 @@ func start_match() -> void:
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
 	winners.clear()
+	pickups.fill(0.0)
 	for record: PlayerRecord in players.values():
 		record.kills = 0
 		record.deaths = 0
@@ -238,6 +265,7 @@ func to_dict() -> Dictionary:
 		"time_left": time_left,
 		"team_kills": team_kills,
 		"winners": winners,
+		"pickups": pickups,
 	}
 
 
@@ -257,6 +285,10 @@ static func from_dict(data: Dictionary) -> MatchState:
 	var kills: Variant = data.get("team_kills")
 	if kills is Array and kills.size() == 2 and (kills[0] is int or kills[0] is float) and (kills[1] is int or kills[1] is float):
 		state.team_kills = [int(kills[0]), int(kills[1])]
+	var pads: Variant = data.get("pickups")
+	if pads is Array:
+		for left: Variant in pads:
+			state.pickups.append(maxf(float(left), 0.0) if (left is float or left is int) and is_finite(float(left)) else 0.0)
 	var won: Variant = data.get("winners")
 	if won is Array:
 		for winner: Variant in won:

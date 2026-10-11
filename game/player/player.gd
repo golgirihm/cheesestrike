@@ -96,10 +96,13 @@ func _ready() -> void:
 	body.visible = not _mine
 	visor.visible = not _mine
 	name_tag.visible = not _mine
+	# Everyone places a new character at its spot: until its owner's first
+	# update arrives, it would otherwise stand in the middle of the arena, and
+	# could collect what lies there.
+	global_position = spawn_position
+	_face_middle()
 	if _mine:
 		camera.make_current()
-		global_position = spawn_position
-		_face_middle()
 	_show_weapon(Weapons.STARTING)
 	if match_ != null:
 		match_.state_changed.connect(_on_match_state_changed)
