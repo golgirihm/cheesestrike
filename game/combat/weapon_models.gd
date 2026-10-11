@@ -23,7 +23,7 @@ static func build(id: String) -> Node3D:
 			for hole in [Vector3(0.081, 0.02, -0.1), Vector3(0.081, -0.03, 0.08), Vector3(-0.081, 0.0, -0.02)]:
 				_sphere(model, 0.035, hole, DARK)
 			_box(model, Vector3(0.07, 0.07, 0.2), Vector3(0.0, 0.02, -0.33), DARK)
-			muzzle_z = -0.44
+			muzzle_z = -0.334
 		"grater":
 			_box(model, Vector3(0.12, 0.16, 0.42), Vector3.ZERO, METAL)
 			for row in 4:
@@ -32,9 +32,9 @@ static func build(id: String) -> Node3D:
 			muzzle_z = -0.24
 		"launcher":
 			var tube := CylinderMesh.new()
-			tube.top_radius = 0.11
-			tube.bottom_radius = 0.11
-			tube.height = 0.62
+			tube.top_radius = 0.085
+			tube.bottom_radius = 0.085
+			tube.height = 0.52
 			tube.material = _material(RIND)
 			var barrel := MeshInstance3D.new()
 			barrel.mesh = tube
@@ -42,10 +42,12 @@ static func build(id: String) -> Node3D:
 			barrel.position = Vector3(0, 0.02, -0.05)
 			model.add_child(barrel)
 			_box(model, Vector3(0.08, 0.16, 0.12), Vector3(0.0, -0.12, 0.08), GOUDA)
-			muzzle_z = -0.4
+			muzzle_z = -0.33
 		_:
 			_box(model, Vector3(0.1, 0.12, 0.55), Vector3.ZERO, CHEDDAR)
 			_box(model, Vector3(0.05, 0.05, 0.2), Vector3(0.0, 0.02, -0.36), DARK)
+	# The hand holding it, which also stands for the arm in first person.
+	_sphere(model, 0.055, Vector3(0.0, -0.09, 0.12), Color(0.95, 0.85, 0.6))
 	var muzzle := Marker3D.new()
 	muzzle.name = "Muzzle"
 	muzzle.position = Vector3(0, 0.02, muzzle_z)

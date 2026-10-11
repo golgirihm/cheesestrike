@@ -148,6 +148,7 @@ func _show_own_shot(origin: Vector3, direction: Vector3, seed: int, player: Node
 func _show_others_shot(shooter: int, ends: Array) -> void:
 	var player := player_node(shooter)
 	if player != null:
+		player.kick()
 		effects.show_shot(player.muzzle.global_position, ends)
 
 

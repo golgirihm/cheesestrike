@@ -391,4 +391,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 0)
 metadata/kind = "health"
 
 [node name="MenuCamera" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, -0, -0, 0.83957, 0.543251, 0, -0.543251, 0.83957, 0, 22, 34)
+transform = Transform3D(1, 0, -0, -0, 0.866186, 0.499722, 0, -0.499722, 0.866186, 0, 15, 22)

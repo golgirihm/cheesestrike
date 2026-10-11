@@ -10,7 +10,8 @@ extends Node
 ## player would.
 ##
 ## Only active in a web build opened with `?test` in the address. The game
-## then stops drawing, so `?test` is no use for looking at it.
+## then stops drawing, so `?test` is no use for looking at it, unless `&draw`
+## is added too, as for taking screenshots.
 
 const PUBLISH_INTERVAL := 0.05
 
@@ -29,7 +30,8 @@ func _init(main: Node) -> void:
 func _ready() -> void:
 	# The tests never look at the picture, and drawing it is most of the work
 	# for a browser without a graphics card, as on a CI machine.
-	RenderingServer.render_loop_enabled = false
+	if not JavaScriptBridge.eval("new URLSearchParams(location.search).has('draw')"):
+		RenderingServer.render_loop_enabled = false
 
 
 func _process(delta: float) -> void:

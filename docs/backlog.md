@@ -33,8 +33,7 @@ Before there is much more game, make it possible for people on different network
 
 What makes it this game rather than any shooter: cheese weapons, a real arena, and the Overload.
 
-1. **Characters.** Replace the capsules with cheese characters, with walk, jump, shoot and death animations, and first-person arms holding the weapon.
-2. **Sound.** Footsteps, weapon sounds, hits, deaths, pickups and the Overload, positioned in 3D, plus menu music. Browsers block audio until the first click or tap, so start it then.
+1. **Sound.** Footsteps, weapon sounds, hits, deaths, pickups and the Overload, positioned in 3D, plus menu music. Browsers block audio until the first click or tap, so start it then.
    *Manual:* rows for hearing direction and the first-click start in each browser.
 
 ## Milestone 5: Fair and smooth online
