@@ -11,6 +11,7 @@ extends Node
 @onready var max_players_button: Button = %MaxPlayersButton
 @onready var kill_limit_button: Button = %KillLimitButton
 @onready var minutes_button: Button = %MinutesButton
+@onready var map_button: Button = %MapButton
 @onready var host_button: Button = %HostButton
 @onready var target_edit: LineEdit = %TargetEdit
 @onready var join_button: Button = %JoinButton
@@ -129,6 +130,7 @@ func _setup_match_buttons() -> void:
 	_cycle(max_players_button, "host_max_players", player_counts, func(count: int) -> String: return "Up to %d players" % count)
 	_cycle(kill_limit_button, "host_kill_limit", MatchSettings.KILL_LIMITS, func(limit: int) -> String: return "First to %d" % limit)
 	_cycle(minutes_button, "host_minutes", MatchSettings.MINUTES, func(minutes: int) -> String: return "%d minutes" % minutes)
+	_cycle(map_button, "host_map", Maps.ORDER, func(map: String) -> String: return "Map: %s" % Maps.NAMES[map])
 
 
 func _cycle(button: Button, key: String, choices: Array, describe: Callable) -> void:
@@ -154,6 +156,7 @@ func host_settings() -> MatchSettings:
 		"kill_limit": Settings.get_value("host_kill_limit"),
 		"minutes": Settings.get_value("host_minutes"),
 		"max_players": Settings.get_value("host_max_players"),
+		"map": Settings.get_value("host_map"),
 	})
 
 
@@ -232,8 +235,8 @@ func _show_menu(message: String) -> void:
 ## How a session reads in the session list.
 static func session_line(session: Dictionary) -> String:
 	var settings := MatchSettings.from_dict(session.get("settings"))
-	return "%s  ·  %d/%d playing  ·  %s" % [
-		session.get("code", "?"), int(session.get("players", 0)), settings.max_players, MatchSettings.MODE_NAMES[settings.mode]]
+	return "%s  ·  %d/%d  ·  %s  ·  %s" % [
+		session.get("code", "?"), int(session.get("players", 0)), settings.max_players, MatchSettings.MODE_NAMES[settings.mode], Maps.NAMES[settings.map]]
 
 
 func _show_sessions(list: Array) -> void:

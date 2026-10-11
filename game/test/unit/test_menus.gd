@@ -8,7 +8,7 @@ var saved := {}
 
 
 func before_each() -> void:
-	for key in ["host_mode", "host_kill_limit", "host_minutes", "host_max_players"]:
+	for key in ["host_mode", "host_kill_limit", "host_minutes", "host_max_players", "host_map"]:
 		saved[key] = Settings.get_value(key)
 	main = MAIN.instantiate()
 	add_child_autofree(main)
@@ -42,16 +42,17 @@ func test_hosting_uses_the_chosen_settings() -> void:
 	Settings.set_value("host_kill_limit", 50)
 	Settings.set_value("host_minutes", 15)
 	Settings.set_value("host_max_players", 4)
-	assert_eq(main.host_settings().to_dict(), {"mode": "teams", "kill_limit": 50, "minutes": 15, "max_players": 4})
+	Settings.set_value("host_map", "box")
+	assert_eq(main.host_settings().to_dict(), {"mode": "teams", "kill_limit": 50, "minutes": 15, "max_players": 4, "map": "box"})
 
 
 func test_a_session_reads_with_its_players_limit_and_mode() -> void:
-	var line: String = main.session_line({"code": "ABCD", "players": 3, "settings": {"mode": "teams", "max_players": 8}})
-	assert_eq(line, "ABCD  ·  3/8 playing  ·  Cheddar vs Brie")
+	var line: String = main.session_line({"code": "ABCD", "players": 3, "settings": {"mode": "teams", "max_players": 8, "map": "box"}})
+	assert_eq(line, "ABCD  ·  3/8  ·  Cheddar vs Brie  ·  Brie Box")
 
 
 func test_a_session_from_an_older_server_still_reads() -> void:
-	assert_eq(main.session_line({"code": "WXYZ", "players": 2}), "WXYZ  ·  2/16 playing  ·  Free-for-all")
+	assert_eq(main.session_line({"code": "WXYZ", "players": 2}), "WXYZ  ·  2/16  ·  Free-for-all  ·  Cheddar Canyon")
 
 
 func test_the_in_game_menu_opens_and_closes() -> void:

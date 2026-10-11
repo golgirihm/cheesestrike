@@ -25,7 +25,7 @@ The host is always peer 1. Joiners only ever exchange messages with the host.
 
 A host's settings are how its matches are set up, which players see in the list
 before joining: {"mode": "ffa" | "teams", "kill_limit": n, "minutes": n,
-"max_players": n}. The server only checks them and passes them on, apart from
+"max_players": n, "map": "canyon" | "box"}. The server only checks them and passes them on, apart from
 max_players, which it enforces. Anything missing or out of range is replaced by
 the default, as the game itself does.
 """
@@ -46,7 +46,8 @@ CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # no I or O
 CODE_LENGTH = 4
 RELAYED = ("offer", "answer", "candidate")
 MODES = ("ffa", "teams")
-DEFAULT_SETTINGS = {"mode": "ffa", "kill_limit": 20, "minutes": 8, "max_players": MAX_PLAYERS}
+MAPS = ("canyon", "box")
+DEFAULT_SETTINGS = {"mode": "ffa", "kill_limit": 20, "minutes": 8, "max_players": MAX_PLAYERS, "map": "canyon"}
 # Allowed range of each number in a host's settings.
 SETTING_RANGES = {"kill_limit": (1, 999), "minutes": (1, 60), "max_players": (2, MAX_PLAYERS)}
 
@@ -59,6 +60,8 @@ def clean_settings(given):
         return settings
     if given.get("mode") in MODES:
         settings["mode"] = given["mode"]
+    if given.get("map") in MAPS:
+        settings["map"] = given["map"]
     for key, (low, high) in SETTING_RANGES.items():
         value = given.get(key)
         # bool is an int to Python, but not a number of anything here.

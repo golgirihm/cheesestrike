@@ -11,9 +11,9 @@ func test_the_defaults_are_a_free_for_all_to_20_in_8_minutes_for_16() -> void:
 
 
 func test_settings_survive_the_trip() -> void:
-	var settings := MatchSettings.from_dict({"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6})
+	var settings := MatchSettings.from_dict({"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6, "map": "box"})
 	var copy := MatchSettings.from_dict(bytes_to_var(var_to_bytes(settings.to_dict())))
-	assert_eq(copy.to_dict(), {"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6})
+	assert_eq(copy.to_dict(), {"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6, "map": "box"})
 	assert_true(copy.is_teams())
 
 
@@ -32,7 +32,7 @@ func test_out_of_range_numbers_are_brought_into_range() -> void:
 
 
 func test_nonsense_gives_the_defaults() -> void:
-	var settings := MatchSettings.from_dict({"mode": "tag", "kill_limit": "ten", "minutes": NAN, "max_players": null})
+	var settings := MatchSettings.from_dict({"mode": "tag", "kill_limit": "ten", "minutes": NAN, "max_players": null, "map": "moon"})
 	assert_eq(settings.to_dict(), MatchSettings.new().to_dict())
 	assert_eq(MatchSettings.from_dict("teams").to_dict(), MatchSettings.new().to_dict())
 	assert_eq(MatchSettings.from_dict(null).to_dict(), MatchSettings.new().to_dict())
@@ -46,9 +46,9 @@ func test_every_menu_choice_is_within_range() -> void:
 
 
 func test_the_description_says_the_mode_goal_and_length() -> void:
-	assert_eq(MatchSettings.new().describe(), "Free-for-all · first to 20 · 8 min")
-	var teams := MatchSettings.from_dict({"mode": "teams", "kill_limit": 50, "minutes": 15})
-	assert_eq(teams.describe(), "Cheddar vs Brie · first to 50 · 15 min")
+	assert_eq(MatchSettings.new().describe(), "Free-for-all · first to 20 · 8 min · Cheddar Canyon")
+	var teams := MatchSettings.from_dict({"mode": "teams", "kill_limit": 50, "minutes": 15, "map": "box"})
+	assert_eq(teams.describe(), "Cheddar vs Brie · first to 50 · 15 min · Brie Box")
 
 
 func test_the_server_and_the_game_agree_on_the_defaults() -> void:
@@ -58,4 +58,5 @@ func test_the_server_and_the_game_agree_on_the_defaults() -> void:
 		pass_test("the server's source isn't reachable from here")
 		return
 	var defaults := MatchSettings.new()
-	assert_string_contains(server, '"mode": "%s", "kill_limit": %d, "minutes": %d, "max_players": MAX_PLAYERS' % [defaults.mode, defaults.kill_limit, defaults.minutes])
+	assert_string_contains(server, '"mode": "%s", "kill_limit": %d, "minutes": %d, "max_players": MAX_PLAYERS, "map": "%s"' % [defaults.mode, defaults.kill_limit, defaults.minutes, defaults.map])
+	assert_string_contains(server, 'MAPS = ("%s")' % '", "'.join(Maps.ORDER))

@@ -63,6 +63,9 @@ class WeaponsTest(GameTestCase):
 class OverloadTest(GameTestCase):
     def test_a_full_meter_sets_off_an_overload_on_q(self):
         host = self.open_game()
+        # On the small arena, whoever is knocked out comes back straight ahead
+        # of the host, the spot farthest from it.
+        host.choose("MapButton", "Map: Brie Box")
         joiner = self.open_game()
         joiner.join(host.host())
         host.wait_for("s.players.length === 2")

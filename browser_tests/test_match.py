@@ -9,15 +9,29 @@ FIRST_TO_5 = "First to 5"
 
 
 class MatchTest(GameTestCase):
-    def host_with(self, mode="Free-for-all", kills="First to 20", players="Up to 16 players"):
+    def host_with(self, mode="Free-for-all", kills="First to 20", players="Up to 16 players", map="Cheddar Canyon"):
         host = self.open_game()
         host.choose("ModeButton", mode)
         host.choose("KillLimitButton", kills)
         host.choose("MaxPlayersButton", players)
+        host.choose("MapButton", f"Map: {map}")
         return host, host.host()
 
+    def test_everyone_plays_on_the_map_the_host_chose(self):
+        host, code = self.host_with(map="Brie Box")
+        self.assertEqual(host.state()["map"], "box")
+        joiner = self.open_game()
+        self.assertEqual(joiner.state()["map"], "canyon", "the menu shows the default arena")
+        joiner.join(code)
+        joiner.wait_for("s.map === 'box'")
+        # Standing on the small arena's floor, not fallen through it.
+        joiner.page.wait_for_timeout(1000)
+        self.assertGreater(joiner.own_player()["position"][1], -0.5)
+
     def test_a_short_match_ends_with_a_winner_and_the_next_begins(self):
-        host, code = self.host_with(kills=FIRST_TO_5)
+        # On the small arena, whoever is knocked out comes back straight ahead
+        # of the host, the spot farthest from it.
+        host, code = self.host_with(kills=FIRST_TO_5, map="Brie Box")
         joiner = self.open_game()
         joiner.join(code)
         joiner_id = joiner.own_player()["id"]
@@ -43,7 +57,7 @@ class MatchTest(GameTestCase):
         host, code = self.host_with(mode="Cheddar vs Brie", players="Up to 2 players")
         watcher = self.open_game()
         watcher.click("RefreshButton")
-        watcher.wait_for(f"s.sessions.some((line) => line.text === '{code}  ·  1/2 playing  ·  Cheddar vs Brie')")
+        watcher.wait_for(f"s.sessions.some((line) => line.text === '{code}  ·  1/2  ·  Cheddar vs Brie  ·  Cheddar Canyon')")
 
         joiner = self.open_game()
         joiner.join(code)

@@ -17,6 +17,7 @@ const DEFAULTS := {
 	"host_kill_limit": 20,
 	"host_minutes": 8,
 	"host_max_players": MatchSettings.MAX_PLAYERS,
+	"host_map": Maps.DEFAULT,
 }
 
 ## Where the settings are kept. Tests point their own instances elsewhere.

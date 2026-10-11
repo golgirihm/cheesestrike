@@ -13,14 +13,16 @@ var match_: Match
 func before_each() -> void:
 	world = WORLD.instantiate()
 	add_child_autofree(world)
+	# The small arena, whose layout these tests are written around.
+	world.load_map("box")
 	match_ = world.match_
-	match_.start()
+	match_.start(MatchSettings.from_dict({"map": "box"}))
 	await wait_physics_frames(2)
 
 
 func _add(id: int, at: Vector3) -> Node3D:
 	match_.add_player(id)
-	var player: Node3D = world._create_player([id, 0])
+	var player: Node3D = world._create_player([id, Vector3.ZERO])
 	world.players.add_child(player)
 	player.global_position = at
 	return player
@@ -212,7 +214,7 @@ func test_a_knock_out_is_announced_with_both_names() -> void:
 
 
 func _teams() -> void:
-	match_.start(MatchSettings.from_dict({"mode": "teams", "kill_limit": 3}))
+	match_.start(MatchSettings.from_dict({"mode": "teams", "kill_limit": 3, "map": "box"}))
 
 
 func test_teammates_shots_pass_without_hurting() -> void:
@@ -242,7 +244,7 @@ func test_a_new_match_brings_everyone_back_with_scores_cleared() -> void:
 
 
 func test_the_match_ends_when_the_kill_limit_is_reached() -> void:
-	match_.start(MatchSettings.from_dict({"kill_limit": 1}))
+	match_.start(MatchSettings.from_dict({"kill_limit": 1, "map": "box"}))
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	for i in 3:
@@ -436,7 +438,7 @@ func test_every_weapon_but_the_first_can_be_picked_up() -> void:
 func test_a_new_player_starts_at_their_spot_on_every_machine() -> void:
 	# Player 2 isn't this process's own, as on the host when someone joins.
 	var spot: Vector3 = world.spawn_positions()[3]
-	var other: Node3D = world._create_player([2, 3])
+	var other: Node3D = world._create_player([2, spot])
 	world.players.add_child(other)
 	assert_eq(other.global_position, spot)
 	other.queue_free()
