@@ -45,7 +45,7 @@ jobs:
       # downloading it takes several seconds, so it is kept in a cache.
       - name: Restore cached Python
         id: python-cache
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.tool_cache }}/Python/${{ env.PYTHON_VERSION }}
           key: python-${{ env.PYTHON_VERSION }}-ubuntu-24.04-${{ runner.arch }}
@@ -73,7 +73,7 @@ jobs:
       # downloading it takes several seconds, so it is kept in a cache.
       - name: Restore cached Python
         id: python-cache
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.tool_cache }}/Python/${{ env.PYTHON_VERSION }}
           key: python-${{ env.PYTHON_VERSION }}-ubuntu-24.04-${{ runner.arch }}
@@ -106,7 +106,7 @@ jobs:
       - name: Load pinned versions
         run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
       - name: Restore cached Python
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.tool_cache }}/Python/${{ env.PYTHON_VERSION }}
           key: python-${{ env.PYTHON_VERSION }}-ubuntu-24.04-${{ runner.arch }}
