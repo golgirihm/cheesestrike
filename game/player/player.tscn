@@ -48,5 +48,16 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.34)
 mesh = SubResource("BoxMesh_visor")
 
+[node name="NameTag" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, 0)
+pixel_size = 0.004
+billboard = 1
+no_depth_test = true
+fixed_size = false
+modulate = Color(1, 1, 1, 1)
+outline_modulate = Color(0, 0, 0, 0.8)
+font_size = 48
+outline_size = 12
+
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_player")

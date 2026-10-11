@@ -16,6 +16,7 @@ const PITCH_LIMIT := deg_to_rad(85.0)
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var body: MeshInstance3D = $Body
 @onready var visor: MeshInstance3D = $Head/Visor
+@onready var name_tag: Label3D = $NameTag
 
 # Touch controls: the left half of the screen is a movement stick, the right
 # half drags to look and taps to jump.
@@ -30,6 +31,8 @@ var _mine := false
 ## Where this player starts, chosen by the host and set before the node enters
 ## the tree.
 var spawn_position := Vector3.ZERO
+## The world's Match node, set with spawn_position.
+var match_: Node
 
 
 func _enter_tree() -> void:
@@ -47,11 +50,19 @@ func _ready() -> void:
 	set_process_input(_mine)
 	body.visible = not _mine
 	visor.visible = not _mine
+	name_tag.visible = not _mine
+	if match_ != null:
+		match_.state_changed.connect(_on_match_state_changed)
+		_on_match_state_changed()
 	if _mine:
 		camera.make_current()
 		global_position = spawn_position
 		# Start facing the middle of the arena, not the wall behind the spot.
 		rotation.y = atan2(spawn_position.x, spawn_position.z)
+
+
+func _on_match_state_changed() -> void:
+	name_tag.text = match_.state.name_of(name.to_int())
 
 
 func _input(event: InputEvent) -> void:

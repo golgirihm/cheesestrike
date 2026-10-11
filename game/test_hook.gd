@@ -46,7 +46,13 @@ func snapshot() -> Dictionary:
 		if player.is_queued_for_deletion():
 			continue
 		var at := player.global_position
-		players.append({"id": player.name.to_int(), "mine": player.is_multiplayer_authority(), "position": [at.x, at.y, at.z]})
+		var id := player.name.to_int()
+		players.append({
+			"id": id,
+			"mine": player.is_multiplayer_authority(),
+			"name": _main.world.match_.state.name_of(id),
+			"position": [at.x, at.y, at.z],
+		})
 
 	# Each line of the session list: a session to click, or the note shown when
 	# there are none.
@@ -57,6 +63,7 @@ func snapshot() -> Dictionary:
 
 	var controls := {}
 	for control: Control in [
+		_main.name_edit,
 		_main.host_button,
 		_main.target_edit,
 		_main.join_button,
@@ -70,6 +77,7 @@ func snapshot() -> Dictionary:
 	return {
 		"screen": _screen(),
 		"status": _main.status.text,
+		"name_box": _main.name_edit.text,
 		"hud": _main.hud.text if _main.hud.visible else "",
 		"code": Net.room_code,
 		"notice": _main.disconnected_detail.text if _main.disconnected_notice.visible else "",

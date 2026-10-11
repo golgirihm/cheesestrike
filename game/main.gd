@@ -6,6 +6,7 @@ extends Node
 
 @onready var world: Node3D = $World
 @onready var menu: Control = $UI/Menu
+@onready var name_edit: LineEdit = %NameEdit
 @onready var host_button: Button = %HostButton
 @onready var target_edit: LineEdit = %TargetEdit
 @onready var join_button: Button = %JoinButton
@@ -33,6 +34,9 @@ func _ready() -> void:
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
 	target_edit.text_submitted.connect(_join)
 	refresh_button.pressed.connect(Net.request_sessions)
+	name_edit.text = Settings.get_value("name")
+	name_edit.text_submitted.connect(func(_text: String) -> void: _remember_name())
+	name_edit.focus_exited.connect(_remember_name)
 
 	# Session codes and the session list only exist with the signaling server.
 	sessions_panel.visible = Net.use_webrtc
@@ -54,7 +58,17 @@ func _process(_delta: float) -> void:
 		hud.text = "Session %s  ·  %d playing" % [Net.room_code, world.players.get_child_count()]
 
 
+## Keeps the name typed in the menu, cleaned, or puts back the last one if
+## nothing usable was typed.
+func _remember_name() -> void:
+	var cleaned := PlayerName.clean(name_edit.text)
+	if not cleaned.is_empty():
+		Settings.set_value("name", cleaned)
+	name_edit.text = Settings.get_value("name")
+
+
 func _host() -> void:
+	_remember_name()
 	_set_busy("Starting session…")
 	Net.host()
 
@@ -63,6 +77,7 @@ func _join(target: String) -> void:
 	if Net.use_webrtc and target.strip_edges().is_empty():
 		status.text = "Enter a session code."
 		return
+	_remember_name()
 	_set_busy("Joining…")
 	Net.join(target)
 

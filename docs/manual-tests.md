@@ -41,6 +41,7 @@ Setup: two windows. Why manual: this checks what one player sees of another acro
 | PLR-02 | Movement is shared | 1. In B, walk and jump while watching window A. | A sees B's character move and jump as B does, without long freezes or jumps in position. |
 | PLR-03 | Facing is shared | 1. In B, turn left and right, then look up and down, while watching window A. | The visor on B's character turns and tilts to match where B is looking. |
 | PLR-04 | Starting spots | 1. Host in A, join in B.<br>2. Before moving, look at where each character is. | The two characters start in different places, each facing the middle of the arena. |
+| PLR-05 | Name tags | 1. Host in A, join in B, each with a different name.<br>2. Turn each view until the other character is visible, then walk away from it. | A name floats above the other character, readable from near and far and through walls, and turns to face you. Your own name is not shown over your own head. |
 
 ## Input devices
 
