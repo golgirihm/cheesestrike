@@ -32,6 +32,10 @@ var _health_bar: ProgressBar
 var _health_label: Label
 var _ammo_label: Label
 var _weapon_label: Label
+var _pickup_label: Label
+var _pickup_left := 0.0
+## Pickups this player has collected, for the browser tests.
+var pickups_shown := 0
 var _knocked_out: PanelContainer
 var _knocked_out_title: Label
 var _knocked_out_detail: Label
@@ -55,12 +59,14 @@ func bind(of: Node3D) -> void:
 	world.match_.hit_confirmed.connect(_on_hit_confirmed)
 	world.match_.hurt.connect(_on_hurt)
 	world.match_.knocked_out.connect(kill_feed.add)
+	world.match_.picked_up.connect(_on_picked_up)
 	world.match_.state_changed.connect(_refresh_scoreboard)
 
 
 ## Clears what is left from a session that has ended.
 func reset() -> void:
 	kill_feed.clear()
+	_pickup_left = 0.0
 	_indicators.clear()
 	_hit_left = 0.0
 	scoreboard.hide()
@@ -139,6 +145,8 @@ func _process(delta: float) -> void:
 	if world == null:
 		return
 	_hit_left = maxf(_hit_left - delta, 0.0)
+	_pickup_left = maxf(_pickup_left - delta, 0.0)
+	_pickup_label.visible = _pickup_left > 0.0
 	for indicator in _indicators:
 		indicator.left -= delta
 	_indicators = _indicators.filter(func(indicator: Dictionary) -> bool: return indicator.left > 0.0)
@@ -177,6 +185,14 @@ func _touch_held(button: String) -> bool:
 func _refresh_scoreboard() -> void:
 	if scoreboard.visible and world != null:
 		scoreboard.show_state(world.match_.state, multiplayer.get_unique_id())
+
+
+func _on_picked_up(id: int, kind: String) -> void:
+	if multiplayer.multiplayer_peer == null or id != multiplayer.get_unique_id():
+		return
+	pickups_shown += 1
+	_pickup_label.text = "+ %s" % Pickups.display_name(kind)
+	_pickup_left = 2.0
 
 
 func _on_hit_confirmed(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
@@ -237,6 +253,11 @@ func _build() -> void:
 	arms.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	arms.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(arms)
+	_pickup_label = _outlined_label(16)
+	_pickup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_pickup_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35))
+	_pickup_label.visible = false
+	arms.add_child(_pickup_label)
 	_weapon_label = _outlined_label(15)
 	_weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	arms.add_child(_weapon_label)

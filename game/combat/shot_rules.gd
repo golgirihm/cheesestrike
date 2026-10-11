@@ -56,10 +56,14 @@ func reload(weapon: WeaponStats, now: float) -> void:
 		_reload_done_at[weapon.id] = now + weapon.reload_time * RELOAD_ALLOWANCE
 
 
-## Everything is full again, as on respawning.
-func refill() -> void:
-	_fired.clear()
-	_reload_done_at.clear()
+## Everything is full again, as on respawning, or just `weapon` if given.
+func refill(weapon := "") -> void:
+	if weapon.is_empty():
+		_fired.clear()
+		_reload_done_at.clear()
+	else:
+		_fired.erase(weapon)
+		_reload_done_at.erase(weapon)
 
 
 static func origin_believable(reported: Vector3, head: Vector3) -> bool:

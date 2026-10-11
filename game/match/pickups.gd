@@ -1,0 +1,53 @@
+class_name Pickups
+## What lies on the arena's pickup pads, and the rules for collecting it: a
+## cheese wedge for health, or a weapon. The pads themselves are part of the
+## arena; which are full is part of the match state, decided by the host.
+
+const HEALTH := "health"
+## Health a wedge gives back, up to full.
+const HEALTH_AMOUNT := 50
+## Seconds before a collected pickup is back.
+const RESPAWN := {HEALTH: 15.0}
+const WEAPON_RESPAWN := 20.0
+## How close a player's feet must come to a pad to collect from it.
+const REACH := 1.3
+const REACH_UP := 2.0
+
+
+static func respawn_time(kind: String) -> float:
+	return RESPAWN.get(kind, WEAPON_RESPAWN)
+
+
+## Whether a player standing at `feet` is close enough to collect from a pad at `pad`.
+static func within_reach(pad: Vector3, feet: Vector3) -> bool:
+	var across := Vector2(feet.x - pad.x, feet.z - pad.z).length()
+	return across <= REACH and feet.y - pad.y >= -0.5 and feet.y - pad.y <= REACH_UP
+
+
+## Whether `record` would gain anything from a pickup of `kind`: health only
+## for someone hurt, a weapon always (more ammunition, if already carried).
+static func wanted(kind: String, record: PlayerRecord) -> bool:
+	if record == null or not record.alive:
+		return false
+	if kind == HEALTH:
+		return record.health < PlayerRecord.MAX_HEALTH
+	return Weapons.find(kind) != null
+
+
+## Gives `record` a pickup of `kind`. Returns true if it was a weapon they
+## already carried, which only refills it.
+static func give(kind: String, record: PlayerRecord) -> bool:
+	if kind == HEALTH:
+		record.health = mini(record.health + HEALTH_AMOUNT, PlayerRecord.MAX_HEALTH)
+		return false
+	if record.weapons.has(kind):
+		return true
+	record.weapons.append(kind)
+	return false
+
+
+static func display_name(kind: String) -> String:
+	if kind == HEALTH:
+		return "Cheese wedge"
+	var weapon := Weapons.find(kind)
+	return weapon.display_name if weapon != null else kind
