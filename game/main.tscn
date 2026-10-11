@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://world/world.tscn" id="2_world"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://ui/touch_controls.gd" id="4_touch"]
 [ext_resource type="Script" path="res://ui/combat_hud.gd" id="5_combat_hud"]
 [ext_resource type="Script" path="res://ui/settings_menu.gd" id="6_settings"]
+[ext_resource type="Script" path="res://ui/controls_help.gd" id="7_help"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -247,6 +248,12 @@ custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Copy invite link"
 
+[node name="HelpButton" type="Button" parent="UI/PauseMenu/Panel/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Controls"
+
 [node name="PauseSettingsButton" type="Button" parent="UI/PauseMenu/Panel/Margin/Rows"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
@@ -268,6 +275,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("6_settings")
+
+[node name="ControlsHelp" type="CenterContainer" parent="UI"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7_help")
 
 [node name="WaitingNotice" type="CenterContainer" parent="UI"]
 unique_name_in_owner = true

@@ -35,6 +35,8 @@ extends Node
 @onready var resume_button: Button = %ResumeButton
 @onready var menu_leave_button: Button = %MenuLeaveButton
 @onready var copy_link_button: Button = %CopyLinkButton
+@onready var help_button: Button = %HelpButton
+@onready var controls_help: Control = %ControlsHelp
 @onready var settings_button: Button = %SettingsButton
 @onready var pause_settings_button: Button = %PauseSettingsButton
 @onready var settings_menu: Control = %SettingsMenu
@@ -68,6 +70,7 @@ func _ready() -> void:
 	resume_button.pressed.connect(close_pause_menu)
 	menu_leave_button.pressed.connect(_leave)
 	copy_link_button.pressed.connect(_copy_link)
+	help_button.pressed.connect(_show_help_from_menu)
 	settings_button.pressed.connect(settings_menu.open)
 	pause_settings_button.pressed.connect(settings_menu.open)
 	Controls.apply(Settings.get_value("bindings"))
@@ -109,7 +112,7 @@ func _process(_delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not hud.visible or waiting_notice.visible or settings_menu.visible:
+	if not hud.visible or waiting_notice.visible or settings_menu.visible or controls_help.visible:
 		return
 	var toggle := event.is_action_pressed("pause_menu")
 	if event.is_action_pressed("ui_cancel"):
@@ -228,6 +231,22 @@ func _on_session_started() -> void:
 	combat_hud.show()
 	touch_controls.show()
 	world.start(host_settings())
+	if not Settings.get_value("seen_help"):
+		Settings.set_value("seen_help", true)
+		show_help()
+
+
+## Shows the controls for the device the player seems to be using.
+func show_help() -> void:
+	controls_help.open(controls_help.device_for(touch_controls.shown, Input.get_connected_joypads().size()))
+
+
+func _show_help_from_menu() -> void:
+	close_pause_menu()
+	show_help()
+	await controls_help.closed
+	if hud.visible:
+		open_pause_menu()
 
 
 func _on_host_silent_changed(silent: bool) -> void:
@@ -271,6 +290,7 @@ func _on_session_ended(reason: String) -> void:
 	final_standings.text = standings(world.match_.state)
 	world.stop()
 	pause_menu.hide()
+	controls_help.hide()
 	combat_hud.hide()
 	combat_hud.reset()
 	touch_controls.hide()
@@ -305,6 +325,7 @@ func _show_menu(message: String) -> void:
 	Sounds.set_music_quiet(false)
 	pause_menu.hide()
 	settings_menu.hide()
+	controls_help.hide()
 	hud.hide()
 	combat_hud.hide()
 	combat_hud.reset()

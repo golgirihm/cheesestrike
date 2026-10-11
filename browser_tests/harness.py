@@ -274,9 +274,10 @@ class GameTestCase(unittest.TestCase):
             return False
         return any(test is self for test, _ in result.failures + result.errors)
 
-    def open_game(self):
-        """Opens the game in a new window and waits for its menu."""
-        url = f"http://localhost:{self._web.server_address[1]}/?test&signal=ws://localhost:{self.signaling.port}"
+    def open_game(self, extra=""):
+        """Opens the game in a new window and waits for its menu. `extra` is
+        added to the address's query, such as "&help"."""
+        url = f"http://localhost:{self._web.server_address[1]}/?test&signal=ws://localhost:{self.signaling.port}{extra}"
         game = Game(self._context.new_page(), url)
         self._games.append(game)
         return game

@@ -127,6 +127,7 @@ Why manual: these need physical hardware.
 | INP-12 | Touch: scoreboard | As INP-03 | 1. Hold the round Scores button at the top middle of the screen, then lift. | The scoreboard shows while it is held, and holding it doesn't turn the view. |
 | INP-14 | Touch: in-game menu | As INP-03 | 1. Tap Menu at the top left.<br>2. Tap Resume. | The menu opens and closes. Neither tap turns the view or makes the character jump. |
 | INP-07 | Touch: menu | Phone and PC | 1. On the phone, use the menu to host, then reload and join by tapping a listed session and by typing a code. | Every button and the code box respond to taps, including the match settings buttons, and the on-screen keyboard appears for the name and code boxes. |
+| INP-19 | Controls for the device | A PC with a controller, and a phone, each in a private browser window (so the game is new to it) | 1. On the PC, with the controller connected, host a session; leave, disconnect the controller, open a fresh private window and host again.<br>2. On the phone, host a session. | Each first session opens with a list of controls: the gamepad's with the controller connected, the keyboard and mouse's without, and touch on the phone. Each list matches what the controls really do (INP-01 to INP-18), and "Got it" or Esc closes it. |
 
 ## Background tabs and screen sleep
 

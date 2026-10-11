@@ -31,11 +31,10 @@ Before there is much more game, make it possible for people on different network
 
 ## Milestone 6: Polish and release
 
-1. **First-time help.** A short controls overlay for the device being used, shown on the first visit.
-2. **Accessibility.** Colorblind-safe team and hit colors, scalable HUD text, captions for important sounds and reduced screen shake.
-3. **Signaling server protection.** Rate limiting per address, message size limits, and filtering of names, so the public server can't be easily flooded or abused.
+1. **Accessibility.** Colorblind-safe team and hit colors, scalable HUD text, captions for important sounds and reduced screen shake.
+2. **Signaling server protection.** Rate limiting per address, message size limits, and filtering of names, so the public server can't be easily flooded or abused.
    *Tests:* signaling tests for each limit.
-4. **Release.** Version number on the menu, a changelog, a page on itch.io, and a round of playtests with people outside the project, running the full manual test list first.
+3. **Release.** Version number on the menu, a changelog, a page on itch.io, and a round of playtests with people outside the project, running the full manual test list first.
 
 ## Later
 

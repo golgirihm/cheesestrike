@@ -461,10 +461,13 @@ func _process(delta: float) -> void:
 			mouse_look(page_to_view(moved, view, window, DisplayServer.screen_get_scale()))
 
 
-## Whether the in-game menu is open, so this player's controls are set aside.
+## Whether the in-game menu, or anything else in its group such as the controls
+## help, is open, so this player's controls are set aside.
 func _menu_open() -> bool:
-	var menu := get_tree().get_first_node_in_group("pause_menu")
-	return menu != null and menu.visible
+	for menu in get_tree().get_nodes_in_group("pause_menu"):
+		if menu is CanvasItem and menu.visible:
+			return true
+	return false
 
 
 # Clicking the game takes the mouse. Handled after the interface has had the
