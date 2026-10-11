@@ -12,6 +12,8 @@ signal fired(origin: Vector3, direction: Vector3, seed: int)
 ## Another player's update arrived at `time` (this machine's clock, seconds)
 ## placing them at `at`.
 signal received(time: float, at: Vector3)
+## Another player was moved at once to somewhere new, as on coming back.
+signal teleported
 
 const SPEED := 6.0
 const JUMP_VELOCITY := 5.5
@@ -408,6 +410,7 @@ func _receive(state: PackedFloat32Array) -> void:
 		# Moved at once: show it at once, without sliding there.
 		_teleports = int(state[5])
 		smoothing.clear()
+		teleported.emit()
 	smoothing.push(now, state)
 	if smoothing.is_empty():
 		return

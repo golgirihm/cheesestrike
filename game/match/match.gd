@@ -36,6 +36,9 @@ const RESYNC_INTERVAL := 2.0
 const WORLD_MASK := 1
 ## Height of a player's middle above their feet, where bursts aim their harm.
 const MIDDLE := 0.9
+## The most a shot is checked back in time. Beyond it, a shooter on a slow
+## connection has to lead their target.
+const MAX_REWIND := 0.3
 ## Seconds between the host's pings to each player.
 const PING_INTERVAL := 1.0
 ## A ping that changes by less than this many milliseconds isn't news.
@@ -51,6 +54,8 @@ var state := MatchState.new()
 var _clock := 0.0
 # The host's ShotRules for each player, by id.
 var _rules := {}
+# Where each player has lately been, as the host saw them, by id.
+var _histories := {}
 # The host's measure of each player's round trip, by id.
 var _pings := {}
 var _since_ping := 0.0
@@ -76,6 +81,7 @@ func start(settings := MatchSettings.new()) -> void:
 		_pending_names.clear()
 		_rules.clear()
 		_projectiles.clear()
+		_histories.clear()
 		state_changed.emit()
 	else:
 		introduce(Settings.get_value("name"))
@@ -114,6 +120,7 @@ func remove_player(id: int) -> void:
 	_pending_names.erase(id)
 	_rules.erase(id)
 	_pings.erase(id)
+	_histories.erase(id)
 	_changed()
 
 
@@ -276,7 +283,7 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 		_launch(shooter, weapon, origin, direction)
 		return
 
-	var targets := _targets_except(shooter)
+	var targets := _targets_except(shooter, now() - rewind_for(shooter))
 	var damage_to := {}
 	var headshot := {}
 	var ends := []
@@ -295,15 +302,46 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 		_harm(shooter, victim, damage_to[victim], origin, weapon.id, headshot[victim])
 
 
-## Feet of every player in play other than `except`, by id.
-func _targets_except(except: int) -> Dictionary:
+## Feet of every player in play other than `except`, by id: where they are,
+## or, given a time, where the host saw them then.
+func _targets_except(except: int, then := -1.0) -> Dictionary:
 	var targets := {}
 	for node: Node3D in world.players.get_children():
 		var id := node.name.to_int()
 		var target := state.player(id)
 		if id != except and target != null and target.alive and not node.is_queued_for_deletion():
-			targets[id] = node.global_position
+			var history: PositionHistory = _histories.get(id)
+			targets[id] = history.at(then) if then >= 0.0 and history != null and not history.is_empty() else node.global_position
 	return targets
+
+
+## The host's clock for positions and shots, in seconds.
+static func now() -> float:
+	return Time.get_ticks_usec() / 1000000.0
+
+
+## How far back to look for where `shooter`'s targets were when they fired.
+## They saw the others a moment behind (InterpolationBuffer.DELAY), as others'
+## movement came to them through the host, and their shot took half a round
+## trip to arrive: a round trip and the delay in all. The host's own view has
+## only the delay.
+func rewind_for(shooter: int) -> float:
+	return minf(round_trip(shooter) + InterpolationBuffer.DELAY, MAX_REWIND)
+
+
+## Player `id` has moved at once to somewhere new; where they were before
+## says nothing about where they are, so it is forgotten.
+func forget_positions(id: int) -> void:
+	_histories.erase(id)
+
+
+## Host only: player `id` was at `at` at time `time` on the host's clock.
+func record_position(time: float, at: Vector3, id: int) -> void:
+	if not is_host():
+		return
+	if not _histories.has(id):
+		_histories[id] = PositionHistory.new()
+	_histories[id].push(time, at)
 
 
 ## `attacker` hurts `victim` for `amount` with `weapon`, from `from`, and
@@ -329,6 +367,10 @@ func _launch(shooter: int, weapon: WeaponStats, origin: Vector3, direction: Vect
 func _physics_process(delta: float) -> void:
 	if not is_host():
 		return
+	# The host's own player moves here, so its history is kept here too.
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own != null:
+		record_position(now(), own.global_position, own.name.to_int())
 	_collect_pickups()
 	if _projectiles.is_empty():
 		return
@@ -537,6 +579,7 @@ func _new_match() -> void:
 
 
 func _bring_back(id: int, at: Vector3) -> void:
+	forget_positions(id)
 	state.respawn(id)
 	_rules_for(id).refill()
 	_changed()
