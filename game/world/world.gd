@@ -9,6 +9,7 @@ const PLAYER := preload("res://player/player.tscn")
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var menu_camera: Camera3D = $MenuCamera
 @onready var match_: Node = $Match
+@onready var effects: Node3D = $Effects
 
 # Which starting spot each player holds. Only the host uses it.
 var _spawn_slots: SpawnSlots
@@ -16,6 +17,7 @@ var _spawn_slots: SpawnSlots
 
 func _ready() -> void:
 	spawner.spawn_function = _create_player
+	match_.shot_shown.connect(_show_others_shot)
 
 
 func start() -> void:
@@ -54,6 +56,29 @@ func _remove_player(id: int) -> void:
 		print("player left: %d" % id)
 
 
+## Physics layers a shot stops at, for showing it: the arena and players.
+const SHOT_VIEW_MASK := 3
+
+
+## This machine's own player fired: show the shot at once, without waiting to
+## hear from the host where it went.
+func _show_own_shot(origin: Vector3, direction: Vector3, seed: int, player: Node3D) -> void:
+	var weapon: WeaponStats = player.weapon.stats
+	var space := get_world_3d().direct_space_state
+	var ends := []
+	for pellet in HitScan.pellet_directions(direction, weapon.pellets, weapon.spread_degrees, seed):
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + pellet * weapon.max_range, SHOT_VIEW_MASK, [player.get_rid()])
+		var hit := space.intersect_ray(query)
+		ends.append(hit.position if not hit.is_empty() else origin + pellet * weapon.max_range)
+	effects.show_shot(player.muzzle.global_position, ends)
+
+
+func _show_others_shot(shooter: int, ends: Array) -> void:
+	var player := player_node(shooter)
+	if player != null:
+		effects.show_shot(player.muzzle.global_position, ends)
+
+
 ## The player node for peer `id`, or null.
 func player_node(id: int) -> Node3D:
 	var node := players.get_node_or_null(str(id))
@@ -73,5 +98,6 @@ func _create_player(data: Array) -> Node:
 	var player := PLAYER.instantiate()
 	player.name = str(data[0])
 	player.match_ = match_
+	player.fired.connect(_show_own_shot.bind(player))
 	player.spawn_position = spawn_points.get_child(data[1]).global_position
 	return player

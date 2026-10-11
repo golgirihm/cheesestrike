@@ -16,6 +16,7 @@ extends Node
 @onready var status: Label = %Status
 @onready var hud: Label = %Hud
 @onready var touch_controls: Control = %TouchControls
+@onready var combat_hud: Control = %CombatHud
 @onready var waiting_notice: Control = %WaitingNotice
 @onready var leave_button: Button = %LeaveButton
 @onready var disconnected_notice: Control = %DisconnectedNotice
@@ -35,6 +36,7 @@ func _ready() -> void:
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
 	target_edit.text_submitted.connect(_join)
 	refresh_button.pressed.connect(Net.request_sessions)
+	combat_hud.bind(world)
 	name_edit.text = Settings.get_value("name")
 	name_edit.text_submitted.connect(func(_text: String) -> void: _remember_name())
 	name_edit.focus_exited.connect(_remember_name)
@@ -92,6 +94,7 @@ func _set_busy(message: String) -> void:
 func _on_session_started() -> void:
 	menu.hide()
 	hud.show()
+	combat_hud.show()
 	touch_controls.show()
 	world.start()
 
@@ -108,6 +111,7 @@ func _on_session_failed(reason: String) -> void:
 
 func _on_session_ended(reason: String) -> void:
 	world.stop()
+	combat_hud.hide()
 	touch_controls.hide()
 	if reason.is_empty():
 		_show_menu("")
@@ -125,6 +129,7 @@ func _dismiss_disconnected() -> void:
 
 func _show_menu(message: String) -> void:
 	hud.hide()
+	combat_hud.hide()
 	touch_controls.hide()
 	menu.show()
 	status.text = message

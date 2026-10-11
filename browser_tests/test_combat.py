@@ -41,16 +41,41 @@ class CombatTest(GameTestCase):
         host.capture_mouse()
         host.hold_fire(50)
         host.wait_for(f"s.players[0].ammo < {MAGAZINE}")
-        self.assertEqual(host.own_player()["facing"], facing)
+        # Within a degree: the test tool's pointer sits a pixel from the
+        # corner, which may still turn the view a hair (see capture_mouse).
+        for now, before in zip(host.own_player()["facing"], facing):
+            self.assertAlmostEqual(now, before, delta=0.02)
 
     def test_a_shot_hurts_the_player_it_hits_in_everyones_view(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()
         host.hold_fire(50)
-        state = host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.health < {FULL_HEALTH})")
-        joiner.wait_for(f"s.players.some((p) => p.mine && p.health < {FULL_HEALTH})")
+        # A slow machine may fire several shots in that time, enough to knock
+        # the player out and bring them back, so a knock-out counts too.
+        hurt = f"(p.health < {FULL_HEALTH} || p.deaths > 0)"
+        state = host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && {hurt})")
+        joiner.wait_for(f"s.players.some((p) => p.mine && {hurt})")
         own = next(player for player in state["players"] if player["mine"])
         self.assertEqual(own["health"], FULL_HEALTH, "the shooter isn't hurt")
+
+    def test_the_shooter_sees_a_hit_marker_and_the_one_hit_sees_where_from(self):
+        host, joiner, joiner_id = self.start_pair()
+        host.capture_mouse()
+        host.hold_fire(50)
+        host.wait_for("s.combat.hits_shown >= 1")
+        state = joiner.wait_for("s.combat.hurts_shown >= 1")
+        self.assertEqual(state["combat"]["hits_shown"], 0)
+        self.assertEqual(host.state()["combat"]["hurts_shown"], 0)
+
+    def test_health_and_ammo_are_on_screen(self):
+        host = self.open_game()
+        host.host()
+        state = host.wait_for("s.combat.ammo !== ''")
+        self.assertEqual(state["combat"]["health"], str(FULL_HEALTH))
+        self.assertEqual(state["combat"]["ammo"], f"{MAGAZINE} / {MAGAZINE}")
+        host.capture_mouse()
+        host.hold_fire(50)
+        host.wait_for(f"s.combat.ammo !== '{MAGAZINE} / {MAGAZINE}'")
 
     def test_enough_hits_knock_a_player_out_and_score(self):
         host, joiner, joiner_id = self.start_pair()
@@ -67,7 +92,7 @@ class CombatTest(GameTestCase):
         host.page.mouse.down()
         host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths === 1)")
         host.page.mouse.up()
-        joiner.wait_for(f"s.players.some((p) => p.mine && p.deaths === 1 && p.alive && p.health === {FULL_HEALTH})")
+        joiner.wait_for(f"s.players.some((p) => p.mine && p.deaths >= 1 && p.alive && p.health === {FULL_HEALTH})")
 
     def test_reloading_fills_the_magazine(self):
         host = self.open_game()

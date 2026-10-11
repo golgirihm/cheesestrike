@@ -51,7 +51,11 @@ Setup: two windows. Why manual: these check what the fighting looks and feels li
 |---|---|---|---|
 | CMB-01 | The weapon in view | 1. Host in A, join in B.<br>2. In each, look at your own view, then at the other character. | Your own weapon shows at the lower right of your view and moves with it. The other character holds theirs in front of them. |
 | CMB-02 | Holding the trigger | 1. In A, click to take the mouse, then hold the left button for a few seconds while looking around. | Shots keep coming at a steady rate while the button is held, and stop when it is released. The view never jumps when you click or hold. |
-| CMB-03 | Knocked out and back | 1. In A, shoot B until B is knocked out, watching both windows. | In A, B's character disappears and you can walk through where it stood. In B, the view stops responding to movement and firing. A few seconds later B is back, at a spot far from A, and both can see each other again. |
+| CMB-04 | Shots are seen | 1. Host in A, join in B, and face each other.<br>2. Fire in A, then in B. | Each shot shows a brief flash at the end of the weapon and a thin yellow line to where it stopped, in both windows, whoever fired it. A line stops at the wall or player it hit. |
+| CMB-05 | Crosshair and hit marker | 1. In A, fire at B's body, then at B's head, then until B is knocked out. | A small cross stays in the middle of A's view. Each hit flashes four short marks around it: white for the body, yellow for the head, red for the knock-out. A shot that misses shows no marks. |
+| CMB-06 | Where the damage came from | 1. In B, turn so A is to your left, and let A shoot you. Repeat with A behind you and to your right. | A red curve appears at the edge of B's view on the side A is, fading over about a second. |
+| CMB-07 | Health and ammo | 1. In A, watch the lower corners while firing, reloading and being shot by B. | Lower left: a health bar and number that drop when hit and turn red at 30 or less. Lower right: rounds left out of 24, which reads "Reloading…" while reloading. |
+| CMB-03 | Knocked out and back | 1. In A, shoot B until B is knocked out, watching both windows. | In A, B's character disappears and you can walk through where it stood. In B, the view stops responding to movement and firing, and a notice in the middle says "Knocked out by" A's name and counts down to coming back. A few seconds later B is back, at a spot far from A, and both can see each other again. |
 
 ## Input devices
 

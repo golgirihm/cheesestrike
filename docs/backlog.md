@@ -33,9 +33,7 @@ Before there is much more game, make it possible for people on different network
 
 The smallest version of the game that is actually a shooter: one weapon, health, death and respawn, with the host deciding every hit.
 
-1. **Combat feedback.** Crosshair, a hit marker for the shooter, a red edge on screen showing which way damage came from, a health bar, a muzzle flash and tracer that everyone sees, and a brief death screen saying who did it.
-   *Tests:* expose health and the last hit through `TestHook` and check them in the browser tests. Manual: rows for how the effects look.
-2. **Kill feed and scoreboard.** Kills appear in a corner for everyone; holding Tab (or a button on gamepad and touch) shows each player's kills and deaths. Score is kept by the host.
+1. **Kill feed and scoreboard.** Kills appear in a corner for everyone; holding Tab (or a button on gamepad and touch) shows each player's kills and deaths. Score is kept by the host.
    *Tests:* GUT test for score keeping; browser test that a kill shows up for a third player.
 
 ## Milestone 3: A match
