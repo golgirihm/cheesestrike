@@ -8,7 +8,6 @@ import json
 import unittest
 
 from websockets.asyncio.client import connect
-from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
 import server
@@ -16,10 +15,13 @@ import server
 TIMEOUT = 2
 
 
-class SignalingTest(unittest.IsolatedAsyncioTestCase):
+class ServerTestCase(unittest.IsolatedAsyncioTestCase):
+    """Starts a server with no sessions for each test, and talks to it."""
+
     async def asyncSetUp(self):
         server.sessions.clear()
-        self.server = await serve(server.handle, "127.0.0.1", 0)
+        server.addresses.clear()
+        self.server = await server.serving("127.0.0.1", 0)
         port = self.server.sockets[0].getsockname()[1]
         self.url = f"ws://127.0.0.1:{port}"
         self.clients = []
@@ -30,10 +32,22 @@ class SignalingTest(unittest.IsolatedAsyncioTestCase):
         self.server.close()
         await self.server.wait_closed()
 
-    async def client(self):
-        ws = await connect(self.url)
+    async def client(self, **options):
+        ws = await connect(self.url, **options)
         self.clients.append(ws)
         return ws
+
+    def limit(self, name, value):
+        """Sets one of the server's limits for this test only."""
+        was = getattr(server, name)
+        setattr(server, name, value)
+        self.addCleanup(setattr, server, name, was)
+
+    async def closed_with(self, ws):
+        """Waits for the server to close `ws`; returns the close code."""
+        with self.assertRaises(ConnectionClosed):
+            await asyncio.wait_for(ws.recv(), TIMEOUT)
+        return ws.close_code
 
     async def send(self, ws, **msg):
         await ws.send(json.dumps(msg))
@@ -60,6 +74,8 @@ class SignalingTest(unittest.IsolatedAsyncioTestCase):
         await self.send(ws, type="list")
         return (await self.recv(ws))["sessions"]
 
+
+class SignalingTest(ServerTestCase):
     async def test_hosting_returns_a_code_and_lists_the_session(self):
         ws = await self.client()
         await self.send(ws, type="host")
@@ -205,6 +221,97 @@ class SignalingTest(unittest.IsolatedAsyncioTestCase):
         await ws.close()
         self.assertEqual(await self.recv(host_ws), {"type": "peer_left", "id": peer_id})
         self.assertEqual((await self.list_sessions())[0]["players"], 1)
+
+
+class LimitsTest(ServerTestCase):
+    async def test_a_message_too_large_closes_the_connection(self):
+        ws = await self.client(max_size=None)
+        await self.send(ws, type="list", padding="x" * server.MAX_MESSAGE_SIZE)
+        self.assertEqual(await self.closed_with(ws), 1009)
+
+    async def test_a_large_offer_within_the_limit_is_relayed(self):
+        host_ws, code = await self.host()
+        ws, peer_id = await self.join(code, host_ws)
+        sdp = "a" * 20_000
+        await self.send(ws, type="offer", sdp=sdp)
+        self.assertEqual((await self.recv(host_ws))["sdp"], sdp)
+
+    async def test_one_address_can_only_have_so_many_connections(self):
+        self.limit("MAX_CONNECTIONS_PER_ADDRESS", 3)
+        for _ in range(3):
+            await self.list_sessions()
+        extra = await self.client()
+        self.assertEqual(await self.closed_with(extra), 1008)
+        self.assertIn("Too many connections", extra.close_reason)
+
+    async def test_closing_a_connection_frees_its_place(self):
+        self.limit("MAX_CONNECTIONS_PER_ADDRESS", 1)
+        first = await self.client()
+        await first.close()
+        await asyncio.sleep(0.1)
+        self.assertEqual(await self.list_sessions(), [])
+
+    async def test_one_address_can_only_host_so_many_sessions(self):
+        self.limit("MAX_SESSIONS_PER_ADDRESS", 2)
+        host_ws, _ = await self.host()
+        await self.host()
+        ws = await self.client()
+        await self.send(ws, type="host")
+        self.assertEqual(await self.recv(ws), {"type": "error", "message": "Too many sessions hosted from this address."})
+
+        await host_ws.close()
+        await asyncio.sleep(0.1)
+        await self.send(ws, type="host")
+        self.assertEqual((await self.recv(ws))["type"], "hosted")
+
+    async def test_messages_beyond_the_rate_are_dropped_with_an_error(self):
+        self.limit("MESSAGE_RATE", 0.0)
+        self.limit("MESSAGE_BURST", 5.0)
+        ws = await self.client()
+        for _ in range(5):
+            await self.send(ws, type="list")
+            self.assertEqual((await self.recv(ws))["type"], "sessions")
+        await self.send(ws, type="list")
+        self.assertEqual(await self.recv(ws), {"type": "error", "message": "Too many messages. Slow down."})
+        # Still connected, just held back.
+        await self.send(ws, type="list")
+        self.assertEqual((await self.recv(ws))["type"], "error")
+
+    async def test_the_rate_is_shared_by_one_addresss_connections(self):
+        self.limit("MESSAGE_RATE", 0.0)
+        self.limit("MESSAGE_BURST", 2.0)
+        await self.list_sessions()
+        await self.list_sessions()
+        ws = await self.client()
+        await self.send(ws, type="list")
+        self.assertEqual((await self.recv(ws))["type"], "error")
+
+    async def test_behind_a_proxy_players_are_told_apart_by_the_forwarded_address(self):
+        self.limit("behind_proxy", True)
+        self.limit("MAX_CONNECTIONS_PER_ADDRESS", 1)
+        await self.client(additional_headers={"X-Forwarded-For": "203.0.113.1"})
+        other = await self.client(additional_headers={"X-Forwarded-For": "198.51.100.7, 203.0.113.2"})
+        await self.send(other, type="list")
+        self.assertEqual((await self.recv(other))["type"], "sessions")
+        again = await self.client(additional_headers={"X-Forwarded-For": "203.0.113.1"})
+        self.assertEqual(await self.closed_with(again), 1008)
+
+    async def test_without_a_proxy_the_forwarded_address_is_ignored(self):
+        self.limit("MAX_CONNECTIONS_PER_ADDRESS", 1)
+        await self.client(additional_headers={"X-Forwarded-For": "203.0.113.1"})
+        second = await self.client(additional_headers={"X-Forwarded-For": "203.0.113.2"})
+        self.assertEqual(await self.closed_with(second), 1008)
+
+
+class RateLimitTest(unittest.TestCase):
+    def test_a_burst_then_the_steady_rate(self):
+        clock = [0.0]
+        limit = server.RateLimit(rate=2.0, burst=3.0, now=lambda: clock[0])
+        self.assertEqual([limit.allow() for _ in range(4)], [True, True, True, False])
+        clock[0] = 0.5
+        self.assertEqual([limit.allow() for _ in range(2)], [True, False])
+        clock[0] = 100.0
+        self.assertEqual(sum(limit.allow() for _ in range(10)), 3, "never more than a burst saved up")
 
 
 if __name__ == "__main__":

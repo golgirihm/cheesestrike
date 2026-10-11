@@ -29,6 +29,19 @@ before joining: {"mode": "ffa" | "teams", "kill_limit": n, "minutes": n,
 max_players, which it enforces. Anything missing or out of range is replaced by
 the default, as the game itself does.
 
+Limits, so that one machine can't flood the server: a message may be at most
+MAX_MESSAGE_SIZE bytes (a larger one closes the connection); each address may
+have MAX_CONNECTIONS_PER_ADDRESS connections open and MAX_SESSIONS_PER_ADDRESS
+sessions hosted at once; and each address may send MESSAGE_RATE messages a
+second on average, in bursts of up to MESSAGE_BURST. A message over the rate
+is dropped with an error. Behind a reverse proxy, as when the proxy handles
+TLS, start the server with --behind-proxy so it reads each player's address
+from the X-Forwarded-For header the proxy adds, rather than seeing every
+player as the proxy.
+
+Names never pass through here: players exchange them with the host directly,
+and the game cleans them (game/match/player_name.gd).
+
 A private session is left out of the list; players join it by its code, given
 to them by the host, usually in an invite link.
 """
@@ -38,6 +51,7 @@ import asyncio
 import json
 import math
 import random
+import time
 
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
@@ -51,6 +65,11 @@ RELAYED = ("offer", "answer", "candidate")
 MODES = ("ffa", "teams")
 MAPS = ("canyon", "box")
 DEFAULT_SETTINGS = {"mode": "ffa", "kill_limit": 20, "minutes": 8, "max_players": MAX_PLAYERS, "map": "canyon"}
+MAX_MESSAGE_SIZE = 64 * 1024
+MAX_CONNECTIONS_PER_ADDRESS = 32
+MAX_SESSIONS_PER_ADDRESS = 8
+MESSAGE_RATE = 50.0
+MESSAGE_BURST = 200.0
 # Allowed range of each number in a host's settings.
 SETTING_RANGES = {"kill_limit": (1, 999), "minutes": (1, 60), "max_players": (2, MAX_PLAYERS)}
 
@@ -81,7 +100,50 @@ class Session:
         self.private = private is True
 
 
+class RateLimit:
+    """A token bucket: `rate` tokens a second, holding at most `burst`."""
+
+    def __init__(self, rate, burst, now=time.monotonic):
+        self.rate = rate
+        self.burst = burst
+        self.now = now
+        self.tokens = burst
+        self.last = now()
+
+    def allow(self):
+        """Takes a token if there is one; says whether there was."""
+        at = self.now()
+        self.tokens = min(self.burst, self.tokens + (at - self.last) * self.rate)
+        self.last = at
+        if self.tokens < 1:
+            return False
+        self.tokens -= 1
+        return True
+
+
+class Address:
+    """What one address is using: its connections, sessions and message rate."""
+
+    def __init__(self):
+        self.connections = 0
+        self.sessions = 0
+        self.rate = RateLimit(MESSAGE_RATE, MESSAGE_BURST)
+
+
 sessions = {}  # code -> Session
+addresses = {}  # address -> Address
+behind_proxy = False
+
+
+def address_of(ws):
+    """The address a connection comes from: the one the proxy saw, behind a
+    proxy (the last in X-Forwarded-For, which the proxy itself added)."""
+    if behind_proxy:
+        forwarded = ws.request.headers.get("X-Forwarded-For", "") if ws.request else ""
+        last = forwarded.split(",")[-1].strip()
+        if last:
+            return last
+    return ws.remote_address[0] if ws.remote_address else "?"
 
 
 async def send(ws, **msg):
@@ -99,10 +161,28 @@ def new_code():
 
 
 async def handle(ws):
+    address = address_of(ws)
+    usage = addresses.setdefault(address, Address())
+    if usage.connections >= MAX_CONNECTIONS_PER_ADDRESS:
+        await ws.close(1008, "Too many connections from this address.")
+        return
+    usage.connections += 1
+    try:
+        await serve_connection(ws, usage)
+    finally:
+        usage.connections -= 1
+        if usage.connections == 0 and usage.sessions == 0:
+            addresses.pop(address, None)
+
+
+async def serve_connection(ws, usage):
     session = None
     peer_id = None
     try:
         async for raw in ws:
+            if not usage.rate.allow():
+                await send(ws, type="error", message="Too many messages. Slow down.")
+                continue
             try:
                 msg = json.loads(raw)
                 kind = msg["type"]
@@ -118,6 +198,10 @@ async def handle(ws):
                 if len(sessions) >= MAX_SESSIONS:
                     await send(ws, type="error", message="The session server is full.")
                     continue
+                if usage.sessions >= MAX_SESSIONS_PER_ADDRESS:
+                    await send(ws, type="error", message="Too many sessions hosted from this address.")
+                    continue
+                usage.sessions += 1
                 session = Session(new_code(), ws, msg.get("settings"), msg.get("private"))
                 peer_id = HOST_ID
                 sessions[session.code] = session
@@ -157,6 +241,7 @@ async def handle(ws):
             # WebRTC links between host and players are already up and survive
             # this; the session just stops being listed or joinable.
             sessions.pop(session.code, None)
+            usage.sessions -= 1
             print(f"[{session.code}] closed")
             for other_id, other in list(session.peers.items()):
                 if other_id != HOST_ID:
@@ -169,12 +254,20 @@ async def handle(ws):
                 await send(session.peers[HOST_ID], type="peer_left", id=peer_id)
 
 
+def serving(host, port):
+    """The server, with its limits, ready to start with `async with`."""
+    return serve(handle, host, port, max_size=MAX_MESSAGE_SIZE)
+
+
 async def main():
+    global behind_proxy
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=9080)
+    parser.add_argument("--behind-proxy", action="store_true", help="take players' addresses from X-Forwarded-For")
     args = parser.parse_args()
-    async with serve(handle, args.host, args.port, max_size=64 * 1024):
+    behind_proxy = args.behind_proxy
+    async with serving(args.host, args.port):
         print(f"signaling server listening on ws://{args.host}:{args.port}", flush=True)
         await asyncio.Future()
 

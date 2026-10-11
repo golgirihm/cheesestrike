@@ -6,7 +6,7 @@ The plan for taking CheeseStrike from where it is now to a game people can play 
 
 ## Where the game is now
 
-Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. Matches run to a kill limit or a time limit, free-for-all or in two teams (Cheddar and Brie), as the host chose on the menu, with a winner and then a fresh match; the session list shows each host's settings. Players are cheese characters who fight with four weapons (one a lobbed, bursting projectile), pick up weapons and cheese wedges, and fill a Gouda Overload meter, on two arenas, with synthesized sound and music. There is a crosshair, hit markers, a kill feed, a scoreboard with pings and an in-game menu. Others' movement is smoothed, shots are checked against where their targets were when fired (lag compensation), impossible movement is put right, a dropped player can rejoin with their score, and a host leaving ends the session with final standings.
+Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. Matches run to a kill limit or a time limit, free-for-all or in two teams (Cheddar and Brie), as the host chose on the menu, with a winner and then a fresh match; the session list shows each host's settings. Players are cheese characters who fight with four weapons (one a lobbed, bursting projectile), pick up weapons and cheese wedges, and fill a Gouda Overload meter, on two arenas, with synthesized sound and music. There is a crosshair, hit markers, a kill feed, a scoreboard with pings, an in-game menu, a settings screen (look sensitivity, field of view, volume, graphics quality, keys, touch layout, text size, captions and screen shake) and a list of controls shown on a first session. On phones the game goes full screen and sideways and can be installed to the home screen. Hosts can copy an invite link that joins straight away, and make a session private. The signaling server limits message sizes, connections, sessions and message rates per address. Others' movement is smoothed, shots are checked against where their targets were when fired (lag compensation), impossible movement is put right, a dropped player can rejoin with their score, and a host leaving ends the session with final standings.
 
 Things about how it works that shape the plan:
 
@@ -19,7 +19,7 @@ Things about how it works that shape the plan:
 
 Before there is much more game, make it possible for people on different networks to reach it, so every later milestone can be playtested with real players.
 
-1. **Host the signaling server publicly.** Run `signaling/server.py` behind TLS (`wss://`) on a small server or a container platform, with automatic restarts and a health check. Add a log line per session hosted and closed so problems can be traced.
+1. **Host the signaling server publicly.** Run `signaling/server.py` behind TLS (`wss://`) on a small server or a container platform, with automatic restarts and a health check. Add a log line per session hosted and closed so problems can be traced. If a proxy in front of it handles TLS, start the server with `--behind-proxy`, or its per-address limits will count every player as the proxy.
    *Tests:* signaling tests for anything added to the server, such as a health endpoint. Manual: DEV-06 becomes runnable.
 2. **Point the web build at the public server.** Replace the same-host-port-9080 guess in `Net._web_signaling_url()` with a URL set at export time, keeping the `?signal=` override and falling back to the current behavior for local development.
    *Tests:* pull the URL choice into a plain function and cover it with a GUT test.
@@ -31,9 +31,7 @@ Before there is much more game, make it possible for people on different network
 
 ## Milestone 6: Polish and release
 
-1. **Signaling server protection.** Rate limiting per address, message size limits, and filtering of names, so the public server can't be easily flooded or abused.
-   *Tests:* signaling tests for each limit.
-2. **Release.** Version number on the menu, a changelog, a page on itch.io, and a round of playtests with people outside the project, running the full manual test list first.
+1. **Release.** Version number on the menu, a changelog, a page on itch.io, and a round of playtests with people outside the project, running the full manual test list first.
 
 ## Later
 
