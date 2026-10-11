@@ -10,8 +10,8 @@ extends CharacterBody3D
 ## A shot this player fired, for effects on this machine.
 signal fired(origin: Vector3, direction: Vector3, seed: int)
 ## Another player's update arrived at `time` (this machine's clock, seconds)
-## placing them at `at`.
-signal received(time: float, at: Vector3)
+## placing them at `at`, after being moved at once `teleports` times.
+signal received(time: float, at: Vector3, teleports: int)
 ## Another player was moved at once to somewhere new, as on coming back.
 signal teleported
 
@@ -166,6 +166,16 @@ func respawn_at(at: Vector3) -> void:
 	_face_middle()
 	for carried: WeaponState in arsenal.values():
 		carried.refill()
+
+
+## The host put this player back where they last were, as their movement
+## couldn't have happened.
+func put_back(at: Vector3) -> void:
+	global_position = at
+	velocity = Vector3.ZERO
+	_knockback = Vector3.ZERO
+	_teleports += 1
+	_publish()
 
 
 ## A burst shoved this player.
@@ -414,7 +424,7 @@ func _receive(state: PackedFloat32Array) -> void:
 	smoothing.push(now, state)
 	if smoothing.is_empty():
 		return
-	received.emit(now, Vector3(state[0], state[1], state[2]))
+	received.emit(now, Vector3(state[0], state[1], state[2]), int(state[5]))
 
 
 ## Draws another player where the smoothing says they were a moment ago.

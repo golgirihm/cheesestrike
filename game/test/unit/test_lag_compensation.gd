@@ -108,15 +108,17 @@ func test_the_hosts_own_movement_is_recorded() -> void:
 
 func test_others_updates_are_recorded_as_they_arrive() -> void:
 	var other := _add(2, Vector3.ZERO)
-	other.net_state = PackedFloat32Array([5, 0, 6, 0, 0, 0])
+	other.net_state = PackedFloat32Array([5, 0, 0.5, 0, 0, 0])
 	assert_true(match_._histories.has(2))
-	assert_eq(match_._histories[2].at(Match.now()), Vector3(5, 0, 6))
+	assert_eq(match_._histories[2].at(Match.now()), Vector3(5, 0, 0.5))
 
 
 func test_a_jump_to_somewhere_new_restarts_the_history() -> void:
 	var other := _add(2, Vector3.ZERO)
 	other.net_state = PackedFloat32Array([5, 0, 6, 0, 0, 0])
 	await wait_seconds(0.02)
+	# The host sent them there, as on coming back.
+	match_._check_for(2).expect_move(Vector3(-10, 0, -10))
 	other.net_state = PackedFloat32Array([-10, 0, -10, 0, 0, 1])
 	assert_eq(match_._histories[2].at(0.0), Vector3(-10, 0, -10), "nothing from before the jump")
 

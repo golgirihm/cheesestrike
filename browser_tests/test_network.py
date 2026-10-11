@@ -49,6 +49,29 @@ class NetworkTest(GameTestCase):
                 f"s.players.some((p) => p.id === {mover_id} && Math.hypot(p.position[0] - {start[0]}, p.position[2] - {start[2]}) > 1)",
                 timeout=20_000,
             )
+        self.assertEqual(host.state()["put_backs"], 0, "ordinary movement was taken for cheating")
+
+    def test_running_jumping_and_being_shoved_are_never_taken_for_cheating(self):
+        host = self.open_game()
+        host.choose("MapButton", "Map: Brie Box")
+        joiner = self.open_game()
+        joiner.join(host.host())
+        host.wait_for("s.players.length === 2")
+        # The joiner runs about, jumping as they go.
+        for key in ("w", "a", "s", "d"):
+            joiner.page.keyboard.down(key)
+            for _ in range(3):
+                joiner.press("Space")
+                joiner.page.wait_for_timeout(250)
+            joiner.page.keyboard.up(key)
+        # The host walks to the Gouda Launcher and fires it at the joiner.
+        host.page.keyboard.down("w")
+        host.wait_for("s.players.some((p) => p.mine && p.carrying.includes('launcher'))")
+        host.page.keyboard.up("w")
+        host.capture_mouse()
+        host.hold_fire(1500)
+        host.page.wait_for_timeout(1500)
+        self.assertEqual(host.state()["put_backs"], 0)
 
 
 if __name__ == "__main__":
