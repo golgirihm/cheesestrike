@@ -16,6 +16,8 @@ const SHOT_VIEW_MASK := 3
 @onready var match_: Node = $Match
 @onready var effects: Node3D = $Effects
 
+var sound_cues: Node
+
 ## The loaded arena, and which of the Maps it is.
 var map: Node3D
 var map_id := ""
@@ -32,6 +34,8 @@ func _ready() -> void:
 	match_.projectile_launched.connect(effects.launch_projectile)
 	match_.projectile_burst.connect(effects.burst_projectile)
 	match_.state_changed.connect(_on_state_changed)
+	sound_cues = preload("res://audio/sound_cues.gd").new(self)
+	add_child(sound_cues)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 
@@ -132,6 +136,7 @@ func _process(delta: float) -> void:
 ## hear from the host where it went.
 func _show_own_shot(origin: Vector3, direction: Vector3, seed: int, player: Node3D) -> void:
 	var weapon: WeaponStats = player.weapon.stats
+	sound_cues.own_shot(weapon.id, player.muzzle.global_position)
 	if weapon.fires_projectile():
 		# The projectile itself shows once the host launches it.
 		effects.show_shot(player.muzzle.global_position, [])

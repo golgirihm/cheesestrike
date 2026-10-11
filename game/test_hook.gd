@@ -113,6 +113,8 @@ func snapshot() -> Dictionary:
 		"code": Net.room_code,
 		"notice": _main.disconnected_detail.text if _main.disconnected_notice.visible else "",
 		"players": players,
+		"sounds": Sounds.counts,
+		"music": Sounds.is_music_playing(),
 		"pickups": range(_main.world.pickup_pads().size()).map(func(index: int) -> bool: return _main.world.match_.state.pickup_ready(index)),
 		"combat": {
 			"health": _main.combat_hud.health_text() if _main.combat_hud.visible else "",

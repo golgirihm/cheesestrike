@@ -66,6 +66,7 @@ func _ready() -> void:
 	if not Net.use_webrtc:
 		target_edit.placeholder_text = "Host address (blank for this PC)"
 	Net.request_sessions()
+	Sounds.play_music()
 	if TestHook.wanted():
 		add_child(TestHook.new(self))
 
@@ -182,6 +183,7 @@ func _set_busy(message: String) -> void:
 
 
 func _on_session_started() -> void:
+	Sounds.set_music_quiet(true)
 	menu.hide()
 	hud.show()
 	combat_hud.show()
@@ -220,6 +222,7 @@ func _dismiss_disconnected() -> void:
 
 
 func _show_menu(message: String) -> void:
+	Sounds.set_music_quiet(false)
 	pause_menu.hide()
 	hud.hide()
 	combat_hud.hide()
