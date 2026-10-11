@@ -147,6 +147,29 @@ class LosingTheHostTest(GameTestCase):
             # the host left got through.
             state = joiner.wait_for("s.screen === 'disconnected'", timeout=5_000)
             self.assertEqual(state["notice"], "The host closed the session.")
+            self.assertTrue(state["standings"].startswith("1. "), "how the session stood")
+
+    def test_the_host_leaving_through_the_menu_ends_it_with_the_standings(self):
+        host = self.open_game()
+        joiner = self.open_game()
+        joiner.join(host.host())
+        joiner_id = joiner.own_player()["id"]
+        host.wait_for("s.players.length === 2")
+        host.page.wait_for_timeout(500)
+        host.capture_mouse()
+        host.page.mouse.down()
+        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
+        host.page.mouse.up()
+        host_name = host.own_player()["name"]
+
+        host.press("Escape")
+        host.click("MenuButton")
+        host.click("MenuLeaveButton")
+        state = joiner.wait_for("s.screen === 'disconnected'")
+        self.assertEqual(state["notice"], "The host ended the session.")
+        self.assertTrue(state["standings"].startswith(f"1. {host_name}  ·  "), state["standings"])
+        self.assertNotIn("RejoinButton", state["controls"])
+        host.wait_for("s.screen === 'menu'")
 
     def test_going_back_to_the_menu_after_losing_the_host(self):
         host = self.open_game()

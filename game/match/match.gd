@@ -36,6 +36,8 @@ const RESYNC_INTERVAL := 2.0
 const WORLD_MASK := 1
 ## Height of a player's middle above their feet, where bursts aim their harm.
 const MIDDLE := 0.9
+## What players are told when the host ends the session on purpose.
+const HOST_ENDED := "The host ended the session."
 ## The most a shot is checked back in time. Beyond it, a shooter on a slow
 ## connection has to lead their target.
 const MAX_REWIND := 0.3
@@ -231,6 +233,20 @@ func _pong(sent: Variant) -> void:
 	if record != null and absi(record.ping - _pings[id].milliseconds()) >= PING_CHANGE:
 		record.ping = _pings[id].milliseconds()
 		_changed()
+
+
+## Host only: the host is leaving, which ends the session for everyone.
+func end_session() -> void:
+	if is_host():
+		_session_over.rpc(state.to_dict())
+
+
+## The host ended the session; the state it sends is how it stood.
+@rpc("authority", "call_remote", "reliable")
+func _session_over(final: Variant) -> void:
+	if final is Dictionary:
+		state = MatchState.from_dict(final)
+	Net.leave(HOST_ENDED)
 
 
 ## This player sets off their Overload, if it is ready.

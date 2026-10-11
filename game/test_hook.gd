@@ -113,6 +113,7 @@ func snapshot() -> Dictionary:
 		"hud": _main.hud.text if _main.hud.visible else "",
 		"code": Net.room_code,
 		"notice": _main.disconnected_detail.text if _main.disconnected_notice.visible else "",
+		"standings": _main.final_standings.text if _main.disconnected_notice.visible else "",
 		"players": players,
 		"sounds": Sounds.counts,
 		"put_backs": _main.world.match_.put_backs,

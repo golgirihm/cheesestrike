@@ -20,6 +20,8 @@ func before_each() -> void:
 	main = MAIN.instantiate()
 	add_child_autofree(main)
 	main.get_node("%DisconnectedDetail").text = LONGEST_REASON
+	# The most the final standings can say: a result, the teams and five players.
+	main.get_node("%FinalStandings").text = "Draw: Mozzarella 10 and Halloumi 99\nCheddar 50  –  50 Brie" + "\n5. Mozzarella 10  ·  50".repeat(5)
 	await wait_frames(2)
 
 

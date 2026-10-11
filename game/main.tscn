@@ -315,6 +315,11 @@ unique_name_in_owner = true
 layout_mode = 2
 horizontal_alignment = 1
 
+[node name="FinalStandings" type="Label" parent="UI/DisconnectedNotice/Panel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+
 [node name="RejoinButton" type="Button" parent="UI/DisconnectedNotice/Panel/Margin/Rows"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
