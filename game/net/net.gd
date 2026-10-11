@@ -51,11 +51,13 @@ func _ready() -> void:
 		JavaScriptBridge.get_interface("document").addEventListener("visibilitychange", _visibility_callback)
 
 
-func host(settings := MatchSettings.new()) -> void:
+## Starts a session. A `private` one is left out of the session list, so only
+## players given its code or a link can join.
+func host(settings := MatchSettings.new(), private := false) -> void:
 	last_joined = ""
 	_connecting = true
 	if use_webrtc:
-		_send({"type": "host", "settings": settings.to_dict()})
+		_send({"type": "host", "settings": settings.to_dict(), "private": private})
 		return
 	var enet := ENetMultiplayerPeer.new()
 	if enet.create_server(ENET_PORT, settings.max_players - 1) != OK:

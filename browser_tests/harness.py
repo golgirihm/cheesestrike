@@ -94,12 +94,12 @@ class SignalingServer:
 class Game:
     """One browser window running the game."""
 
-    def __init__(self, page, url):
+    def __init__(self, page, url, ready="s.screen === 'menu'"):
         self.page = page
         self.errors = []
         page.on("pageerror", lambda error: self.errors.append(str(error)))
         page.goto(url)
-        self.wait_for("s.screen === 'menu'")
+        self.wait_for(ready)
 
     def state(self):
         return self.page.evaluate("window.cheeseStrikeTest")
@@ -194,7 +194,7 @@ class Game:
         "KillLimitButton", until it reads `text`."""
         for _ in range(20):
             state = self.wait_for("s.screen === 'menu'")
-            buttons = dict(zip(["ModeButton", "MaxPlayersButton", "KillLimitButton", "MinutesButton", "MapButton"], state["match_buttons"]))
+            buttons = dict(zip(["ModeButton", "MaxPlayersButton", "KillLimitButton", "MinutesButton", "MapButton", "PrivateButton"], state["match_buttons"]))
             if buttons[control] == text:
                 return
             self.click(control)
@@ -278,5 +278,12 @@ class GameTestCase(unittest.TestCase):
         """Opens the game in a new window and waits for its menu."""
         url = f"http://localhost:{self._web.server_address[1]}/?test&signal=ws://localhost:{self.signaling.port}"
         game = Game(self._context.new_page(), url)
+        self._games.append(game)
+        return game
+
+    def open_link(self, url):
+        """Opens the game at `url`, such as an invite link, in a new window,
+        and waits for it to start, without waiting for the menu."""
+        game = Game(self._context.new_page(), url, ready="s.screen")
         self._games.append(game)
         return game

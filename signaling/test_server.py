@@ -102,6 +102,21 @@ class SignalingTest(unittest.IsolatedAsyncioTestCase):
         await self.recv(ws)
         self.assertEqual((await self.list_sessions())[0]["settings"], server.DEFAULT_SETTINGS)
 
+    async def test_a_private_session_is_not_listed_but_can_be_joined_by_code(self):
+        public_ws, public_code = await self.host()
+        private_ws = await self.client()
+        await self.send(private_ws, type="host", private=True)
+        private_code = (await self.recv(private_ws))["code"]
+        self.assertEqual([session["code"] for session in await self.list_sessions()], [public_code])
+        await self.join(private_code, private_ws)
+
+    async def test_only_true_makes_a_session_private(self):
+        for given in ("yes", 1, None, [True]):
+            ws = await self.client()
+            await self.send(ws, type="host", private=given)
+            await self.recv(ws)
+        self.assertEqual(len(await self.list_sessions()), 4)
+
     async def test_a_session_is_full_at_its_own_player_limit(self):
         host_ws = await self.client()
         await self.send(host_ws, type="host", settings={"max_players": 3})

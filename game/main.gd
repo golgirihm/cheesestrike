@@ -12,6 +12,7 @@ extends Node
 @onready var kill_limit_button: Button = %KillLimitButton
 @onready var minutes_button: Button = %MinutesButton
 @onready var map_button: Button = %MapButton
+@onready var private_button: Button = %PrivateButton
 @onready var host_button: Button = %HostButton
 @onready var target_edit: LineEdit = %TargetEdit
 @onready var join_button: Button = %JoinButton
@@ -33,6 +34,7 @@ extends Node
 @onready var pause_menu: Control = %PauseMenu
 @onready var resume_button: Button = %ResumeButton
 @onready var menu_leave_button: Button = %MenuLeaveButton
+@onready var copy_link_button: Button = %CopyLinkButton
 @onready var settings_button: Button = %SettingsButton
 @onready var pause_settings_button: Button = %PauseSettingsButton
 @onready var settings_menu: Control = %SettingsMenu
@@ -42,6 +44,8 @@ var _match_buttons := {}
 # Whether the mouse was captured as of the last frame. Esc while it is captured
 # only frees the mouse; the press after that opens the menu.
 var _was_captured := false
+## The invite link last copied, for the browser tests.
+var copied_link := ""
 
 
 func _ready() -> void:
@@ -63,6 +67,7 @@ func _ready() -> void:
 	menu_button.pressed.connect(open_pause_menu)
 	resume_button.pressed.connect(close_pause_menu)
 	menu_leave_button.pressed.connect(_leave)
+	copy_link_button.pressed.connect(_copy_link)
 	settings_button.pressed.connect(settings_menu.open)
 	pause_settings_button.pressed.connect(settings_menu.open)
 	Controls.apply(Settings.get_value("bindings"))
@@ -72,14 +77,22 @@ func _ready() -> void:
 	name_edit.text_submitted.connect(func(_text: String) -> void: _remember_name())
 	name_edit.focus_exited.connect(_remember_name)
 
-	# Session codes and the session list only exist with the signaling server.
+	# Session codes and the session list only exist with the signaling server,
+	# and links only in a browser.
 	sessions_panel.visible = Net.use_webrtc
+	private_button.visible = Net.use_webrtc
+	copy_link_button.visible = Net.use_webrtc and OS.has_feature("web")
 	if not Net.use_webrtc:
 		target_edit.placeholder_text = "Host address (blank for this PC)"
 	Net.request_sessions()
 	Sounds.play_music()
 	if TestHook.wanted():
 		add_child(TestHook.new(self))
+
+	var invited := WebPage.take_invite_code()
+	if not invited.is_empty():
+		target_edit.text = invited
+		_join(invited)
 
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--host":
@@ -143,6 +156,7 @@ func _setup_match_buttons() -> void:
 	_cycle(kill_limit_button, "host_kill_limit", MatchSettings.KILL_LIMITS, func(limit: int) -> String: return "First to %d" % limit)
 	_cycle(minutes_button, "host_minutes", MatchSettings.MINUTES, func(minutes: int) -> String: return "%d minutes" % minutes)
 	_cycle(map_button, "host_map", Maps.ORDER, func(map: String) -> String: return "Map: %s" % Maps.NAMES[map])
+	_cycle(private_button, "host_private", [false, true], func(hidden: bool) -> String: return "Private: invite only" if hidden else "Listed for everyone")
 
 
 func _cycle(button: Button, key: String, choices: Array, describe: Callable) -> void:
@@ -180,7 +194,7 @@ func host_settings() -> MatchSettings:
 func _host() -> void:
 	_remember_name()
 	_set_busy("Starting session…")
-	Net.host(host_settings())
+	Net.host(host_settings(), Settings.get_value("host_private"))
 
 
 func _join(target: String) -> void:
@@ -190,6 +204,15 @@ func _join(target: String) -> void:
 	_remember_name()
 	_set_busy("Joining…")
 	Net.join(target)
+
+
+## Puts a link to the session on the clipboard, and says so on the button.
+func _copy_link() -> void:
+	copied_link = Invite.link(WebPage.address(), Net.room_code)
+	DisplayServer.clipboard_set(copied_link)
+	copy_link_button.text = "Link copied!"
+	await get_tree().create_timer(2.0).timeout
+	copy_link_button.text = "Copy invite link"
 
 
 func _set_busy(message: String) -> void:

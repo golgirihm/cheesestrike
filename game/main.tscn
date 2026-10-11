@@ -92,6 +92,11 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 
+[node name="PrivateButton" type="Button" parent="UI/Menu/Panel/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
 [node name="HostRow" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
 layout_mode = 2
 
@@ -235,6 +240,12 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Resume"
+
+[node name="CopyLinkButton" type="Button" parent="UI/PauseMenu/Panel/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Copy invite link"
 
 [node name="PauseSettingsButton" type="Button" parent="UI/PauseMenu/Panel/Margin/Rows"]
 unique_name_in_owner = true

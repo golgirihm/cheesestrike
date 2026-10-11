@@ -91,6 +91,7 @@ func snapshot() -> Dictionary:
 		_main.kill_limit_button,
 		_main.minutes_button,
 		_main.map_button,
+		_main.private_button,
 		_main.host_button,
 		_main.target_edit,
 		_main.join_button,
@@ -103,6 +104,7 @@ func snapshot() -> Dictionary:
 		_main.menu_leave_button,
 		_main.settings_button,
 		_main.pause_settings_button,
+		_main.copy_link_button,
 	]:
 		if control.is_visible_in_tree():
 			controls[control.name] = _centre(control)
@@ -112,11 +114,13 @@ func snapshot() -> Dictionary:
 		"status": _main.status.text,
 		"frame": Engine.get_process_frames(),
 		"name_box": _main.name_edit.text,
-		"match_buttons": [_main.mode_button.text, _main.max_players_button.text, _main.kill_limit_button.text, _main.minutes_button.text, _main.map_button.text],
+		"match_buttons": [_main.mode_button.text, _main.max_players_button.text, _main.kill_limit_button.text, _main.minutes_button.text, _main.map_button.text, _main.private_button.text],
 		"map": _main.world.map_id,
 		"mouse_captured": Input.mouse_mode == Input.MOUSE_MODE_CAPTURED,
 		"hud": _main.hud.text if _main.hud.visible else "",
 		"code": Net.room_code,
+		"copied_link": _main.copied_link,
+		"address": WebPage.address(),
 		"notice": _main.disconnected_detail.text if _main.disconnected_notice.visible else "",
 		"standings": _main.final_standings.text if _main.disconnected_notice.visible else "",
 		"players": players,
