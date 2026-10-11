@@ -145,10 +145,17 @@ func _ready() -> void:
 	_publish()
 	if _mine:
 		camera.make_current()
+		camera.fov = Settings.get_value("fov")
+		Settings.changed.connect(_on_setting_changed)
 	_show_weapon(Weapons.STARTING)
 	if match_ != null:
 		match_.state_changed.connect(_on_match_state_changed)
 		_on_match_state_changed()
+
+
+func _on_setting_changed(key: String) -> void:
+	if key == "fov":
+		camera.fov = Settings.get_value("fov")
 
 
 ## The host's record of this player, or null before it has arrived.
@@ -339,7 +346,7 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		# A web build takes the movement from the browser instead; see WebPage.
 		if not OS.has_feature("web"):
-			_look(event.relative * MOUSE_SENSITIVITY)
+			mouse_look(event.relative)
 	elif event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		_mouse_fire_held = false
@@ -451,7 +458,7 @@ func _process(delta: float) -> void:
 		if moved != Vector2.ZERO and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			var view := get_viewport().get_visible_rect().size
 			var window := Vector2(DisplayServer.window_get_size())
-			_look(page_to_view(moved, view, window, DisplayServer.screen_get_scale()) * MOUSE_SENSITIVITY)
+			mouse_look(page_to_view(moved, view, window, DisplayServer.screen_get_scale()))
 
 
 ## Whether the in-game menu is open, so this player's controls are set aside.
@@ -500,7 +507,7 @@ func _physics_process(delta: float) -> void:
 		_reload_pressed = false
 		_fire_pressed = false
 		return
-	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * delta)
+	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * Settings.get_value("stick_sensitivity") * delta)
 
 	if not is_on_floor():
 		velocity += get_gravity() * delta
@@ -565,9 +572,16 @@ func _release_controls() -> void:
 	_button_touches.clear()
 
 
+## Turns by a mouse movement of `relative` interface pixels.
+func mouse_look(relative: Vector2) -> void:
+	_look(relative * MOUSE_SENSITIVITY * Settings.get_value("mouse_sensitivity"))
+
+
 func _look(delta: Vector2) -> void:
 	if Net.host_silent:
 		return
+	if Settings.get_value("invert_look"):
+		delta.y = -delta.y
 	rotate_y(-delta.x)
 	head.rotation.x = clampf(head.rotation.x - delta.y, -PITCH_LIMIT, PITCH_LIMIT)
 
@@ -618,4 +632,4 @@ func _handle_drag(event: InputEventScreenDrag) -> void:
 	if event.index == _move_touch:
 		_move_touch_vector = ((event.position - _move_touch_origin) / TOUCH_STICK_RADIUS).limit_length(1.0)
 	elif event.index == _look_touch:
-		_look(event.relative * TOUCH_LOOK_SENSITIVITY)
+		_look(event.relative * TOUCH_LOOK_SENSITIVITY * Settings.get_value("touch_sensitivity"))

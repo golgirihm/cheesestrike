@@ -130,6 +130,18 @@ class Game:
             self.page.wait_for_timeout(100)
         self.click_at(at)
 
+    def scroll_to(self, control):
+        """Turns the mouse wheel down over the middle of the screen until
+        `control` is in view, as for something far down a scrolling list. The
+        game only reports controls in a list's visible part."""
+        for _ in range(30):
+            if control in self.state()["controls"]:
+                return
+            self.page.mouse.move(VIEWPORT["width"] / 2, VIEWPORT["height"] / 2)
+            self.page.mouse.wheel(0, 120)
+            self.page.wait_for_timeout(150)
+        raise AssertionError(f"couldn't scroll {control} into view")
+
     def click_at(self, canvas_point):
         """Clicks a point given in the game canvas's own pixels."""
         x, y = self.page.evaluate(

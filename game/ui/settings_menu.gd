@@ -1,0 +1,228 @@
+extends CenterContainer
+## The settings screen: how looking feels, the field of view, loudness,
+## graphics quality and the keys. Every change is saved and takes effect at
+## once. Reached from the main menu and the in-game menu, over either.
+##
+## Each control is named after what it sets ("Setting_fov",
+## "Key_move_forward"), which the browser tests use to find them.
+
+signal closed
+
+const SLIDERS := [
+	["mouse_sensitivity", "Mouse look", 0.1, 4.0, 0.05, "%.2f×"],
+	["stick_sensitivity", "Stick look", 0.1, 4.0, 0.05, "%.2f×"],
+	["touch_sensitivity", "Touch look", 0.1, 4.0, 0.05, "%.2f×"],
+	["fov", "Field of view", 60.0, 110.0, 1.0, "%d°"],
+	["master_volume", "Volume", 0.0, 1.0, 0.05, "%d%%"],
+	["music_volume", "Music", 0.0, 1.0, 0.05, "%d%%"],
+	["effects_volume", "Effects", 0.0, 1.0, 0.05, "%d%%"],
+]
+
+var _rows: VBoxContainer
+var _scroll: ScrollContainer
+var _done: Button
+var _value_labels := {}
+var _key_buttons := {}
+# The action waiting for its new key, or "".
+var _waiting_for := ""
+
+
+func _ready() -> void:
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	visible = false
+	add_to_group("touch_blockers")
+	_build()
+	Settings.changed.connect(func(_key: String) -> void: refresh())
+	refresh()
+
+
+func open() -> void:
+	refresh()
+	show()
+	_done.grab_focus()
+
+
+func close() -> void:
+	_waiting_for = ""
+	hide()
+	closed.emit()
+
+
+## Brings every control in line with the settings as they are.
+func refresh() -> void:
+	for row: Array in SLIDERS:
+		var slider: HSlider = find_child("Setting_" + row[0], true, false)
+		if slider != null:
+			slider.set_value_no_signal(Settings.get_value(row[0]))
+		_show_value(row[0])
+	(find_child("Setting_invert_look", true, false) as CheckButton).set_pressed_no_signal(Settings.get_value("invert_look"))
+	(find_child("Setting_quality", true, false) as Button).text = "Graphics: %s" % GraphicsQuality.NAMES[GraphicsQuality.level(Settings.get_value("quality"))]
+	for action: String in _key_buttons:
+		_key_buttons[action].text = "Press a key…" if action == _waiting_for else Controls.keys_text(action)
+
+
+## The value a slider shows, such as "1.25×" or "80%".
+static func value_text(key: String, value: float) -> String:
+	for row: Array in SLIDERS:
+		if row[0] == key:
+			var shown: float = value * 100.0 if row[5] == "%d%%" else value
+			return row[5] % shown
+	return str(value)
+
+
+## The next graphics level after `current`, coming round.
+static func next_quality(current: String) -> String:
+	var levels := GraphicsQuality.LEVELS
+	return levels[(levels.find(current) + 1) % levels.size()]
+
+
+## Starts waiting for the next key pressed, to give it to `action`.
+func rebind(action: String) -> void:
+	_waiting_for = action
+	refresh()
+
+
+func is_waiting_for_key() -> bool:
+	return not _waiting_for.is_empty()
+
+
+func _input(event: InputEvent) -> void:
+	if _waiting_for.is_empty() or not visible:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		get_viewport().set_input_as_handled()
+		if event.physical_keycode != KEY_ESCAPE:
+			var bindings: Dictionary = Settings.get_value("bindings")
+			bindings[_waiting_for] = event.physical_keycode
+			Settings.set_value("bindings", bindings)
+			Controls.apply(bindings)
+		_waiting_for = ""
+		refresh()
+	elif event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_waiting_for = ""
+		refresh()
+
+
+func _reset_keys() -> void:
+	_waiting_for = ""
+	Settings.set_value("bindings", {})
+	Controls.apply({})
+	refresh()
+
+
+func _show_value(key: String) -> void:
+	if _value_labels.has(key):
+		_value_labels[key].text = value_text(key, Settings.get_value(key))
+
+
+func _build() -> void:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(420, 0)
+	add_child(panel)
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 20)
+	panel.add_child(margin)
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 10)
+	margin.add_child(outer)
+	var title := Label.new()
+	title.text = "Settings"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 26)
+	outer.add_child(title)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(380, 400)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(scroll)
+	_scroll = scroll
+	_rows = VBoxContainer.new()
+	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_rows.add_theme_constant_override("separation", 8)
+	scroll.add_child(_rows)
+
+	for row: Array in SLIDERS:
+		_add_slider(row[0], row[1], row[2], row[3], row[4])
+	var invert := CheckButton.new()
+	invert.name = "Setting_invert_look"
+	invert.text = "Invert looking up and down"
+	invert.custom_minimum_size = Vector2(0, 40)
+	invert.toggled.connect(func(on: bool) -> void: Settings.set_value("invert_look", on))
+	_rows.add_child(invert)
+	var quality := Button.new()
+	quality.name = "Setting_quality"
+	quality.custom_minimum_size = Vector2(0, 40)
+	quality.pressed.connect(func() -> void:
+		Settings.set_value("quality", next_quality(GraphicsQuality.level(Settings.get_value("quality")))))
+	_rows.add_child(quality)
+
+	var keys_title := Label.new()
+	keys_title.text = "Keys"
+	keys_title.add_theme_font_size_override("font_size", 20)
+	_rows.add_child(keys_title)
+	for action: String in Controls.REBINDABLE:
+		var line := HBoxContainer.new()
+		_rows.add_child(line)
+		var label := Label.new()
+		label.text = Controls.REBINDABLE[action]
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(label)
+		var button := Button.new()
+		button.name = "Key_" + action
+		button.custom_minimum_size = Vector2(160, 36)
+		button.pressed.connect(rebind.bind(action))
+		line.add_child(button)
+		_key_buttons[action] = button
+	var reset := Button.new()
+	reset.name = "SettingsResetKeys"
+	reset.text = "Reset keys"
+	reset.custom_minimum_size = Vector2(0, 36)
+	reset.pressed.connect(_reset_keys)
+	_rows.add_child(reset)
+
+	_done = Button.new()
+	_done.name = "SettingsDone"
+	_done.text = "Done"
+	_done.custom_minimum_size = Vector2(0, 44)
+	_done.pressed.connect(close)
+	outer.add_child(_done)
+
+
+func _add_slider(key: String, text: String, low: float, high: float, step: float) -> void:
+	var line := HBoxContainer.new()
+	_rows.add_child(line)
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(110, 0)
+	line.add_child(label)
+	var slider := HSlider.new()
+	slider.name = "Setting_" + key
+	slider.min_value = low
+	slider.max_value = high
+	slider.step = step
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.custom_minimum_size = Vector2(0, 32)
+	slider.value_changed.connect(func(value: float) -> void: Settings.set_value(key, value))
+	line.add_child(slider)
+	var shown := Label.new()
+	shown.custom_minimum_size = Vector2(60, 0)
+	shown.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	line.add_child(shown)
+	_value_labels[key] = shown
+
+
+## Every control that can be pressed or dragged and is in view, scrolled
+## into the visible part of the list if it is in the list, for the browser tests.
+func controls() -> Array[Control]:
+	var found: Array[Control] = []
+	var shown := _scroll.get_global_rect()
+	for node in find_children("*", "BaseButton", true, false) + find_children("*", "Range", true, false):
+		if not (node is Control) or not node.is_visible_in_tree() or node is ScrollBar:
+			continue
+		if _scroll.is_ancestor_of(node) and not shown.has_point(node.get_global_rect().get_center()):
+			continue
+		found.append(node)
+	return found

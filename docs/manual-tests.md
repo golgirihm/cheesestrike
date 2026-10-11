@@ -91,6 +91,19 @@ Setup: two windows, with sound on and headphones for SND-02. Why manual: these a
 | SND-02 | Where sounds come from | 1. Host in A, join in B. In B, turn so A is to your left, then behind you, while A fires and walks. | A's shots and footsteps are heard from A's direction, louder when closer. |
 | SND-03 | Every sound | 1. In a session, fire each weapon, reload, jump, walk, pick something up, set off an Overload, hit and be hit, and be knocked out. | Each has its own sound: a zap for the Blaster, a boom for the Shotgun, a rattle for the Grater, a thump and then a rumbling burst for the Launcher, clicks for reloading, a tick when your shot hits, a thud when you're hurt, a falling tone when knocked out, a chime for pickups and a rising whoosh for the Overload. None crackles or clips. |
 
+## Settings
+
+Setup: two windows. Why manual: these are about how the settings feel and look; the automated tests check that they are kept and applied.
+
+| ID | Test | Steps | Expected |
+|---|---|---|---|
+| SET-01 | Look sensitivity and inverting | 1. Open Settings from the menu and set Mouse look to 0.5×, then 2×, playing a little after each.<br>2. Turn on "Invert looking up and down". | The view turns half as far, then twice as far, for the same mouse movement. Inverted, moving the mouse up looks down. Stick look and touch look do the same for the gamepad and touch screen. |
+| SET-02 | Field of view | 1. Set Field of view to 60°, then 110°, from the in-game menu. | The view narrows, then widens, at once, without leaving the game. |
+| SET-03 | Volume | 1. Turn Music to 0%, then Effects to 0%, then Volume to 0%. | Each silences what it says and nothing else; turning it back up brings the sound back. |
+| SET-04 | Graphics quality | 1. Step Graphics through Low, Medium and High, in a session, looking at the arena. | Low is softer and has no shadows; Medium is sharper with shadows; High is sharpest with smooth edges. A first visit on a phone starts at Low, on a PC at High. |
+| SET-05 | Choosing keys | 1. Under Keys, press the button by Jump, then press J. Play a little.<br>2. Give Forward the key Space.<br>3. Press Reset keys. | J jumps and Space no longer does. Space then moves forward instead of jumping. Reset brings back every usual key. Esc while choosing leaves the key as it was. The choice is kept after a reload. |
+| SET-06 | Fits on a phone | 1. Open Settings on a phone, upright and sideways. | The screen fits, the list scrolls with a finger, and every slider and button can be used by touch. |
+
 ## Input devices
 
 Why manual: these need physical hardware.

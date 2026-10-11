@@ -6,6 +6,8 @@ extends GutTest
 
 const MAIN := preload("res://main.tscn")
 const PANELS := ["UI/Menu/Panel", "UI/WaitingNotice/Panel", "UI/DisconnectedNotice/Panel", "UI/PauseMenu/Panel"]
+# Panels built in code, found under these.
+const BUILT := ["UI/SettingsMenu"]
 # The longest reason the game gives for a lost session.
 const LONGEST_REASON := "The connection to the host was lost."
 
@@ -30,7 +32,10 @@ func test_base_size_is_square() -> void:
 
 
 func test_menu_and_notices_fit_inside_the_base_size() -> void:
-	for path: String in PANELS:
+	var paths := PANELS.duplicate()
+	for holder: String in BUILT:
+		paths.append(str(main.get_node(holder).get_path_to(main.get_node(holder).get_child(0))).insert(0, holder + "/"))
+	for path: String in paths:
 		var needed: Vector2 = main.get_node(path).get_combined_minimum_size()
 		assert_lte(needed.x, base.x, "%s is too wide" % path)
 		assert_lte(needed.y, base.y, "%s is too tall" % path)

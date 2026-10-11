@@ -33,6 +33,9 @@ extends Node
 @onready var pause_menu: Control = %PauseMenu
 @onready var resume_button: Button = %ResumeButton
 @onready var menu_leave_button: Button = %MenuLeaveButton
+@onready var settings_button: Button = %SettingsButton
+@onready var pause_settings_button: Button = %PauseSettingsButton
+@onready var settings_menu: Control = %SettingsMenu
 
 # Each match setting's button, choices and description, by setting.
 var _match_buttons := {}
@@ -60,6 +63,9 @@ func _ready() -> void:
 	menu_button.pressed.connect(open_pause_menu)
 	resume_button.pressed.connect(close_pause_menu)
 	menu_leave_button.pressed.connect(_leave)
+	settings_button.pressed.connect(settings_menu.open)
+	pause_settings_button.pressed.connect(settings_menu.open)
+	Controls.apply(Settings.get_value("bindings"))
 	name_edit.text = Settings.get_value("name")
 	name_edit.text_submitted.connect(func(_text: String) -> void: _remember_name())
 	name_edit.focus_exited.connect(_remember_name)
@@ -88,7 +94,7 @@ func _process(_delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not hud.visible or waiting_notice.visible:
+	if not hud.visible or waiting_notice.visible or settings_menu.visible:
 		return
 	var toggle := event.is_action_pressed("pause_menu")
 	if event.is_action_pressed("ui_cancel"):
@@ -268,6 +274,7 @@ func _dismiss_disconnected() -> void:
 func _show_menu(message: String) -> void:
 	Sounds.set_music_quiet(false)
 	pause_menu.hide()
+	settings_menu.hide()
 	hud.hide()
 	combat_hud.hide()
 	combat_hud.reset()

@@ -81,6 +81,9 @@ func snapshot() -> Dictionary:
 			sessions.append({"text": line.text, "at": _centre(line)})
 
 	var controls := {}
+	if _main.settings_menu.visible:
+		for control in _main.settings_menu.controls():
+			controls[control.name] = _centre(control)
 	for control: Control in [
 		_main.name_edit,
 		_main.mode_button,
@@ -98,6 +101,8 @@ func snapshot() -> Dictionary:
 		_main.menu_button,
 		_main.resume_button,
 		_main.menu_leave_button,
+		_main.settings_button,
+		_main.pause_settings_button,
 	]:
 		if control.is_visible_in_tree():
 			controls[control.name] = _centre(control)
@@ -117,6 +122,14 @@ func snapshot() -> Dictionary:
 		"players": players,
 		"sounds": Sounds.counts,
 		"put_backs": _main.world.match_.put_backs,
+		"settings": {
+			"mouse_sensitivity": Settings.get_value("mouse_sensitivity"),
+			"invert_look": Settings.get_value("invert_look"),
+			"fov": Settings.get_value("fov"),
+			"quality": GraphicsQuality.level(Settings.get_value("quality")),
+			"music_volume": Settings.get_value("music_volume"),
+			"jump_keys": Controls.keys_text("jump"),
+		},
 		"music": Sounds.is_music_playing(),
 		"pickups": range(_main.world.pickup_pads().size()).map(func(index: int) -> bool: return _main.world.match_.state.pickup_ready(index)),
 		"combat": {
@@ -141,6 +154,8 @@ func snapshot() -> Dictionary:
 
 
 func _screen() -> String:
+	if _main.settings_menu.visible:
+		return "settings"
 	if _main.disconnected_notice.visible:
 		return "disconnected"
 	if _main.waiting_notice.visible:
