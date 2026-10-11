@@ -34,6 +34,8 @@ var _ammo_label: Label
 var _knocked_out: PanelContainer
 var _knocked_out_title: Label
 var _knocked_out_detail: Label
+var kill_feed: VBoxContainer
+var scoreboard: PanelContainer
 
 
 func _ready() -> void:
@@ -47,6 +49,16 @@ func bind(of: Node3D) -> void:
 	world = of
 	world.match_.hit_confirmed.connect(_on_hit_confirmed)
 	world.match_.hurt.connect(_on_hurt)
+	world.match_.knocked_out.connect(kill_feed.add)
+	world.match_.state_changed.connect(_refresh_scoreboard)
+
+
+## Clears what is left from a session that has ended.
+func reset() -> void:
+	kill_feed.clear()
+	_indicators.clear()
+	_hit_left = 0.0
+	scoreboard.hide()
 
 
 ## How far round from straight ahead `from` lies, for a player at `at` facing
@@ -105,11 +117,25 @@ func _process(delta: float) -> void:
 	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
 	if own != null:
 		_ammo_label.text = ammo_text(own.weapon)
+	var wants_scores := Input.is_action_pressed("scoreboard") or _touch_held("scores")
+	if wants_scores != scoreboard.visible:
+		scoreboard.visible = wants_scores
+		_refresh_scoreboard()
 	var notice: Array = knocked_out_text(world.match_.state, multiplayer.get_unique_id()) if record != null else ["", ""]
 	_knocked_out.visible = not notice[0].is_empty()
 	_knocked_out_title.text = notice[0]
 	_knocked_out_detail.text = notice[1]
 	queue_redraw()
+
+
+func _touch_held(button: String) -> bool:
+	var controls := get_tree().get_first_node_in_group("touch_controls")
+	return controls != null and controls.held.has(button)
+
+
+func _refresh_scoreboard() -> void:
+	if scoreboard.visible and world != null:
+		scoreboard.show_state(world.match_.state, multiplayer.get_unique_id())
 
 
 func _on_hit_confirmed(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
@@ -172,6 +198,11 @@ func _build() -> void:
 	_ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(_ammo_label)
 
+	kill_feed = preload("res://ui/kill_feed.gd").new()
+	kill_feed.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 16)
+	kill_feed.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	add_child(kill_feed)
+
 	var middle := CenterContainer.new()
 	middle.set_anchors_preset(Control.PRESET_FULL_RECT)
 	middle.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -189,6 +220,14 @@ func _build() -> void:
 	_knocked_out_detail = _outlined_label(18)
 	_knocked_out_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rows.add_child(_knocked_out_detail)
+
+	var board_holder := CenterContainer.new()
+	board_holder.set_anchors_preset(Control.PRESET_FULL_RECT)
+	board_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(board_holder)
+	scoreboard = preload("res://ui/scoreboard.gd").new()
+	scoreboard.visible = false
+	board_holder.add_child(scoreboard)
 
 
 static func _outlined_label(font_size: int) -> Label:

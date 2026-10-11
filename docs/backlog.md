@@ -6,11 +6,11 @@ The plan for taking CheeseStrike from where it is now to a game people can play 
 
 ## Where the game is now
 
-Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. There is nothing to shoot yet, no health, no score and no sound.
+Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. There is a crosshair, hit markers, a kill feed and a scoreboard, but no rounds, no winner and no sound yet.
 
 Things about how it works that shape the plan:
 
-- **Each player simulates their own movement** (`game/player/player.gd`) and a `MultiplayerSynchronizer` sends position and facing to everyone else. That is fine for movement, but anything that decides who wins, such as hits, damage and score, has to be decided by the host, or any player could award themselves kills.
+- **Each player simulates their own movement** (`game/player/player.gd`) and a `MultiplayerSynchronizer` sends position and facing to everyone else. That is fine for movement, but anything that decides who wins, such as hits, damage and score, is decided by the host, or any player could award themselves kills. Rules live in plain classes (`game/combat/`, `game/match/`) so they can be tested without a network.
 - **The host is a browser tab**, possibly on a phone. Whatever the host simulates for everyone has to stay cheap, and the session ends when the host leaves.
 - **The signaling server only runs on the development PC**, and the game looks for it on the same machine as the page, at port 9080. Nobody outside the local network can play yet.
 - **The web export is single-threaded** (`thread_support=false`), which lets it run on any static host without special headers. Keep it that way unless something needs threads badly enough to justify the hosting requirements.
@@ -28,13 +28,6 @@ Before there is much more game, make it possible for people on different network
 4. **Publish the web build.** A workflow that exports the web build on every push to `main` and deploys it to a static host (GitHub Pages or itch.io), so there is always a current build to share.
 5. **Version check on join.** Send the game's version with `host` and `join`, and have the signaling server refuse a join between different versions with a clear message ("This session is running an older version. Reload the page."). Once builds are deployed continuously, mismatched tabs will happen.
    *Tests:* signaling tests for the refusal; a browser test that the message reaches the menu.
-
-## Milestone 2: First shot
-
-The smallest version of the game that is actually a shooter: one weapon, health, death and respawn, with the host deciding every hit.
-
-1. **Kill feed and scoreboard.** Kills appear in a corner for everyone; holding Tab (or a button on gamepad and touch) shows each player's kills and deaths. Score is kept by the host.
-   *Tests:* GUT test for score keeping; browser test that a kill shows up for a third player.
 
 ## Milestone 3: A match
 

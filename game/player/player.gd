@@ -256,7 +256,7 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_reload_pressed = true
 		elif not button.is_empty():
 			_button_touches[event.index] = button
-			_fire_pressed = true
+			_fire_pressed = _fire_pressed or button == "fire"
 		elif event.position.x < get_viewport().get_visible_rect().size.x * 0.5:
 			if _move_touch == -1:
 				_move_touch = event.index

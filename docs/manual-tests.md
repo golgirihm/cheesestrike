@@ -55,6 +55,8 @@ Setup: two windows. Why manual: these check what the fighting looks and feels li
 | CMB-05 | Crosshair and hit marker | 1. In A, fire at B's body, then at B's head, then until B is knocked out. | A small cross stays in the middle of A's view. Each hit flashes four short marks around it: white for the body, yellow for the head, red for the knock-out. A shot that misses shows no marks. |
 | CMB-06 | Where the damage came from | 1. In B, turn so A is to your left, and let A shoot you. Repeat with A behind you and to your right. | A red curve appears at the edge of B's view on the side A is, fading over about a second. |
 | CMB-07 | Health and ammo | 1. In A, watch the lower corners while firing, reloading and being shot by B. | Lower left: a health bar and number that drop when hit and turn red at 30 or less. Lower right: rounds left out of 24, which reads "Reloading…" while reloading. |
+| CMB-08 | Kill feed | 1. Host in A, join in B, and knock B out from A. | In both windows a line appears at the top right, "A's name [Cheddar Blaster] B's name" (with "head" if the last hit was to the head), and goes after a few seconds. Several knock-outs in a row stack up, newest at the bottom. |
+| CMB-09 | Scoreboard | 1. After CMB-08, hold Tab in each window, then let go. | While Tab is held, a table in the middle lists both players with their knock-outs and times out, best first, your own row in yellow. It goes when Tab is released. |
 | CMB-03 | Knocked out and back | 1. In A, shoot B until B is knocked out, watching both windows. | In A, B's character disappears and you can walk through where it stood. In B, the view stops responding to movement and firing, and a notice in the middle says "Knocked out by" A's name and counts down to coming back. A few seconds later B is back, at a spot far from A, and both can see each other again. |
 
 ## Input devices
@@ -65,12 +67,14 @@ Why manual: these need physical hardware.
 |---|---|---|---|---|
 | INP-01 | Gamepad | Two windows, a controller connected to the PC | 1. Enter a session and press any controller button.<br>2. Move the left stick.<br>3. Move the right stick.<br>4. Press the bottom face button (A on Xbox, B on Nintendo, Cross on PlayStation). | The left stick walks and the right stick looks, both with no drift when the sticks are at rest. The button jumps. |
 | INP-08 | Gamepad: fire and reload | As INP-01 | 1. Hold the right trigger.<br>2. Fire a few shots, then press the left face button (X on Xbox, Y on Nintendo, Square on PlayStation). | The trigger fires while held. The button reloads. |
+| INP-11 | Gamepad: scoreboard | As INP-01 | 1. Hold the Back (View, Select, Share or minus) button. | The scoreboard shows while it is held. |
 | INP-02 | Gamepad types | As INP-01, repeated with each controller you have: Xbox, PlayStation, Nintendo | Repeat INP-01. | Each controller behaves the same way. |
 | INP-03 | Touch: move | Phone and PC; join or host on the phone | 1. Put a thumb on the left half of the screen and drag. | The character walks in the direction of the drag, faster the further the thumb is from where it first touched, and stops when the thumb lifts. |
 | INP-04 | Touch: look | As INP-03 | 1. Drag on the right half of the screen. | The view follows the drag. |
 | INP-05 | Touch: jump | As INP-03 | 1. Tap the right half of the screen quickly. | The character jumps. A slow drag on the right half does not jump. |
 | INP-06 | Touch: both thumbs | As INP-03 | 1. Walk with the left thumb while looking with the right. | Both work at once and neither interrupts the other. |
 | INP-09 | Touch: fire and reload | As INP-03 | 1. Touch the screen once. Two round buttons, FIRE and R, appear at the lower right.<br>2. Hold FIRE, then lift.<br>3. Tap R.<br>4. Hold FIRE while dragging on the right half to look. | FIRE fires while held and stops when lifted. R reloads. Touching a button doesn't turn the view or jump, and looking still works while FIRE is held. |
+| INP-12 | Touch: scoreboard | As INP-03 | 1. Hold the round Scores button at the top middle of the screen, then lift. | The scoreboard shows while it is held, and holding it doesn't turn the view. |
 | INP-07 | Touch: menu | Phone and PC | 1. On the phone, use the menu to host, then reload and join by tapping a listed session and by typing a code. | Every button and the code box respond to taps, and the on-screen keyboard appears for the code box. |
 
 ## Background tabs and screen sleep

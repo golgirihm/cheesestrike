@@ -11,11 +11,17 @@ func before_each() -> void:
 	add_child_autofree(controls)
 
 
-func test_buttons_sit_in_the_lower_right() -> void:
+func test_fire_and_reload_sit_in_the_lower_right() -> void:
 	var placed := TOUCH.layout_for(Vector2(1000, 600))
-	for name: String in placed:
+	for name: String in ["fire", "reload"]:
 		assert_gt(placed[name].centre.x, 500.0, name)
 		assert_gt(placed[name].centre.y, 300.0, name)
+
+
+func test_the_scores_button_sits_at_the_top_middle() -> void:
+	var placed := TOUCH.layout_for(Vector2(1000, 600))
+	assert_eq(placed.scores.centre.x, 500.0)
+	assert_lt(placed.scores.centre.y, 100.0)
 
 
 func test_buttons_do_not_overlap_or_leave_the_screen() -> void:
@@ -25,7 +31,12 @@ func test_buttons_do_not_overlap_or_leave_the_screen() -> void:
 		for name: String in placed:
 			var reach: Vector2 = Vector2.ONE * placed[name].radius
 			assert_true(rect.encloses(Rect2(placed[name].centre - reach, reach * 2.0)), "%s at %s" % [name, screen])
-		assert_gt(placed.fire.centre.distance_to(placed.reload.centre), placed.fire.radius + placed.reload.radius)
+		var names := placed.keys()
+		for i in names.size():
+			for j in range(i + 1, names.size()):
+				var a: Dictionary = placed[names[i]]
+				var b: Dictionary = placed[names[j]]
+				assert_gt(a.centre.distance_to(b.centre), a.radius + b.radius, "%s and %s" % [names[i], names[j]])
 
 
 func test_nothing_is_a_button_until_the_screen_is_touched() -> void:
