@@ -235,3 +235,21 @@ func test_the_field_of_view_follows_the_setting() -> void:
 	var player := _own_player()
 	Settings.set_value("fov", 95.0)
 	assert_eq(player.camera.fov, 95.0)
+
+
+func test_the_touch_settings_toggle_and_size() -> void:
+	var menu := _menu()
+	(menu.find_child("Setting_touch_left_handed", true, false) as CheckButton).button_pressed = true
+	assert_true(Settings.get_value("touch_left_handed"))
+	(menu.find_child("Setting_touch_fullscreen", true, false) as CheckButton).button_pressed = false
+	assert_false(Settings.get_value("touch_fullscreen"))
+	(menu.find_child("Setting_touch_size", true, false) as HSlider).value = 1.25
+	assert_eq(Settings.get_value("touch_size"), 1.25)
+	assert_eq(SETTINGS_MENU.value_text("touch_size", 1.25), "1.25×")
+
+
+func test_touch_buttons_cannot_be_made_too_small_or_too_big() -> void:
+	Settings.set_value("touch_size", 5.0)
+	assert_eq(Settings.get_value("touch_size"), 1.5)
+	Settings.set_value("touch_size", 0.1)
+	assert_eq(Settings.get_value("touch_size"), 0.7)

@@ -33,6 +33,12 @@ const DEFAULTS := {
 	"quality": "",
 	# Keys chosen for actions, by action: physical key codes.
 	"bindings": {},
+	# Touch screens: the size of the on-screen buttons, whether the buttons
+	# and the movement stick swap sides, and whether the first touch makes the
+	# game fill the screen, turned sideways.
+	"touch_size": 1.0,
+	"touch_left_handed": false,
+	"touch_fullscreen": true,
 }
 
 ## The allowed range of each number setting. A value outside is brought in.
@@ -44,6 +50,7 @@ const RANGES := {
 	"master_volume": [0.0, 1.0],
 	"music_volume": [0.0, 1.0],
 	"effects_volume": [0.0, 1.0],
+	"touch_size": [0.7, 1.5],
 }
 ## The allowed choices of a setting that is one of a few.
 const CHOICES := {

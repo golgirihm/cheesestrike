@@ -31,15 +31,13 @@ Before there is much more game, make it possible for people on different network
 
 ## Milestone 6: Polish and release
 
-1. **Phone experience.** Fullscreen and landscape lock on touch devices, a touch layout that can be adjusted, graphics settings that keep 60 frames per second on a mid-range phone, and an install-to-home-screen option.
-   *Manual:* DEV rows for each.
-2. **Invite links.** A Copy Link button that gives `…/?join=ABCD`; opening it goes straight to joining. Optionally, private sessions that are not in the list.
+1. **Invite links.** A Copy Link button that gives `…/?join=ABCD`; opening it goes straight to joining. Optionally, private sessions that are not in the list.
    *Tests:* browser test for joining by link; signaling tests for private sessions.
-3. **First-time help.** A short controls overlay for the device being used, shown on the first visit.
-4. **Accessibility.** Colorblind-safe team and hit colors, scalable HUD text, captions for important sounds and reduced screen shake.
-5. **Signaling server protection.** Rate limiting per address, message size limits, and filtering of names, so the public server can't be easily flooded or abused.
+2. **First-time help.** A short controls overlay for the device being used, shown on the first visit.
+3. **Accessibility.** Colorblind-safe team and hit colors, scalable HUD text, captions for important sounds and reduced screen shake.
+4. **Signaling server protection.** Rate limiting per address, message size limits, and filtering of names, so the public server can't be easily flooded or abused.
    *Tests:* signaling tests for each limit.
-6. **Release.** Version number on the menu, a changelog, a page on itch.io, and a round of playtests with people outside the project, running the full manual test list first.
+5. **Release.** Version number on the menu, a changelog, a page on itch.io, and a round of playtests with people outside the project, running the full manual test list first.
 
 ## Later
 

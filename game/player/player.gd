@@ -608,7 +608,7 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		elif not button.is_empty():
 			_button_touches[event.index] = button
 			_fire_pressed = _fire_pressed or button == "fire"
-		elif event.position.x < get_viewport().get_visible_rect().size.x * 0.5:
+		elif preload("res://ui/touch_controls.gd").is_movement_side(event.position, get_viewport().get_visible_rect().size, Settings.get_value("touch_left_handed")):
 			if _move_touch == -1:
 				_move_touch = event.index
 				_move_touch_origin = event.position

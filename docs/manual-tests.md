@@ -178,8 +178,12 @@ Why manual: each combination is a different real device or program.
 | DEV-04 | Each browser | Two windows of the browser under test | In each of Chrome, Firefox, Edge and Safari:<br>1. Host a session in one window and join it from the session list in the other.<br>2. Run MOV-01, MOV-02 and PLR-02. | Joining works and the tests pass in every browser. |
 | DEV-05 | Mixed browsers | One window each of two different browsers | 1. Host in one, join in the other, then swap. | Both directions connect and PLR-02 passes. |
 | DEV-06 | Different networks | Two devices on different internet connections, such as home Wi-Fi and mobile data | 1. Host on one, join on the other. | They connect and PLR-02 passes. |
+| DEV-07 | Full screen and sideways | Phone and PC | 1. Open the game on the phone, held upright, and tap the menu once. | The game fills the screen, with the browser's bars gone, and turns sideways if the phone allows locking the orientation (Android Chrome does; iPhone Safari doesn't, so turn it by hand). With "Full screen when touched" off in Settings, a reload and a tap leave the browser as it is. |
+| DEV-08 | Adjusting the touch buttons | As DEV-07 | 1. In a session, set Touch buttons to 1.5× in Settings, then 0.7×.<br>2. Turn on "Touch buttons on the left" and play a little. | The round buttons grow and shrink and stay on screen. Left-handed, the buttons are at the lower left, the left half of the screen looks and the right half moves. |
+| DEV-09 | Smooth on a phone | A mid-range phone (two or three years old), hosting, with one PC joined | 1. Play for a few minutes on each map, with Graphics on Low, the phone's starting choice. | The game stays smooth (about 60 frames per second) and the phone doesn't get uncomfortably hot. |
+| DEV-10 | Install to the home screen | A phone, with the game served over HTTPS (local `http://localhost` doesn't qualify on a phone) | 1. Use the browser's "Install app" or "Add to Home screen".<br>2. Open the game from the new icon. | The icon is a cheese wedge. The game opens without the browser's address bar and plays as in the browser. |
 
-DEV-06 can't be run yet: the signaling server only runs on the development PC, so a device on another network can't reach it. It becomes runnable once the server is hosted publicly.
+DEV-06 can't be run yet: the signaling server only runs on the development PC, so a device on another network can't reach it. It becomes runnable once the server is hosted publicly. DEV-10 needs the game on an HTTPS host, as published builds will be; `tools/serve.py` also turns off the offline cache that installing uses, so a reload always picks up a new build.
 
 ## Native build
 
