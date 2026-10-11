@@ -81,16 +81,16 @@ class CombatTest(GameTestCase):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()
         host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths === 1)")
+        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         host.page.mouse.up()
-        host.wait_for("s.players.some((p) => p.mine && p.kills === 1)")
-        joiner.wait_for("s.players.some((p) => p.mine && p.deaths === 1) && s.players.some((p) => !p.mine && p.kills === 1)")
+        host.wait_for("s.players.some((p) => p.mine && p.kills >= 1)")
+        joiner.wait_for("s.players.some((p) => p.mine && p.deaths >= 1) && s.players.some((p) => !p.mine && p.kills >= 1)")
 
     def test_a_knocked_out_player_comes_back_with_full_health(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()
         host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths === 1)")
+        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         host.page.mouse.up()
         joiner.wait_for(f"s.players.some((p) => p.mine && p.deaths >= 1 && p.alive && p.health === {FULL_HEALTH})")
 

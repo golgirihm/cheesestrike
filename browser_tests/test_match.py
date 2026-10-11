@@ -51,7 +51,7 @@ class MatchTest(GameTestCase):
 
         # After the break, a new match with the scores cleared.
         for game in (host, joiner):
-            game.wait_for("s.combat.result === '' && s.combat.match.startsWith('First to 5') && s.players.every((p) => p.kills === 0 && p.deaths === 0)", timeout=30_000)
+            game.wait_for("s.combat.result === '' && s.combat.match.startsWith('First to 5') && s.players.every((p) => p.kills === 0 && p.deaths === 0)")
 
     def test_the_session_list_shows_the_hosts_settings_and_its_limit_holds(self):
         host, code = self.host_with(mode="Cheddar vs Brie", players="Up to 2 players")
