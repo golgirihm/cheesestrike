@@ -18,6 +18,8 @@ signal hit_confirmed(victim: int, dealt: int, knocked_out: bool, head: bool)
 signal hurt(attacker: int, from: Vector3, dealt: int)
 ## Another player fired a shot whose pellets ended at `ends`, for effects.
 signal shot_shown(shooter: int, ends: Array)
+## Someone knocked someone out, for the kill feed. Names are as they were then.
+signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
 
 const SYNC_INTERVAL := 0.1
 ## Physics layer of the arena's walls, floor and cover, which stop shots.
@@ -186,6 +188,8 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int) -> void
 			_changed()
 			_tell_hit(shooter, victim, result.dealt, result.knocked_out, headshot[victim])
 			_tell_hurt(victim, shooter, origin, result.dealt)
+		if result.knocked_out:
+			_announce_knockout(state.name_of(shooter), state.name_of(victim), weapon.id, headshot[victim])
 
 
 func _show_shot_to_others(shooter: int, ends: Array) -> void:
@@ -208,6 +212,16 @@ func _tell_hurt(victim: int, attacker: int, from: Vector3, dealt: int) -> void:
 		hurt.emit(attacker, from, dealt)
 	elif multiplayer.get_peers().has(victim):
 		_hurt.rpc_id(victim, attacker, from, dealt)
+
+
+func _announce_knockout(attacker: String, victim: String, weapon: String, head: bool) -> void:
+	_knockout_seen.rpc(attacker, victim, weapon, head)
+	knocked_out.emit(attacker, victim, weapon, head)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _knockout_seen(attacker: String, victim: String, weapon: String, head: bool) -> void:
+	knocked_out.emit(attacker, victim, weapon, head)
 
 
 @rpc("authority", "call_remote", "unreliable")

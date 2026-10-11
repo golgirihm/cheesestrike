@@ -1,0 +1,69 @@
+extends PanelContainer
+## Everyone's score, shown while the scoreboard button is held: Tab, the
+## gamepad's Back or View button, or SCORES on a touch screen.
+
+const COLUMNS := ["Player", "Knock-outs", "Times out"]
+const OWN_COLOR := Color(1.0, 0.85, 0.35)
+
+var _grid: GridContainer
+
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 18)
+	add_child(margin)
+	_grid = GridContainer.new()
+	_grid.columns = COLUMNS.size()
+	_grid.add_theme_constant_override("h_separation", 28)
+	_grid.add_theme_constant_override("v_separation", 6)
+	margin.add_child(_grid)
+
+
+## The rows of the scoreboard, best first: most knock-outs, then fewest times
+## knocked out, then by name.
+static func rows(state: MatchState) -> Array[PlayerRecord]:
+	var sorted: Array[PlayerRecord] = []
+	for record: PlayerRecord in state.players.values():
+		sorted.append(record)
+	sorted.sort_custom(func(a: PlayerRecord, b: PlayerRecord) -> bool:
+		if a.kills != b.kills:
+			return a.kills > b.kills
+		if a.deaths != b.deaths:
+			return a.deaths < b.deaths
+		return a.name.naturalnocasecmp_to(b.name) < 0)
+	return sorted
+
+
+## Fills the board from `state`, marking the row of player `own`.
+func show_state(state: MatchState, own: int) -> void:
+	for child in _grid.get_children():
+		_grid.remove_child(child)
+		child.queue_free()
+	for heading: String in COLUMNS:
+		_add_cell(heading, Color(1, 1, 1, 0.6))
+	for record in rows(state):
+		var color := OWN_COLOR if record.id == own else Color.WHITE
+		_add_cell(record.name, color)
+		_add_cell(str(record.kills), color)
+		_add_cell(str(record.deaths), color)
+
+
+## The board as text, row by row, for the browser tests.
+func rows_shown() -> Array:
+	var cells := []
+	for child in _grid.get_children():
+		cells.append(child.text)
+	var shown := []
+	for start in range(0, cells.size(), COLUMNS.size()):
+		shown.append(cells.slice(start, start + COLUMNS.size()))
+	return shown
+
+
+func _add_cell(text: String, color: Color) -> void:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", color)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_grid.add_child(label)

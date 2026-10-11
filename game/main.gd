@@ -112,6 +112,7 @@ func _on_session_failed(reason: String) -> void:
 func _on_session_ended(reason: String) -> void:
 	world.stop()
 	combat_hud.hide()
+	combat_hud.reset()
 	touch_controls.hide()
 	if reason.is_empty():
 		_show_menu("")
@@ -130,6 +131,7 @@ func _dismiss_disconnected() -> void:
 func _show_menu(message: String) -> void:
 	hud.hide()
 	combat_hud.hide()
+	combat_hud.reset()
 	touch_controls.hide()
 	menu.show()
 	status.text = message

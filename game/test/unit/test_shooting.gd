@@ -197,3 +197,15 @@ func test_the_shooters_own_shot_shows_at_once() -> void:
 	shooter.fired.emit(shooter.head.global_position, Vector3.FORWARD, 1)
 	var tracers: int = world.effects.get_child_count()
 	assert_eq(tracers, 2, "a flash and a tracer")
+
+
+func test_a_knock_out_is_announced_with_both_names() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	match_.state.rename(1, "Shooter")
+	match_.state.rename(2, "Target")
+	watch_signals(match_)
+	for i in 3:
+		_shoot(shooter, Vector3(0, 1.65, -5))
+	assert_signal_emit_count(match_, "knocked_out", 1)
+	assert_signal_emitted_with_parameters(match_, "knocked_out", ["Shooter", "Target", "blaster", true])
