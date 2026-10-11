@@ -28,6 +28,7 @@ extends Node
 @onready var disconnected_detail: Label = %DisconnectedDetail
 @onready var disconnected_button: Button = %DisconnectedButton
 @onready var rejoin_button: Button = %RejoinButton
+@onready var final_standings: Label = %FinalStandings
 @onready var menu_button: Button = %MenuButton
 @onready var pause_menu: Control = %PauseMenu
 @onready var resume_button: Button = %ResumeButton
@@ -58,7 +59,7 @@ func _ready() -> void:
 	Settings.changed.connect(_show_match_setting)
 	menu_button.pressed.connect(open_pause_menu)
 	resume_button.pressed.connect(close_pause_menu)
-	menu_leave_button.pressed.connect(Net.leave)
+	menu_leave_button.pressed.connect(_leave)
 	name_edit.text = Settings.get_value("name")
 	name_edit.text_submitted.connect(func(_text: String) -> void: _remember_name())
 	name_edit.focus_exited.connect(_remember_name)
@@ -203,7 +204,35 @@ func _on_session_failed(reason: String) -> void:
 	_show_menu(reason)
 
 
+## How a session that has ended stood: the result if a match had just been
+## won, then the best few players, or the teams' scores.
+static func standings(state: MatchState) -> String:
+	if state.players.is_empty():
+		return ""
+	var lines: Array[String] = []
+	if not state.is_playing():
+		lines.append(state.result_text())
+	if state.settings.is_teams():
+		lines.append("Cheddar %d  –  %d Brie" % [state.team_kills[MatchState.CHEDDAR], state.team_kills[MatchState.BRIE]])
+	var rows := preload("res://ui/scoreboard.gd").rows(state)
+	if state.settings.is_teams():
+		rows.sort_custom(func(a: PlayerRecord, b: PlayerRecord) -> bool: return a.kills > b.kills)
+	for place in mini(rows.size(), 5):
+		lines.append("%d. %s  ·  %d" % [place + 1, rows[place].name, rows[place].kills])
+	return "\n".join(lines)
+
+
+## Leaves the session. A host first tells everyone the session is over, so
+## they see why, and gives that a moment to arrive.
+func _leave() -> void:
+	if world.match_.is_host() and not multiplayer.get_peers().is_empty():
+		world.match_.end_session()
+		await get_tree().create_timer(0.3).timeout
+	Net.leave()
+
+
 func _on_session_ended(reason: String) -> void:
+	final_standings.text = standings(world.match_.state)
 	world.stop()
 	pause_menu.hide()
 	combat_hud.hide()
@@ -222,7 +251,7 @@ func _on_session_ended(reason: String) -> void:
 ## Whether a player who lost their session for `reason` can try joining it
 ## again: a joiner whose connection failed, not one whose host closed it.
 static func can_rejoin(reason: String, joined: String) -> bool:
-	return not joined.is_empty() and not reason.is_empty() and reason != "The host closed the session."
+	return not joined.is_empty() and not reason.is_empty() and not reason in ["The host closed the session.", Match.HOST_ENDED]
 
 
 func _rejoin() -> void:

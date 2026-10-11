@@ -6,7 +6,7 @@ The plan for taking CheeseStrike from where it is now to a game people can play 
 
 ## Where the game is now
 
-Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. Matches run to a kill limit or a time limit, free-for-all or in two teams (Cheddar and Brie), as the host chose on the menu, with a winner and then a fresh match; the session list shows each host's settings. Players are cheese characters who fight with four weapons (one a lobbed, bursting projectile), pick up weapons and cheese wedges, and fill a Gouda Overload meter, on two arenas, with synthesized sound and music. There is a crosshair, hit markers, a kill feed, a scoreboard and an in-game menu.
+Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 players walk, look and jump around a grey-box arena with a few cheese blocks, as colored capsules, with keyboard and mouse, gamepad or touch. Each player starts at their own spot. When the host's tab is put away, everyone else freezes with a "Waiting for host" notice; when the host leaves, they are told the session is over. Players choose a name, and fight with one weapon, the Cheddar Blaster: the host decides every hit (`game/match/match.gd`), and keeps everyone's health and score in a `MatchState` it sends to all. Matches run to a kill limit or a time limit, free-for-all or in two teams (Cheddar and Brie), as the host chose on the menu, with a winner and then a fresh match; the session list shows each host's settings. Players are cheese characters who fight with four weapons (one a lobbed, bursting projectile), pick up weapons and cheese wedges, and fill a Gouda Overload meter, on two arenas, with synthesized sound and music. There is a crosshair, hit markers, a kill feed, a scoreboard with pings and an in-game menu. Others' movement is smoothed, shots are checked against where their targets were when fired (lag compensation), impossible movement is put right, a dropped player can rejoin with their score, and a host leaving ends the session with final standings.
 
 Things about how it works that shape the plan:
 
@@ -28,12 +28,6 @@ Before there is much more game, make it possible for people on different network
 4. **Publish the web build.** A workflow that exports the web build on every push to `main` and deploys it to a static host (GitHub Pages or itch.io), so there is always a current build to share.
 5. **Version check on join.** Send the game's version with `host` and `join`, and have the signaling server refuse a join between different versions with a clear message ("This session is running an older version. Reload the page."). Once builds are deployed continuously, mismatched tabs will happen.
    *Tests:* signaling tests for the refusal; a browser test that the message reaches the menu.
-
-## Milestone 5: Fair and smooth online
-
-Once there is real combat, the shortcuts from earlier milestones start to show.
-
-1. **Host leaving.** Decide between host migration (hand the session to another player, which is hard with a host-decided game) and ending the match gracefully with final scores. Ending gracefully is the likely first step.
 
 ## Milestone 6: Polish and release
 

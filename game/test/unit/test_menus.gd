@@ -119,3 +119,42 @@ func test_touches_on_the_menu_are_not_moves() -> void:
 	await wait_process_frames(1)
 	assert_true(controls.blocked_at(Vector2(400, 400)), "the open menu covers the screen")
 	main.world.stop()
+
+
+func test_the_final_standings_list_the_best_players() -> void:
+	var state := MatchState.new()
+	for id in range(1, 8):
+		var record := state.add_player(id)
+		record.name = "P%d" % id
+		record.kills = id
+	var lines: PackedStringArray = main.standings(state).split("\n")
+	assert_eq(lines.size(), 5)
+	assert_eq(lines[0], "1. P7  ·  7")
+	assert_eq(lines[4], "5. P3  ·  3")
+
+
+func test_the_final_standings_say_who_won_and_the_team_scores() -> void:
+	var state := MatchState.new(MatchSettings.from_dict({"mode": "teams"}))
+	state.add_player(1)
+	state.add_player(2)
+	state.team_kills = [3, 7]
+	state.end_match()
+	var lines: PackedStringArray = main.standings(state).split("\n")
+	assert_eq(lines[0], "Brie wins!")
+	assert_eq(lines[1], "Cheddar 3  –  7 Brie")
+
+
+func test_no_players_no_standings() -> void:
+	assert_eq(main.standings(MatchState.new()), "")
+
+
+func test_the_disconnected_notice_shows_how_the_session_stood() -> void:
+	main._on_session_started()
+	main.world.match_.state.player(1).kills = 2
+	main._on_session_ended("The host closed the session.")
+	assert_string_contains(main.final_standings.text, "·  2")
+	assert_false(main.rejoin_button.visible)
+
+
+func test_a_session_the_host_ended_is_not_offered_for_rejoining() -> void:
+	assert_false(preload("res://main.gd").can_rejoin(Match.HOST_ENDED, "ABCD"))
