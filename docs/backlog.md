@@ -33,21 +33,14 @@ Before there is much more game, make it possible for people on different network
 
 What makes it this game rather than any shooter: cheese weapons, a real arena, and the Overload.
 
-1. **Weapon roster.** Two or three more weapons with different jobs, each needing projectile or spread support as it goes:
-   - **Swiss Shotgun**: a spread of pellets, strong up close.
-   - **Gouda Launcher**: a slow rolling wheel of cheese that explodes, with splash damage and knockback. The first projectile, simulated by the host.
-   - **Parmesan Grater**: a fast, weak spray.
-
-   Weapon switching with number keys, the mouse wheel, a shoulder button and a touch button. Weapon stats live in resources so they can be tuned without code changes.
-   *Tests:* GUT tests for spread, splash falloff and switching.
-2. **Weapon and health pickups.** Weapons and cheese-wedge health packs that sit on pads around the arena and come back after a delay. The host decides who picked one up.
+1. **Weapon and health pickups.** Weapons and cheese-wedge health packs that sit on pads around the arena and come back after a delay. The host decides who picked one up.
    *Tests:* GUT tests for pickup and respawn timing.
-3. **Gouda Overload.** The signature mechanic: dealing damage fills a meter, and when it's full the player can trigger a short Overload, such as faster movement and a melting-cheese effect that slows anyone they hit. Tune it so it rewards playing well without deciding matches on its own.
+2. **Gouda Overload.** The signature mechanic: dealing damage fills a meter, and when it's full the player can trigger a short Overload, such as faster movement and a melting-cheese effect that slows anyone they hit. Tune it so it rewards playing well without deciding matches on its own.
    *Tests:* GUT tests for the meter and its effects.
-4. **A real arena.** Replace the grey box with a designed map: cover, height, several routes, sight lines that suit both the rifle and the shotgun, and enough spawn points for 16. Keep geometry and lighting cheap enough for a phone host. Then a second, smaller map for few players, and map choice in the host settings.
+3. **A real arena.** Replace the grey box with a designed map: cover, height, several routes, sight lines that suit both the rifle and the shotgun, and enough spawn points for 16. Keep geometry and lighting cheap enough for a phone host. Then a second, smaller map for few players, and map choice in the host settings.
    *Tests:* GUT test that every spawn point is on the floor and clear of walls, generalizing `test_world_spawn_points.gd`. Manual: rows for walking every route.
-5. **Characters.** Replace the capsules with cheese characters, with walk, jump, shoot and death animations, and first-person arms holding the weapon.
-6. **Sound.** Footsteps, weapon sounds, hits, deaths, pickups and the Overload, positioned in 3D, plus menu music. Browsers block audio until the first click or tap, so start it then.
+4. **Characters.** Replace the capsules with cheese characters, with walk, jump, shoot and death animations, and first-person arms holding the weapon.
+5. **Sound.** Footsteps, weapon sounds, hits, deaths, pickups and the Overload, positioned in 3D, plus menu music. Browsers block audio until the first click or tap, so start it then.
    *Manual:* rows for hearing direction and the first-click start in each browser.
 
 ## Milestone 5: Fair and smooth online

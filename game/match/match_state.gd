@@ -120,6 +120,7 @@ func damage(attacker: int, victim: int, amount: float) -> Dictionary:
 		target.respawn_in = RESPAWN_DELAY
 		target.deaths += 1
 		target.last_attacker = attacker
+		target.disarm()
 		var scorer := player(attacker)
 		if scorer != null:
 			scorer.kills += 1
@@ -172,6 +173,7 @@ func start_match() -> void:
 		record.kills = 0
 		record.deaths = 0
 		record.last_attacker = 0
+		record.disarm()
 
 
 func respawn(id: int) -> void:

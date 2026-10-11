@@ -249,3 +249,130 @@ func test_the_match_ends_when_the_kill_limit_is_reached() -> void:
 		_shoot(shooter, Vector3(0, 1.65, -5))
 	assert_false(match_.state.is_playing())
 	assert_eq(match_.state.winners, [1] as Array[int])
+
+
+func _give(id: int, weapon: String) -> void:
+	match_.state.player(id).weapons.append(weapon)
+
+
+func test_a_weapon_not_carried_cannot_be_fired() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	match_._shot(1, shooter.head.global_position, Vector3.FORWARD, 1, "shotgun")
+	assert_eq(match_.state.player(2).health, 100)
+
+
+func test_a_shotgun_blast_up_close_lands_many_pellets() -> void:
+	var shooter := _add(1, Vector3(0, 0, 0))
+	_add(2, Vector3(0, 0, -2))
+	_give(1, "shotgun")
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(0, 1.0, -2) - origin).normalized(), 7, "shotgun")
+	var dealt := 100 - match_.state.player(2).health
+	assert_gt(dealt, 50, "most pellets hit at two metres")
+
+
+func test_a_shotgun_blast_far_away_mostly_misses() -> void:
+	var shooter := _add(1, Vector3(-12, 0, 12))
+	_add(2, Vector3(12, 0, 12))
+	_give(1, "shotgun")
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(12, 1.0, 12) - origin).normalized(), 7, "shotgun")
+	assert_lt(100 - match_.state.player(2).health, 40)
+
+
+func _fly(seconds: float) -> void:
+	for i in int(seconds * 60.0):
+		match_._physics_process(1.0 / 60.0)
+
+
+func test_a_launcher_wheel_bursts_on_a_player_and_hurts_them() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -3))
+	_give(1, "launcher")
+	watch_signals(match_)
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(0, 1.0, -3) - origin).normalized(), 1, "launcher")
+	assert_signal_emitted(match_, "projectile_launched")
+	_fly(1.0)
+	assert_signal_emitted(match_, "projectile_burst")
+	assert_lt(match_.state.player(2).health, 100)
+	assert_eq(match_.state.player(1).health, 100, "the shooter is out of reach")
+
+
+func test_a_burst_does_not_hurt_its_shooter() -> void:
+	var shooter := _add(1, Vector3(0, 0, -7))
+	_give(1, "launcher")
+	# Straight at the cheese block just ahead.
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(0, 1.0, -10) - origin).normalized(), 1, "launcher")
+	_fly(1.0)
+	assert_eq(match_.state.player(1).health, 100)
+
+
+func test_a_burst_behind_a_wall_does_no_harm() -> void:
+	var shooter := _add(1, Vector3(0, 0, -6))
+	_add(2, Vector3(0, 0, -12))
+	_give(1, "launcher")
+	# The block at (0, 1, -10) stands between them; burst on its near face.
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(0, 1.0, -10) - origin).normalized(), 1, "launcher")
+	_fly(1.0)
+	assert_eq(match_.state.player(2).health, 100)
+
+
+func test_a_burst_shoves_the_players_near_it() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	var target := _add(2, Vector3(0, 0, -3))
+	_give(1, "launcher")
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(0, 1.0, -3) - origin).normalized(), 1, "launcher")
+	watch_signals(match_)
+	_fly(1.0)
+	# Player 2 isn't this process's own, so the shove goes by RPC; the host's
+	# own player would be moved at once.
+	assert_signal_emitted(match_, "projectile_burst")
+	var at: Vector3 = get_signal_parameters(match_, "projectile_burst")[2]
+	assert_lt(at.distance_to(target.global_position + Vector3.UP * Match.MIDDLE), 1.0)
+
+
+func test_the_hosts_own_player_is_shoved_by_its_own_burst() -> void:
+	var shooter := _add(1, Vector3(0, 0, -7))
+	_give(1, "launcher")
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(0, 0.2, -8.5) - origin).normalized(), 1, "launcher")
+	_fly(0.5)
+	assert_gt(shooter.velocity.y, 0.0, "lifted")
+	assert_gt(shooter._knockback.length(), 0.0)
+
+
+func test_choosing_a_carried_weapon_shows_it_to_others() -> void:
+	_add(1, Vector3(0, 0, 5))
+	_give(1, "grater")
+	match_.select_weapon("grater")
+	assert_eq(match_.state.player(1).weapon, "grater")
+	match_.select_weapon("launcher")
+	assert_eq(match_.state.player(1).weapon, "grater", "not carried, so refused")
+
+
+func test_the_owner_takes_up_a_new_weapon_and_drops_it_when_knocked_out() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	_give(1, "shotgun")
+	match_.state_changed.emit()
+	assert_eq(own.weapon.stats.id, "shotgun", "a new weapon comes into hand")
+	assert_eq(own.arsenal.keys().size(), 2)
+	match_.state.damage(2, 1, 500.0)
+	match_.state_changed.emit()
+	assert_eq(own.weapon.stats.id, Weapons.STARTING)
+	assert_eq(own.arsenal.keys(), [Weapons.STARTING])
+
+
+func test_switching_weapons_takes_a_moment() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	_give(1, "grater")
+	match_.state_changed.emit()
+	own.equip("blaster")
+	assert_false(own.weapon.can_fire())
+	own.weapon.tick(own.SWITCH_TIME)
+	assert_true(own.weapon.can_fire())

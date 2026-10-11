@@ -3,8 +3,14 @@ class_name Weapons
 
 const STARTING := "blaster"
 
+## In the order the number keys choose them.
+const ORDER := ["blaster", "shotgun", "grater", "launcher"]
+
 const _ALL := {
 	"blaster": preload("res://combat/weapons/blaster.tres"),
+	"shotgun": preload("res://combat/weapons/shotgun.tres"),
+	"grater": preload("res://combat/weapons/grater.tres"),
+	"launcher": preload("res://combat/weapons/launcher.tres"),
 }
 
 
@@ -14,4 +20,16 @@ static func find(id: Variant) -> WeaponStats:
 
 
 static func ids() -> Array:
-	return _ALL.keys()
+	return ORDER.duplicate()
+
+
+## The weapon after (or with `step` -1, before) `current` among `owned`, in
+## the usual order, coming round at the end.
+static func cycle(owned: Array, current: String, step := 1) -> String:
+	var held := ORDER.filter(func(id: String) -> bool: return owned.has(id))
+	if held.is_empty():
+		return current
+	var at := held.find(current)
+	if at == -1:
+		return held[0]
+	return held[posmod(at + step, held.size())]
