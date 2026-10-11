@@ -31,6 +31,7 @@ var _indicators: Array[Dictionary] = []
 var _health_bar: ProgressBar
 var _health_label: Label
 var _ammo_label: Label
+var _weapon_label: Label
 var _knocked_out: PanelContainer
 var _knocked_out_title: Label
 var _knocked_out_detail: Label
@@ -118,6 +119,10 @@ func knocked_out_shown() -> String:
 	return _knocked_out_title.text if _knocked_out.visible else ""
 
 
+func weapon_shown() -> String:
+	return _weapon_label.text
+
+
 func match_shown() -> String:
 	return _match_label.text
 
@@ -146,6 +151,7 @@ func _process(delta: float) -> void:
 	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
 	if own != null:
 		_ammo_label.text = ammo_text(own.weapon)
+		_weapon_label.text = own.weapon.stats.display_name
 	var state: MatchState = world.match_.state
 	_match_label.text = match_text(state)
 	_result.visible = not state.is_playing()
@@ -225,13 +231,19 @@ func _build() -> void:
 	_health_label = _outlined_label(22)
 	health.add_child(_health_label)
 
+	var arms := VBoxContainer.new()
+	arms.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)
+	arms.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	arms.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	arms.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(arms)
+	_weapon_label = _outlined_label(15)
+	_weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	arms.add_child(_weapon_label)
 	_ammo_label = _outlined_label(22)
 	_ammo_label.name = "Ammo"
-	_ammo_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)
-	_ammo_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_ammo_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	add_child(_ammo_label)
+	arms.add_child(_ammo_label)
 
 	kill_feed = preload("res://ui/kill_feed.gd").new()
 	kill_feed.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 16)

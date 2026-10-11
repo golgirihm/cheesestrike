@@ -20,6 +20,9 @@ signal hurt(attacker: int, from: Vector3, dealt: int)
 signal shot_shown(shooter: int, ends: Array)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
+## A projectile was launched, or burst, for effects.
+signal projectile_launched(id: int, weapon: String, from: Vector3, velocity: Vector3)
+signal projectile_burst(id: int, weapon: String, at: Vector3)
 
 const SYNC_INTERVAL := 0.1
 ## The host sends the state at least this often, even unchanged, so that
@@ -27,6 +30,8 @@ const SYNC_INTERVAL := 0.1
 const RESYNC_INTERVAL := 2.0
 ## Physics layer of the arena's walls, floor and cover, which stop shots.
 const WORLD_MASK := 1
+## Height of a player's middle above their feet, where bursts aim their harm.
+const MIDDLE := 0.9
 
 ## Everyone's copy of the host's decisions. Replaced, not changed, on players
 ## other than the host, so hold on to it only briefly.
@@ -38,6 +43,9 @@ var state := MatchState.new()
 var _clock := 0.0
 # The host's ShotRules for each player, by id.
 var _rules := {}
+# The host's projectiles in flight, by id.
+var _projectiles := {}
+var _next_projectile := 1
 # Names asked for by players the host hasn't seen join yet, by player id.
 var _pending_names := {}
 var _dirty := false
@@ -51,6 +59,7 @@ func start(settings := MatchSettings.new()) -> void:
 		state = MatchState.new(settings)
 		_pending_names.clear()
 		_rules.clear()
+		_projectiles.clear()
 		state_changed.emit()
 	else:
 		introduce(Settings.get_value("name"))
@@ -93,21 +102,29 @@ func introduce(wanted: String) -> void:
 		_introduce.rpc_id(1, wanted)
 
 
-## This player fires the weapon in their hands from `origin` along `direction`.
-## `seed` decides where any spread sends each pellet.
-func fire(origin: Vector3, direction: Vector3, seed: int) -> void:
+## This player fires `weapon` from `origin` along `direction`. `seed` decides
+## where any spread sends each pellet.
+func fire(origin: Vector3, direction: Vector3, seed: int, weapon := Weapons.STARTING) -> void:
 	if is_host():
-		_shot(1, origin, direction, seed)
+		_shot(1, origin, direction, seed, weapon)
 	elif multiplayer.multiplayer_peer != null:
-		_request_shot.rpc_id(1, origin, direction, seed)
+		_request_shot.rpc_id(1, origin, direction, seed, weapon)
 
 
-## This player has started reloading.
-func reload() -> void:
+## This player has started reloading `weapon`.
+func reload(weapon := Weapons.STARTING) -> void:
 	if is_host():
-		_reload(1)
+		_reload(1, weapon)
 	elif multiplayer.multiplayer_peer != null:
-		_request_reload.rpc_id(1)
+		_request_reload.rpc_id(1, weapon)
+
+
+## This player has taken `weapon` in hand, so others see it.
+func select_weapon(weapon: String) -> void:
+	if is_host():
+		_select(1, weapon)
+	elif multiplayer.multiplayer_peer != null:
+		_request_select.rpc_id(1, weapon)
 
 
 ## This player's own record, or null before the host has sent it.
@@ -155,14 +172,19 @@ func _rules_for(id: int) -> ShotRules:
 	return _rules[id]
 
 
-## The host checks and carries out a shot that `shooter` reports.
-func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int) -> void:
+## The host checks and carries out a shot from `weapon` that `shooter`
+## reports; by default, the weapon the host last saw in their hands.
+func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_id := "") -> void:
 	var record := state.player(shooter)
 	var shooter_node: Node3D = world.player_node(shooter)
 	if record == null or not record.alive or shooter_node == null:
 		return
-	var weapon := Weapons.find(record.weapon)
-	if weapon == null or not origin.is_finite() or not direction.is_finite() or direction.length() < 0.5:
+	if weapon_id.is_empty():
+		weapon_id = record.weapon
+	var weapon := Weapons.find(weapon_id)
+	if weapon == null or not record.weapons.has(weapon_id):
+		return
+	if not origin.is_finite() or not direction.is_finite() or direction.length() < 0.5:
 		return
 	if not ShotRules.origin_believable(origin, shooter_node.head.global_position):
 		return
@@ -171,14 +193,11 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int) -> void
 	if record.is_protected():
 		record.protected_for = 0.0
 		_changed()
+	if weapon.fires_projectile():
+		_launch(shooter, weapon, origin, direction)
+		return
 
-	var targets := {}
-	for node: Node3D in world.players.get_children():
-		var id := node.name.to_int()
-		var target := state.player(id)
-		if id != shooter and target != null and target.alive and not node.is_queued_for_deletion():
-			targets[id] = node.global_position
-
+	var targets := _targets_except(shooter)
 	var damage_to := {}
 	var headshot := {}
 	var ends := []
@@ -194,13 +213,107 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int) -> void
 			headshot[hit.id] = headshot.get(hit.id, false) or hit.head
 	_show_shot_to_others(shooter, ends)
 	for victim: int in damage_to:
-		var result := state.damage(shooter, victim, damage_to[victim])
-		if result.dealt > 0:
-			_changed()
-			_tell_hit(shooter, victim, result.dealt, result.knocked_out, headshot[victim])
-			_tell_hurt(victim, shooter, origin, result.dealt)
-		if result.knocked_out:
-			_announce_knockout(state.name_of(shooter), state.name_of(victim), weapon.id, headshot[victim])
+		_harm(shooter, victim, damage_to[victim], origin, weapon.id, headshot[victim])
+
+
+## Feet of every player in play other than `except`, by id.
+func _targets_except(except: int) -> Dictionary:
+	var targets := {}
+	for node: Node3D in world.players.get_children():
+		var id := node.name.to_int()
+		var target := state.player(id)
+		if id != except and target != null and target.alive and not node.is_queued_for_deletion():
+			targets[id] = node.global_position
+	return targets
+
+
+## `attacker` hurts `victim` for `amount` with `weapon`, from `from`, and
+## everyone who needs to know is told.
+func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: String, head: bool) -> void:
+	var result := state.damage(attacker, victim, amount)
+	if result.dealt > 0:
+		_changed()
+		_tell_hit(attacker, victim, result.dealt, result.knocked_out, head)
+		_tell_hurt(victim, attacker, from, result.dealt)
+	if result.knocked_out:
+		_announce_knockout(state.name_of(attacker), state.name_of(victim), weapon, head)
+
+
+func _launch(shooter: int, weapon: WeaponStats, origin: Vector3, direction: Vector3) -> void:
+	var projectile := Projectile.new(_next_projectile, shooter, weapon, origin, direction)
+	_next_projectile += 1
+	_projectiles[projectile.id] = projectile
+	_projectile_seen.rpc(projectile.id, weapon.id, origin, projectile.velocity)
+	projectile_launched.emit(projectile.id, weapon.id, origin, projectile.velocity)
+
+
+func _physics_process(delta: float) -> void:
+	if not is_host() or _projectiles.is_empty():
+		return
+	var wall := func(from: Vector3, to: Vector3) -> float:
+		var query := PhysicsRayQueryParameters3D.create(from, to, WORLD_MASK)
+		var hit := world.get_world_3d().direct_space_state.intersect_ray(query)
+		return from.distance_to(hit.position) if not hit.is_empty() else INF
+	for id: int in _projectiles.keys():
+		var projectile: Projectile = _projectiles[id]
+		var burst: Variant = projectile.advance(delta, wall, _targets_except(projectile.shooter))
+		if burst != null:
+			_projectiles.erase(id)
+			_burst(projectile, burst)
+
+
+## A projectile bursts at `at`, hurting and shoving everyone in reach who
+## isn't behind a wall from it. Its shooter is shoved but not hurt.
+func _burst(projectile: Projectile, at: Vector3) -> void:
+	_burst_seen.rpc(projectile.id, projectile.weapon.id, at)
+	projectile_burst.emit(projectile.id, projectile.weapon.id, at)
+	var weapon := projectile.weapon
+	var space := world.get_world_3d().direct_space_state
+	# A burst against a wall is at its face; sight lines are checked from a
+	# hand's width back along the way it came, so the wall itself counts.
+	var eye := at - projectile.velocity.normalized() * 0.1 if projectile.velocity.length() > 0.001 else at
+	for node: Node3D in world.players.get_children():
+		var id := node.name.to_int()
+		var record := state.player(id)
+		if record == null or not record.alive or node.is_queued_for_deletion():
+			continue
+		var middle := node.global_position + Vector3.UP * MIDDLE
+		if at.distance_to(middle) >= weapon.splash_radius:
+			continue
+		var query := PhysicsRayQueryParameters3D.create(eye, middle, WORLD_MASK)
+		if not space.intersect_ray(query).is_empty():
+			continue
+		_tell_push(id, Splash.push(at, middle, weapon.knockback, weapon.splash_radius))
+		if id != projectile.shooter:
+			_harm(projectile.shooter, id, Splash.damage_at(at.distance_to(middle), weapon.splash_damage, weapon.splash_radius), at, weapon.id, false)
+
+
+func _tell_push(id: int, push: Vector3) -> void:
+	if push == Vector3.ZERO:
+		return
+	if id == multiplayer.get_unique_id():
+		_pushed(push)
+	elif multiplayer.get_peers().has(id):
+		_pushed.rpc_id(id, push)
+
+
+## A burst shoved this player. Players move themselves, so the host can only
+## tell them.
+@rpc("authority", "call_remote", "reliable")
+func _pushed(push: Vector3) -> void:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own != null:
+		own.push(push)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _projectile_seen(id: int, weapon: String, from: Vector3, velocity: Vector3) -> void:
+	projectile_launched.emit(id, weapon, from, velocity)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _burst_seen(id: int, weapon: String, at: Vector3) -> void:
+	projectile_burst.emit(id, weapon, at)
 
 
 func _show_shot_to_others(shooter: int, ends: Array) -> void:
@@ -258,11 +371,18 @@ func _distance_to_wall(origin: Vector3, direction: Vector3, max_range: float) ->
 	return origin.distance_to(hit.position) if not hit.is_empty() else max_range
 
 
-func _reload(id: int) -> void:
+func _reload(id: int, weapon_id: String) -> void:
 	var record := state.player(id)
-	var weapon := Weapons.find(record.weapon) if record != null else null
-	if weapon != null:
+	var weapon := Weapons.find(weapon_id)
+	if record != null and weapon != null and record.weapons.has(weapon_id):
 		_rules_for(id).reload(weapon, _clock)
+
+
+func _select(id: int, weapon: String) -> void:
+	var record := state.player(id)
+	if record != null and record.weapons.has(weapon) and record.weapon != weapon:
+		record.weapon = weapon
+		_changed()
 
 
 ## The host brings a knocked-out player back, at the spot farthest from the
@@ -310,15 +430,21 @@ func _respawned(at: Vector3) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _request_shot(origin: Variant, direction: Variant, seed: Variant) -> void:
-	if is_host() and origin is Vector3 and direction is Vector3 and seed is int:
-		_shot(multiplayer.get_remote_sender_id(), origin, direction, seed)
+func _request_shot(origin: Variant, direction: Variant, seed: Variant, weapon: Variant) -> void:
+	if is_host() and origin is Vector3 and direction is Vector3 and seed is int and weapon is String:
+		_shot(multiplayer.get_remote_sender_id(), origin, direction, seed, weapon)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _request_reload() -> void:
-	if is_host():
-		_reload(multiplayer.get_remote_sender_id())
+func _request_reload(weapon: Variant) -> void:
+	if is_host() and weapon is String:
+		_reload(multiplayer.get_remote_sender_id(), weapon)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_select(weapon: Variant) -> void:
+	if is_host() and weapon is String:
+		_select(multiplayer.get_remote_sender_id(), weapon)
 
 
 @rpc("any_peer", "call_remote", "reliable")

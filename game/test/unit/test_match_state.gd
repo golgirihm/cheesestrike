@@ -199,3 +199,29 @@ func test_health_and_score_survive_the_trip_to_other_players() -> void:
 	assert_eq(copy.player(2).deaths, 1)
 	assert_eq(copy.player(2).last_attacker, 1)
 	assert_almost_eq(copy.player(2).respawn_in, MatchState.RESPAWN_DELAY, 0.001)
+
+
+func test_a_new_player_carries_only_the_starting_weapon() -> void:
+	assert_eq(state.add_player(5).weapons, [Weapons.STARTING])
+
+
+func test_being_knocked_out_loses_picked_up_weapons() -> void:
+	state.add_player(1)
+	var record := state.add_player(2)
+	record.weapons = ["blaster", "launcher"]
+	record.weapon = "launcher"
+	state.damage(1, 2, 500.0)
+	assert_eq(record.weapons, [Weapons.STARTING])
+	assert_eq(record.weapon, Weapons.STARTING)
+
+
+func test_carried_weapons_survive_the_trip_and_nonsense_is_dropped() -> void:
+	var record := state.add_player(2)
+	record.weapons = ["blaster", "grater"]
+	record.weapon = "grater"
+	var copy := MatchState.from_dict(bytes_to_var(var_to_bytes(state.to_dict()))).player(2)
+	assert_eq(copy.weapons, ["blaster", "grater"])
+	assert_eq(copy.weapon, "grater")
+	var odd := PlayerRecord.from_dict({"id": 3, "weapons": ["spoon", 4], "weapon": "spoon"})
+	assert_eq(odd.weapons, [Weapons.STARTING])
+	assert_eq(odd.weapon, Weapons.STARTING)

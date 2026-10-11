@@ -113,3 +113,53 @@ func test_every_weapon_is_listed_under_its_own_id() -> void:
 func test_an_unknown_weapon_is_not_found() -> void:
 	assert_null(Weapons.find("banana"))
 	assert_null(Weapons.find(7))
+
+
+func test_the_weapons_come_in_their_number_key_order() -> void:
+	assert_eq(Weapons.ids(), ["blaster", "shotgun", "grater", "launcher"])
+
+
+func test_each_weapon_is_set_up_sensibly() -> void:
+	for id: String in Weapons.ids():
+		var stats := Weapons.find(id)
+		assert_gt(stats.magazine, 0, id)
+		assert_gt(stats.fire_interval, 0.0, id)
+		assert_gt(stats.reload_time, 0.0, id)
+		if stats.fires_projectile():
+			assert_gt(stats.splash_damage, 0.0, id)
+			assert_gt(stats.splash_radius, 0.0, id)
+			assert_gt(stats.fuse, 0.0, id)
+		else:
+			assert_gt(stats.damage * stats.pellets, 0.0, id)
+			assert_gt(stats.max_range, 0.0, id)
+
+
+func test_the_shotgun_needs_more_than_one_close_blast_but_not_many() -> void:
+	var shotgun := Weapons.find("shotgun")
+	var all_pellets := shotgun.damage * shotgun.pellets
+	assert_lt(all_pellets, PlayerRecord.MAX_HEALTH)
+	assert_gt(all_pellets * 2.0, PlayerRecord.MAX_HEALTH)
+
+
+func test_stepping_through_weapons_goes_in_order_and_comes_round() -> void:
+	var carried := ["launcher", "blaster", "shotgun"]
+	assert_eq(Weapons.cycle(carried, "blaster"), "shotgun")
+	assert_eq(Weapons.cycle(carried, "shotgun"), "launcher")
+	assert_eq(Weapons.cycle(carried, "launcher"), "blaster")
+	assert_eq(Weapons.cycle(carried, "blaster", -1), "launcher")
+
+
+func test_stepping_with_one_weapon_stays_put() -> void:
+	assert_eq(Weapons.cycle(["blaster"], "blaster"), "blaster")
+
+
+func test_stepping_from_a_weapon_not_carried_gives_the_first() -> void:
+	assert_eq(Weapons.cycle(["shotgun", "grater"], "blaster"), "shotgun")
+
+
+func test_every_weapon_has_a_model_with_a_muzzle() -> void:
+	for id: String in Weapons.ids():
+		var model := WeaponModels.build(id)
+		assert_not_null(model.get_node_or_null("Muzzle"), id)
+		assert_lt(model.get_node("Muzzle").position.z, 0.0, "%s points forward" % id)
+		model.free()

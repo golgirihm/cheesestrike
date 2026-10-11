@@ -20,12 +20,20 @@ var deaths := 0
 var last_attacker := 0
 ## The weapon in their hands.
 var weapon := Weapons.STARTING
+## Every weapon they carry. Picked-up weapons are lost on being knocked out.
+var weapons: Array = [Weapons.STARTING]
 ## Their team in a team match, or MatchState.NO_TEAM.
 var team := -1
 
 
 func _init(player_id := 0) -> void:
 	id = player_id
+
+
+## Back to only the starting weapon, as after being knocked out.
+func disarm() -> void:
+	weapons = [Weapons.STARTING]
+	weapon = Weapons.STARTING
 
 
 func is_protected() -> bool:
@@ -44,6 +52,7 @@ func to_dict() -> Dictionary:
 		"deaths": deaths,
 		"last_attacker": last_attacker,
 		"weapon": weapon,
+		"weapons": weapons,
 		"team": team,
 	}
 
@@ -62,6 +71,13 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.last_attacker = _int(data, "last_attacker", record.last_attacker)
 	record.weapon = _string(data, "weapon", record.weapon)
 	record.team = clampi(_int(data, "team", record.team), -1, 1)
+	var carried: Variant = data.get("weapons")
+	if carried is Array:
+		record.weapons = carried.filter(func(id: Variant) -> bool: return Weapons.find(id) != null)
+		if record.weapons.is_empty():
+			record.weapons = [Weapons.STARTING]
+	if not record.weapons.has(record.weapon):
+		record.weapon = record.weapons[0]
 	return record
 
 

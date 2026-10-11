@@ -18,6 +18,8 @@ var _spawn_slots: SpawnSlots
 func _ready() -> void:
 	spawner.spawn_function = _create_player
 	match_.shot_shown.connect(_show_others_shot)
+	match_.projectile_launched.connect(effects.launch_projectile)
+	match_.projectile_burst.connect(effects.burst_projectile)
 
 
 ## Begins the session. `settings` are the host's choice, and only used there.
@@ -65,6 +67,10 @@ const SHOT_VIEW_MASK := 3
 ## hear from the host where it went.
 func _show_own_shot(origin: Vector3, direction: Vector3, seed: int, player: Node3D) -> void:
 	var weapon: WeaponStats = player.weapon.stats
+	if weapon.fires_projectile():
+		# The projectile itself shows once the host launches it.
+		effects.show_shot(player.muzzle.global_position, [])
+		return
 	var space := get_world_3d().direct_space_state
 	var ends := []
 	for pellet in HitScan.pellet_directions(direction, weapon.pellets, weapon.spread_degrees, seed):

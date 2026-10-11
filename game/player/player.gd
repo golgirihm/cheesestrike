@@ -24,7 +24,8 @@ const PITCH_LIMIT := deg_to_rad(85.0)
 @onready var body: MeshInstance3D = $Body
 @onready var visor: MeshInstance3D = $Head/Visor
 @onready var gun: Node3D = $Head/Gun
-@onready var muzzle: Node3D = $Head/Gun/Muzzle
+## Where this player's shots leave from: the muzzle of the weapon in hand.
+var muzzle: Node3D
 @onready var name_tag: Label3D = $NameTag
 @onready var collider: CollisionShape3D = $CollisionShape3D
 
@@ -46,12 +47,29 @@ var spawn_position := Vector3.ZERO
 ## The world's Match node, set with spawn_position.
 var match_: Node
 
+## Seconds a weapon takes to come up after switching to it.
+const SWITCH_TIME := 0.35
+## How quickly a shove from a burst dies away, on the ground and in the air.
+const KNOCKBACK_GROUND_DECAY := 6.0
+const KNOCKBACK_AIR_DECAY := 0.8
+
 ## The weapon in this player's hands. Only the owner fires it.
 var weapon := WeaponState.new(Weapons.find(Weapons.STARTING))
+## Every weapon this player carries, by id. Kept by the owner, who learns from
+## the host which they have.
+var arsenal := {Weapons.STARTING: weapon}
 ## Whether the host has this player in play, as opposed to knocked out.
 var alive := true
 
 var _mouse_fire_held := false
+# The sideways part of a shove from a burst, which dies away; the owner's own
+# movement is added to it.
+var _knockback := Vector3.ZERO
+# A weapon change asked for since the last physics frame: a step through the
+# carried weapons, or a weapon by id.
+var _switch_step := 0
+var _switch_to := ""
+var _shown_weapon := ""
 var _body_material: StandardMaterial3D
 var _team := -2
 var _badge: MeshInstance3D
@@ -82,6 +100,7 @@ func _ready() -> void:
 		camera.make_current()
 		global_position = spawn_position
 		_face_middle()
+	_show_weapon(Weapons.STARTING)
 	if match_ != null:
 		match_.state_changed.connect(_on_match_state_changed)
 		_on_match_state_changed()
@@ -97,8 +116,40 @@ func respawn_at(at: Vector3) -> void:
 	global_position = at
 	velocity = Vector3.ZERO
 	head.rotation.x = 0.0
+	_knockback = Vector3.ZERO
 	_face_middle()
-	weapon.refill()
+	for carried: WeaponState in arsenal.values():
+		carried.refill()
+
+
+## A burst shoved this player.
+func push(impulse: Vector3) -> void:
+	velocity.y += impulse.y
+	_knockback += Vector3(impulse.x, 0.0, impulse.z)
+
+
+## Takes the weapon `id` in hand, if carried. The owner tells the host, so that
+## others see it.
+func equip(id: String) -> void:
+	if not arsenal.has(id) or weapon.stats.id == id:
+		return
+	weapon.reload_left = 0.0
+	weapon = arsenal[id]
+	weapon.cooldown = maxf(weapon.cooldown, SWITCH_TIME)
+	_show_weapon(id)
+	if _mine and match_ != null:
+		match_.select_weapon(id)
+
+
+func _show_weapon(id: String) -> void:
+	if id == _shown_weapon:
+		return
+	_shown_weapon = id
+	for child in gun.get_children():
+		child.queue_free()
+	var model := WeaponModels.build(id)
+	gun.add_child(model)
+	muzzle = model.get_node("Muzzle")
 
 
 func _face_middle() -> void:
@@ -111,6 +162,31 @@ func _on_match_state_changed() -> void:
 	name_tag.text = match_.state.name_of(name.to_int())
 	_set_alive(own == null or own.alive)
 	_show_team(own.team if own != null else MatchState.NO_TEAM)
+	if own == null:
+		return
+	if _mine:
+		_carry(own.weapons)
+	else:
+		_show_weapon(own.weapon)
+
+
+# Brings the owner's weapons in line with what the host says they carry: a new
+# one is taken in hand at once, and a lost one is put away.
+func _carry(carried: Array) -> void:
+	var picked_up := ""
+	for id: String in carried:
+		if not arsenal.has(id) and Weapons.find(id) != null:
+			arsenal[id] = WeaponState.new(Weapons.find(id))
+			picked_up = id
+	for id: String in arsenal.keys():
+		if not carried.has(id):
+			arsenal.erase(id)
+	if not picked_up.is_empty():
+		equip(picked_up)
+	elif not arsenal.has(weapon.stats.id):
+		weapon = arsenal.get(Weapons.STARTING, WeaponState.new(Weapons.find(Weapons.STARTING)))
+		arsenal[Weapons.STARTING] = weapon
+		_show_weapon(Weapons.STARTING)
 
 
 ## A player's own colour when not on a team: spread round the colour wheel by id.
@@ -171,6 +247,13 @@ func _set_alive(now_alive: bool) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# Before the rest, as the mouse wheel's events are mouse buttons.
+	if event.is_action_pressed("weapon_next"):
+		_switch_step += 1
+		return
+	if event.is_action_pressed("weapon_previous"):
+		_switch_step -= 1
+		return
 	if event is InputEventScreenTouch:
 		_handle_touch(event)
 	elif event is InputEventScreenDrag:
@@ -193,6 +276,8 @@ func _input(event: InputEvent) -> void:
 		_mouse_fire_held = false
 	elif event.is_action_pressed("reload"):
 		_reload_pressed = true
+	elif _weapon_key(event) != "":
+		_switch_to = _weapon_key(event)
 	elif event.is_action_pressed("jump"):
 		_jump_pressed = true
 	elif event.is_action_pressed("fire"):
@@ -234,6 +319,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
+# The weapon a number key asks for, or "".
+static func _weapon_key(event: InputEvent) -> String:
+	for index in Weapons.ORDER.size():
+		if event.is_action_pressed("weapon_%d" % (index + 1)):
+			return Weapons.ORDER[index]
+	return ""
+
+
 func _physics_process(delta: float) -> void:
 	if Net.host_silent:
 		return
@@ -266,18 +359,25 @@ func _physics_process(delta: float) -> void:
 
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back") + _move_touch_vector
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y).limit_length(1.0)
-	velocity.x = direction.x * SPEED
-	velocity.z = direction.z * SPEED
+	_knockback *= exp(-(KNOCKBACK_GROUND_DECAY if is_on_floor() else KNOCKBACK_AIR_DECAY) * delta)
+	velocity.x = direction.x * SPEED + _knockback.x
+	velocity.z = direction.z * SPEED + _knockback.z
 	move_and_slide()
 
 	_use_weapon()
 
 
 func _use_weapon() -> void:
+	if _switch_step != 0:
+		equip(Weapons.cycle(arsenal.keys(), weapon.stats.id, signi(_switch_step)))
+	elif not _switch_to.is_empty():
+		equip(_switch_to)
+	_switch_step = 0
+	_switch_to = ""
 	if _reload_pressed:
 		_reload_pressed = false
 		if weapon.start_reload():
-			match_.reload()
+			match_.reload(weapon.stats.id)
 	var held := Input.is_action_pressed("fire") or _mouse_fire_held or _button_touches.values().has("fire")
 	var wants := _fire_pressed or (held and weapon.stats.automatic)
 	# A press waits for the weapon to be ready, unless it is empty.
@@ -287,11 +387,11 @@ func _use_weapon() -> void:
 		var origin := camera.global_position
 		var direction := -camera.global_basis.z
 		var seed := randi()
-		match_.fire(origin, direction, seed)
+		match_.fire(origin, direction, seed, weapon.stats.id)
 		fired.emit(origin, direction, seed)
 		# Firing the last round starts the reload by itself.
 		if weapon.is_reloading():
-			match_.reload()
+			match_.reload(weapon.stats.id)
 
 
 func _exit_tree() -> void:
@@ -327,6 +427,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		var button: String = controls.button_at(event.position) if controls != null else ""
 		if button == "reload":
 			_reload_pressed = true
+		elif button == "swap":
+			_switch_step += 1
 		elif not button.is_empty():
 			_button_touches[event.index] = button
 			_fire_pressed = _fire_pressed or button == "fire"
