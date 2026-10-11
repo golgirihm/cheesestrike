@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://world/world.tscn" id="2_world"]
 [ext_resource type="Script" path="res://ui/spinner.gd" id="3_spinner"]
 [ext_resource type="Script" path="res://ui/touch_controls.gd" id="4_touch"]
 [ext_resource type="Script" path="res://ui/combat_hud.gd" id="5_combat_hud"]
+[ext_resource type="Script" path="res://ui/settings_menu.gd" id="6_settings"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -91,11 +92,21 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 
-[node name="HostButton" type="Button" parent="UI/Menu/Panel/Margin/Rows"]
+[node name="HostRow" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
+layout_mode = 2
+
+[node name="HostButton" type="Button" parent="UI/Menu/Panel/Margin/Rows/HostRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
+size_flags_horizontal = 3
 text = "Host a session"
+
+[node name="SettingsButton" type="Button" parent="UI/Menu/Panel/Margin/Rows/HostRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 44)
+layout_mode = 2
+text = "Settings"
 
 [node name="JoinRow" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
 layout_mode = 2
@@ -225,11 +236,27 @@ custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Resume"
 
+[node name="PauseSettingsButton" type="Button" parent="UI/PauseMenu/Panel/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Settings"
+
 [node name="MenuLeaveButton" type="Button" parent="UI/PauseMenu/Panel/Margin/Rows"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Leave session"
+
+[node name="SettingsMenu" type="CenterContainer" parent="UI"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("6_settings")
 
 [node name="WaitingNotice" type="CenterContainer" parent="UI"]
 unique_name_in_owner = true

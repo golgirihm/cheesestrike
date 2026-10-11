@@ -38,6 +38,15 @@ func _ready() -> void:
 	add_child(sound_cues)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
+	apply_quality()
+	Settings.changed.connect(func(key: String) -> void:
+		if key == "quality":
+			apply_quality())
+
+
+## Puts the chosen graphics quality into effect.
+func apply_quality() -> void:
+	GraphicsQuality.apply(GraphicsQuality.level(Settings.get_value("quality")), get_viewport(), $Sun)
 
 
 ## Replaces the arena with map `id`, unless it is already loaded.

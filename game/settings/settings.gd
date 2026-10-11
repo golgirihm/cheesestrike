@@ -18,6 +18,36 @@ const DEFAULTS := {
 	"host_minutes": 8,
 	"host_max_players": MatchSettings.MAX_PLAYERS,
 	"host_map": Maps.DEFAULT,
+	# How fast looking turns, as a share of the usual, for each kind of control.
+	"mouse_sensitivity": 1.0,
+	"stick_sensitivity": 1.0,
+	"touch_sensitivity": 1.0,
+	"invert_look": false,
+	"fov": 75.0,
+	# Loudness from 0 (silent) to 1.
+	"master_volume": 0.8,
+	"music_volume": 0.6,
+	"effects_volume": 0.8,
+	# "low", "medium" or "high"; "" until first chosen, when it depends on the
+	# device (see GraphicsQuality).
+	"quality": "",
+	# Keys chosen for actions, by action: physical key codes.
+	"bindings": {},
+}
+
+## The allowed range of each number setting. A value outside is brought in.
+const RANGES := {
+	"mouse_sensitivity": [0.1, 4.0],
+	"stick_sensitivity": [0.1, 4.0],
+	"touch_sensitivity": [0.1, 4.0],
+	"fov": [60.0, 110.0],
+	"master_volume": [0.0, 1.0],
+	"music_volume": [0.0, 1.0],
+	"effects_volume": [0.0, 1.0],
+}
+## The allowed choices of a setting that is one of a few.
+const CHOICES := {
+	"quality": ["", "low", "medium", "high"],
 }
 
 ## Where the settings are kept. Tests point their own instances elsewhere.
@@ -39,14 +69,16 @@ func load_settings() -> void:
 			if not file.has_section_key(SECTION, key):
 				continue
 			var stored: Variant = file.get_value(SECTION, key)
-			if _same_type(stored, DEFAULTS[key]):
-				_values[key] = type_convert(stored, typeof(DEFAULTS[key]))
+			if _same_type(stored, DEFAULTS[key]) and _allowed(key, stored):
+				_values[key] = _within(key, type_convert(stored, typeof(DEFAULTS[key])))
 	if PlayerName.clean(_values.name).is_empty():
 		set_value("name", PlayerName.random_default())
 
 
 func get_value(key: String) -> Variant:
-	return _values[key]
+	var value: Variant = _values[key]
+	# A copy, so that changing it means setting it.
+	return value.duplicate() if value is Dictionary else value
 
 
 ## Stores `value` for `key` and saves. Unknown keys and values of the wrong
@@ -58,7 +90,10 @@ func set_value(key: String, value: Variant) -> void:
 	if not _same_type(value, DEFAULTS[key]):
 		push_error("setting %s takes a %s, not %s" % [key, type_string(typeof(DEFAULTS[key])), value])
 		return
-	value = type_convert(value, typeof(DEFAULTS[key]))
+	if not _allowed(key, value):
+		push_error("setting %s can't be %s" % [key, value])
+		return
+	value = _within(key, type_convert(value, typeof(DEFAULTS[key])))
 	if _values[key] == value:
 		return
 	_values[key] = value
@@ -71,6 +106,16 @@ func _save() -> void:
 	for key: String in _values:
 		file.set_value(SECTION, key, _values[key])
 	file.save(path)
+
+
+static func _allowed(key: String, value: Variant) -> bool:
+	return not CHOICES.has(key) or CHOICES[key].has(value)
+
+
+static func _within(key: String, value: Variant) -> Variant:
+	if RANGES.has(key) and (value is float or value is int):
+		return clampf(value, RANGES[key][0], RANGES[key][1])
+	return value
 
 
 # Whole numbers are accepted for decimal settings, as a file written by hand

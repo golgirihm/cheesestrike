@@ -9,6 +9,8 @@ signal played(name: String, at: Variant)
 
 const MUSIC_BUS := "Music"
 const EFFECTS_BUS := "Effects"
+## Each volume setting, and the bus it sets.
+const VOLUME_SETTINGS := {"master_volume": "Master", "music_volume": MUSIC_BUS, "effects_volume": EFFECTS_BUS}
 ## Most sounds in the arena at once; beyond that the oldest is cut short.
 const MAX_VOICES := 24
 
@@ -20,7 +22,24 @@ var _voices: Array[AudioStreamPlayer3D] = []
 var _flat_voices: Array[AudioStreamPlayer] = []
 
 
+## Bus loudness, in decibels, for a setting from 0 (silent) to 1.
+static func volume_db(level: float) -> float:
+	return -80.0 if level <= 0.001 else linear_to_db(level)
+
+
+## Sets each bus to the player's chosen loudness.
+func apply_volumes() -> void:
+	for setting: String in VOLUME_SETTINGS:
+		var bus := AudioServer.get_bus_index(VOLUME_SETTINGS[setting])
+		if bus != -1:
+			AudioServer.set_bus_volume_db(bus, volume_db(Settings.get_value(setting)))
+
+
 func _ready() -> void:
+	apply_volumes()
+	Settings.changed.connect(func(key: String) -> void:
+		if VOLUME_SETTINGS.has(key):
+			apply_volumes())
 	_music = AudioStreamPlayer.new()
 	_music.bus = MUSIC_BUS
 	_music.volume_db = -8.0
