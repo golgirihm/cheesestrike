@@ -21,8 +21,8 @@ const PITCH_LIMIT := deg_to_rad(85.0)
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
-@onready var body: MeshInstance3D = $Body
-@onready var visor: MeshInstance3D = $Head/Visor
+@onready var body: Node3D = $Body
+@onready var visor: Node3D = $Head/Visor
 @onready var gun: Node3D = $Head/Gun
 ## Where this player's shots leave from: the muzzle of the weapon in hand.
 var muzzle: Node3D
@@ -71,8 +71,15 @@ var _knockback := Vector3.ZERO
 var _switch_step := 0
 var _switch_to := ""
 var _shown_weapon := ""
-var _body_material: StandardMaterial3D
 var _base_colour := Color.WHITE
+# For animating others: where this player was last frame, and how fast they
+# have been moving across the ground, smoothed.
+var _last_position := Vector3.ZERO
+var _ground_speed := 0.0
+# Recoil, from 1 just after a shot to 0 at rest, and where the weapon rests.
+var _kick := 0.0
+var _gun_rest := Vector3.ZERO
+var _bob_phase := 0.0
 var _team := -2
 var _badge: MeshInstance3D
 # Presses noted as their events arrive, so that a click or tap that begins and
@@ -87,22 +94,31 @@ func _enter_tree() -> void:
 	set_multiplayer_authority(name.to_int())
 
 
+## Where the weapon sits in this player's own view, and how big: smaller and
+## further out than in their hand as others see it, so it doesn't fill the screen.
+const VIEW_GUN_POSITION := Vector3(0.2, -0.19, -0.55)
+const VIEW_GUN_SCALE := 0.6
+
+
 func _ready() -> void:
-	_body_material = StandardMaterial3D.new()
-	body.material_override = _body_material
+	if is_multiplayer_authority():
+		gun.position = VIEW_GUN_POSITION
+		gun.scale = Vector3.ONE * VIEW_GUN_SCALE
+	_gun_rest = gun.position
 	_show_team(MatchState.NO_TEAM)
 
 	_mine = is_multiplayer_authority()
 	set_physics_process(_mine)
 	set_process_input(_mine)
 	set_process_unhandled_input(_mine)
-	body.visible = not _mine
+	body.shown = not _mine
 	visor.visible = not _mine
 	name_tag.visible = not _mine
 	# Everyone places a new character at its spot: until its owner's first
 	# update arrives, it would otherwise stand in the middle of the arena, and
 	# could collect what lies there.
 	global_position = spawn_position
+	_last_position = spawn_position
 	_face_middle()
 	if _mine:
 		camera.make_current()
@@ -200,11 +216,8 @@ func _carry(carried: Array) -> void:
 func _show_overload(own: PlayerRecord) -> void:
 	var glowing := own != null and own.overload_left > 0.0
 	var melted := own != null and own.melted_for > 0.0
-	_body_material.emission_enabled = glowing
-	_body_material.emission = Color(1.0, 0.55, 0.1)
-	_body_material.emission_energy_multiplier = 1.2
-	body.scale = Vector3(1.1, 0.85, 1.1) if melted else Vector3.ONE
-	_body_material.albedo_color = _base_colour.darkened(0.35) if melted else _base_colour
+	body.set_glow(glowing)
+	body.set_colour(_base_colour.darkened(0.35) if melted else _base_colour)
 
 
 ## A player's own colour when not on a team: spread round the colour wheel by id.
@@ -219,7 +232,7 @@ func _show_team(team: int) -> void:
 		return
 	_team = team
 	_base_colour = TeamColors.of(team) if team != MatchState.NO_TEAM else colour_for(name.to_int())
-	_body_material.albedo_color = _base_colour
+	body.set_colour(_base_colour)
 	name_tag.modulate = TeamColors.of(team)
 	if _badge != null:
 		_badge.queue_free()
@@ -255,7 +268,8 @@ func _set_alive(now_alive: bool) -> void:
 	alive = now_alive
 	collider.set_deferred("disabled", not alive)
 	if not _mine:
-		body.visible = alive
+		# The body melts away, and hides itself once melted.
+		body.set_in_play(alive)
 		visor.visible = alive
 		name_tag.visible = alive
 		if _badge != null:
@@ -305,6 +319,28 @@ func _input(event: InputEvent) -> void:
 		_fire_pressed = true
 
 
+# Recoil and, for this machine's own player, the weapon bobbing with each
+# step; for everyone else's, their body walking.
+func _animate(delta: float) -> void:
+	_kick = maxf(_kick - delta * 8.0, 0.0)
+	var bob := Vector3.ZERO
+	if _mine:
+		var across := Vector2(velocity.x, velocity.z).length()
+		if is_on_floor() and across > 0.5:
+			_bob_phase = fmod(_bob_phase + across * delta * 1.8, TAU)
+			bob = Vector3(sin(_bob_phase) * 0.012, absf(cos(_bob_phase)) * 0.012, 0.0)
+	else:
+		var moved := global_position - _last_position
+		_last_position = global_position
+		if delta > 0.0:
+			var speed := Vector2(moved.x, moved.z).length() / delta
+			# Updates arrive in steps, so smooth the speed they give.
+			_ground_speed = lerpf(_ground_speed, minf(speed, 12.0), minf(delta * 10.0, 1.0))
+			body.set_motion(_ground_speed, absf(moved.y) / delta > 0.5)
+	gun.position = _gun_rest + bob + Vector3(0.0, 0.01, 0.07) * _kick
+	gun.rotation.x = 0.18 * _kick
+
+
 ## A mouse movement measured in the page's pixels, as the browser reports it,
 ## in the game's own interface pixels, which is what the engine reports
 ## natively, so that the mouse feels the same either way. `view` is the size of
@@ -316,7 +352,13 @@ static func page_to_view(movement: Vector2, view: Vector2, window: Vector2, pixe
 	return movement * pixel_ratio * view.x / window.x
 
 
-func _process(_delta: float) -> void:
+## A shot just left this player's weapon: it kicks back.
+func kick() -> void:
+	_kick = 1.0
+
+
+func _process(delta: float) -> void:
+	_animate(delta)
 	if OS.has_feature("web") and _mine:
 		var moved := WebPage.take_mouse_movement()
 		if moved != Vector2.ZERO and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -415,6 +457,7 @@ func _use_weapon() -> void:
 		var direction := -camera.global_basis.z
 		var seed := randi()
 		match_.fire(origin, direction, seed, weapon.stats.id)
+		kick()
 		fired.emit(origin, direction, seed)
 		# Firing the last round starts the reload by itself.
 		if weapon.is_reloading():

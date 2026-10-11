@@ -28,7 +28,7 @@ Setup: two windows; do the steps in either one. Why manual: this is how the cont
 | MOV-02 | Look with the mouse | 1. Click in the game.<br>2. Move the mouse in all directions.<br>3. Press Esc. | After the click the pointer disappears and the view follows the mouse. Looking up and down stops just short of straight up and straight down. Esc brings the pointer back and the view stops following. |
 | MOV-03 | Jump | 1. Press Space while standing.<br>2. Press Space again while in the air. | The character jumps and lands. The second press does nothing until it is back on the ground. |
 | MOV-04 | Solid world | 1. Walk into a wall, then into a cheese block. | The character stops at walls and blocks and can't pass through them or leave the arena. |
-| MOV-05 | Own body hidden | 1. Look straight down and around. | You don't see your own character's body or visor. |
+| MOV-05 | Own body hidden | 1. Look straight down and around. | You don't see your own character's body or eyes, only your weapon and the hand holding it at the lower right, which bobs as you walk and kicks back when you fire. |
 | MOV-06 | Fast mouse look | 1. Click in the game.<br>2. For half a minute, sweep the mouse quickly from side to side and in circles, as in a firefight. | The view always follows the mouse smoothly. It never snaps to an angle the mouse didn't move it to. |
 
 ## Other players
@@ -37,9 +37,10 @@ Setup: two windows. Why manual: this checks what one player sees of another acro
 
 | ID | Test | Steps | Expected |
 |---|---|---|---|
-| PLR-01 | Appearance | 1. Host in A, join in B.<br>2. Turn each view until the other character is visible. | Each sees the other as a colored capsule with a dark visor. The two characters have different colors. |
+| PLR-01 | Appearance | 1. Host in A, join in B.<br>2. Turn each view until the other character is visible. | Each sees the other as an upright wedge of cheese with holes, two eyes, two legs and two arms, holding their weapon. The two characters have different colours. |
+| PLR-06 | Animation | 1. In B, walk, run in circles, jump and fire while A watches; then let A knock B out. | B's legs and arms swing as B walks, faster when moving faster, and stop when B stops. B's legs tuck up in a jump, and B's weapon kicks back with each shot. Knocked out, B sags and spreads into a puddle, then vanishes; on coming back B pops up from the floor. |
 | PLR-02 | Movement is shared | 1. In B, walk and jump while watching window A. | A sees B's character move and jump as B does, without long freezes or jumps in position. |
-| PLR-03 | Facing is shared | 1. In B, turn left and right, then look up and down, while watching window A. | The visor on B's character turns and tilts to match where B is looking. |
+| PLR-03 | Facing is shared | 1. In B, turn left and right, then look up and down, while watching window A. | B's eyes and weapon turn and tilt to match where B is looking. |
 | PLR-04 | Starting spots | 1. Host in A, join in B.<br>2. Before moving, look at where each character is. | The two characters start in different places, each facing the middle of the arena. |
 | PLR-05 | Name tags | 1. Host in A, join in B, each with a different name.<br>2. Turn each view until the other character is visible, then walk away from it. | A name floats above the other character, readable from near and far and through walls, and turns to face you. Your own name is not shown over your own head. |
 

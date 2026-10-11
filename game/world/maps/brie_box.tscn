@@ -231,4 +231,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, 9)
 metadata/kind = "grater"
 
 [node name="MenuCamera" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, -0, -0, 0.843661, 0.536875, 0, -0.536875, 0.843661, 0, 14, 22)
+transform = Transform3D(1, 0, -0, -0, 0.83957, 0.543251, 0, -0.543251, 0.83957, 0, 11, 14)
