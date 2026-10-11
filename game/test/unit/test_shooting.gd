@@ -465,3 +465,14 @@ func test_an_overload_that_is_not_ready_does_nothing() -> void:
 	watch_signals(match_)
 	match_.set_off_overload()
 	assert_signal_not_emitted(match_, "overloaded")
+
+
+func test_a_new_match_forgets_players_who_left() -> void:
+	_add(1, Vector3(0, 0, 5))
+	match_._known_as(2, "tab-a")
+	_add(2, Vector3(0, 0, -5))
+	match_.state.player(2).kills = 3
+	match_.remove_player(2)
+	match_.state.end_match()
+	match_._process(MatchState.INTERMISSION + 0.01)
+	assert_true(match_._departed.is_empty())
