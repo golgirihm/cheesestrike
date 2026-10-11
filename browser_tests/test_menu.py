@@ -44,5 +44,35 @@ class InGameMenuTest(GameTestCase):
         host.wait_for("s.players.length === 1")
 
 
+class ControlsHelpTest(GameTestCase):
+    def test_a_first_session_shows_the_controls_once(self):
+        game = self.open_game("&help")
+        game.click("HostButton")
+        state = game.wait_for("s.screen === 'help'")
+        self.assertIn("Fire: Left mouse button", state["help"])
+        game.click("HelpDone")
+        game.wait_for("s.screen === 'game'")
+        # Shown, the player can play: clicking the game takes the mouse.
+        game.capture_mouse()
+
+        game.press("Escape")
+        game.click("MenuButton")
+        game.click("MenuLeaveButton")
+        game.wait_for("s.screen === 'menu'")
+        game.host()
+        game.page.wait_for_timeout(500)
+        self.assertEqual(game.state()["screen"], "game")
+
+    def test_the_controls_can_be_shown_again_from_the_menu(self):
+        game = self.open_game()
+        game.host()
+        game.click("MenuButton")
+        game.click("HelpButton")
+        state = game.wait_for("s.screen === 'help'")
+        self.assertIn("Menu: Esc", state["help"])
+        game.press("Escape")
+        game.wait_for("s.screen === 'paused'")
+
+
 if __name__ == "__main__":
     unittest.main()

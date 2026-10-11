@@ -8,8 +8,9 @@ var saved := {}
 
 
 func before_each() -> void:
-	for key in ["host_mode", "host_kill_limit", "host_minutes", "host_max_players", "host_map", "host_private"]:
+	for key in ["host_mode", "host_kill_limit", "host_minutes", "host_max_players", "host_map", "host_private", "seen_help", "touch_left_handed", "bindings"]:
 		saved[key] = Settings.get_value(key)
+	Settings.set_value("seen_help", true)
 	main = MAIN.instantiate()
 	add_child_autofree(main)
 	await wait_process_frames(1)
@@ -18,6 +19,7 @@ func before_each() -> void:
 func after_each() -> void:
 	for key: String in saved:
 		Settings.set_value(key, saved[key])
+	Controls.apply(Settings.get_value("bindings"))
 
 
 func test_each_match_button_steps_through_its_choices_and_comes_round() -> void:
@@ -102,6 +104,87 @@ func test_the_menu_closes_when_the_session_ends() -> void:
 	main.open_pause_menu()
 	main._on_session_ended("The host closed the session.")
 	assert_false(main.is_pause_menu_open())
+
+
+func test_the_controls_are_shown_on_entering_a_first_session_only() -> void:
+	Settings.set_value("seen_help", false)
+	main._on_session_started()
+	assert_true(main.controls_help.visible)
+	assert_true(Settings.get_value("seen_help"))
+	(main.controls_help.find_child("HelpDone", true, false) as Button).pressed.emit()
+	assert_false(main.controls_help.visible)
+	main._on_session_ended("")
+	main._on_session_started()
+	assert_false(main.controls_help.visible)
+	main.world.stop()
+
+
+func test_esc_closes_the_controls_without_opening_the_menu() -> void:
+	Settings.set_value("seen_help", false)
+	main._on_session_started()
+	var esc := InputEventAction.new()
+	esc.action = "ui_cancel"
+	esc.pressed = true
+	main.controls_help._input(esc)
+	main._input(esc)
+	assert_false(main.controls_help.visible)
+	main.world.stop()
+
+
+func test_the_controls_from_the_menu_go_back_to_the_menu() -> void:
+	main._on_session_started()
+	main.open_pause_menu()
+	main.help_button.pressed.emit()
+	assert_true(main.controls_help.visible)
+	assert_false(main.is_pause_menu_open())
+	main.controls_help.close()
+	assert_true(main.is_pause_menu_open())
+	main.world.stop()
+
+
+func test_the_controls_close_when_the_session_ends() -> void:
+	main._on_session_started()
+	main.show_help()
+	main._on_session_ended("The host closed the session.")
+	assert_false(main.controls_help.visible)
+
+
+func test_while_the_controls_show_the_player_stands_still() -> void:
+	main._on_session_started()
+	await wait_physics_frames(3)
+	var own: CharacterBody3D = main.world.player_node(1)
+	main.show_help()
+	Input.action_press("move_forward")
+	var start := own.global_position
+	await wait_physics_frames(10)
+	Input.action_release("move_forward")
+	var moved := (own.global_position - start) * Vector3(1, 0, 1)
+	assert_almost_eq(moved.length(), 0.0, 0.01)
+	main.world.stop()
+
+
+func test_the_controls_shown_suit_the_device() -> void:
+	var help: Node = main.controls_help
+	assert_eq(help.device_for(true, 1), help.TOUCH)
+	assert_eq(help.device_for(false, 1), help.GAMEPAD)
+	assert_eq(help.device_for(false, 0), help.KEYBOARD)
+	for device: String in [help.KEYBOARD, help.GAMEPAD, help.TOUCH]:
+		help.open(device)
+		assert_eq(help.shown().size(), help.lines(device).size(), device)
+		assert_eq(help.shown()[0].get_slice(":", 0), "Move", device)
+
+
+func test_the_keyboard_controls_show_the_chosen_keys() -> void:
+	Settings.set_value("bindings", {"jump": KEY_J})
+	Controls.apply(Settings.get_value("bindings"))
+	main.controls_help.open(main.controls_help.KEYBOARD)
+	assert_has(main.controls_help.shown(), "Jump: J")
+
+
+func test_the_touch_controls_follow_the_side_chosen() -> void:
+	Settings.set_value("touch_left_handed", true)
+	main.controls_help.open(main.controls_help.TOUCH)
+	assert_has(main.controls_help.shown(), "Move: Drag on the right half of the screen")
 
 
 func test_while_the_menu_is_open_the_player_stands_still() -> void:

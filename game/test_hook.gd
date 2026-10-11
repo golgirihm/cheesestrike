@@ -11,7 +11,9 @@ extends Node
 ##
 ## Only active in a web build opened with `?test` in the address. The game
 ## then stops drawing, so `?test` is no use for looking at it, unless `&draw`
-## is added too, as for taking screenshots.
+## is added too, as for taking screenshots. Windows start as players who have
+## seen the controls help, so it doesn't cover what a test came to click,
+## unless `&help` is added too.
 
 const PUBLISH_INTERVAL := 0.05
 
@@ -25,6 +27,7 @@ static func wanted() -> bool:
 
 func _init(main: Node) -> void:
 	_main = main
+	Settings.set_value("seen_help", not JavaScriptBridge.eval("new URLSearchParams(location.search).has('help')"))
 
 
 func _ready() -> void:
@@ -81,6 +84,8 @@ func snapshot() -> Dictionary:
 			sessions.append({"text": line.text, "at": _centre(line)})
 
 	var controls := {}
+	if _main.controls_help.visible:
+		controls["HelpDone"] = _centre(_main.controls_help.find_child("HelpDone", true, false))
 	if _main.settings_menu.visible:
 		for control in _main.settings_menu.controls():
 			controls[control.name] = _centre(control)
@@ -105,6 +110,7 @@ func snapshot() -> Dictionary:
 		_main.settings_button,
 		_main.pause_settings_button,
 		_main.copy_link_button,
+		_main.help_button,
 	]:
 		if control.is_visible_in_tree():
 			controls[control.name] = _centre(control)
@@ -120,6 +126,7 @@ func snapshot() -> Dictionary:
 		"hud": _main.hud.text if _main.hud.visible else "",
 		"code": Net.room_code,
 		"copied_link": _main.copied_link,
+		"help": _main.controls_help.shown() if _main.controls_help.visible else [],
 		"address": WebPage.address(),
 		"notice": _main.disconnected_detail.text if _main.disconnected_notice.visible else "",
 		"standings": _main.final_standings.text if _main.disconnected_notice.visible else "",
@@ -158,6 +165,8 @@ func snapshot() -> Dictionary:
 
 
 func _screen() -> String:
+	if _main.controls_help.visible:
+		return "help"
 	if _main.settings_menu.visible:
 		return "settings"
 	if _main.disconnected_notice.visible:

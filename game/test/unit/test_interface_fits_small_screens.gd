@@ -7,7 +7,7 @@ extends GutTest
 const MAIN := preload("res://main.tscn")
 const PANELS := ["UI/Menu/Panel", "UI/WaitingNotice/Panel", "UI/DisconnectedNotice/Panel", "UI/PauseMenu/Panel"]
 # Panels built in code, found under these.
-const BUILT := ["UI/SettingsMenu"]
+const BUILT := ["UI/SettingsMenu", "UI/ControlsHelp"]
 # The longest reason the game gives for a lost session.
 const LONGEST_REASON := "The connection to the host was lost."
 
@@ -24,6 +24,8 @@ func before_each() -> void:
 	main.get_node("%DisconnectedDetail").text = LONGEST_REASON
 	# The most the final standings can say: a result, the teams and five players.
 	main.get_node("%FinalStandings").text = "Draw: Mozzarella 10 and Halloumi 99\nCheddar 50  –  50 Brie" + "\n5. Mozzarella 10  ·  50".repeat(5)
+	# The longest list of controls.
+	main.controls_help.open(main.controls_help.KEYBOARD)
 	await wait_frames(2)
 
 

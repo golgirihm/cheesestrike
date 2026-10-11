@@ -42,6 +42,8 @@ const DEFAULTS := {
 	"touch_size": 1.0,
 	"touch_left_handed": false,
 	"touch_fullscreen": true,
+	# Whether the controls have been shown, as they are on entering a first session.
+	"seen_help": false,
 }
 
 ## The allowed range of each number setting. A value outside is brought in.
