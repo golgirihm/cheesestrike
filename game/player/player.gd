@@ -28,7 +28,6 @@ const PITCH_LIMIT := deg_to_rad(85.0)
 ## How much the view is shaking, from hits and nearby bursts.
 var shake := Shake.new()
 @onready var body: Node3D = $Body
-@onready var visor: Node3D = $Head/Visor
 @onready var gun: Node3D = $Head/Gun
 ## Where this player's shots leave from: the muzzle of the weapon in hand.
 var muzzle: Node3D
@@ -108,6 +107,8 @@ var _bob_phase := 0.0
 const STEP_LENGTH := 1.7
 var _since_step := 0.0
 var _team := -2
+# The health the host last gave for this player, to notice them being hurt.
+var _health := PlayerRecord.MAX_HEALTH
 var _badge: MeshInstance3D
 # Presses noted as their events arrive, so that a click or tap that begins and
 # ends between two physics frames isn't missed.
@@ -154,7 +155,6 @@ func _ready() -> void:
 	set_process_input(_mine)
 	set_process_unhandled_input(_mine)
 	body.shown = not _mine
-	visor.visible = not _mine
 	name_tag.visible = not _mine
 	# Everyone places a new character at its spot: until its owner's first
 	# update arrives, it would otherwise stand in the middle of the arena, and
@@ -260,6 +260,10 @@ func _on_match_state_changed() -> void:
 	_show_overload(own)
 	if own == null:
 		return
+	# Everyone sees a player who has just been hurt wince.
+	if own.alive and own.health < _health:
+		body.grimace()
+	_health = own.health
 	if _mine:
 		_carry(own.weapons)
 	else:
@@ -303,15 +307,15 @@ func _grow() -> void:
 	collider.shape = capsule
 	collider.position = Vector3(0, BodyShape.HEIGHT / 2.0, 0)
 	head.position = Vector3(0, BodyShape.HEAD_HEIGHT * BodyShape.SIZE, 0)
-	visor.position = BodyShape.EYES_OFFSET * BodyShape.SIZE
-	visor.scale = Vector3.ONE * BodyShape.SIZE
 	gun.position *= BodyShape.SIZE
 	gun.scale = Vector3.ONE * BodyShape.SIZE
 	name_tag.position *= BodyShape.SIZE
 
 
 static func colour_for(id: int) -> Color:
-	return Color.from_hsv(fmod(id * 0.618034, 1.0), 0.65, 0.95)
+	# Never yellow, which is kept for cheese that can be eaten: the hues run
+	# from green round through blue and red to orange.
+	return Color.from_hsv(fmod(0.22 + 0.86 * fmod(id * 0.618034, 1.0), 1.0), 0.65, 0.95)
 
 
 # Team colours on the body and name, and a badge over the head whose shape
@@ -360,7 +364,6 @@ func _set_alive(now_alive: bool) -> void:
 	if not _mine:
 		# The body melts away, and hides itself once melted.
 		body.set_in_play(alive)
-		visor.visible = alive
 		name_tag.visible = alive
 		if _badge != null:
 			_badge.visible = alive
@@ -438,10 +441,14 @@ func _animate(delta: float) -> void:
 			body.set_motion(_ground_speed, airborne)
 			if alive and not airborne and _ground_speed > 0.5:
 				_step(_ground_speed * delta, global_position)
+		body.set_gaze(head.rotation.x)
 	# A weapon just changed to swings up from below.
 	var lowered := switch_lowering(_switch_left)
 	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + Vector3(0.0, -0.5, 0.1) * lowered * gun.scale.x
 	gun.rotation = Vector3(0.18 * _kick - 1.1 * lowered, 0.0, 0.5 * lowered)
+	if not _mine and muzzle != null:
+		# Their weapon arm follows the hand on the weapon.
+		body.reach_for(body.to_local(muzzle.get_parent().to_global(WeaponModels.GRIP)))
 
 
 ## How far down a weapon changed to `left` seconds short of SWITCH_TIME ago

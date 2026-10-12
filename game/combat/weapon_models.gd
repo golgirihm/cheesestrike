@@ -1,15 +1,25 @@
 class_name WeaponModels
-## What each weapon looks like in a player's hands, built from simple shapes.
-## Each model has a "Muzzle" marker where its shots leave from, and points
-## along -Z like the camera.
+## What each weapon looks like in a player's hands, built from rounded
+## shapes. Each model has a "Muzzle" marker where its shots leave from, and
+## points along -Z like the camera.
+##
+## Yellow is kept for cheese that can be eaten, so the weapons are steel,
+## wood and wax, each with a colour of its own to tell it by.
 
-const CHEDDAR := Color(1.0, 0.62, 0.15)
-const SWISS := Color(0.98, 0.9, 0.55)
-const PARMESAN := Color(0.93, 0.88, 0.72)
-const GOUDA := Color(0.95, 0.75, 0.2)
-const RIND := Color(0.75, 0.12, 0.1)
-const METAL := Color(0.62, 0.65, 0.7)
-const DARK := Color(0.12, 0.12, 0.15)
+const STEEL := Color(0.58, 0.61, 0.66)
+const GUNMETAL := Color(0.2, 0.22, 0.26)
+const DARK := Color(0.1, 0.1, 0.12)
+const WOOD := Color(0.47, 0.29, 0.16)
+const TEAL := Color(0.13, 0.5, 0.55)
+const PURPLE := Color(0.45, 0.3, 0.62)
+## The red wax a Gouda comes wrapped in.
+const WAX := Color(0.75, 0.12, 0.1)
+## The mitten of the hand holding the weapon.
+const HAND := Color(0.1, 0.09, 0.09)
+## Where the hand holds every weapon, from the model's middle.
+const GRIP := Vector3(0.0, -0.09, 0.12)
+
+static var _materials := {}
 
 
 static func build(id: String) -> Node3D:
@@ -17,41 +27,48 @@ static func build(id: String) -> Node3D:
 	model.name = "Model"
 	var muzzle_z := -0.47
 	match id:
-		"shotgun":
-			_box(model, Vector3(0.16, 0.14, 0.5), Vector3.ZERO, SWISS)
-			# The holes, of course.
-			for hole in [Vector3(0.081, 0.02, -0.1), Vector3(0.081, -0.03, 0.08), Vector3(-0.081, 0.0, -0.02)]:
-				_sphere(model, 0.035, hole, DARK)
-			_box(model, Vector3(0.07, 0.07, 0.2), Vector3(0.0, 0.02, -0.33), DARK)
-			muzzle_z = -0.334
-		"grater":
-			_box(model, Vector3(0.12, 0.16, 0.42), Vector3.ZERO, METAL)
-			for row in 4:
-				_box(model, Vector3(0.125, 0.012, 0.3), Vector3(0.0, -0.05 + row * 0.03, 0.0), DARK)
-			_box(model, Vector3(0.09, 0.07, 0.12), Vector3(0.0, -0.1, 0.12), PARMESAN)
-			muzzle_z = -0.24
-		"launcher":
-			var tube := CylinderMesh.new()
-			tube.top_radius = 0.085
-			tube.bottom_radius = 0.085
-			tube.height = 0.52
-			tube.material = _material(RIND)
-			var barrel := MeshInstance3D.new()
-			barrel.mesh = tube
-			barrel.rotation.x = PI / 2.0
-			barrel.position = Vector3(0, 0.02, -0.05)
-			model.add_child(barrel)
-			_box(model, Vector3(0.08, 0.16, 0.12), Vector3(0.0, -0.12, 0.08), GOUDA)
-			muzzle_z = -0.33
 		"pistol":
-			_box(model, Vector3(0.07, 0.09, 0.26), Vector3(0.0, 0.0, -0.05), PARMESAN)
-			_box(model, Vector3(0.06, 0.14, 0.08), Vector3(0.0, -0.09, 0.04), DARK)
-			muzzle_z = -0.19
+			# A slide over a short grip.
+			_box(model, Vector3(0.07, 0.085, 0.27), Vector3(0.0, 0.0, -0.04), STEEL)
+			_box(model, Vector3(0.06, 0.15, 0.085), Vector3(0.0, -0.09, 0.05), GUNMETAL)
+			_box(model, Vector3(0.03, 0.03, 0.05), Vector3(0.0, 0.045, 0.06), DARK)
+			muzzle_z = -0.18
+		"shotgun":
+			# Two barrels on a wooden stock.
+			_box(model, Vector3(0.11, 0.11, 0.3), Vector3(0.0, -0.01, 0.1), WOOD)
+			_box(model, Vector3(0.1, 0.07, 0.16), Vector3(0.0, -0.045, -0.12), WOOD)
+			for side in [-1.0, 1.0]:
+				_tube(model, 0.03, 0.44, Vector3(0.029 * side, 0.02, -0.14), GUNMETAL)
+			muzzle_z = -0.36
+		"grater":
+			# A boxy grater with rows of slots down each side.
+			_box(model, Vector3(0.12, 0.16, 0.42), Vector3.ZERO, STEEL)
+			for row in 4:
+				_box(model, Vector3(0.128, 0.014, 0.3), Vector3(0.0, -0.05 + row * 0.03, 0.0), DARK, 0.004)
+			_box(model, Vector3(0.09, 0.08, 0.12), Vector3(0.0, -0.1, 0.12), PURPLE)
+			muzzle_z = -0.22
+		"launcher":
+			# A fat tube, wide at the mouth.
+			_tube(model, 0.085, 0.52, Vector3(0, 0.02, -0.05), WAX)
+			_tube(model, 0.1, 0.07, Vector3(0, 0.02, -0.29), GUNMETAL)
+			_tube(model, 0.07, 0.03, Vector3(0, 0.02, -0.315), DARK)
+			_box(model, Vector3(0.07, 0.16, 0.1), Vector3(0.0, -0.11, 0.08), GUNMETAL)
+			muzzle_z = -0.33
 		_:
-			_box(model, Vector3(0.1, 0.12, 0.55), Vector3.ZERO, CHEDDAR)
-			_box(model, Vector3(0.05, 0.05, 0.2), Vector3(0.0, 0.02, -0.36), DARK)
+			# The blaster: a long body, a barrel and a magazine.
+			_box(model, Vector3(0.1, 0.12, 0.5), Vector3(0.0, 0.0, 0.02), TEAL)
+			_tube(model, 0.028, 0.24, Vector3(0.0, 0.02, -0.34), GUNMETAL)
+			_box(model, Vector3(0.06, 0.15, 0.09), Vector3(0.0, -0.11, -0.06), GUNMETAL)
+			_box(model, Vector3(0.03, 0.035, 0.2), Vector3(0.0, 0.075, 0.02), DARK)
 	# The hand holding it, which also stands for the arm in first person.
-	_sphere(model, 0.055, Vector3(0.0, -0.09, 0.12), Color(0.95, 0.85, 0.6))
+	var hand := SphereMesh.new()
+	hand.radius = 0.055
+	hand.height = 0.11
+	hand.radial_segments = 12
+	hand.rings = 6
+	var mitten := Rounded.instance(hand, _material(HAND), GRIP)
+	mitten.name = "Hand"
+	model.add_child(mitten)
 	var muzzle := Marker3D.new()
 	muzzle.name = "Muzzle"
 	muzzle.position = Vector3(0, 0.02, muzzle_z)
@@ -60,28 +77,21 @@ static func build(id: String) -> Node3D:
 
 
 static func _material(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.6
-	return material
+	if not _materials.has(color):
+		var material := StandardMaterial3D.new()
+		material.albedo_color = color
+		material.roughness = 0.6
+		_materials[color] = material
+	return _materials[color]
 
 
-static func _box(parent: Node3D, size: Vector3, at: Vector3, color: Color) -> void:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh.material = _material(color)
-	var instance := MeshInstance3D.new()
-	instance.mesh = mesh
-	instance.position = at
-	parent.add_child(instance)
+static func _box(parent: Node3D, size: Vector3, at: Vector3, color: Color, rounding := 0.018) -> void:
+	parent.add_child(Rounded.instance(Rounded.box(size, rounding), _material(color), at))
 
 
-static func _sphere(parent: Node3D, radius: float, at: Vector3, color: Color) -> void:
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * 2.0
-	mesh.material = _material(color)
-	var instance := MeshInstance3D.new()
-	instance.mesh = mesh
-	instance.position = at
-	parent.add_child(instance)
+# A round barrel of `radius`, `length` long, lying along the way the weapon
+# points.
+static func _tube(parent: Node3D, radius: float, length: float, at: Vector3, color: Color) -> void:
+	var tube := Rounded.instance(Rounded.cylinder(radius, length, minf(0.012, radius * 0.4), 14), _material(color), at)
+	tube.rotation.x = PI / 2.0
+	parent.add_child(tube)

@@ -65,13 +65,13 @@ func test_a_slanted_ray_hits_where_expected() -> void:
 ## A player at FEET facing the shooter at the origin, who looks along -Z.
 const FACING_US := PI
 ## Height of the middle of the wedge, in the arena.
-const CHEST := BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
 ## Half the wedge's depth, in the arena: how far its faces are from its middle.
 const FRONT := BodyShape.WEDGE_SIZE.z / 2.0 * BodyShape.SIZE
 
 
-func _eye(feet: Vector3, yaw: float, pitch := 0.0) -> Vector3:
-	return feet + Basis(Vector3.UP, yaw) * BodyShape.eye_centres(pitch)[0] * BodyShape.SIZE
+func _eye(feet: Vector3, yaw: float) -> Vector3:
+	return feet + Basis(Vector3.UP, yaw) * BodyShape.eye_centres()[0] * BodyShape.SIZE
 
 
 func _from_level_with(point: Vector3) -> Vector3:
@@ -120,7 +120,13 @@ func test_a_shot_between_the_legs_misses() -> void:
 	var knee := (BodyShape.HIP_HEIGHT / 2.0) * BodyShape.SIZE
 	assert_true(HitScan.first_hit(Vector3(0, knee, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
 	var leg: Vector3 = BodyShape.LEGS[0][0] * BodyShape.SIZE
-	assert_false(HitScan.first_hit(Vector3(leg.x, knee, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty(), "a leg is hit")
+	assert_true(HitScan.first_hit(Vector3(leg.x, knee, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty(), "a leg is only a stick, and can't be hit")
+
+
+func test_a_shot_at_an_arm_out_from_the_wedge_misses() -> void:
+	var arm: Vector3 = BodyShape.ARMS[0][0] * BodyShape.SIZE
+	var beside := Vector3(arm.x - 0.3, arm.y - 0.5, 0)
+	assert_true(HitScan.first_hit(beside, Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
 
 
 func test_a_shot_beside_the_narrow_top_of_the_wedge_misses() -> void:
@@ -138,13 +144,11 @@ func test_how_a_player_faces_changes_what_is_hit() -> void:
 	assert_true(HitScan.first_hit(edge, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, PI / 2.0)}).is_empty())
 
 
-func test_the_eyes_move_with_where_a_player_looks() -> void:
+func test_where_a_player_looks_does_not_move_what_is_hit() -> void:
 	var level := _from_level_with(_eye(FEET, FACING_US))
-	var looking_down := {8: HitScan.pose(FEET, FACING_US, -0.8)}
-	var hit := HitScan.first_hit(level, Vector3.FORWARD, 100.0, looking_down)
-	assert_true(hit.is_empty() or not hit.head, "the eyes have moved from where they were")
-	var lowered := _from_level_with(_eye(FEET, FACING_US, -0.8))
-	assert_true(HitScan.first_hit(lowered, Vector3.FORWARD, 100.0, looking_down).head)
+	var ahead := HitScan.first_hit(level, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, FACING_US)})
+	var down := HitScan.first_hit(level, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, FACING_US, -0.8)})
+	assert_eq(down, ahead)
 
 
 func test_no_targets_means_no_hit() -> void:

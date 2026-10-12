@@ -2,7 +2,7 @@ extends GutTest
 
 const WORLD := preload("res://world/world.tscn")
 ## Height of the middle of a player's wedge: a body shot, not between the legs.
-const CHEST := BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match

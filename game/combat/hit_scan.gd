@@ -3,7 +3,7 @@ class_name HitScan
 ## the physics engine, so that the host can test a shot against where players
 ## are (or, later, where they were) and so it can be tested on its own.
 ##
-## A player's body is the shape of their cheese character (body_shape.gd),
+## A player's body is the wedge of their cheese character (body_shape.gd),
 ## standing on their position and facing where they face.
 
 
@@ -40,7 +40,9 @@ static func ray_capsule(origin: Vector3, direction: Vector3, feet: Vector3, radi
 
 
 ## A player standing at `feet`, turned by `yaw` and looking up or down by
-## `pitch`, as `targets` in first_hit() hold them.
+## `pitch`, as `targets` in first_hit() hold them. Looking up or down doesn't
+## move the wedge, so only where they stand and how they are turned decide
+## what hits.
 static func pose(feet: Vector3, yaw := 0.0, pitch := 0.0) -> Dictionary:
 	return {"feet": feet, "yaw": yaw, "pitch": pitch}
 
@@ -54,7 +56,7 @@ static func first_hit(origin: Vector3, direction: Vector3, max_distance: float, 
 	for id: int in targets:
 		var target: Variant = targets[id]
 		var at: Dictionary = target if target is Dictionary else pose(target)
-		var hit := BodyShape.ray_hit(origin, direction, at.feet, at.yaw, at.pitch)
+		var hit := BodyShape.ray_hit(origin, direction, at.feet, at.yaw)
 		if not hit.is_empty() and hit.distance <= best_distance:
 			best_distance = hit.distance
 			best = {"id": id, "distance": hit.distance, "point": origin + direction * hit.distance, "head": hit.head}

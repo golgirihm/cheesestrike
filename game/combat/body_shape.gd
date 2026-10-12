@@ -1,14 +1,14 @@
 class_name BodyShape
 ## The shape of a player's cheese character, and where a ray first touches it.
-## The character everyone sees (player/cheese_character.gd, player/eyes.gd) is
-## built from these measurements, and shots are tested against the same ones
-## (hit_scan.gd), so a shot hits exactly when it looks like it hits.
+## The character everyone sees (player/cheese_character.gd) is built from
+## these measurements, and shots are tested against the same ones
+## (hit_scan.gd), so a shot hits when it looks like it hits.
+##
+## Only the wedge can be hit. The face and the holes are drawn flat on its
+## surface, and the arms and legs are thin sticks that shots pass through.
 ##
 ## Measurements are in the character's own units and grow by SIZE in the
-## arena. The body faces -Z and turns with the player; the eyes are on the
-## head, so they also tilt with where the player looks. Arms and legs are
-## tested where they hang at rest: walking swings them a little, in step with
-## a pace that each screen keeps for itself.
+## arena. The body faces -Z and turns with the player.
 
 ## How many times bigger than its measurements a character stands.
 const SIZE := 3.0
@@ -17,28 +17,43 @@ const HIP_HEIGHT := 0.42
 ## An upright wedge (a triangle across, standing on its base, made deep).
 const WEDGE_SIZE := Vector3(0.78, 1.0, 0.56)
 const WEDGE_CENTRE := Vector3(0, HIP_HEIGHT + 0.5, 0)
-## Holes, as [centre, radius]: bumps of darker cheese on the wedge's faces.
-const HOLES := [
-	[Vector3(-0.16, 0.94, -0.27), 0.07], [Vector3(0.12, 1.1, -0.27), 0.05],
-	[Vector3(0.05, 0.84, -0.27), 0.04], [Vector3(-0.27, 0.92, 0.05), 0.06],
-	[Vector3(0.25, 1.0, 0.12), 0.05],
-]
-## Limbs hang straight down from their joints, as [joint, length, radius].
-const LEGS := [[Vector3(-0.17, HIP_HEIGHT, 0), 0.42, 0.07], [Vector3(0.17, HIP_HEIGHT, 0), 0.42, 0.07]]
-const ARMS := [[Vector3(-0.36, HIP_HEIGHT + 0.42, -0.02), 0.34, 0.05], [Vector3(0.36, HIP_HEIGHT + 0.42, -0.02), 0.34, 0.05]]
+## How far the wedge's edges are rounded off where it is drawn. Shots are
+## tested against the wedge with sharp edges, which is that hair bigger.
+const WEDGE_ROUNDING := 0.025
 
-## Where the player sees from, above their feet: level with their eyes, on
-## the upper face of the wedge, so that a shot fired straight ahead at a
-## player standing level with the shooter meets their face.
-const HEAD_HEIGHT := 1.25
-## The eyes' middle, from the head: just in front of the wedge's face.
-const EYES_OFFSET := Vector3(0, 0, -0.3)
-const EYE_APART := 0.1
-const EYE_RADIUS := 0.075
-const PUPIL_FORWARD := 0.055
-const PUPIL_RADIUS := 0.035
-## Hits on the eyes, or on the wedge's tip level with them or higher, are headshots.
-const HEAD_FROM := HEAD_HEIGHT + EYES_OFFSET.y - EYE_RADIUS
+## The faces of the wedge that holes are drawn on.
+enum { FRONT, BACK, RIGHT, LEFT }
+## Holes, as [face, across, up, radius]. On the front and back, `across` and
+## `up` are from the middle of the wedge; on the sloping sides, `across` is
+## from the middle toward the back and `up` is the share of the way up the
+## slope.
+const HOLES := [
+	[FRONT, 0.0, 0.27, 0.04], [FRONT, -0.21, -0.31, 0.06], [FRONT, 0.2, -0.36, 0.04],
+	[FRONT, 0.24, -0.22, 0.028], [FRONT, -0.03, -0.38, 0.03],
+	[BACK, 0.04, 0.2, 0.05], [BACK, -0.12, -0.04, 0.06], [BACK, 0.15, -0.26, 0.07],
+	[BACK, -0.2, -0.36, 0.04], [BACK, 0.0, -0.38, 0.03],
+	[RIGHT, 0.1, 0.2, 0.06], [RIGHT, -0.12, 0.42, 0.05], [RIGHT, 0.06, 0.7, 0.04],
+	[LEFT, -0.08, 0.25, 0.05], [LEFT, 0.12, 0.5, 0.06], [LEFT, -0.1, 0.72, 0.035],
+]
+
+## Arms and legs are sticks this thick.
+const LIMB_RADIUS := 0.02
+## Each leg hangs straight down from its hip, as [hip, length].
+const LEGS := [[Vector3(-0.15, HIP_HEIGHT, 0), HIP_HEIGHT], [Vector3(0.15, HIP_HEIGHT, 0), HIP_HEIGHT]]
+## Each arm starts on the slope of the wedge, as [shoulder, length]: the left
+## hangs free, and the right reaches to the weapon.
+const SHOULDER_HEIGHT := HIP_HEIGHT + 0.42
+const ARMS := [[Vector3(-0.226, SHOULDER_HEIGHT, 0), 0.34], [Vector3(0.226, SHOULDER_HEIGHT, 0), 0.34]]
+
+## Where the player sees from, above their feet: level with the eyes drawn
+## on the front of the wedge, so that a shot fired straight ahead at a player
+## standing level with the shooter meets their face.
+const HEAD_HEIGHT := 0.9
+## The eyes: dots drawn this far either side of the middle of the face.
+const EYE_APART := 0.075
+const EYE_RADIUS := 0.028
+## Hits on the wedge from just under the eyes up to its tip are headshots.
+const HEAD_FROM := HEAD_HEIGHT - EYE_RADIUS
 
 ## The capsule the player moves as, which holds all of the above.
 const CAPSULE_RADIUS := 0.4
@@ -49,57 +64,46 @@ const RADIUS := CAPSULE_RADIUS * SIZE
 const HEIGHT := CAPSULE_HEIGHT * SIZE
 
 
-## The middle of each eye (or, with `forward` = PUPIL_FORWARD, each pupil) in
-## the body's measurements, for a head tilted by `pitch`.
-static func eye_centres(pitch: float, forward := 0.0) -> Array[Vector3]:
-	var tilt := Basis(Vector3.RIGHT, pitch)
-	var head := Vector3(0, HEAD_HEIGHT, 0)
+## The middle of each eye, on the front of the wedge, in the body's
+## measurements.
+static func eye_centres() -> Array[Vector3]:
 	var centres: Array[Vector3] = []
 	for side in [-1.0, 1.0]:
-		centres.append(head + tilt * (EYES_OFFSET + Vector3(EYE_APART * side, 0, -forward)))
+		centres.append(Vector3(EYE_APART * side, HEAD_HEIGHT, -WEDGE_SIZE.z / 2.0))
 	return centres
 
 
+## Where hole `hole` (one of HOLES) is drawn, in the body's measurements, as
+## {centre, normal, radius}: `normal` is the way the face it lies on looks.
+static func hole_place(hole: Array) -> Dictionary:
+	var half := WEDGE_SIZE / 2.0
+	var centre := Vector3.ZERO
+	var normal := Vector3.ZERO
+	match hole[0]:
+		FRONT, BACK:
+			normal = Vector3.FORWARD if hole[0] == FRONT else Vector3.BACK
+			centre = Vector3(hole[1], hole[2], normal.z * half.z)
+		_:
+			var side := 1.0 if hole[0] == RIGHT else -1.0
+			normal = Vector3(2.0 * half.y * side, half.x, 0).normalized()
+			# From the foot of the slope to the tip.
+			centre = Vector3(half.x * side, -half.y, hole[1]).lerp(Vector3(0, half.y, hole[1]), hole[2])
+	return {"centre": WEDGE_CENTRE + centre, "normal": normal, "radius": hole[3]}
+
+
 ## Where a ray from `origin` in direction `direction` (normalized) first touches
-## the body of a player standing at `feet`, turned by `yaw` and looking up or
-## down by `pitch`, as {distance, head}; or an empty dictionary if it misses. A
-## ray that starts inside a part doesn't hit that part.
-static func ray_hit(origin: Vector3, direction: Vector3, feet: Vector3, yaw := 0.0, pitch := 0.0) -> Dictionary:
+## the wedge of a player standing at `feet` and turned by `yaw`, as {distance,
+## head}; or an empty dictionary if it misses. A ray that starts inside the
+## wedge doesn't hit it.
+static func ray_hit(origin: Vector3, direction: Vector3, feet: Vector3, yaw := 0.0) -> Dictionary:
 	# Into the body's own measurements, where it stands at the origin facing -Z.
 	var unturn := Basis(Vector3.UP, -yaw)
 	var local := unturn * (origin - feet) / SIZE
 	var along := unturn * direction
-	var nearest := INF
-	var head := false
-
 	var t := _ray_wedge(local - WEDGE_CENTRE, along)
-	if t < nearest:
-		nearest = t
-		head = local.y + along.y * t >= HEAD_FROM
-	for hole: Array in HOLES:
-		t = HitScan.ray_sphere(local - hole[0], along, hole[1])
-		if t < nearest:
-			nearest = t
-			head = local.y + along.y * t >= HEAD_FROM
-	for limb: Array in LEGS + ARMS:
-		var joint: Vector3 = limb[0]
-		t = HitScan.ray_capsule(local, along, joint - Vector3(0, limb[1], 0), limb[2], limb[1])
-		if t < nearest:
-			nearest = t
-			head = false
-	for eye in eye_centres(pitch):
-		t = HitScan.ray_sphere(local - eye, along, EYE_RADIUS)
-		if t < nearest:
-			nearest = t
-			head = true
-	for pupil in eye_centres(pitch, PUPIL_FORWARD):
-		t = HitScan.ray_sphere(local - pupil, along, PUPIL_RADIUS)
-		if t < nearest:
-			nearest = t
-			head = true
-	if nearest == INF:
+	if t == INF:
 		return {}
-	return {"distance": nearest * SIZE, "head": head}
+	return {"distance": t * SIZE, "head": local.y + along.y * t >= HEAD_FROM}
 
 
 ## The point up the middle of a player standing at `feet` that is nearest

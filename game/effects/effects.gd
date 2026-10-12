@@ -6,15 +6,16 @@ extends Node3D
 const TRACER_LIFE := 0.09
 const TRACER_WIDTH := 0.03
 const FLASH_LIFE := 0.06
-const TRACER_COLOR := Color(1.0, 0.9, 0.45)
-const FLASH_COLOR := Color(1.0, 0.75, 0.3)
+const TRACER_COLOR := Color(1.0, 0.96, 0.9)
+const FLASH_COLOR := Color(1.0, 0.55, 0.25)
 
 var _tracer_material := _glow(TRACER_COLOR)
 var _flash_material := _glow(FLASH_COLOR)
 var _tracer_mesh := BoxMesh.new()
 var _flash_mesh := SphereMesh.new()
-var _wheel_mesh := CylinderMesh.new()
-var _burst_material := _glow(Color(1.0, 0.85, 0.35, 0.7))
+var _wheel_mesh := Rounded.cylinder(0.16, 0.12, 0.04)
+var _wheel_material := _glow(WeaponModels.WAX)
+var _burst_material := _glow(Color(1.0, 0.5, 0.2, 0.7))
 # Projectiles in flight, by id: {"node", "from", "velocity", "gravity", "age"}.
 var _projectiles := {}
 
@@ -27,10 +28,6 @@ func _init() -> void:
 	_flash_mesh.radius = 0.09
 	_flash_mesh.height = 0.18
 	_flash_mesh.material = _flash_material
-	_wheel_mesh.top_radius = 0.16
-	_wheel_mesh.bottom_radius = 0.16
-	_wheel_mesh.height = 0.12
-	_wheel_mesh.material = _glow(WeaponModels.GOUDA)
 	_burst_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 
@@ -48,6 +45,7 @@ func launch_projectile(id: int, weapon: String, from: Vector3, velocity: Vector3
 	var stats := Weapons.find(weapon)
 	var wheel := MeshInstance3D.new()
 	wheel.mesh = _wheel_mesh
+	wheel.material_override = _wheel_material
 	wheel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(wheel)
 	wheel.global_position = from
