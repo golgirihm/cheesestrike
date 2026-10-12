@@ -4,8 +4,9 @@ extends GutTest
 ## the spawner would add them.
 
 const WORLD := preload("res://world/world.tscn")
-## Height of the middle of a player's wedge: a body shot, not between the legs.
-const CHEST := BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+## A height low on a player's wedge: a body shot, under the face and not
+## between the legs.
+const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match
@@ -35,7 +36,7 @@ func _add(id: int, at: Vector3) -> Node3D:
 ## The middle of one of player `id`'s eyes: a headshot.
 func _eye_of(id: int) -> Vector3:
 	var target: Node3D = world.player_node(id)
-	var eye: Vector3 = BodyShape.eye_centres(target.head.rotation.x)[0]
+	var eye: Vector3 = BodyShape.eye_centres()[0]
 	return target.global_position + Basis(Vector3.UP, target.rotation.y) * eye * BodyShape.SIZE
 
 
@@ -622,3 +623,30 @@ func test_a_new_match_forgets_players_who_left() -> void:
 	match_.state.end_match()
 	match_._process(MatchState.INTERMISSION + 0.01)
 	assert_true(match_._departed.is_empty())
+
+
+func test_everyone_sees_a_player_who_is_hurt_wince() -> void:
+	_add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	match_.state_changed.emit()
+	assert_false(other.body.is_grimacing())
+	match_.state.damage(1, 2, 10.0)
+	match_.state_changed.emit()
+	assert_true(other.body.is_grimacing())
+
+
+func test_coming_back_at_full_health_is_nothing_to_wince_at() -> void:
+	_add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	match_.state.damage(1, 2, 500.0)
+	match_.state_changed.emit()
+	assert_false(other.body.is_grimacing(), "knocked out, they melt instead")
+	match_.state.respawn(2)
+	match_.state_changed.emit()
+	assert_false(other.body.is_grimacing())
+
+
+func test_no_player_is_coloured_like_cheese_to_eat() -> void:
+	for id in range(1, 200):
+		var hue: float = preload("res://player/player.gd").colour_for(id).h
+		assert_false(hue > 0.11 and hue < 0.2, "player %d is yellow" % id)
