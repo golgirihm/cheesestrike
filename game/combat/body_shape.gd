@@ -27,10 +27,12 @@ const HOLES := [
 const LEGS := [[Vector3(-0.17, HIP_HEIGHT, 0), 0.42, 0.07], [Vector3(0.17, HIP_HEIGHT, 0), 0.42, 0.07]]
 const ARMS := [[Vector3(-0.36, HIP_HEIGHT + 0.42, -0.02), 0.34, 0.05], [Vector3(0.36, HIP_HEIGHT + 0.42, -0.02), 0.34, 0.05]]
 
-## Where the player sees from, above their feet.
-const HEAD_HEIGHT := 1.55
-## The eyes' middle, from the head.
-const EYES_OFFSET := Vector3(0, -0.12, -0.3)
+## Where the player sees from, above their feet: level with their eyes, on
+## the upper face of the wedge, so that a shot fired straight ahead at a
+## player standing level with the shooter meets their face.
+const HEAD_HEIGHT := 1.25
+## The eyes' middle, from the head: just in front of the wedge's face.
+const EYES_OFFSET := Vector3(0, 0, -0.3)
 const EYE_APART := 0.1
 const EYE_RADIUS := 0.075
 const PUPIL_FORWARD := 0.055
@@ -100,10 +102,12 @@ static func ray_hit(origin: Vector3, direction: Vector3, feet: Vector3, yaw := 0
 	return {"distance": nearest * SIZE, "head": head}
 
 
-## The point on the upright line through a player standing at `feet` that is
-## nearest `at`: where a burst at `at` is measured to.
+## The point up the middle of a player standing at `feet` that is nearest
+## `at`: where a burst at `at` is measured to. The middle runs up the core of
+## their capsule, a radius in from its ends, so it is never down at the floor
+## a burst lies on.
 static func nearest_middle(feet: Vector3, at: Vector3) -> Vector3:
-	return feet + Vector3.UP * clampf(at.y - feet.y, 0.0, HEIGHT)
+	return feet + Vector3.UP * clampf(at.y - feet.y, RADIUS, HEIGHT - RADIUS)
 
 
 ## How far along the ray `local` + t * `direction` it enters the wedge, measured

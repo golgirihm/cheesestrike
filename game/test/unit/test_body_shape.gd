@@ -98,6 +98,14 @@ func test_shots_hit_and_miss_exactly_where_the_character_is_drawn() -> void:
 		player.free()
 
 
+func test_a_shot_straight_ahead_at_someone_level_meets_their_face() -> void:
+	var eye_level := BodyShape.HEAD_HEIGHT * BodyShape.SIZE
+	for yaw in [0.0, PI, 0.5, -2.0]:
+		var hit := BodyShape.ray_hit(Vector3(0, eye_level, 10), Vector3.FORWARD, Vector3.ZERO, yaw)
+		assert_false(hit.is_empty(), "facing %s" % yaw)
+		assert_true(hit.head, "facing %s" % yaw)
+
+
 func test_the_head_is_the_eyes_and_the_tip_above_them() -> void:
 	var feet := Vector3.ZERO
 	var eye: Vector3 = BodyShape.eye_centres(0.0)[0] * BodyShape.SIZE
@@ -109,6 +117,6 @@ func test_the_head_is_the_eyes_and_the_tip_above_them() -> void:
 
 func test_a_burst_is_measured_to_the_nearest_point_up_the_middle() -> void:
 	var feet := Vector3(1, 2, 3)
-	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, 2.5, 3)), Vector3(1, 2.5, 3))
-	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, -10, 3)), feet, "from below, the feet")
-	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, 99, 3)), feet + Vector3.UP * BodyShape.HEIGHT, "from above, the top")
+	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, 4.5, 3)), Vector3(1, 4.5, 3))
+	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, -10, 3)), feet + Vector3.UP * BodyShape.RADIUS, "from below, low down")
+	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, 99, 3)), feet + Vector3.UP * (BodyShape.HEIGHT - BodyShape.RADIUS), "from above, high up")

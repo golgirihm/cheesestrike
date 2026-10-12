@@ -1,6 +1,8 @@
 extends GutTest
 
 const WORLD := preload("res://world/world.tscn")
+## Height of the middle of a player's wedge: a body shot, not between the legs.
+const CHEST := BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match
@@ -90,7 +92,7 @@ func test_a_shot_hits_where_the_target_was_when_the_shooter_saw_them() -> void:
 	match_.record_position(now - 0.05, Vector3(0, 0, -5), 2)
 	match_.record_position(now, Vector3(3, 0, -5), 2)
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(0, 1.0, -5) - origin).normalized(), 1)
+	match_._shot(1, origin, (Vector3(0, CHEST, -5) - origin).normalized(), 1)
 	assert_eq(match_.state.player(2).health, 80, "hit where they were")
 	assert_eq(target.global_position, Vector3(3, 0, -5), "they stay where they are")
 
@@ -103,7 +105,7 @@ func test_a_shot_at_where_the_target_is_now_but_was_not_then_misses() -> void:
 	match_.record_position(now - 0.05, Vector3(0, 0, -5), 2)
 	match_.record_position(now, Vector3(3, 0, -5), 2)
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(3, 1.0, -5) - origin).normalized(), 1)
+	match_._shot(1, origin, (Vector3(3, CHEST, -5) - origin).normalized(), 1)
 	assert_eq(match_.state.player(2).health, 100)
 
 
@@ -111,7 +113,7 @@ func test_without_a_history_the_target_is_where_they_stand() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(3, 0, -5))
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(3, 1.0, -5) - origin).normalized(), 1)
+	match_._shot(1, origin, (Vector3(3, CHEST, -5) - origin).normalized(), 1)
 	assert_eq(match_.state.player(2).health, 80)
 
 
