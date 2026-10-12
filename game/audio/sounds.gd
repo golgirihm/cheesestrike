@@ -17,6 +17,12 @@ const MAX_VOICES := 24
 ## How many times each sound has been played, for tests.
 var counts := {}
 
+
+## A pitch a little above or below true, by up to `by`: no two footsteps or
+## shots sound quite alike.
+static func varied(by := 0.06) -> float:
+	return randf_range(1.0 - by, 1.0 + by)
+
 var _music: AudioStreamPlayer
 var _voices: Array[AudioStreamPlayer3D] = []
 var _flat_voices: Array[AudioStreamPlayer] = []
@@ -46,14 +52,16 @@ func _ready() -> void:
 	add_child(_music)
 
 
-## Plays `name` at `at` in `world`'s 3D space.
-func play_at(name: String, at: Vector3, world: Node3D, volume_db := 0.0) -> void:
+## Plays `name` at `at` in `world`'s 3D space. `pitch` plays it higher (above
+## 1) or lower, so that a sound heard over and over isn't the same each time.
+func play_at(name: String, at: Vector3, world: Node3D, volume_db := 0.0, pitch := 1.0) -> void:
 	var stream := SoundBank.get_sound(name)
 	if stream == null or world == null or not world.is_inside_tree():
 		return
 	var voice := _free_voice(world)
 	voice.stream = stream
 	voice.volume_db = volume_db
+	voice.pitch_scale = pitch
 	voice.global_position = at
 	voice.play()
 	_count(name, at)
@@ -61,7 +69,7 @@ func play_at(name: String, at: Vector3, world: Node3D, volume_db := 0.0) -> void
 
 ## Plays `name` without a place, as for the player's own footsteps or the
 ## sound of their hits landing.
-func play(name: String, volume_db := 0.0) -> void:
+func play(name: String, volume_db := 0.0, pitch := 1.0) -> void:
 	var stream := SoundBank.get_sound(name)
 	if stream == null:
 		return
@@ -77,6 +85,7 @@ func play(name: String, volume_db := 0.0) -> void:
 		_flat_voices.append(voice)
 	voice.stream = stream
 	voice.volume_db = volume_db
+	voice.pitch_scale = pitch
 	voice.play()
 	_count(name, null)
 
