@@ -136,7 +136,7 @@ func _enter_tree() -> void:
 const VIEW_GUN_POSITION := Vector3(0.2, -0.19, -0.55)
 ## Where it sits when aiming down the sights: in the middle, just under the
 ## point being aimed at.
-const AIM_GUN_POSITION := Vector3(0.0, -0.085, -0.42)
+const AIM_GUN_POSITION := Vector3(0.0, -0.1, -0.42)
 const VIEW_GUN_SCALE := 0.6
 ## How high the team badge floats, in the character's measurements.
 const BADGE_HEIGHT := 2.5
