@@ -23,6 +23,9 @@ func before_each() -> void:
 
 func _add(id: int, at: Vector3) -> Node3D:
 	match_.add_player(id)
+	# In hand, a Cheddar Blaster, which these tests' numbers are for.
+	match_.state.player(id).weapons.append("blaster")
+	match_.state.player(id).weapon = "blaster"
 	var player: Node3D = world._create_player([id, Vector3.ZERO])
 	world.players.add_child(player)
 	player.global_position = at
@@ -207,7 +210,7 @@ func test_a_missed_shot_ends_at_the_wall() -> void:
 
 func test_the_shooters_own_shot_shows_at_once() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
-	shooter.fired.emit(shooter.head.global_position, Vector3.FORWARD, 1)
+	shooter.fired.emit(shooter.head.global_position, Vector3.FORWARD, 1, true)
 	var tracers: int = world.effects.get_child_count()
 	assert_eq(tracers, 2, "a flash and a tracer")
 
@@ -313,14 +316,120 @@ func test_a_launcher_wheel_bursts_on_a_player_and_hurts_them() -> void:
 	assert_eq(match_.state.player(1).health, 100, "the shooter is out of reach")
 
 
-func test_a_burst_does_not_hurt_its_shooter() -> void:
+func test_a_burst_hurts_its_shooter_too() -> void:
 	var shooter := _add(1, Vector3(0, 0, -7))
+	_add(2, Vector3(12, 0, 12))
 	_give(1, "launcher")
+	watch_signals(match_)
 	# Straight at the cheese block just ahead.
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(0, CHEST, -10) - origin).normalized(), 1, "launcher")
+	match_._shot(1, origin, (Vector3(0, 1, -10) - origin).normalized(), 1, "launcher")
 	_fly(1.0)
-	assert_eq(match_.state.player(1).health, 100)
+	assert_lt(match_.state.player(1).health, 100)
+	assert_signal_emitted(match_, "hurt", "they are told, as when anyone hurts them")
+	assert_signal_not_emitted(match_, "hit_confirmed", "but it is no hit to be pleased with")
+
+
+func test_a_player_who_bursts_themselves_out_scores_nothing() -> void:
+	var shooter := _add(1, Vector3(0, 0, -7))
+	_add(2, Vector3(12, 0, 12))
+	_give(1, "launcher")
+	match_.state.rename(1, "Shooter")
+	match_.state.player(1).health = 10
+	watch_signals(match_)
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(0, 1, -10) - origin).normalized(), 1, "launcher")
+	_fly(1.0)
+	var record := match_.state.player(1)
+	assert_false(record.alive)
+	assert_eq(record.kills, 0)
+	assert_eq(record.deaths, 1)
+	assert_signal_emitted_with_parameters(match_, "knocked_out", ["", "Shooter", "launcher", false])
+
+
+func test_a_launcher_wheel_knocks_out_a_healthy_player_it_lands_on() -> void:
+	var shooter := _add(1, Vector3(0, 0, 14))
+	_add(2, Vector3(0, 0, 0))
+	_give(1, "launcher")
+	var origin: Vector3 = shooter.head.global_position
+	match_._shot(1, origin, (Vector3(0, CHEST, 0) - origin).normalized(), 1, "launcher")
+	_fly(1.5)
+	assert_false(match_.state.player(2).alive)
+	assert_eq(match_.state.player(1).health, 100, "the shooter stood well back")
+
+
+func test_a_shot_from_the_hip_strays_and_an_aimed_one_does_not() -> void:
+	_add(1, Vector3(-5, 0, 0))
+	var shooter := _add(2, Vector3(10, 0, 5))
+	watch_signals(match_)
+	var origin: Vector3 = shooter.head.global_position
+	var straight := (Vector3(10, 2.3, -100) - origin).normalized()
+	var blaster := Weapons.find("blaster")
+	match_._shot(2, origin, straight, 5, "blaster", true)
+	var aimed: Vector3 = get_signal_parameters(match_, "shot_shown")[1][0]
+	match_._shot(2, origin, straight, 5, "blaster", false)
+	var hip: Vector3 = get_signal_parameters(match_, "shot_shown")[1][0]
+	var off_aimed := rad_to_deg(straight.angle_to(aimed - origin))
+	var off_hip := rad_to_deg(straight.angle_to(hip - origin))
+	assert_lte(off_aimed, blaster.spread_degrees / 2.0 + 0.01)
+	assert_gt(off_hip, off_aimed)
+	assert_lte(off_hip, blaster.hip_spread_degrees / 2.0 + 0.01)
+
+
+## Lets this process's own player finish taking its weapon in hand.
+func _settle(own: Node3D) -> void:
+	await wait_physics_frames(3)
+	own._switch_left = 0.0
+	own.weapon.cooldown = 0.0
+	own._animate(0.0)
+
+
+func test_holding_aim_brings_the_sights_up_and_slows_the_owner() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	assert_false(own.is_aiming())
+	var hip_spread: float = own.shot_spread()
+	var wide: float = own.camera.fov
+	Input.action_press("aim")
+	await wait_seconds(own.AIM_TIME + 0.1)
+	assert_true(own.is_aiming())
+	assert_lt(own.shot_spread(), hip_spread)
+	assert_lt(own.camera.fov, wide, "the view closes in")
+	var speed: float = await _speed_of(own)
+	Input.action_release("aim")
+	assert_almost_eq(speed, Movement.WALK_SPEED * Movement.AIM_FACTOR, 0.01)
+	await wait_seconds(own.AIM_TIME + 0.1)
+	assert_false(own.is_aiming())
+	assert_almost_eq(own.camera.fov, wide, 0.01)
+
+
+func test_the_owner_tells_the_host_whether_a_shot_was_aimed() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	watch_signals(own)
+	own._fire_pressed = true
+	await wait_physics_frames(2)
+	assert_false(get_signal_parameters(own, "fired")[3], "from the hip")
+	Input.action_press("aim")
+	await wait_seconds(own.AIM_TIME + own.weapon.stats.fire_interval + 0.1)
+	own._fire_pressed = true
+	await wait_physics_frames(2)
+	Input.action_release("aim")
+	assert_true(get_signal_parameters(own, "fired")[3], "down the sights")
+
+
+func test_a_weapon_changed_to_swings_up_from_below() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	var rest: Vector3 = own.gun.position
+	_give(1, "shotgun")
+	match_.state_changed.emit()
+	assert_eq(own.weapon.stats.id, "shotgun")
+	own._animate(0.01)
+	assert_lt(own.gun.position.y, rest.y - 0.1, "it starts low")
+	assert_false(own.weapon.can_fire(), "and can't fire until it is up")
+	own._animate(own.SWITCH_TIME)
+	assert_almost_eq(own.gun.position.distance_to(rest), 0.0, 0.02)
 
 
 func test_a_burst_behind_a_wall_does_no_harm() -> void:
@@ -374,7 +483,7 @@ func test_the_owner_takes_up_a_new_weapon_and_drops_it_when_knocked_out() -> voi
 	_give(1, "shotgun")
 	match_.state_changed.emit()
 	assert_eq(own.weapon.stats.id, "shotgun", "a new weapon comes into hand")
-	assert_eq(own.arsenal.keys().size(), 2)
+	assert_eq(own.arsenal.keys().size(), 3, "with the sidearm and the blaster")
 	match_.state.damage(2, 1, 500.0)
 	match_.state_changed.emit()
 	assert_eq(own.weapon.stats.id, Weapons.STARTING)

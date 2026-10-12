@@ -234,6 +234,7 @@ func test_inverted_look_turns_the_other_way_up_and_down() -> void:
 func test_the_field_of_view_follows_the_setting() -> void:
 	var player := _own_player()
 	Settings.set_value("fov", 95.0)
+	await wait_process_frames(2)
 	assert_eq(player.camera.fov, 95.0)
 
 

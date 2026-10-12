@@ -43,6 +43,10 @@ static func build(id: String) -> Node3D:
 			model.add_child(barrel)
 			_box(model, Vector3(0.08, 0.16, 0.12), Vector3(0.0, -0.12, 0.08), GOUDA)
 			muzzle_z = -0.33
+		"pistol":
+			_box(model, Vector3(0.07, 0.09, 0.26), Vector3(0.0, 0.0, -0.05), PARMESAN)
+			_box(model, Vector3(0.06, 0.14, 0.08), Vector3(0.0, -0.09, 0.04), DARK)
+			muzzle_z = -0.19
 		_:
 			_box(model, Vector3(0.1, 0.12, 0.55), Vector3.ZERO, CHEDDAR)
 			_box(model, Vector3(0.05, 0.05, 0.2), Vector3(0.0, 0.02, -0.36), DARK)

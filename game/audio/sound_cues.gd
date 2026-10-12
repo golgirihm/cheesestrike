@@ -30,7 +30,7 @@ func _ready() -> void:
 
 ## This machine's own player fired `weapon` from `muzzle`.
 func own_shot(weapon: String, muzzle: Vector3) -> void:
-	if weapon != "launcher":
+	if not Weapons.find(weapon).fires_projectile():
 		Sounds.play_at(weapon, muzzle, world, -2.0)
 
 

@@ -18,10 +18,13 @@ func _ready() -> void:
 	alignment = BoxContainer.ALIGNMENT_BEGIN
 
 
-## How a knock-out reads in the feed.
+## How a knock-out reads in the feed. Nobody (an empty `attacker`) knocks out
+## a player who did it themselves.
 static func entry_text(attacker: String, victim: String, weapon: String, head: bool) -> String:
 	var stats := Weapons.find(weapon)
 	var using := stats.display_name if stats != null else weapon
+	if attacker.is_empty():
+		return "%s  knocked themself out  [%s]" % [victim, using]
 	return "%s  [%s%s]  %s" % [attacker, using, ", head" if head else "", victim]
 
 

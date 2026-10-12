@@ -1,12 +1,15 @@
 class_name Weapons
 ## Every weapon in the game, by id.
 
-const STARTING := "blaster"
+## The sidearm every player starts with, and keeps when knocked out. It is
+## weak: the rest are found on the arena's pads.
+const STARTING := "pistol"
 
 ## In the order the number keys choose them.
-const ORDER := ["blaster", "shotgun", "grater", "launcher"]
+const ORDER := ["pistol", "blaster", "shotgun", "grater", "launcher"]
 
 const _ALL := {
+	"pistol": preload("res://combat/weapons/pistol.tres"),
 	"blaster": preload("res://combat/weapons/blaster.tres"),
 	"shotgun": preload("res://combat/weapons/shotgun.tres"),
 	"grater": preload("res://combat/weapons/grater.tres"),

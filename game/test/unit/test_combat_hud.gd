@@ -60,6 +60,25 @@ func test_the_notice_says_who_did_it_and_when_you_are_back() -> void:
 	assert_eq(HUD.knocked_out_text(state, 1)[1], "Back in 1…")
 
 
+func test_the_notice_for_a_player_who_knocked_themself_out_says_so() -> void:
+	var state := MatchState.new()
+	state.add_player(1)
+	state.damage(1, 1, 500.0, true)
+	assert_eq(HUD.knocked_out_text(state, 1)[0], "You knocked yourself out")
+
+
+func test_the_crosshair_opens_as_wide_as_shots_spread() -> void:
+	var tight := HUD.crosshair_gap(0.3, 75.0, 648.0)
+	var hip := HUD.crosshair_gap(9.0, 75.0, 648.0)
+	assert_eq(tight, HUD.CROSSHAIR_GAP, "never closed up altogether")
+	assert_gt(hip, tight * 4.0)
+	# The edge of a 9 degree cone, 4.5 degrees off the middle of a view that
+	# reaches 37.5 degrees up.
+	assert_almost_eq(hip, tan(deg_to_rad(4.5)) / tan(deg_to_rad(37.5)) * 324.0, 0.01)
+	assert_gt(HUD.crosshair_gap(9.0, 45.0, 648.0), hip, "wider on screen when zoomed in")
+	assert_lte(HUD.crosshair_gap(170.0, 75.0, 648.0), 648.0 * 0.4, "and never off the screen")
+
+
 func test_the_notice_without_an_attacker_who_has_left() -> void:
 	var state := MatchState.new()
 	state.add_player(1)

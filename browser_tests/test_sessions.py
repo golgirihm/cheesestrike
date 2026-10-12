@@ -197,9 +197,7 @@ class LosingTheHostTest(GameTestCase):
         host.wait_for("s.players.length === 2")
         host.page.wait_for_timeout(500)
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         host_name = host.own_player()["name"]
 
         host.press("Escape")

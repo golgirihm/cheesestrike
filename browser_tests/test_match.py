@@ -41,12 +41,11 @@ class MatchTest(GameTestCase):
         self.assertRegex(state["combat"]["match"], r"First to 5   ·   \d:\d\d$")
 
         host.capture_mouse()
-        host.page.mouse.down()
         own_name = host.own_player()["name"]
+        host.shoot_until(f"s.combat.result === {own_name + ' wins!'!r}", timeout=180_000)
         for game in (host, joiner):
-            state = game.wait_for(f"s.combat.result === {own_name + ' wins!'!r}", timeout=120_000)
+            state = game.wait_for(f"s.combat.result === {own_name + ' wins!'!r}")
             self.assertEqual(state["combat"]["match"], "Match over")
-        host.page.mouse.up()
         self.assertEqual(host.player(joiner_id)["deaths"], 5)
 
         # After the break, a new match with the scores cleared.
@@ -83,9 +82,7 @@ class MatchTest(GameTestCase):
         # Opponents can hurt each other.
         host.page.wait_for_timeout(500)
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         host.wait_for("s.combat.match.startsWith('Cheddar 1')")
 
         joiner.page.keyboard.down("Tab")
@@ -102,9 +99,7 @@ class MatchTest(GameTestCase):
         host.wait_for("s.players.length === 2")
         host.page.wait_for_timeout(500)
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         deaths = host.player(joiner_id)["deaths"]
 
         late = self.open_game()

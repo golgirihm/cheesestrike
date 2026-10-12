@@ -14,6 +14,10 @@ func test_an_entry_names_both_players_and_the_weapon() -> void:
 	assert_eq(FEED.entry_text("Brie", "Edam", "blaster", false), "Brie  [Cheddar Blaster]  Edam")
 
 
+func test_a_player_who_knocked_themself_out_is_the_only_one_named() -> void:
+	assert_eq(FEED.entry_text("", "Edam", "launcher", false), "Edam  knocked themself out  [Gouda Launcher]")
+
+
 func test_a_headshot_says_so() -> void:
 	assert_eq(FEED.entry_text("Brie", "Edam", "blaster", true), "Brie  [Cheddar Blaster, head]  Edam")
 

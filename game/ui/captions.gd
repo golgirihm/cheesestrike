@@ -14,6 +14,7 @@ const MOST := 4
 const OWN_DISTANCE := 1.5
 ## What each sound is called; sounds not here get no caption.
 const TEXTS := {
+	"pistol": "Pistol fire",
 	"blaster": "Blaster fire",
 	"shotgun": "Shotgun blast",
 	"grater": "Grater fire",

@@ -96,12 +96,12 @@ func test_refilling_ends_a_reload_and_fills_up() -> void:
 
 
 func test_the_starting_weapon_exists_and_is_sensible() -> void:
-	var blaster := Weapons.find(Weapons.STARTING)
-	assert_not_null(blaster)
-	assert_eq(blaster.id, Weapons.STARTING)
-	assert_gt(blaster.magazine, 0)
-	assert_gt(blaster.fire_interval, 0.0)
-	assert_gt(blaster.damage, 0.0)
+	var sidearm := Weapons.find(Weapons.STARTING)
+	assert_not_null(sidearm)
+	assert_eq(sidearm.id, Weapons.STARTING)
+	assert_gt(sidearm.magazine, 0)
+	assert_gt(sidearm.fire_interval, 0.0)
+	assert_gt(sidearm.damage, 0.0)
 
 
 func test_every_weapon_is_listed_under_its_own_id() -> void:
@@ -116,7 +116,43 @@ func test_an_unknown_weapon_is_not_found() -> void:
 
 
 func test_the_weapons_come_in_their_number_key_order() -> void:
-	assert_eq(Weapons.ids(), ["blaster", "shotgun", "grater", "launcher"])
+	assert_eq(Weapons.ids(), ["pistol", "blaster", "shotgun", "grater", "launcher"])
+	for index in Weapons.ORDER.size():
+		assert_true(InputMap.has_action("weapon_%d" % (index + 1)), "a number key for %s" % Weapons.ORDER[index])
+
+
+## Damage a second from `stats` with every shot landing on the body.
+func _damage_rate(stats: WeaponStats) -> float:
+	return stats.damage * stats.pellets / stats.fire_interval
+
+
+func test_players_start_with_a_sidearm_weaker_than_anything_they_can_find() -> void:
+	var sidearm := Weapons.find(Weapons.STARTING)
+	assert_eq(sidearm.id, "pistol")
+	assert_false(sidearm.automatic)
+	for id: String in Weapons.ids():
+		var other := Weapons.find(id)
+		if id != Weapons.STARTING and not other.fires_projectile():
+			assert_lt(_damage_rate(sidearm), _damage_rate(other) / 2.0, id)
+
+
+func test_every_weapon_is_far_less_accurate_from_the_hip() -> void:
+	for id: String in Weapons.ids():
+		var stats := Weapons.find(id)
+		assert_gte(stats.spread(false), 6.0, "%s from the hip" % id)
+		assert_gte(stats.spread(false), stats.spread(true) * 2.0, id)
+		assert_between(stats.aim_zoom, 0.4, 0.95, id)
+
+
+func test_the_launcher_holds_two_wheels_that_knock_out_whoever_they_land_by() -> void:
+	var launcher := Weapons.find("launcher")
+	assert_eq(launcher.magazine, 2)
+	# A wheel that lands on a player bursts on their surface, at most the
+	# width of their body from their middle.
+	var on_them := Splash.damage_at(BodyShape.RADIUS, launcher.splash_damage, launcher.splash_radius)
+	assert_gte(on_them, float(PlayerRecord.MAX_HEALTH))
+	# One that lands a couple of metres off still does.
+	assert_gte(Splash.damage_at(2.5, launcher.splash_damage, launcher.splash_radius), float(PlayerRecord.MAX_HEALTH))
 
 
 func test_each_weapon_is_set_up_sensibly() -> void:

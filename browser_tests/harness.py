@@ -18,6 +18,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import unittest
 
 from playwright.sync_api import sync_playwright
@@ -188,6 +189,31 @@ class Game:
         self.page.mouse.down()
         self.page.wait_for_timeout(milliseconds)
         self.page.mouse.up()
+
+    def shoot_until(self, condition, timeout=TIMEOUT_MS):
+        """Aims down the sights with the right mouse button, then pulls the
+        trigger again and again until `condition` (as for wait_for) is true,
+        and returns the state at that moment.
+
+        Shots from the hip spread too widely to count on hitting anything,
+        and the sidearm players start with fires once for each pull."""
+        check = f"(() => {{ const s = window.cheeseStrikeTest; return s && ({condition}) ? s : null; }})()"
+        self.page.mouse.down(button="right")
+        try:
+            self.wait_for("s.players.some((p) => p.mine && p.aiming)")
+            deadline = time.monotonic() + timeout / 1000
+            while True:
+                state = self.page.evaluate(check)
+                if state:
+                    return state
+                if time.monotonic() > deadline:
+                    raise AssertionError(f"never became true while shooting: {condition}\nstate: {self._state_or_none()}")
+                self.page.mouse.down()
+                self.page.wait_for_timeout(60)
+                self.page.mouse.up()
+                self.page.wait_for_timeout(60)
+        finally:
+            self.page.mouse.up(button="right")
 
     def choose(self, control, text):
         """Presses one of the menu's match settings buttons, such as
