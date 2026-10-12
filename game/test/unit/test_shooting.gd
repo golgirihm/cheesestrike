@@ -466,7 +466,35 @@ func test_setting_off_an_overload_makes_the_owner_faster() -> void:
 	await wait_physics_frames(2)
 	var speed := Vector2(own.velocity.x, own.velocity.z).length()
 	Input.action_release("move_forward")
-	assert_almost_eq(speed, own.SPEED * Overload.SPEED_BOOST, 0.01)
+	assert_almost_eq(speed, Movement.WALK_SPEED * Overload.SPEED_BOOST, 0.01)
+
+
+func _speed_of(player: Node3D) -> float:
+	Input.action_press("move_forward")
+	await wait_physics_frames(2)
+	var speed := Vector2(player.velocity.x, player.velocity.z).length()
+	Input.action_release("move_forward")
+	return speed
+
+
+func test_holding_the_run_key_makes_the_owner_run() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await wait_physics_frames(3)
+	Input.action_press("sprint")
+	var speed: float = await _speed_of(own)
+	Input.action_release("sprint")
+	assert_almost_eq(speed, Movement.WALK_SPEED * Movement.RUN_FACTOR, 0.01)
+
+
+func test_being_hurt_slows_the_owner_for_a_moment() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await wait_physics_frames(3)
+	match_.hurt.emit(2, Vector3.ZERO, 10)
+	var slowed: float = await _speed_of(own)
+	assert_lt(slowed, Movement.WALK_SPEED * 0.6)
+	assert_gte(slowed, Movement.WALK_SPEED * Movement.FLINCH_SLOW)
+	own._flinch_left = 0.0
+	assert_almost_eq(await _speed_of(own), Movement.WALK_SPEED, 0.01)
 
 
 func test_an_overload_that_is_not_ready_does_nothing() -> void:

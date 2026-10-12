@@ -11,6 +11,7 @@ const REBINDABLE := {
 	"move_left": "Left",
 	"move_right": "Right",
 	"jump": "Jump",
+	"sprint": "Run",
 	"reload": "Reload",
 	"overload": "Overload",
 	"scoreboard": "Scoreboard",
