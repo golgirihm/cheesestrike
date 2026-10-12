@@ -1,10 +1,12 @@
 class_name TeamColors
 ## The teams' colours, from a palette that people with the common kinds of
-## colour blindness can tell apart: Cheddar orange and Brie blue. Teams also
+## colour blindness can tell apart: Cheddar a red orange and Brie blue.
+## Cheddar's is not the yellow orange of cheese itself, which is kept for
+## cheese that can be eaten. Teams also
 ## differ by the shape of the badge over each player, so colour is never the
 ## only clue.
 
-const CHEDDAR := Color(0.902, 0.624, 0.0)
+const CHEDDAR := Color(0.835, 0.369, 0.0)
 const BRIE := Color(0.337, 0.706, 0.914)
 
 
