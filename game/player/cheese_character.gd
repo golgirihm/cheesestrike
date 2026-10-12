@@ -170,7 +170,7 @@ func _build() -> void:
 
 	for hole: Array in BodyShape.HOLES:
 		var place := BodyShape.hole_place(hole)
-		var spot := _spot(place.radius, _hole_material, place.centre, place.normal, 1)
+		var spot := Rounded.spot(place.radius, _hole_material, place.centre, place.normal, LAYER)
 		spot.name = "Hole%d" % get_child_count()
 		add_child(spot)
 
@@ -206,10 +206,10 @@ func _build_face() -> void:
 	var front := -BodyShape.WEDGE_SIZE.z / 2.0
 	var eye_level := BodyShape.HEAD_HEIGHT
 	for centre in BodyShape.eye_centres():
-		var eye := _spot(BodyShape.EYE_RADIUS, _ink, centre, Vector3.FORWARD, 2)
+		var eye := Rounded.spot(BodyShape.EYE_RADIUS, _ink, centre, Vector3.FORWARD, LAYER * 2.0)
 		eye.name = "Eye%d" % (_eyes.size() + 1)
 		# A glint, so the eyes look alive.
-		eye.add_child(_spot(BodyShape.EYE_RADIUS * 0.32, _flat(Color.WHITE), Vector3(0.008, 0.0, 0.009), Vector3.UP, 1))
+		eye.add_child(Rounded.spot(BodyShape.EYE_RADIUS * 0.32, _flat(Color.WHITE), Vector3(0.008, 0.0, 0.009), Vector3.UP, LAYER))
 		add_child(eye)
 		_eyes.append(eye)
 
@@ -218,7 +218,7 @@ func _build_face() -> void:
 	add_child(_calm)
 	var blush := _flat(BLUSH)
 	for side in [-1.0, 1.0]:
-		_calm.add_child(_spot(0.034, blush, Vector3(0.15 * side, eye_level - 0.055, front), Vector3.FORWARD, 1))
+		_calm.add_child(Rounded.spot(0.034, blush, Vector3(0.15 * side, eye_level - 0.055, front), Vector3.FORWARD, LAYER))
 	var smile := MeshInstance3D.new()
 	smile.mesh = _arc(0.05, 0.011, deg_to_rad(205.0), deg_to_rad(335.0))
 	smile.material_override = _ink
@@ -249,25 +249,6 @@ static func _flat(colour: Color) -> StandardMaterial3D:
 	# Drawn-on marks are flat, and seen from either side.
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return material
-
-
-# A flat round spot of `radius` lying on a surface that faces `normal`,
-# `layer` layers above it, centred on `at`.
-static func _spot(radius: float, material: Material, at: Vector3, normal: Vector3, layer: int) -> MeshInstance3D:
-	var disc := CylinderMesh.new()
-	disc.top_radius = radius
-	disc.bottom_radius = radius
-	disc.height = 0.001
-	disc.radial_segments = 20
-	disc.rings = 0
-	var spot := MeshInstance3D.new()
-	spot.mesh = disc
-	spot.material_override = material
-	spot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# The disc's flat sides face along its Y axis.
-	spot.quaternion = Quaternion(Vector3.UP, normal)
-	spot.position = at + normal * LAYER * layer
-	return spot
 
 
 # A flat rectangle of `size` on the front of the wedge, centred on `at`.

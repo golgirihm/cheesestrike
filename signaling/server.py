@@ -25,8 +25,8 @@ The host is always peer 1. Joiners only ever exchange messages with the host.
 
 A host's settings are how its matches are set up, which players see in the list
 before joining: {"mode": "ffa" | "teams", "kill_limit": n, "minutes": n,
-"max_players": n, "map": "canyon" | "box"}. The server only checks them and passes them on, apart from
-max_players, which it enforces. Anything missing or out of range is replaced by
+"max_players": n, "map": "canyon" | "box" | "city"}. The server only checks them and passes them on, apart
+from max_players, which it enforces. Anything missing or out of range is replaced by
 the default, as the game itself does.
 
 Limits, so that one machine can't flood the server: a message may be at most
@@ -63,7 +63,7 @@ CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # no I or O
 CODE_LENGTH = 4
 RELAYED = ("offer", "answer", "candidate")
 MODES = ("ffa", "teams")
-MAPS = ("canyon", "box")
+MAPS = ("canyon", "box", "city")
 DEFAULT_SETTINGS = {"mode": "ffa", "kill_limit": 20, "minutes": 8, "max_players": MAX_PLAYERS, "map": "canyon"}
 MAX_MESSAGE_SIZE = 64 * 1024
 MAX_CONNECTIONS_PER_ADDRESS = 32

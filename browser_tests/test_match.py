@@ -28,6 +28,30 @@ class MatchTest(GameTestCase):
         joiner.page.wait_for_timeout(1000)
         self.assertGreater(joiner.own_player()["position"][1], -0.5)
 
+    def test_the_city_can_be_played_in(self):
+        host, code = self.host_with(map="Curd City")
+        self.assertEqual(host.state()["map"], "city")
+        joiner = self.open_game()
+        joiner.join(code)
+        joiner.wait_for("s.map === 'city'")
+        joiner_id = joiner.own_player()["id"]
+        host.wait_for("s.players.length === 2")
+        # Standing on the street, not fallen through it.
+        joiner.page.wait_for_timeout(1000)
+        self.assertGreater(joiner.own_player()["position"][1], -0.5)
+        # The two start facing each other across the crossroads.
+        host.capture_mouse()
+        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && (p.health < 100 || p.deaths > 0))")
+        # Running straight ahead, the host reaches the launcher in the middle.
+        host.page.keyboard.down("Shift")
+        host.page.keyboard.down("w")
+        try:
+            host.wait_for("s.players.some((p) => p.mine && p.carrying.includes('launcher'))")
+        finally:
+            host.page.keyboard.up("w")
+            host.page.keyboard.up("Shift")
+        self.assertEqual(host.state()["put_backs"], 0, "running is allowed")
+
     def test_a_short_match_ends_with_a_winner_and_the_next_begins(self):
         # On the small arena, whoever is knocked out comes back straight ahead
         # of the host, the spot farthest from it.

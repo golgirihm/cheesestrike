@@ -90,6 +90,15 @@ class SignalingTest(ServerTestCase):
         await self.recv(ws)
         self.assertEqual((await self.list_sessions())[0]["settings"], settings)
 
+    async def test_every_arena_can_be_hosted(self):
+        for arena in server.MAPS:
+            ws = await self.client()
+            await self.send(ws, type="host", settings={"map": arena})
+            hosted = await self.recv(ws)
+            listed = next(session for session in await self.list_sessions() if session["code"] == hosted["code"])
+            self.assertEqual(listed["settings"]["map"], arena)
+        self.assertIn("city", server.MAPS)
+
     async def test_settings_out_of_range_are_brought_into_it(self):
         ws = await self.client()
         await self.send(ws, type="host", settings={"mode": "teams", "kill_limit": 0, "minutes": 1e9, "max_players": 99})

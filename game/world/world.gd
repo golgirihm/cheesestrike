@@ -61,6 +61,7 @@ func load_map(id: String) -> void:
 		map.queue_free()
 	map = Maps.scene(id).instantiate()
 	map.name = "Map"
+	Scenery.dress(map)
 	add_child(map)
 	move_child(map, 0)
 	map_id = id
