@@ -33,6 +33,21 @@ func test_it_fits_inside_the_players_collision_capsule() -> void:
 	assert_lte(bounds.end.y, HitScan.BODY_HEIGHT, "not above the head")
 	assert_lte(maxf(absf(bounds.position.x), absf(bounds.end.x)), HitScan.BODY_RADIUS + 0.05)
 	assert_lte(maxf(absf(bounds.position.z), absf(bounds.end.z)), HitScan.BODY_RADIUS + 0.05)
+	# Big enough to see and to match what can be hit.
+	assert_gte(bounds.end.y, HitScan.BODY_HEIGHT * 0.75, "fills most of the capsule's height")
+
+
+func test_the_players_capsule_head_and_eyes_match_the_body_shots_are_tested_against() -> void:
+	var player: CharacterBody3D = PLAYER.instantiate()
+	player.name = "2"
+	add_child_autofree(player)
+	var shape: CapsuleShape3D = player.collider.shape
+	assert_almost_eq(shape.radius, HitScan.BODY_RADIUS, 0.001)
+	assert_almost_eq(shape.height, HitScan.BODY_HEIGHT, 0.001)
+	assert_almost_eq(player.collider.position.y, HitScan.BODY_HEIGHT / 2.0, 0.001, "standing on the feet")
+	assert_between(player.head.position.y, HitScan.HEAD_FROM, HitScan.BODY_HEIGHT, "seeing from the head")
+	assert_between(player.visor.global_position.y - player.global_position.y, HitScan.HEAD_FROM, HitScan.BODY_HEIGHT, "eyes on the head")
+	assert_gt(player.name_tag.position.y, HitScan.BODY_HEIGHT, "name above the head")
 
 
 func test_legs_do_not_swing_when_standing_still() -> void:
@@ -64,8 +79,8 @@ func test_knocked_out_it_melts_then_disappears() -> void:
 	character.set_in_play(false)
 	character._process(CHARACTER.MELT_TIME / 2.0)
 	assert_true(character.visible, "still melting")
-	assert_lt(character.scale.y, 1.0)
-	assert_gt(character.scale.x, 1.0)
+	assert_lt(character.scale.y, CHARACTER.SIZE)
+	assert_gt(character.scale.x, CHARACTER.SIZE)
 	character._process(CHARACTER.MELT_TIME)
 	assert_false(character.visible)
 
@@ -76,9 +91,9 @@ func test_coming_back_it_pops_up_to_full_size() -> void:
 	character.set_in_play(true)
 	character._process(0.01)
 	assert_true(character.visible)
-	assert_lt(character.scale.y, 0.5)
+	assert_lt(character.scale.y, CHARACTER.SIZE * 0.5)
 	character._process(CHARACTER.POP_TIME)
-	assert_almost_eq(character.scale.y, 1.0, 0.0001)
+	assert_almost_eq(character.scale.y, CHARACTER.SIZE, 0.0001)
 
 
 func test_a_character_not_shown_stays_hidden() -> void:

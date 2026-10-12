@@ -302,18 +302,18 @@ func _show_team(team: int) -> void:
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	if team == MatchState.CHEDDAR:
 		var wedge := PrismMesh.new()
-		wedge.size = Vector3(0.3, 0.26, 0.08)
+		wedge.size = Vector3(0.45, 0.39, 0.12)
 		wedge.material = material
 		_badge.mesh = wedge
 	else:
 		var wheel := CylinderMesh.new()
-		wheel.top_radius = 0.15
-		wheel.bottom_radius = 0.15
-		wheel.height = 0.08
+		wheel.top_radius = 0.22
+		wheel.bottom_radius = 0.22
+		wheel.height = 0.12
 		wheel.material = material
 		_badge.mesh = wheel
 		_badge.rotation.x = PI / 2.0
-	_badge.position = Vector3(0, 2.5, 0)
+	_badge.position = Vector3(0, 3.7, 0)
 	_badge.visible = not _mine and alive
 	add_child(_badge)
 

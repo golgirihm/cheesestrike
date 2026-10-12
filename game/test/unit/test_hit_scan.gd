@@ -9,19 +9,19 @@ func test_a_ray_straight_at_the_body_hits_its_front() -> void:
 
 
 func test_a_ray_beside_the_body_misses() -> void:
-	assert_eq(HitScan.ray_capsule(Vector3(0.5, 1, 0), Vector3.FORWARD, FEET), INF)
+	assert_eq(HitScan.ray_capsule(Vector3(HitScan.BODY_RADIUS + 0.1, 1, 0), Vector3.FORWARD, FEET), INF)
 
 
 func test_a_ray_just_inside_the_edge_hits() -> void:
-	assert_lt(HitScan.ray_capsule(Vector3(0.39, 1, 0), Vector3.FORWARD, FEET), INF)
+	assert_lt(HitScan.ray_capsule(Vector3(HitScan.BODY_RADIUS - 0.01, 1, 0), Vector3.FORWARD, FEET), INF)
 
 
 func test_a_ray_over_the_head_misses() -> void:
-	assert_eq(HitScan.ray_capsule(Vector3(0, 1.85, 0), Vector3.FORWARD, FEET), INF)
+	assert_eq(HitScan.ray_capsule(Vector3(0, HitScan.BODY_HEIGHT + 0.05, 0), Vector3.FORWARD, FEET), INF)
 
 
 func test_a_ray_at_the_top_of_the_head_hits_the_rounded_top() -> void:
-	var t := HitScan.ray_capsule(Vector3(0, 1.75, 0), Vector3.FORWARD, FEET)
+	var t := HitScan.ray_capsule(Vector3(0, HitScan.BODY_HEIGHT - 0.05, 0), Vector3.FORWARD, FEET)
 	assert_lt(t, INF)
 	# The rounded top is narrower than the body, so the hit is further away.
 	assert_gt(t, 10.0 - HitScan.BODY_RADIUS)
@@ -64,7 +64,7 @@ func test_the_nearest_of_several_players_is_hit() -> void:
 	var targets := {7: Vector3(0, 0, -20), 8: Vector3(0, 0, -10), 9: Vector3(0, 0, -30)}
 	var hit := HitScan.first_hit(Vector3(0, 1, 0), Vector3.FORWARD, 100.0, targets)
 	assert_eq(hit.id, 8)
-	assert_almost_eq(hit.distance, 9.6, 0.001)
+	assert_almost_eq(hit.distance, 10.0 - HitScan.BODY_RADIUS, 0.001)
 
 
 func test_nobody_beyond_the_range_is_hit() -> void:
@@ -79,19 +79,19 @@ func test_a_wall_in_front_of_the_player_stops_the_shot() -> void:
 
 
 func test_a_hit_high_on_the_body_is_a_headshot() -> void:
-	var hit := HitScan.first_hit(Vector3(0, 1.6, 0), Vector3.FORWARD, 100.0, {8: FEET})
+	var hit := HitScan.first_hit(Vector3(0, HitScan.HEAD_FROM + 0.2, 0), Vector3.FORWARD, 100.0, {8: FEET})
 	assert_true(hit.head)
 
 
 func test_a_hit_on_the_chest_is_not_a_headshot() -> void:
-	var hit := HitScan.first_hit(Vector3(0, 1.2, 0), Vector3.FORWARD, 100.0, {8: FEET})
+	var hit := HitScan.first_hit(Vector3(0, HitScan.HEAD_FROM - 0.6, 0), Vector3.FORWARD, 100.0, {8: FEET})
 	assert_false(hit.head)
 
 
 func test_headshots_count_from_the_feet_of_a_player_on_a_box() -> void:
 	var raised := FEET + Vector3(0, 2, 0)
-	assert_true(HitScan.first_hit(Vector3(0, 3.6, 0), Vector3.FORWARD, 100.0, {8: raised}).head)
-	assert_false(HitScan.first_hit(Vector3(0, 3.0, 0), Vector3.FORWARD, 100.0, {8: raised}).head)
+	assert_true(HitScan.first_hit(Vector3(0, 2.0 + HitScan.HEAD_FROM + 0.2, 0), Vector3.FORWARD, 100.0, {8: raised}).head)
+	assert_false(HitScan.first_hit(Vector3(0, 2.0 + HitScan.HEAD_FROM - 0.6, 0), Vector3.FORWARD, 100.0, {8: raised}).head)
 
 
 func test_no_targets_means_no_hit() -> void:
