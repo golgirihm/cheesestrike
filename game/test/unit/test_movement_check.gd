@@ -32,8 +32,8 @@ func test_moving_far_too_fast_is_refused() -> void:
 	assert_eq(check.last_position(), Vector3.ZERO, "the last good place is kept")
 
 
-func test_an_overload_is_fast_but_allowed() -> void:
-	assert_true(check.check(11.0, Vector3(6.0 * 1.35, 0, 0), 0, open, true))
+func test_running_in_an_overload_is_fast_but_allowed() -> void:
+	assert_true(check.check(11.0, Vector3(Movement.speed(true, false, 0.0, Overload.SPEED_BOOST), 0, 0), 0, open, true))
 
 
 func test_a_shove_allows_more_speed_for_a_moment() -> void:
@@ -42,7 +42,7 @@ func test_a_shove_allows_more_speed_for_a_moment() -> void:
 	var later := MovementCheck.new()
 	later.check(10.0, Vector3.ZERO, 0, open, true)
 	later.pushed(10.0, Vector3(9, 4, 0))
-	assert_false(later.check(13.0, Vector3(40, 0, 0), 0, open, true), "not long after")
+	assert_false(later.check(13.0, Vector3(60, 0, 0), 0, open, true), "not long after")
 
 
 func test_rising_faster_than_a_jump_is_refused() -> void:

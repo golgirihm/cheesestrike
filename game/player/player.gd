@@ -15,8 +15,6 @@ signal received(time: float, at: Vector3, teleports: int, facing: Vector2)
 ## Another player was moved at once to somewhere new, as on coming back.
 signal teleported
 
-const SPEED := 6.0
-const JUMP_VELOCITY := 5.5
 const MOUSE_SENSITIVITY := 0.0025
 const STICK_LOOK_SPEED := 2.8
 const TOUCH_LOOK_SENSITIVITY := 0.006
@@ -112,6 +110,8 @@ var _fire_pressed := false
 var _reload_pressed := false
 var _jump_pressed := false
 var _overload_pressed := false
+# Seconds of flinching left after being hit, which slows this player.
+var _flinch_left := 0.0
 
 
 func _enter_tree() -> void:
@@ -163,6 +163,7 @@ func _ready() -> void:
 
 func _on_hurt(_attacker: int, _from: Vector3, dealt: int) -> void:
 	shake.add(Shake.from_damage(dealt))
+	_flinch_left = Movement.FLINCH_TIME
 
 
 func _on_burst(_id: int, weapon_id: String, at: Vector3) -> void:
@@ -188,6 +189,7 @@ func respawn_at(at: Vector3) -> void:
 	velocity = Vector3.ZERO
 	head.rotation.x = 0.0
 	_knockback = Vector3.ZERO
+	_flinch_left = 0.0
 	_face_middle()
 	for carried: WeaponState in arsenal.values():
 		carried.refill()
@@ -553,7 +555,7 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 	elif _jump_pressed or _touch_jump:
-		velocity.y = JUMP_VELOCITY
+		velocity.y = Movement.JUMP_VELOCITY
 		Sounds.play("jump", -10.0)
 	_jump_pressed = false
 	_touch_jump = false
@@ -561,7 +563,8 @@ func _physics_process(delta: float) -> void:
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back") + _move_touch_vector
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y).limit_length(1.0)
 	_knockback *= exp(-(KNOCKBACK_GROUND_DECAY if is_on_floor() else KNOCKBACK_AIR_DECAY) * delta)
-	var speed := SPEED * Overload.speed_factor(record())
+	_flinch_left = maxf(_flinch_left - delta, 0.0)
+	var speed := Movement.speed(Input.is_action_pressed("sprint"), false, _flinch_left, Overload.speed_factor(record()))
 	velocity.x = direction.x * speed + _knockback.x
 	velocity.z = direction.z * speed + _knockback.z
 	move_and_slide()

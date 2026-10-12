@@ -160,9 +160,10 @@ func test_the_canyons_ramps_lead_up_to_its_mesas() -> void:
 func test_nobody_can_jump_out_of_any_arena() -> void:
 	# The highest a player can be thrown, with a jump and a full burst under
 	# them, standing on the highest floor.
-	var lift: float = 5.5 + Weapons.find("launcher").knockback
+	var lift: float = Movement.JUMP_VELOCITY + Weapons.find("launcher").knockback
+	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 	# Stacked blocks make 4 m the highest floor anywhere.
-	var highest := 4.0 + lift * lift / (2.0 * 9.8) + BodyShape.HEIGHT
+	var highest := 4.0 + lift * lift / (2.0 * gravity) + BodyShape.HEIGHT
 	for id: String in _each_map():
 		await _load(id)
 		var walls: Array = world.map.get_node("Geometry").get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Wall"))
