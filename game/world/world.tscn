@@ -1,15 +1,37 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://world/world.gd" id="1_world"]
 [ext_resource type="Script" path="res://match/match.gd" id="3_match"]
 [ext_resource type="Script" path="res://effects/effects.gd" id="4_effects"]
 
+[ext_resource type="Shader" path="res://world/sky.gdshader" id="5_sky"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_clouds"]
+seed = 7
+frequency = 0.007
+fractal_octaves = 4
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_clouds"]
+width = 512
+height = 512
+seamless = true
+noise = SubResource("FastNoiseLite_clouds")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("5_sky")
+shader_parameter/clouds = SubResource("NoiseTexture2D_clouds")
+
+[sub_resource type="Sky" id="Sky_clouds"]
+sky_material = SubResource("ShaderMaterial_sky")
+radiance_size = 0
+
 [sub_resource type="Environment" id="Environment_sky"]
-background_mode = 1
-background_color = Color(0.55, 0.8, 0.98, 1)
+background_mode = 2
+sky = SubResource("Sky_clouds")
 ambient_light_source = 2
-ambient_light_color = Color(1, 0.97, 0.9, 1)
-ambient_light_energy = 0.6
+reflected_light_source = 1
+ambient_light_color = Color(0.82, 0.88, 1, 1)
+ambient_light_energy = 0.5
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_world")

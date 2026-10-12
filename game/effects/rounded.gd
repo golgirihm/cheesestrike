@@ -9,6 +9,7 @@ class_name Rounded
 ## Steps round each quarter turn of an edge.
 const STEPS := 3
 
+# Each shape made so far, by what was asked for.
 static var _made := {}
 
 
@@ -47,6 +48,26 @@ static func cylinder(radius: float, height: float, edge := 0.05, sides := 20) ->
 	if not _made.has(key):
 		_made[key] = _build_cylinder(radius, height, edge, sides)
 	return _made[key]
+
+
+## A flat round mark of `radius`, such as a hole in cheese, lying on a
+## surface that faces `normal`: centred on `at` and `lift` above it, so that
+## it doesn't flicker through the surface.
+static func spot(radius: float, material: Material, at: Vector3, normal: Vector3, lift := 0.003) -> MeshInstance3D:
+	var key := ["spot", radius]
+	if not _made.has(key):
+		var disc := CylinderMesh.new()
+		disc.top_radius = radius
+		disc.bottom_radius = radius
+		disc.height = 0.001
+		disc.radial_segments = 20
+		disc.rings = 0
+		_made[key] = disc
+	var mark := instance(_made[key], material, at + normal * lift)
+	mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The disc's flat sides face along its Y axis.
+	mark.quaternion = Quaternion(Vector3.UP, normal)
+	return mark
 
 
 ## A MeshInstance3D showing `mesh` in `material`.
