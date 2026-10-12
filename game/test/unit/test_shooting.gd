@@ -4,7 +4,8 @@ extends GutTest
 ## the spawner would add them.
 
 const WORLD := preload("res://world/world.tscn")
-const EYE := Vector3(0, 2.3, 0)
+## Height of the middle of a player's wedge: a body shot, not between the legs.
+const CHEST := BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match
@@ -28,6 +29,13 @@ func _add(id: int, at: Vector3) -> Node3D:
 	return player
 
 
+## The middle of one of player `id`'s eyes: a headshot.
+func _eye_of(id: int) -> Vector3:
+	var target: Node3D = world.player_node(id)
+	var eye: Vector3 = BodyShape.eye_centres(target.head.rotation.x)[0]
+	return target.global_position + Basis(Vector3.UP, target.rotation.y) * eye * BodyShape.SIZE
+
+
 func _shoot(from: Node3D, at: Vector3) -> void:
 	var origin: Vector3 = from.head.global_position
 	match_._shot(from.name.to_int(), origin, (at - origin).normalized(), 1)
@@ -36,29 +44,30 @@ func _shoot(from: Node3D, at: Vector3) -> void:
 func test_a_shot_at_another_player_hurts_them() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
-	_shoot(shooter, Vector3(0, 1.0, -5))
+	_shoot(shooter, Vector3(0, CHEST, -5))
 	assert_eq(match_.state.player(2).health, 100 - 20)
 
 
 func test_a_shot_at_the_head_does_more() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
-	_shoot(shooter, Vector3(0, 2.4, -5))
+	_shoot(shooter, _eye_of(2))
 	assert_eq(match_.state.player(2).health, 100 - 35)
 
 
 func test_a_shot_that_misses_hurts_nobody() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
-	_shoot(shooter, Vector3(3, 1.0, -5))
+	_shoot(shooter, Vector3(3, CHEST, -5))
 	assert_eq(match_.state.player(2).health, 100)
 
 
 func test_a_wall_stops_a_shot() -> void:
-	# A cheese block stands at (0, 1, -10), between these two.
-	var shooter := _add(1, Vector3(0, 0, -6))
-	_add(2, Vector3(0, 0, -13))
-	_shoot(shooter, Vector3(0, 1.0, -13))
+	# A cheese block stands at (0, 1, -10), between these two; the shot is aimed
+	# low at the player close behind it, so the block is in its way.
+	var shooter := _add(1, Vector3(0, 0, 10))
+	_add(2, Vector3(0, 0, -11.0 - BodyShape.RADIUS))
+	_shoot(shooter, Vector3(0, (BodyShape.HIP_HEIGHT + 0.05) * BodyShape.SIZE, -11.0 - BodyShape.RADIUS))
 	assert_eq(match_.state.player(2).health, 100)
 
 
@@ -66,7 +75,7 @@ func test_only_the_nearest_player_in_line_is_hit() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, 0))
 	_add(3, Vector3(0, 0, -5))
-	_shoot(shooter, Vector3(0, 1.0, -5))
+	_shoot(shooter, Vector3(0, CHEST, -5))
 	assert_eq(match_.state.player(2).health, 80)
 	assert_eq(match_.state.player(3).health, 100)
 
@@ -82,7 +91,7 @@ func test_a_player_who_is_out_cannot_shoot() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	match_.state.damage(2, 1, 500.0)
-	_shoot(shooter, Vector3(0, 1.0, -5))
+	_shoot(shooter, Vector3(0, CHEST, -5))
 	assert_eq(match_.state.player(2).health, 100)
 
 
@@ -91,7 +100,7 @@ func test_a_player_who_is_out_is_not_hit() -> void:
 	_add(2, Vector3(0, 0, 0))
 	_add(3, Vector3(0, 0, -5))
 	match_.state.damage(3, 2, 500.0)
-	_shoot(shooter, Vector3(0, 1.0, -5))
+	_shoot(shooter, Vector3(0, CHEST, -5))
 	assert_eq(match_.state.player(3).health, 80, "the shot passes where the knocked-out player stood")
 
 
@@ -99,7 +108,7 @@ func test_firing_faster_than_the_weapon_allows_is_refused() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	for i in 10:
-		_shoot(shooter, Vector3(0, 1.0, -5))
+		_shoot(shooter, Vector3(0, CHEST, -5))
 	assert_eq(match_.state.player(2).health, 100 - 3 * 20, "only the allowed burst lands")
 
 
@@ -107,7 +116,7 @@ func test_enough_hits_knock_a_player_out_and_score() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	for i in 3:
-		_shoot(shooter, Vector3(0, 2.4, -5))
+		_shoot(shooter, _eye_of(2))
 	assert_false(match_.state.player(2).alive)
 	assert_eq(match_.state.player(1).kills, 1)
 
@@ -140,7 +149,7 @@ func test_firing_ends_protection() -> void:
 	_add(2, Vector3(0, 0, -5))
 	match_.state.respawn(1)
 	assert_true(match_.state.player(1).is_protected())
-	_shoot(shooter, Vector3(3, 1.0, -5))
+	_shoot(shooter, Vector3(3, CHEST, -5))
 	assert_false(match_.state.player(1).is_protected())
 
 
@@ -166,7 +175,7 @@ func test_the_host_is_told_of_its_own_hit() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	watch_signals(match_)
-	_shoot(shooter, Vector3(0, 2.4, -5))
+	_shoot(shooter, _eye_of(2))
 	assert_signal_emitted_with_parameters(match_, "hit_confirmed", [2, 35, false, true])
 	assert_signal_not_emitted(match_, "shot_shown", "the shooter shows its own shot")
 
@@ -175,7 +184,7 @@ func test_the_host_is_told_when_it_is_hurt_and_sees_the_shot() -> void:
 	_add(1, Vector3(0, 0, -5))
 	var shooter := _add(2, Vector3(0, 0, 5))
 	watch_signals(match_)
-	_shoot(shooter, Vector3(0, 1.0, -5))
+	_shoot(shooter, Vector3(0, CHEST, -5))
 	assert_signal_emitted(match_, "hurt")
 	var hurt: Array = get_signal_parameters(match_, "hurt")
 	assert_eq(hurt[0], 2)
@@ -184,7 +193,7 @@ func test_the_host_is_told_when_it_is_hurt_and_sees_the_shot() -> void:
 	assert_signal_emitted(match_, "shot_shown")
 	var ends: Array = get_signal_parameters(match_, "shot_shown")[1]
 	assert_eq(ends.size(), 1)
-	assert_almost_eq(ends[0].z, -5.0 + HitScan.BODY_RADIUS, 0.01, "the tracer stops at the player hit")
+	assert_almost_eq(ends[0].z, -5.0 + BodyShape.WEDGE_SIZE.z / 2.0 * BodyShape.SIZE, 0.01, "the tracer stops at the player hit")
 
 
 func test_a_missed_shot_ends_at_the_wall() -> void:
@@ -210,7 +219,7 @@ func test_a_knock_out_is_announced_with_both_names() -> void:
 	match_.state.rename(2, "Target")
 	watch_signals(match_)
 	for i in 3:
-		_shoot(shooter, Vector3(0, 2.4, -5))
+		_shoot(shooter, _eye_of(2))
 	assert_signal_emit_count(match_, "knocked_out", 1)
 	assert_signal_emitted_with_parameters(match_, "knocked_out", ["Shooter", "Target", "blaster", true])
 
@@ -225,7 +234,7 @@ func test_teammates_shots_pass_without_hurting() -> void:
 	_add(2, Vector3(10, 0, 0))
 	_add(3, Vector3(0, 0, -5))
 	assert_eq(match_.state.player(1).team, match_.state.player(3).team, "1 and 3 share a team")
-	_shoot(shooter, Vector3(0, 1.0, -5))
+	_shoot(shooter, Vector3(0, CHEST, -5))
 	assert_eq(match_.state.player(3).health, 100)
 
 
@@ -233,7 +242,7 @@ func test_a_new_match_brings_everyone_back_with_scores_cleared() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	for i in 3:
-		_shoot(shooter, Vector3(0, 2.4, -5))
+		_shoot(shooter, _eye_of(2))
 	match_.state.end_match()
 	match_._process(MatchState.INTERMISSION + 0.01)
 	assert_true(match_.state.is_playing())
@@ -250,7 +259,7 @@ func test_the_match_ends_when_the_kill_limit_is_reached() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	for i in 3:
-		_shoot(shooter, Vector3(0, 2.4, -5))
+		_shoot(shooter, _eye_of(2))
 	assert_false(match_.state.is_playing())
 	assert_eq(match_.state.winners, [1] as Array[int])
 
@@ -271,7 +280,7 @@ func test_a_shotgun_blast_up_close_lands_many_pellets() -> void:
 	_add(2, Vector3(0, 0, -2))
 	_give(1, "shotgun")
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(0, 1.0, -2) - origin).normalized(), 7, "shotgun")
+	match_._shot(1, origin, (Vector3(0, CHEST, -2) - origin).normalized(), 7, "shotgun")
 	var dealt := 100 - match_.state.player(2).health
 	assert_gt(dealt, 50, "most pellets hit at two metres")
 
@@ -281,7 +290,7 @@ func test_a_shotgun_blast_far_away_mostly_misses() -> void:
 	_add(2, Vector3(12, 0, 12))
 	_give(1, "shotgun")
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(12, 1.0, 12) - origin).normalized(), 7, "shotgun")
+	match_._shot(1, origin, (Vector3(12, CHEST, 12) - origin).normalized(), 7, "shotgun")
 	assert_lt(100 - match_.state.player(2).health, 40)
 
 
@@ -296,7 +305,7 @@ func test_a_launcher_wheel_bursts_on_a_player_and_hurts_them() -> void:
 	_give(1, "launcher")
 	watch_signals(match_)
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(0, 1.0, -3) - origin).normalized(), 1, "launcher")
+	match_._shot(1, origin, (Vector3(0, CHEST, -3) - origin).normalized(), 1, "launcher")
 	assert_signal_emitted(match_, "projectile_launched")
 	_fly(1.0)
 	assert_signal_emitted(match_, "projectile_burst")
@@ -309,18 +318,18 @@ func test_a_burst_does_not_hurt_its_shooter() -> void:
 	_give(1, "launcher")
 	# Straight at the cheese block just ahead.
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(0, 1.0, -10) - origin).normalized(), 1, "launcher")
+	match_._shot(1, origin, (Vector3(0, CHEST, -10) - origin).normalized(), 1, "launcher")
 	_fly(1.0)
 	assert_eq(match_.state.player(1).health, 100)
 
 
 func test_a_burst_behind_a_wall_does_no_harm() -> void:
 	var shooter := _add(1, Vector3(0, 0, -6))
-	_add(2, Vector3(0, 0, -12))
+	_add(2, Vector3(0, 0, -11.0 - BodyShape.RADIUS))
 	_give(1, "launcher")
-	# The block at (0, 1, -10) stands between them; burst on its near face.
+	# The block at (0, 1, -10) stands between them; burst low on its near face.
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(0, 1.0, -10) - origin).normalized(), 1, "launcher")
+	match_._shot(1, origin, (Vector3(0, 0.5, -9) - origin).normalized(), 1, "launcher")
 	_fly(1.0)
 	assert_eq(match_.state.player(2).health, 100)
 
@@ -330,14 +339,14 @@ func test_a_burst_shoves_the_players_near_it() -> void:
 	var target := _add(2, Vector3(0, 0, -3))
 	_give(1, "launcher")
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(0, 1.0, -3) - origin).normalized(), 1, "launcher")
+	match_._shot(1, origin, (Vector3(0, CHEST, -3) - origin).normalized(), 1, "launcher")
 	watch_signals(match_)
 	_fly(1.0)
 	# Player 2 isn't this process's own, so the shove goes by RPC; the host's
 	# own player would be moved at once.
 	assert_signal_emitted(match_, "projectile_burst")
 	var at: Vector3 = get_signal_parameters(match_, "projectile_burst")[2]
-	assert_lt(at.distance_to(target.global_position + Vector3.UP * Match.MIDDLE), 1.0)
+	assert_lt(at.distance_to(target.global_position + Vector3.UP * CHEST), 1.0)
 
 
 func test_the_hosts_own_player_is_shoved_by_its_own_burst() -> void:

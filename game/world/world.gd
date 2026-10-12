@@ -195,7 +195,8 @@ func _create_player(data: Array) -> Node:
 	player.match_ = match_
 	player.world = self
 	player.fired.connect(_show_own_shot.bind(player))
-	player.received.connect(match_.on_moved.bind(data[0]))
+	player.received.connect(func(time: float, at: Vector3, teleports: int, facing: Vector2) -> void:
+		match_.on_moved(time, at, teleports, data[0], facing))
 	player.teleported.connect(match_.forget_positions.bind(data[0]))
 	player.spawn_position = data[1]
 	return player

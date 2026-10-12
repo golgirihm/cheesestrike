@@ -52,6 +52,22 @@ func test_history_ignores_records_out_of_order() -> void:
 	assert_eq(history.at(0.5), Vector3(1, 0, 0))
 
 
+func test_history_gives_how_a_player_faced_between_records() -> void:
+	var history := PositionHistory.new()
+	history.push(1.0, Vector3.ZERO, Vector2(0.0, 0.2))
+	history.push(2.0, Vector3.ZERO, Vector2(1.0, -0.2))
+	assert_almost_eq(history.facing_at(1.5).x, 0.5, 0.001)
+	assert_almost_eq(history.facing_at(1.5).y, 0.0, 0.001)
+	assert_eq(history.facing_at(0.0), Vector2(0.0, 0.2), "held at the oldest")
+
+
+func test_history_turns_the_short_way_round() -> void:
+	var history := PositionHistory.new()
+	history.push(1.0, Vector3.ZERO, Vector2(PI - 0.1, 0.0))
+	history.push(2.0, Vector3.ZERO, Vector2(-PI + 0.1, 0.0))
+	assert_almost_eq(absf(angle_difference(history.facing_at(1.5).x, PI)), 0.0, 0.001, "facing straight behind, not ahead")
+
+
 func test_the_host_rewinds_by_the_shooters_round_trip_and_the_smoothing() -> void:
 	match_._pings[7] = PingTracker.new()
 	match_._pings[7].add(0.08)
@@ -111,6 +127,32 @@ func test_others_updates_are_recorded_as_they_arrive() -> void:
 	other.net_state = PackedFloat32Array([5, 0, 0.5, 0, 0, 0])
 	assert_true(match_._histories.has(2))
 	assert_eq(match_._histories[2].at(Match.now()), Vector3(5, 0, 0.5))
+
+
+func test_how_others_face_is_recorded_with_where_they_are() -> void:
+	var other := _add(2, Vector3.ZERO)
+	other.net_state = PackedFloat32Array([5, 0, 0.5, 1.2, -0.3, 0])
+	var facing: Vector2 = match_._histories[2].facing_at(Match.now())
+	assert_almost_eq(facing.x, 1.2, 0.0001)
+	assert_almost_eq(facing.y, -0.3, 0.0001)
+
+
+func test_a_shot_is_checked_against_how_its_target_faced_then() -> void:
+	# Low down, the wedge is wider than it is deep. A shot that clips its edge
+	# face-on passes by a player who was side-on when it was fired, though
+	# they face the shooter now.
+	var edge := BodyShape.WEDGE_SIZE.z / 2.0 * BodyShape.SIZE + 0.1
+	var shooter := _add(1, Vector3(edge, 0, 10))
+	var target := _add(2, Vector3(0, 0, -5))
+	target.rotation.y = PI
+	var then := Match.now() - match_.rewind_for(1)
+	match_.record_position(then - 0.1, Vector3(0, 0, -5), 2, Vector2(PI / 2.0, 0.0))
+	match_.record_position(then + 0.1, Vector3(0, 0, -5), 2, Vector2(PI / 2.0, 0.0))
+	var origin: Vector3 = shooter.head.global_position
+	var direction := (Vector3(edge, (BodyShape.HIP_HEIGHT + 0.1) * BodyShape.SIZE, -5) - origin).normalized()
+	assert_false(BodyShape.ray_hit(origin, direction, Vector3(0, 0, -5), PI).is_empty(), "face-on, it would hit")
+	match_._shot(1, origin, direction, 1)
+	assert_eq(match_.state.player(2).health, 100)
 
 
 func test_a_jump_to_somewhere_new_restarts_the_history() -> void:

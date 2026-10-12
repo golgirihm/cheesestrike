@@ -34,8 +34,9 @@ const SYNC_INTERVAL := 0.1
 const RESYNC_INTERVAL := 2.0
 ## Physics layer of the arena's walls, floor and cover, which stop shots.
 const WORLD_MASK := 1
-## Height of a player's middle above their feet, where bursts aim their harm.
-const MIDDLE := HitScan.BODY_HEIGHT / 2.0
+## Height above a player's feet at which the host looks for walls in the way
+## of a move: low enough that every block in the arena counts.
+const MOVE_CHECK_HEIGHT := 0.9
 ## What players are told when the host ends the session on purpose.
 const HOST_ENDED := "The host ended the session."
 ## The most a shot is checked back in time. Beyond it, a shooter on a slow
@@ -377,8 +378,8 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 		_harm(shooter, victim, damage_to[victim], origin, weapon.id, headshot[victim])
 
 
-## Feet of every player in play other than `except`, by id: where they are,
-## or, given a time, where the host saw them then.
+## Every player in play other than `except`, by id, as a HitScan.pose(): where
+## they are and how they face, or, given a time, as the host saw them then.
 func _targets_except(except: int, then := -1.0) -> Dictionary:
 	var targets := {}
 	for node: Node3D in world.players.get_children():
@@ -386,7 +387,11 @@ func _targets_except(except: int, then := -1.0) -> Dictionary:
 		var target := state.player(id)
 		if id != except and target != null and target.alive and not node.is_queued_for_deletion():
 			var history: PositionHistory = _histories.get(id)
-			targets[id] = history.at(then) if then >= 0.0 and history != null and not history.is_empty() else node.global_position
+			if then >= 0.0 and history != null and not history.is_empty():
+				var facing := history.facing_at(then)
+				targets[id] = HitScan.pose(history.at(then), facing.x, facing.y)
+			else:
+				targets[id] = HitScan.pose(node.global_position, node.rotation.y, node.head.rotation.x)
 	return targets
 
 
@@ -416,20 +421,21 @@ func _check_for(id: int) -> MovementCheck:
 
 
 ## Host only: player `id`'s update arrived at `time` placing them at `at`,
-## after being moved at once `teleports` times. Movement that couldn't have
-## happened is ignored, and the player is put back where they last were.
-func on_moved(time: float, at: Vector3, teleports: int, id: int) -> void:
+## after being moved at once `teleports` times, turned by `facing` (yaw,
+## pitch). Movement that couldn't have happened is ignored, and the player is
+## put back where they last were.
+func on_moved(time: float, at: Vector3, teleports: int, id: int, facing := Vector2.ZERO) -> void:
 	if not is_host():
 		return
 	var space := world.get_world_3d().direct_space_state
-	var waist := Vector3.UP * MIDDLE
+	var waist := Vector3.UP * MOVE_CHECK_HEIGHT
 	var blocked := func(from: Vector3, to: Vector3) -> bool:
 		return not space.intersect_ray(PhysicsRayQueryParameters3D.create(from + waist, to + waist, WORLD_MASK)).is_empty()
 	var ground := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.1, at + Vector3.DOWN * 0.6, WORLD_MASK)
 	var on_ground := not space.intersect_ray(ground).is_empty()
 	var check := _check_for(id)
 	if check.check(time, at, teleports, blocked, on_ground):
-		record_position(time, at, id)
+		record_position(time, at, id, facing)
 		return
 	if time - _put_back_at.get(id, -INF) < PUT_BACK_INTERVAL:
 		return
@@ -455,13 +461,14 @@ func forget_positions(id: int) -> void:
 	_histories.erase(id)
 
 
-## Host only: player `id` was at `at` at time `time` on the host's clock.
-func record_position(time: float, at: Vector3, id: int) -> void:
+## Host only: player `id` was at `at`, facing `facing` (yaw, pitch), at time
+## `time` on the host's clock.
+func record_position(time: float, at: Vector3, id: int, facing := Vector2.ZERO) -> void:
 	if not is_host():
 		return
 	if not _histories.has(id):
 		_histories[id] = PositionHistory.new()
-	_histories[id].push(time, at)
+	_histories[id].push(time, at, facing)
 
 
 ## `attacker` hurts `victim` for `amount` with `weapon`, from `from`, and
@@ -490,7 +497,7 @@ func _physics_process(delta: float) -> void:
 	# The host's own player moves here, so its history is kept here too.
 	var own: Node3D = world.player_node(multiplayer.get_unique_id())
 	if own != null:
-		record_position(now(), own.global_position, own.name.to_int())
+		record_position(now(), own.global_position, own.name.to_int(), Vector2(own.rotation.y, own.head.rotation.x))
 	_collect_pickups()
 	if _projectiles.is_empty():
 		return
@@ -565,7 +572,8 @@ func _burst(projectile: Projectile, at: Vector3) -> void:
 		var record := state.player(id)
 		if record == null or not record.alive or node.is_queued_for_deletion():
 			continue
-		var middle := node.global_position + Vector3.UP * MIDDLE
+		# Measured to the nearest point up the middle of the body.
+		var middle := BodyShape.nearest_middle(node.global_position, at)
 		if at.distance_to(middle) >= weapon.splash_radius:
 			continue
 		var query := PhysicsRayQueryParameters3D.create(eye, middle, WORLD_MASK)

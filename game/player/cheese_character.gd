@@ -1,25 +1,22 @@
 extends Node3D
 ## How a player looks to everyone else: an upright wedge of cheese with holes,
-## two legs and two arms, built from simple shapes and animated in code. It
-## stands on the player's feet and fits inside their collision capsule. The
-## eyes are on the player's head, so they look where the player looks.
+## two legs and two arms, built from simple shapes and animated in code. Its
+## measurements are BodyShape's, which shots are tested against too, so it is
+## hit exactly where it is seen. It stands on the player's feet and fits
+## inside their collision capsule. The eyes are on the player's head, so they
+## look where the player looks.
 ##
 ## The player sets its colour and tells it how it is moving; it walks, jumps,
 ## melts when knocked out and pops back on returning.
 
 const HOLE_COLOR := Color(0.25, 0.17, 0.05)
 const LEG_COLOR := Color(0.95, 0.85, 0.6)
-const HIP_HEIGHT := 0.42
-const LEG_LENGTH := 0.42
 ## How far the legs swing, in radians, at full running speed.
 const STRIDE := 0.7
 ## Steps per metre walked.
 const STEPS_PER_METRE := 0.9
 const MELT_TIME := 0.45
 const POP_TIME := 0.2
-## How much bigger it is than the shapes it's built from, to fill the
-## player's capsule.
-const SIZE := 1.5
 
 ## Whether to draw it at all: not for the player's own machine, which sees
 ## from inside it.
@@ -42,7 +39,7 @@ var _pop := 1.0
 func _init() -> void:
 	_material.roughness = 0.7
 	_build()
-	scale = Vector3.ONE * SIZE
+	scale = Vector3.ONE * BodyShape.SIZE
 
 
 ## The body's colour.
@@ -104,7 +101,7 @@ func _process(delta: float) -> void:
 	# Melting sags and spreads the body; popping back grows it from the floor.
 	var sag := 1.0 - 0.85 * _melt
 	var spread := 1.0 + 0.6 * _melt
-	scale = Vector3(spread, sag, spread) * _ease_out(_pop) * SIZE
+	scale = Vector3(spread, sag, spread) * _ease_out(_pop) * BodyShape.SIZE
 	visible = shown and not is_melted()
 
 
@@ -114,44 +111,43 @@ static func _ease_out(t: float) -> float:
 
 func _build() -> void:
 	var wedge_mesh := PrismMesh.new()
-	wedge_mesh.size = Vector3(0.78, 1.0, 0.56)
+	wedge_mesh.size = BodyShape.WEDGE_SIZE
 	wedge_mesh.material = _material
 	_wedge = MeshInstance3D.new()
 	_wedge.name = "Wedge"
 	_wedge.mesh = wedge_mesh
-	_wedge.position = Vector3(0, HIP_HEIGHT + 0.5, 0)
+	_wedge.position = BodyShape.WEDGE_CENTRE
 	add_child(_wedge)
 
 	# Holes on the front and sides.
 	var hole_material := StandardMaterial3D.new()
 	hole_material.albedo_color = HOLE_COLOR
-	for hole: Array in [[Vector3(-0.16, 0.62, -0.27), 0.07], [Vector3(0.12, 0.78, -0.27), 0.05],
-			[Vector3(0.05, 0.52, -0.27), 0.04], [Vector3(-0.27, 0.6, 0.05), 0.06], [Vector3(0.25, 0.68, 0.12), 0.05]]:
+	for hole: Array in BodyShape.HOLES:
 		var sphere := SphereMesh.new()
 		sphere.radius = hole[1]
 		sphere.height = hole[1] * 2.0
 		sphere.material = hole_material
 		var mesh := MeshInstance3D.new()
 		mesh.mesh = sphere
-		mesh.position = hole[0] + Vector3(0, HIP_HEIGHT - 0.1, 0)
+		mesh.position = hole[0]
 		mesh.name = "Hole%d" % get_child_count()
 		add_child(mesh)
 
 	var limb_material := StandardMaterial3D.new()
 	limb_material.albedo_color = LEG_COLOR
-	for side in [-1.0, 1.0]:
+	for leg: Array in BodyShape.LEGS:
 		var hip := Node3D.new()
 		hip.name = "Leg%d" % (_legs.size() + 1)
-		hip.position = Vector3(0.17 * side, HIP_HEIGHT, 0)
+		hip.position = leg[0]
 		add_child(hip)
-		hip.add_child(_limb(LEG_LENGTH, 0.07, limb_material))
+		hip.add_child(_limb(leg[1], leg[2], limb_material))
 		_legs.append(hip)
-	for side in [-1.0, 1.0]:
+	for arm: Array in BodyShape.ARMS:
 		var shoulder := Node3D.new()
 		shoulder.name = "Arm%d" % (_arms.size() + 1)
-		shoulder.position = Vector3(0.36 * side, HIP_HEIGHT + 0.42, -0.02)
+		shoulder.position = arm[0]
 		add_child(shoulder)
-		shoulder.add_child(_limb(0.34, 0.05, limb_material))
+		shoulder.add_child(_limb(arm[1], arm[2], limb_material))
 		_arms.append(shoulder)
 
 

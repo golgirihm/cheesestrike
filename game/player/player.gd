@@ -11,7 +11,7 @@ extends CharacterBody3D
 signal fired(origin: Vector3, direction: Vector3, seed: int)
 ## Another player's update arrived at `time` (this machine's clock, seconds)
 ## placing them at `at`, after being moved at once `teleports` times.
-signal received(time: float, at: Vector3, teleports: int)
+signal received(time: float, at: Vector3, teleports: int, facing: Vector2)
 ## Another player was moved at once to somewhere new, as on coming back.
 signal teleported
 
@@ -122,9 +122,12 @@ func _enter_tree() -> void:
 ## further out than in their hand as others see it, so it doesn't fill the screen.
 const VIEW_GUN_POSITION := Vector3(0.2, -0.19, -0.55)
 const VIEW_GUN_SCALE := 0.6
+## How high the team badge floats, in the character's measurements.
+const BADGE_HEIGHT := 2.5
 
 
 func _ready() -> void:
+	_grow()
 	if is_multiplayer_authority():
 		gun.position = VIEW_GUN_POSITION
 		gun.scale = Vector3.ONE * VIEW_GUN_SCALE
@@ -277,6 +280,22 @@ func _show_overload(own: PlayerRecord) -> void:
 
 
 ## A player's own colour when not on a team: spread round the colour wheel by id.
+## The scene is laid out in the character's own measurements (BodyShape);
+## everything about the player's size grows from them by BodyShape.SIZE here.
+func _grow() -> void:
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = BodyShape.RADIUS
+	capsule.height = BodyShape.HEIGHT
+	collider.shape = capsule
+	collider.position = Vector3(0, BodyShape.HEIGHT / 2.0, 0)
+	head.position = Vector3(0, BodyShape.HEAD_HEIGHT * BodyShape.SIZE, 0)
+	visor.position = BodyShape.EYES_OFFSET * BodyShape.SIZE
+	visor.scale = Vector3.ONE * BodyShape.SIZE
+	gun.position *= BodyShape.SIZE
+	gun.scale = Vector3.ONE * BodyShape.SIZE
+	name_tag.position *= BodyShape.SIZE
+
+
 static func colour_for(id: int) -> Color:
 	return Color.from_hsv(fmod(id * 0.618034, 1.0), 0.65, 0.95)
 
@@ -302,18 +321,19 @@ func _show_team(team: int) -> void:
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	if team == MatchState.CHEDDAR:
 		var wedge := PrismMesh.new()
-		wedge.size = Vector3(0.45, 0.39, 0.12)
+		wedge.size = Vector3(0.3, 0.26, 0.08)
 		wedge.material = material
 		_badge.mesh = wedge
 	else:
 		var wheel := CylinderMesh.new()
-		wheel.top_radius = 0.22
-		wheel.bottom_radius = 0.22
-		wheel.height = 0.12
+		wheel.top_radius = 0.15
+		wheel.bottom_radius = 0.15
+		wheel.height = 0.08
 		wheel.material = material
 		_badge.mesh = wheel
 		_badge.rotation.x = PI / 2.0
-	_badge.position = Vector3(0, 3.7, 0)
+	_badge.position = Vector3(0, BADGE_HEIGHT * BodyShape.SIZE, 0)
+	_badge.scale = Vector3.ONE * BodyShape.SIZE
 	_badge.visible = not _mine and alive
 	add_child(_badge)
 
@@ -446,7 +466,7 @@ func _receive(state: PackedFloat32Array) -> void:
 	smoothing.push(now, state)
 	if smoothing.is_empty():
 		return
-	received.emit(now, Vector3(state[0], state[1], state[2]), int(state[5]))
+	received.emit(now, Vector3(state[0], state[1], state[2]), int(state[5]), Vector2(state[3], state[4]))
 
 
 ## Draws another player where the smoothing says they were a moment ago.

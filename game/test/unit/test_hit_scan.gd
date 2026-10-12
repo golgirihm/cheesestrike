@@ -1,97 +1,150 @@
 extends GutTest
 
 const FEET := Vector3(0, 0, -10)
+const RADIUS := 0.4
+const HEIGHT := 1.8
 
 
 func test_a_ray_straight_at_the_body_hits_its_front() -> void:
-	var t := HitScan.ray_capsule(Vector3(0, 1, 0), Vector3.FORWARD, FEET)
-	assert_almost_eq(t, 10.0 - HitScan.BODY_RADIUS, 0.001)
+	var t := HitScan.ray_capsule(Vector3(0, 1, 0), Vector3.FORWARD, FEET, RADIUS, HEIGHT)
+	assert_almost_eq(t, 10.0 - RADIUS, 0.001)
 
 
 func test_a_ray_beside_the_body_misses() -> void:
-	assert_eq(HitScan.ray_capsule(Vector3(HitScan.BODY_RADIUS + 0.1, 1, 0), Vector3.FORWARD, FEET), INF)
+	assert_eq(HitScan.ray_capsule(Vector3(RADIUS + 0.1, 1, 0), Vector3.FORWARD, FEET, RADIUS, HEIGHT), INF)
 
 
 func test_a_ray_just_inside_the_edge_hits() -> void:
-	assert_lt(HitScan.ray_capsule(Vector3(HitScan.BODY_RADIUS - 0.01, 1, 0), Vector3.FORWARD, FEET), INF)
+	assert_lt(HitScan.ray_capsule(Vector3(RADIUS - 0.01, 1, 0), Vector3.FORWARD, FEET, RADIUS, HEIGHT), INF)
 
 
 func test_a_ray_over_the_head_misses() -> void:
-	assert_eq(HitScan.ray_capsule(Vector3(0, HitScan.BODY_HEIGHT + 0.05, 0), Vector3.FORWARD, FEET), INF)
+	assert_eq(HitScan.ray_capsule(Vector3(0, HEIGHT + 0.05, 0), Vector3.FORWARD, FEET, RADIUS, HEIGHT), INF)
 
 
 func test_a_ray_at_the_top_of_the_head_hits_the_rounded_top() -> void:
-	var t := HitScan.ray_capsule(Vector3(0, HitScan.BODY_HEIGHT - 0.05, 0), Vector3.FORWARD, FEET)
+	var t := HitScan.ray_capsule(Vector3(0, HEIGHT - 0.05, 0), Vector3.FORWARD, FEET, RADIUS, HEIGHT)
 	assert_lt(t, INF)
 	# The rounded top is narrower than the body, so the hit is further away.
-	assert_gt(t, 10.0 - HitScan.BODY_RADIUS)
+	assert_gt(t, 10.0 - RADIUS)
 
 
 func test_a_ray_under_the_feet_misses() -> void:
-	assert_eq(HitScan.ray_capsule(Vector3(0, -0.05, 0), Vector3.FORWARD, FEET), INF)
+	assert_eq(HitScan.ray_capsule(Vector3(0, -0.05, 0), Vector3.FORWARD, FEET, RADIUS, HEIGHT), INF)
 
 
 func test_a_ray_pointing_away_misses() -> void:
-	assert_eq(HitScan.ray_capsule(Vector3(0, 1, 0), Vector3.BACK, FEET), INF)
+	assert_eq(HitScan.ray_capsule(Vector3(0, 1, 0), Vector3.BACK, FEET, RADIUS, HEIGHT), INF)
 
 
 func test_a_ray_from_straight_above_hits_the_top() -> void:
-	var t := HitScan.ray_capsule(Vector3(0, 10, -10), Vector3.DOWN, FEET)
-	assert_almost_eq(t, 10.0 - HitScan.BODY_HEIGHT, 0.001)
+	var t := HitScan.ray_capsule(Vector3(0, 10, -10), Vector3.DOWN, FEET, RADIUS, HEIGHT)
+	assert_almost_eq(t, 10.0 - HEIGHT, 0.001)
 
 
 func test_a_ray_from_straight_below_hits_the_bottom() -> void:
-	var t := HitScan.ray_capsule(Vector3(0, -5, -10), Vector3.UP, FEET)
+	var t := HitScan.ray_capsule(Vector3(0, -5, -10), Vector3.UP, FEET, RADIUS, HEIGHT)
 	assert_almost_eq(t, 5.0, 0.001)
 
 
 func test_a_ray_starting_inside_does_not_hit() -> void:
-	assert_eq(HitScan.ray_capsule(FEET + Vector3(0, 1, 0), Vector3.FORWARD, FEET), INF)
+	assert_eq(HitScan.ray_capsule(FEET + Vector3(0, 1, 0), Vector3.FORWARD, FEET, RADIUS, HEIGHT), INF)
 
 
 func test_a_slanted_ray_hits_where_expected() -> void:
 	var origin := Vector3(3, 1.6, -5)
 	var target := FEET + Vector3(0, 1.0, 0)
 	var direction := (target - origin).normalized()
-	var t := HitScan.ray_capsule(origin, direction, FEET)
+	var t := HitScan.ray_capsule(origin, direction, FEET, RADIUS, HEIGHT)
 	assert_lt(t, origin.distance_to(target))
 	var point := origin + direction * t
 	var across := Vector2(point.x - FEET.x, point.z - FEET.z).length()
-	assert_almost_eq(across, HitScan.BODY_RADIUS, 0.001, "the hit should be on the body's surface")
+	assert_almost_eq(across, RADIUS, 0.001, "the hit should be on the body's surface")
+
+
+## A player at FEET facing the shooter at the origin, who looks along -Z.
+const FACING_US := PI
+## Height of the middle of the wedge, in the arena.
+const CHEST := BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+## Half the wedge's depth, in the arena: how far its faces are from its middle.
+const FRONT := BodyShape.WEDGE_SIZE.z / 2.0 * BodyShape.SIZE
+
+
+func _eye(feet: Vector3, yaw: float, pitch := 0.0) -> Vector3:
+	return feet + Basis(Vector3.UP, yaw) * BodyShape.eye_centres(pitch)[0] * BodyShape.SIZE
+
+
+func _from_level_with(point: Vector3) -> Vector3:
+	return Vector3(point.x, point.y, 0)
 
 
 func test_the_nearest_of_several_players_is_hit() -> void:
 	var targets := {7: Vector3(0, 0, -20), 8: Vector3(0, 0, -10), 9: Vector3(0, 0, -30)}
-	var hit := HitScan.first_hit(Vector3(0, 1, 0), Vector3.FORWARD, 100.0, targets)
+	var hit := HitScan.first_hit(Vector3(0, CHEST, 0), Vector3.FORWARD, 100.0, targets)
 	assert_eq(hit.id, 8)
-	assert_almost_eq(hit.distance, 10.0 - HitScan.BODY_RADIUS, 0.001)
+	assert_almost_eq(hit.distance, 10.0 - FRONT, 0.001)
 
 
 func test_nobody_beyond_the_range_is_hit() -> void:
-	var hit := HitScan.first_hit(Vector3(0, 1, 0), Vector3.FORWARD, 5.0, {8: Vector3(0, 0, -10)})
+	var hit := HitScan.first_hit(Vector3(0, CHEST, 0), Vector3.FORWARD, 5.0, {8: Vector3(0, 0, -10)})
 	assert_true(hit.is_empty())
 
 
 func test_a_wall_in_front_of_the_player_stops_the_shot() -> void:
 	# The caller passes the distance to the wall as the range.
-	var hit := HitScan.first_hit(Vector3(0, 1, 0), Vector3.FORWARD, 9.0, {8: Vector3(0, 0, -10)})
+	var hit := HitScan.first_hit(Vector3(0, CHEST, 0), Vector3.FORWARD, 9.0, {8: Vector3(0, 0, -10)})
 	assert_true(hit.is_empty())
 
 
-func test_a_hit_high_on_the_body_is_a_headshot() -> void:
-	var hit := HitScan.first_hit(Vector3(0, HitScan.HEAD_FROM + 0.2, 0), Vector3.FORWARD, 100.0, {8: FEET})
+func test_a_hit_on_an_eye_is_a_headshot() -> void:
+	var eye := _eye(FEET, FACING_US)
+	var hit := HitScan.first_hit(_from_level_with(eye), Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, FACING_US)})
+	assert_false(hit.is_empty())
 	assert_true(hit.head)
 
 
 func test_a_hit_on_the_chest_is_not_a_headshot() -> void:
-	var hit := HitScan.first_hit(Vector3(0, HitScan.HEAD_FROM - 0.6, 0), Vector3.FORWARD, 100.0, {8: FEET})
+	var hit := HitScan.first_hit(Vector3(0, CHEST, 0), Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, FACING_US)})
+	assert_false(hit.is_empty())
 	assert_false(hit.head)
 
 
-func test_headshots_count_from_the_feet_of_a_player_on_a_box() -> void:
+func test_headshots_count_on_a_player_standing_on_a_box() -> void:
 	var raised := FEET + Vector3(0, 2, 0)
-	assert_true(HitScan.first_hit(Vector3(0, 2.0 + HitScan.HEAD_FROM + 0.2, 0), Vector3.FORWARD, 100.0, {8: raised}).head)
-	assert_false(HitScan.first_hit(Vector3(0, 2.0 + HitScan.HEAD_FROM - 0.6, 0), Vector3.FORWARD, 100.0, {8: raised}).head)
+	var target := {8: HitScan.pose(raised, FACING_US)}
+	assert_true(HitScan.first_hit(_from_level_with(_eye(raised, FACING_US)), Vector3.FORWARD, 100.0, target).head)
+	assert_false(HitScan.first_hit(Vector3(0, 2.0 + CHEST, 0), Vector3.FORWARD, 100.0, target).head)
+
+
+func test_a_shot_between_the_legs_misses() -> void:
+	var knee := (BodyShape.HIP_HEIGHT / 2.0) * BodyShape.SIZE
+	assert_true(HitScan.first_hit(Vector3(0, knee, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
+	var leg: Vector3 = BodyShape.LEGS[0][0] * BodyShape.SIZE
+	assert_false(HitScan.first_hit(Vector3(leg.x, knee, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty(), "a leg is hit")
+
+
+func test_a_shot_beside_the_narrow_top_of_the_wedge_misses() -> void:
+	# The wedge narrows to a point, so high up a shot just off the middle passes it.
+	var high := (BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y * 0.3) * BodyShape.SIZE
+	assert_true(HitScan.first_hit(Vector3(0.6, high, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
+	assert_false(HitScan.first_hit(Vector3(0.1, high, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
+
+
+func test_how_a_player_faces_changes_what_is_hit() -> void:
+	# Low down, the wedge is wider than it is deep: side-on, a shot that would
+	# clip its edge from the front passes by.
+	var edge := Vector3(FRONT + 0.1, (BodyShape.HIP_HEIGHT + 0.1) * BodyShape.SIZE, 0)
+	assert_false(HitScan.first_hit(edge, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, FACING_US)}).is_empty())
+	assert_true(HitScan.first_hit(edge, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, PI / 2.0)}).is_empty())
+
+
+func test_the_eyes_move_with_where_a_player_looks() -> void:
+	var level := _from_level_with(_eye(FEET, FACING_US))
+	var looking_down := {8: HitScan.pose(FEET, FACING_US, -0.8)}
+	var hit := HitScan.first_hit(level, Vector3.FORWARD, 100.0, looking_down)
+	assert_true(hit.is_empty() or not hit.head, "the eyes have moved from where they were")
+	var lowered := _from_level_with(_eye(FEET, FACING_US, -0.8))
+	assert_true(HitScan.first_hit(lowered, Vector3.FORWARD, 100.0, looking_down).head)
 
 
 func test_no_targets_means_no_hit() -> void:
