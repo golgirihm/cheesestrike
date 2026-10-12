@@ -11,6 +11,8 @@ extends Control
 ## Drawn over the whole screen. bind() gives it the world, whose Match says what
 ## the host decided and who this player is.
 
+## The least the crosshair opens. It opens as wide as the weapon's shots
+## spread: wide from the hip, and tight down the sights.
 const CROSSHAIR_GAP := 5.0
 const CROSSHAIR_LENGTH := 9.0
 const CROSSHAIR_COLOR := Color(1, 1, 1, 0.9)
@@ -110,6 +112,13 @@ static func damage_direction(at: Vector3, yaw: float, from: Vector3) -> float:
 	return atan2(to.dot(right), to.dot(forward))
 
 
+## How far from the middle of a view `height` pixels tall, seen with a field
+## of view of `fov` degrees, the edge of a cone `spread` degrees wide falls.
+static func crosshair_gap(spread: float, fov: float, height: float) -> float:
+	var reach := tan(deg_to_rad(spread) / 2.0) / tan(deg_to_rad(fov) / 2.0) * height / 2.0
+	return clampf(reach, CROSSHAIR_GAP, height * 0.4)
+
+
 ## Seconds as minutes and seconds, such as "7:05".
 static func clock_text(seconds: float) -> String:
 	var whole := ceili(maxf(seconds, 0.0))
@@ -151,6 +160,8 @@ static func knocked_out_text(state: MatchState, id: int) -> Array:
 	if record == null or record.alive:
 		return ["", ""]
 	var by := "Knocked out by %s" % state.name_of(record.last_attacker) if state.player(record.last_attacker) != null else "Knocked out"
+	if record.last_attacker == id:
+		by = "You knocked yourself out"
 	return [by, "Back in %d…" % ceili(record.respawn_in) if record.respawn_in > 0.0 else "Coming back…"]
 
 
@@ -261,8 +272,11 @@ func _draw() -> void:
 	if world == null or _knocked_out.visible:
 		return
 	var centre := size / 2.0
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	var gap := crosshair_gap(own.shot_spread(), own.camera.fov, size.y) if own != null else CROSSHAIR_GAP
 	for direction in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
-		draw_line(centre + direction * CROSSHAIR_GAP, centre + direction * (CROSSHAIR_GAP + CROSSHAIR_LENGTH), CROSSHAIR_COLOR, 2.0, true)
+		draw_line(centre + direction * gap, centre + direction * (gap + CROSSHAIR_LENGTH), CROSSHAIR_COLOR, 2.0, true)
+	draw_circle(centre, 1.5, CROSSHAIR_COLOR)
 	if _hit_left > 0.0:
 		var color: Color = {HIT: HIT_COLOR, HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[hit_kind]
 		color.a = _hit_left / HIT_MARKER_LIFE
@@ -273,7 +287,6 @@ func _draw() -> void:
 		if hit_kind == KNOCKOUT:
 			draw_arc(centre, reach + 4.0, 0.0, TAU, 32, color, 2.0, true)
 
-	var own: Node3D = world.player_node(multiplayer.get_unique_id())
 	if own == null:
 		return
 	var radius := minf(size.x, size.y) * 0.42

@@ -8,6 +8,7 @@ const MUSIC_RATE := 16000
 
 ## Every sound by name, with what makes it.
 const SOUNDS := {
+	"pistol": "_pistol",
 	"blaster": "_blaster",
 	"shotgun": "_shotgun",
 	"grater": "_grater",
@@ -97,6 +98,12 @@ static func _blaster() -> AudioStreamWAV:
 	return _make(0.16, func(t: float, _i: int) -> float:
 		var tone := signf(sin(TAU * (900.0 - 2500.0 * t) * t)) * 0.4
 		return (tone + rng.randf_range(-1.0, 1.0) * 0.6) * _decay(t, 28.0))
+
+
+static func _pistol() -> AudioStreamWAV:
+	var rng := _rng(9)
+	return _make(0.12, func(t: float, _i: int) -> float:
+		return rng.randf_range(-1.0, 1.0) * _decay(t, 40.0), 0.7)
 
 
 static func _shotgun() -> AudioStreamWAV:

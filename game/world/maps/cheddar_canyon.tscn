@@ -390,5 +390,13 @@ metadata/kind = "grater"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 0)
 metadata/kind = "health"
 
+[node name="BlasterWest" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0, 21)
+metadata/kind = "blaster"
+
+[node name="BlasterEast" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0, -21)
+metadata/kind = "blaster"
+
 [node name="MenuCamera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, -0, -0, 0.866186, 0.499722, 0, -0.499722, 0.866186, 0, 15, 22)

@@ -16,9 +16,13 @@ extends Resource
 @export var magazine := 24
 @export var reload_time := 1.6
 @export var max_range := 150.0
-## Rays per shot, spread over a cone `spread_degrees` wide.
+## Rays per shot, spread over a cone `spread_degrees` wide when aiming down
+## the sights, or `hip_spread_degrees` wide when fired from the hip.
 @export var pellets := 1
 @export var spread_degrees := 0.0
+@export var hip_spread_degrees := 8.0
+## The share of the player's field of view left when aiming down the sights.
+@export var aim_zoom := 0.7
 
 @export_group("Projectile")
 ## Weapons with a projectile speed fire a projectile instead of a hitscan shot,
@@ -32,6 +36,11 @@ extends Resource
 @export var splash_radius := 0.0
 ## How hard the burst shoves players, in metres per second at its middle.
 @export var knockback := 0.0
+
+
+## How wide a cone a shot's pellets spread over, in degrees.
+func spread(aimed: bool) -> float:
+	return spread_degrees if aimed else maxf(hip_spread_degrees, spread_degrees)
 
 
 func fires_projectile() -> bool:

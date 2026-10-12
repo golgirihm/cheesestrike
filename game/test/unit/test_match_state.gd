@@ -126,10 +126,37 @@ func test_a_player_who_is_out_takes_no_more_damage() -> void:
 	assert_eq(state.player(2).deaths, 1)
 
 
-func test_players_cannot_hurt_themselves() -> void:
+func test_players_cannot_hurt_themselves_with_a_shot() -> void:
 	state.add_player(1)
 	assert_eq(state.damage(1, 1, 50.0).dealt, 0)
 	assert_eq(state.player(1).health, PlayerRecord.MAX_HEALTH)
+
+
+func test_a_burst_of_their_own_hurts_a_player_and_fills_no_meter() -> void:
+	state.add_player(1)
+	assert_eq(state.damage(1, 1, 50.0, true).dealt, 50)
+	assert_eq(state.player(1).health, PlayerRecord.MAX_HEALTH - 50)
+	assert_eq(state.player(1).overload, 0.0)
+
+
+func test_knocking_themself_out_costs_a_player_a_death_and_scores_nothing() -> void:
+	state.add_player(1)
+	var result := state.damage(1, 1, 500.0, true)
+	assert_true(result.knocked_out)
+	var record := state.player(1)
+	assert_false(record.alive)
+	assert_eq(record.deaths, 1)
+	assert_eq(record.kills, 0)
+	assert_eq(record.last_attacker, 1)
+
+
+func test_a_teammates_burst_still_cannot_hurt() -> void:
+	var teams := MatchState.new(MatchSettings.from_dict({"mode": "teams"}))
+	teams.add_player(1)
+	teams.add_player(2)
+	teams.add_player(3)
+	assert_true(teams.are_allies(1, 3))
+	assert_eq(teams.damage(1, 3, 50.0, true).dealt, 0)
 
 
 func test_damage_from_someone_who_has_left_still_counts() -> void:

@@ -7,8 +7,9 @@ extends CharacterBody3D
 ## the host (see Match), which decides what it hit. Health and whether the
 ## player is in play are the host's to decide, and arrive with the match state.
 
-## A shot this player fired, for effects on this machine.
-signal fired(origin: Vector3, direction: Vector3, seed: int)
+## A shot this player fired, for effects on this machine; `aimed` if down
+## the sights rather than from the hip.
+signal fired(origin: Vector3, direction: Vector3, seed: int, aimed: bool)
 ## Another player's update arrived at `time` (this machine's clock, seconds)
 ## placing them at `at`, after being moved at once `teleports` times.
 signal received(time: float, at: Vector3, teleports: int, facing: Vector2)
@@ -55,6 +56,10 @@ var world: Node3D
 
 ## Seconds a weapon takes to come up after switching to it.
 const SWITCH_TIME := 0.35
+## Seconds to bring the sights up to the eye, or back down to the hip.
+const AIM_TIME := 0.14
+## How much slower the view turns when aiming down the sights.
+const AIM_LOOK_FACTOR := 0.6
 ## How quickly a shove from a burst dies away, on the ground and in the air.
 const KNOCKBACK_GROUND_DECAY := 6.0
 const KNOCKBACK_AIR_DECAY := 0.8
@@ -112,6 +117,13 @@ var _jump_pressed := false
 var _overload_pressed := false
 # Seconds of flinching left after being hit, which slows this player.
 var _flinch_left := 0.0
+# How far the sights are up: 0 at the hip, 1 at the eye.
+var _aim := 0.0
+# Whether the touch screen's aim button, which stays on until pressed again,
+# is on.
+var _touch_aim := false
+# Seconds left of the weapon in hand coming up, after a change of weapon.
+var _switch_left := 0.0
 
 
 func _enter_tree() -> void:
@@ -121,6 +133,9 @@ func _enter_tree() -> void:
 ## Where the weapon sits in this player's own view, and how big: smaller and
 ## further out than in their hand as others see it, so it doesn't fill the screen.
 const VIEW_GUN_POSITION := Vector3(0.2, -0.19, -0.55)
+## Where it sits when aiming down the sights: in the middle, just under the
+## point being aimed at.
+const AIM_GUN_POSITION := Vector3(0.0, -0.085, -0.42)
 const VIEW_GUN_SCALE := 0.6
 ## How high the team badge floats, in the character's measurements.
 const BADGE_HEIGHT := 2.5
@@ -151,7 +166,6 @@ func _ready() -> void:
 	if _mine:
 		camera.make_current()
 		camera.fov = Settings.get_value("fov")
-		Settings.changed.connect(_on_setting_changed)
 	_show_weapon(Weapons.STARTING)
 	if match_ != null and _mine:
 		match_.hurt.connect(_on_hurt)
@@ -170,11 +184,6 @@ func _on_burst(_id: int, weapon_id: String, at: Vector3) -> void:
 	var stats := Weapons.find(weapon_id)
 	if stats != null:
 		shake.add(Shake.from_burst(global_position.distance_to(at), stats.splash_radius * 2.0))
-
-
-func _on_setting_changed(key: String) -> void:
-	if key == "fov":
-		camera.fov = Settings.get_value("fov")
 
 
 ## The host's record of this player, or null before it has arrived.
@@ -227,6 +236,9 @@ func equip(id: String) -> void:
 func _show_weapon(id: String) -> void:
 	if id == _shown_weapon:
 		return
+	# The first weapon is simply there; one changed to comes up from below.
+	if not _shown_weapon.is_empty():
+		_switch_left = SWITCH_TIME
 	_shown_weapon = id
 	for child in gun.get_children():
 		child.queue_free()
@@ -403,12 +415,17 @@ func _input(event: InputEvent) -> void:
 # step; for everyone else's, their body walking.
 func _animate(delta: float) -> void:
 	_kick = maxf(_kick - delta * 8.0, 0.0)
+	_switch_left = maxf(_switch_left - delta, 0.0)
+	var rest := _gun_rest
 	var bob := Vector3.ZERO
 	if _mine:
+		var sights := smoothstep(0.0, 1.0, _aim)
+		rest = _gun_rest.lerp(AIM_GUN_POSITION, sights)
 		var across := Vector2(velocity.x, velocity.z).length()
 		if is_on_floor() and across > 0.5:
 			_bob_phase = fmod(_bob_phase + across * delta * 1.8, TAU)
-			bob = Vector3(sin(_bob_phase) * 0.012, absf(cos(_bob_phase)) * 0.012, 0.0)
+			# Held steadier at the eye.
+			bob = Vector3(sin(_bob_phase) * 0.012, absf(cos(_bob_phase)) * 0.012, 0.0) * (1.0 - 0.8 * sights)
 			_step(across * delta, Vector3.INF)
 	else:
 		var moved := global_position - _last_position
@@ -421,8 +438,34 @@ func _animate(delta: float) -> void:
 			body.set_motion(_ground_speed, airborne)
 			if alive and not airborne and _ground_speed > 0.5:
 				_step(_ground_speed * delta, global_position)
-	gun.position = _gun_rest + bob + Vector3(0.0, 0.01, 0.07) * _kick
-	gun.rotation.x = 0.18 * _kick
+	# A weapon just changed to swings up from below.
+	var lowered := switch_lowering(_switch_left)
+	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + Vector3(0.0, -0.5, 0.1) * lowered * gun.scale.x
+	gun.rotation = Vector3(0.18 * _kick - 1.1 * lowered, 0.0, 0.5 * lowered)
+
+
+## How far down a weapon changed to `left` seconds short of SWITCH_TIME ago
+## still is: 1 as the change begins, 0 once it is up.
+static func switch_lowering(left: float) -> float:
+	var share := clampf(left / SWITCH_TIME, 0.0, 1.0)
+	return share * share
+
+
+## Whether this player is aiming down the sights, so their shots go where
+## they point rather than spreading as from the hip.
+func is_aiming() -> bool:
+	return _aim >= 0.9
+
+
+## How wide a cone this player's next shot spreads over, in degrees.
+func shot_spread() -> float:
+	return weapon.stats.spread(is_aiming())
+
+
+func _wants_aim() -> bool:
+	if not alive or _switch_left > 0.0 or Net.host_silent or _menu_open():
+		return false
+	return _touch_aim or Input.is_action_pressed("aim")
 
 
 # Counts off distance walked, and makes a footstep sound each stride: at
@@ -493,6 +536,8 @@ func _process(delta: float) -> void:
 	if _mine:
 		var tip := shake.tick(delta, Settings.get_value("screen_shake"))
 		camera.rotation = Vector3(tip.x, 0.0, tip.y)
+		_aim = move_toward(_aim, 1.0 if _wants_aim() else 0.0, delta / AIM_TIME)
+		camera.fov = Settings.get_value("fov") * lerpf(1.0, weapon.stats.aim_zoom, smoothstep(0.0, 1.0, _aim))
 	if OS.has_feature("web") and _mine:
 		var moved := WebPage.take_mouse_movement()
 		if moved != Vector2.ZERO and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -564,7 +609,7 @@ func _physics_process(delta: float) -> void:
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y).limit_length(1.0)
 	_knockback *= exp(-(KNOCKBACK_GROUND_DECAY if is_on_floor() else KNOCKBACK_AIR_DECAY) * delta)
 	_flinch_left = maxf(_flinch_left - delta, 0.0)
-	var speed := Movement.speed(Input.is_action_pressed("sprint"), false, _flinch_left, Overload.speed_factor(record()))
+	var speed := Movement.speed(Input.is_action_pressed("sprint"), _wants_aim(), _flinch_left, Overload.speed_factor(record()))
 	velocity.x = direction.x * speed + _knockback.x
 	velocity.z = direction.z * speed + _knockback.z
 	move_and_slide()
@@ -598,9 +643,10 @@ func _use_weapon() -> void:
 		# The head's facing, not the camera's, which may be shaking.
 		var direction := -head.global_basis.z
 		var seed := randi()
-		match_.fire(origin, direction, seed, weapon.stats.id)
+		var aimed := is_aiming()
+		match_.fire(origin, direction, seed, weapon.stats.id, aimed)
 		kick()
-		fired.emit(origin, direction, seed)
+		fired.emit(origin, direction, seed, aimed)
 		# Firing the last round starts the reload by itself.
 		if weapon.is_reloading():
 			match_.reload(weapon.stats.id)
@@ -614,6 +660,7 @@ func _exit_tree() -> void:
 func _release_controls() -> void:
 	_mouse_fire_held = false
 	_fire_pressed = false
+	_touch_aim = false
 	_button_touches.clear()
 
 
@@ -627,6 +674,7 @@ func _look(delta: Vector2) -> void:
 		return
 	if Settings.get_value("invert_look"):
 		delta.y = -delta.y
+	delta *= lerpf(1.0, AIM_LOOK_FACTOR, _aim)
 	rotate_y(-delta.x)
 	head.rotation.x = clampf(head.rotation.x - delta.y, -PITCH_LIMIT, PITCH_LIMIT)
 
@@ -648,6 +696,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_reload_pressed = true
 		elif button == "swap":
 			_switch_step += 1
+		elif button == "aim":
+			_touch_aim = not _touch_aim
 		elif button == "overload":
 			_overload_pressed = true
 		elif not button.is_empty():
@@ -670,7 +720,7 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		if Time.get_ticks_msec() - _look_touch_start_msec < TOUCH_TAP_MSEC:
 			_touch_jump = true
 	if controls != null:
-		controls.held = _button_touches.values()
+		controls.held = _button_touches.values() + (["aim"] if _touch_aim else [])
 
 
 func _handle_drag(event: InputEventScreenDrag) -> void:

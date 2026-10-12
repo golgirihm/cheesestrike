@@ -1,7 +1,8 @@
 extends Control
 ## The on-screen buttons a touch screen needs for what has no gesture of its
-## own: fire, reload, changing weapon, the Overload and the scoreboard. Moving, looking and jumping are gestures on the screen
-## itself (see the player).
+## own: fire, aim, reload, changing weapon, the Overload and the scoreboard.
+## Moving, looking and jumping are gestures on the screen itself (see the
+## player). Aim stays on until it is pressed again.
 ##
 ## The buttons show once the screen has been touched, or from the start on a
 ## device that reports a touch screen. The player asks button_at() whether a
@@ -13,6 +14,7 @@ const BUTTONS := {
 	"fire": {"anchor": Vector2(1, 1), "offset": Vector2(-96.0, -150.0), "radius": 56.0, "label": "FIRE", "font_size": 18},
 	"reload": {"anchor": Vector2(1, 1), "offset": Vector2(-200.0, -74.0), "radius": 34.0, "label": "R", "font_size": 18},
 	"overload": {"anchor": Vector2(1, 1), "offset": Vector2(-62.0, -262.0), "radius": 32.0, "label": "GO", "font_size": 16},
+	"aim": {"anchor": Vector2(1, 1), "offset": Vector2(-150.0, -256.0), "radius": 32.0, "label": "AIM", "font_size": 15},
 	"swap": {"anchor": Vector2(1, 1), "offset": Vector2(-214.0, -172.0), "radius": 30.0, "label": "Swap", "font_size": 14},
 	"scores": {"anchor": Vector2(0.5, 0), "offset": Vector2(0.0, 44.0), "radius": 30.0, "label": "Scores", "font_size": 13},
 }

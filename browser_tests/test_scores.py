@@ -16,9 +16,7 @@ class ScoresTest(GameTestCase):
 
     def knock_out(self, host, victim_id):
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {victim_id} && p.deaths >= 1)")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {victim_id} && p.deaths >= 1)")
 
     def test_a_knock_out_shows_in_everyones_kill_feed(self):
         host = self.named_game("Hunter")
@@ -32,7 +30,7 @@ class ScoresTest(GameTestCase):
         host.page.wait_for_timeout(500)
 
         self.knock_out(host, target_id)
-        expected = "Hunter  [Cheddar Blaster"
+        expected = "Hunter  [Curd Pistol"
         for game in (host, target, watcher):
             state = game.wait_for("s.combat.knockouts_announced >= 1")
             self.assertTrue(state["combat"]["latest_knockout"].startswith(expected), state["combat"]["latest_knockout"])

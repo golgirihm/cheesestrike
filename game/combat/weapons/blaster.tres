@@ -14,4 +14,6 @@ magazine = 24
 reload_time = 1.6
 max_range = 150.0
 pellets = 1
-spread_degrees = 0.0
+spread_degrees = 0.3
+hip_spread_degrees = 9.0
+aim_zoom = 0.6

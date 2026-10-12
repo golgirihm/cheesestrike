@@ -30,11 +30,11 @@ class WeaponsTest(GameTestCase):
         self.walk_to_the_launcher(host)
         host.capture_mouse()
         host.press("1")
-        host.wait_for("s.combat.weapon === 'Cheddar Blaster'")
-        host.press("4")
+        host.wait_for("s.combat.weapon === 'Curd Pistol'")
+        host.press("5")
         host.wait_for("s.combat.weapon === 'Gouda Launcher'")
         host.page.mouse.wheel(0, 120)
-        host.wait_for("s.combat.weapon === 'Cheddar Blaster'")
+        host.wait_for("s.combat.weapon === 'Curd Pistol'")
         host.page.mouse.wheel(0, -120)
         host.wait_for("s.combat.weapon === 'Gouda Launcher'")
 
@@ -53,10 +53,8 @@ class WeaponsTest(GameTestCase):
         host.wait_for("s.players.length === 2")
         self.walk_to_the_launcher(host)
         host.capture_mouse()
-        host.page.mouse.down()
         hurt = "(p.health < 100 || p.deaths > 0)"
-        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && {hurt})")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && {hurt})")
         joiner.wait_for(f"s.players.some((p) => p.mine && {hurt}) && s.combat.hurts_shown >= 1")
 
 
@@ -68,8 +66,8 @@ class SoundTest(GameTestCase):
         host.wait_for("s.players.length === 2")
         host.capture_mouse()
         host.hold_fire(50)
-        host.wait_for("(s.sounds.blaster || 0) >= 1")
-        joiner.wait_for("(s.sounds.blaster || 0) >= 1")
+        host.wait_for("(s.sounds.pistol || 0) >= 1")
+        joiner.wait_for("(s.sounds.pistol || 0) >= 1")
 
     def test_the_menu_has_music(self):
         game = self.open_game()
@@ -87,9 +85,7 @@ class OverloadTest(GameTestCase):
         host.wait_for("s.players.length === 2")
         host.page.wait_for_timeout(500)
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for("s.players.some((p) => p.mine && p.overload >= 100)")
-        host.page.mouse.up()
+        host.shoot_until("s.players.some((p) => p.mine && p.overload >= 100)")
         host.wait_for("s.combat.overload === 'Overload ready: Q'")
         host.press("q")
         state = host.wait_for("s.players.some((p) => p.mine && p.overloaded)")

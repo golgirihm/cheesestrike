@@ -1,6 +1,7 @@
 """Shooting, through real mouse clicks and a real connection: the host of a
 session starts on the first spot and the first joiner on the second, facing
-each other across the arena, so a shot fired without aiming hits.
+each other across the arena, so a shot fired down the sights without turning
+hits. Everyone starts with the Curd Pistol, which fires once for each pull.
 
 A slow machine can run the game with long gaps between frames, so these wait
 for what lasts (a score, a count of reloads) rather than for a passing moment
@@ -11,7 +12,7 @@ import unittest
 from harness import GameTestCase
 
 FULL_HEALTH = 100
-MAGAZINE = 24
+MAGAZINE = 10
 
 
 class CombatTest(GameTestCase):
@@ -49,11 +50,10 @@ class CombatTest(GameTestCase):
     def test_a_shot_hurts_the_player_it_hits_in_everyones_view(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()
-        host.hold_fire(50)
-        # A slow machine may fire several shots in that time, enough to knock
-        # the player out and bring them back, so a knock-out counts too.
+        # A slow machine may fire several shots before it is seen, enough to
+        # knock the player out and bring them back, so a knock-out counts too.
         hurt = f"(p.health < {FULL_HEALTH} || p.deaths > 0)"
-        state = host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && {hurt})")
+        state = host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && {hurt})")
         joiner.wait_for(f"s.players.some((p) => p.mine && {hurt})")
         own = next(player for player in state["players"] if player["mine"])
         self.assertEqual(own["health"], FULL_HEALTH, "the shooter isn't hurt")
@@ -61,8 +61,7 @@ class CombatTest(GameTestCase):
     def test_the_shooter_sees_a_hit_marker_and_the_one_hit_sees_where_from(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()
-        host.hold_fire(50)
-        host.wait_for("s.combat.hits_shown >= 1")
+        host.shoot_until("s.combat.hits_shown >= 1")
         state = joiner.wait_for("s.combat.hurts_shown >= 1")
         self.assertEqual(state["combat"]["hits_shown"], 0)
         self.assertEqual(host.state()["combat"]["hurts_shown"], 0)
@@ -80,19 +79,25 @@ class CombatTest(GameTestCase):
     def test_enough_hits_knock_a_player_out_and_score(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         host.wait_for("s.players.some((p) => p.mine && p.kills >= 1)")
         joiner.wait_for("s.players.some((p) => p.mine && p.deaths >= 1) && s.players.some((p) => !p.mine && p.kills >= 1)")
 
     def test_a_knocked_out_player_comes_back_with_full_health(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         joiner.wait_for(f"s.players.some((p) => p.mine && p.deaths >= 1 && p.alive && p.health === {FULL_HEALTH})")
+
+    def test_holding_the_right_button_aims_down_the_sights(self):
+        host = self.open_game()
+        host.host()
+        host.capture_mouse()
+        self.assertFalse(host.own_player()["aiming"])
+        host.page.mouse.down(button="right")
+        host.wait_for("s.players[0].aiming")
+        host.page.mouse.up(button="right")
+        host.wait_for("!s.players[0].aiming")
 
     def test_reloading_fills_the_magazine(self):
         host = self.open_game()
@@ -108,9 +113,7 @@ class CombatTest(GameTestCase):
         host = self.open_game()
         host.host()
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for("s.players[0].reloads === 1")
-        host.page.mouse.up()
+        host.shoot_until("s.players[0].reloads === 1")
 
 
 if __name__ == "__main__":

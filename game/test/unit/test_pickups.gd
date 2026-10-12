@@ -51,14 +51,14 @@ func test_a_player_at_full_health_leaves_the_wedge() -> void:
 
 func test_a_new_weapon_is_carried() -> void:
 	assert_eq(state.collect(1, "shotgun", 1), "taken")
-	assert_eq(state.player(1).weapons, ["blaster", "shotgun"])
+	assert_eq(state.player(1).weapons, [Weapons.STARTING, "shotgun"])
 
 
 func test_a_weapon_already_carried_is_a_refill() -> void:
 	state.collect(1, "shotgun", 1)
 	state.tick(Pickups.WEAPON_RESPAWN)
 	assert_eq(state.collect(1, "shotgun", 1), "refill")
-	assert_eq(state.player(1).weapons, ["blaster", "shotgun"], "not carried twice")
+	assert_eq(state.player(1).weapons, [Weapons.STARTING, "shotgun"], "not carried twice")
 
 
 func test_a_collected_pickup_comes_back_after_its_time() -> void:
@@ -77,7 +77,7 @@ func test_weapons_take_longer_to_come_back_than_wedges() -> void:
 func test_an_empty_pad_gives_nothing() -> void:
 	state.collect(1, "shotgun", 1)
 	assert_eq(state.collect(1, "shotgun", 2), "")
-	assert_eq(state.player(2).weapons, ["blaster"])
+	assert_eq(state.player(2).weapons, [Weapons.STARTING])
 
 
 func test_a_knocked_out_player_collects_nothing() -> void:

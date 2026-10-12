@@ -83,9 +83,7 @@ class ReconnectTest(GameTestCase):
         host.wait_for("s.players.length === 2")
         host.page.wait_for_timeout(500)
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {old_id} && p.deaths >= 1)")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {old_id} && p.deaths >= 1)")
         deaths = host.player(old_id)["deaths"]
 
         joiner.page.reload()
@@ -105,9 +103,7 @@ class ReconnectTest(GameTestCase):
         host.wait_for("s.players.length === 2")
         host.page.wait_for_timeout(500)
         host.capture_mouse()
-        host.page.mouse.down()
-        host.wait_for(f"s.players.some((p) => p.id === {old_id} && p.deaths >= 1)")
-        host.page.mouse.up()
+        host.shoot_until(f"s.players.some((p) => p.id === {old_id} && p.deaths >= 1)")
         joiner.close()
         host.wait_for(f"!s.players.some((p) => p.id === {old_id})")
 

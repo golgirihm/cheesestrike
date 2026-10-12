@@ -74,6 +74,7 @@ func snapshot() -> Dictionary:
 			described.carrying = player.arsenal.keys()
 			described.facing = [player.rotation.y, player.head.rotation.x]
 			described.reloading = player.weapon.is_reloading()
+			described.aiming = player.is_aiming()
 		players.append(described)
 
 	# Each line of the session list: a session to click, or the note shown when
