@@ -35,7 +35,7 @@ const RESYNC_INTERVAL := 2.0
 ## Physics layer of the arena's walls, floor and cover, which stop shots.
 const WORLD_MASK := 1
 ## Height of a player's middle above their feet, where bursts aim their harm.
-const MIDDLE := 0.9
+const MIDDLE := HitScan.BODY_HEIGHT / 2.0
 ## What players are told when the host ends the session on purpose.
 const HOST_ENDED := "The host ended the session."
 ## The most a shot is checked back in time. Beyond it, a shooter on a slow

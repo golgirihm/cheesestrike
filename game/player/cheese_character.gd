@@ -17,6 +17,9 @@ const STRIDE := 0.7
 const STEPS_PER_METRE := 0.9
 const MELT_TIME := 0.45
 const POP_TIME := 0.2
+## How much bigger it is than the shapes it's built from, to fill the
+## player's capsule.
+const SIZE := 1.5
 
 ## Whether to draw it at all: not for the player's own machine, which sees
 ## from inside it.
@@ -39,6 +42,7 @@ var _pop := 1.0
 func _init() -> void:
 	_material.roughness = 0.7
 	_build()
+	scale = Vector3.ONE * SIZE
 
 
 ## The body's colour.
@@ -100,7 +104,7 @@ func _process(delta: float) -> void:
 	# Melting sags and spreads the body; popping back grows it from the floor.
 	var sag := 1.0 - 0.85 * _melt
 	var spread := 1.0 + 0.6 * _melt
-	scale = Vector3(spread, sag, spread) * _ease_out(_pop)
+	scale = Vector3(spread, sag, spread) * _ease_out(_pop) * SIZE
 	visible = shown and not is_melted()
 
 

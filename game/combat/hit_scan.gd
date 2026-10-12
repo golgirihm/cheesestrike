@@ -6,10 +6,10 @@ class_name HitScan
 ## A player's body is a vertical capsule standing on their position, the same
 ## size as their collision shape; the top part of it counts as the head.
 
-const BODY_RADIUS := 0.4
-const BODY_HEIGHT := 1.8
+const BODY_RADIUS := 0.6
+const BODY_HEIGHT := 2.7
 ## Hits this high above the feet or higher are headshots.
-const HEAD_FROM := 1.4
+const HEAD_FROM := 2.1
 
 
 ## How far along the ray from `origin` in direction `direction` (normalized) it

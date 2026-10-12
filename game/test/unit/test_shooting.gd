@@ -4,7 +4,7 @@ extends GutTest
 ## the spawner would add them.
 
 const WORLD := preload("res://world/world.tscn")
-const EYE := Vector3(0, 1.55, 0)
+const EYE := Vector3(0, 2.3, 0)
 
 var world: Node3D
 var match_: Match
@@ -43,7 +43,7 @@ func test_a_shot_at_another_player_hurts_them() -> void:
 func test_a_shot_at_the_head_does_more() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
-	_shoot(shooter, Vector3(0, 1.65, -5))
+	_shoot(shooter, Vector3(0, 2.4, -5))
 	assert_eq(match_.state.player(2).health, 100 - 35)
 
 
@@ -107,7 +107,7 @@ func test_enough_hits_knock_a_player_out_and_score() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	for i in 3:
-		_shoot(shooter, Vector3(0, 1.65, -5))
+		_shoot(shooter, Vector3(0, 2.4, -5))
 	assert_false(match_.state.player(2).alive)
 	assert_eq(match_.state.player(1).kills, 1)
 
@@ -166,7 +166,7 @@ func test_the_host_is_told_of_its_own_hit() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	watch_signals(match_)
-	_shoot(shooter, Vector3(0, 1.65, -5))
+	_shoot(shooter, Vector3(0, 2.4, -5))
 	assert_signal_emitted_with_parameters(match_, "hit_confirmed", [2, 35, false, true])
 	assert_signal_not_emitted(match_, "shot_shown", "the shooter shows its own shot")
 
@@ -191,7 +191,7 @@ func test_a_missed_shot_ends_at_the_wall() -> void:
 	_add(1, Vector3(-5, 0, 0))
 	var shooter := _add(2, Vector3(10, 0, 5))
 	watch_signals(match_)
-	_shoot(shooter, Vector3(10, 1.55, -100))
+	_shoot(shooter, Vector3(10, 2.3, -100))
 	var ends: Array = get_signal_parameters(match_, "shot_shown")[1]
 	assert_almost_eq(ends[0].z, -16.0, 0.01, "the north wall's inner face")
 
@@ -210,7 +210,7 @@ func test_a_knock_out_is_announced_with_both_names() -> void:
 	match_.state.rename(2, "Target")
 	watch_signals(match_)
 	for i in 3:
-		_shoot(shooter, Vector3(0, 1.65, -5))
+		_shoot(shooter, Vector3(0, 2.4, -5))
 	assert_signal_emit_count(match_, "knocked_out", 1)
 	assert_signal_emitted_with_parameters(match_, "knocked_out", ["Shooter", "Target", "blaster", true])
 
@@ -233,7 +233,7 @@ func test_a_new_match_brings_everyone_back_with_scores_cleared() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	for i in 3:
-		_shoot(shooter, Vector3(0, 1.65, -5))
+		_shoot(shooter, Vector3(0, 2.4, -5))
 	match_.state.end_match()
 	match_._process(MatchState.INTERMISSION + 0.01)
 	assert_true(match_.state.is_playing())
@@ -250,7 +250,7 @@ func test_the_match_ends_when_the_kill_limit_is_reached() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
 	for i in 3:
-		_shoot(shooter, Vector3(0, 1.65, -5))
+		_shoot(shooter, Vector3(0, 2.4, -5))
 	assert_false(match_.state.is_playing())
 	assert_eq(match_.state.winners, [1] as Array[int])
 

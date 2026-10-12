@@ -4,7 +4,7 @@ extends GutTest
 
 const WORLD := preload("res://world/world.tscn")
 const PLAYER := preload("res://player/player.tscn")
-const EYE := Vector3(0, 1.55, 0)
+const EYE := Vector3(0, 2.3, 0)
 
 var world: Node3D
 
@@ -119,7 +119,7 @@ func test_a_launcher_lies_straight_ahead_of_the_first_spot_with_a_clear_walk() -
 		var pad: Vector3 = launchers[0].position
 		var ahead := ((pad - start) * Vector3(1, 0, 1)).normalized()
 		assert_gt(ahead.dot((-start * Vector3(1, 0, 1)).normalized()), 0.999, "%s: the launcher isn't straight ahead" % id)
-		for height in [0.3, 1.0, 1.7]:
+		for height in [0.3, 1.3, HitScan.BODY_HEIGHT - 0.1]:
 			var knee := Vector3(0, height, 0)
 			assert_true(space.intersect_ray(PhysicsRayQueryParameters3D.create(start + knee, pad + knee, Match.WORLD_MASK)).is_empty(), "%s: the walk is blocked at %s m" % [id, height])
 
@@ -162,7 +162,7 @@ func test_nobody_can_jump_out_of_any_arena() -> void:
 	# them, standing on the highest floor.
 	var lift: float = 5.5 + Weapons.find("launcher").knockback
 	# Stacked blocks make 4 m the highest floor anywhere.
-	var highest := 4.0 + lift * lift / (2.0 * 9.8) + 1.8
+	var highest := 4.0 + lift * lift / (2.0 * 9.8) + HitScan.BODY_HEIGHT
 	for id: String in _each_map():
 		await _load(id)
 		var walls: Array = world.map.get_node("Geometry").get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Wall"))
