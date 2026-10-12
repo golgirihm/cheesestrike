@@ -80,3 +80,77 @@ func test_the_music_plays_and_quietens_in_a_session() -> void:
 	Sounds.set_music_quiet(true)
 	assert_lt(Sounds._music.volume_db, -10.0)
 	Sounds.set_music_quiet(false)
+
+
+## How loud `stream` is between `from` and `to` seconds, as the root of the
+## mean square of its samples, from 0 to 1.
+func _level(stream: AudioStreamWAV, from: float, to: float) -> float:
+	var first := int(from * stream.mix_rate)
+	var last := mini(int(to * stream.mix_rate), stream.data.size() / 2)
+	var total := 0.0
+	for i in range(first, last):
+		var sample := stream.data.decode_s16(i * 2) / 32767.0
+		total += sample * sample
+	return sqrt(total / maxi(last - first, 1))
+
+
+## How much of `stream`'s sound is low: the share of its loudness left once
+## each sample is averaged with those just before it, which takes the high
+## notes out.
+func _lowness(stream: AudioStreamWAV) -> float:
+	var smooth := 0.0
+	var low := 0.0
+	var all := 0.0
+	for i in stream.data.size() / 2:
+		var sample := stream.data.decode_s16(i * 2) / 32767.0
+		smooth = lerpf(smooth, sample, 0.05)
+		low += smooth * smooth
+		all += sample * sample
+	return sqrt(low / all)
+
+
+func test_a_gunshot_starts_with_a_bang_and_dies_away() -> void:
+	for id: String in ["pistol", "blaster", "grater", "shotgun"]:
+		var shot := SoundBank.get_sound(id)
+		var bang := _level(shot, 0.0, 0.01)
+		assert_gt(bang, 0.3, "%s starts loud, with no fade in" % id)
+		var length := SoundBank.seconds(shot)
+		assert_lt(_level(shot, length * 0.8, length), bang * 0.2, "%s has died away by its end" % id)
+		assert_gt(_level(shot, length * 0.4, length * 0.6), 0.005, "%s has a tail, not just a click" % id)
+
+
+func test_each_gun_sounds_like_its_size() -> void:
+	var pistol := SoundBank.get_sound("pistol")
+	var blaster := SoundBank.get_sound("blaster")
+	var grater := SoundBank.get_sound("grater")
+	var shotgun := SoundBank.get_sound("shotgun")
+	assert_gt(SoundBank.seconds(shotgun), SoundBank.seconds(blaster), "the shotgun booms longest")
+	assert_gt(SoundBank.seconds(blaster), SoundBank.seconds(pistol))
+	assert_lt(SoundBank.seconds(grater), Weapons.find("grater").fire_interval * 3.0, "the grater's shots don't pile up into a hum")
+	assert_gt(_lowness(shotgun), _lowness(blaster), "the shotgun is the deepest")
+	assert_gt(_lowness(blaster), _lowness(pistol), "the pistol the sharpest")
+
+
+func test_the_launcher_thumps_rather_than_cracks() -> void:
+	assert_gt(_lowness(SoundBank.get_sound("launcher")), _lowness(SoundBank.get_sound("shotgun")))
+	assert_gt(_lowness(SoundBank.get_sound("burst")), _lowness(SoundBank.get_sound("blaster")))
+	assert_gt(SoundBank.seconds(SoundBank.get_sound("burst")), SoundBank.seconds(SoundBank.get_sound("shotgun")), "a burst rolls on")
+
+
+func test_a_footstep_is_a_heel_and_then_a_sole() -> void:
+	var step := SoundBank.get_sound("step")
+	var heel := _level(step, 0.0, 0.02)
+	var between := _level(step, 0.04, 0.054)
+	var sole := _level(step, 0.056, 0.075)
+	assert_gt(heel, between * 2.0, "the heel lands and fades")
+	assert_gt(sole, between * 1.5, "then the sole comes down")
+	assert_gt(heel, sole, "more lightly")
+	assert_gt(_lowness(step), _lowness(SoundBank.get_sound("pistol")), "a dull knock, not a click")
+
+
+func test_a_sound_can_be_played_a_little_higher_or_lower() -> void:
+	Sounds.play("hit", 0.0, 1.2)
+	var voice: AudioStreamPlayer = Sounds._flat_voices.filter(func(flat: AudioStreamPlayer) -> bool: return flat.playing and flat.stream == SoundBank.get_sound("hit"))[0]
+	assert_almost_eq(voice.pitch_scale, 1.2, 0.0001)
+	for i in 20:
+		assert_between(Sounds.varied(0.1), 0.9, 1.1)

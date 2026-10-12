@@ -483,9 +483,9 @@ func _step(distance: float, at: Vector3) -> void:
 		return
 	_since_step = 0.0
 	if at == Vector3.INF:
-		Sounds.play("step", -14.0)
+		Sounds.play("step", -9.0, Sounds.varied(0.1))
 	elif world != null:
-		Sounds.play_at("step", at, world, -8.0)
+		Sounds.play_at("step", at, world, -3.0, Sounds.varied(0.1))
 
 
 ## A mouse movement measured in the page's pixels, as the browser reports it,

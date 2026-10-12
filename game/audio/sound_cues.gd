@@ -31,14 +31,14 @@ func _ready() -> void:
 ## This machine's own player fired `weapon` from `muzzle`.
 func own_shot(weapon: String, muzzle: Vector3) -> void:
 	if not Weapons.find(weapon).fires_projectile():
-		Sounds.play_at(weapon, muzzle, world, -2.0)
+		Sounds.play_at(weapon, muzzle, world, -2.0, Sounds.varied(0.04))
 
 
 func _on_others_shot(shooter: int, _ends: Array) -> void:
 	var player: Node3D = world.player_node(shooter)
 	var record: PlayerRecord = world.match_.state.player(shooter)
 	if player != null and record != null:
-		Sounds.play_at(record.weapon, player.muzzle.global_position, world)
+		Sounds.play_at(record.weapon, player.muzzle.global_position, world, 0.0, Sounds.varied(0.04))
 
 
 func _at_player(sound: String, id: int) -> void:
