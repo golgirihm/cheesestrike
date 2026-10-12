@@ -196,7 +196,13 @@ class Game:
         and returns the state at that moment.
 
         Shots from the hip spread too widely to count on hitting anything,
-        and the sidearm players start with fires once for each pull."""
+        and the sidearm players start with fires once for each pull.
+
+        The pointer is first put on the very corner of the page. A click with
+        the pointer locked can turn the view by the pointer's distance from
+        the corner (see capture_mouse), and one pixel for each of the hundreds
+        of clicks here would turn it clean away from the target."""
+        self.page.mouse.move(0, 0)
         check = f"(() => {{ const s = window.cheeseStrikeTest; return s && ({condition}) ? s : null; }})()"
         self.page.mouse.down(button="right")
         try:
