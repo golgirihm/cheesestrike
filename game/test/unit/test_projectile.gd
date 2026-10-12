@@ -61,14 +61,14 @@ func test_it_bursts_on_a_wall_at_the_wall() -> void:
 
 
 func test_it_bursts_on_a_player() -> void:
-	var projectile := Projectile.new(1, 5, launcher, Vector3(0, 1.5, 0), Vector3.FORWARD)
+	var projectile := Projectile.new(1, 5, launcher, Vector3(0, BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE, 0), Vector3.FORWARD)
 	var burst: Variant = null
 	for i in 60:
 		burst = projectile.advance(1.0 / 60.0, _no_walls(), {9: Vector3(0, 0, -6)})
 		if burst != null:
 			break
 	assert_not_null(burst)
-	assert_almost_eq(burst.z, -6.0 + HitScan.BODY_RADIUS, 0.05)
+	assert_almost_eq(burst.z, -6.0 + BodyShape.WEDGE_SIZE.z / 2.0 * BodyShape.SIZE, 0.05)
 
 
 func test_it_bursts_when_its_fuse_runs_out() -> void:

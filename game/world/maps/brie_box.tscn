@@ -15,17 +15,17 @@ albedo_color = Color(1, 0.8, 0.2, 1)
 
 [sub_resource type="BoxMesh" id="S5"]
 material = SubResource("S4")
-size = Vector3(34, 18, 1)
+size = Vector3(34, 24, 1)
 
 [sub_resource type="BoxShape3D" id="S6"]
-size = Vector3(34, 18, 1)
+size = Vector3(34, 24, 1)
 
 [sub_resource type="BoxMesh" id="S7"]
 material = SubResource("S4")
-size = Vector3(1, 18, 32)
+size = Vector3(1, 24, 32)
 
 [sub_resource type="BoxShape3D" id="S8"]
-size = Vector3(1, 18, 32)
+size = Vector3(1, 24, 32)
 
 [sub_resource type="StandardMaterial3D" id="S9"]
 albedo_color = Color(1, 0.62, 0.15, 1)
@@ -51,7 +51,7 @@ mesh = SubResource("S2")
 shape = SubResource("S3")
 
 [node name="WallNorth" type="StaticBody3D" parent="Geometry"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, -16.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, -16.5)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/WallNorth"]
 mesh = SubResource("S5")
@@ -60,7 +60,7 @@ mesh = SubResource("S5")
 shape = SubResource("S6")
 
 [node name="WallSouth" type="StaticBody3D" parent="Geometry"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, 16.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, 16.5)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/WallSouth"]
 mesh = SubResource("S5")
@@ -69,7 +69,7 @@ mesh = SubResource("S5")
 shape = SubResource("S6")
 
 [node name="WallEast" type="StaticBody3D" parent="Geometry"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.5, 9, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.5, 12, 0)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/WallEast"]
 mesh = SubResource("S7")
@@ -78,7 +78,7 @@ mesh = SubResource("S7")
 shape = SubResource("S8")
 
 [node name="WallWest" type="StaticBody3D" parent="Geometry"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.5, 9, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.5, 12, 0)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/WallWest"]
 mesh = SubResource("S7")

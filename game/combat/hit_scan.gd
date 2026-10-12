@@ -3,20 +3,14 @@ class_name HitScan
 ## the physics engine, so that the host can test a shot against where players
 ## are (or, later, where they were) and so it can be tested on its own.
 ##
-## A player's body is a vertical capsule standing on their position, the same
-## size as their collision shape; the top part of it counts as the head.
-
-const BODY_RADIUS := 0.6
-const BODY_HEIGHT := 2.7
-## Hits this high above the feet or higher are headshots.
-const HEAD_FROM := 2.1
+## A player's body is the shape of their cheese character (body_shape.gd),
+## standing on their position and facing where they face.
 
 
 ## How far along the ray from `origin` in direction `direction` (normalized) it
-## first touches the capsule standing at `feet`, or INF if it misses. A ray that
-## starts inside the capsule doesn't hit it.
-static func ray_capsule(origin: Vector3, direction: Vector3, feet: Vector3,
-		radius := BODY_RADIUS, height := BODY_HEIGHT) -> float:
+## first touches an upright capsule standing at `feet`, or INF if it misses. A
+## ray that starts inside the capsule doesn't hit it.
+static func ray_capsule(origin: Vector3, direction: Vector3, feet: Vector3, radius: float, height: float) -> float:
 	var local := origin - feet
 	var bottom := radius
 	var top := height - radius
@@ -36,7 +30,7 @@ static func ray_capsule(origin: Vector3, direction: Vector3, feet: Vector3,
 
 	# The rounded ends.
 	for centre_y: float in [bottom, top]:
-		var t := _ray_sphere(local - Vector3(0.0, centre_y, 0.0), direction, radius)
+		var t := ray_sphere(local - Vector3(0.0, centre_y, 0.0), direction, radius)
 		if t < nearest:
 			var y := local.y + t * direction.y
 			# Only the outer half of each end sphere is part of the capsule.
@@ -45,18 +39,25 @@ static func ray_capsule(origin: Vector3, direction: Vector3, feet: Vector3,
 	return nearest
 
 
-## The first of `targets` (player id -> feet position) that the ray hits within
-## `max_distance`, as {id, distance, point, head}, or an empty dictionary.
+## A player standing at `feet`, turned by `yaw` and looking up or down by
+## `pitch`, as `targets` in first_hit() hold them.
+static func pose(feet: Vector3, yaw := 0.0, pitch := 0.0) -> Dictionary:
+	return {"feet": feet, "yaw": yaw, "pitch": pitch}
+
+
+## The first of `targets` that the ray hits within `max_distance`, as {id,
+## distance, point, head}, or an empty dictionary. `targets` maps player ids to
+## a pose(), or to just their feet for a player facing -Z and looking level.
 static func first_hit(origin: Vector3, direction: Vector3, max_distance: float, targets: Dictionary) -> Dictionary:
 	var best := {}
 	var best_distance := max_distance
 	for id: int in targets:
-		var feet: Vector3 = targets[id]
-		var t := ray_capsule(origin, direction, feet)
-		if t <= best_distance:
-			best_distance = t
-			var point := origin + direction * t
-			best = {"id": id, "distance": t, "point": point, "head": point.y - feet.y >= HEAD_FROM}
+		var target: Variant = targets[id]
+		var at: Dictionary = target if target is Dictionary else pose(target)
+		var hit := BodyShape.ray_hit(origin, direction, at.feet, at.yaw, at.pitch)
+		if not hit.is_empty() and hit.distance <= best_distance:
+			best_distance = hit.distance
+			best = {"id": id, "distance": hit.distance, "point": origin + direction * hit.distance, "head": hit.head}
 	return best
 
 
@@ -84,7 +85,9 @@ static func pellet_directions(direction: Vector3, pellets: int, spread_degrees: 
 	return result
 
 
-static func _ray_sphere(local: Vector3, direction: Vector3, radius: float) -> float:
+## How far along the ray from `local`, measured from a sphere's centre, it first
+## touches the sphere, or INF. A ray that starts inside doesn't hit it.
+static func ray_sphere(local: Vector3, direction: Vector3, radius: float) -> float:
 	var b := local.dot(direction)
 	var c := local.dot(local) - radius * radius
 	if c <= 0.0:
