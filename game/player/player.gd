@@ -591,7 +591,27 @@ func _set_alive(now_alive: bool) -> void:
 			Sounds.play("knocked_out")
 
 
+# What a player out of play does with their controls instead: steps
+# through the players to watch, or takes to flying free.
+func _watch_input(event: InputEvent) -> void:
+	if world == null or world.get("watch_camera") == null or _menu_open():
+		return
+	if event is InputEventMouseButton and event.pressed and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			world.watch_camera.step(1)
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			world.watch_camera.step(-1)
+	elif event.is_action_pressed("weapon_next") or event.is_action_pressed("fire"):
+		world.watch_camera.step(1)
+	elif event.is_action_pressed("weapon_previous"):
+		world.watch_camera.step(-1)
+	elif event.is_action_pressed("jump"):
+		world.watch_camera.toggle_free()
+
+
 func _input(event: InputEvent) -> void:
+	if not alive:
+		_watch_input(event)
 	for action: String in _toggled:
 		if event.is_action_pressed(action):
 			_toggled[action] = not _toggled[action]
@@ -1517,6 +1537,14 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		return
 	if event.pressed:
 		var button: String = controls.button_at(event.position) if controls != null else ""
+		if not alive and world != null and world.get("watch_camera") != null:
+			# Out of play, the buttons choose who to watch.
+			if button == "fire":
+				world.watch_camera.step(1)
+			elif button == "aim":
+				world.watch_camera.step(-1)
+			elif button == "swap":
+				world.watch_camera.toggle_free()
 		if button == "reload":
 			_reload_pressed = true
 		elif button == "swap":

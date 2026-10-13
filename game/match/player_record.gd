@@ -16,6 +16,9 @@ var health := MAX_HEALTH
 ## Armour left: a rind that takes part of each hit until it is gone.
 var armour := 0
 var alive := true
+## Whether they are watching rather than playing (see Watching): not in the
+## arena, and not coming back until they choose to.
+var watching := false
 ## Seconds until a knocked-out player comes back.
 var respawn_in := 0.0
 ## Seconds left in which a player who has just come back can't be hurt.
@@ -140,6 +143,7 @@ func to_dict() -> Dictionary:
 		"armour": armour,
 		"main": main,
 		"attachment": attachment,
+		"watching": watching,
 		"overload_kind": overload_kind,
 		"overload_build": overload_build,
 		"fitted": fitted,
@@ -183,7 +187,7 @@ func to_packed() -> Array:
 	numbers[_MAIN] = Weapons.ORDER.find(main)
 	# Likewise: what is chosen, what is fitted, and the weapon it is on.
 	# And above those, their kind of Overload and hundredths of its build-up.
-	numbers[_FITTED] = attachment | (fitted << 4) | ((Weapons.ORDER.find(fitted_to) + 1) << 8) | (overload_kind << 16) | (roundi(overload_build * 100.0) << 20)
+	numbers[_FITTED] = attachment | (fitted << 4) | ((Weapons.ORDER.find(fitted_to) + 1) << 8) | (overload_kind << 16) | (roundi(overload_build * 100.0) << 20) | ((1 if watching else 0) << 28)
 	numbers[_SIDE] = Weapons.ORDER.find(side)
 	return [name, numbers]
 
@@ -231,7 +235,8 @@ static func from_packed(data: Variant) -> PlayerRecord:
 	record.fitted = (fit >> 4) & 15 if Attachments.is_kind((fit >> 4) & 15) else Attachments.NONE
 	record.fitted_to = _weapon_at(((fit >> 8) & 255) - 1)
 	record.overload_kind = (fit >> 16) & 15 if Overload.is_kind((fit >> 16) & 15) else Overload.MELT
-	record.overload_build = clampf((fit >> 20) / 100.0, 0.0, Overload.BUILD_UP)
+	record.overload_build = clampf(((fit >> 20) & 255) / 100.0, 0.0, Overload.BUILD_UP)
+	record.watching = (fit >> 28) & 1 == 1
 	return record
 
 
@@ -264,6 +269,7 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.fitted = data.get("fitted") if Attachments.is_kind(data.get("fitted")) else Attachments.NONE
 	record.overload_kind = data.get("overload_kind") if Overload.is_kind(data.get("overload_kind")) else Overload.MELT
 	record.overload_build = clampf(_float(data, "overload_build", 0.0), 0.0, Overload.BUILD_UP)
+	record.watching = data.get("watching") == true
 	record.fitted_to = data.get("fitted_to") if data.get("fitted_to") is String and Weapons.ids().has(data.get("fitted_to")) else ""
 	var carried: Variant = data.get("weapons")
 	if carried is Array:

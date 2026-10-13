@@ -78,6 +78,21 @@ func _ready() -> void:
 	practice_button.add_sibling(tutorial_button)
 	tutorial_button.pressed.connect(_teach)
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
+	# Whether to join to play or to watch, and the same choice once in.
+	var watch_button := Button.new()
+	watch_button.name = "WatchButton"
+	watch_button.custom_minimum_size = join_button.custom_minimum_size
+	join_button.add_sibling(watch_button)
+	_cycle(watch_button, "join_watching", [false, true], func(watching: bool) -> String: return "Joining to watch" if watching else "Joining to play")
+	var watch_toggle := Button.new()
+	watch_toggle.name = "WatchToggleButton"
+	watch_toggle.custom_minimum_size = resume_button.custom_minimum_size
+	resume_button.add_sibling(watch_toggle)
+	watch_toggle.pressed.connect(func() -> void:
+		var own: PlayerRecord = world.match_.own_record()
+		if own != null:
+			world.match_.watch(not own.watching)
+		close_pause_menu())
 	target_edit.text_submitted.connect(_join)
 	refresh_button.pressed.connect(Net.request_sessions)
 	combat_hud.bind(world)
@@ -126,6 +141,11 @@ func _process(_delta: float) -> void:
 		hud.text = "Practice range" if Net.alone else "Session %s  ·  %d playing" % [Net.room_code, world.players.get_child_count()]
 	if tutorial != null and hud.visible:
 		_run_tutorial()
+	if pause_menu.visible:
+		var own: PlayerRecord = world.match_.own_record()
+		var toggle: Button = pause_menu.find_child("WatchToggleButton", true, false)
+		toggle.text = "Play" if own != null and own.watching else "Watch instead"
+		toggle.visible = not Net.alone
 	_was_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	menu_button.visible = hud.visible and not _was_captured and not pause_menu.visible
 
@@ -308,6 +328,9 @@ func _on_session_started() -> void:
 	combat_hud.show()
 	touch_controls.show()
 	world.start(_alone_settings if _alone_settings != null else host_settings())
+	# Someone who joined to watch says so as soon as they are in.
+	if _alone_settings == null and not world.match_.is_host() and Settings.get_value("join_watching"):
+		world.match_.watch(true)
 	_alone_settings = null
 	copy_link_button.visible = Net.use_webrtc and OS.has_feature("web") and not Net.alone
 	if not Settings.get_value("seen_help") and tutorial == null:

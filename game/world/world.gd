@@ -18,6 +18,7 @@ const PLAYER_MASK := 2
 
 var sound_cues: Node
 var objective_marks: Node3D
+var watch_camera: Camera3D
 
 ## The loaded arena, and which of the Maps it is.
 var map: Node3D
@@ -60,6 +61,8 @@ func _ready() -> void:
 	add_child(sound_cues)
 	objective_marks = preload("res://world/objective_marks.gd").new(self)
 	add_child(objective_marks)
+	watch_camera = preload("res://world/watch_camera.gd").new(self)
+	add_child(watch_camera)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()

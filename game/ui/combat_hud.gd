@@ -71,6 +71,8 @@ var kill_feed: VBoxContainer
 var scoreboard: PanelContainer
 var _match_label: Label
 var _objective_label: Label
+# Who a player out of play is watching, and how to change it.
+var _watch_label: Label
 # What the tutorial asks the player to do next.
 var _tutorial_label: Label
 # What each weapon has done, on the practice range.
@@ -191,7 +193,7 @@ static func reserve_text(weapon: WeaponState) -> String:
 ## The notice for a player who is knocked out: who did it and when they're back.
 static func knocked_out_text(state: MatchState, id: int) -> Array:
 	var record := state.player(id)
-	if record == null or record.alive:
+	if record == null or record.alive or record.watching:
 		return ["", ""]
 	var by := "Knocked out by %s" % state.name_of(record.last_attacker) if state.player(record.last_attacker) != null else "Knocked out"
 	if record.last_attacker == id:
@@ -306,6 +308,8 @@ func _process(delta: float) -> void:
 		_weapon_label.text = own.weapon.stats.display_name
 	var state: MatchState = world.match_.state
 	_match_label.text = match_text(state)
+	_watch_label.text = world.watch_camera.text(_touch_shown())
+	_watch_label.visible = not _watch_label.text.is_empty()
 	_practice_label.visible = state.settings.is_practice() and state.is_playing()
 	if _practice_label.visible:
 		_practice_label.text = "\n".join(world.match_.tally.practice_lines())
@@ -343,6 +347,15 @@ func _on_announced(text: String, team: int) -> void:
 	_announce_label.text = text
 	_announce_label.add_theme_color_override("font_color", TeamColors.of(team))
 	_announce_left = ANNOUNCE_LIFE
+
+
+func watching_shown() -> String:
+	return _watch_label.text if _watch_label.visible else ""
+
+
+func _touch_shown() -> bool:
+	var controls := get_tree().get_first_node_in_group("touch_controls") if is_inside_tree() else null
+	return controls != null and controls.shown
 
 
 ## Shows what the tutorial asks next, or nothing for "".
@@ -533,6 +546,14 @@ func _build() -> void:
 	_announce_label.visible = false
 	add_child(_announce_label)
 
+	_watch_label = _outlined_label(18)
+	_watch_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 10)
+	_watch_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_watch_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_watch_label.offset_bottom = -96.0
+	_watch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_watch_label.visible = false
+	add_child(_watch_label)
 	_tutorial_label = _outlined_label(22)
 	_tutorial_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
 	_tutorial_label.grow_horizontal = Control.GROW_DIRECTION_BOTH

@@ -226,6 +226,26 @@ func introduce(wanted: String, key := WebPage.player_key()) -> void:
 		_introduce.rpc_id(1, wanted, key)
 
 
+## Tells the host this player wants to watch rather than play, or to play
+## after all.
+func watch(on: bool) -> void:
+	if is_host():
+		_watch(1, on)
+	elif multiplayer.multiplayer_peer != null:
+		_request_watch.rpc_id(1, on)
+
+
+func _watch(id: int, on: Variant) -> void:
+	if on is bool and state.set_watching(id, on):
+		_changed()
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_watch(on: Variant) -> void:
+	if is_host():
+		_watch(multiplayer.get_remote_sender_id(), on)
+
+
 ## Tells the host the kind of Overload this player wants to set off.
 func choose_overload(kind: int) -> void:
 	if is_host():
@@ -1256,6 +1276,9 @@ func _new_match() -> void:
 	spots.shuffle()
 	var index := 0
 	for id: int in state.players:
+		# Not those who are only watching.
+		if state.player(id).watching:
+			continue
 		_bring_back(id, spots[index % spots.size()])
 		index += 1
 	_changed()

@@ -244,9 +244,52 @@ func add_player(id: int) -> PlayerRecord:
 		players[id] = record
 		rearm(record)
 		# The practice range has no match to begin.
-		if not started and players.size() >= MIN_TO_START and not settings.is_practice():
+		if not started and playing_count() >= MIN_TO_START and not settings.is_practice():
 			_begin()
 	return players[id]
+
+
+## How many are in the match to play, rather than to watch.
+func playing_count() -> int:
+	var count := 0
+	for record: PlayerRecord in players.values():
+		if not record.watching:
+			count += 1
+	return count
+
+
+## Player `id` turns to watching, or back to playing. One who watches is out
+## of the arena at once and on no team; one who goes back to playing joins
+## the smaller team and comes into play as a knocked-out player does.
+## Returns whether anything changed.
+func set_watching(id: int, on: bool) -> bool:
+	var record := player(id)
+	if record == null or record.watching == on:
+		return false
+	record.watching = on
+	if on:
+		record.alive = false
+		record.respawn_in = 0.0
+		record.team = NO_TEAM
+		record.overload_left = 0.0
+		record.overload_build = 0.0
+		record.give_power(Powers.NONE, 0.0)
+		_check_round()
+		# Someone who joined to watch was a player for a moment, which may
+		# have begun the match: with too few left to play and nothing yet
+		# scored, it goes back to waiting.
+		if started and playing_count() < MIN_TO_START and _nothing_scored():
+			started = false
+			overtime = false
+			time_left = settings.minutes * 60.0
+	else:
+		if settings.is_teams():
+			record.team = smaller_team()
+		rearm(record)
+		record.respawn_in = RESPAWN_DELAY
+		if not started and playing_count() >= MIN_TO_START and not settings.is_practice():
+			_begin()
+	return true
 
 
 ## Whether the match is waiting for players before it begins.
@@ -270,6 +313,10 @@ func _begin() -> void:
 		record.overload = 0.0
 		if settings.mode == MatchSettings.GUN_GAME:
 			rearm(record)
+
+
+func _nothing_scored() -> bool:
+	return team_points == [0, 0] and players.values().all(func(record: PlayerRecord) -> bool: return record.kills == 0)
 
 
 # Whether nobody is ahead: the leaders are level, or nobody has scored.
@@ -338,6 +385,9 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 	if not is_playing() or target == null or not target.alive or target.is_protected() or round_break > 0.0:
 		return result
 	var own := attacker == victim
+	# What someone threw before they turned to watching does nothing.
+	if not own and player(attacker) != null and player(attacker).watching:
+		return result
 	if (own and not own_too) or amount <= 0.0 or (not own and are_allies(attacker, victim)):
 		return result
 	var scorer := player(attacker) if not own else null
@@ -494,7 +544,7 @@ func tick(delta: float) -> Array[int]:
 		return due
 	time_left = maxf(time_left - delta, 0.0)
 	if is_playing() and time_left == 0.0:
-		if not overtime and _level() and players.size() >= MIN_TO_START:
+		if not overtime and _level() and playing_count() >= MIN_TO_START:
 			# Level at the end: extra time, and the next score wins.
 			overtime = true
 			just_overtime = true
@@ -543,7 +593,7 @@ func end_match() -> void:
 func start_match() -> void:
 	phase = PLAYING
 	overtime = false
-	started = players.size() >= MIN_TO_START and not settings.is_practice()
+	started = playing_count() >= MIN_TO_START and not settings.is_practice()
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
 	team_points = [0, 0]
@@ -572,7 +622,8 @@ func start_match() -> void:
 
 func respawn(id: int) -> void:
 	var record := player(id)
-	if record == null:
+	# Someone watching stays out until they choose to play.
+	if record == null or record.watching:
 		return
 	record.alive = true
 	record.health = PlayerRecord.MAX_HEALTH
