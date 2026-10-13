@@ -55,6 +55,8 @@ var hurt_view: HurtView
 var announcer: Announcer
 ## Talking with teammates.
 var voice_chat: VoiceChat
+## The markers players have put down for their teammates.
+var pings: Pings
 var _built_code := ""
 ## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
@@ -123,6 +125,8 @@ func _ready() -> void:
 	add_child(MusicDirector.new(self))
 	voice_chat = VoiceChat.new(self)
 	add_child(voice_chat)
+	pings = Pings.new(self)
+	add_child(pings)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()
@@ -280,6 +284,7 @@ func stop() -> void:
 	for player in players.get_children():
 		player.queue_free()
 	match_.stop()
+	pings.clear()
 	# The next host's custom arena is theirs to send.
 	custom_code = ""
 	if map_id == Maps.CUSTOM:

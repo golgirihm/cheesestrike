@@ -64,6 +64,9 @@ var _announce_left := 0.0
 var _waits := {}
 const ANNOUNCE_LIFE := 3.5
 var _pickup_left := 0.0
+## Which way everything is, and what is said.
+var compass: Compass
+var chat_box: ChatBox
 ## Pickups this player has collected, for the browser tests.
 var pickups_shown := 0
 var _knocked_out: PanelContainer
@@ -107,6 +110,23 @@ func _ready() -> void:
 func bind(of: Node3D) -> void:
 	world = of
 	captions.world = of
+	# Across the top, which way everything is; at the left, what is said.
+	compass = Compass.new(world)
+	compass.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	compass.position = Vector2(-Compass.WIDE / 2.0, 92.0)
+	add_child(compass)
+	chat_box = ChatBox.new(world)
+	chat_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
+	chat_box.position = Vector2(14.0, -40.0)
+	chat_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	add_child(chat_box)
+	var wheel := Wheel.new()
+	wheel.name = "ChatWheel"
+	wheel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	wheel.position -= Vector2(Wheel.SIZE, Wheel.SIZE) / 2.0
+	add_child(wheel)
+	chat_box.wheel = wheel
+	wheel.chosen.connect(chat_box._on_wheel_chosen)
 	world.match_.hit_confirmed.connect(_on_hit_confirmed)
 	world.match_.hurt.connect(_on_hurt)
 	# Where a player falls is heard just before who did it and how.
@@ -129,6 +149,8 @@ func bind(of: Node3D) -> void:
 ## Clears what is left from a session that has ended.
 func reset() -> void:
 	kill_feed.clear()
+	if chat_box != null:
+		chat_box.clear()
 	_pickup_left = 0.0
 	_indicators.clear()
 	_damage_numbers.clear()

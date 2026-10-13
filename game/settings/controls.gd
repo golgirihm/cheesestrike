@@ -23,6 +23,9 @@ const REBINDABLE := {
 	"overload": "Overload",
 	"scoreboard": "Scoreboard",
 	"talk": "Talk",
+	"ping": "Ping",
+	"chat_team": "Chat to team",
+	"quick_chat": "Quick messages",
 }
 
 # Each rebindable action's own keys, as the project sets them, by action.

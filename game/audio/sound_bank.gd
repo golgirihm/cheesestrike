@@ -55,6 +55,7 @@ const SOUNDS := {
 	"voice_out": "_voice_out",
 	"hit_pop": "_hit_pop",
 	"hit_bell": "_hit_bell",
+	"ping": "_ping",
 	"ui_hover": "_ui_hover",
 	"ui_press": "_ui_press",
 	"ui_back": "_ui_back",
@@ -710,6 +711,13 @@ static func _overload() -> AudioStreamWAV:
 
 
 ## A cheerful loop for the menu: a bass line and a tune, four bars long.
+# A ping: two quick notes, the second higher, like a tap on a glass.
+static func _ping() -> AudioStreamWAV:
+	return _make(0.22, func(t: float, _i: int) -> float:
+		var second := sin(TAU * 1568.0 * (t - 0.07)) * _decay(t - 0.07, 22.0) if t >= 0.07 else 0.0
+		return (sin(TAU * 1174.7 * t) * _decay(t, 30.0) + second) * 0.6, 0.55)
+
+
 # The pointer coming onto a button: the lightest tick.
 static func _ui_hover() -> AudioStreamWAV:
 	return _make(0.045, func(t: float, _i: int) -> float:

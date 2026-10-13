@@ -39,6 +39,16 @@ func refresh() -> void:
 	_place_wheels()
 
 
+## Where the objectives showing are, and the colour of each: [{"at",
+## "colour"}], for the compass.
+func shown() -> Array:
+	var found := []
+	for mark: Node3D in _bases + _wheels + _zones:
+		if is_instance_valid(mark) and mark.is_visible_in_tree():
+			found.append({"at": mark.global_position, "colour": mark.get_meta("colour", NEUTRAL)})
+	return found
+
+
 ## How many bases, wheels and zones are drawn, for tests.
 func counts() -> Dictionary:
 	return {"bases": _bases.size(), "wheels": _wheels.size(), "zones": _zones.size(), "shown": _zones.filter(func(zone: Node3D) -> bool: return zone.visible).size()}

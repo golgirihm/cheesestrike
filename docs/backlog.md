@@ -79,28 +79,22 @@ The game uses the Compatibility renderer so it runs in a browser and on phones. 
 
 ## Milestone 10: An interface that looks the part
 
-1. **A map.** A small overhead map or a compass with teammates, objectives, pings and the direction of gunfire heard.
-   *Tests:* GUT tests of what it shows and hides.
-2. **Pings.** Point and press to mark a place, an enemy or a pickup for teammates, with a sound and a marker.
-   *Tests:* browser test that a teammate sees one and an opponent doesn't.
-3. **Chat.** Text chat to all or to the team, a wheel of quick messages for gamepad and touch, a filter for bad language, and a mute for each player.
-   *Tests:* GUT tests of the filter; browser test.
-4. **Medals.** Call out a double knock-out, a streak, a long shot, a comeback, revenge, with an icon and a sound.
+1. **Medals.** Call out a double knock-out, a streak, a long shot, a comeback, revenge, with an icon and a sound.
    *Tests:* GUT tests of each rule.
-5. **The end of a match.** A screen with the podium, each player's numbers (accuracy, damage, best streak, favourite weapon), medals earned and what was unlocked.
+2. **The end of a match.** A screen with the podium, each player's numbers (accuracy, damage, best streak, favourite weapon), medals earned and what was unlocked.
    *Tests:* GUT tests of the numbers; browser test.
-6. **A fuller scoreboard.** Assists, damage, objective score, ping as bars, who is talking or muted, and a way to mute or report from it.
+3. **A fuller scoreboard.** Assists, damage, objective score, ping as bars, who is talking or muted, and a way to mute or report from it.
    *Tests:* extend `test_scoreboard.gd`.
-7. **Your crosshair.** Shape, size, gap, thickness, colour, outline and a centre dot, with a code to share.
+4. **Your crosshair.** Shape, size, gap, thickness, colour, outline and a centre dot, with a code to share.
    *Tests:* GUT tests of the settings and the code.
-8. **The HUD your way.** Move and scale each part, set its opacity, turn parts off, and a minimal preset.
+5. **The HUD your way.** Move and scale each part, set its opacity, turn parts off, and a minimal preset.
    *Tests:* GUT tests that no layout puts anything off the screen.
-9. **Choosing weapons quickly.** A wheel for gamepad and touch, and icons with numbers for the keyboard.
+6. **Choosing weapons quickly.** A wheel for gamepad and touch, and icons with numbers for the keyboard.
    *Tests:* GUT tests of the wheel's choice from a stick direction.
-10. **Numbers for the curious.** A frame-rate counter, ping, packet loss and a small graph, each a setting.
-    *Tests:* GUT tests of the readings.
-11. **A photo mode.** Free the camera, hide the HUD, and save a picture.
-    *Tests:* browser test that a picture is saved.
+7. **Numbers for the curious.** A frame-rate counter, ping, packet loss and a small graph, each a setting.
+   *Tests:* GUT tests of the readings.
+8. **A photo mode.** Free the camera, hide the HUD, and save a picture.
+   *Tests:* browser test that a picture is saved.
 
 ## Milestone 11: A reason to come back
 

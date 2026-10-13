@@ -52,6 +52,8 @@ const DEFAULTS := {
 	## How many tips the player has been shown, so that each comes in turn
 	## (see JoinScreen).
 	"tips_seen": 0,
+	## Whether text chat is shown and can be typed (see ChatBox).
+	"text_chat": true,
 	## Whether the announcer speaks (see Announcer).
 	"announcer": true,
 	## Whether left and right are made the same.

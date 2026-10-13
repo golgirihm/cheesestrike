@@ -29,6 +29,11 @@ signal strike_shown(striker: int)
 signal fell(victim: int, weapon: String, from: Vector3)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
+## Player `by` pinged `at`, for this machine's player to see (see Pings).
+signal pinged(by: int, at: Vector3, kind: String)
+## Player `by` said `text` in the chat, to their team alone or to everyone,
+## for this machine's player to read (see Chat).
+signal chatted(by: int, text: String, to_team: bool)
 ## A packet of player `speaker`'s talk, for this machine's player to hear
 ## (see VoiceChat).
 signal voice_heard(speaker: int, packet: PackedByteArray)
@@ -84,6 +89,9 @@ var state := MatchState.new()
 var _clock := 0.0
 # Host only: when each player's last packets of talk came, by player.
 var _talk_times := {}
+# Host only: when each player last pinged, and when they lately chatted.
+var _point_times := {}
+var _chat_times := {}
 # The host's ShotRules for each player, by id.
 var _rules := {}
 # Where each player has lately been, as the host saw them, by id.
@@ -389,6 +397,88 @@ func watch(on: bool) -> void:
 func _watch(id: int, on: Variant) -> void:
 	if on is bool and state.set_watching(id, on):
 		_changed()
+
+
+## Pings `at`, as a ping of `kind` (see Pings), for whoever should see it.
+func ping(at: Vector3, kind: String) -> void:
+	if is_host():
+		_pass_on_ping(multiplayer.get_unique_id(), at, kind)
+	elif multiplayer.multiplayer_peer != null:
+		_point.rpc_id(1, at, kind)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _point(at: Variant, kind: Variant) -> void:
+	if is_host():
+		_pass_on_ping(multiplayer.get_remote_sender_id(), at, kind)
+
+
+# Host only: passes a ping by `by` on to each player who should see it, if
+# it is one, they are in play, and it isn't too soon after their last.
+func _pass_on_ping(by: int, at: Variant, kind: Variant) -> void:
+	var pinger := state.player(by)
+	if not Pings.is_ping(at, kind) or pinger == null or not pinger.alive or pinger.watching:
+		return
+	if not Pings.may_ping(_clock - _point_times.get(by, -INF)):
+		return
+	_point_times[by] = _clock
+	var teams := state.settings.is_teams()
+	for id: int in state.players:
+		if Bots.is_bot(id) or not Pings.seen_by(pinger, state.player(id), teams):
+			continue
+		if id == multiplayer.get_unique_id():
+			pinged.emit(by, at, kind)
+		elif multiplayer.get_peers().has(id):
+			_point_from.rpc_id(id, by, at, kind)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _point_from(by: Variant, at: Variant, kind: Variant) -> void:
+	if by is int and Pings.is_ping(at, kind):
+		pinged.emit(by, at, kind)
+
+
+## Says `text` in the chat, to this player's team alone or to everyone.
+func chat(text: String, to_team: bool) -> void:
+	if is_host():
+		_pass_on_chat(multiplayer.get_unique_id(), text, to_team)
+	elif multiplayer.multiplayer_peer != null:
+		_chat.rpc_id(1, text, to_team)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _chat(text: Variant, to_team: Variant) -> void:
+	if is_host():
+		_pass_on_chat(multiplayer.get_remote_sender_id(), text, to_team)
+
+
+# Host only: passes what `by` said on to each player who should read it,
+# cleaned, if there is anything left of it and they haven't said too much.
+func _pass_on_chat(by: int, text: Variant, to_team: Variant) -> void:
+	var said := Chat.clean(text)
+	var sender := state.player(by)
+	if said.is_empty() or sender == null or not to_team is bool:
+		return
+	var times: Array = _chat_times.get(by, []).filter(func(at: float) -> bool: return _clock - at < Chat.WINDOW)
+	_chat_times[by] = times
+	if not Chat.may_send(times, _clock):
+		return
+	times.append(_clock)
+	var teams := state.settings.is_teams()
+	for id: int in state.players:
+		if Bots.is_bot(id) or not Chat.seen_by(sender, state.player(id), to_team, teams):
+			continue
+		if id == multiplayer.get_unique_id():
+			chatted.emit(by, said, to_team and teams)
+		elif multiplayer.get_peers().has(id):
+			_chat_from.rpc_id(id, by, said, to_team and teams)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _chat_from(by: Variant, text: Variant, to_team: Variant) -> void:
+	# Cleaned again here: it has come over a connection.
+	if by is int and to_team is bool and not Chat.clean(text).is_empty():
+		chatted.emit(by, Chat.clean(text), to_team)
 
 
 ## Sends a packet of this player's talk to whoever should hear it.

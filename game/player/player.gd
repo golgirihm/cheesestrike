@@ -618,6 +618,10 @@ func _watch_input(event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# While something is being typed, as in the chat, the keys are letters:
+	# none of them plays.
+	if event is InputEventKey and typing():
+		return
 	# A vote, in whatever is being voted on.
 	if match_ != null and match_.has_state() and match_.state.ballot != null:
 		for option in 3:
@@ -665,6 +669,8 @@ func _input(event: InputEvent) -> void:
 		_overload_pressed = true
 	elif event.is_action_pressed("melee"):
 		_melee_pressed = true
+	elif event.is_action_pressed("ping"):
+		ping()
 	elif event.is_action_pressed("emote"):
 		_emote_held = true
 		_emote_picked = false
@@ -1055,6 +1061,11 @@ func _process(delta: float) -> void:
 
 ## Whether the in-game menu, or anything else in its group such as the controls
 ## help, is open, so this player's controls are set aside.
+## Whether the keyboard is being typed on, in a box that takes text.
+func typing() -> bool:
+	return is_inside_tree() and get_viewport().gui_get_focus_owner() is LineEdit
+
+
 func _menu_open() -> bool:
 	for menu in get_tree().get_nodes_in_group("pause_menu"):
 		if menu is CanvasItem and menu.visible:
@@ -1084,6 +1095,28 @@ func _make_emote(kind: int) -> void:
 	if alive and match_ != null and not _menu_open():
 		match_.emote(kind)
 		_next_emote = Emotes.next(kind)
+
+
+## Pings what this player is pointing at, for their teammates: an opponent,
+## a pickup, or the place (see Pings). Returns what was pinged, or {} if
+## they are pointing at nothing.
+func ping() -> Dictionary:
+	if not alive or match_ == null or world == null or not is_inside_tree():
+		return {}
+	var from := camera.global_position
+	var query := PhysicsRayQueryParameters3D.create(from, from - camera.global_basis.z * Pings.REACH, 3, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return {}
+	var other: Node = hit.collider
+	var on_player: bool = other.get_parent() == world.players
+	var on_opponent: bool = on_player and not match_.state.are_allies(name.to_int(), String(other.name).to_int())
+	# A ping on a player is at their feet, wherever on them was pointed at.
+	var at: Vector3 = other.global_position if on_player else hit.position
+	var pads: Array = world.pickup_pads().map(func(pad: Dictionary) -> Vector3: return pad.position)
+	var pinged := {"at": at, "kind": Pings.kind_at(at, on_opponent, pads)}
+	match_.ping(pinged.at, pinged.kind)
+	return pinged
 
 
 ## This character's own voice as they do `event`, such as "jump" or "hurt"
