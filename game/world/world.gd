@@ -22,6 +22,7 @@ var objective_marks: Node3D
 var watch_camera: Camera3D
 var replay_view: Node3D
 var atmosphere: Atmosphere
+var ambient_life: Node3D
 
 ## The loaded arena, and which of the Maps it is.
 var map: Node3D
@@ -110,6 +111,7 @@ func load_map(id: String) -> void:
 	if was_menu_view:
 		menu_camera.make_current()
 	_build_pickups()
+	_build_life()
 
 
 ## Begins the session. `settings` are the host's choice, and only used there.
@@ -187,11 +189,22 @@ func _leave(id: int) -> void:
 		print("player left: %d" % id)
 
 
+# What moves about the arena for the look of it (see AmbientLife).
+func _build_life() -> void:
+	var extras := GraphicsQuality.level(Settings.get_value("quality")) != GraphicsQuality.LOW
+	ambient_life = preload("res://world/ambient_life.gd").new()
+	map.add_child(ambient_life)
+	ambient_life.build(String(map.get_meta("scenery", Scenery.MEADOW)), Scenery.bounds(map.get_node("Geometry")), extras)
+
+
 # The sky is as the host chose it, with rain or dust in the air only where
 # the graphics setting has room for it.
 func _show_sky() -> void:
 	var extras := GraphicsQuality.level(Settings.get_value("quality")) != GraphicsQuality.LOW
 	atmosphere.show_look(match_.state.settings.sky if match_.has_state() else Atmosphere.NOON, extras)
+	# Clouds throw shadows only where there is a sun to throw them.
+	if ambient_life != null:
+		ambient_life.show_cloud_shadows([Atmosphere.NOON, Atmosphere.DAWN, Atmosphere.DUSK].has(atmosphere.showing))
 
 
 # Gravity pulls as hard as the host's rules say, on this machine as on
