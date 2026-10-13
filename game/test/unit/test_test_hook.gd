@@ -13,8 +13,8 @@ func before_each() -> void:
 	add_child_autofree(main)
 	hook = TestHook.new(main)
 	autofree(hook)
-	# Let the menu lay itself out.
-	await wait_process_frames(2)
+	# Let the game get ready and the menu lay itself out.
+	await wait_process_frames(Warmup.FRAMES + 3)
 
 
 func test_it_starts_on_the_menu_with_nobody_playing() -> void:

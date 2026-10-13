@@ -25,6 +25,11 @@ static func wanted() -> bool:
 	return OS.has_feature("web") and JavaScriptBridge.eval("new URLSearchParams(location.search).has('test')")
 
 
+## How long frames have taken, for tests that look for the game catching.
+var frame_times := FrameTimes.new()
+var _last_frame := 0
+
+
 func _init(main: Node) -> void:
 	_main = main
 	Settings.set_value("seen_help", not JavaScriptBridge.eval("new URLSearchParams(location.search).has('help')"))
@@ -38,6 +43,11 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Timed by the clock: the engine's own count leaves long frames short.
+	var now := Time.get_ticks_usec()
+	if _last_frame > 0:
+		frame_times.add((now - _last_frame) / 1000000.0)
+	_last_frame = now
 	_since_publish += delta
 	if _since_publish < PUBLISH_INTERVAL:
 		return
@@ -172,6 +182,7 @@ func snapshot() -> Dictionary:
 		"music": Sounds.is_music_playing(),
 		"replays_seen": _main.world.replay_view.played,
 		"sky": _main.world.atmosphere.showing,
+		"frames": {"typical": frame_times.typical(), "now": frame_times.now(), "seconds": frame_times.seconds},
 		"hurt_view": _main.world.hurt_view.showing(),
 		"editor": _main.arena_editor.text() if _main.arena_editor.visible else [],
 		"editor_link": _main.arena_editor.link() if _main.arena_editor.visible else "",
@@ -218,6 +229,8 @@ func snapshot() -> Dictionary:
 
 
 func _screen() -> String:
+	if _main.loading_cover.visible:
+		return "loading"
 	if _main.controls_help.visible:
 		return "help"
 	if _main.settings_menu.visible:

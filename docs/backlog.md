@@ -71,8 +71,6 @@ The game uses the Compatibility renderer so it runs in a browser and on phones. 
 
 1. **Simpler shapes far away, and nothing drawn behind walls.** Small dressing is already left out far away (`game/world/detail.gd`). Still to do: a simpler shape for far characters and scenery in place of the full one, and leaving out what a wall hides, if occlusion culling can be had in the browser.
    *Tests:* extend `test_detail.gd` and its budgets.
-2. **No hitches.** Compile shaders and build meshes behind a loading screen, so the first shot, burst and pickup don't stutter.
-   *Tests:* a browser test that measures the longest frame in a first fight.
 
 ## Milestone 9: Sound that sells it
 
