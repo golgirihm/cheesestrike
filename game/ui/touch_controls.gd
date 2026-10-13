@@ -1,6 +1,7 @@
 extends Control
 ## The on-screen buttons a touch screen needs for what has no gesture of its
-## own: fire, aim, reload, changing weapon, the Overload and the scoreboard.
+## own: fire, aim, reload, the knife, changing weapon, the Overload and the
+## scoreboard.
 ## Moving, looking and jumping are gestures on the screen itself (see the
 ## player). Aim stays on until it is pressed again.
 ##
@@ -15,6 +16,7 @@ const BUTTONS := {
 	"reload": {"anchor": Vector2(1, 1), "offset": Vector2(-200.0, -74.0), "radius": 34.0, "label": "R", "font_size": 18},
 	"overload": {"anchor": Vector2(1, 1), "offset": Vector2(-62.0, -262.0), "radius": 32.0, "label": "GO", "font_size": 16},
 	"aim": {"anchor": Vector2(1, 1), "offset": Vector2(-150.0, -256.0), "radius": 32.0, "label": "AIM", "font_size": 15},
+	"knife": {"anchor": Vector2(1, 1), "offset": Vector2(-290.0, -110.0), "radius": 30.0, "label": "KNIFE", "font_size": 12},
 	"swap": {"anchor": Vector2(1, 1), "offset": Vector2(-214.0, -172.0), "radius": 30.0, "label": "Swap", "font_size": 14},
 	"scores": {"anchor": Vector2(0.5, 0), "offset": Vector2(0.0, 44.0), "radius": 30.0, "label": "Scores", "font_size": 13},
 }

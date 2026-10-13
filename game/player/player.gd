@@ -124,6 +124,11 @@ var _fire_pressed := false
 var _reload_pressed := false
 var _jump_pressed := false
 var _overload_pressed := false
+var _melee_pressed := false
+# Seconds since this player last struck with their knife, and the knife as
+# it is seen while it swings.
+var _since_strike := INF
+var _knife: Node3D
 # Seconds of flinching left after being hit, which slows this player.
 var _flinch_left := 0.0
 # How far the sights are up: 0 at the hip, 1 at the eye.
@@ -440,6 +445,8 @@ func _input(event: InputEvent) -> void:
 		_reload_pressed = true
 	elif event.is_action_pressed("overload"):
 		_overload_pressed = true
+	elif event.is_action_pressed("melee"):
+		_melee_pressed = true
 	elif _weapon_key(event) != "":
 		_switch_to = _weapon_key(event)
 	elif event.is_action_pressed("jump"):
@@ -499,6 +506,7 @@ func _animate(delta: float) -> void:
 			if alive and not airborne and _ground_speed > 0.5:
 				_step(_ground_speed * delta, global_position)
 		body.set_gaze(head.rotation.x)
+	_animate_knife(delta)
 	# A weapon just changed to swings up from below.
 	var lowered := switch_lowering(_switch_left)
 	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + (Vector3(0.0, -0.5, 0.1) * lowered + Vector3(0.03, -0.16, 0.04) * reloading) * gun.scale.x
@@ -694,6 +702,7 @@ func _physics_process(delta: float) -> void:
 		_touch_jump = false
 		_reload_pressed = false
 		_fire_pressed = false
+		_melee_pressed = false
 		return
 	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * Settings.get_value("stick_sensitivity") * delta)
 
@@ -723,10 +732,62 @@ func _physics_process(delta: float) -> void:
 	_use_weapon()
 
 
+## The knife swings across the weapon hand's side of the view, for a strike
+## by this player that everyone should see.
+func swing_knife() -> void:
+	_since_strike = 0.0
+	if _knife == null:
+		_knife = _build_knife()
+		head.add_child(_knife)
+	if _mine:
+		Sounds.play("knife", -6.0)
+	elif world != null:
+		Sounds.play_at("knife", head.global_position, world, -2.0)
+
+
+# A cheese knife: a handle, and a blade with a forked tip.
+static func _build_knife() -> Node3D:
+	var knife := Node3D.new()
+	knife.name = "Knife"
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = WeaponModels.STEEL
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = WeaponModels.WOOD
+	knife.add_child(Rounded.instance(Rounded.box(Vector3(0.035, 0.035, 0.13), 0.012), wood, Vector3(0, 0, 0.06)))
+	knife.add_child(Rounded.instance(Rounded.box(Vector3(0.012, 0.06, 0.26), 0.005), steel, Vector3(0, 0.005, -0.13)))
+	for side in [-1.0, 1.0]:
+		knife.add_child(Rounded.instance(Rounded.box(Vector3(0.012, 0.022, 0.05), 0.004), steel, Vector3(0, 0.005 + 0.019 * side, -0.28)))
+	return knife
+
+
+# Moves the knife through its swing, and puts it away at the end of it.
+func _animate_knife(delta: float) -> void:
+	_since_strike += delta
+	if _knife == null:
+		return
+	var through := Melee.swing(_since_strike)
+	_knife.visible = through < 1.0 and alive
+	# From the weapon's side, low, across to the other side, as far out as the
+	# weapon is held.
+	var reach := gun.scale.x
+	var sweep := lerpf(-1.0, 1.0, smoothstep(0.0, 1.0, through))
+	_knife.position = Vector3(-0.22 * sweep, -0.16 + 0.05 * sin(through * PI), -0.5) * reach
+	_knife.rotation = Vector3(0.0, 0.9 * sweep, -1.2)
+	_knife.scale = Vector3.ONE * reach
+
+
 func _use_weapon() -> void:
 	if _overload_pressed:
 		_overload_pressed = false
 		match_.set_off_overload()
+	if _melee_pressed:
+		_melee_pressed = false
+		if _since_strike >= Melee.INTERVAL:
+			swing_knife()
+			# A step into it.
+			var forward := -global_basis.z
+			_knockback += Vector3(forward.x, 0.0, forward.z) * Melee.LUNGE
+			match_.strike(camera.global_position, -head.global_basis.z)
 	if _switch_step != 0:
 		equip(Weapons.cycle(arsenal.keys(), weapon.stats.id, signi(_switch_step)))
 	elif not _switch_to.is_empty():
@@ -814,6 +875,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_switch_step += 1
 		elif button == "aim":
 			_touch_aim = not _touch_aim
+		elif button == "knife":
+			_melee_pressed = true
 		elif button == "overload":
 			_overload_pressed = true
 		elif not button.is_empty():

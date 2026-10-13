@@ -227,6 +227,14 @@ class Game:
         finally:
             self.page.mouse.up(button="right")
 
+    def distance_to(self, player_id):
+        """How far this window's own character is from player `player_id`,
+        across the ground, in metres."""
+        state = self.wait_for(f"s.players.some((p) => p.mine) && s.players.some((p) => p.id === {player_id})")
+        own = next(player for player in state["players"] if player["mine"])["position"]
+        other = next(player for player in state["players"] if player["id"] == player_id)["position"]
+        return ((own[0] - other[0]) ** 2 + (own[2] - other[2]) ** 2) ** 0.5
+
     def choose(self, control, text):
         """Presses one of the menu's match settings buttons, such as
         "KillLimitButton", until it reads `text`."""

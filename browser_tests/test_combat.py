@@ -7,6 +7,7 @@ A slow machine can run the game with long gaps between frames, so these wait
 for what lasts (a score, a count of reloads) rather than for a passing moment
 such as the seconds a player spends knocked out."""
 
+import time
 import unittest
 
 from harness import GameTestCase
@@ -107,6 +108,29 @@ class CombatTest(GameTestCase):
         self.assertFalse(joiner.own_player()["aiming"])
         host.page.mouse.up(button="right")
         joiner.wait_for("s.players.some((p) => p.id === 1 && !p.aiming)")
+
+    def test_a_knife_strike_hurts_a_player_within_reach(self):
+        host, joiner, joiner_id = self.start_pair()
+        host.capture_mouse()
+        # The two start facing each other, so walking forward brings the host
+        # up to the joiner.
+        host.page.keyboard.down("w")
+        try:
+            deadline = time.monotonic() + 30
+            while host.distance_to(joiner_id) > 3.5:
+                self.assertLess(time.monotonic(), deadline, "the host never reached the joiner")
+                host.page.wait_for_timeout(50)
+        finally:
+            host.page.keyboard.up("w")
+        hurt = f"(p.health < {FULL_HEALTH} || p.deaths > 0)"
+        for _ in range(8):
+            host.press("v")
+            host.page.wait_for_timeout(900)
+            if host.page.evaluate(f"window.cheeseStrikeTest.players.some((p) => p.id === {joiner_id} && {hurt})"):
+                break
+        joiner.wait_for(f"s.players.some((p) => p.mine && {hurt}) && s.combat.hurts_shown >= 1")
+        self.assertGreaterEqual(host.state()["combat"]["hits_shown"], 1)
+        self.assertEqual(host.state()["sounds"].get("pistol", 0), 0, "without a shot fired")
 
     def test_reloading_fills_the_magazine(self):
         host = self.open_game()

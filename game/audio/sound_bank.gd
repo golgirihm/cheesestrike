@@ -27,6 +27,7 @@ const SOUNDS := {
 	"overload": "_overload",
 	"reload": "_reload",
 	"dry": "_dry",
+	"knife": "_knife",
 	"music": "_music",
 }
 
@@ -240,6 +241,24 @@ static func _dry() -> AudioStreamWAV:
 	var rng := _rng(11)
 	return _make(0.06, func(t: float, _i: int) -> float:
 		return rng.randf_range(-1.0, 1.0) * _decay(t, 260.0) + sin(TAU * 2400.0 * t) * 0.4 * _decay(t, 90.0), 0.4)
+
+
+# A knife through the air: a breath of noise that rises and is gone.
+static func _knife() -> AudioStreamWAV:
+	var rng := _rng(12)
+	var count := int(0.16 * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var soft := 0.0
+	var softer := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var noise := rng.randf_range(-1.0, 1.0)
+		# Brighter as the swing speeds up.
+		soft = lerpf(soft, noise, lerpf(0.15, 0.7, t / 0.16))
+		softer = lerpf(softer, noise, 0.05)
+		samples[i] = (soft - softer) * sin(PI * t / 0.16)
+	return _stream(_shaped(samples, 0.5))
 
 
 static func _hit() -> AudioStreamWAV:

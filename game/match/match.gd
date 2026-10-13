@@ -18,6 +18,8 @@ signal hit_confirmed(victim: int, dealt: int, knocked_out: bool, head: bool)
 signal hurt(attacker: int, from: Vector3, dealt: int)
 ## Another player fired a shot whose pellets ended at `ends`, for effects.
 signal shot_shown(shooter: int, ends: Array)
+## Another player struck with their knife, for effects.
+signal strike_shown(striker: int)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
 ## Player `id` set off their Overload (on everyone's machine).
@@ -71,6 +73,8 @@ var put_backs := 0
 # The host's measure of each player's round trip, by id.
 var _pings := {}
 var _since_ping := 0.0
+# When the host last allowed each player a strike with the knife, by id.
+var _struck_at := {}
 # The host's projectiles in flight, by id.
 var _projectiles := {}
 var _next_projectile := 1
@@ -152,6 +156,7 @@ func remove_player(id: int) -> void:
 	state.remove_player(id)
 	_pending_names.erase(id)
 	_rules.erase(id)
+	_struck_at.erase(id)
 	_pings.erase(id)
 	_histories.erase(id)
 	_checks.erase(id)
@@ -206,6 +211,63 @@ func fire(origin: Vector3, direction: Vector3, seed: int, weapon := Weapons.STAR
 		_shot(1, origin, direction, seed, weapon, stance)
 	elif multiplayer.multiplayer_peer != null:
 		_request_shot.rpc_id(1, origin, direction, seed, weapon, stance)
+
+
+## This player strikes with their knife from `origin` along `direction`.
+func strike(origin: Vector3, direction: Vector3) -> void:
+	if is_host():
+		_strike(1, origin, direction)
+	elif multiplayer.multiplayer_peer != null:
+		_request_strike.rpc_id(1, origin, direction)
+
+
+## The host checks and carries out a strike that `striker` reports: it
+## reaches the nearest player within the knife's reach and sweep, unless the
+## arena is in the way.
+func _strike(striker: int, origin: Vector3, direction: Vector3) -> void:
+	var record := state.player(striker)
+	var node: Node3D = world.player_node(striker)
+	if record == null or not record.alive or node == null:
+		return
+	if not origin.is_finite() or not direction.is_finite() or direction.length() < 0.5:
+		return
+	if not ShotRules.origin_believable(origin, node.head.global_position):
+		return
+	# A little grace for strikes bunched up on the way here.
+	if _clock - _struck_at.get(striker, -INF) < Melee.INTERVAL * 0.8:
+		return
+	_struck_at[striker] = _clock
+	if record.is_protected():
+		record.protected_for = 0.0
+		_changed()
+	for peer in multiplayer.get_peers():
+		if peer != striker:
+			_strike_seen.rpc_id(peer, striker)
+	if striker != multiplayer.get_unique_id():
+		strike_shown.emit(striker)
+	var targets := _targets_except(striker, now() - rewind_for(striker))
+	var nearest := {}
+	var along := Vector3.ZERO
+	for way in Melee.sweep(direction.normalized()):
+		var reach := _distance_to_wall(origin, way, Melee.REACH)
+		var hit := HitScan.first_hit(origin, way, reach, targets)
+		if not hit.is_empty() and (nearest.is_empty() or hit.distance < nearest.distance):
+			nearest = hit
+			along = way
+	if not nearest.is_empty():
+		var yaw: float = targets[nearest.id].yaw
+		_harm(striker, nearest.id, Melee.damage(along, yaw), origin, Melee.ID, false)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_strike(origin: Variant, direction: Variant) -> void:
+	if is_host() and origin is Vector3 and direction is Vector3:
+		_strike(multiplayer.get_remote_sender_id(), origin, direction)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _strike_seen(striker: int) -> void:
+	strike_shown.emit(striker)
 
 
 ## This player has started reloading `weapon`.
