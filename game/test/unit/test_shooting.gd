@@ -25,7 +25,8 @@ func before_each() -> void:
 func _add(id: int, at: Vector3) -> Node3D:
 	match_.add_player(id)
 	# In hand, a Cheddar Blaster, which these tests' numbers are for.
-	match_.state.player(id).weapons.append("blaster")
+	if not match_.state.player(id).weapons.has("blaster"):
+		match_.state.player(id).weapons.append("blaster")
 	match_.state.player(id).weapon = "blaster"
 	var player: Node3D = world._create_player([id, Vector3.ZERO])
 	world.players.add_child(player)
@@ -488,8 +489,8 @@ func test_the_owner_takes_up_a_new_weapon_and_drops_it_when_knocked_out() -> voi
 	assert_eq(own.arsenal.keys().size(), 3, "with the sidearm and the blaster")
 	match_.state.damage(2, 1, 500.0)
 	match_.state_changed.emit()
-	assert_eq(own.weapon.stats.id, Weapons.STARTING)
-	assert_eq(own.arsenal.keys(), [Weapons.STARTING])
+	assert_eq(own.weapon.stats.id, Weapons.DEFAULT_MAIN, "back to the main weapon they chose")
+	assert_eq(own.arsenal.keys(), [Weapons.STARTING, Weapons.DEFAULT_MAIN], "what they found is gone")
 
 
 func test_switching_weapons_takes_a_moment() -> void:
@@ -529,14 +530,16 @@ func test_a_hurt_player_heals_on_a_wedge() -> void:
 
 
 func test_a_weapon_already_carried_is_refilled_on_its_pad() -> void:
-	var pad := _pad("grater")
+	var pad := _pad("launcher")
 	var own := _add(1, Vector3(0, 0, 10))
-	_give(1, "grater")
+	_give(1, "launcher")
 	match_.state_changed.emit()
-	own.arsenal["grater"].ammo = 3
+	own.arsenal["launcher"].ammo = 0
+	own.arsenal["launcher"].reserve = 0
 	own.global_position = pad.position
 	match_._physics_process(1.0 / 60.0)
-	assert_eq(own.arsenal["grater"].ammo, Weapons.find("grater").magazine)
+	assert_eq(own.arsenal["launcher"].ammo, Weapons.find("launcher").magazine)
+	assert_eq(own.arsenal["launcher"].reserve, Weapons.find("launcher").reserve)
 
 
 func test_every_pad_is_on_the_floor_and_holds_a_known_pickup() -> void:
@@ -549,11 +552,10 @@ func test_every_pad_is_on_the_floor_and_holds_a_known_pickup() -> void:
 		assert_false(hit.is_empty(), "%s pad floats" % pad.kind)
 
 
-func test_every_weapon_but_the_first_can_be_picked_up() -> void:
+func test_every_power_weapon_can_be_picked_up() -> void:
 	var kinds: Array = world.pickup_pads().map(func(pad: Dictionary) -> String: return pad.kind)
-	for id: String in Weapons.ids():
-		if id != Weapons.STARTING:
-			assert_has(kinds, id)
+	for id: String in Weapons.in_slot(Weapons.POWER):
+		assert_has(kinds, id)
 	assert_has(kinds, Pickups.HEALTH)
 
 

@@ -6,6 +6,9 @@ extends Resource
 ## Short name used on the network and in settings, such as "blaster".
 @export var id := ""
 @export var display_name := ""
+## How a player comes by the weapon: "main" and "side" weapons are chosen in
+## their loadout, one of each; "power" weapons are found on an arena's pads.
+@export var slot := "main"
 ## Damage per hit, per pellet for a weapon with several.
 @export var damage := 20.0
 @export var headshot_multiplier := 1.75

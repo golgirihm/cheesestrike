@@ -28,6 +28,10 @@ var last_attacker := 0
 var weapon := Weapons.STARTING
 ## Every weapon they carry. Picked-up weapons are lost on being knocked out.
 var weapons: Array = [Weapons.STARTING]
+## Their loadout: the main weapon ("" for none) and sidearm they come into
+## play with, and keep when knocked out.
+var main := ""
+var side := Weapons.STARTING
 ## Their team in a team match, or MatchState.NO_TEAM.
 var team := -1
 ## The Overload meter, filling to Overload.METER_FULL; seconds left in an
@@ -44,7 +48,7 @@ var look := 0
 
 # Where each number sits in a packed record (see to_packed).
 enum { _ID, _HEALTH, _FLAGS, _RESPAWN, _PROTECTED, _KILLS, _DEATHS, _LAST_ATTACKER,
-	_WEAPON, _WEAPONS, _TEAM, _OVERLOAD, _OVERLOAD_LEFT, _MELTED, _PING, _GRENADES, _LOOK, _ARMOUR, _COUNT }
+	_WEAPON, _WEAPONS, _TEAM, _OVERLOAD, _OVERLOAD_LEFT, _MELTED, _PING, _GRENADES, _LOOK, _ARMOUR, _MAIN, _SIDE, _COUNT }
 const _ALIVE := 1
 
 
@@ -52,10 +56,19 @@ func _init(player_id := 0) -> void:
 	id = player_id
 
 
-## Back to only the starting weapon, as after being knocked out.
+## Back to only their loadout, with the main weapon in hand, as after being
+## knocked out.
 func disarm() -> void:
-	weapons = [Weapons.STARTING]
-	weapon = Weapons.STARTING
+	weapons = [side]
+	weapon = side
+	if not main.is_empty():
+		weapons.append(main)
+		weapon = main
+
+
+## Whether they carry exactly their loadout: nothing found, nothing lost.
+func has_only_loadout() -> bool:
+	return weapons.size() == (1 if main.is_empty() else 2) and weapons.has(side) and (main.is_empty() or weapons.has(main))
 
 
 ## Takes a hit of `amount`: armour absorbs its share for as long as it
@@ -94,6 +107,8 @@ func to_dict() -> Dictionary:
 		"grenades": grenades,
 		"look": look,
 		"armour": armour,
+		"main": main,
+		"side": side,
 	}
 
 
@@ -124,6 +139,8 @@ func to_packed() -> Array:
 	numbers[_GRENADES] = grenades
 	numbers[_LOOK] = look
 	numbers[_ARMOUR] = armour
+	numbers[_MAIN] = Weapons.ORDER.find(main)
+	numbers[_SIDE] = Weapons.ORDER.find(side)
 	return [name, numbers]
 
 
@@ -161,6 +178,9 @@ static func from_packed(data: Variant) -> PlayerRecord:
 	record.grenades = clampi(numbers[_GRENADES], 0, Weapons.GRENADES)
 	record.look = Looks.clean(numbers[_LOOK])
 	record.armour = clampi(numbers[_ARMOUR], 0, MAX_ARMOUR)
+	var chosen := Weapons.clean_loadout(_weapon_at(numbers[_MAIN]), _weapon_at(numbers[_SIDE]))
+	record.main = chosen[0]
+	record.side = chosen[1]
 	return record
 
 
@@ -185,6 +205,9 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.grenades = clampi(_int(data, "grenades", Weapons.GRENADES), 0, Weapons.GRENADES)
 	record.look = Looks.clean(_int(data, "look", 0))
 	record.armour = clampi(_int(data, "armour", 0), 0, MAX_ARMOUR)
+	var chosen := Weapons.clean_loadout(data.get("main"), data.get("side"))
+	record.main = chosen[0]
+	record.side = chosen[1]
 	var carried: Variant = data.get("weapons")
 	if carried is Array:
 		record.weapons = carried.filter(func(id: Variant) -> bool: return Weapons.find(id) != null)
@@ -193,6 +216,11 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	if not record.weapons.has(record.weapon):
 		record.weapon = record.weapons[0]
 	return record
+
+
+# The weapon at `index` in the usual order, or "".
+static func _weapon_at(index: int) -> String:
+	return Weapons.ORDER[index] if index >= 0 and index < Weapons.ORDER.size() else ""
 
 
 static func _int(data: Dictionary, key: String, default: int) -> int:

@@ -281,6 +281,18 @@ func _on_burst(_id: int, weapon_id: String, at: Vector3) -> void:
 func _on_setting_changed(key: String) -> void:
 	if Looks.SETTINGS.has(key) and match_ != null:
 		match_.wear(Looks.chosen())
+	if key.begins_with("loadout_") and match_ != null:
+		var loadout := Weapons.chosen_loadout()
+		match_.choose_loadout(loadout[0], loadout[1])
+
+
+# The weapon to fall back on when the one in hand runs dry: one that never
+# does, which every loadout has in its sidearm.
+func _fallback_weapon() -> String:
+	for id: String in arsenal:
+		if arsenal[id].stats.unlimited():
+			return id
+	return weapon.stats.id
 
 
 ## The host's record of this player, or null before it has arrived.
@@ -390,10 +402,13 @@ func _carry(carried: Array) -> void:
 			arsenal.erase(id)
 	if not picked_up.is_empty():
 		equip(picked_up)
-	elif not arsenal.has(weapon.stats.id):
-		weapon = arsenal.get(Weapons.STARTING, WeaponState.new(Weapons.find(Weapons.STARTING)))
-		arsenal[Weapons.STARTING] = weapon
-		_show_weapon(Weapons.STARTING)
+	elif not arsenal.has(weapon.stats.id) and not arsenal.is_empty():
+		# What was in hand is gone: take up what the host says is in hand, or
+		# failing that the last thing carried.
+		var own := record()
+		var held: String = own.weapon if own != null and arsenal.has(own.weapon) else arsenal.keys()[arsenal.size() - 1]
+		weapon = arsenal[held]
+		_show_weapon(held)
 
 
 # An Overloaded player glows; a melted one sags and darkens.
@@ -1313,7 +1328,7 @@ func _use_weapon() -> void:
 	if wants and weapon.is_dry():
 		_fire_pressed = false
 		Sounds.play("dry", -6.0)
-		equip(Weapons.STARTING)
+		equip(_fallback_weapon())
 		return
 	if wants and weapon.fire():
 		var origin := camera.global_position

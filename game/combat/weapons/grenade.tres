@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_stats")
 id = "grenade"
+slot = "thrown"
 display_name = "Wax Grenade"
 damage = 0.0
 headshot_multiplier = 1.0

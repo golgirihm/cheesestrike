@@ -93,8 +93,8 @@ class SoundTest(GameTestCase):
         host.wait_for("s.players.length === 2")
         host.capture_mouse()
         host.hold_fire(50)
-        host.wait_for("(s.sounds.pistol || 0) >= 1")
-        joiner.wait_for("(s.sounds.pistol || 0) >= 1")
+        host.wait_for("(s.sounds.blaster || 0) >= 1")
+        joiner.wait_for("(s.sounds.blaster || 0) >= 1")
 
     def test_the_menu_has_music(self):
         game = self.open_game()
