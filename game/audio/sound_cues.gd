@@ -18,14 +18,22 @@ func _ready() -> void:
 		Sounds.play_at("launcher", from, world))
 	match_.projectile_burst.connect(func(_id: int, _weapon: String, at: Vector3) -> void:
 		Sounds.play_at("burst", at, world))
-	match_.hit_confirmed.connect(func(_victim: int, _dealt: int, _knocked_out: bool, _head: bool) -> void:
-		Sounds.play("hit", -4.0))
+	match_.hit_confirmed.connect(func(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
+		Sounds.play(hit_sound(knocked_out, head), -4.0))
 	match_.hurt.connect(func(_attacker: int, _from: Vector3, _dealt: int) -> void:
 		Sounds.play("hurt"))
 	match_.picked_up.connect(func(id: int, _kind: String) -> void:
 		_at_player("pickup", id))
 	match_.overloaded.connect(func(id: int) -> void:
 		_at_player("overload", id))
+
+
+## The sound this player hears when their shot lands: one for a body hit, a
+## sharper one for the head, and another for a knock-out.
+static func hit_sound(knocked_out: bool, head: bool) -> String:
+	if knocked_out:
+		return "knock_out"
+	return "hit_head" if head else "hit"
 
 
 ## This machine's own player fired `weapon` from `muzzle`.

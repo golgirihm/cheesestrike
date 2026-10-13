@@ -40,6 +40,10 @@ var hit_kind := ""
 var captions: VBoxContainer
 
 var _hit_left := 0.0
+## Seconds a hit's damage stays written by the crosshair, drifting upward.
+const DAMAGE_NUMBER_LIFE := 0.7
+# Each entry: {"text": String, "left": seconds, "kind": one of the hit kinds}.
+var _damage_numbers: Array[Dictionary] = []
 # Each entry: {"from": Vector3, "left": seconds}.
 var _indicators: Array[Dictionary] = []
 var _overload_bar: ProgressBar
@@ -86,6 +90,7 @@ func reset() -> void:
 	kill_feed.clear()
 	_pickup_left = 0.0
 	_indicators.clear()
+	_damage_numbers.clear()
 	_hit_left = 0.0
 	scoreboard.hide()
 	captions.clear()
@@ -201,6 +206,9 @@ func _process(delta: float) -> void:
 	if world == null:
 		return
 	_hit_left = maxf(_hit_left - delta, 0.0)
+	for number in _damage_numbers:
+		number.left -= delta
+	_damage_numbers = _damage_numbers.filter(func(number: Dictionary) -> bool: return number.left > 0.0)
 	_pickup_left = maxf(_pickup_left - delta, 0.0)
 	_pickup_label.visible = _pickup_left > 0.0
 	for indicator in _indicators:
@@ -261,6 +269,18 @@ func _on_hit_confirmed(_victim: int, _dealt: int, knocked_out: bool, head: bool)
 	hits_shown += 1
 	_hit_left = HIT_MARKER_LIFE
 	hit_kind = hit_kind_for(knocked_out, head)
+	if Settings.get_value("damage_numbers"):
+		_damage_numbers.append({"text": str(_dealt), "left": DAMAGE_NUMBER_LIFE, "kind": hit_kind})
+		while _damage_numbers.size() > 6:
+			_damage_numbers.pop_front()
+
+
+## The damage numbers showing, oldest first.
+func damage_numbers_shown() -> Array[String]:
+	var texts: Array[String] = []
+	for number in _damage_numbers:
+		texts.append(number.text)
+	return texts
 
 
 func _on_hurt(_attacker: int, from: Vector3, _dealt: int) -> void:
@@ -286,6 +306,17 @@ func _draw() -> void:
 			draw_line(centre + corner * 4.0, centre + corner * reach, color, width, true)
 		if hit_kind == KNOCKOUT:
 			draw_arc(centre, reach + 4.0, 0.0, TAU, 32, color, 2.0, true)
+	var font := get_theme_default_font()
+	var font_size := text_size(18)
+	for index in _damage_numbers.size():
+		var number: Dictionary = _damage_numbers[index]
+		var age: float = 1.0 - number.left / DAMAGE_NUMBER_LIFE
+		var tint: Color = {HIT: HIT_COLOR, HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[number.kind]
+		tint.a = 1.0 - age * age
+		# Each a little to one side of the last, so a burst of hits can be read.
+		var at := centre + Vector2(26.0 + (index % 3) * 22.0, -18.0 - age * 34.0)
+		draw_string_outline(font, at, number.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 5, Color(0, 0, 0, tint.a))
+		draw_string(font, at, number.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, tint)
 
 	if own == null:
 		return

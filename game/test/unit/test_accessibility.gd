@@ -143,3 +143,22 @@ func test_being_hurt_shakes_the_view_but_not_the_aim() -> void:
 	assert_ne(own.camera.rotation, Vector3.ZERO)
 	assert_eq(own.head.rotation, Vector3.ZERO)
 	main.world.stop()
+
+
+func test_the_damage_of_a_hit_is_written_only_if_asked_for() -> void:
+	var main: Node = await _main_in_a_session()
+	var hud: Control = main.combat_hud
+	Settings.set_value("damage_numbers", false)
+	main.world.match_.hit_confirmed.emit(2, 20, false, false)
+	assert_eq(hud.damage_numbers_shown(), [] as Array[String])
+	Settings.set_value("damage_numbers", true)
+	main.world.match_.hit_confirmed.emit(2, 20, false, false)
+	main.world.match_.hit_confirmed.emit(2, 35, false, true)
+	assert_eq(hud.damage_numbers_shown(), ["20", "35"] as Array[String])
+	await wait_seconds(HUD.DAMAGE_NUMBER_LIFE + 0.1)
+	assert_eq(hud.damage_numbers_shown(), [] as Array[String], "each fades")
+	for hit in 20:
+		main.world.match_.hit_confirmed.emit(2, hit, false, false)
+	assert_lte(hud.damage_numbers_shown().size(), 6, "and only a few show at once")
+	Settings.set_value("damage_numbers", false)
+	main.world.stop()

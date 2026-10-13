@@ -21,6 +21,8 @@ const MELT_TIME := 0.45
 const POP_TIME := 0.2
 ## Seconds the face stays screwed up after being hurt.
 const GRIMACE_TIME := 0.5
+## Seconds the whole body flashes pale when hit.
+const FLASH_TIME := 0.09
 ## How far above the surface each layer of what is drawn on it sits, so that
 ## none flickers through another.
 const LAYER := 0.003
@@ -45,6 +47,8 @@ var _speed := 0.0
 var _airborne := false
 var _gaze := 0.0
 var _grimace_left := 0.0
+var _flash_left := 0.0
+var _glowing := false
 # 0 standing, 1 fully melted.
 var _melt := 0.0
 var _melting := false
@@ -73,9 +77,15 @@ func colour() -> Color:
 
 ## Whether the body glows, as in an Overload.
 func set_glow(on: bool) -> void:
-	_material.emission_enabled = on
-	_material.emission = Color(1.0, 0.45, 0.1)
-	_material.emission_energy_multiplier = 1.2
+	_glowing = on
+	_light()
+
+
+# The body lights up orange in an Overload, and white for an instant when hit.
+func _light() -> void:
+	_material.emission_enabled = _glowing or is_flashing()
+	_material.emission = Color.WHITE if is_flashing() else Color(1.0, 0.45, 0.1)
+	_material.emission_energy_multiplier = 0.9 if is_flashing() else 1.2
 
 
 ## How the player is moving, for the walk: speed across the ground in metres
@@ -91,9 +101,16 @@ func set_gaze(pitch: float) -> void:
 	_gaze = pitch
 
 
-## The player was just hurt: the face screws up for a moment.
+## The player was just hurt: the body flashes for an instant, and the face
+## screws up for a moment.
 func grimace() -> void:
 	_grimace_left = GRIMACE_TIME
+	_flash_left = FLASH_TIME
+	_light()
+
+
+func is_flashing() -> bool:
+	return _flash_left > 0.0
 
 
 func is_grimacing() -> bool:
@@ -143,6 +160,9 @@ func _process(delta: float) -> void:
 	# The free arm swings; the other holds the weapon.
 	_arms[0].rotation.x = -swing * 0.6
 	_grimace_left = maxf(_grimace_left - delta, 0.0)
+	if is_flashing():
+		_flash_left = maxf(_flash_left - delta, 0.0)
+		_light()
 	_calm.visible = not is_grimacing()
 	_wince.visible = is_grimacing()
 	for eye in _eyes:
