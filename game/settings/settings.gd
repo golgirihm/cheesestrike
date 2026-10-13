@@ -68,6 +68,12 @@ const DEFAULTS := {
 	"damage_numbers": false,
 	## Whether to be shown how one was knocked out, and the play of the match.
 	"replays": true,
+	## What is done to the picture (see Picture): whether bright things glow,
+	## whether each arena has its own cast of colour, and whether the corners
+	## of the view are darkened.
+	"bloom": true,
+	"colour_grade": true,
+	"vignette": true,
 	## What the player's character looks like to others (see Looks).
 	"look_cheese": Looks.CHEESES[0],
 	"look_hat": Looks.HATS[0],

@@ -34,6 +34,8 @@ var fixtures := {"pads": [], "ladders": []}
 ## The code of the custom arena to play on (see ArenaCode), when the match is
 ## on one: the host's own, or what the host sent.
 var custom_code := ""
+## The layer that darkens the corners of the view (see Picture).
+var vignette: CanvasLayer
 var _built_code := ""
 ## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
@@ -91,17 +93,30 @@ func _ready() -> void:
 		# For those who want them.
 		if Settings.get_value("replays"):
 			replay_view.play(clip, about, title))
+	vignette = Picture.vignette()
+	add_child(vignette)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()
 	Settings.changed.connect(func(key: String) -> void:
 		if key == "quality":
-			apply_quality())
+			apply_quality()
+		elif key in [Picture.BLOOM, Picture.GRADE, Picture.VIGNETTE]:
+			apply_picture())
 
 
 ## Puts the chosen graphics quality into effect.
 func apply_quality() -> void:
 	GraphicsQuality.apply(GraphicsQuality.level(Settings.get_value("quality")), get_viewport(), $Sun)
+	apply_picture()
+
+
+## Puts the glow, the arena's cast of colour and the darker corners into
+## effect, as the settings have them.
+func apply_picture() -> void:
+	var wanted := Picture.wanted()
+	Picture.apply($WorldEnvironment.environment, map_id, GraphicsQuality.level(Settings.get_value("quality")), wanted)
+	vignette.visible = wanted[Picture.VIGNETTE]
 
 
 ## Replaces the arena with map `id`, unless it is already loaded.
@@ -126,6 +141,8 @@ func load_map(id: String) -> void:
 	add_child(map)
 	move_child(map, 0)
 	map_id = id
+	if vignette != null:
+		apply_picture()
 	spawn_points = map.get_node("SpawnPoints")
 	fixtures = Fixtures.of(map)
 	moving_parts = MovingParts.of(map)

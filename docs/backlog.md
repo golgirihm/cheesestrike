@@ -69,19 +69,17 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 The game uses the Compatibility renderer so it runs in a browser and on phones. Some effects common in big games (ambient occlusion, volumetric light, screen-space reflections) aren't available there. Items here stay within it; a second, richer renderer for desktop builds is in Milestone 13.
 
-1. **Glow and colour.** Bloom on bright things, a colour grade for each arena, and a vignette, where the renderer allows, each with a setting.
-   *Tests:* GUT tests of the settings.
-2. **What being hurt looks like.** Red at the edges of the view that deepens with low health, a pulse, a blur on a near miss by a burst.
+1. **What being hurt looks like.** Red at the edges of the view that deepens with low health, a pulse, a blur on a near miss by a burst.
    *Tests:* GUT tests of the rule. Manual row.
-3. **Outlines.** A thin outline on teammates through walls, and on pickups nearby, so they are never lost against the arena.
+2. **Outlines.** A thin outline on teammates through walls, and on pickups nearby, so they are never lost against the arena.
    *Tests:* GUT test that enemies never get one.
-4. **Smoother edges and sharper far.** Choices of anti-aliasing, texture filtering and render scale, with dynamic resolution to hold a frame rate.
+3. **Smoother edges and sharper far.** Choices of anti-aliasing, texture filtering and render scale, with dynamic resolution to hold a frame rate.
    *Tests:* GUT tests in `GraphicsQuality`.
-5. **Graphics settings, one by one.** Shadows, particles, effects, view distance and render scale each on its own, under the Low, Medium and High presets.
+4. **Graphics settings, one by one.** Shadows, particles, effects, view distance and render scale each on its own, under the Low, Medium and High presets.
    *Tests:* extend `test_settings.gd`.
-6. **Less detail far away.** Simpler shapes for far things, and nothing drawn that can't be seen, so big arenas hold their frame rate on a phone.
+5. **Less detail far away.** Simpler shapes for far things, and nothing drawn that can't be seen, so big arenas hold their frame rate on a phone.
    *Tests:* a benchmark scene with a frame-time budget run in CI.
-7. **No hitches.** Compile shaders and build meshes behind a loading screen, so the first shot, burst and pickup don't stutter.
+6. **No hitches.** Compile shaders and build meshes behind a loading screen, so the first shot, burst and pickup don't stutter.
    *Tests:* a browser test that measures the longest frame in a first fight.
 
 ## Milestone 9: Sound that sells it
