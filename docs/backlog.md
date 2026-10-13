@@ -62,13 +62,11 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 7: Arenas with character
 
-1. **Textures and materials.** Give surfaces more than a flat colour: brick, asphalt, wood grain, rock, cheese rind, made in code or drawn, small enough for the web build.
-   *Tests:* GUT test of the build's size budget. Manual rows.
-2. **Light.** Baked lighting for each arena, warm sun and cool shade, lamps in the city, with the real-time sun kept for players.
+1. **Light.** Baked lighting for each arena, warm sun and cool shade, lamps in the city, with the real-time sun kept for players.
    *Tests:* manual rows; a GUT test that each arena has its lighting.
-3. **Inside the buildings.** Open a floor or two of the city's towers: lobbies, stairs, windows to shoot from.
+2. **Inside the buildings.** Open a floor or two of the city's towers: lobbies, stairs, windows to shoot from.
    *Tests:* the arena tests (spots fit, pads reachable, nowhere traps) already run over every arena.
-4. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
+3. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
    *Tests:* GUT tests of saving and loading; the arena tests run on a saved arena.
 
 ## Milestone 8: A picture that holds up

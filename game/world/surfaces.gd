@@ -49,6 +49,6 @@ static func dust(body: Node) -> Color:
 				break
 	var material := drawn.material_override as StandardMaterial3D if drawn != null else null
 	# A wall of windows is a picture tinted by its colour: plain dust off that.
-	if material != null and material.albedo_texture == null:
+	if material != null and not material.has_meta("windows"):
 		return material.albedo_color.lerp(Color.WHITE, 0.25)
 	return DUST
