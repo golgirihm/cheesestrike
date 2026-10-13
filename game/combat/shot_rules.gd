@@ -29,6 +29,9 @@ var _reload_done_at := {}
 # that was (0 for the first), for its recoil and spread.
 var _shot_at := {}
 var _run := {}
+# Per weapon id: rounds in reserve, for weapons that can run out. Missing
+# until the weapon is first fired, when it is what the weapon starts with.
+var _reserve := {}
 
 
 ## Whether a shot from `weapon` at time `now` (seconds) is allowed, recording it
@@ -39,7 +42,11 @@ func allow_shot(weapon: WeaponStats, now: float) -> bool:
 		if now < _reload_done_at[id]:
 			return false
 		_reload_done_at.erase(id)
-		_fired[id] = 0
+		# The reload puts back what was fired, as far as the reserve goes.
+		var taken: int = _fired.get(id, 0) if weapon.unlimited() else mini(_fired.get(id, 0), reserve(weapon))
+		_fired[id] = _fired.get(id, 0) - taken
+		if not weapon.unlimited():
+			_reserve[id] = reserve(weapon) - taken
 	if _fired.get(id, 0) >= weapon.magazine:
 		return false
 	var budget: float = _budget.get(id, BURST)
@@ -69,8 +76,22 @@ func run(weapon: WeaponStats) -> int:
 	return _run.get(weapon.id, 0)
 
 
+## Rounds the player has in reserve for `weapon`. Meaningless for one that
+## never runs out.
+func reserve(weapon: WeaponStats) -> int:
+	return _reserve.get(weapon.id, maxi(weapon.reserve, 0))
+
+
+## The player picked up `rounds` for `weapon`.
+func add_reserve(weapon: WeaponStats, rounds: int) -> void:
+	if not weapon.unlimited():
+		_reserve[weapon.id] = mini(reserve(weapon) + rounds, weapon.reserve_max)
+
+
 ## The player has started reloading `weapon` at time `now`.
 func reload(weapon: WeaponStats, now: float) -> void:
+	if not weapon.unlimited() and reserve(weapon) <= 0:
+		return
 	if _fired.get(weapon.id, 0) > 0 and not _reload_done_at.has(weapon.id):
 		_reload_done_at[weapon.id] = now + weapon.reload_time * RELOAD_ALLOWANCE
 
@@ -80,11 +101,13 @@ func refill(weapon := "") -> void:
 	if weapon.is_empty():
 		_fired.clear()
 		_reload_done_at.clear()
+		_reserve.clear()
 		_run.clear()
 		_shot_at.clear()
 	else:
 		_fired.erase(weapon)
 		_reload_done_at.erase(weapon)
+		_reserve.erase(weapon)
 
 
 static func origin_believable(reported: Vector3, head: Vector3) -> bool:

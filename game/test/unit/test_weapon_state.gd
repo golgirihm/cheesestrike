@@ -199,3 +199,73 @@ func test_every_weapon_has_a_model_with_a_muzzle() -> void:
 		assert_not_null(model.get_node_or_null("Muzzle"), id)
 		assert_lt(model.get_node("Muzzle").position.z, 0.0, "%s points forward" % id)
 		model.free()
+
+
+func test_a_reload_takes_its_rounds_from_the_reserve() -> void:
+	var blaster := WeaponState.new(Weapons.find("blaster"))
+	var carried := blaster.reserve
+	assert_eq(carried, blaster.stats.reserve)
+	for shot in 10:
+		blaster.fire()
+		blaster.tick(blaster.stats.fire_interval)
+	assert_true(blaster.start_reload())
+	blaster.tick(blaster.stats.reload_time)
+	assert_eq(blaster.ammo, blaster.stats.magazine)
+	assert_eq(blaster.reserve, carried - 10)
+
+
+func test_a_short_reserve_gives_a_short_magazine_then_none() -> void:
+	var launcher := WeaponState.new(Weapons.find("launcher"))
+	launcher.reserve = 1
+	launcher.ammo = 0
+	assert_false(launcher.is_dry(), "there is one left to load")
+	assert_true(launcher.start_reload())
+	launcher.tick(launcher.stats.reload_time)
+	assert_eq(launcher.ammo, 1)
+	assert_eq(launcher.reserve, 0)
+	launcher.cooldown = 0.0
+	assert_true(launcher.fire())
+	assert_false(launcher.is_reloading(), "nothing to reload with")
+	assert_true(launcher.is_dry())
+	assert_false(launcher.start_reload())
+	assert_false(launcher.can_fire())
+
+
+func test_the_sidearm_never_runs_out() -> void:
+	var pistol := WeaponState.new(Weapons.find(Weapons.STARTING))
+	assert_true(pistol.stats.unlimited())
+	for reload in 30:
+		pistol.ammo = 0
+		assert_false(pistol.is_dry())
+		assert_true(pistol.start_reload())
+		pistol.tick(pistol.stats.reload_time)
+		assert_eq(pistol.ammo, pistol.stats.magazine)
+	assert_false(pistol.add_reserve(10), "and has no use for more")
+
+
+func test_every_other_weapon_can_run_out_and_carry_more_than_it_starts_with() -> void:
+	for id: String in Weapons.ids():
+		var stats := Weapons.find(id)
+		if id == Weapons.STARTING:
+			continue
+		assert_false(stats.unlimited(), id)
+		assert_gte(stats.reserve, stats.magazine, "%s: at least one reload" % id)
+		assert_gt(stats.reserve_max, stats.reserve, id)
+
+
+func test_picked_up_rounds_fill_the_reserve_to_its_limit() -> void:
+	var blaster := WeaponState.new(Weapons.find("blaster"))
+	assert_true(blaster.add_reserve(blaster.stats.magazine))
+	assert_eq(blaster.reserve, blaster.stats.reserve + blaster.stats.magazine)
+	assert_true(blaster.add_reserve(9999))
+	assert_eq(blaster.reserve, blaster.stats.reserve_max)
+	assert_false(blaster.add_reserve(1), "full")
+
+
+func test_coming_back_gives_back_the_reserve() -> void:
+	var blaster := WeaponState.new(Weapons.find("blaster"))
+	blaster.reserve = 0
+	blaster.ammo = 3
+	blaster.refill()
+	assert_eq(blaster.ammo, blaster.stats.magazine)
+	assert_eq(blaster.reserve, blaster.stats.reserve)

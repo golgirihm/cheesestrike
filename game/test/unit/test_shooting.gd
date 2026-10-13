@@ -543,7 +543,7 @@ func test_every_pad_is_on_the_floor_and_holds_a_known_pickup() -> void:
 	var space := world.get_world_3d().direct_space_state
 	assert_gt(world.pickup_pads().size(), 0)
 	for pad: Dictionary in world.pickup_pads():
-		assert_true(pad.kind == Pickups.HEALTH or Weapons.find(pad.kind) != null, pad.kind)
+		assert_true(Pickups.is_kind(pad.kind), pad.kind)
 		var from: Vector3 = pad.position + Vector3.UP * 0.2
 		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 0.5))
 		assert_false(hit.is_empty(), "%s pad floats" % pad.kind)
@@ -717,3 +717,39 @@ func test_the_owners_view_climbs_with_a_run_of_fire_and_settles() -> void:
 	await wait_seconds(1.0)
 	assert_almost_eq(own.camera.rotation.x, 0.0, 0.002, "it settles")
 	assert_eq(own.next_in_run(), 0)
+
+
+func test_walking_over_ammunition_tops_up_every_weapon_carried() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	_give(1, "shotgun")
+	match_.state_changed.emit()
+	var pad := _pad(Pickups.AMMO)
+	var before: int = own.arsenal["blaster"].reserve
+	var shells: int = own.arsenal["shotgun"].reserve
+	own.global_position = pad.position
+	match_._physics_process(0.016)
+	assert_eq(own.arsenal["blaster"].reserve, before + Weapons.find("blaster").magazine)
+	assert_eq(own.arsenal["shotgun"].reserve, shells + Weapons.find("shotgun").magazine)
+	assert_eq(match_._rules_for(1).reserve(Weapons.find("blaster")), own.arsenal["blaster"].reserve, "the host counts the same")
+	assert_false(match_.state.pickup_ready(world.pickup_pads().find(pad)))
+
+
+func test_a_knock_out_gives_the_winner_a_little_ammunition() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	match_.state_changed.emit()
+	var before: int = shooter.arsenal["blaster"].reserve
+	match_._harm(1, 2, 500.0, Vector3.ZERO, "blaster", false)
+	assert_eq(shooter.arsenal["blaster"].reserve, before + roundi(Weapons.find("blaster").magazine * Match.SPOILS))
+
+
+func test_a_weapon_run_dry_gives_way_to_the_sidearm() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	assert_eq(own.weapon.stats.id, "blaster")
+	own.weapon.ammo = 0
+	own.weapon.reserve = 0
+	own._fire_pressed = true
+	await wait_physics_frames(2)
+	assert_eq(own.weapon.stats.id, Weapons.STARTING)
+	assert_true(own.arsenal.has("blaster"), "still carried, for when there is ammunition")

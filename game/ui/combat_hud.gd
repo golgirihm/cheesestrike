@@ -51,6 +51,7 @@ var _overload_label: Label
 var _health_bar: ProgressBar
 var _health_label: Label
 var _ammo_label: Label
+var _reserve_label: Label
 var _weapon_label: Label
 var _pickup_label: Label
 var _pickup_left := 0.0
@@ -159,6 +160,11 @@ static func ammo_text(weapon: WeaponState) -> String:
 	return "%d / %d" % [weapon.ammo, weapon.stats.magazine]
 
 
+## What is left to reload with: a number, or a sign that it never runs out.
+static func reserve_text(weapon: WeaponState) -> String:
+	return "+ ∞" if weapon.stats.unlimited() else "+ %d" % weapon.reserve
+
+
 ## The notice for a player who is knocked out: who did it and when they're back.
 static func knocked_out_text(state: MatchState, id: int) -> Array:
 	var record := state.player(id)
@@ -183,6 +189,10 @@ func health_text() -> String:
 
 func ammo_shown() -> String:
 	return _ammo_label.text if _ammo_label.visible else ""
+
+
+func reserve_shown() -> String:
+	return _reserve_label.text
 
 
 func knocked_out_shown() -> String:
@@ -236,6 +246,8 @@ func _process(delta: float) -> void:
 	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
 	if own != null:
 		_ammo_label.text = ammo_text(own.weapon)
+		_reserve_label.text = reserve_text(own.weapon)
+		_reserve_label.modulate = KNOCKOUT_COLOR if own.weapon.reserve <= 0 and not own.weapon.stats.unlimited() else Color.WHITE
 		_weapon_label.text = own.weapon.stats.display_name
 	var state: MatchState = world.match_.state
 	_match_label.text = match_text(state)
@@ -391,6 +403,9 @@ func _build() -> void:
 	_ammo_label.name = "Ammo"
 	_ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	arms.add_child(_ammo_label)
+	_reserve_label = _outlined_label(15)
+	_reserve_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	arms.add_child(_reserve_label)
 
 	kill_feed = preload("res://ui/kill_feed.gd").new()
 	kill_feed.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 16)

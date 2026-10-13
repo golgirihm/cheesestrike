@@ -38,6 +38,20 @@ class WeaponsTest(GameTestCase):
         host.page.mouse.wheel(0, -120)
         host.wait_for("s.combat.weapon === 'Gouda Launcher'")
 
+    def test_a_weapon_fired_dry_gives_way_to_the_sidearm(self):
+        host = self.open_game()
+        host.host()
+        self.walk_to_the_launcher(host)
+        state = host.wait_for("s.combat.weapon === 'Gouda Launcher' && s.combat.reserve !== ''")
+        self.assertEqual(state["combat"]["reserve"], "+ 4", "two reloads' worth besides the two loaded")
+        host.capture_mouse()
+        # Six wheels and two reloads later there is nothing left to fire.
+        state = host.shoot_until("s.players[0].weapon === 'pistol'", timeout=120_000)
+        own = state["players"][0]
+        self.assertIn("launcher", own["carrying"], "still carried, for when there is ammunition")
+        self.assertEqual(own["health"], 100, "none of them burst near enough to hurt")
+        host.wait_for("s.combat.reserve === '+ ∞'")
+
     def test_others_see_the_weapon_in_hand(self):
         host = self.open_game()
         joiner = self.open_game()

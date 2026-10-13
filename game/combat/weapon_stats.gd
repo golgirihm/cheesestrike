@@ -14,6 +14,10 @@ extends Resource
 ## Whether holding the trigger keeps firing.
 @export var automatic := true
 @export var magazine := 24
+## Rounds carried besides those in the magazine when the weapon is taken up,
+## and the most that can be carried. Below zero, there is no end to them.
+@export var reserve := -1
+@export var reserve_max := -1
 @export var reload_time := 1.6
 @export var max_range := 150.0
 ## A hit does all of its damage out to `falloff_start` metres, then less,
@@ -101,6 +105,11 @@ func damage_at(distance: float) -> float:
 		return damage
 	var faded := clampf((distance - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
 	return damage * lerpf(1.0, falloff_floor, faded)
+
+
+## Whether the weapon never runs out of rounds to reload with.
+func unlimited() -> bool:
+	return reserve < 0
 
 
 func fires_projectile() -> bool:

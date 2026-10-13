@@ -19,6 +19,14 @@ static func build(kind: String) -> Node3D:
 		# A slice lying on its side: a right-angled wedge, point forward.
 		var outline := PackedVector2Array([Vector2(-0.3, -0.2), Vector2(0.3, -0.2), Vector2(-0.3, 0.25)])
 		holder.add_child(Rounded.instance(Rounded.prism(outline, 0.4, 0.05), material))
+	elif kind == Pickups.AMMO:
+		# A crate with a pale band round it.
+		var crate := StandardMaterial3D.new()
+		crate.albedo_color = Color(0.24, 0.42, 0.3)
+		var band := StandardMaterial3D.new()
+		band.albedo_color = Color(0.9, 0.9, 0.86)
+		holder.add_child(Rounded.instance(Rounded.box(Vector3(0.55, 0.36, 0.4), 0.05), crate))
+		holder.add_child(Rounded.instance(Rounded.box(Vector3(0.57, 0.1, 0.42), 0.02), band))
 	else:
 		var model := WeaponModels.build(kind)
 		model.scale = Vector3.ONE * 1.6
