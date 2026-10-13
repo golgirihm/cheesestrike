@@ -46,8 +46,8 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* GUT tests of each in `Projectile` and `Match`; browser test of the choice.
 2. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
    *Tests:* GUT tests of the rule and of the host's ray walk.
-3. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
-   *Tests:* GUT tests of the tallies.
+3. **Tune the weapons from play.** The host is shown, at the end of each match, what every weapon did: shots, hits, damage and knock-outs. Play matches with people, read those numbers, and adjust each weapon until none is the obvious choice or the one nobody picks up. Repeat after each milestone that adds weapons.
+   *Tests:* the weapon tests already hold each weapon to its role; add to them whatever the tuning decides.
 
 ## Milestone 3: Movement with depth
 

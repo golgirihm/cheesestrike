@@ -67,6 +67,7 @@ var _match_label: Label
 var _result: PanelContainer
 var _result_title: Label
 var _result_detail: Label
+var _result_tally: Label
 
 
 func _ready() -> void:
@@ -203,6 +204,11 @@ func grenades_shown() -> String:
 	return _grenade_label.text
 
 
+## What the host is shown of each weapon's match, or "" when it isn't.
+func tally_shown() -> String:
+	return _result_tally.text if _result.visible and _result_tally.visible else ""
+
+
 func reserve_shown() -> String:
 	return _reserve_label.text
 
@@ -268,6 +274,10 @@ func _process(delta: float) -> void:
 	if _result.visible:
 		_result_title.text = state.result_text()
 		_result_detail.text = "Next match in %d…" % ceili(state.time_left)
+		# The host sees what each weapon did, for judging their balance.
+		var lines: Array[String] = world.match_.tally.lines() if world.match_.is_host() else ([] as Array[String])
+		_result_tally.text = "\n".join(lines)
+		_result_tally.visible = not lines.is_empty()
 	var wants_scores := Input.is_action_pressed("scoreboard") or _touch_held("scores") or _result.visible
 	if wants_scores != scoreboard.visible:
 		scoreboard.visible = wants_scores
@@ -472,6 +482,10 @@ func _build() -> void:
 	_result_detail = _outlined_label(16)
 	_result_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_rows.add_child(_result_detail)
+	_result_tally = _outlined_label(12)
+	_result_tally.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_tally.visible = false
+	result_rows.add_child(_result_tally)
 	scoreboard = preload("res://ui/scoreboard.gd").new()
 	scoreboard.visible = false
 	board_rows.add_child(scoreboard)

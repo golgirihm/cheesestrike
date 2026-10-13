@@ -73,6 +73,8 @@ var put_backs := 0
 # The host's measure of each player's round trip, by id.
 var _pings := {}
 var _since_ping := 0.0
+## Host only: what each weapon has done this match (see WeaponTally).
+var tally := WeaponTally.new()
 # When the host last allowed each player a strike with the knife, by id.
 var _struck_at := {}
 # The host's projectiles in flight, by id.
@@ -104,6 +106,7 @@ func start(settings := MatchSettings.new()) -> void:
 		_departed.clear()
 		_rules.clear()
 		_projectiles.clear()
+		tally.clear()
 		_histories.clear()
 		_checks.clear()
 		_put_back_at.clear()
@@ -238,6 +241,7 @@ func _throw(thrower: int, origin: Vector3, direction: Vector3, cooked: float) ->
 		return
 	if not state.throw_grenade(thrower):
 		return
+	tally.shot(Weapons.GRENADE)
 	record.protected_for = 0.0
 	_changed()
 	var grenade := Weapons.find(Weapons.GRENADE)
@@ -275,6 +279,7 @@ func _strike(striker: int, origin: Vector3, direction: Vector3) -> void:
 	if _clock - _struck_at.get(striker, -INF) < Melee.INTERVAL * 0.8:
 		return
 	_struck_at[striker] = _clock
+	tally.shot(Melee.ID)
 	if record.is_protected():
 		record.protected_for = 0.0
 		_changed()
@@ -457,6 +462,7 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 		return
 	if not _rules_for(shooter).allow_shot(weapon, _clock):
 		return
+	tally.shot(weapon.id)
 	if record.is_protected():
 		record.protected_for = 0.0
 		_changed()
@@ -588,6 +594,7 @@ func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: Str
 	if result.dealt > 0:
 		_changed()
 		if not own:
+			tally.hit(weapon, result.dealt, result.knocked_out)
 			_tell_hit(attacker, victim, result.dealt, result.knocked_out, head)
 		_tell_hurt(victim, attacker, from, result.dealt)
 	if result.knocked_out and not own:
@@ -849,6 +856,7 @@ func _respawn(id: int) -> void:
 func _new_match() -> void:
 	# Scores start again, so there are none to give back.
 	_departed.clear()
+	tally.clear()
 	state.start_match()
 	var spots: Array[Vector3] = world.spawn_positions()
 	spots.shuffle()
