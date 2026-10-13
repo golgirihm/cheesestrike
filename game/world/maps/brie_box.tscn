@@ -220,6 +220,10 @@ metadata/kind = "ammo"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 4)
 metadata/kind = "armour"
 
+[node name="Power" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, -4)
+metadata/kind = "power"
+
 [node name="JumpPads" type="Node3D" parent="."]
 
 [node name="PadWest" type="Marker3D" parent="JumpPads"]

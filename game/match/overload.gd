@@ -19,9 +19,10 @@ const KEPT_ON_KNOCK_OUT := 0.5
 static func speed_factor(record: PlayerRecord) -> float:
 	if record == null:
 		return 1.0
-	var factor := 1.0
+	# An Overload and a speed power-up don't add up: the faster of the two.
+	var factor := Powers.speed_factor(record)
 	if record.overload_left > 0.0:
-		factor *= SPEED_BOOST
+		factor = maxf(factor, SPEED_BOOST)
 	if record.melted_for > 0.0:
 		factor *= MELT_SLOW
 	return factor

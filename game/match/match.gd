@@ -33,6 +33,8 @@ signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
 signal overloaded(id: int)
 ## Player `id` collected a pickup of `kind` (on everyone's machine).
 signal picked_up(id: int, kind: String)
+## Player `id` took power-up `power` (see Powers), which everyone is told.
+signal power_taken(id: int, power: int)
 ## A projectile was launched, or burst, for effects.
 signal projectile_launched(id: int, weapon: String, from: Vector3, velocity: Vector3)
 signal projectile_burst(id: int, weapon: String, at: Vector3)
@@ -114,6 +116,7 @@ func start(settings := MatchSettings.new()) -> void:
 		state = MatchState.new(settings)
 		_has_state = true
 		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
+		_hold_back_powers()
 		_pending_names.clear()
 		_pending_looks.clear()
 		_pending_loadouts.clear()
@@ -536,6 +539,9 @@ func _process(delta: float) -> void:
 				_ping.rpc_id(peer, _clock)
 		for id in due:
 			_respawn(id)
+		if state.power_ended:
+			state.power_ended = false
+			_changed()
 		if was_playing != state.is_playing():
 			_changed()
 		if state.match_due():
@@ -796,6 +802,21 @@ static func wall_finder(space: PhysicsDirectSpaceState3D) -> Callable:
 		return {"distance": from.distance_to(hit.position), "normal": hit.normal}
 
 
+# A match begins with no power-up on its pad: it comes in a while.
+func _hold_back_powers() -> void:
+	if world == null:
+		return
+	var pads: Array = world.pickup_pads()
+	for index in pads.size():
+		if pads[index].kind == Pickups.POWER:
+			state.hold_back(index, Pickups.POWER_FIRST)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _power_seen(id: int, power: int) -> void:
+	power_taken.emit(id, power)
+
+
 ## The host hands each pickup that is there to the first player in play
 ## standing on its pad who has a use for it.
 func _collect_pickups() -> void:
@@ -819,6 +840,9 @@ func _collect_pickups() -> void:
 			_changed()
 			_pickup_seen.rpc(id, pad.kind)
 			picked_up.emit(id, pad.kind)
+			if pad.kind == Pickups.POWER:
+				_power_seen.rpc(id, state.player(id).power)
+				power_taken.emit(id, state.player(id).power)
 			break
 
 
@@ -1019,6 +1043,7 @@ func _new_match() -> void:
 	_departed.clear()
 	tally.clear()
 	state.start_match()
+	_hold_back_powers()
 	var spots: Array[Vector3] = world.spawn_positions()
 	spots.shuffle()
 	var index := 0

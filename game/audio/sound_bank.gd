@@ -35,6 +35,7 @@ const SOUNDS := {
 	"emote": "_emote",
 	"pickup": "_pickup",
 	"overload": "_overload",
+	"power": "_power",
 	"reload": "_reload",
 	"dry": "_dry",
 	"knife": "_knife",
@@ -411,6 +412,17 @@ static func _pickup() -> AudioStreamWAV:
 	return _make(0.3, func(t: float, _i: int) -> float:
 		var note: float = notes[mini(int(t / 0.1), 2)]
 		return sin(TAU * note * t) * _decay(fmod(t, 0.1), 12.0), 0.5)
+
+
+# A power-up taken: a fanfare of rising chords, loud enough for everyone.
+static func _power() -> AudioStreamWAV:
+	var notes := [392.0, 523.25, 659.25, 783.99, 1046.5]
+	return _make(0.9, func(t: float, _i: int) -> float:
+		var step := mini(int(t / 0.12), 4)
+		var note: float = notes[step]
+		var since := t - step * 0.12
+		var ring := _decay(since, 3.0 if step == 4 else 9.0)
+		return (sin(TAU * note * t) + 0.5 * sin(TAU * note * 1.5 * t) + 0.3 * sin(TAU * note * 2.0 * t)) * ring * 0.55, 0.85)
 
 
 static func _overload() -> AudioStreamWAV:

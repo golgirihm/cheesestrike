@@ -40,6 +40,10 @@ var winners: Array[int] = []
 ## For each of the arena's pickup pads, in order, seconds until its pickup is
 ## back: 0 when it is there to collect.
 var pickups: Array[float] = []
+## How many power-ups have been taken this match, which decides the next.
+var powers_taken := 0
+## Set when a power-up runs out, for the host to tell everyone.
+var power_ended := false
 
 
 func _init(with := MatchSettings.new()) -> void:
@@ -118,11 +122,13 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 	var own := attacker == victim
 	if (own and not own_too) or amount <= 0.0 or (not own and are_allies(attacker, victim)):
 		return result
+	var scorer := player(attacker) if not own else null
+	# Power-ups: more from an attacker with double damage, less to a shield.
+	amount *= Powers.outgoing(scorer) * Powers.incoming(target)
 	var taken := target.take(roundi(amount))
 	var dealt: int = taken.dealt
 	result.dealt = dealt
 	result.absorbed = taken.absorbed
-	var scorer := player(attacker) if not own else null
 	if scorer != null:
 		if scorer.overload_left > 0.0:
 			target.melted_for = Overload.MELT_DURATION
@@ -137,6 +143,7 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 		target.overload *= Overload.KEPT_ON_KNOCK_OUT
 		target.overload_left = 0.0
 		target.melted_for = 0.0
+		target.give_power(Powers.NONE, 0.0)
 		if scorer != null:
 			scorer.kills += 1
 			if scorer.team != NO_TEAM:
@@ -166,7 +173,18 @@ func collect(index: int, kind: String, id: int) -> String:
 	if not is_playing() or not pickup_ready(index) or not Pickups.wanted(kind, record):
 		return ""
 	pickups[index] = Pickups.respawn_time(kind)
+	if kind == Pickups.POWER:
+		var power := Powers.next(powers_taken)
+		powers_taken += 1
+		record.give_power(power, Powers.DURATION[power])
+		return "taken"
 	return "refill" if Pickups.give(kind, record) else "taken"
+
+
+## Empties pad `index` for `seconds`, as a power-up's is when a match begins.
+func hold_back(index: int, seconds: float) -> void:
+	if index >= 0 and index < pickups.size():
+		pickups[index] = seconds
 
 
 ## Moves the clocks on by `delta` seconds. Returns the ids of players who are
@@ -179,6 +197,11 @@ func tick(delta: float) -> Array[int]:
 		record.protected_for = maxf(record.protected_for - delta, 0.0)
 		record.overload_left = maxf(record.overload_left - delta, 0.0)
 		record.melted_for = maxf(record.melted_for - delta, 0.0)
+		if record.power != Powers.NONE:
+			record.power_left = maxf(record.power_left - delta, 0.0)
+			if record.power_left == 0.0:
+				record.power = Powers.NONE
+				power_ended = true
 		if not record.alive and record.respawn_in > 0.0:
 			record.respawn_in = maxf(record.respawn_in - delta, 0.0)
 			if record.respawn_in == 0.0:
@@ -221,7 +244,9 @@ func start_match() -> void:
 	team_kills = [0, 0]
 	winners.clear()
 	pickups.fill(0.0)
+	powers_taken = 0
 	for record: PlayerRecord in players.values():
+		record.give_power(Powers.NONE, 0.0)
 		record.kills = 0
 		record.deaths = 0
 		record.last_attacker = 0
