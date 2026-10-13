@@ -334,3 +334,55 @@ func test_grenades_left_survive_the_trip() -> void:
 	state.throw_grenade(1)
 	var copy := MatchState.from_dict(state.to_dict())
 	assert_eq(copy.player(1).grenades, Weapons.GRENADES - 1)
+
+
+func test_armour_takes_half_of_each_hit_until_it_is_gone() -> void:
+	state.add_player(1)
+	state.add_player(2)
+	state.player(2).armour = 30
+	var first := state.damage(1, 2, 40.0)
+	assert_eq(first.absorbed, 20)
+	assert_eq(first.dealt, 20)
+	assert_eq(state.player(2).health, 80)
+	assert_eq(state.player(2).armour, 10)
+	var second := state.damage(1, 2, 40.0)
+	assert_eq(second.absorbed, 10, "all that is left of it")
+	assert_eq(second.dealt, 30)
+	assert_eq(state.player(2).armour, 0)
+	var third := state.damage(1, 2, 40.0)
+	assert_eq(third.absorbed, 0)
+	assert_eq(third.dealt, 40)
+	assert_eq(state.player(2).health, 10)
+
+
+func test_armour_can_save_a_player_from_a_hit_that_would_have_finished_them() -> void:
+	state.add_player(1)
+	state.add_player(2)
+	state.player(2).health = 30
+	state.player(2).armour = PlayerRecord.MAX_ARMOUR
+	var result := state.damage(1, 2, 50.0)
+	assert_false(result.knocked_out)
+	assert_eq(state.player(2).health, 5)
+
+
+func test_the_meter_fills_by_health_taken_not_by_what_armour_stopped() -> void:
+	state.add_player(1)
+	state.add_player(2)
+	state.player(2).armour = PlayerRecord.MAX_ARMOUR
+	state.damage(1, 2, 40.0)
+	assert_eq(state.player(1).overload, 20 * Overload.CHARGE_PER_DAMAGE)
+
+
+func test_armour_is_lost_on_being_knocked_out_and_survives_the_trip() -> void:
+	state.add_player(1)
+	state.add_player(2)
+	state.player(2).armour = 35
+	assert_eq(MatchState.from_dict(state.to_dict()).player(2).armour, 35)
+	state.damage(1, 2, 500.0)
+	state.respawn(2)
+	assert_eq(state.player(2).armour, 0)
+	var numbers := PackedInt32Array()
+	numbers.resize(PlayerRecord._COUNT)
+	numbers.fill(0)
+	numbers[PlayerRecord._ARMOUR] = 9999
+	assert_eq(PlayerRecord.from_packed(["X", numbers]).armour, PlayerRecord.MAX_ARMOUR, "no more than can be worn")

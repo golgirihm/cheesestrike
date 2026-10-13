@@ -19,6 +19,14 @@ static func build(kind: String) -> Node3D:
 		# A slice lying on its side: a right-angled wedge, point forward.
 		var outline := PackedVector2Array([Vector2(-0.3, -0.2), Vector2(0.3, -0.2), Vector2(-0.3, 0.25)])
 		holder.add_child(Rounded.instance(Rounded.prism(outline, 0.4, 0.05), material))
+	elif kind == Pickups.ARMOUR:
+		# A thick curl of wax rind, to wear.
+		var wax := StandardMaterial3D.new()
+		wax.albedo_color = WeaponModels.WAX
+		var inside := StandardMaterial3D.new()
+		inside.albedo_color = Color(0.95, 0.93, 0.88)
+		holder.add_child(Rounded.instance(Rounded.cylinder(0.3, 0.16, 0.06, 24), wax))
+		holder.add_child(Rounded.instance(Rounded.cylinder(0.2, 0.17, 0.03, 24), inside))
 	elif kind == Pickups.AMMO:
 		# A crate with a pale band round it.
 		var crate := StandardMaterial3D.new()

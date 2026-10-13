@@ -684,8 +684,9 @@ func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: Str
 		# hear that they have.
 		_fall_seen.rpc(victim, weapon, from)
 		fell.emit(victim, weapon, from)
-	if result.dealt > 0:
+	if result.dealt > 0 or result.absorbed > 0:
 		_changed()
+	if result.dealt > 0:
 		if not own:
 			tally.hit(weapon, result.dealt, result.knocked_out)
 			_tell_hit(attacker, victim, result.dealt, result.knocked_out, head)

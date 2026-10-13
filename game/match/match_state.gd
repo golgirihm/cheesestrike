@@ -105,21 +105,23 @@ func is_playing() -> bool:
 
 ## `attacker` hits `victim` for `amount`. Returns what came of it:
 ## {"dealt": health taken, "knocked_out": whether that finished them, "ended":
-## whether that won the match}. Nothing happens between matches, to a player
+## whether that won the match, "absorbed": armour taken with it}. Nothing
+## happens between matches, to a player
 ## who is already out or still protected, or between teammates. A player only
 ## hurts themselves with `own_too`, as with a burst of their own; that fills
 ## no meter and scores nothing.
 func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dictionary:
-	var result := {"dealt": 0, "knocked_out": false, "ended": false}
+	var result := {"dealt": 0, "knocked_out": false, "ended": false, "absorbed": 0}
 	var target := player(victim)
 	if not is_playing() or target == null or not target.alive or target.is_protected():
 		return result
 	var own := attacker == victim
 	if (own and not own_too) or amount <= 0.0 or (not own and are_allies(attacker, victim)):
 		return result
-	var dealt := mini(roundi(amount), target.health)
-	target.health -= dealt
+	var taken := target.take(roundi(amount))
+	var dealt: int = taken.dealt
 	result.dealt = dealt
+	result.absorbed = taken.absorbed
 	var scorer := player(attacker) if not own else null
 	if scorer != null:
 		if scorer.overload_left > 0.0:
@@ -237,6 +239,7 @@ func respawn(id: int) -> void:
 	record.health = PlayerRecord.MAX_HEALTH
 	record.respawn_in = 0.0
 	record.protected_for = PROTECTION
+	record.armour = 0
 	record.grenades = Weapons.GRENADES
 
 

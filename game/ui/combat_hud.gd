@@ -50,6 +50,7 @@ var _overload_bar: ProgressBar
 var _overload_label: Label
 var _health_bar: ProgressBar
 var _health_label: Label
+var _armour_label: Label
 var _ammo_label: Label
 var _reserve_label: Label
 var _grenade_label: Label
@@ -209,6 +210,15 @@ func tally_shown() -> String:
 	return _result_tally.text if _result.visible and _result_tally.visible else ""
 
 
+## What is shown of a player's armour: how much, or nothing when they have none.
+static func armour_text(record: PlayerRecord) -> String:
+	return "+ %d rind" % record.armour if record != null and record.armour > 0 else ""
+
+
+func armour_shown() -> String:
+	return _armour_label.text
+
+
 func reserve_shown() -> String:
 	return _reserve_label.text
 
@@ -261,6 +271,7 @@ func _process(delta: float) -> void:
 	var ready := Overload.is_ready(record) or (record != null and record.overload_left > 0.0)
 	_overload_bar.modulate = Color(1.0, 0.6, 0.15) if ready else Color(1, 1, 1, 0.8)
 	_health_label.text = str(health)
+	_armour_label.text = armour_text(record)
 	_grenade_label.text = grenade_text(record)
 	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
 	if own != null:
@@ -407,6 +418,9 @@ func _build() -> void:
 	health.add_child(_health_bar)
 	_health_label = _outlined_label(22)
 	health.add_child(_health_label)
+	_armour_label = _outlined_label(15)
+	_armour_label.add_theme_color_override("font_color", Color(0.95, 0.6, 0.55))
+	health.add_child(_armour_label)
 
 	var arms := VBoxContainer.new()
 	arms.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)

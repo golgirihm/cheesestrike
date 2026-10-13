@@ -1399,3 +1399,23 @@ func test_everyone_sees_the_arm_of_a_player_who_throws() -> void:
 	assert_signal_emitted_with_parameters(match_, "throw_shown", [2])
 	other.body._process(0.016)
 	assert_eq(other.body.action(), CharacterMotion.THROW)
+
+
+func test_a_hit_that_armour_takes_all_of_is_still_told_to_everyone() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	match_.state.player(2).armour = PlayerRecord.MAX_ARMOUR
+	watch_signals(match_)
+	# A single point: half of it rounds to the armour, and none is left for health.
+	match_._harm(1, 2, 1.0, shooter.head.global_position, "blaster", false)
+	assert_eq(match_.state.player(2).armour, PlayerRecord.MAX_ARMOUR - 1)
+	assert_eq(match_.state.player(2).health, 100)
+	assert_signal_emitted(match_, "state_changed", "the armour lost is news")
+	assert_signal_not_emitted(match_, "hit_confirmed", "but nobody was hurt")
+
+
+func test_every_arena_has_a_rind_to_find() -> void:
+	for id: String in Maps.ORDER:
+		world.load_map(id)
+		var kinds: Array = world.pickup_pads().map(func(pad: Dictionary) -> String: return pad.kind)
+		assert_has(kinds, Pickups.ARMOUR, id)

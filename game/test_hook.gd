@@ -59,6 +59,7 @@ func snapshot() -> Dictionary:
 			"name": _main.world.match_.state.name_of(id),
 			"position": [at.x, at.y, at.z],
 			"health": record.health if record != null else null,
+			"armour": record.armour if record != null else null,
 			"alive": record.alive if record != null else null,
 			"kills": record.kills if record != null else null,
 			"team": record.team if record != null else null,
