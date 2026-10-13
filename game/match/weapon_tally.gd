@@ -56,7 +56,8 @@ func practice_lines() -> Array[String]:
 		var stats := Weapons.find(weapon)
 		var name := stats.display_name if stats != null else (Melee.NAME if weapon == Melee.ID else weapon)
 		var each: float = float(entry.damage) / entry.hits if entry.hits > 0 else 0.0
-		text.append("%s: %d fired · %d%% hit · %d damage (%.0f a hit)" % [name, entry.shots, roundi(minf(accuracy(weapon), 1.0) * 100.0), entry.damage, each])
+		# Rounded here, as formatting rounds a half differently from one machine to another.
+		text.append("%s: %d fired · %d%% hit · %d damage (%d a hit)" % [name, entry.shots, roundi(minf(accuracy(weapon), 1.0) * 100.0), entry.damage, roundi(each)])
 	return text
 
 

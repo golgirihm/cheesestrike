@@ -10,6 +10,17 @@ class TutorialTest(GameTestCase):
     def step(self, game, number):
         return game.wait_for(f"s.combat.tutorial.startsWith('{number} of 7')")
 
+    def drag(self, game, points):
+        """Drags a finger across the page through `points`."""
+        touch = game.page.context.new_cdp_session(game.page)
+        touch.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": points[0][0], "y": points[0][1]}]})
+        for x, y in points[1:]:
+            game.page.wait_for_timeout(60)
+            touch.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x, "y": y}]})
+        game.page.wait_for_timeout(60)
+        touch.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        touch.detach()
+
     def test_a_player_is_taken_through_every_step(self):
         game = self.open_game()
         game.click("TutorialButton")
@@ -25,18 +36,17 @@ class TutorialTest(GameTestCase):
         finally:
             game.page.keyboard.up("w")
 
-        # Look: take the mouse and move it, then put the view back.
-        game.capture_mouse()
+        # Look: by dragging a finger across the looking side of the screen and
+        # back, which leaves the view where it was. A test can't look with
+        # the mouse: the movement a test tool makes up for a captured pointer
+        # is the kind the game takes for Chrome's phantom movements, and
+        # leaves out (see game/net/web_page.gd).
         facing = game.own_player()["facing"][0]
-        for x in (30, 60, 90, 120, 150, 180):
-            game.page.mouse.move(x, 1)
-            game.page.wait_for_timeout(50)
-        self.step(game, 3)
-        for x in (150, 120, 90, 60, 30, 1):
-            game.page.mouse.move(x, 1)
-            game.page.wait_for_timeout(50)
-        game.page.mouse.move(0, 0)
+        self.drag(game, [(480, 150), (520, 150), (560, 150), (600, 150), (560, 150), (520, 150), (480, 150)])
+        state = self.step(game, 3)
+        self.assertIn("FIRE", state["combat"]["tutorial"], "asked in a touch screen's words, now that one has been touched")
 
+        game.capture_mouse()
         game.hold_fire(100)
         self.step(game, 4)
 

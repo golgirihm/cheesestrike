@@ -65,7 +65,9 @@ class SignalingServer:
                 self._started = True
                 return
             except RuntimeError as error:
-                if self._started or "address already in use" not in str(error):
+                # As Linux words it, and as Windows does.
+                taken = "address already in use" in str(error) or "only one usage of each socket address" in str(error)
+                if self._started or not taken:
                     raise
                 self.port = _free_port()
         self._start()
