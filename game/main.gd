@@ -48,6 +48,8 @@ var _match_buttons := {}
 var _alone_settings: MatchSettings
 ## The tutorial the player is being taken through, or null.
 var tutorial: Tutorial
+# Who the pause menu's vote-to-remove button names.
+var _remove_target := 0
 # Whether the mouse was captured as of the last frame. Esc while it is captured
 # only frees the mouse; the press after that opens the menu.
 var _was_captured := false
@@ -88,6 +90,22 @@ func _ready() -> void:
 	watch_toggle.name = "WatchToggleButton"
 	watch_toggle.custom_minimum_size = resume_button.custom_minimum_size
 	resume_button.add_sibling(watch_toggle)
+	# Asking for a vote on removing someone: one button names who, stepping
+	# through the others each time it is pressed, and one asks.
+	var remove_choice := Button.new()
+	remove_choice.name = "RemoveChoiceButton"
+	var remove_ask := Button.new()
+	remove_ask.name = "RemoveVoteButton"
+	remove_ask.text = "Ask for the vote"
+	for added: Button in [remove_ask, remove_choice]:
+		added.custom_minimum_size = resume_button.custom_minimum_size
+		watch_toggle.add_sibling(added)
+	remove_choice.pressed.connect(func() -> void:
+		var others := removable()
+		_remove_target = others[(others.find(_remove_target) + 1) % others.size()] if not others.is_empty() else 0)
+	remove_ask.pressed.connect(func() -> void:
+		world.match_.propose_removal(_remove_target)
+		close_pause_menu())
 	watch_toggle.pressed.connect(func() -> void:
 		var own: PlayerRecord = world.match_.own_record()
 		if own != null:
@@ -146,6 +164,14 @@ func _process(_delta: float) -> void:
 		var toggle: Button = pause_menu.find_child("WatchToggleButton", true, false)
 		toggle.text = "Play" if own != null and own.watching else "Watch instead"
 		toggle.visible = not Net.alone
+		var others := removable()
+		if not others.has(_remove_target):
+			_remove_target = others[0] if not others.is_empty() else 0
+		var choice: Button = pause_menu.find_child("RemoveChoiceButton", true, false)
+		var ask: Button = pause_menu.find_child("RemoveVoteButton", true, false)
+		choice.visible = not others.is_empty()
+		ask.visible = choice.visible
+		choice.text = "Vote to remove: %s" % world.match_.state.name_of(_remove_target)
 	_was_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	menu_button.visible = hud.visible and not _was_captured and not pause_menu.visible
 
@@ -256,6 +282,16 @@ func _host() -> void:
 	_remember_name()
 	_set_busy("Starting session…")
 	Net.host(host_settings(), Settings.get_value("host_private"))
+
+
+## The players this one could ask for a vote on removing, in order.
+func removable() -> Array:
+	if multiplayer.multiplayer_peer == null or not world.match_.has_state():
+		return []
+	var own := multiplayer.get_unique_id()
+	var found: Array = world.match_.state.voters().filter(func(id: int) -> bool: return world.match_.can_propose(own, id))
+	found.sort()
+	return found
 
 
 # Starts a session alone on the practice range.
@@ -409,7 +445,7 @@ func _on_session_ended(reason: String) -> void:
 		return
 	hud.hide()
 	disconnected_detail.text = reason
-	rejoin_button.visible = can_rejoin(reason, Net.last_joined)
+	rejoin_button.visible = can_rejoin(reason, Net.last_joined) and reason != Match.REMOVED
 	disconnected_notice.show()
 	disconnected_button.grab_focus()
 

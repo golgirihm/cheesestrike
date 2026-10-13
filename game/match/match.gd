@@ -107,6 +107,10 @@ var _pending_names := {}
 var _pending_looks := {}
 # And their loadouts, as [main, side].
 var _pending_loadouts := {}
+# The keys (see introduce) of players removed by a vote, who are not let
+# back into the session.
+var _removed_keys := {}
+const REMOVED := "You were removed from the session by a vote."
 ## The last few seconds of the match, and the best moment of it so far:
 ## the host's, for showing players how they were knocked out and the play
 ## of the match.
@@ -147,6 +151,7 @@ func start(settings := MatchSettings.new()) -> void:
 		_pending_looks.clear()
 		_pending_loadouts.clear()
 		_pending_overloads.clear()
+		_removed_keys.clear()
 		_rains.clear()
 		_keys.clear()
 		_departed.clear()
@@ -241,6 +246,120 @@ func introduce(wanted: String, key := WebPage.player_key()) -> void:
 		_rename(1, wanted)
 	elif multiplayer.multiplayer_peer != null:
 		_introduce.rpc_id(1, wanted, key)
+
+
+## Tells the host this player's vote in whatever is being voted on: which
+## of the choices for the next match, or Ballot.YES or NO.
+func cast(option: int) -> void:
+	if is_host():
+		_cast(1, option)
+	elif multiplayer.multiplayer_peer != null:
+		_request_vote.rpc_id(1, option)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_vote(option: Variant) -> void:
+	if is_host():
+		_cast(multiplayer.get_remote_sender_id(), option)
+
+
+func _cast(voter: int, option: Variant) -> void:
+	var ballot := state.ballot
+	if ballot == null or not state.voters().has(voter) or not ballot.vote(voter, option):
+		return
+	_changed()
+	_settle_removal()
+
+
+## Asks the host for a vote on removing player `target`.
+func propose_removal(target: int) -> void:
+	if is_host():
+		_propose(1, target)
+	elif multiplayer.multiplayer_peer != null:
+		_request_removal.rpc_id(1, target)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_removal(target: Variant) -> void:
+	if is_host() and target is int:
+		_propose(multiplayer.get_remote_sender_id(), target)
+
+
+## Whether player `by` may start a vote on removing `target`: a real player
+## other than themselves and the host, in a session with enough players to
+## vote, while nothing else is being voted on.
+func can_propose(by: int, target: int) -> bool:
+	var voters := state.voters()
+	return state.ballot == null and by != target and target != 1 and voters.has(by) and voters.has(target) and voters.size() >= Ballot.MIN_TO_REMOVE
+
+
+func _propose(by: int, target: int) -> void:
+	if not can_propose(by, target):
+		return
+	# Everyone but the one it is about may vote, and whoever asked says yes.
+	state.ballot = Ballot.to_remove(target, state.voters().size() - 1)
+	state.ballot.vote(by, Ballot.YES)
+	announce("%s wants %s removed: F1 for yes, F2 for no" % [state.name_of(by), state.name_of(target)], MatchState.NO_TEAM)
+	_changed()
+	_settle_removal()
+
+
+# Host only: closes a vote to remove someone once it has passed or failed.
+func _settle_removal() -> void:
+	var ballot := state.ballot
+	if ballot == null or ballot.kind != Ballot.REMOVE:
+		return
+	var outcome := ballot.outcome()
+	if outcome.is_empty():
+		return
+	state.ballot = null
+	var name := state.name_of(ballot.subject)
+	if outcome == "yes" and state.player(ballot.subject) != null:
+		announce("%s was removed by a vote" % name, MatchState.NO_TEAM)
+		_remove_by_vote(ballot.subject)
+	else:
+		announce("%s stays" % name, MatchState.NO_TEAM)
+	_changed()
+
+
+# Host only: puts player `id` out of the session, and keeps them out.
+func _remove_by_vote(id: int) -> void:
+	if _keys.has(id):
+		_removed_keys[_keys[id]] = true
+	if not multiplayer.get_peers().has(id):
+		return
+	_removed.rpc_id(id)
+	# In case their game doesn't leave of its own accord.
+	get_tree().create_timer(1.0).timeout.connect(func() -> void:
+		if multiplayer.multiplayer_peer != null and multiplayer.get_peers().has(id):
+			multiplayer.multiplayer_peer.disconnect_peer(id))
+
+
+@rpc("authority", "call_remote", "reliable")
+func _removed() -> void:
+	Net.leave(REMOVED)
+
+
+# Host only: after a match, the next is whatever the players voted for. A
+# change of arena or of mode makes a new match of the same players.
+func _apply_vote() -> void:
+	var ballot := state.ballot
+	if ballot == null or ballot.kind != Ballot.NEXT:
+		return
+	var chosen := ballot.winner()
+	if chosen.map == state.settings.map and chosen.mode == state.settings.mode:
+		return
+	var next := MatchSettings.from_dict(state.settings.to_dict().merged({"map": chosen.map, "mode": chosen.mode}, true))
+	state = state.with_settings(next)
+	world.load_map(next.map)
+	state.set_pickup_count(world.pickup_pads().size())
+	state.blocks = BlockRules.new(world.cheese_blocks().size(), randi())
+	_projectiles.clear()
+	_rules.clear()
+	_histories.clear()
+	_checks.clear()
+	recording.clear()
+	announce("Next: %s" % Ballot.choice_text(chosen), MatchState.NO_TEAM)
 
 
 ## Tells the host this player wants to watch rather than play, or to play
@@ -659,6 +778,8 @@ func _process(delta: float) -> void:
 			state.just_overtime = false
 			announce("Sudden death: the next score wins", MatchState.NO_TEAM)
 			_changed()
+		if state.ballot != null and state.ballot.kind == Ballot.REMOVE:
+			_settle_removal()
 		if state.round_won != -2:
 			var taken: int = state.round_won
 			state.round_won = -2
@@ -1330,6 +1451,7 @@ func _new_match() -> void:
 	tally.clear()
 	_rains.clear()
 	highlights.clear()
+	_apply_vote()
 	state.start_match()
 	_hold_back_powers()
 	var spots: Array[Vector3] = world.spawn_positions()
@@ -1413,6 +1535,10 @@ func _introduce(wanted: Variant, key: Variant = "") -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
+	# Someone voted out stays out.
+	if key is String and _removed_keys.has(key):
+		_remove_by_vote(id)
+		return
 	if key is String:
 		_known_as(id, key)
 	if wanted is String:
