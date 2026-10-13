@@ -56,15 +56,13 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* GUT tests that each state is reached from the player's motion. Manual: PLR-06 grows.
 2. **A better end.** A knocked-out character is thrown by what hit it and then melts, with crumbs; a burst scatters it.
    *Tests:* GUT tests of which ending each cause gives. Manual row.
-3. **More faces.** Blinking, looking at nearby players, a determined face when firing, a cheer on a knock-out, dizzy stars when melted by an Overload.
-   *Tests:* GUT tests of each trigger.
-4. **Kinds of cheese.** Let players choose their character: Swiss, cheddar, blue, brie, each a different wedge, rind and hole pattern on the same hit shape. Shown on the menu.
+3. **Kinds of cheese.** Let players choose their character: Swiss, cheddar, blue, brie, each a different wedge, rind and hole pattern on the same hit shape. Shown on the menu.
    *Tests:* GUT test that every kind fits the hit shape; browser test that others see the choice.
-5. **Hats and accessories.** Things worn on the tip of the wedge and held in the free hand, chosen on the menu, which don't change what can be hit.
+4. **Hats and accessories.** Things worn on the tip of the wedge and held in the free hand, chosen on the menu, which don't change what can be hit.
    *Tests:* GUT tests that none change `BodyShape`.
-6. **Emotes and taunts.** A wheel of short animations and sounds (a wave, a dance, a shrug), safe to use only when it doesn't leave the player helpless for long.
+5. **Emotes and taunts.** A wheel of short animations and sounds (a wave, a dance, a shrug), safe to use only when it doesn't leave the player helpless for long.
    *Tests:* browser test that others see one.
-7. **Footprints and shadows.** A soft blob shadow under each character on low graphics, where real shadows are off, and brief footprints on dusty ground.
+6. **Footprints and shadows.** A soft blob shadow under each character on low graphics, where real shadows are off, and brief footprints on dusty ground.
    *Tests:* GUT test of the fallback. Manual row.
 
 ## Milestone 5: An arsenal

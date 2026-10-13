@@ -250,3 +250,85 @@ func test_crouching_folds_the_legs_and_brings_everything_else_down() -> void:
 	character._process(0.016)
 	assert_almost_eq(wedge.position.y, stood, 0.0001)
 	assert_almost_eq(_named("Leg")[0].scale.y, 1.0, 0.0001)
+
+
+func test_the_face_shows_what_matters_most() -> void:
+	assert_eq(character.expression(), CHARACTER.CALM)
+	character.fire_face()
+	assert_eq(character.expression(), CHARACTER.SET, "firing")
+	character.cheer()
+	assert_eq(character.expression(), CHARACTER.CHEER, "a knock-out outshines that")
+	character.set_dizzy(true)
+	assert_eq(character.expression(), CHARACTER.DIZZY, "being melted outdoes a cheer")
+	character.grimace()
+	assert_eq(character.expression(), CHARACTER.WINCE, "and being hurt comes before everything")
+	character._process(CHARACTER.GRIMACE_TIME + 0.01)
+	assert_eq(character.expression(), CHARACTER.DIZZY)
+	character.set_dizzy(false)
+	assert_eq(character.expression(), CHARACTER.CHEER)
+	character._process(CHARACTER.CHEER_TIME)
+	assert_eq(character.expression(), CHARACTER.CALM, "the set face ran out meanwhile")
+
+
+func test_only_the_face_being_made_is_drawn() -> void:
+	for face: String in [CHARACTER.CALM, CHARACTER.SET, CHARACTER.CHEER, CHARACTER.DIZZY, CHARACTER.WINCE]:
+		character._cheer_left = 0.0
+		character._set_left = 0.0
+		character._grimace_left = 0.0
+		character.set_dizzy(false)
+		match face:
+			CHARACTER.SET: character.fire_face()
+			CHARACTER.CHEER: character.cheer()
+			CHARACTER.DIZZY: character.set_dizzy(true)
+			CHARACTER.WINCE: character.grimace()
+		character._process(0.001)
+		assert_eq(character.expression(), face)
+		var showing := ["Calm", "Set", "Cheer", "Dizzy", "Wince"].filter(func(node: String) -> bool: return character.get_node(node).visible)
+		assert_eq(showing, [face.capitalize()], face)
+		assert_eq(character.get_node("Stars").visible, face == CHARACTER.DIZZY, "stars only when dizzy")
+
+
+func test_every_face_is_drawn_flat_on_the_front_of_the_wedge() -> void:
+	var front := -BodyShape.WEDGE_SIZE.z / 2.0
+	for face: String in ["Calm", "Set", "Cheer", "Dizzy", "Wince"]:
+		for mark: MeshInstance3D in character.get_node(face).find_children("*", "MeshInstance3D", true, false):
+			assert_between(front - mark.position.z, 0.0, 0.015, "%s: %s is on the surface" % [face, mark.name])
+			# Inside the triangle of the front, at its height.
+			var half_width := BodyShape.WEDGE_SIZE.x / 2.0 * (0.5 - (mark.position.y - BodyShape.WEDGE_CENTRE.y) / BodyShape.WEDGE_SIZE.y)
+			assert_lt(absf(mark.position.x), half_width, "%s: %s is on the wedge" % [face, mark.name])
+
+
+func test_the_eyes_blink_now_and_then() -> void:
+	var blinks := 0
+	var was := false
+	for frame in 1200:
+		character._process(1.0 / 60.0)
+		if character.is_blinking() and not was:
+			blinks += 1
+		was = character.is_blinking()
+	assert_between(blinks, 2, 12, "a few times in twenty seconds")
+	character._blink_in = 0.0
+	character._process(0.001)
+	assert_true(character.is_blinking())
+	assert_lt(_named("Eye")[0].scale.z, 0.3, "shut")
+	character._process(CHARACTER.BLINK_TIME + 0.01)
+	assert_eq(_named("Eye")[0].scale.z, 1.0, "and open again")
+
+
+func test_the_eyes_do_not_blink_through_a_wince() -> void:
+	character.grimace()
+	character._blink_in = 0.0
+	character._process(0.001)
+	assert_false(character.is_blinking())
+
+
+func test_the_eyes_turn_toward_someone_near() -> void:
+	character.set_glance(1.0)
+	character._process(0.016)
+	var right: float = _named("Eye")[0].position.x
+	character.set_glance(-1.0)
+	character._process(0.016)
+	assert_lt(_named("Eye")[0].position.x, right)
+	character.set_glance(0.0)
+	character._process(0.016)
+	assert_almost_eq(_named("Eye")[0].position.x, BodyShape.eye_centres()[0].x, 0.0001)
