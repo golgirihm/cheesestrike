@@ -19,6 +19,7 @@ const BUTTONS := {
 	"knife": {"anchor": Vector2(1, 1), "offset": Vector2(-290.0, -110.0), "radius": 30.0, "label": "KNIFE", "font_size": 12},
 	"grenade": {"anchor": Vector2(1, 1), "offset": Vector2(-292.0, -186.0), "radius": 30.0, "label": "NADE", "font_size": 12},
 	"crouch": {"anchor": Vector2(1, 1), "offset": Vector2(-236.0, -262.0), "radius": 30.0, "label": "DUCK", "font_size": 12},
+	"emote": {"anchor": Vector2(0.5, 0), "offset": Vector2(84.0, 44.0), "radius": 30.0, "label": "WAVE", "font_size": 12},
 	"swap": {"anchor": Vector2(1, 1), "offset": Vector2(-214.0, -172.0), "radius": 30.0, "label": "Swap", "font_size": 14},
 	"scores": {"anchor": Vector2(0.5, 0), "offset": Vector2(0.0, 44.0), "radius": 30.0, "label": "Scores", "font_size": 13},
 }

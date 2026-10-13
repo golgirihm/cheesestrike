@@ -54,10 +54,6 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 1. **Animation, properly.** Move the character from code-driven poses to an animation tree: idle, walk, run, crouch, slide, jump, fall, land, aim, fire, reload, throw, melee, hurt, with blending between them.
    *Tests:* GUT tests that each state is reached from the player's motion. Manual: PLR-06 grows.
-2. **A better end.** A knocked-out character is thrown by what hit it and then melts, with crumbs; a burst scatters it.
-   *Tests:* GUT tests of which ending each cause gives. Manual row.
-3. **Emotes and taunts.** A wheel of short animations and sounds (a wave, a dance, a shrug), safe to use only when it doesn't leave the player helpless for long.
-   *Tests:* browser test that others see one.
 
 ## Milestone 5: An arsenal
 

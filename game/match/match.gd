@@ -18,8 +18,13 @@ signal hit_confirmed(victim: int, dealt: int, knocked_out: bool, head: bool)
 signal hurt(attacker: int, from: Vector3, dealt: int)
 ## Another player fired a shot whose pellets ended at `ends`, for effects.
 signal shot_shown(shooter: int, ends: Array)
+## Player `id` made emote `kind` (see Emotes), on everyone's machine.
+signal emote_shown(id: int, kind: int)
 ## Another player struck with their knife, for effects.
 signal strike_shown(striker: int)
+## Player `victim` is knocked out by `weapon`, from `from` (on everyone's
+## machine, just before the state that says so), for how they go.
+signal fell(victim: int, weapon: String, from: Vector3)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
 ## Player `id` set off their Overload (on everyone's machine).
@@ -75,6 +80,8 @@ var _pings := {}
 var _since_ping := 0.0
 ## Host only: what each weapon has done this match (see WeaponTally).
 var tally := WeaponTally.new()
+# When the host last passed on an emote from each player, by id.
+var _emoted_at := {}
 # When the host last allowed each player a strike with the knife, by id.
 var _struck_at := {}
 # The host's projectiles in flight, by id.
@@ -168,6 +175,7 @@ func remove_player(id: int) -> void:
 	_pending_names.erase(id)
 	_rules.erase(id)
 	_struck_at.erase(id)
+	_emoted_at.erase(id)
 	_pings.erase(id)
 	_histories.erase(id)
 	_checks.erase(id)
@@ -285,6 +293,37 @@ func _throw(thrower: int, origin: Vector3, direction: Vector3, cooked: float) ->
 func _request_throw(origin: Variant, direction: Variant, cooked: Variant = 0.0) -> void:
 	if is_host() and origin is Vector3 and direction is Vector3 and (cooked is float or cooked is int):
 		_throw(multiplayer.get_remote_sender_id(), origin, direction, float(cooked))
+
+
+## This player makes emote `kind` (see Emotes), for everyone to see.
+func emote(kind: int) -> void:
+	if is_host():
+		_emote(1, kind)
+	elif multiplayer.multiplayer_peer != null:
+		_request_emote.rpc_id(1, kind)
+
+
+func _emote(id: int, kind: Variant) -> void:
+	var record := state.player(id)
+	if record == null or not record.alive or not Emotes.is_kind(kind):
+		return
+	# No faster than they can be watched.
+	if _clock - _emoted_at.get(id, -INF) < Emotes.INTERVAL:
+		return
+	_emoted_at[id] = _clock
+	_emote_seen.rpc(id, kind)
+	emote_shown.emit(id, kind)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_emote(kind: Variant) -> void:
+	if is_host():
+		_emote(multiplayer.get_remote_sender_id(), kind)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _emote_seen(id: int, kind: int) -> void:
+	emote_shown.emit(id, kind)
 
 
 ## This player strikes with their knife from `origin` along `direction`.
@@ -631,6 +670,11 @@ func record_position(time: float, at: Vector3, id: int, facing := Vector2.ZERO) 
 func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: String, head: bool) -> void:
 	var own := attacker == victim
 	var result := state.damage(attacker, victim, amount, own)
+	if result.knocked_out:
+		# Told first, so that everyone knows how they went by the time they
+		# hear that they have.
+		_fall_seen.rpc(victim, weapon, from)
+		fell.emit(victim, weapon, from)
 	if result.dealt > 0:
 		_changed()
 		if not own:
@@ -843,6 +887,11 @@ func _tell_hurt(victim: int, attacker: int, from: Vector3, dealt: int) -> void:
 func _announce_knockout(attacker: String, victim: String, weapon: String, head: bool) -> void:
 	_knockout_seen.rpc(attacker, victim, weapon, head)
 	knocked_out.emit(attacker, victim, weapon, head)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _fall_seen(victim: int, weapon: String, from: Vector3) -> void:
+	fell.emit(victim, weapon, from)
 
 
 @rpc("authority", "call_remote", "reliable")

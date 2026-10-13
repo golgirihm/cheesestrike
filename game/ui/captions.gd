@@ -24,6 +24,7 @@ const TEXTS := {
 	"throw": "Grenade thrown",
 	"slide": "Slide",
 	"pad": "Jump pad",
+	"emote": "Squeak",
 	"step": "Footsteps",
 	"pickup": "Pickup taken",
 	"overload": "Gouda Overload",

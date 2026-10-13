@@ -135,6 +135,11 @@ var _reload_pressed := false
 var _jump_pressed := false
 var _overload_pressed := false
 var _melee_pressed := false
+# The emote key: whether it is down, whether an emote has been picked by
+# number while it was, and the emote it makes next when it isn't.
+var _emote_held := false
+var _emote_picked := false
+var _next_emote := Emotes.WAVE
 # How far down this player is crouched, 0 to 1, and whether the touch
 # screen's crouch button, which stays on until pressed again, is on.
 var _crouch := 0.0
@@ -513,6 +518,18 @@ func _input(event: InputEvent) -> void:
 		_overload_pressed = true
 	elif event.is_action_pressed("melee"):
 		_melee_pressed = true
+	elif event.is_action_pressed("emote"):
+		_emote_held = true
+		_emote_picked = false
+	elif event.is_action_released("emote"):
+		# Let go without picking one: the next in turn.
+		if _emote_held and not _emote_picked:
+			_make_emote(_next_emote)
+		_emote_held = false
+	elif _emote_held and _number_key(event) != -1:
+		if _number_key(event) < Emotes.KINDS.size():
+			_make_emote(Emotes.KINDS[_number_key(event)])
+		_emote_picked = true
 	elif event.is_action_pressed("grenade"):
 		_start_grenade()
 	elif _weapon_key(event) != "":
@@ -564,7 +581,7 @@ func _animate(delta: float) -> void:
 		body.set_crouch(smoothstep(0.0, 1.0, _crouch))
 		var leaning := (1.0 if _pose & POSE_LEAN_RIGHT else 0.0) - (1.0 if _pose & POSE_LEAN_LEFT else 0.0)
 		_lean = move_toward(_lean, leaning if alive else 0.0, delta * Movement.CROUCH_RATE)
-		body.rotation = BodyShape.lean_basis(_lean).get_euler()
+		body.set_lean(_lean)
 		# Others bring their weapon up to the eye when they aim.
 		_aim = move_toward(_aim, 1.0 if _pose & POSE_AIMING and alive else 0.0, delta / AIM_TIME)
 		rest = _gun_rest.lerp(SEEN_AIM_GUN_POSITION * BodyShape.SIZE, smoothstep(0.0, 1.0, _aim))
@@ -869,6 +886,40 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Not while waiting on the host or in the menu: the pointer is needed there.
 		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not Net.host_silent and not _menu_open():
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+# Which number key `event` presses, counting from 0, or -1.
+static func _number_key(event: InputEvent) -> int:
+	for index in Weapons.ORDER.size():
+		if event.is_action_pressed("weapon_%d" % (index + 1)):
+			return index
+	return -1
+
+
+# Asks the host to show everyone emote `kind`.
+func _make_emote(kind: int) -> void:
+	if alive and match_ != null and not _menu_open():
+		match_.emote(kind)
+		_next_emote = Emotes.next(kind)
+
+
+## Everyone sees this player make emote `kind`.
+func show_emote(kind: int) -> void:
+	body.emote(kind)
+	if _mine:
+		Sounds.play("emote", -8.0)
+	elif world != null:
+		Sounds.play_at("emote", head.global_position, world, -2.0)
+
+
+## This player is being knocked out by `weapon`, from `from`: everyone sees
+## them thrown away from it, or blown to crumbs by a burst.
+func fall(weapon: String, from: Vector3) -> void:
+	var away := global_basis.inverse() * (global_position - from)
+	body.knock(weapon, away)
+	if world != null and not _mine:
+		var scattered: bool = body.ending() == body.SCATTERED
+		world.effects.crumbs(global_position + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE, body.colour(), 36 if scattered else 12, 9.0 if scattered else 4.0)
 
 
 # The weapon a number key asks for, or "".
@@ -1329,6 +1380,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_touch_aim = not _touch_aim
 		elif button == "knife":
 			_melee_pressed = true
+		elif button == "emote":
+			_make_emote(_next_emote)
 		elif button == "crouch":
 			_touch_crouch = not _touch_crouch
 		elif button == "grenade":

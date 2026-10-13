@@ -332,3 +332,104 @@ func test_the_eyes_turn_toward_someone_near() -> void:
 	character.set_glance(0.0)
 	character._process(0.016)
 	assert_almost_eq(_named("Eye")[0].position.x, BodyShape.eye_centres()[0].x, 0.0001)
+
+
+func test_a_shot_throws_a_character_back_as_it_melts_and_a_burst_scatters_it() -> void:
+	assert_eq(CHARACTER.ending_for("blaster"), CHARACTER.THROWN)
+	assert_eq(CHARACTER.ending_for("pistol"), CHARACTER.THROWN)
+	assert_eq(CHARACTER.ending_for(Melee.ID), CHARACTER.THROWN)
+	assert_eq(CHARACTER.ending_for("launcher"), CHARACTER.SCATTERED)
+	assert_eq(CHARACTER.ending_for(Weapons.GRENADE), CHARACTER.SCATTERED)
+
+
+func test_a_thrown_character_goes_the_way_it_was_hit_tips_over_and_stops() -> void:
+	character.knock("blaster", Vector3(0, 0.5, 1))
+	character.set_in_play(false)
+	character._process(CHARACTER.MELT_TIME / 2.0)
+	assert_true(character.visible, "still there, melting")
+	assert_gt(character.position.z, 0.3, "thrown back, away from the shot")
+	assert_almost_eq(character.position.y, 0.0, 0.0001, "along the ground")
+	assert_ne(character.rotation, Vector3.ZERO, "tipping over")
+	var halfway := character.position.z
+	character._process(CHARACTER.MELT_TIME)
+	assert_false(character.visible)
+	assert_gt(character.position.z, halfway)
+	assert_lt(character.position.z, 4.0, "not far")
+
+
+func test_a_scattered_character_is_gone_at_once() -> void:
+	character.knock("launcher", Vector3.FORWARD)
+	character.set_in_play(false)
+	character._process(0.001)
+	assert_eq(character.ending(), CHARACTER.SCATTERED)
+	assert_false(character.visible, "nothing left to melt")
+
+
+func test_coming_back_stands_a_thrown_character_up_where_the_player_is() -> void:
+	character.knock("blaster", Vector3.RIGHT)
+	character.set_in_play(false)
+	character._process(CHARACTER.MELT_TIME * 2.0)
+	character.set_in_play(true)
+	character._process(CHARACTER.POP_TIME + 0.01)
+	assert_eq(character.position, Vector3.ZERO)
+	assert_eq(character.rotation, Vector3.ZERO)
+	assert_true(character.visible)
+	assert_eq(character.ending(), CHARACTER.THROWN, "a burst last time is forgotten")
+
+
+func test_each_emote_moves_the_free_arm_and_ends() -> void:
+	var arm: Node3D = _named("Arm")[0]
+	for kind: int in Emotes.KINDS:
+		character.emote(kind)
+		assert_eq(character.emoting(), kind)
+		character._process(Emotes.TIME / 2.0)
+		assert_lt(arm.rotation.z, Emotes.ARM_REST - 0.4, "%s: the arm is up" % Emotes.NAMES[kind])
+		character._process(Emotes.TIME)
+		assert_eq(character.emoting(), -1, Emotes.NAMES[kind])
+		character._process(0.016)
+		assert_almost_eq(arm.rotation.z, Emotes.ARM_REST, 0.0001, "%s: and back down" % Emotes.NAMES[kind])
+		assert_eq(character.position, Vector3.ZERO)
+		assert_almost_eq(character.rotation.z, 0.0, 0.0001)
+
+
+func test_a_dance_sways_and_hops_and_a_cheer_grins() -> void:
+	var swayed := 0.0
+	var hopped := 0.0
+	character.emote(Emotes.DANCE)
+	for frame in 60:
+		character._process(1.0 / 60.0)
+		swayed = maxf(swayed, absf(character.rotation.z))
+		hopped = maxf(hopped, character.position.y)
+	assert_gt(swayed, 0.1)
+	assert_gt(hopped, 0.05)
+	character._process(Emotes.TIME)
+	character.emote(Emotes.CHEER)
+	character._process(0.3)
+	assert_eq(character.expression(), CHARACTER.CHEER)
+
+
+func test_firing_or_being_hurt_cuts_an_emote_short() -> void:
+	character.emote(Emotes.DANCE)
+	character.fire_face()
+	assert_eq(character.emoting(), -1)
+	character.emote(Emotes.WAVE)
+	character.grimace()
+	assert_eq(character.emoting(), -1)
+	character.emote(Emotes.WAVE)
+	character.set_in_play(false)
+	character._process(0.016)
+	assert_eq(character.emoting(), -1, "and so does being knocked out")
+
+
+func test_an_emote_holds_itself_gently_at_each_end() -> void:
+	for kind: int in Emotes.KINDS:
+		assert_almost_eq(Emotes.pose(kind, 0.0).arm, Emotes.ARM_REST, 0.0001, Emotes.NAMES[kind])
+		assert_almost_eq(Emotes.pose(kind, Emotes.TIME).arm, Emotes.ARM_REST, 0.0001, Emotes.NAMES[kind])
+		assert_eq(Emotes.pose(kind, Emotes.TIME).hop, 0.0)
+		assert_true(Emotes.is_kind(kind))
+		assert_true(Emotes.NAMES.has(kind))
+	assert_false(Emotes.is_kind(99))
+	assert_false(Emotes.is_kind("wave"))
+	assert_eq(Emotes.next(Emotes.WAVE), Emotes.DANCE)
+	assert_eq(Emotes.next(Emotes.CHEER), Emotes.WAVE, "and round again")
+	assert_lt(Emotes.INTERVAL, Emotes.TIME + 0.7)
