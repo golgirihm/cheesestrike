@@ -188,3 +188,95 @@ func test_only_so_many_prints_are_kept() -> void:
 	for step in 80:
 		world.effects.footprint(Vector3(0, 0, 5 - step * 0.1), 0.0, world.map)
 	assert_lte(world.effects.prints_showing(), 48)
+
+
+func _burst(world: Node3D, at: Vector3, weapon := "launcher") -> void:
+	world.effects.launch_projectile(1, weapon, at, Vector3.FORWARD)
+	world.effects.burst_projectile(1, weapon, at)
+
+
+func test_a_burst_flashes_and_sends_a_ring_out_to_its_edge() -> void:
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var world: Node3D = await _arena()
+	var radius: float = Weapons.find("launcher").splash_radius
+	_burst(world, Vector3(0, 1, 0))
+	assert_eq(world.effects.projectiles_in_flight(), 0)
+	assert_eq(world.effects.showing("burst_flash"), 1)
+	assert_eq(world.effects.showing("shockwave"), 1)
+	var flash: Node3D = world.effects.get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == "burst_flash")[0]
+	var ring: Node3D = world.effects.get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == "shockwave")[0]
+	assert_lt(ring.scale.x, 1.0, "it starts small")
+	assert_gt(flash.get_child(0).light_energy, 0.0, "and lights what is round it")
+	await wait_seconds(EFFECTS.BURST_FLASH_LIFE * 0.6)
+	assert_gt(flash.scale.x, radius * 0.3)
+	assert_lte(flash.scale.x, radius * EFFECTS.BURST_FLASH_SIZE + 0.001, "never the whole burst: it isn't a growing ball")
+	await wait_seconds(EFFECTS.BURST_LIFE * 0.75 - EFFECTS.BURST_FLASH_LIFE * 0.6)
+	assert_gt(ring.scale.x, radius * 0.7, "nearly at the edge")
+	assert_lte(ring.scale.x, radius + 0.001)
+	assert_eq(ring.scale.y, 1.0, "and still flat")
+	await wait_seconds(EFFECTS.BURST_LIFE)
+	assert_eq(world.effects.showing("burst_flash"), 0)
+	assert_eq(world.effects.showing("shockwave"), 0)
+
+
+func test_a_burst_near_the_ground_scorches_it_and_one_in_the_air_does_not() -> void:
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var world: Node3D = await _arena()
+	var radius: float = Weapons.find("launcher").splash_radius
+	_burst(world, Vector3(0, radius * 2.0, 0))
+	assert_eq(world.effects.showing("scorch"), 0)
+	assert_eq(world.effects.debris_showing(), 0)
+	_burst(world, Vector3(0, 0.3, 0))
+	assert_eq(world.effects.showing("scorch"), 1)
+	var scorch: Node3D = world.effects.get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == "scorch")[0]
+	assert_almost_eq(scorch.global_position.y, 0.02, 0.01, "lying on the ground")
+	assert_almost_eq(scorch.scale.x, radius * EFFECTS.SCORCH_SIZE, 0.001)
+	# It counts among the marks, fades as they do and goes.
+	assert_eq(world.effects.marks_showing(), 1)
+	world.effects._process(EFFECTS.MARK_LIFE - 1.0)
+	assert_almost_eq((scorch.material_override as StandardMaterial3D).albedo_color.a, EFFECTS.SCORCH_ALPHA / EFFECTS.MARK_FADE, 0.01)
+	world.effects._process(1.1)
+	assert_eq(world.effects.marks_showing(), 0)
+
+
+func test_a_burst_throws_lumps_of_the_ground_that_fall_and_are_cleared_away() -> void:
+	assert_eq(EFFECTS.debris_count(GraphicsQuality.LOW), 0)
+	assert_lt(EFFECTS.debris_count(GraphicsQuality.MEDIUM), EFFECTS.debris_count(GraphicsQuality.HIGH))
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var world: Node3D = await _arena()
+	_burst(world, Vector3(0, 0.3, 0))
+	assert_eq(world.effects.debris_showing(), EFFECTS.debris_count(GraphicsQuality.HIGH))
+	assert_eq(world.effects.showing("debris"), world.effects.debris_showing())
+	for step in 30:
+		world.effects._process(0.02)
+	var lumps: Array = world.effects.get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == "debris")
+	assert_true(lumps.any(func(lump: Node3D) -> bool: return lump.global_position.y > 1.0), "up in the air")
+	for step in 100:
+		world.effects._process(0.02)
+	for lump: Node3D in lumps:
+		assert_almost_eq(lump.global_position.y, 0.02, 0.01, "come to rest on the ground")
+		assert_gt(Vector2(lump.global_position.x, lump.global_position.z).length(), 0.05, "thrown outward")
+	world.effects._process(EFFECTS.DEBRIS_LIFE)
+	assert_eq(world.effects.debris_showing(), 0)
+	# However many bursts, only so many lie about.
+	for burst in 12:
+		_burst(world, Vector3(burst - 6, 0.3, 3))
+	assert_lte(world.effects.debris_showing(), 36)
+
+
+func test_low_graphics_still_shows_the_burst_but_throws_no_lumps() -> void:
+	Settings.set_value("quality", GraphicsQuality.LOW)
+	var world: Node3D = await _arena()
+	_burst(world, Vector3(0, 0.3, 0))
+	assert_eq(world.effects.showing("burst_flash"), 1)
+	assert_eq(world.effects.showing("shockwave"), 1)
+	assert_eq(world.effects.showing("scorch"), 1)
+	assert_eq(world.effects.debris_showing(), 0)
+
+
+func test_what_only_strikes_does_not_burst() -> void:
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var world: Node3D = await _arena()
+	_burst(world, Vector3(0, 0.3, 0), "bow")
+	for kind: String in ["burst_flash", "shockwave", "scorch", "debris", "puff"]:
+		assert_eq(world.effects.showing(kind), 0, kind)
