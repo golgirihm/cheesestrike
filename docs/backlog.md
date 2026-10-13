@@ -56,11 +56,7 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* GUT tests that each state is reached from the player's motion. Manual: PLR-06 grows.
 2. **A better end.** A knocked-out character is thrown by what hit it and then melts, with crumbs; a burst scatters it.
    *Tests:* GUT tests of which ending each cause gives. Manual row.
-3. **Kinds of cheese.** Let players choose their character: Swiss, cheddar, blue, brie, each a different wedge, rind and hole pattern on the same hit shape. Shown on the menu.
-   *Tests:* GUT test that every kind fits the hit shape; browser test that others see the choice.
-4. **Hats and accessories.** Things worn on the tip of the wedge and held in the free hand, chosen on the menu, which don't change what can be hit.
-   *Tests:* GUT tests that none change `BodyShape`.
-5. **Emotes and taunts.** A wheel of short animations and sounds (a wave, a dance, a shrug), safe to use only when it doesn't leave the player helpless for long.
+3. **Emotes and taunts.** A wheel of short animations and sounds (a wave, a dance, a shrug), safe to use only when it doesn't leave the player helpless for long.
    *Tests:* browser test that others see one.
 
 ## Milestone 5: An arsenal

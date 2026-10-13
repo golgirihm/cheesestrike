@@ -73,6 +73,8 @@ func refresh() -> void:
 	for row: Array in TOGGLES:
 		(find_child("Setting_" + row[0], true, false) as CheckButton).set_pressed_no_signal(Settings.get_value(row[0]))
 	(find_child("Setting_quality", true, false) as Button).text = "Graphics: %s" % GraphicsQuality.NAMES[GraphicsQuality.level(Settings.get_value("quality"))]
+	for key: String in Looks.SETTINGS:
+		(find_child("Setting_" + key, true, false) as Button).text = look_text(key)
 	for action: String in _key_buttons:
 		_key_buttons[action].text = "Press a key…" if action == _waiting_for else Controls.keys_text(action)
 
@@ -84,6 +86,17 @@ static func value_text(key: String, value: float) -> String:
 			var shown: float = value * 100.0 if row[5] == "%d%%" else value
 			return row[5] % shown
 	return str(value)
+
+
+## What the button for one of the character's looks says, such as "Hat: Crown".
+static func look_text(key: String) -> String:
+	var choice: Array = Looks.SETTINGS[key]
+	return "%s: %s" % [choice[2], choice[1][Settings.get_value(key)]]
+
+
+## The choice after `current` among `choices`, coming round.
+static func next_choice(choices: Array, current: Variant) -> Variant:
+	return choices[(choices.find(current) + 1) % choices.size()]
 
 
 ## The next graphics level after `current`, coming round.
@@ -174,6 +187,18 @@ func _build() -> void:
 	quality.pressed.connect(func() -> void:
 		Settings.set_value("quality", next_quality(GraphicsQuality.level(Settings.get_value("quality")))))
 	_rows.add_child(quality)
+
+	var look_title := Label.new()
+	look_title.text = "Your character, as others see it"
+	look_title.add_theme_font_size_override("font_size", 20)
+	_rows.add_child(look_title)
+	for key: String in Looks.SETTINGS:
+		var look := Button.new()
+		look.name = "Setting_" + key
+		look.custom_minimum_size = Vector2(0, 40)
+		look.pressed.connect(func() -> void:
+			Settings.set_value(key, next_choice(Looks.SETTINGS[key][0], Settings.get_value(key))))
+		_rows.add_child(look)
 
 	var keys_title := Label.new()
 	keys_title.text = "Keys"

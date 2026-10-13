@@ -67,6 +67,7 @@ func snapshot() -> Dictionary:
 			"overloaded": record.overload_left > 0.0 if record != null else null,
 			"deaths": record.deaths if record != null else null,
 			"grenades": record.grenades if record != null else null,
+			"look": Looks.unpack(record.look) if record != null else null,
 			"aiming": player.is_aiming(),
 			"crouching": player.crouch() >= 0.9,
 			"leaning": signf(player.lean()) if absf(player.lean()) >= 0.9 else 0.0,

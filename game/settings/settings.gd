@@ -58,6 +58,10 @@ const DEFAULTS := {
 	"captions": false,
 	## Whether the damage of each hit is written by the crosshair.
 	"damage_numbers": false,
+	## What the player's character looks like to others (see Looks).
+	"look_cheese": Looks.CHEESES[0],
+	"look_hat": Looks.HATS[0],
+	"look_held": Looks.HELD[0],
 }
 
 ## The allowed range of each number setting. A value outside is brought in.
@@ -77,6 +81,9 @@ const RANGES := {
 ## The allowed choices of a setting that is one of a few.
 const CHOICES := {
 	"quality": ["", "low", "medium", "high"],
+	"look_cheese": Looks.CHEESES,
+	"look_hat": Looks.HATS,
+	"look_held": Looks.HELD,
 }
 
 ## Where the settings are kept. Tests point their own instances elsewhere.
