@@ -5,8 +5,12 @@ extends RefCounted
 ## pass through walls or hang in the air. This says whether each update could
 ## have happened; the host puts the player back if not.
 ##
-## Updates arrive unevenly, so speed is judged with some slack in time and
-## distance, and a shove from a burst allows more for a moment.
+## Updates arrive unevenly, so there is some slack in time and distance, and
+## a shove from a burst allows more for a moment. The slack is a reserve,
+## not an allowance on every update: a player has only as far to go as the
+## time that has really passed gives them, plus what is left of the reserve.
+## Without that, a game sending many small updates close together could
+## spend the slack on each, and go several times as fast as anyone can.
 
 ## Fastest a player can move across the ground, at the start of a slide from
 ## a run in an Overload, with a margin.
@@ -35,6 +39,10 @@ var _last_teleports := 0
 var _push_until := -1.0
 var _push_speed := 0.0
 var _airborne_since := -1.0
+# How far the player may yet go across the ground, and up, before the next
+# update: what time has allowed them and they haven't used.
+var _reach := 0.0
+var _lift := 0.0
 # Where the host has sent the player, if it is waiting for them to arrive.
 var _expected: Variant = null
 
@@ -72,23 +80,42 @@ func check(time: float, at: Vector3, teleports: int, blocked: Callable, on_groun
 		_expected = null
 		_accept(time, at, teleports, true)
 		return true
-	var elapsed := maxf(time - _last_time, 0.0) + SLACK_TIME
+	var elapsed := maxf(time - _last_time, 0.0)
 	var shoved := _push_speed if time < _push_until else 0.0
+	var speed := MAX_SPEED * maxf(speed_scale, 1.0) + shoved
+	var rise_speed := MAX_RISE_SPEED + shoved
+	# What the time since the last update allows, on top of what was left,
+	# and never more than the reserve and that together.
+	var reach := minf(_reach, reserve(speed)) + speed * elapsed
+	var lift := minf(_lift, reserve(rise_speed)) + rise_speed * elapsed
 	var across := Vector2(at.x - _last_position.x, at.z - _last_position.z).length()
-	if across > (MAX_SPEED * maxf(speed_scale, 1.0) + shoved) * elapsed + SLACK_DISTANCE:
+	if across > reach:
 		return false
 	var rise := at.y - _last_position.y
-	if rise > (MAX_RISE_SPEED + shoved) * elapsed + SLACK_DISTANCE:
+	if rise > lift:
 		return false
 	if blocked.call(_last_position, at):
 		return false
 	if not on_ground and _airborne_since >= 0.0 and time - _airborne_since > MAX_AIRTIME * maxf(air_scale, 1.0):
 		return false
+	_reach = reach - across
+	_lift = lift - maxf(rise, 0.0)
 	_accept(time, at, teleports, on_ground)
 	return true
 
 
+## The most a player moving at `speed` can have in hand: the slack for
+## updates bunched up on the way.
+static func reserve(speed: float) -> float:
+	return speed * SLACK_TIME + SLACK_DISTANCE
+
+
 func _accept(time: float, at: Vector3, teleports: int, on_ground: bool) -> void:
+	# From the first update, and after being moved at once, the reserve is
+	# full.
+	if _last_time < 0.0 or teleports != _last_teleports:
+		_reach = reserve(MAX_SPEED * maxf(speed_scale, 1.0))
+		_lift = reserve(MAX_RISE_SPEED)
 	_last_time = time
 	_last_position = at
 	_last_teleports = teleports

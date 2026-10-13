@@ -61,6 +61,16 @@ func facing_at(time: float) -> Vector2:
 	return Vector2(lerp_angle(before.x, _facings[after].x, weight), lerpf(before.y, _facings[after].y, weight))
 
 
+## Every way the player has faced since `time` (each a yaw and pitch), and
+## the one just before it.
+func facings_since(time: float) -> Array:
+	var faced := []
+	for index in _times.size():
+		if _times[index] >= time or index == _times.size() - 1 or _times[index + 1] >= time:
+			faced.append(_facings[index])
+	return faced
+
+
 func clear() -> void:
 	_times.clear()
 	_positions.clear()
