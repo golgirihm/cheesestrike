@@ -384,5 +384,15 @@ metadata/kind = "ammo"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8)
 metadata/kind = "ammo"
 
+[node name="JumpPads" type="Node3D" parent="."]
+
+[node name="PadNorth" type="Marker3D" parent="JumpPads"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -8)
+metadata/launch = Vector3(0, 13, -9)
+
+[node name="PadSouth" type="Marker3D" parent="JumpPads"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 8)
+metadata/launch = Vector3(0, 13, 9)
+
 [node name="MenuCamera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.866186, 0.499722, 0, -0.499722, 0.866186, 0, 15, 22)

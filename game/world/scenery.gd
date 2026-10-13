@@ -52,6 +52,7 @@ static func dress(map: Node3D) -> void:
 			_car(body)
 		elif body.name.begins_with("Bus"):
 			_bus(body)
+	_fixtures(map)
 	var kind := String(map.get_meta("scenery", MEADOW))
 	if not LOOKS.has(kind):
 		kind = MEADOW
@@ -194,6 +195,40 @@ static func _windows(colour: Color) -> StandardMaterial3D:
 	material.roughness = 0.6
 	_materials[key] = material
 	return material
+
+
+# Draws the arena's jump pads and ladders where its scene marks them.
+static func _fixtures(map: Node3D) -> void:
+	var glow := StandardMaterial3D.new()
+	glow.albedo_color = Color(0.2, 0.85, 0.9)
+	glow.emission_enabled = true
+	glow.emission = Color(0.1, 0.7, 0.8)
+	glow.emission_energy_multiplier = 0.8
+	var pads := map.get_node_or_null("JumpPads")
+	if pads != null:
+		for pad: Node3D in pads.get_children():
+			pad.add_child(Rounded.instance(Rounded.cylinder(Fixtures.PAD_RADIUS, 0.12, 0.05, 28), _material(INK.lightened(0.1)), Vector3(0, 0.06, 0)))
+			pad.add_child(Rounded.instance(Rounded.cylinder(Fixtures.PAD_RADIUS * 0.72, 0.14, 0.05, 28), glow, Vector3(0, 0.07, 0)))
+			# Chevrons pointing the way it throws.
+			var launch: Vector3 = pad.get_meta("launch", Vector3.UP)
+			var way := Vector3(launch.x, 0, launch.z)
+			for step in 3:
+				var chevron := Rounded.instance(Rounded.box(Vector3(0.9 - step * 0.22, 0.05, 0.16), 0.02), _material(Color(0.95, 0.95, 0.95)), Vector3.ZERO)
+				chevron.position = Vector3(0, 0.16, 0) + (way.normalized() * (step * 0.4 - 0.3) if way.length() > 0.1 else Vector3.ZERO)
+				if way.length() > 0.1:
+					chevron.rotation.y = atan2(way.x, way.z)
+				pad.add_child(chevron)
+	var ladders := map.get_node_or_null("Ladders")
+	if ladders != null:
+		var steel := _material(Color(0.62, 0.65, 0.7))
+		for ladder: Node3D in ladders.get_children():
+			var height := float(ladder.get_meta("height", 4.0))
+			# Against what it climbs, which is just ahead of where the climber stands.
+			var back := -0.95
+			for side in [-1.0, 1.0]:
+				ladder.add_child(Rounded.instance(Rounded.box(Vector3(0.12, height + 0.9, 0.12), 0.04), steel, Vector3(0.6 * side, (height + 0.9) / 2.0, back)))
+			for rung in int(height / 0.6):
+				ladder.add_child(Rounded.instance(Rounded.box(Vector3(1.2, 0.09, 0.09), 0.03), steel, Vector3(0, 0.5 + rung * 0.6, back)))
 
 
 # A wheel at `at`, its axle across the vehicle.

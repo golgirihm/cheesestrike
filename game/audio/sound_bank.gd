@@ -25,6 +25,7 @@ const SOUNDS := {
 	"jump": "_jump",
 	"land": "_land",
 	"slide": "_slide",
+	"pad": "_pad",
 	"pickup": "_pickup",
 	"overload": "_overload",
 	"reload": "_reload",
@@ -295,6 +296,13 @@ static func _slide() -> AudioStreamWAV:
 		dull = lerpf(dull, noise, 0.04)
 		samples[i] = (soft - dull) * minf(t * 30.0, 1.0) * _decay(t, 4.5)
 	return _stream(_shaped(samples, 0.5))
+
+
+# A jump pad: a springy note that leaps up.
+static func _pad() -> AudioStreamWAV:
+	return _make(0.3, func(t: float, _i: int) -> float:
+		var hertz := lerpf(180.0, 720.0, sqrt(t / 0.3))
+		return (sin(TAU * hertz * t) * 0.7 + sin(TAU * hertz * 2.0 * t) * 0.2) * _decay(t, 7.0), 0.5)
 
 
 static func _hit() -> AudioStreamWAV:
