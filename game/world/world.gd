@@ -76,11 +76,13 @@ func _ready() -> void:
 	match_.throw_shown.connect(func(id: int) -> void:
 		var player := player_node(id)
 		if player != null:
-			player.body.act(CharacterMotion.THROW))
+			player.body.act(CharacterMotion.THROW)
+			player.voice("throw"))
 	match_.strike_shown.connect(func(striker: int) -> void:
 		var player := player_node(striker)
 		if player != null:
-			player.swing_knife())
+			player.swing_knife()
+			player.voice("strike"))
 	match_.projectile_launched.connect(effects.launch_projectile)
 	match_.projectile_burst.connect(effects.burst_projectile)
 	match_.overloaded.connect(func(id: int) -> void:

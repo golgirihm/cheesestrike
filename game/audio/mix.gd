@@ -37,6 +37,7 @@ const BUS_OF := {
 	"step": STEPS, "jump": STEPS, "land": STEPS, "slide": STEPS,
 	"step_rock": STEPS, "step_grass": STEPS, "step_wood": STEPS, "step_metal": STEPS, "step_cheese": STEPS,
 	"hurt": VOICES, "knocked_out": VOICES, "emote": VOICES,
+	"voice_effort": VOICES, "voice_pain": VOICES, "voice_taunt": VOICES, "voice_reload": VOICES, "voice_out": VOICES,
 	"hit": INTERFACE, "hit_pop": INTERFACE, "hit_bell": INTERFACE, "hit_head": INTERFACE, "knock_out": INTERFACE, "objective": INTERFACE,
 	"music": MUSIC,
 }
