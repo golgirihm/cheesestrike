@@ -56,6 +56,11 @@ var _reserve_label: Label
 var _grenade_label: Label
 var _weapon_label: Label
 var _pickup_label: Label
+var _power_label: Label
+# What everyone is told when a power-up is taken, and seconds it stays up.
+var _announce_label: Label
+var _announce_left := 0.0
+const ANNOUNCE_LIFE := 3.5
 var _pickup_left := 0.0
 ## Pickups this player has collected, for the browser tests.
 var pickups_shown := 0
@@ -86,6 +91,7 @@ func bind(of: Node3D) -> void:
 	world.match_.hurt.connect(_on_hurt)
 	world.match_.knocked_out.connect(kill_feed.add)
 	world.match_.picked_up.connect(_on_picked_up)
+	world.match_.power_taken.connect(_on_power_taken)
 	world.match_.state_changed.connect(_refresh_scoreboard)
 
 
@@ -256,6 +262,8 @@ func _process(delta: float) -> void:
 	_damage_numbers = _damage_numbers.filter(func(number: Dictionary) -> bool: return number.left > 0.0)
 	_pickup_left = maxf(_pickup_left - delta, 0.0)
 	_pickup_label.visible = _pickup_left > 0.0
+	_announce_left = maxf(_announce_left - delta, 0.0)
+	_announce_label.visible = _announce_left > 0.0
 	for indicator in _indicators:
 		indicator.left -= delta
 	_indicators = _indicators.filter(func(indicator: Dictionary) -> bool: return indicator.left > 0.0)
@@ -272,6 +280,9 @@ func _process(delta: float) -> void:
 	_overload_bar.modulate = Color(1.0, 0.6, 0.15) if ready else Color(1, 1, 1, 0.8)
 	_health_label.text = str(health)
 	_armour_label.text = armour_text(record)
+	_power_label.text = Powers.text(record)
+	if record != null and Powers.is_kind(record.power):
+		_power_label.add_theme_color_override("font_color", Powers.COLOURS[record.power])
 	_grenade_label.text = grenade_text(record)
 	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
 	if own != null:
@@ -308,6 +319,24 @@ func _touch_held(button: String) -> bool:
 func _refresh_scoreboard() -> void:
 	if scoreboard.visible and world != null:
 		scoreboard.show_state(world.match_.state, multiplayer.get_unique_id())
+
+
+func _on_power_taken(id: int, power: int) -> void:
+	var said := Powers.announcement(world.match_.state.name_of(id), power)
+	if said.is_empty():
+		return
+	_announce_label.text = said
+	_announce_label.add_theme_color_override("font_color", Powers.COLOURS[power])
+	_announce_left = ANNOUNCE_LIFE
+
+
+## What is written across the screen about a power-up just taken, or "".
+func announcement_shown() -> String:
+	return _announce_label.text if _announce_label.visible else ""
+
+
+func power_shown() -> String:
+	return _power_label.text
 
 
 func _on_picked_up(id: int, kind: String) -> void:
@@ -427,6 +456,8 @@ func _build() -> void:
 	status.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(status)
+	_power_label = _outlined_label(18)
+	status.add_child(_power_label)
 	_overload_label = _outlined_label(14)
 	status.add_child(_overload_label)
 	_overload_bar = ProgressBar.new()
@@ -450,6 +481,14 @@ func _build() -> void:
 	_armour_label = _outlined_label(15)
 	_armour_label.add_theme_color_override("font_color", Color(0.95, 0.6, 0.55))
 	health.add_child(_armour_label)
+
+	_announce_label = _outlined_label(26)
+	_announce_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 0)
+	_announce_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_announce_label.offset_top = 96.0
+	_announce_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_announce_label.visible = false
+	add_child(_announce_label)
 
 	var arms := VBoxContainer.new()
 	arms.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)

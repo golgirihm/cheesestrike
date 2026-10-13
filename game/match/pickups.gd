@@ -9,10 +9,14 @@ const AMMO := "ammo"
 ## A rind to wear: armour, up to the most that can be worn.
 const ARMOUR := "armour"
 const ARMOUR_AMOUNT := 50
+## A power-up (see Powers): which one, the taker finds out.
+const POWER := "power"
+## Seconds into a match before the first power-up is there.
+const POWER_FIRST := 30.0
 ## Health a wedge gives back, up to full.
 const HEALTH_AMOUNT := 50
 ## Seconds before a collected pickup is back.
-const RESPAWN := {HEALTH: 15.0, AMMO: 12.0, ARMOUR: 25.0}
+const RESPAWN := {HEALTH: 15.0, AMMO: 12.0, ARMOUR: 25.0, POWER: 60.0}
 const WEAPON_RESPAWN := 20.0
 ## How close a player's feet must come to a pad to collect from it.
 const REACH := 1.3
@@ -21,7 +25,7 @@ const REACH_UP := 2.0
 
 ## Whether `kind` is something a pad can hold.
 static func is_kind(kind: String) -> bool:
-	return kind == HEALTH or kind == AMMO or kind == ARMOUR or Weapons.find(kind) != null
+	return kind == HEALTH or kind == AMMO or kind == ARMOUR or kind == POWER or Weapons.ids().has(kind)
 
 
 static func respawn_time(kind: String) -> float:
@@ -43,6 +47,8 @@ static func wanted(kind: String, record: PlayerRecord) -> bool:
 		return record.health < PlayerRecord.MAX_HEALTH
 	if kind == ARMOUR:
 		return record.armour < PlayerRecord.MAX_ARMOUR
+	if kind == POWER:
+		return true
 	if kind == AMMO:
 		# Of use to anyone short of a grenade, or carrying more than the
 		# sidearm, which never runs out.
@@ -75,5 +81,7 @@ static func display_name(kind: String) -> String:
 		return "Ammunition"
 	if kind == ARMOUR:
 		return "Rind armour"
+	if kind == POWER:
+		return "Power-up"
 	var weapon := Weapons.find(kind)
 	return weapon.display_name if weapon != null else kind

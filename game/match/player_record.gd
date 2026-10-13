@@ -39,6 +39,9 @@ var team := -1
 var overload := 0.0
 var overload_left := 0.0
 var melted_for := 0.0
+## The power-up they have (see Powers; 0 for none) and seconds of it left.
+var power := 0
+var power_left := 0.0
 ## Round trip to the host, in milliseconds, as the host measures it.
 var ping := 0
 ## Grenades left to throw.
@@ -48,7 +51,7 @@ var look := 0
 
 # Where each number sits in a packed record (see to_packed).
 enum { _ID, _HEALTH, _FLAGS, _RESPAWN, _PROTECTED, _KILLS, _DEATHS, _LAST_ATTACKER,
-	_WEAPON, _WEAPONS, _TEAM, _OVERLOAD, _OVERLOAD_LEFT, _MELTED, _PING, _GRENADES, _LOOK, _ARMOUR, _MAIN, _SIDE, _COUNT }
+	_WEAPON, _WEAPONS, _TEAM, _OVERLOAD, _OVERLOAD_LEFT, _MELTED, _PING, _GRENADES, _LOOK, _ARMOUR, _MAIN, _SIDE, _POWER, _POWER_LEFT, _COUNT }
 const _ALIVE := 1
 
 
@@ -64,6 +67,14 @@ func disarm() -> void:
 	if not main.is_empty():
 		weapons.append(main)
 		weapon = main
+
+
+## Gives them power-up `kind` for `seconds`, or takes away what they have
+## if it is none, or over.
+func give_power(kind: int, seconds: float) -> void:
+	var real := Powers.is_kind(kind) and seconds > 0.0 and is_finite(seconds)
+	power = kind if real else Powers.NONE
+	power_left = minf(seconds, 60.0) if real else 0.0
 
 
 ## Whether they carry exactly their loadout: nothing found, nothing lost.
@@ -108,6 +119,8 @@ func to_dict() -> Dictionary:
 		"look": look,
 		"armour": armour,
 		"main": main,
+		"power": power,
+		"power_left": power_left,
 		"side": side,
 	}
 
@@ -139,6 +152,8 @@ func to_packed() -> Array:
 	numbers[_GRENADES] = grenades
 	numbers[_LOOK] = look
 	numbers[_ARMOUR] = armour
+	numbers[_POWER] = power
+	numbers[_POWER_LEFT] = roundi(power_left * 1000.0)
 	numbers[_MAIN] = Weapons.ORDER.find(main)
 	numbers[_SIDE] = Weapons.ORDER.find(side)
 	return [name, numbers]
@@ -178,6 +193,7 @@ static func from_packed(data: Variant) -> PlayerRecord:
 	record.grenades = clampi(numbers[_GRENADES], 0, Weapons.GRENADES)
 	record.look = Looks.clean(numbers[_LOOK])
 	record.armour = clampi(numbers[_ARMOUR], 0, MAX_ARMOUR)
+	record.give_power(numbers[_POWER], maxi(numbers[_POWER_LEFT], 0) / 1000.0)
 	var chosen := Weapons.clean_loadout(_weapon_at(numbers[_MAIN]), _weapon_at(numbers[_SIDE]))
 	record.main = chosen[0]
 	record.side = chosen[1]
@@ -205,6 +221,7 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.grenades = clampi(_int(data, "grenades", Weapons.GRENADES), 0, Weapons.GRENADES)
 	record.look = Looks.clean(_int(data, "look", 0))
 	record.armour = clampi(_int(data, "armour", 0), 0, MAX_ARMOUR)
+	record.give_power(_int(data, "power", 0), maxf(_float(data, "power_left", 0.0), 0.0))
 	var chosen := Weapons.clean_loadout(data.get("main"), data.get("side"))
 	record.main = chosen[0]
 	record.side = chosen[1]

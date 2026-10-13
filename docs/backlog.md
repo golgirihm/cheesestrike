@@ -55,13 +55,11 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 5: An arsenal
 
-1. **Power-ups.** Rare, loudly announced pickups on a long timer: double damage, speed, a shield, seeing through walls for a moment.
-   *Tests:* GUT tests of each effect and its end; browser test of the announcement.
-2. **Weapons left behind.** A knocked-out player drops the weapon they held, for anyone to take, for a while.
+1. **Weapons left behind.** A knocked-out player drops the weapon they held, for anyone to take, for a while.
    *Tests:* GUT tests in `Pickups`; browser test.
-3. **Attachments.** A sight, a grip, a longer magazine: small trade-offs on each weapon, chosen in the loadout.
+2. **Attachments.** A sight, a grip, a longer magazine: small trade-offs on each weapon, chosen in the loadout.
    *Tests:* GUT tests that each changes only what it says.
-4. **More to the Overload.** Different Overloads to choose between (speed and melt, as now; a shield; a rain of wheels), with a build-up others can hear and react to.
+3. **More to the Overload.** Different Overloads to choose between (speed and melt, as now; a shield; a rain of wheels), with a build-up others can hear and react to.
    *Tests:* extend `test_overload.gd`.
 
 ## Milestone 6: Ways to play

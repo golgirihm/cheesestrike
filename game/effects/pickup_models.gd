@@ -27,6 +27,23 @@ static func build(kind: String) -> Node3D:
 		inside.albedo_color = Color(0.95, 0.93, 0.88)
 		holder.add_child(Rounded.instance(Rounded.cylinder(0.3, 0.16, 0.06, 24), wax))
 		holder.add_child(Rounded.instance(Rounded.cylinder(0.2, 0.17, 0.03, 24), inside))
+	elif kind == Pickups.POWER:
+		# A bright spinning cross that could be anything.
+		var glow := StandardMaterial3D.new()
+		glow.albedo_color = Color(0.95, 0.95, 1.0)
+		glow.emission_enabled = true
+		glow.emission = Color(0.7, 0.8, 1.0)
+		glow.emission_energy_multiplier = 1.6
+		for turn: float in [0.0, PI / 2.0]:
+			var arm := Rounded.instance(Rounded.box(Vector3(0.7, 0.16, 0.16), 0.06), glow)
+			arm.rotation.z = turn + PI / 4.0
+			holder.add_child(arm)
+		holder.add_child(Rounded.instance(Rounded.box(Vector3(0.3, 0.3, 0.3), 0.1), glow))
+		var light := OmniLight3D.new()
+		light.light_color = Color(0.7, 0.8, 1.0)
+		light.light_energy = 1.5
+		light.omni_range = 4.0
+		holder.add_child(light)
 	elif kind == Pickups.AMMO:
 		# A crate with a pale band round it.
 		var crate := StandardMaterial3D.new()

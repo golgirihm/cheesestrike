@@ -384,6 +384,7 @@ func _on_match_state_changed() -> void:
 	_set_alive(own == null or own.alive)
 	_show_team(own.team if own != null else MatchState.NO_TEAM)
 	_show_overload(own)
+	_show_power(own)
 	if own == null:
 		return
 	# Everyone sees a player who has just been hurt wince, and one who has
@@ -421,6 +422,48 @@ func _carry(carried: Array) -> void:
 		var held: String = own.weapon if own != null and arsenal.has(own.weapon) else arsenal.keys()[arsenal.size() - 1]
 		weapon = arsenal[held]
 		_show_weapon(held)
+
+
+# A ring over the head of a player with a power-up, in its colour; and,
+# to a player who has Sight, everyone else marked through the walls.
+var _halo: MeshInstance3D
+var _seen_mark: MeshInstance3D
+
+
+func _show_power(own: PlayerRecord) -> void:
+	var kind := own.power if own != null and own.alive and own.power_left > 0.0 else Powers.NONE
+	if _halo == null:
+		var ring := TorusMesh.new()
+		ring.inner_radius = 0.22 * BodyShape.SIZE
+		ring.outer_radius = 0.29 * BodyShape.SIZE
+		ring.rings = 20
+		ring.ring_segments = 8
+		var bright := StandardMaterial3D.new()
+		bright.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_halo = Rounded.instance(ring, bright, name_tag.position - Vector3.UP * 0.22 * BodyShape.SIZE)
+		_halo.name = "Halo"
+		_halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_halo)
+		var blob := SphereMesh.new()
+		blob.radius = 0.3 * BodyShape.SIZE
+		blob.height = 0.6 * BodyShape.SIZE
+		blob.radial_segments = 12
+		blob.rings = 6
+		var through := StandardMaterial3D.new()
+		through.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		through.no_depth_test = true
+		through.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		through.albedo_color = Color(Powers.COLOURS[Powers.SIGHT], 0.55)
+		through.render_priority = 5
+		_seen_mark = Rounded.instance(blob, through, BodyShape.WEDGE_CENTRE * BodyShape.SIZE)
+		_seen_mark.name = "SeenMark"
+		_seen_mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_seen_mark)
+	# Their own is over their head, out of their sight.
+	_halo.visible = kind != Powers.NONE and not _mine
+	if kind != Powers.NONE:
+		(_halo.material_override as StandardMaterial3D).albedo_color = Powers.COLOURS[kind]
+	_seen_mark.visible = not _mine and own != null and own.alive and match_ != null and Powers.has(match_.own_record(), Powers.SIGHT)
 
 
 # An Overloaded player glows; a melted one sags and darkens.
