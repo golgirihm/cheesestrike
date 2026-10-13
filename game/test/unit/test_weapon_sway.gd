@@ -160,3 +160,29 @@ func test_turning_the_view_leaves_the_owners_weapon_behind_for_a_moment() -> voi
 	for frame in 30:
 		own._animate(0.05)
 	assert_almost_eq(own.gun.position.x, rest.x, 0.001, "and catches up")
+
+
+func test_the_view_bobs_with_each_stride_and_more_at_speed() -> void:
+	assert_eq(WeaponSway.view_bob(1.0, 0.0), Vector3.ZERO, "not standing still")
+	assert_eq(WeaponSway.view_bob(0.0, 1.0), Vector3.ZERO, "level between strides")
+	var mid := WeaponSway.view_bob(PI / 2.0, 1.0)
+	assert_almost_eq(mid.y, -WeaponSway.VIEW_BOB.y, 0.0001, "down in the middle of a stride")
+	assert_gt(mid.x, 0.0)
+	assert_lt(WeaponSway.view_bob(3.0 * PI / 2.0, 1.0).x, 0.0, "to the other side on the next")
+	assert_gt(WeaponSway.view_bob(PI / 2.0, 1.5).length(), mid.length())
+	assert_eq(WeaponSway.view_bob(PI / 2.0, 9.0), WeaponSway.view_bob(PI / 2.0, 1.5), "and no more than that")
+
+
+func test_the_view_moves_only_as_much_as_the_player_asks() -> void:
+	var own := _own()
+	await wait_process_frames(1)
+	own._landing = 1.0
+	own._bob_phase = PI / 2.0
+	Settings.set_value("camera_motion", 1.0)
+	own._process(0.0)
+	assert_lt(own.camera.position.y, -0.1, "a landing dips the view")
+	Settings.set_value("camera_motion", 0.0)
+	own._process(0.0)
+	assert_eq(own.camera.position, Vector3.ZERO, "unless they have turned it off")
+	assert_eq(own.camera.rotation.z, 0.0)
+	Settings.set_value("camera_motion", 1.0)

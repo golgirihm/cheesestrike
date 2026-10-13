@@ -947,3 +947,95 @@ func test_a_shot_over_a_crouched_player_misses() -> void:
 	match_._rules_for(1).refill()
 	_shoot(shooter, over)
 	assert_lt(match_.state.player(2).health, 100, "standing, it catches the tip")
+
+
+func test_jumping_carries_the_owner_on_and_they_can_only_steer() -> void:
+	var own := _add(1, Vector3(0, 0, 8))
+	await _settle(own)
+	Input.action_press("move_forward")
+	await wait_physics_frames(3)
+	own._jump_pressed = true
+	await wait_physics_frames(3)
+	assert_false(own.is_on_floor())
+	Input.action_release("move_forward")
+	await wait_physics_frames(2)
+	var carried := Vector2(own.velocity.x, own.velocity.z).length()
+	assert_gt(carried, Movement.WALK_SPEED * 0.8, "letting go in the air doesn't stop them dead")
+	assert_lt(carried, Movement.WALK_SPEED)
+	await wait_seconds(1.2)
+	assert_true(own.is_on_floor())
+	assert_almost_eq(Vector2(own.velocity.x, own.velocity.z).length(), 0.0, 0.01, "on the ground they stop at once")
+
+
+func test_a_long_fall_lands_with_a_thud_and_winds_the_owner() -> void:
+	var own := _add(1, Vector3(0, 9, 8))
+	await wait_physics_frames(2)
+	var before: int = Sounds.counts.get("land", 0)
+	for frame in 200:
+		await wait_physics_frames(1)
+		if own.is_on_floor():
+			break
+	assert_true(own.is_on_floor())
+	assert_eq(Sounds.counts.get("land", 0), before + 1)
+	assert_gt(own._flinch_left, 0.0, "slowed for a moment")
+	assert_gte(own._landing, Movement.HARD_LANDING)
+
+
+func test_a_small_hop_lands_without_any_of_that() -> void:
+	var own := _add(1, Vector3(0, 0.05, 8))
+	var before: int = Sounds.counts.get("land", 0)
+	await wait_seconds(0.5)
+	assert_true(own.is_on_floor())
+	assert_eq(Sounds.counts.get("land", 0), before)
+	assert_eq(own._flinch_left, 0.0)
+
+
+func test_run_crouch_and_aim_can_be_pressed_once_rather_than_held() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	var press := func(action: String) -> void:
+		var event := InputEventAction.new()
+		event.action = action
+		event.pressed = true
+		own._input(event)
+	Settings.set_value("toggle_crouch", true)
+	Settings.set_value("toggle_run", true)
+	Settings.set_value("toggle_aim", true)
+	press.call("crouch")
+	assert_true(own._wants_crouch(), "on, without holding")
+	press.call("crouch")
+	assert_false(own._wants_crouch(), "and off again")
+	press.call("sprint")
+	assert_true(own._wants_run())
+	press.call("aim")
+	assert_true(own._wants_aim())
+	own._release_controls()
+	assert_false(own._wants_run(), "let go of, as when knocked out")
+	assert_false(own._wants_aim())
+	Settings.set_value("toggle_crouch", false)
+	Settings.set_value("toggle_run", false)
+	Settings.set_value("toggle_aim", false)
+	press.call("crouch")
+	assert_false(own._wants_crouch(), "held, a press alone does nothing")
+
+
+func test_pushing_the_touch_stick_to_its_edge_runs() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	var touch := InputEventScreenTouch.new()
+	touch.index = 0
+	touch.pressed = true
+	touch.position = Vector2(100, 400)
+	own._handle_touch(touch)
+	var drag := InputEventScreenDrag.new()
+	drag.index = 0
+	drag.position = touch.position + Vector2(0, -own.TOUCH_STICK_RADIUS)
+	own._handle_drag(drag)
+	assert_false(own._wants_run(), "at the stick's edge, a walk")
+	drag.position = touch.position + Vector2(0, -own.TOUCH_STICK_RADIUS * (Movement.TOUCH_RUN_REACH + 0.1))
+	own._handle_drag(drag)
+	assert_true(own._wants_run(), "pushed on past it, a run")
+	assert_almost_eq(own._move_touch_vector.length(), 1.0, 0.0001)
+	touch.pressed = false
+	own._handle_touch(touch)
+	assert_false(own._wants_run())

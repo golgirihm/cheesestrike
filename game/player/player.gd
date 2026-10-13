@@ -130,6 +130,13 @@ var _melee_pressed := false
 # screen's crouch button, which stays on until pressed again, is on.
 var _crouch := 0.0
 var _touch_crouch := false
+# Run, crouch and aim as turned on by a press, for players who have chosen
+# to press once rather than hold; and running by the touch stick's edge.
+var _toggled := {"sprint": false, "crouch": false, "aim": false}
+var _touch_run := false
+# The player's own speed across the ground, which off the ground can only
+# be steered.
+var _walk := Vector2.ZERO
 # Seconds a grenade has been held with its fuse burning, or below zero when
 # none is in hand; and whether a touch has asked for one to be thrown at once.
 var _cooking := -1.0
@@ -427,6 +434,9 @@ func _set_alive(now_alive: bool) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	for action: String in _toggled:
+		if event.is_action_pressed(action):
+			_toggled[action] = not _toggled[action]
 	# Before the rest, as the mouse wheel's events are mouse buttons.
 	if event.is_action_pressed("weapon_next"):
 		_switch_step += 1
@@ -564,10 +574,21 @@ func crouch() -> float:
 	return _crouch
 
 
+# Whether `action` (run, crouch or aim) is wanted: held, or, for a player
+# who has chosen that in the settings, pressed on and not yet off.
+func _on(action: String) -> bool:
+	var setting := "toggle_run" if action == "sprint" else "toggle_" + action
+	return _toggled[action] if Settings.get_value(setting) else Input.is_action_pressed(action)
+
+
 func _wants_crouch() -> bool:
 	if not alive or Net.host_silent or _menu_open():
 		return false
-	return _touch_crouch or Input.is_action_pressed("crouch")
+	return _touch_crouch or _on("crouch")
+
+
+func _wants_run() -> bool:
+	return _touch_run or _on("sprint")
 
 
 ## How this player stands, as a shot fired now would report it.
@@ -595,7 +616,7 @@ func shot_spread() -> float:
 func _wants_aim() -> bool:
 	if not alive or _switch_left > 0.0 or Net.host_silent or _menu_open():
 		return false
-	return _touch_aim or Input.is_action_pressed("aim")
+	return _touch_aim or _on("aim")
 
 
 # Counts off distance walked, and makes a footstep sound each stride: at
@@ -679,10 +700,17 @@ func _process(delta: float) -> void:
 		var firing := _run >= 0 and _since_shot <= weapon.stats.recoil_reset
 		var kicked := Recoil.offset(weapon.stats, _run, is_aiming()) if firing else Vector2.ZERO
 		_recoil_view = _recoil_view.lerp(kicked, minf(delta * (RECOIL_RISE if firing else RECOIL_SETTLE), 1.0))
-		camera.rotation = Vector3(tip.x + _recoil_view.y, -_recoil_view.x, tip.y)
+		# The view moves with the body, as much as the player has asked for:
+		# a bob with each stride, a roll into a sidestep, a dip on landing.
+		var motion: float = Settings.get_value("camera_motion") * (1.0 - 0.7 * smoothstep(0.0, 1.0, _aim))
+		var across := Vector2(velocity.x, velocity.z).length() if is_on_floor() else 0.0
+		var sideways := (global_basis.inverse() * velocity).x / Movement.WALK_SPEED
+		camera.position = (WeaponSway.view_bob(_bob_phase, across / Movement.WALK_SPEED) + Vector3.DOWN * WeaponSway.VIEW_DIP * _landing) * motion
+		camera.rotation = Vector3(tip.x + _recoil_view.y, -_recoil_view.x, tip.y - clampf(sideways, -1.0, 1.0) * WeaponSway.VIEW_ROLL * motion)
 		_aim = move_toward(_aim, 1.0 if _wants_aim() else 0.0, delta / AIM_TIME)
 		_crouch = move_toward(_crouch, 1.0 if _wants_crouch() else 0.0, delta * Movement.CROUCH_RATE)
-		camera.fov = Settings.get_value("fov") * lerpf(1.0, weapon.stats.aim_zoom, smoothstep(0.0, 1.0, _aim))
+		var run_fov := lerpf(1.0, WeaponSway.RUN_FOV, _running * Settings.get_value("camera_motion"))
+		camera.fov = Settings.get_value("fov") * lerpf(1.0, weapon.stats.aim_zoom, smoothstep(0.0, 1.0, _aim)) * run_fov
 	if OS.has_feature("web") and _mine:
 		var moved := WebPage.take_mouse_movement()
 		if moved != Vector2.ZERO and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -756,14 +784,23 @@ func _physics_process(delta: float) -> void:
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y).limit_length(1.0)
 	_knockback *= exp(-(KNOCKBACK_GROUND_DECAY if is_on_floor() else KNOCKBACK_AIR_DECAY) * delta)
 	_flinch_left = maxf(_flinch_left - delta, 0.0)
-	var speed := Movement.speed(Input.is_action_pressed("sprint"), _wants_aim(), _flinch_left, Overload.speed_factor(record()), _wants_crouch())
-	velocity.x = direction.x * speed + _knockback.x
-	velocity.z = direction.z * speed + _knockback.z
+	var speed := Movement.speed(_wants_run(), _wants_aim(), _flinch_left, Overload.speed_factor(record()), _wants_crouch())
+	var wanted := Vector2(direction.x, direction.z) * speed
+	# On the ground a player goes where they push; in the air they can only
+	# steer what they left it with.
+	_walk = wanted if is_on_floor() else Movement.air_steer(_walk, wanted, delta)
+	velocity.x = _walk.x + _knockback.x
+	velocity.z = _walk.y + _knockback.z
 	_fall_speed = maxf(-velocity.y, 0.0)
 	move_and_slide()
-	# Coming down onto the ground jolts the weapon in view.
+	# Coming down onto the ground jolts the view and the weapon in it, and a
+	# hard landing winds the player for a moment.
 	if is_on_floor() and not _was_on_floor:
 		_landing = WeaponSway.impact(_fall_speed)
+		if _landing > 0.2:
+			Sounds.play("land", lerpf(-16.0, -4.0, _landing))
+		if _landing >= Movement.HARD_LANDING:
+			_flinch_left = maxf(_flinch_left, Movement.FLINCH_TIME * Movement.LANDING_WIND)
 	_was_on_floor = is_on_floor()
 	_publish()
 
@@ -956,6 +993,9 @@ func _release_controls() -> void:
 	_fire_pressed = false
 	_touch_aim = false
 	_touch_crouch = false
+	_touch_run = false
+	for action: String in _toggled:
+		_toggled[action] = false
 	_button_touches.clear()
 
 
@@ -1018,6 +1058,7 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 	elif event.index == _move_touch:
 		_move_touch = -1
 		_move_touch_vector = Vector2.ZERO
+		_touch_run = false
 	elif event.index == _look_touch:
 		_look_touch = -1
 		if Time.get_ticks_msec() - _look_touch_start_msec < TOUCH_TAP_MSEC:
@@ -1028,6 +1069,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 
 func _handle_drag(event: InputEventScreenDrag) -> void:
 	if event.index == _move_touch:
-		_move_touch_vector = ((event.position - _move_touch_origin) / TOUCH_STICK_RADIUS).limit_length(1.0)
+		var pushed := (event.position - _move_touch_origin) / TOUCH_STICK_RADIUS
+		_move_touch_vector = pushed.limit_length(1.0)
+		_touch_run = pushed.length() >= Movement.TOUCH_RUN_REACH
 	elif event.index == _look_touch:
 		_look(event.relative * TOUCH_LOOK_SENSITIVITY * Settings.get_value("touch_sensitivity"))

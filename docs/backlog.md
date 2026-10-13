@@ -55,16 +55,10 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* GUT tests in a small test arena for what can and can't be climbed.
 3. **Steps and kerbs.** Walk up small steps without jumping, so arenas can have kerbs, stairs and uneven ground.
    *Tests:* GUT tests walking a player over steps of several heights.
-4. **Air control and landing.** A little steering in the air, a view dip and a thud on landing scaled by the fall, and a short slow-down after a long one.
-   *Tests:* GUT tests of the rules. Manual row for feel.
-5. **Run on a touch screen, and toggles.** Push the movement stick to its edge to run. Settings for hold or toggle on run, crouch and aim.
-   *Tests:* GUT tests of the touch stick and the toggles.
-6. **Lean.** Peek left and right round a corner without stepping out.
+4. **Lean.** Peek left and right round a corner without stepping out.
    *Tests:* GUT tests of the view offset and the hit shape.
-7. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
+5. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
    *Tests:* GUT tests of the arc and of `MovementCheck` allowing it and nothing more.
-8. **A view that moves like a head.** Gentle bob when walking, more when running, a tilt when strafing and a widening of the view at a run, all scaled by a "camera motion" setting that can be turned off.
-   *Tests:* GUT tests of the setting at zero. Manual row.
 
 ## Milestone 4: Characters that are alive
 
