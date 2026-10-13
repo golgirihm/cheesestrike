@@ -86,3 +86,21 @@ func test_a_change_is_announced_once() -> void:
 	settings.set_value("name", "Stilton")
 	assert_signal_emit_count(settings, "changed", 1)
 	assert_signal_emitted_with_parameters(settings, "changed", ["name"])
+
+
+func test_each_part_of_the_graphics_is_kept_and_takes_only_its_choices() -> void:
+	var settings := _fresh()
+	for part: String in GraphicsQuality.PARTS:
+		var key: String = GraphicsQuality.PARTS[part].setting
+		var choices: Array = GraphicsQuality.PARTS[part].choices.keys()
+		assert_eq(settings.get_value(key), "", key)
+		settings.set_value(key, choices[-1])
+		assert_eq(settings.get_value(key), choices[-1], key)
+		settings.set_value(key, "ultra")
+		assert_push_error("can't be ultra")
+		assert_eq(settings.get_value(key), choices[-1], "%s: what isn't a choice is refused" % key)
+	var again: Node = autofree(SETTINGS.new(PATH))
+	for part: String in GraphicsQuality.PARTS:
+		assert_eq(again.get_value(GraphicsQuality.PARTS[part].setting), GraphicsQuality.PARTS[part].choices.keys()[-1], "kept: %s" % part)
+	settings.set_value("gfx_shadows", "")
+	assert_eq(autofree(SETTINGS.new(PATH)).get_value("gfx_shadows"), "", "and given back to the level")

@@ -69,13 +69,9 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 The game uses the Compatibility renderer so it runs in a browser and on phones. Some effects common in big games (ambient occlusion, volumetric light, screen-space reflections) aren't available there. Items here stay within it; a second, richer renderer for desktop builds is in Milestone 13.
 
-1. **Smoother edges and sharper far.** Choices of anti-aliasing, texture filtering and render scale, with dynamic resolution to hold a frame rate.
-   *Tests:* GUT tests in `GraphicsQuality`.
-2. **Graphics settings, one by one.** Shadows, particles, effects, view distance and render scale each on its own, under the Low, Medium and High presets.
-   *Tests:* extend `test_settings.gd`.
-3. **Less detail far away.** Simpler shapes for far things, and nothing drawn that can't be seen, so big arenas hold their frame rate on a phone.
+1. **Less detail far away.** Simpler shapes for far things, and nothing drawn that can't be seen, so big arenas hold their frame rate on a phone.
    *Tests:* a benchmark scene with a frame-time budget run in CI.
-4. **No hitches.** Compile shaders and build meshes behind a loading screen, so the first shot, burst and pickup don't stutter.
+2. **No hitches.** Compile shaders and build meshes behind a loading screen, so the first shot, burst and pickup don't stutter.
    *Tests:* a browser test that measures the longest frame in a first fight.
 
 ## Milestone 9: Sound that sells it

@@ -37,6 +37,11 @@ var custom_code := ""
 ## The layer that darkens the corners of the view (see Picture).
 var vignette: CanvasLayer
 var _outlines_in := 0.0
+# The render scale dynamic resolution has settled on, and the frames it has
+# counted since it last looked.
+var _dynamic_scale := 1.0
+var _frames := 0
+var _frames_took := 0.0
 ## What being hurt looks like to this machine's player.
 var hurt_view: HurtView
 var _built_code := ""
@@ -104,15 +109,19 @@ func _ready() -> void:
 	menu_camera.make_current()
 	apply_quality()
 	Settings.changed.connect(func(key: String) -> void:
-		if key == "quality":
+		if key == "quality" or key.begins_with("gfx_") or key == GraphicsQuality.DYNAMIC:
 			apply_quality()
+			# What is only made on some graphics is made, or cleared away.
+			if map != null and (key == "quality" or key == "gfx_effects"):
+				_show_sky()
 		elif key in [Picture.BLOOM, Picture.GRADE, Picture.VIGNETTE]:
 			apply_picture())
 
 
 ## Puts the chosen graphics quality into effect.
 func apply_quality() -> void:
-	GraphicsQuality.apply(GraphicsQuality.level(Settings.get_value("quality")), get_viewport(), $Sun)
+	GraphicsQuality.apply(GraphicsQuality.level(Settings.get_value("quality")), get_viewport(), $Sun, GraphicsQuality.chosen())
+	_dynamic_scale = get_viewport().scaling_3d_scale
 	apply_picture()
 
 
@@ -120,7 +129,7 @@ func apply_quality() -> void:
 ## effect, as the settings have them.
 func apply_picture() -> void:
 	var wanted := Picture.wanted()
-	Picture.apply($WorldEnvironment.environment, map_id, GraphicsQuality.level(Settings.get_value("quality")), wanted)
+	Picture.apply($WorldEnvironment.environment, map_id, GraphicsQuality.choice(GraphicsQuality.EFFECTS), wanted)
 	vignette.visible = wanted[Picture.VIGNETTE]
 
 
@@ -263,7 +272,7 @@ func _leave(id: int) -> void:
 
 # What moves about the arena for the look of it (see AmbientLife).
 func _build_life() -> void:
-	var extras := GraphicsQuality.level(Settings.get_value("quality")) != GraphicsQuality.LOW
+	var extras := GraphicsQuality.choice(GraphicsQuality.EFFECTS) != GraphicsQuality.LOW
 	ambient_life = preload("res://world/ambient_life.gd").new()
 	map.add_child(ambient_life)
 	# Traffic lights and a train belong to the city's streets, not to every
@@ -277,7 +286,7 @@ func _build_life() -> void:
 # The sky is as the host chose it, with rain or dust in the air only where
 # the graphics setting has room for it.
 func _show_sky() -> void:
-	var extras := GraphicsQuality.level(Settings.get_value("quality")) != GraphicsQuality.LOW
+	var extras := GraphicsQuality.choice(GraphicsQuality.EFFECTS) != GraphicsQuality.LOW
 	atmosphere.show_look(match_.state.settings.sky if match_.has_state() else Atmosphere.NOON, extras)
 	if lighting != null:
 		lighting.show_for(atmosphere.showing, -$Sun.global_basis.z, extras)
@@ -439,6 +448,27 @@ func _process(delta: float) -> void:
 	if _outlines_in <= 0.0:
 		_outlines_in = 0.2
 		show_outlines()
+		# Whichever camera the view is through sees as far as is chosen.
+		var camera := get_viewport().get_camera_3d()
+		if camera != null and not is_equal_approx(camera.far, GraphicsQuality.view_metres()):
+			camera.far = GraphicsQuality.view_metres()
+	_hold_frame_rate(delta)
+
+
+# Lets the render scale drop to hold the frame rate, if that is wanted, and
+# come back when there is room.
+func _hold_frame_rate(delta: float) -> void:
+	if not Settings.get_value(GraphicsQuality.DYNAMIC):
+		return
+	_frames += 1
+	_frames_took += delta
+	if _frames_took < 0.5:
+		return
+	var most := GraphicsQuality.render_scale(GraphicsQuality.level(Settings.get_value("quality")), Settings.get_value("gfx_render_scale"))
+	_dynamic_scale = GraphicsQuality.dynamic_scale(_dynamic_scale, _frames_took / _frames, most)
+	get_viewport().scaling_3d_scale = _dynamic_scale
+	_frames = 0
+	_frames_took = 0.0
 
 
 ## Outlines this machine's player's teammates, through walls, and the

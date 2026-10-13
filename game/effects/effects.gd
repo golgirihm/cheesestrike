@@ -96,7 +96,7 @@ static func extras(level: String) -> bool:
 
 
 func _quality() -> String:
-	return GraphicsQuality.level(Settings.get_value("quality"))
+	return GraphicsQuality.choice(GraphicsQuality.EFFECTS)
 
 
 func _init() -> void:
@@ -270,7 +270,7 @@ func _impact(from: Vector3, to: Vector3) -> void:
 func _puff(at: Vector3, normal: Vector3, colour: Color, count: int, speed: float, life: float, size: float, bright := false, look := {}) -> void:
 	if not is_inside_tree():
 		return
-	count = ParticleBudget.grant(count, specks_showing(), _quality(), look.get("matters", false))
+	count = ParticleBudget.grant(count, specks_showing(), GraphicsQuality.choice(GraphicsQuality.PARTICLES), look.get("matters", false))
 	if count == 0:
 		return
 	puffs_made += 1

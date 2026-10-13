@@ -33,6 +33,7 @@ const TOGGLES := [
 	["damage_numbers", "Show the damage of each hit"],
 	["replays", "Show how I was knocked out, and the play of the match"],
 	["outlines", "Outline teammates and nearby pickups"],
+	["dynamic_resolution", "Lower the render scale to hold the frame rate"],
 	["bloom", "Glow on bright things"],
 	["colour_grade", "A cast of colour for each arena"],
 	["vignette", "Darker corners of the view"],
@@ -78,6 +79,9 @@ func refresh() -> void:
 	for row: Array in TOGGLES:
 		(find_child("Setting_" + row[0], true, false) as CheckButton).set_pressed_no_signal(Settings.get_value(row[0]))
 	(find_child("Setting_quality", true, false) as Button).text = "Graphics: %s" % GraphicsQuality.NAMES[GraphicsQuality.level(Settings.get_value("quality"))]
+	for part: String in GraphicsQuality.ORDER:
+		var setting: String = GraphicsQuality.PARTS[part].setting
+		(find_child("Setting_" + setting, true, false) as Button).text = GraphicsQuality.part_text(part, GraphicsQuality.level(Settings.get_value("quality")), Settings.get_value(setting))
 	for key: String in Looks.SETTINGS:
 		(find_child("Setting_" + key, true, false) as Button).text = look_text(key)
 	for key: String in LOADOUT:
@@ -209,6 +213,15 @@ func _build() -> void:
 	quality.pressed.connect(func() -> void:
 		Settings.set_value("quality", next_quality(GraphicsQuality.level(Settings.get_value("quality")))))
 	_rows.add_child(quality)
+	# Each part of the graphics on its own, under the level above.
+	for part: String in GraphicsQuality.ORDER:
+		var setting: String = GraphicsQuality.PARTS[part].setting
+		var button := Button.new()
+		button.name = "Setting_" + setting
+		button.custom_minimum_size = Vector2(0, 40)
+		button.pressed.connect(func() -> void:
+			Settings.set_value(setting, GraphicsQuality.next_choice(part, Settings.get_value(setting))))
+		_rows.add_child(button)
 
 	var loadout_title := Label.new()
 	loadout_title.text = "Your weapons, from when you next come back"
