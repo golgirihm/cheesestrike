@@ -36,6 +36,8 @@ var fixtures := {"pads": [], "ladders": []}
 var custom_code := ""
 ## The layer that darkens the corners of the view (see Picture).
 var vignette: CanvasLayer
+## What being hurt looks like to this machine's player.
+var hurt_view: HurtView
 var _built_code := ""
 ## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
@@ -95,6 +97,8 @@ func _ready() -> void:
 			replay_view.play(clip, about, title))
 	vignette = Picture.vignette()
 	add_child(vignette)
+	hurt_view = HurtView.new(self)
+	add_child(hurt_view)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()
