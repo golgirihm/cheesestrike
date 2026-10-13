@@ -53,6 +53,7 @@ func _ready() -> void:
 	match_.projectile_launched.connect(effects.launch_projectile)
 	match_.projectile_burst.connect(effects.burst_projectile)
 	match_.state_changed.connect(_on_state_changed)
+	match_.block_gnawed.connect(_show_mice)
 	sound_cues = preload("res://audio/sound_cues.gd").new(self)
 	add_child(sound_cues)
 	objective_marks = preload("res://world/objective_marks.gd").new(self)
@@ -127,6 +128,7 @@ func _on_state_changed() -> void:
 		load_map(match_.state.settings.map)
 	_show_pickups()
 	_show_drops()
+	_show_blocks()
 	objective_marks.refresh()
 
 
@@ -236,6 +238,76 @@ func pickup_pads() -> Array:
 	for pad: Node3D in map.get_node("Pickups").get_children():
 		pads.append({"position": pad.global_position, "kind": String(pad.get_meta("kind", Pickups.HEALTH))})
 	return pads
+
+
+## The loaded arena's blocks of cheese, in an order that is the same on
+## every machine.
+func cheese_blocks() -> Array:
+	if map == null:
+		return []
+	return map.get_node("Geometry").get_children().filter(func(body: Node) -> bool: return String(body.name).begins_with("Block"))
+
+
+## Which of the cheese blocks `collider` is, or -1 if it is none of them.
+func block_index(collider: Object) -> int:
+	return cheese_blocks().find(collider)
+
+
+## The space each cheese block fills, in the same order.
+func block_boxes() -> Array:
+	return cheese_blocks().map(func(body: Node3D) -> AABB:
+		var size: Vector3 = (body.get_node("CollisionShape3D").shape as BoxShape3D).size
+		return AABB(body.global_position - size / 2.0, size))
+
+
+# Shows each block of cheese as the match state has it: whole, bitten into,
+# or gone, when it stops nothing and a scatter of crumbs marks its going.
+func _show_blocks() -> void:
+	var rules: BlockRules = match_.state.blocks if match_.has_state() else null
+	var bodies := cheese_blocks()
+	for index in bodies.size():
+		var body: StaticBody3D = bodies[index]
+		var stage: int = rules.stage(index) if rules != null and index < rules.health.size() else 0
+		if body.get_meta("stage", 0) == stage:
+			continue
+		var was: int = body.get_meta("stage", 0)
+		body.set_meta("stage", stage)
+		var gone := stage > BlockRules.STAGES
+		body.visible = not gone
+		body.collision_layer = 0 if gone else 1
+		body.get_node("CollisionShape3D").set_deferred("disabled", gone)
+		if gone and was <= BlockRules.STAGES and is_inside_tree():
+			effects.crumbs(body.global_position, Scenery.CHEESE, 40, 7.0)
+			Sounds.play_at("crumble", body.global_position, self)
+		Scenery.bite(body, 0 if gone else stage)
+
+
+## How many cheese blocks are standing, as they are shown.
+func blocks_standing() -> int:
+	return cheese_blocks().filter(func(body: Node3D) -> bool: return body.visible).size()
+
+
+# Mice come out round block `index` for a few seconds, and are heard.
+func _show_mice(index: int) -> void:
+	var bodies := cheese_blocks()
+	if index < 0 or index >= bodies.size() or not is_inside_tree():
+		return
+	var body: Node3D = bodies[index]
+	var half: Vector3 = (body.get_node("CollisionShape3D").shape as BoxShape3D).size / 2.0
+	Sounds.play_at("gnaw", body.global_position, self)
+	for mouse_index in 3:
+		var mouse := Scenery.mouse()
+		mouse.add_to_group("mice")
+		add_child(mouse)
+		# Round its foot, each on a side of its own, nose to the cheese.
+		var angle := mouse_index * TAU / 3.0 + index
+		var out := Vector3(cos(angle), 0.0, sin(angle))
+		mouse.global_position = body.global_position + out * (maxf(half.x, half.z) + 0.5) + Vector3.DOWN * half.y
+		mouse.rotation.y = atan2(out.x, out.z)
+		var nibble := create_tween().set_loops(8)
+		nibble.tween_property(mouse, "scale", Vector3(1.0, 0.85, 1.1), 0.18)
+		nibble.tween_property(mouse, "scale", Vector3.ONE, 0.18)
+		get_tree().create_timer(3.0).timeout.connect(mouse.queue_free)
 
 
 ## The loaded arena's places for the modes that have them: {"bases": the
