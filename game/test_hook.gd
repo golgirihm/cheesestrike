@@ -167,6 +167,8 @@ func snapshot() -> Dictionary:
 		"music": Sounds.is_music_playing(),
 		"replays_seen": _main.world.replay_view.played,
 		"sky": _main.world.atmosphere.showing,
+		"doors": _main.world.match_.state.doors,
+		"doors_shown": _main.world.doors_shown(),
 		"blocks": _main.world.blocks_standing(),
 		"drops": _main.world.match_.state.drops.map(func(lying: Dictionary) -> String: return lying.weapon) if _main.world.drops_shown() == _main.world.match_.state.drops.size() else null,
 		"pickups": range(_main.world.pickup_pads().size()).map(func(index: int) -> bool: return _main.world.match_.state.pickup_ready(index)),

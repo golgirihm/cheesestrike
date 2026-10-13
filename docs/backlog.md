@@ -21,7 +21,7 @@ Things about how it works that shape the plan:
 - **The signaling server only runs on the development PC**, and the game looks for it on the same machine as the page, at port 9080. Nobody outside the local network can play yet.
 - **The web export is single-threaded** (`thread_support=false`), which lets it run on any static host without special headers. Keep it that way unless something needs threads badly enough to justify the hosting requirements.
 - **The renderer is Compatibility**, the one that runs in browsers and on phones. It has no ambient occlusion, volumetric light or screen-space reflections, so the look has to come from shapes, colour, baked light and particles.
-- **The session list knows two modes.** The server that keeps the list accepts only free-for-all and teams, so a session in any newer mode is listed as whichever of those is nearer (`MatchSettings.advertised`). Players are told the real mode once they join. Listing it properly means teaching `signaling/` the new modes.
+- **The session list knows two modes and three arenas.** The server that keeps the list accepts only free-for-all and teams, and only the first three arenas, so a session in any newer mode is listed as whichever of those two is nearer, and one on a newer arena as Cheddar Canyon (`MatchSettings.advertised`). Nor is it told of bots, the host's rules or the sky. Players get all of it once they join. Listing it properly means teaching `signaling/` the rest.
 - **There is no server that keeps anything.** Names and settings live in each browser. Anything a player earns and keeps (Milestone 11) needs either that, which can't be trusted, or a service and a database, which have to be run and paid for.
 - **Almost everything is made in code**: meshes, sounds, arenas' dressing. That has kept the build small and the look consistent, and it has a ceiling. Recorded sound, textures and animation (Milestones 4, 7 and 9) mean taking on assets, their licences and their size.
 
@@ -70,9 +70,7 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* the arena tests (spots fit, pads reachable, nowhere traps) already run over every arena.
 4. **More arenas.** A dairy with vats and conveyor belts, a kitchen at mouse scale, a market, a cheese cave, a small one for duels.
    *Tests:* the arena tests.
-5. **Hazards and doors.** A grater that hurts, a vat of fondue, doors that open and lifts that move, all decided by the host.
-   *Tests:* GUT tests of each; browser test that both players see a door open.
-6. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
+5. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
    *Tests:* GUT tests of saving and loading; the arena tests run on a saved arena.
 
 ## Milestone 8: A picture that holds up

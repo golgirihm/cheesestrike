@@ -59,4 +59,8 @@ func test_the_server_and_the_game_agree_on_the_defaults() -> void:
 		return
 	var defaults := MatchSettings.new()
 	assert_string_contains(server, '"mode": "%s", "kill_limit": %d, "minutes": %d, "max_players": MAX_PLAYERS, "map": "%s"' % [defaults.mode, defaults.kill_limit, defaults.minutes, defaults.map])
-	assert_string_contains(server, 'MAPS = ("%s")' % '", "'.join(Maps.ORDER))
+	# It knows the first arenas, and is told one of them whatever is played.
+	assert_string_contains(server, 'MAPS = ("%s")' % '", "'.join(Maps.LISTED))
+	for id: String in Maps.ORDER:
+		assert_has(Maps.LISTED, MatchSettings.from_dict({"map": id}).advertised().map, id)
+		assert_eq(MatchSettings.from_dict({"map": id}).to_dict().map, id, "and players are told the real one")

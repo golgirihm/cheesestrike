@@ -107,6 +107,8 @@ var _pending_names := {}
 var _pending_looks := {}
 # And their loadouts, as [main, side].
 var _pending_loadouts := {}
+# The arena's hazards and doors, as the host runs them.
+var _moving := MovingParts.new()
 # Where players have lately been knocked out: each {"where", "at": when on
 # the host's clock, "victim"}. A returning player is kept away from them.
 var _fights: Array[Dictionary] = []
@@ -1053,6 +1055,7 @@ func _physics_process(delta: float) -> void:
 	_collect_pickups()
 	_collect_drops()
 	_run_objectives(delta)
+	_run_moving_parts(delta)
 	if _projectiles.is_empty():
 		return
 	var wall := wall_finder(world.get_world_3d().direct_space_state)
@@ -1182,6 +1185,27 @@ func _show_play_of_the_match() -> void:
 func _replay(clip: Variant, about: Variant, title: Variant) -> void:
 	if clip is Dictionary and about is int and title is String:
 		replay_shown.emit(clip, about, title.left(120))
+
+
+# The host hurts whoever stands in a hazard, and opens doors for whoever
+# comes near.
+func _run_moving_parts(delta: float) -> void:
+	var parts: Dictionary = world.moving_parts
+	state.has_lifts = not parts.lifts.is_empty()
+	if parts.hazards.is_empty() and parts.doors.is_empty():
+		return
+	var standing := {}
+	for node: Node3D in world.players.get_children():
+		var record := state.player(node.name.to_int())
+		if record != null and not node.is_queued_for_deletion():
+			standing[record.id] = {"at": node.global_position, "alive": record.alive and _is_where_shown(record.id, node)}
+	if state.is_playing():
+		for hurt: Dictionary in _moving.hurt(delta, parts.hazards, standing):
+			_harm(hurt.id, hurt.id, hurt.amount, hurt.at, hurt.kind, false)
+	var open := _moving.doors_open(delta, parts.doors, standing, state.doors)
+	if open != state.doors:
+		state.doors = open
+		_changed()
 
 
 ## Host only: tells everyone `text`, in `team`'s colour.

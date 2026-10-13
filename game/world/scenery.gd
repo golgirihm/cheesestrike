@@ -263,7 +263,56 @@ static func _windows(colour: Color) -> StandardMaterial3D:
 
 
 # Draws the arena's jump pads and ladders where its scene marks them.
+# What hurts and what moves (see MovingParts): the grater's teeth and the
+# vat of fondue are only drawn, and are felt through the host; doors and
+# lifts are solid things the world moves.
+static func _moving_parts(map: Node3D) -> void:
+	var hazards := map.get_node_or_null("Hazards")
+	if hazards != null:
+		for hazard: Node3D in hazards.get_children():
+			var size: Vector3 = hazard.get_meta("size", Vector3(4, 1, 4))
+			if String(hazard.get_meta("kind", "")) == MovingParts.FONDUE:
+				# A low steel rim round a pool that glows like something hot.
+				var hot := StandardMaterial3D.new()
+				hot.albedo_color = Color(0.92, 0.42, 0.08)
+				hot.emission_enabled = true
+				hot.emission = Color(0.9, 0.3, 0.05)
+				hot.emission_energy_multiplier = 0.6
+				hazard.add_child(Rounded.instance(Rounded.box(Vector3(size.x + 0.5, 0.3, size.z + 0.5), 0.1), _material(Color(0.55, 0.58, 0.62)), Vector3(0, 0.1, 0)))
+				hazard.add_child(Rounded.instance(Rounded.box(Vector3(size.x, 0.1, size.z), 0.04), hot, Vector3(0, 0.25, 0)))
+			else:
+				# A steel plate with rows of dark teeth standing out of it.
+				hazard.add_child(Rounded.instance(Rounded.box(Vector3(size.x, 0.08, size.z), 0.03), _material(Color(0.68, 0.7, 0.74)), Vector3(0, 0.04, 0)))
+				var rows := maxi(int(size.z / 0.9), 1)
+				for row in rows:
+					var z := -size.z / 2.0 + (row + 0.5) * size.z / rows
+					hazard.add_child(Rounded.instance(Rounded.box(Vector3(size.x - 0.5, 0.16, 0.14), 0.03), _material(INK.lightened(0.12)), Vector3(0.0, 0.14, z)))
+	for kind: String in ["Doors", "Lifts"]:
+		var holder := map.get_node_or_null(kind)
+		if holder == null:
+			continue
+		for marker: Node3D in holder.get_children():
+			var size: Vector3 = marker.get_meta("size", Vector3(4, 1, 4))
+			var body := AnimatableBody3D.new()
+			body.add_to_group("doors" if kind == "Doors" else "lifts")
+			var shape := CollisionShape3D.new()
+			var box := BoxShape3D.new()
+			box.size = size
+			shape.shape = box
+			body.add_child(shape)
+			var colour := Color(0.5, 0.32, 0.2) if kind == "Doors" else Color(0.6, 0.63, 0.68)
+			body.add_child(Rounded.instance(Rounded.box(size, 0.08), _material(colour)))
+			if kind == "Doors":
+				# A band across it, to tell it from a wall.
+				body.add_child(Rounded.instance(Rounded.box(Vector3(size.x + 0.04, 0.35, size.z + 0.04), 0.04), _material(INK.lightened(0.2)), Vector3(0, 0, 0)))
+			else:
+				body.add_child(Rounded.instance(Rounded.box(Vector3(size.x - 0.6, size.y + 0.04, size.z - 0.6), 0.04), _material(Color(0.2, 0.75, 0.8))))
+			map.add_child(body)
+			body.position = marker.position
+
+
 static func _fixtures(map: Node3D) -> void:
+	_moving_parts(map)
 	var glow := StandardMaterial3D.new()
 	glow.albedo_color = Color(0.2, 0.85, 0.9)
 	glow.emission_enabled = true

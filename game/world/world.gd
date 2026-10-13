@@ -30,6 +30,8 @@ var map_id := ""
 var spawn_points: Node3D
 ## The loaded arena's jump pads and ladders, as Fixtures.of gives them.
 var fixtures := {"pads": [], "ladders": []}
+## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
+var moving_parts := {"hazards": [], "doors": [], "lifts": []}
 var menu_camera: Camera3D
 
 # Which starting spot each player holds. Only the host uses it.
@@ -107,6 +109,7 @@ func load_map(id: String) -> void:
 	map_id = id
 	spawn_points = map.get_node("SpawnPoints")
 	fixtures = Fixtures.of(map)
+	moving_parts = MovingParts.of(map)
 	menu_camera = map.get_node("MenuCamera")
 	if was_menu_view:
 		menu_camera.make_current()
@@ -393,6 +396,40 @@ func pickup_pads() -> Array:
 	for pad: Node3D in map.get_node("Pickups").get_children():
 		pads.append({"position": pad.global_position, "kind": String(pad.get_meta("kind", Pickups.HEALTH))})
 	return pads
+
+
+# Each door slides toward open or shut, as the host has it, and each lift
+# is where the session's clock puts it: the same on every machine, moved in
+# step with the physics so that players are carried and stopped by them.
+func _physics_process(delta: float) -> void:
+	if map == null:
+		return
+	var doors := _parts_in("doors")
+	for index in mini(doors.size(), moving_parts.doors.size()):
+		var door: Dictionary = moving_parts.doors[index]
+		var open: bool = match_.has_state() and index < match_.state.doors.size() and match_.state.doors[index]
+		var wanted: Vector3 = door.position + (door.slide if open else Vector3.ZERO)
+		doors[index].global_position = doors[index].global_position.move_toward(wanted, MovingParts.DOOR_SPEED * delta)
+	var lifts := _parts_in("lifts")
+	var time: float = match_.state.uptime if match_.has_state() else 0.0
+	for index in mini(lifts.size(), moving_parts.lifts.size()):
+		var lift: Dictionary = moving_parts.lifts[index]
+		lifts[index].global_position = lift.position + Vector3.UP * MovingParts.lift_height(time, lift.rise)
+
+
+# The loaded arena's doors, or its lifts, in its own order.
+func _parts_in(group: String) -> Array:
+	return map.get_children().filter(func(part: Node) -> bool: return part.is_in_group(group)) if map != null else []
+
+
+## How far each door has slid toward open, from 0 to 1, for tests.
+func doors_shown() -> Array:
+	var shown := []
+	var doors := _parts_in("doors")
+	for index in mini(doors.size(), moving_parts.doors.size()):
+		var door: Dictionary = moving_parts.doors[index]
+		shown.append(snappedf(doors[index].global_position.distance_to(door.position) / maxf(door.slide.length(), 0.01), 0.01))
+	return shown
 
 
 ## The loaded arena's named places: each {"name", "at"}.

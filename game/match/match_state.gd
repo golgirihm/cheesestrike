@@ -53,6 +53,13 @@ var overtime := false
 ## everyone.
 var just_started := false
 var just_overtime := false
+## Which of the arena's doors are open (see MovingParts), in its own order.
+var doors: Array = []
+## Seconds the session has run, which its lifts go by. It never stops or
+## starts again, so that a lift never jumps.
+var uptime := 0.0
+## Whether the arena has lifts, so that the clock they go by is worth sending.
+var has_lifts := false
 ## What the players are voting on just now (see Ballot), or null.
 var ballot: Ballot
 ## The arena's blocks of cheese, and how much of each is left.
@@ -340,6 +347,7 @@ func _level() -> bool:
 ## there are teams, and nothing else of the match that was.
 func with_settings(next: MatchSettings) -> MatchState:
 	var fresh := MatchState.new(next)
+	fresh.uptime = uptime
 	for old: PlayerRecord in players.values():
 		var record := fresh.add_player(old.id)
 		record.name = old.name
@@ -585,6 +593,7 @@ func tick(delta: float) -> Array[int]:
 		drops = drops.filter(func(lying: Dictionary) -> bool: return lying.left > 0.0)
 		drop_ended = true
 	round_break = maxf(round_break - delta, 0.0)
+	uptime += delta
 	if ballot != null:
 		ballot.left = maxf(ballot.left - delta, 0.0)
 	# The clock stands still through a warm-up.
@@ -767,6 +776,11 @@ func to_dict() -> Dictionary:
 		data["blocks"] = blocks.to_array()
 	if ballot != null:
 		data["ballot"] = ballot.to_array()
+	if not doors.is_empty():
+		data["doors"] = doors
+		data["uptime"] = uptime
+	elif uptime > 0.0 and has_lifts:
+		data["uptime"] = uptime
 	if not drops.is_empty():
 		data["drops"] = drops.map(func(lying: Dictionary) -> Array: return [lying.id, Weapons.ORDER.find(lying.weapon), lying.at, lying.left])
 	return data
@@ -807,6 +821,14 @@ static func from_dict(data: Dictionary) -> MatchState:
 	state.just_started = false
 	state.blocks = BlockRules.from_array(data.get("blocks"))
 	state.ballot = Ballot.from_array(data.get("ballot"))
+	var open: Variant = data.get("doors")
+	if open is Array:
+		for door: Variant in open.slice(0, 32):
+			state.doors.append(door == true)
+	var run: Variant = data.get("uptime")
+	if (run is float or run is int) and is_finite(float(run)):
+		state.uptime = maxf(float(run), 0.0)
+		state.has_lifts = true
 	var lying: Variant = data.get("drops")
 	if lying is Array:
 		for entry: Variant in lying.slice(0, Pickups.MAX_DROPS):
