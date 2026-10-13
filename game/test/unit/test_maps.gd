@@ -4,6 +4,7 @@ extends GutTest
 
 const WORLD := preload("res://world/world.tscn")
 const PLAYER := preload("res://player/player.tscn")
+const SAMPLE := preload("res://test/sample_arena.gd")
 const EYE := Vector3(0, BodyShape.HEAD_HEIGHT * BodyShape.SIZE, 0)
 
 var world: Node3D
@@ -12,10 +13,12 @@ var world: Node3D
 func before_each() -> void:
 	world = WORLD.instantiate()
 	add_child_autofree(world)
+	world.custom_code = SAMPLE.code()
 
 
+# Every arena that comes with the game, and one laid out in the editor.
 func _each_map() -> Array:
-	return Maps.ORDER
+	return Maps.ORDER + [Maps.CUSTOM]
 
 
 func _load(id: String) -> PhysicsDirectSpaceState3D:

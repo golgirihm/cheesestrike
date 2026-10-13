@@ -115,6 +115,7 @@ func snapshot() -> Dictionary:
 		_main.host_button,
 		_main.find_child("PracticeButton", true, false),
 		_main.find_child("TutorialButton", true, false),
+		_main.find_child("EditorButton", true, false),
 		_main.target_edit,
 		_main.join_button,
 		_main.find_child("WatchButton", true, false),
@@ -132,6 +133,9 @@ func snapshot() -> Dictionary:
 		_main.pause_settings_button,
 		_main.copy_link_button,
 		_main.help_button,
+		_main.arena_editor.find_child("EditorDone", true, false),
+		_main.arena_editor.find_child("EditorCopy", true, false),
+		_main.arena_editor.find_child("EditorClear", true, false),
 	]:
 		if control.is_visible_in_tree():
 			controls[control.name] = _centre(control)
@@ -167,6 +171,10 @@ func snapshot() -> Dictionary:
 		"music": Sounds.is_music_playing(),
 		"replays_seen": _main.world.replay_view.played,
 		"sky": _main.world.atmosphere.showing,
+		"editor": _main.arena_editor.text() if _main.arena_editor.visible else [],
+		"editor_link": _main.arena_editor.link() if _main.arena_editor.visible else "",
+		"custom_arena": Settings.get_value("custom_arena"),
+		"arena_shown": _main.world.custom_code if _main.world.map_id == Maps.CUSTOM else "",
 		"doors": _main.world.match_.state.doors,
 		"doors_shown": _main.world.doors_shown(),
 		"blocks": _main.world.blocks_standing(),
@@ -220,6 +228,8 @@ func _screen() -> String:
 		return "paused"
 	if _main.menu.visible:
 		return "menu"
+	if _main.arena_editor.visible:
+		return "editor"
 	return "game"
 
 

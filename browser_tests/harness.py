@@ -316,6 +316,7 @@ class GameTestCase(unittest.TestCase):
         self.signaling = SignalingServer()
         self.signaling.start()
         self._games = []
+        self._fresh = []
 
     def tearDown(self):
         if self._failed():
@@ -327,6 +328,8 @@ class GameTestCase(unittest.TestCase):
         for game in self._games:
             if not game.page.is_closed():
                 game.close()
+        for context in self._fresh:
+            context.close()
         self.signaling.stop()
         self.assertEqual(errors, [], "a page raised a JavaScript error")
 
@@ -336,11 +339,17 @@ class GameTestCase(unittest.TestCase):
             return False
         return any(test is self for test, _ in result.failures + result.errors)
 
-    def open_game(self, extra=""):
+    def open_game(self, extra="", fresh=False):
         """Opens the game in a new window and waits for its menu. `extra` is
-        added to the address's query, such as "&help"."""
+        added to the address's query, such as "&help". A `fresh` window is
+        someone else's browser: it has none of what the other windows saved,
+        such as their settings."""
         url = f"http://localhost:{self._web.server_address[1]}/?test&signal=ws://localhost:{self.signaling.port}{extra}"
-        game = Game(self._context.new_page(), url)
+        context = self._context
+        if fresh:
+            context = self._browser.new_context(viewport=VIEWPORT, service_workers="block")
+            self._fresh.append(context)
+        game = Game(context.new_page(), url)
         self._games.append(game)
         return game
 

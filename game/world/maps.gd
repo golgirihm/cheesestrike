@@ -24,8 +24,11 @@ const LISTED := ["canyon", "box", "city"]
 ## `distance`, where a target stands to be shot at; and its pads hold every
 ## weapon, laid out as a rack.
 const RANGE := "range"
+## An arena a player laid out themselves (see ArenaCode): built from its
+## code rather than loaded from a scene.
+const CUSTOM := "custom"
 const NAMES := {"canyon": "Cheddar Canyon", "box": "Brie Box", "city": "Curd City", "dairy": "Double Cream Dairy", "kitchen": "Crumb Kitchen",
-	"market": "Rind Market", "cave": "Gruyère Grotto", "duel": "Cracker Duel", RANGE: "Practice range"}
+	"market": "Rind Market", "cave": "Gruyère Grotto", "duel": "Cracker Duel", RANGE: "Practice range", CUSTOM: "Custom arena"}
 
 const _SCENES := {
 	"canyon": preload("res://world/maps/cheddar_canyon.tscn"),
@@ -45,4 +48,4 @@ static func scene(id: String) -> PackedScene:
 
 
 static func exists(id: Variant) -> bool:
-	return id is String and _SCENES.has(id)
+	return id is String and (_SCENES.has(id) or id == CUSTOM)

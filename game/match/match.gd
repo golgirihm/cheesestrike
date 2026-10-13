@@ -222,6 +222,9 @@ func add_player(id: int) -> void:
 	_pending_overloads.erase(id)
 	if _keys.has(id):
 		_welcome_back(id)
+	# Someone joining a match on a custom arena is sent it.
+	if is_host() and state.settings.map == Maps.CUSTOM and multiplayer.get_peers().has(id):
+		_custom_arena.rpc_id(id, world.custom_code)
 	_changed()
 
 
@@ -1209,6 +1212,12 @@ func _run_moving_parts(delta: float) -> void:
 	if open != state.doors:
 		state.doors = open
 		_changed()
+
+
+@rpc("authority", "call_remote", "reliable")
+func _custom_arena(code: Variant) -> void:
+	if code is String and not ArenaCode.decode(code).is_empty():
+		world.load_custom(code)
 
 
 ## Host only: tells everyone `text`, in `team`'s colour.

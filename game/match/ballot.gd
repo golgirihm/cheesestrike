@@ -147,7 +147,7 @@ static func from_array(data: Variant) -> Ballot:
 	var ballot := Ballot.new()
 	ballot.kind = data[0]
 	for choice: Variant in data[1].slice(0, 4):
-		if choice is Array and choice.size() == 2 and Maps.ORDER.has(choice[0]) and MatchSettings.MODES.has(choice[1]):
+		if choice is Array and choice.size() == 2 and (Maps.ORDER.has(choice[0]) or choice[0] == Maps.CUSTOM) and MatchSettings.MODES.has(choice[1]):
 			ballot.choices.append({"map": choice[0], "mode": choice[1]})
 	if ballot.kind == NEXT and ballot.choices.is_empty():
 		return null
