@@ -252,6 +252,7 @@ Why manual: these need many real devices, and measure the host's machine.
 | ID | Test | Setup | Steps | Expected |
 |---|---|---|---|---|
 | LOAD-01 | A full session | 16 browser windows across several PCs and phones, one hosting on a phone | 1. Join everyone to one session and fight for five minutes, with the host's browser task manager (or the phone's developer tools) open. | Everyone stays connected and sees everyone else move smoothly. The host keeps a steady frame rate and its network upload stays under about 1 MB/s. The scoreboard's Ping column shows each player's round trip, "host" for the host. |
+| LOAD-02 | Far detail | A phone and a PC | 1. On the PC on High, in Curd City and Cheddar Canyon, walk from one end to the other watching the far end: the holes in cheese, windows, fence posts, cars' wheels, trees.<br>2. Do the same with Effects on Plain.<br>3. On the phone on Low, play each arena with eight bots and watch the frame rate looking down its longest line. | On High nothing is seen to appear or vanish at any distance a player can stand at. On Plain small things far away (cheese holes, wheels, small props) are missing and come in as you approach, each while still small on the screen, never close enough to be distracting and never anything you can stand on, hide behind or pick up. On the phone each arena holds a steady frame rate along its longest line, no worse than in its smallest corner. |
 
 ## Phones, browsers and networks
 
