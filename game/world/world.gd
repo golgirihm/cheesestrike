@@ -67,6 +67,14 @@ func _ready() -> void:
 			player.swing_knife())
 	match_.projectile_launched.connect(effects.launch_projectile)
 	match_.projectile_burst.connect(effects.burst_projectile)
+	match_.overloaded.connect(func(id: int) -> void:
+		var player := player_node(id)
+		if player != null:
+			effects.overload_flare(player.global_position + Vector3.UP * 0.4, player.body.colour()))
+	match_.picked_up.connect(func(id: int, kind: String) -> void:
+		var player := player_node(id)
+		if player != null:
+			effects.sparkle(player.global_position, kind))
 	match_.state_changed.connect(_on_state_changed)
 	match_.block_gnawed.connect(_show_mice)
 	sound_cues = preload("res://audio/sound_cues.gd").new(self)

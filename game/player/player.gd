@@ -1193,6 +1193,8 @@ func _physics_process(delta: float) -> void:
 	# hard landing winds the player for a moment.
 	if is_on_floor() and not _was_on_floor:
 		_landing = WeaponSway.impact(_fall_speed)
+		if world != null:
+			world.effects.landing(global_position, _landing)
 		if _landing > 0.2:
 			Sounds.play("land", lerpf(-16.0, -4.0, _landing))
 		if _landing >= Movement.HARD_LANDING:
