@@ -49,8 +49,6 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 3: Movement with depth
 
-1. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
-   *Tests:* GUT tests of the arc and of `MovementCheck` allowing it and nothing more.
 
 ## Milestone 4: Characters that are alive
 
@@ -266,7 +264,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* a CI job that plays a match against a headless host.
 6. **Movement you can trust, and feel.** Predict the player's own movement and correct it gently when the host disagrees, in place of snapping back, and have the host own movement on dedicated servers.
    *Tests:* extend `test_movement_check.gd`; browser tests under a throttled connection.
-7. **Harder to cheat.** The host checks aim that turns impossibly fast, shots through walls it can't see through, and rates of everything; sessions can remove a player; on servers, results are signed.
+7. **Harder to cheat.** The host checks aim that turns impossibly fast, shots through walls it can't see through, and rates of everything; sessions can remove a player; on servers, results are signed. The check on speed needs tightening first: its slack for bunched updates lets a player go several times their top speed as long as their updates keep coming close together.
    *Tests:* GUT tests of each check, with the cheat written as a test.
 8. **Reporting and moderation.** Report a player with a reason, mute and block, and a filter on names and chat.
    *Tests:* service tests; browser test.

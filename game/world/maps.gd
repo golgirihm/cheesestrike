@@ -9,7 +9,8 @@ class_name Maps
 ## are seen, and adds the fence at the edge and the land beyond. The four
 ## Wall bodies are the edge: solid, far taller than anyone can be thrown,
 ## and not drawn. A Block is cheese, a Building a tower, and a Car or a Bus
-## is only its collision shapes, drawn by Scenery.
+## is only its collision shapes, drawn by Scenery. An arena may also have
+## JumpPads and Ladders (see Fixtures).
 
 const DEFAULT := "canyon"
 const ORDER := ["canyon", "box", "city"]

@@ -141,6 +141,9 @@ var _touch_run := false
 # The player's own speed across the ground, which off the ground can only
 # be steered.
 var _walk := Vector2.ZERO
+# The speed across the ground a jump pad threw the player with, which lasts
+# until they land: steering in the air is added to it.
+var _thrown := Vector2.ZERO
 # A slide: seconds of it left, the speed and way it began with, and seconds
 # until another can begin; and whether crouch was wanted last frame, to tell
 # when it is first pressed.
@@ -825,7 +828,35 @@ func _physics_process(delta: float) -> void:
 		_use_weapon()
 		return
 
-	if not is_on_floor():
+	var fixtures: Dictionary = world.fixtures if world != null else {"pads": [], "ladders": []}
+	var ladder := Fixtures.ladder_at(fixtures.ladders, global_position)
+	var launch: Variant = Fixtures.launch_at(fixtures.pads, global_position) if is_on_floor() else null
+	if launch != null:
+		# Thrown by a jump pad, the way it throws everyone.
+		velocity.y = launch.y
+		_thrown = Vector2(launch.x, launch.z)
+		_walk = Vector2.ZERO
+		_slide_left = 0.0
+		Sounds.play("pad", -6.0)
+		_jump_pressed = false
+		_touch_jump = false
+		velocity.x = _thrown.x
+		velocity.z = _thrown.y
+		_fall_speed = 0.0
+		move_and_slide()
+		_was_on_floor = false
+		_publish()
+		_use_weapon()
+		return
+	if not ladder.is_empty() and not (_jump_pressed or _touch_jump):
+		# On a ladder nothing falls: pushing toward it climbs, away from it
+		# goes down, and letting go of the keys holds on.
+		var push := Input.get_vector("move_left", "move_right", "move_forward", "move_back") + _move_touch_vector
+		var toward := (transform.basis * Vector3(push.x, 0.0, push.y)).dot(ladder.facing)
+		velocity.y = Fixtures.LADDER_SPEED * clampf(toward, -1.0, 1.0)
+		if is_on_floor() and velocity.y < 0.0:
+			velocity.y = 0.0
+	elif not is_on_floor():
 		velocity += get_gravity() * delta
 	elif _jump_pressed or _touch_jump:
 		velocity.y = Movement.JUMP_VELOCITY
@@ -843,10 +874,12 @@ func _physics_process(delta: float) -> void:
 	var wanted := Vector2(direction.x, direction.z) * speed
 	# On the ground a player goes where they push; in the air they can only
 	# steer what they left it with.
-	_walk = wanted if is_on_floor() else Movement.air_steer(_walk, wanted, delta)
+	_walk = wanted if is_on_floor() or not ladder.is_empty() else Movement.air_steer(_walk, wanted, delta)
 	_slide(delta)
-	velocity.x = _walk.x + _knockback.x
-	velocity.z = _walk.y + _knockback.z
+	if is_on_floor():
+		_thrown = Vector2.ZERO
+	velocity.x = _walk.x + _knockback.x + _thrown.x
+	velocity.z = _walk.y + _knockback.z + _thrown.y
 	_fall_speed = maxf(-velocity.y, 0.0)
 	if _begin_climb(direction):
 		_publish()

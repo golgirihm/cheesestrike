@@ -550,8 +550,13 @@ func on_moved(time: float, at: Vector3, teleports: int, id: int, facing := Vecto
 	var blocked := func(from: Vector3, to: Vector3) -> bool:
 		return not space.intersect_ray(PhysicsRayQueryParameters3D.create(from + waist, to + waist, WORLD_MASK)).is_empty()
 	var ground := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.1, at + Vector3.DOWN * 0.6, WORLD_MASK)
-	var on_ground := not space.intersect_ray(ground).is_empty()
+	# Holding a ladder is as good as standing: it isn't hanging in the air.
+	var on_ground := not space.intersect_ray(ground).is_empty() or not Fixtures.ladder_at(world.fixtures.ladders, at).is_empty()
 	var check := _check_for(id)
+	# A player last seen on a jump pad is about to be thrown by it.
+	var launch: Variant = Fixtures.launch_at(world.fixtures.pads, check.last_position())
+	if launch != null:
+		check.pushed(time, launch)
 	if check.check(time, at, teleports, blocked, on_ground):
 		record_position(time, at, id, facing)
 		return

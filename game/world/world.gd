@@ -22,6 +22,8 @@ var sound_cues: Node
 var map: Node3D
 var map_id := ""
 var spawn_points: Node3D
+## The loaded arena's jump pads and ladders, as Fixtures.of gives them.
+var fixtures := {"pads": [], "ladders": []}
 var menu_camera: Camera3D
 
 # Which starting spot each player holds. Only the host uses it.
@@ -70,6 +72,7 @@ func load_map(id: String) -> void:
 	move_child(map, 0)
 	map_id = id
 	spawn_points = map.get_node("SpawnPoints")
+	fixtures = Fixtures.of(map)
 	menu_camera = map.get_node("MenuCamera")
 	if was_menu_view:
 		menu_camera.make_current()

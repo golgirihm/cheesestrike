@@ -216,5 +216,11 @@ metadata/kind = "blaster"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 9)
 metadata/kind = "ammo"
 
+[node name="JumpPads" type="Node3D" parent="."]
+
+[node name="PadWest" type="Marker3D" parent="JumpPads"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.5, 0, 3)
+metadata/launch = Vector3(11, 12, 0)
+
 [node name="MenuCamera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.83957, 0.543251, 0, -0.543251, 0.83957, 0, 11, 14)
