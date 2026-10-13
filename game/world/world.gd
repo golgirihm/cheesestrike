@@ -8,8 +8,8 @@ extends Node3D
 ## one named in the match state when it arrives.
 
 const PLAYER := preload("res://player/player.tscn")
-## Physics layers a shot stops at, for showing it: the arena and players.
-const SHOT_VIEW_MASK := 3
+## Physics layer of the players, whom a shot stops at where it is shown.
+const PLAYER_MASK := 2
 
 @onready var players: Node3D = $Players
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
@@ -159,9 +159,12 @@ func _show_own_shot(origin: Vector3, direction: Vector3, seed: int, stance: int,
 	var space := get_world_3d().direct_space_state
 	var ends := []
 	for pellet in HitScan.pellet_directions(direction, weapon.pellets, weapon.spread_for(stance, run), seed):
-		var query := PhysicsRayQueryParameters3D.create(origin, origin + pellet * weapon.max_range, SHOT_VIEW_MASK, [player.get_rid()])
+		# As far as the arena lets it go, thin cover and all, or to the first
+		# player in its way.
+		var reach: float = Penetration.path(origin, pellet, weapon.max_range, Match.wall_caster(space)).reach
+		var query := PhysicsRayQueryParameters3D.create(origin, origin + pellet * reach, PLAYER_MASK, [player.get_rid()])
 		var hit := space.intersect_ray(query)
-		ends.append(hit.position if not hit.is_empty() else origin + pellet * weapon.max_range)
+		ends.append(hit.position if not hit.is_empty() else origin + pellet * reach)
 	effects.show_shot(player.muzzle.global_position, ends, aside)
 
 

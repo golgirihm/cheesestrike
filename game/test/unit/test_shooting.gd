@@ -866,3 +866,44 @@ func test_others_see_a_grenade_bounce_through_their_own_copy_of_the_arena() -> v
 	assert_gte(flying.node.global_position.y, 0.0, "it never sinks through the floor")
 	world.effects.burst_projectile(77, Weapons.GRENADE, flying.node.global_position)
 	assert_eq(world.effects.projectiles_in_flight(), 0)
+
+
+## A solid sheet `thick` metres through, standing across the arena at z 0.
+func _sheet(thick: float) -> void:
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(8, 10, thick)
+	var collider := CollisionShape3D.new()
+	collider.shape = shape
+	var sheet := StaticBody3D.new()
+	sheet.add_child(collider)
+	sheet.position = Vector3(0, 5, 0)
+	world.add_child(sheet)
+	await wait_physics_frames(2)
+
+
+func test_a_shot_through_thin_cover_hurts_less() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	await _sheet(0.3)
+	_shoot(shooter, Vector3(0, CHEST, -5))
+	assert_eq(match_.state.player(2).health, 100 - roundi(20 * Penetration.DAMAGE_SHARE))
+
+
+func test_thick_cover_still_stops_a_shot() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	await _sheet(1.0)
+	_shoot(shooter, Vector3(0, CHEST, -5))
+	assert_eq(match_.state.player(2).health, 100)
+
+
+func test_the_shooter_sees_their_shot_carry_on_through_thin_cover() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	await _sheet(0.3)
+	var origin: Vector3 = shooter.head.global_position
+	shooter.fired.emit(origin, Vector3.FORWARD, 1, WeaponStats.AIMED, 0)
+	var tracer: Node3D = world.effects.get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == "tracer")[0]
+	# The tracer runs from the muzzle to where the shot ended: past the sheet,
+	# at the arena's edge.
+	var far_end: Vector3 = tracer.global_transform * Vector3(0, 0, -0.5)
+	assert_lt(far_end.z, -10.0)
