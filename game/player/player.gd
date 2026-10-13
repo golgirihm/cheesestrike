@@ -212,6 +212,12 @@ var _turn_rate := Vector2.ZERO
 var _landing := 0.0
 var _running := 0.0
 var _was_on_floor := true
+# When this character last made a voice, by a clock of their own, and what
+# they were last seen doing, for one played on another machine.
+var _voice_clock := 0.0
+var _last_voice := -INF
+var _seen_airborne := false
+var _seen_reloading := false
 var _fall_speed := 0.0
 # How far the weapon is lowered for a reload, and its magazine out, 0 to 1.
 var _reload_lowered := 0.0
@@ -415,6 +421,7 @@ func _on_match_state_changed() -> void:
 	# just knocked someone out cheer.
 	if own.alive and own.health < _health:
 		body.grimace()
+		voice("hurt")
 	_health = own.health
 	if own.kills > _kills:
 		body.cheer()
@@ -586,6 +593,7 @@ func _set_alive(now_alive: bool) -> void:
 			_badge.visible = alive
 	gun.visible = alive
 	if not alive:
+		voice("knocked_out")
 		_release_controls()
 		if _mine:
 			Sounds.play("knocked_out")
@@ -733,6 +741,13 @@ func _animate(delta: float) -> void:
 			var airborne := absf(moved.y) / delta > 0.5
 			body.set_motion(_ground_speed, airborne, moved.y / delta, _pose & POSE_SLIDING != 0)
 			body.set_holding(_pose & POSE_AIMING != 0, _pose & POSE_RELOADING != 0)
+			# Heard leaving the ground, and beginning to reload.
+			if alive and airborne and not _seen_airborne and moved.y > 0.0:
+				voice("jump")
+			_seen_airborne = airborne
+			if alive and _pose & POSE_RELOADING != 0 and not _seen_reloading:
+				voice("reload")
+			_seen_reloading = _pose & POSE_RELOADING != 0
 			if alive and not airborne and _ground_speed > 0.5:
 				_step(_ground_speed * delta, global_position)
 		body.set_gaze(head.rotation.x)
@@ -1003,6 +1018,7 @@ func kick() -> void:
 
 
 func _process(delta: float) -> void:
+	_voice_clock += delta
 	if not _mine and not driven:
 		_show_smoothed()
 	_animate(delta)
@@ -1070,9 +1086,29 @@ func _make_emote(kind: int) -> void:
 		_next_emote = Emotes.next(kind)
 
 
+## This character's own voice as they do `event`, such as "jump" or "hurt"
+## (see Voices): heard by whoever should hear it, at the pitch that is
+## theirs, and not too soon after their last.
+func voice(event: String) -> void:
+	var sound := Voices.cue(event)
+	if sound.is_empty() or not Voices.ready(sound, _voice_clock - _last_voice) or not is_inside_tree():
+		return
+	var teams: bool = match_ != null and match_.has_state() and match_.state.settings.is_teams()
+	var who := Footsteps.OWN if _mine else Footsteps.relation(match_.own_record() if match_ != null and match_.has_state() else null, record(), teams)
+	if not Voices.heard(sound, who):
+		return
+	_last_voice = _voice_clock
+	var pitch := Voices.pitch(name.to_int()) * Sounds.varied(0.03)
+	if _mine:
+		Sounds.play(sound, Voices.level(sound, who), pitch)
+	elif world != null:
+		Sounds.play_at(sound, head.global_position, world, Voices.level(sound, who), pitch)
+
+
 ## Everyone sees this player make emote `kind`.
 func show_emote(kind: int) -> void:
 	body.emote(kind)
+	voice("emote")
 	if _mine:
 		Sounds.play("emote", -8.0)
 	elif world != null:
@@ -1164,6 +1200,7 @@ func _physics_process(delta: float) -> void:
 		velocity += get_gravity() * delta
 	elif _jump_pressed or _touch_jump:
 		velocity.y = Movement.JUMP_VELOCITY
+		voice("jump")
 		Sounds.play("jump", -10.0)
 		# A jump ends a slide.
 		_slide_left = 0.0

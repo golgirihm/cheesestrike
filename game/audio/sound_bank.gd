@@ -48,6 +48,11 @@ const SOUNDS := {
 	"dry": "_dry",
 	"knife": "_knife",
 	"throw": "_knife",
+	"voice_effort": "_voice_effort",
+	"voice_pain": "_voice_pain",
+	"voice_taunt": "_voice_taunt",
+	"voice_reload": "_voice_reload",
+	"voice_out": "_voice_out",
 	"hit_pop": "_hit_pop",
 	"hit_bell": "_hit_bell",
 	"music": "_music",
@@ -57,7 +62,8 @@ const SOUNDS := {
 ## two in a row need be the same. The rest have one.
 const TAKES := {"pistol": 3, "blaster": 3, "shotgun": 3, "grater": 4, "pistols": 3, "carbine": 3, "rifle": 2, "lmg": 4,
 	"launcher": 2, "burst": 3, "step": 4, "land": 2, "hurt": 2,
-	"step_rock": 4, "step_grass": 4, "step_wood": 4, "step_metal": 4, "step_cheese": 4}
+	"step_rock": 4, "step_grass": 4, "step_wood": 4, "step_metal": 4, "step_cheese": 4,
+	"voice_effort": 3, "voice_pain": 3}
 
 static var _made := {}
 # The take being made: 0 is each sound as written, the rest differ from it.
@@ -524,6 +530,54 @@ static func _emote() -> AudioStreamWAV:
 static func _hit() -> AudioStreamWAV:
 	return _make(0.07, func(t: float, _i: int) -> float:
 		return sin(TAU * 1500.0 * t) * _decay(t, 45.0), 0.6)
+
+
+# A character's voice: a squeak sung through `notes`, each [when it starts,
+# how long it lasts, the note it starts on, the note it ends on] in seconds
+# and hertz. A squeak is a note with its octave and its twelfth over it,
+# and a little wobble.
+static func _squeak(length: float, notes: Array, volume := 0.6, breath := 0.0) -> AudioStreamWAV:
+	var rng := _rng(40 + notes.size())
+	var turn := 0.0
+	var lift := _varied(1.0, 0.07, 1)
+	return _make(length, func(t: float, _i: int) -> float:
+		var sample := 0.0
+		for note: Array in notes:
+			var since: float = t - note[0]
+			if since < 0.0 or since > note[1]:
+				continue
+			var along: float = since / note[1]
+			var hertz: float = lerpf(note[2], note[3], along) * lift * (1.0 + 0.03 * sin(TAU * 28.0 * t))
+			turn += hertz / RATE
+			# Quick in, and eased away by the end of the note.
+			var swell := minf(since * 120.0, 1.0) * (1.0 - along * along)
+			sample += (sin(TAU * turn) + sin(TAU * turn * 2.0) * 0.35 + sin(TAU * turn * 3.0) * 0.15) * swell
+		return sample * 0.6 + rng.randf_range(-1.0, 1.0) * breath * _decay(t, 20.0), volume)
+
+
+# Effort, as in a jump or a throw: a quick "hup".
+static func _voice_effort() -> AudioStreamWAV:
+	return _squeak(0.13, [[0.0, 0.12, 330.0, 470.0]], 0.5, 0.25)
+
+
+# Pain: a sharp "eek" that falls away.
+static func _voice_pain() -> AudioStreamWAV:
+	return _squeak(0.2, [[0.0, 0.19, 820.0, 560.0]], 0.6, 0.1)
+
+
+# A taunt: three notes, up and back, sung at someone.
+static func _voice_taunt() -> AudioStreamWAV:
+	return _squeak(0.5, [[0.0, 0.14, 560.0, 580.0], [0.16, 0.14, 700.0, 720.0], [0.32, 0.17, 560.0, 500.0]], 0.6)
+
+
+# "Reloading": two rising chirps, called to whoever is on the same side.
+static func _voice_reload() -> AudioStreamWAV:
+	return _squeak(0.34, [[0.0, 0.13, 430.0, 520.0], [0.17, 0.16, 520.0, 680.0]], 0.55)
+
+
+# Knocked out: a squeal that falls all the way down.
+static func _voice_out() -> AudioStreamWAV:
+	return _squeak(0.55, [[0.0, 0.54, 880.0, 190.0]], 0.65, 0.15)
 
 
 # The same told another way, for those who choose it: a soft low pop.
