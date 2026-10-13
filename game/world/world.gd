@@ -23,6 +23,7 @@ var watch_camera: Camera3D
 var replay_view: Node3D
 var atmosphere: Atmosphere
 var ambient_life: Node3D
+var lighting: Node3D
 
 ## The loaded arena, and which of the Maps it is.
 var map: Node3D
@@ -115,6 +116,11 @@ func load_map(id: String) -> void:
 		menu_camera.make_current()
 	_build_pickups()
 	_build_life()
+	lighting = preload("res://world/lighting.gd").new()
+	map.add_child(lighting)
+	lighting.build(map_id, map.get_node("Geometry"))
+	if atmosphere != null:
+		_show_sky()
 
 
 ## Begins the session. `settings` are the host's choice, and only used there.
@@ -210,6 +216,8 @@ func _build_life() -> void:
 func _show_sky() -> void:
 	var extras := GraphicsQuality.level(Settings.get_value("quality")) != GraphicsQuality.LOW
 	atmosphere.show_look(match_.state.settings.sky if match_.has_state() else Atmosphere.NOON, extras)
+	if lighting != null:
+		lighting.show_for(atmosphere.showing, -$Sun.global_basis.z, extras)
 	# Clouds throw shadows only where there is a sun to throw them.
 	if ambient_life != null:
 		ambient_life.show_cloud_shadows([Atmosphere.NOON, Atmosphere.DAWN, Atmosphere.DUSK].has(atmosphere.showing))
