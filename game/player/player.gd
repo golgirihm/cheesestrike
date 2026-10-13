@@ -929,12 +929,17 @@ func _step(distance: float, at: Vector3) -> void:
 	_since_step = 0.0
 	if world != null:
 		world.effects.footprint(global_position, rotation.y, world.map)
-	# A crouched player treads softly.
-	var hush := -10.0 * _crouch
+	# What it sounds like goes by what is trodden on, and how loud by how
+	# they are moving and who they are to whoever is listening (see
+	# Footsteps): a crouched player treads softly, and an opponent's steps
+	# are the clearest.
+	var sound := Footsteps.cue(Footsteps.surface_under(world.map if world != null else null, global_position))
+	var running: bool = body.state() == CharacterMotion.RUN
 	if at == Vector3.INF:
-		Sounds.play("step", -9.0 + hush, Sounds.varied(0.1))
+		Sounds.play(sound, Footsteps.level(Footsteps.OWN, running, _crouch), Sounds.varied(0.1))
 	elif world != null:
-		Sounds.play_at("step", at, world, -3.0 + hush, Sounds.varied(0.1))
+		var who := Footsteps.relation(match_.own_record() if match_ != null and match_.has_state() else null, record(), match_ != null and match_.has_state() and match_.state.settings.is_teams())
+		Sounds.play_at(sound, at, world, Footsteps.level(who, running, _crouch), Sounds.varied(0.1))
 
 
 ## A mouse movement measured in the page's pixels, as the browser reports it,
@@ -1197,6 +1202,8 @@ func _physics_process(delta: float) -> void:
 			world.effects.landing(global_position, _landing)
 		if _landing > 0.2:
 			Sounds.play("land", lerpf(-16.0, -4.0, _landing))
+			# And what was landed on, lower than a step on it.
+			Sounds.play(Footsteps.cue(Footsteps.surface_under(world.map if world != null else null, global_position)), lerpf(-14.0, -5.0, _landing), 0.75)
 		if _landing >= Movement.HARD_LANDING:
 			_flinch_left = maxf(_flinch_left, Movement.FLINCH_TIME * Movement.LANDING_WIND)
 	_was_on_floor = is_on_floor()

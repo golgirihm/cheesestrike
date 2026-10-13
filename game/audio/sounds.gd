@@ -23,6 +23,8 @@ var counts := {}
 static func varied(by := 0.06) -> float:
 	return randf_range(1.0 - by, 1.0 + by)
 
+## How the last sound played in the arena was treated (see Acoustics).
+var last_treatment := {}
 ## The take of each sound that was played last.
 var last_take := {}
 var _ducker := Mix.Ducker.new()
@@ -73,8 +75,22 @@ func play_at(name: String, at: Vector3, world: Node3D, volume_db := 0.0, pitch :
 	if stream == null or world == null or not world.is_inside_tree():
 		return
 	var voice := _free_voice(world)
-	voice.bus = Mix.bus_of(name)
+	# Changed by where it is made and where it is heard from.
+	var bus := Mix.bus_of(name)
+	var listener := world.get_viewport().get_camera_3d()
+	var heard_from := listener.global_position if listener != null else at
+	var space := world.get_world_3d().direct_space_state
+	var map: Node3D = world.get("map")
+	last_treatment = Acoustics.treatment(bus, Acoustics.place_at(map, at), heard_from.distance_to(at),
+		heard_from.distance_to(at) > 1.0 and Acoustics.muffled(space, at, heard_from))
+	voice.bus = last_treatment.bus
+	voice.attenuation_filter_cutoff_hz = last_treatment.cutoff
+	voice.attenuation_filter_db = last_treatment.filter_db
+	# A shot carries across the arena; a step doesn't.
+	voice.max_distance = 160.0 if bus == Mix.WEAPONS else 60.0
+	voice.unit_size = 9.0 if bus == Mix.WEAPONS else 6.0
 	voice.stream = stream
+	volume_db += last_treatment.volume_db
 	voice.volume_db = volume_db
 	voice.pitch_scale = pitch
 	voice.global_position = at
@@ -155,8 +171,6 @@ func _free_voice(world: Node3D) -> AudioStreamPlayer3D:
 			return oldest
 		oldest.queue_free()
 	var voice := AudioStreamPlayer3D.new()
-	voice.unit_size = 6.0
-	voice.max_distance = 60.0
 	world.add_child(voice)
 	_voices.append(voice)
 	return voice

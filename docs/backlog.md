@@ -76,19 +76,15 @@ The game uses the Compatibility renderer so it runs in a browser and on phones. 
 
 1. **Sounds from recordings.** The guns, steps and bursts are synthesized in code (`game/audio/sound_bank.gd`), in layers (a crack, a blast, a thump, a tail, the click of the weapon's works) and with several takes of each. Replace them with recorded ones, licensed for use, keeping the layers and takes.
    *Tests:* the tests in `test_sounds.gd` that every take of every cue has a sound, a length and a level. Manual: SND-03.
-2. **Space.** Shots and steps sound different indoors, in an alley and in the open; sounds behind a wall are muffled; far shots are a dull crack.
-   *Tests:* GUT tests of which treatment a position gets.
-3. **Footsteps by surface.** Different steps on asphalt, wood, rock, grass and cheese, and for running, crouching and landing. Opponents' steps are clearer than teammates'.
-   *Tests:* GUT test that every surface in every arena has steps.
-4. **An announcer.** A voice for the start and end of a match, the lead changing, a minute left, multiple knock-outs and power-ups.
+2. **An announcer.** A voice for the start and end of a match, the lead changing, a minute left, multiple knock-outs and power-ups.
    *Tests:* GUT tests of what triggers each line.
-5. **Characters with voices.** Short squeaks and grunts for effort, pain, a taunt and a reload called to teammates.
+3. **Characters with voices.** Short squeaks and grunts for effort, pain, a taunt and a reload called to teammates.
    *Tests:* GUT tests of the triggers.
-6. **Music that follows the match.** A menu theme, and in a match music that builds in the last minute and on match point, and a sting for winning and losing.
+4. **Music that follows the match.** A menu theme, and in a match music that builds in the last minute and on match point, and a sting for winning and losing.
    *Tests:* GUT tests of which piece plays when.
-7. **The interface makes sound.** Hover, press, back, an error, a countdown.
+5. **The interface makes sound.** Hover, press, back, an error, a countdown.
    *Tests:* GUT test that every button has one.
-8. **Talking.** Voice chat between teammates, push-to-talk, with a mute for each player, over the connections the game already has.
+6. **Talking.** Voice chat between teammates, push-to-talk, with a mute for each player, over the connections the game already has.
    *Tests:* browser test with a fake microphone.
 
 ## Milestone 10: An interface that looks the part
