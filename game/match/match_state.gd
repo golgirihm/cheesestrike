@@ -40,6 +40,13 @@ var winners: Array[int] = []
 ## For each of the arena's pickup pads, in order, seconds until its pickup is
 ## back: 0 when it is there to collect.
 var pickups: Array[float] = []
+## Weapons left behind by knocked-out players, for anyone to take, oldest
+## first. Each: {"id": a number of its own, "weapon": String, "at": Vector3,
+## "left": seconds until it is gone}.
+var drops: Array[Dictionary] = []
+## Set when a drop's time runs out, for the host to tell everyone.
+var drop_ended := false
+var _next_drop := 1
 ## How many power-ups have been taken this match, which decides the next.
 var powers_taken := 0
 ## Set when a power-up runs out, for the host to tell everyone.
@@ -181,6 +188,37 @@ func collect(index: int, kind: String, id: int) -> String:
 	return "refill" if Pickups.give(kind, record) else "taken"
 
 
+## Leaves `weapon` lying at `at`. Returns the drop's id, or 0 if it is not
+## a weapon that is left behind: a sidearm, which everyone has, is not.
+func drop(weapon: String, at: Vector3) -> int:
+	var stats := Weapons.find(weapon)
+	if not is_playing() or stats == null or not Weapons.ids().has(weapon) or stats.slot == Weapons.SIDE or not at.is_finite():
+		return 0
+	drops.append({"id": _next_drop, "weapon": weapon, "at": at, "left": Pickups.DROP_LIFE})
+	_next_drop += 1
+	while drops.size() > Pickups.MAX_DROPS:
+		drops.pop_front()
+	return _next_drop - 1
+
+
+## Player `id` takes drop `drop_id`, if it is there and they are in play.
+## Returns "taken" for a weapon new to them, "refill" for one they carry
+## already, which it fills, or "" if they took nothing.
+func take_drop(drop_id: int, id: int) -> String:
+	var record := player(id)
+	if not is_playing() or record == null or not record.alive:
+		return ""
+	for index in drops.size():
+		if drops[index].id == drop_id:
+			var weapon: String = drops[index].weapon
+			drops.remove_at(index)
+			if record.weapons.has(weapon):
+				return "refill"
+			record.weapons.append(weapon)
+			return "taken"
+	return ""
+
+
 ## Empties pad `index` for `seconds`, as a power-up's is when a match begins.
 func hold_back(index: int, seconds: float) -> void:
 	if index >= 0 and index < pickups.size():
@@ -208,6 +246,11 @@ func tick(delta: float) -> Array[int]:
 				due.append(record.id)
 	for index in pickups.size():
 		pickups[index] = maxf(pickups[index] - delta, 0.0)
+	for lying in drops:
+		lying.left -= delta
+	if drops.any(func(lying: Dictionary) -> bool: return lying.left <= 0.0):
+		drops = drops.filter(func(lying: Dictionary) -> bool: return lying.left > 0.0)
+		drop_ended = true
 	time_left = maxf(time_left - delta, 0.0)
 	if is_playing() and time_left == 0.0:
 		end_match()
@@ -244,6 +287,7 @@ func start_match() -> void:
 	team_kills = [0, 0]
 	winners.clear()
 	pickups.fill(0.0)
+	drops.clear()
 	powers_taken = 0
 	for record: PlayerRecord in players.values():
 		record.give_power(Powers.NONE, 0.0)
@@ -331,6 +375,7 @@ func to_dict() -> Dictionary:
 		"team_kills": team_kills,
 		"winners": winners,
 		"pickups": pickups,
+		"drops": drops.map(func(lying: Dictionary) -> Array: return [lying.id, Weapons.ORDER.find(lying.weapon), lying.at, lying.left]),
 	}
 
 
@@ -354,6 +399,14 @@ static func from_dict(data: Dictionary) -> MatchState:
 	if pads is Array:
 		for left: Variant in pads:
 			state.pickups.append(maxf(float(left), 0.0) if (left is float or left is int) and is_finite(float(left)) else 0.0)
+	var lying: Variant = data.get("drops")
+	if lying is Array:
+		for entry: Variant in lying.slice(0, Pickups.MAX_DROPS):
+			if not entry is Array or entry.size() != 4 or not entry[0] is int or not entry[1] is int or not entry[2] is Vector3:
+				continue
+			if entry[1] < 0 or entry[1] >= Weapons.ORDER.size() or not entry[2].is_finite() or not (entry[3] is float or entry[3] is int) or not is_finite(float(entry[3])):
+				continue
+			state.drops.append({"id": entry[0], "weapon": Weapons.ORDER[entry[1]], "at": entry[2], "left": clampf(float(entry[3]), 0.0, Pickups.DROP_LIFE)})
 	var won: Variant = data.get("winners")
 	if won is Array:
 		for winner: Variant in won:

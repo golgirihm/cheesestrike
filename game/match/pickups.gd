@@ -18,6 +18,10 @@ const HEALTH_AMOUNT := 50
 ## Seconds before a collected pickup is back.
 const RESPAWN := {HEALTH: 15.0, AMMO: 12.0, ARMOUR: 25.0, POWER: 60.0}
 const WEAPON_RESPAWN := 20.0
+## Seconds a weapon dropped by a knocked-out player lies there, and the
+## most that lie about at once: the oldest goes first.
+const DROP_LIFE := 20.0
+const MAX_DROPS := 12
 ## How close a player's feet must come to a pad to collect from it.
 const REACH := 1.3
 const REACH_UP := 2.0

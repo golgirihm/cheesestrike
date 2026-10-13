@@ -123,6 +123,7 @@ func _on_state_changed() -> void:
 	if match_.has_state():
 		load_map(match_.state.settings.map)
 	_show_pickups()
+	_show_drops()
 
 
 func _add_player(id: int) -> void:
@@ -148,6 +149,41 @@ func _build_pickups() -> void:
 		item.name = "Item"
 		pad.add_child(item)
 		pad.add_child(PickupModels.base())
+
+
+# The weapons knocked-out players left behind, lying where they fell.
+func _show_drops() -> void:
+	var holder: Node3D = get_node_or_null("Drops")
+	if holder == null:
+		holder = Node3D.new()
+		holder.name = "Drops"
+		add_child(holder)
+	var lying := {}
+	if match_.has_state():
+		for drop: Dictionary in match_.state.drops:
+			lying[str(drop.id)] = drop
+	for shown in holder.get_children():
+		if not lying.has(String(shown.name)):
+			holder.remove_child(shown)
+			shown.queue_free()
+	for key: String in lying:
+		if holder.has_node(key):
+			continue
+		var model := WeaponModels.build(lying[key].weapon)
+		model.name = key
+		model.get_node("Hand").visible = false
+		WeaponModels.show_own_view(model, false)
+		model.scale = Vector3.ONE * 1.4
+		# On its side on the ground, each at its own angle.
+		model.rotation = Vector3(0.0, int(key) * 2.4, PI / 2.0)
+		holder.add_child(model)
+		model.global_position = lying[key].at + Vector3.UP * 0.12
+
+
+## How many dropped weapons are shown lying about.
+func drops_shown() -> int:
+	var holder := get_node_or_null("Drops")
+	return holder.get_child_count() if holder != null else 0
 
 
 func _show_pickups() -> void:
