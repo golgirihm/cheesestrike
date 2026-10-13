@@ -5,9 +5,7 @@ class_name Outlines
 ## into the game.
 ##
 ## An outline is the thing drawn again a little fatter in one flat colour,
-## everywhere but over the thing itself. Each of its meshes first marks
-## where it is on the screen, then the fatter copy is drawn where no mark
-## is.
+## everywhere but over the thing itself.
 
 ## How far an outline stands out from what it is round, in metres.
 const THICKNESS := 0.035
@@ -77,34 +75,39 @@ static func _meshes(root: Node) -> Array[MeshInstance3D]:
 static var _made := {}
 
 
-# The mark and the fatter copy, for an outline of `colour`.
+# What draws an outline of `colour`. One that is hidden by what is in front
+# of it is only the fatter copy, turned inside out: the thing itself covers
+# all of it but the rim. One that shows through walls can't rely on that, so
+# the thing first marks where it is, even where it is hidden, and the copy
+# is drawn over everything except where the mark is.
 static func _material(colour: Color, through: bool) -> StandardMaterial3D:
 	var key := [colour, through]
 	if _made.has(key):
 		return _made[key]
-	# The mark: nothing to see, only where the thing is. One that shows
-	# through walls marks where the thing would be if nothing hid it.
-	var mark := StandardMaterial3D.new()
-	mark.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mark.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mark.albedo_color = Color(0, 0, 0, 0)
-	mark.stencil_mode = BaseMaterial3D.STENCIL_MODE_CUSTOM
-	mark.stencil_flags = BaseMaterial3D.STENCIL_FLAG_WRITE | (BaseMaterial3D.STENCIL_FLAG_WRITE_DEPTH_FAIL if through else 0)
-	mark.stencil_compare = BaseMaterial3D.STENCIL_COMPARE_ALWAYS
-	mark.stencil_reference = _MARK
-	# The fatter copy, drawn after every mark.
 	var hull := StandardMaterial3D.new()
 	hull.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	hull.albedo_color = colour
 	hull.cull_mode = BaseMaterial3D.CULL_FRONT
 	hull.grow = true
 	hull.grow_amount = THICKNESS
-	hull.no_depth_test = through
+	if not through:
+		_made[key] = hull
+		return hull
+	hull.no_depth_test = true
 	hull.stencil_mode = BaseMaterial3D.STENCIL_MODE_CUSTOM
 	hull.stencil_flags = BaseMaterial3D.STENCIL_FLAG_READ
 	hull.stencil_compare = BaseMaterial3D.STENCIL_COMPARE_NOT_EQUAL
 	hull.stencil_reference = _MARK
 	hull.render_priority = 1
+	# The mark: nothing to see, only where the thing is, hidden or not.
+	var mark := StandardMaterial3D.new()
+	mark.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mark.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mark.albedo_color = Color(0, 0, 0, 0)
+	mark.stencil_mode = BaseMaterial3D.STENCIL_MODE_CUSTOM
+	mark.stencil_flags = BaseMaterial3D.STENCIL_FLAG_WRITE | BaseMaterial3D.STENCIL_FLAG_WRITE_DEPTH_FAIL
+	mark.stencil_compare = BaseMaterial3D.STENCIL_COMPARE_ALWAYS
+	mark.stencil_reference = _MARK
 	mark.next_pass = hull
 	_made[key] = mark
 	return mark
