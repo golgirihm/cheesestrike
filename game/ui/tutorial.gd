@@ -47,7 +47,8 @@ func step_name() -> String:
 
 ## Told how things stand with the player: {"at": their feet, "yaw": which
 ## way they face, "shots": how many they have fired, "aiming", "reloading",
-## "reloads": how many they have finished, "weapons": how many they carry,
+## "reloads": how many they have finished, "full": whether the weapon in
+## hand has nothing to reload, "weapons": how many they carry,
 ## "overloaded": whether they are in an Overload}. Returns whether that
 ## finishes the step they were on.
 func update(now: Dictionary) -> bool:
@@ -74,7 +75,9 @@ func update(now: Dictionary) -> bool:
 		"reload":
 			# Begun is enough: a player standing on the rack has their
 			# weapon filled again before a reload can finish.
-			done = now.reloads > _from.reloads or now.get("reloading", false)
+			# And with a full weapon in hand, as after taking one from the
+			# rack in passing, there is nothing to reload: the step is let go.
+			done = now.reloads > _from.reloads or now.get("reloading", false) or now.get("full", false)
 		"pick_up":
 			# One taken from the rack earlier, in passing, will do: there may
 			# be no other within easy reach.
