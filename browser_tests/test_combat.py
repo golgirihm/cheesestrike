@@ -85,6 +85,15 @@ class CombatTest(GameTestCase):
         host.wait_for("s.players.some((p) => p.mine && p.kills >= 1)")
         joiner.wait_for("s.players.some((p) => p.mine && p.deaths >= 1) && s.players.some((p) => !p.mine && p.kills >= 1)")
 
+    def test_a_knocked_out_player_leaves_their_weapon_for_everyone_to_see(self):
+        host, joiner, joiner_id = self.start_pair()
+        host.capture_mouse()
+        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
+        # Null while what is drawn lying about isn't yet what the host says is.
+        lying = "s.drops && s.drops.includes('blaster')"
+        host.wait_for(lying)
+        joiner.wait_for(lying)
+
     def test_a_knocked_out_player_comes_back_with_full_health(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()

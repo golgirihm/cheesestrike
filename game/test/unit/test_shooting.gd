@@ -425,9 +425,9 @@ func test_a_weapon_changed_to_swings_up_from_below() -> void:
 	var own := _add(1, Vector3(0, 0, 5))
 	await _settle(own)
 	var rest: Vector3 = own.gun.position
-	_give(1, "shotgun")
+	_give(1, "launcher")
 	match_.state_changed.emit()
-	assert_eq(own.weapon.stats.id, "shotgun")
+	assert_eq(own.weapon.stats.id, "launcher")
 	own._animate(0.01)
 	assert_lt(own.gun.position.y, rest.y - 0.1, "it starts low")
 	assert_false(own.weapon.can_fire(), "and can't fire until it is up")
@@ -483,9 +483,9 @@ func test_choosing_a_carried_weapon_shows_it_to_others() -> void:
 func test_the_owner_takes_up_a_new_weapon_and_drops_it_when_knocked_out() -> void:
 	var own := _add(1, Vector3(0, 0, 5))
 	_add(2, Vector3(0, 0, -5))
-	_give(1, "shotgun")
+	_give(1, "launcher")
 	match_.state_changed.emit()
-	assert_eq(own.weapon.stats.id, "shotgun", "a new weapon comes into hand")
+	assert_eq(own.weapon.stats.id, "launcher", "a new weapon comes into hand")
 	assert_eq(own.arsenal.keys().size(), 3, "with the sidearm and the blaster")
 	match_.state.damage(2, 1, 500.0)
 	match_.state_changed.emit()

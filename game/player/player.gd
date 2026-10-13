@@ -413,7 +413,10 @@ func _carry(carried: Array) -> void:
 	for id: String in arsenal.keys():
 		if not carried.has(id):
 			arsenal.erase(id)
-	if not picked_up.is_empty():
+	# A weapon found on a pad, or the one the host says is in hand, is taken
+	# up at once; one picked up from where it was dropped is only carried.
+	var own_record := record()
+	if not picked_up.is_empty() and (Weapons.find(picked_up).slot == Weapons.POWER or (own_record != null and own_record.weapon == picked_up)):
 		equip(picked_up)
 	elif not arsenal.has(weapon.stats.id) and not arsenal.is_empty():
 		# What was in hand is gone: take up what the host says is in hand, or

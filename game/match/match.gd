@@ -539,8 +539,9 @@ func _process(delta: float) -> void:
 				_ping.rpc_id(peer, _clock)
 		for id in due:
 			_respawn(id)
-		if state.power_ended:
+		if state.power_ended or state.drop_ended:
 			state.power_ended = false
+			state.drop_ended = false
 			_changed()
 		if was_playing != state.is_playing():
 			_changed()
@@ -734,8 +735,10 @@ func record_position(time: float, at: Vector3, id: int, facing := Vector2.ZERO) 
 ## everyone who needs to know is told.
 func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: String, head: bool) -> void:
 	var own := attacker == victim
+	var in_hand := state.player(victim).weapon if state.player(victim) != null else ""
 	var result := state.damage(attacker, victim, amount, own)
 	if result.knocked_out:
+		_leave_behind(victim, in_hand)
 		# Told first, so that everyone knows how they went by the time they
 		# hear that they have.
 		_fall_seen.rpc(victim, weapon, from)
@@ -772,6 +775,7 @@ func _physics_process(delta: float) -> void:
 	if own != null:
 		record_position(now(), own.global_position, own.name.to_int(), Vector2(own.rotation.y, own.head.rotation.x))
 	_collect_pickups()
+	_collect_drops()
 	if _projectiles.is_empty():
 		return
 	var wall := wall_finder(world.get_world_3d().direct_space_state)
@@ -800,6 +804,40 @@ static func wall_finder(space: PhysicsDirectSpaceState3D) -> Callable:
 		if hit.is_empty():
 			return INF
 		return {"distance": from.distance_to(hit.position), "normal": hit.normal}
+
+
+# Player `id`, just knocked out, leaves the weapon they held where they
+# were: on the ground under them, if they were off it.
+func _leave_behind(id: int, weapon: String) -> void:
+	var node: Node3D = world.player_node(id)
+	if node == null:
+		return
+	var at := node.global_position
+	var below := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.5, at + Vector3.DOWN * 40.0, WORLD_MASK)
+	var ground := world.get_world_3d().direct_space_state.intersect_ray(below)
+	if not ground.is_empty():
+		at = ground.position
+	state.drop(weapon, at)
+
+
+# The host hands each weapon left behind to the first player in play to
+# walk over it.
+func _collect_drops() -> void:
+	for lying: Dictionary in state.drops.duplicate():
+		for node: Node3D in world.players.get_children():
+			var id := node.name.to_int()
+			if node.is_queued_for_deletion() or not Pickups.within_reach(lying.at, node.global_position):
+				continue
+			var outcome := state.take_drop(lying.id, id)
+			if outcome.is_empty():
+				continue
+			_rules_for(id).refill(lying.weapon)
+			if outcome == "refill":
+				_tell_refill(id, lying.weapon)
+			_changed()
+			_pickup_seen.rpc(id, lying.weapon)
+			picked_up.emit(id, lying.weapon)
+			break
 
 
 # A match begins with no power-up on its pad: it comes in a while.
