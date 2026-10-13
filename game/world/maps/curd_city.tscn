@@ -769,5 +769,13 @@ metadata/kind = "health"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0, -32.5)
 metadata/kind = "health"
 
+[node name="AmmoEast" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, -3.5)
+metadata/kind = "ammo"
+
+[node name="AmmoWest" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, 3.5)
+metadata/kind = "ammo"
+
 [node name="MenuCamera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.761939, 0.647648, 0, -0.647648, 0.761939, 0, 34, 40)

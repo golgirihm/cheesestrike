@@ -130,13 +130,14 @@ func test_every_pad_rests_on_a_floor_and_holds_a_known_pickup() -> void:
 		var kinds := []
 		for pad: Dictionary in world.pickup_pads():
 			kinds.append(pad.kind)
-			assert_true(pad.kind == Pickups.HEALTH or Weapons.find(pad.kind) != null, "%s: %s" % [id, pad.kind])
+			assert_true(Pickups.is_kind(pad.kind), "%s: %s" % [id, pad.kind])
 			var from: Vector3 = pad.position + Vector3.UP * 0.2
 			assert_false(space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 0.5)).is_empty(), "%s: %s pad floats" % [id, pad.kind])
 		for weapon: String in Weapons.ids():
 			if weapon != Weapons.STARTING:
 				assert_has(kinds, weapon, id)
 		assert_has(kinds, Pickups.HEALTH, id)
+		assert_has(kinds, Pickups.AMMO, id)
 
 
 func test_the_canyons_ramps_lead_up_to_its_mesas() -> void:

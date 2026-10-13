@@ -42,19 +42,17 @@ Before there is much more game, make it possible for people on different network
 
 The shooting works and is fair. This milestone is about how it feels in the hand: what a big-budget shooter spends most of its polish on.
 
-1. **Ammunition to run out of.** A reserve for each weapon as well as the magazine, shown on the HUD, with ammunition pickups on the arenas and a little taken from fallen players. The sidearm stays unlimited.
-   *Tests:* GUT tests in `WeaponState`, `ShotRules` and `Pickups`; a browser test of running dry.
-2. **Melee.** A quick strike with a cheese knife on its own key, always available: short reach, a lunge, and a knock-out from behind.
+1. **Melee.** A quick strike with a cheese knife on its own key, always available: short reach, a lunge, and a knock-out from behind.
    *Tests:* GUT tests of reach and of the host's checks; a browser test.
-3. **Thrown grenades.** A second kind of equipment beside the weapons: a wax-wrapped cheese that bounces, with a fuse, a cooked throw, and an arc shown while the key is held. Later kinds: one that blinds with a puff of parmesan, one that sticks.
+2. **Thrown grenades.** A second kind of equipment beside the weapons: a wax-wrapped cheese that bounces, with a fuse, a cooked throw, and an arc shown while the key is held. Later kinds: one that blinds with a puff of parmesan, one that sticks.
    *Tests:* GUT tests on the bounce and fuse in `Projectile`; browser test of a throw hurting a player.
-4. **What shots do to the world.** A mark where each shot lands, with a puff of dust or crumbs coloured by what it hit, and a spark off metal. Marks fade and are limited in number.
+3. **What shots do to the world.** A mark where each shot lands, with a puff of dust or crumbs coloured by what it hit, and a spark off metal. Marks fade and are limited in number.
    *Tests:* GUT tests of the limit and of which effect each surface gives. Manual rows.
-5. **Shell casings and muzzle smoke.** Casings flick out of the weapon and bounce; a wisp of smoke hangs after a burst of fire. Off on low graphics.
+4. **Shell casings and muzzle smoke.** Casings flick out of the weapon and bounce; a wisp of smoke hangs after a burst of fire. Off on low graphics.
    *Tests:* GUT test that low quality makes none. Manual row.
-6. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
+5. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
    *Tests:* GUT tests of the rule and of the host's ray walk.
-7. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
+6. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
    *Tests:* GUT tests of the tallies.
 
 ## Milestone 3: Movement with depth

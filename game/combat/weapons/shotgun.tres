@@ -25,3 +25,5 @@ recoil_up = 3.0
 recoil_cap = 2.0
 recoil_side = 0.6
 recoil_reset = 1.0
+reserve = 18
+reserve_max = 30

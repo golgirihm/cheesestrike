@@ -146,3 +146,11 @@ func test_the_end_of_a_match_shows_the_result_and_the_scoreboard() -> void:
 	assert_eq(main.combat_hud.result_shown(), "Nobody wins")
 	assert_true(main.combat_hud.scoreboard.visible)
 	main.world.stop()
+
+
+func test_the_reserve_is_shown_beside_the_magazine() -> void:
+	var blaster := WeaponState.new(Weapons.find("blaster"))
+	assert_eq(HUD.reserve_text(blaster), "+ %d" % blaster.stats.reserve)
+	blaster.reserve = 0
+	assert_eq(HUD.reserve_text(blaster), "+ 0")
+	assert_eq(HUD.reserve_text(WeaponState.new(Weapons.find(Weapons.STARTING))), "+ ∞")

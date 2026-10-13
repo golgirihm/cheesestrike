@@ -6,6 +6,9 @@ extends RefCounted
 
 var stats: WeaponStats
 var ammo: int
+## Rounds carried besides those in the magazine. Not counted for a weapon
+## that never runs out.
+var reserve: int
 ## Seconds until the next shot is allowed.
 var cooldown := 0.0
 ## Seconds until the reload in progress finishes, or 0 when not reloading.
@@ -17,6 +20,7 @@ var reloads := 0
 func _init(weapon: WeaponStats) -> void:
 	stats = weapon
 	ammo = weapon.magazine
+	reserve = maxi(weapon.reserve, 0)
 
 
 func is_reloading() -> bool:
@@ -40,9 +44,26 @@ func fire() -> bool:
 	return true
 
 
-## Starts reloading unless already reloading or full. Reports whether it did.
+## Whether there is nothing left to fire or to reload with.
+func is_dry() -> bool:
+	return ammo <= 0 and not stats.unlimited() and reserve <= 0
+
+
+## Adds `rounds` to the reserve, up to the most that can be carried. Reports
+## whether any were taken.
+func add_reserve(rounds: int) -> bool:
+	if stats.unlimited() or reserve >= stats.reserve_max:
+		return false
+	reserve = mini(reserve + rounds, stats.reserve_max)
+	return true
+
+
+## Starts reloading unless already reloading or full, or with nothing to
+## reload with. Reports whether it did.
 func start_reload() -> bool:
 	if is_reloading() or ammo >= stats.magazine:
+		return false
+	if not stats.unlimited() and reserve <= 0:
 		return false
 	reload_left = stats.reload_time
 	return true
@@ -56,12 +77,17 @@ func tick(delta: float) -> void:
 		reload_left -= delta
 		if reload_left <= 0.0:
 			reload_left = 0.0
-			ammo = stats.magazine
+			var wanted := stats.magazine - ammo
+			var taken := wanted if stats.unlimited() else mini(wanted, reserve)
+			ammo += taken
+			if not stats.unlimited():
+				reserve -= taken
 			reloads += 1
 
 
-## Fills the magazine at once, as on respawning.
+## Fills the magazine at once and gives back the reserve, as on respawning.
 func refill() -> void:
 	ammo = stats.magazine
+	reserve = maxi(stats.reserve, 0)
 	reload_left = 0.0
 	cooldown = 0.0

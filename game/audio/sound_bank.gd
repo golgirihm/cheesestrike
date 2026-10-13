@@ -26,6 +26,7 @@ const SOUNDS := {
 	"pickup": "_pickup",
 	"overload": "_overload",
 	"reload": "_reload",
+	"dry": "_dry",
 	"music": "_music",
 }
 
@@ -232,6 +233,13 @@ static func _reload() -> AudioStreamWAV:
 				var since: float = t - click[0]
 				sample += (noise * _decay(since, 220.0) + sin(TAU * click[2] * since) * 0.5 * _decay(since, 70.0)) * click[1]
 		return sample, 0.5)
+
+
+# The click of a trigger pulled on nothing.
+static func _dry() -> AudioStreamWAV:
+	var rng := _rng(11)
+	return _make(0.06, func(t: float, _i: int) -> float:
+		return rng.randf_range(-1.0, 1.0) * _decay(t, 260.0) + sin(TAU * 2400.0 * t) * 0.4 * _decay(t, 90.0), 0.4)
 
 
 static func _hit() -> AudioStreamWAV:

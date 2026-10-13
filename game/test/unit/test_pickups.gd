@@ -112,3 +112,16 @@ func test_pads_survive_the_trip() -> void:
 func test_names_for_the_pickup_note() -> void:
 	assert_eq(Pickups.display_name(Pickups.HEALTH), "Cheese wedge")
 	assert_eq(Pickups.display_name("launcher"), "Gouda Launcher")
+
+
+func test_ammunition_is_for_anyone_with_a_weapon_that_runs_out() -> void:
+	assert_true(Pickups.is_kind(Pickups.AMMO))
+	assert_false(Pickups.is_kind("spoon"))
+	var record := PlayerRecord.new(1)
+	assert_false(Pickups.wanted(Pickups.AMMO, record), "the sidearm alone needs none")
+	record.weapons.append("blaster")
+	assert_true(Pickups.wanted(Pickups.AMMO, record))
+	assert_false(Pickups.give(Pickups.AMMO, record))
+	assert_eq(record.weapons, [Weapons.STARTING, "blaster"], "it adds no weapon")
+	assert_eq(Pickups.display_name(Pickups.AMMO), "Ammunition")
+	assert_lt(Pickups.respawn_time(Pickups.AMMO), Pickups.respawn_time("launcher"))

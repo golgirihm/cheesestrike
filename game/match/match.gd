@@ -29,6 +29,9 @@ signal projectile_launched(id: int, weapon: String, from: Vector3, velocity: Vec
 signal projectile_burst(id: int, weapon: String, at: Vector3)
 
 const SYNC_INTERVAL := 0.1
+## The share of a magazine, for each weapon carried, that knocking a player
+## out gives.
+const SPOILS := 0.5
 ## The host sends the state at least this often, even unchanged, so that
 ## everyone's clocks stay in step with its own.
 const RESYNC_INTERVAL := 2.0
@@ -487,6 +490,9 @@ func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: Str
 		if not own:
 			_tell_hit(attacker, victim, result.dealt, result.knocked_out, head)
 		_tell_hurt(victim, attacker, from, result.dealt)
+	if result.knocked_out and not own:
+		# A little ammunition is taken from whoever is knocked out.
+		_resupply(attacker, SPOILS)
 	if result.knocked_out:
 		# Nobody is named as knocking out a player who did it themselves.
 		_announce_knockout("" if own else state.name_of(attacker), state.name_of(victim), weapon, head)
@@ -540,10 +546,36 @@ func _collect_pickups() -> void:
 			if outcome == "refill":
 				_rules_for(id).refill(pad.kind)
 				_tell_refill(id, pad.kind)
+			elif pad.kind == Pickups.AMMO:
+				_resupply(id, 1.0)
 			_changed()
 			_pickup_seen.rpc(id, pad.kind)
 			picked_up.emit(id, pad.kind)
 			break
+
+
+## Host only: gives player `id` `magazines` magazines' worth of rounds for
+## every weapon they carry that can run out.
+func _resupply(id: int, magazines: float) -> void:
+	var record := state.player(id)
+	if record == null:
+		return
+	for carried: String in record.weapons:
+		var weapon := Weapons.find(carried)
+		_rules_for(id).add_reserve(weapon, roundi(weapon.magazine * magazines))
+	if id == multiplayer.get_unique_id():
+		_resupplied(magazines)
+	elif multiplayer.get_peers().has(id):
+		_resupplied.rpc_id(id, magazines)
+
+
+## This player was given `magazines` magazines' worth for each weapon.
+@rpc("authority", "call_remote", "reliable")
+func _resupplied(magazines: float) -> void:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own != null:
+		for carried: WeaponState in own.arsenal.values():
+			carried.add_reserve(roundi(carried.stats.magazine * magazines))
 
 
 func _tell_refill(id: int, weapon: String) -> void:

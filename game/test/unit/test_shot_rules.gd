@@ -88,3 +88,58 @@ func test_a_shot_from_the_shooters_head_is_believed() -> void:
 
 func test_a_shot_from_across_the_arena_is_not() -> void:
 	assert_false(ShotRules.origin_believable(Vector3(10, 1.6, 1), Vector3(1, 1.55, 1)))
+
+
+func _empty(rules: ShotRules, weapon: WeaponStats, from: float) -> float:
+	var now := from
+	for shot in weapon.magazine:
+		assert_true(rules.allow_shot(weapon, now), "shot %d" % shot)
+		now += weapon.fire_interval
+	return now
+
+
+func test_the_host_counts_the_reserve_down_with_each_reload() -> void:
+	var rules := ShotRules.new()
+	var launcher := Weapons.find("launcher")
+	assert_eq(rules.reserve(launcher), launcher.reserve)
+	var now := _empty(rules, launcher, 10.0)
+	assert_false(rules.allow_shot(launcher, now), "the magazine is empty")
+	rules.reload(launcher, now)
+	now += launcher.reload_time
+	now = _empty(rules, launcher, now)
+	assert_eq(rules.reserve(launcher), launcher.reserve - launcher.magazine)
+
+
+func test_the_host_refuses_shots_once_a_weapon_has_run_dry() -> void:
+	var rules := ShotRules.new()
+	var launcher := Weapons.find("launcher")
+	var now := 10.0
+	var fired := 0
+	for magazine in 20:
+		for shot in launcher.magazine:
+			if rules.allow_shot(launcher, now):
+				fired += 1
+			now += launcher.fire_interval
+		rules.reload(launcher, now)
+		now += launcher.reload_time
+	assert_eq(fired, launcher.magazine + launcher.reserve, "the magazine and the reserve, and no more")
+	assert_eq(rules.reserve(launcher), 0)
+
+
+func test_the_host_never_runs_the_sidearm_out() -> void:
+	var rules := ShotRules.new()
+	var pistol := Weapons.find(Weapons.STARTING)
+	var now := 10.0
+	for magazine in 12:
+		now = _empty(rules, pistol, now)
+		rules.reload(pistol, now)
+		now += pistol.reload_time
+
+
+func test_rounds_picked_up_can_be_fired() -> void:
+	var rules := ShotRules.new()
+	var launcher := Weapons.find("launcher")
+	rules.add_reserve(launcher, 999)
+	assert_eq(rules.reserve(launcher), launcher.reserve_max, "no more than can be carried")
+	rules.refill("launcher")
+	assert_eq(rules.reserve(launcher), launcher.reserve, "a fresh weapon has what it starts with")

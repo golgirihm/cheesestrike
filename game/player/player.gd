@@ -743,6 +743,12 @@ func _use_weapon() -> void:
 	# A press waits for the weapon to be ready, unless it is empty.
 	if _fire_pressed and (weapon.can_fire() or weapon.is_reloading()):
 		_fire_pressed = false
+	# A weapon with nothing left gives way to the sidearm.
+	if wants and weapon.is_dry():
+		_fire_pressed = false
+		Sounds.play("dry", -6.0)
+		equip(Weapons.STARTING)
+		return
 	if wants and weapon.fire():
 		var origin := camera.global_position
 		# The head's facing, not the camera's, which may be shaking.

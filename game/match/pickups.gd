@@ -4,14 +4,21 @@ class_name Pickups
 ## arena; which are full is part of the match state, decided by the host.
 
 const HEALTH := "health"
+## A box of ammunition: a magazine's worth for every weapon carried.
+const AMMO := "ammo"
 ## Health a wedge gives back, up to full.
 const HEALTH_AMOUNT := 50
 ## Seconds before a collected pickup is back.
-const RESPAWN := {HEALTH: 15.0}
+const RESPAWN := {HEALTH: 15.0, AMMO: 12.0}
 const WEAPON_RESPAWN := 20.0
 ## How close a player's feet must come to a pad to collect from it.
 const REACH := 1.3
 const REACH_UP := 2.0
+
+
+## Whether `kind` is something a pad can hold.
+static func is_kind(kind: String) -> bool:
+	return kind == HEALTH or kind == AMMO or Weapons.find(kind) != null
 
 
 static func respawn_time(kind: String) -> float:
@@ -31,6 +38,9 @@ static func wanted(kind: String, record: PlayerRecord) -> bool:
 		return false
 	if kind == HEALTH:
 		return record.health < PlayerRecord.MAX_HEALTH
+	if kind == AMMO:
+		# Of use to anyone carrying more than the sidearm, which never runs out.
+		return record.weapons.any(func(id: String) -> bool: return not Weapons.find(id).unlimited())
 	return Weapons.find(kind) != null
 
 
@@ -39,6 +49,8 @@ static func wanted(kind: String, record: PlayerRecord) -> bool:
 static func give(kind: String, record: PlayerRecord) -> bool:
 	if kind == HEALTH:
 		record.health = mini(record.health + HEALTH_AMOUNT, PlayerRecord.MAX_HEALTH)
+		return false
+	if kind == AMMO:
 		return false
 	if record.weapons.has(kind):
 		return true
@@ -49,5 +61,7 @@ static func give(kind: String, record: PlayerRecord) -> bool:
 static func display_name(kind: String) -> String:
 	if kind == HEALTH:
 		return "Cheese wedge"
+	if kind == AMMO:
+		return "Ammunition"
 	var weapon := Weapons.find(kind)
 	return weapon.display_name if weapon != null else kind
