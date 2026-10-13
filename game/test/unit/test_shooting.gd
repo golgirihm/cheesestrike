@@ -1039,3 +1039,133 @@ func test_pushing_the_touch_stick_to_its_edge_runs() -> void:
 	touch.pressed = false
 	own._handle_touch(touch)
 	assert_false(own._wants_run())
+
+
+## A solid box of `size` resting on the floor at `at` (its middle, across).
+func _box(size: Vector3, at: Vector2) -> void:
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var collider := CollisionShape3D.new()
+	collider.shape = shape
+	var box := StaticBody3D.new()
+	box.add_child(collider)
+	box.position = Vector3(at.x, size.y / 2.0, at.y)
+	world.add_child(box)
+	await wait_physics_frames(2)
+
+
+func test_crouching_at_a_run_slides() -> void:
+	var own := _add(1, Vector3(-10, 0, 14))
+	own.rotation.y = -PI / 2.0
+	await _settle(own)
+	Input.action_press("sprint")
+	Input.action_press("move_forward")
+	await wait_physics_frames(6)
+	var before: int = Sounds.counts.get("slide", 0)
+	Input.action_press("crouch")
+	Input.action_release("move_forward")
+	Input.action_release("sprint")
+	await wait_physics_frames(3)
+	assert_true(own.is_sliding())
+	assert_eq(Sounds.counts.get("slide", 0), before + 1)
+	var early := Vector2(own.velocity.x, own.velocity.z).length()
+	assert_gt(early, Movement.WALK_SPEED * Movement.RUN_FACTOR, "carried on, with no key held, faster than a run")
+	await wait_seconds(Movement.SLIDE_TIME * 0.7)
+	var late := Vector2(own.velocity.x, own.velocity.z).length()
+	assert_lt(late, early, "easing off")
+	await wait_seconds(Movement.SLIDE_TIME * 0.5)
+	Input.action_release("crouch")
+	assert_false(own.is_sliding())
+	assert_almost_eq(Vector2(own.velocity.x, own.velocity.z).length(), 0.0, 0.01, "and stopped, with nothing held")
+
+
+func test_crouching_at_a_walk_does_not_slide() -> void:
+	var own := _add(1, Vector3(-10, 0, 14))
+	own.rotation.y = -PI / 2.0
+	await _settle(own)
+	Input.action_press("move_forward")
+	await wait_physics_frames(6)
+	Input.action_press("crouch")
+	await wait_physics_frames(3)
+	Input.action_release("crouch")
+	Input.action_release("move_forward")
+	assert_false(own.is_sliding())
+
+
+func test_a_low_step_is_walked_up_without_a_jump() -> void:
+	var own := _add(1, Vector3(-10, 0, 14))
+	own.rotation.y = -PI / 2.0
+	await _settle(own)
+	# Half a metre high: too tall to roll over, low enough to step onto.
+	await _box(Vector3(6, 0.5, 6), Vector2(-3, 14))
+	Input.action_press("move_forward")
+	await wait_seconds(1.2)
+	Input.action_release("move_forward")
+	assert_almost_eq(own.global_position.y, 0.5, 0.06, "up on the step")
+	assert_gt(own.global_position.x, -6.0)
+	assert_false(own.is_climbing(), "a step, not a climb")
+
+
+func test_a_block_is_climbed_by_pushing_into_it() -> void:
+	# The cheese block at (0, 1, -10) is two metres tall.
+	var own := _add(1, Vector3(0, 0, -6))
+	await _settle(own)
+	Input.action_press("move_forward")
+	var climbed := false
+	for frame in 120:
+		await wait_physics_frames(1)
+		climbed = climbed or own.is_climbing()
+		if own.global_position.y > 1.9 and not own.is_climbing():
+			break
+	Input.action_release("move_forward")
+	assert_true(climbed, "pulled up, not jumped")
+	assert_almost_eq(own.global_position.y, 2.0, 0.1, "standing on top of it")
+	assert_lt(own.global_position.z, -8.5)
+
+
+func test_a_wall_too_tall_is_not_climbed() -> void:
+	var own := _add(1, Vector3(-10, 0, 14))
+	own.rotation.y = -PI / 2.0
+	await _settle(own)
+	await _box(Vector3(2, Movement.CLIMB_HEIGHT + 0.5, 6), Vector2(-5, 14))
+	Input.action_press("move_forward")
+	await wait_seconds(1.5)
+	Input.action_release("move_forward")
+	assert_false(own.is_climbing())
+	assert_almost_eq(own.global_position.y, 0.0, 0.05)
+	assert_lt(own.global_position.x, -6.0, "stopped at it")
+
+
+func test_a_ledge_is_only_climbed_when_pushed_into() -> void:
+	var own := _add(1, Vector3(0, 0, -7.7))
+	await _settle(own)
+	var space := world.get_world_3d().direct_space_state
+	var found: Variant = own.ledge_ahead(space, own.global_position, Vector3.FORWARD, own.collider.shape, own.collider.position.y)
+	assert_not_null(found, "the block is there to climb")
+	assert_almost_eq((found as Vector3).y, 2.05, 0.01)
+	await wait_seconds(0.5)
+	assert_false(own.is_climbing(), "but standing by it does nothing")
+	assert_null(own.ledge_ahead(space, own.global_position, Vector3.BACK, own.collider.shape, own.collider.position.y), "and there is nothing behind")
+
+
+func test_the_host_accepts_a_climb_onto_a_block_as_movement() -> void:
+	# As Match.on_moved judges each update: against the arena, at waist height.
+	var space := world.get_world_3d().direct_space_state
+	var waist := Vector3.UP * Match.MOVE_CHECK_HEIGHT
+	var blocked := func(from: Vector3, to: Vector3) -> bool:
+		return not space.intersect_ray(PhysicsRayQueryParameters3D.create(from + waist, to + waist, Match.WORLD_MASK)).is_empty()
+	var check := MovementCheck.new()
+	# From beside the block at (0, 1, -10) to the top of it.
+	var from := Vector3(0, 0, -7.75)
+	var to := Vector3(0, 2.05, -9.45)
+	var time := 100.0
+	assert_true(check.check(time, from, 0, blocked, true))
+	var refused := 0
+	# Updates go out twenty times a second.
+	for update in range(1, 12):
+		time += 0.05
+		var at := Movement.climb_position(from, to, update * 0.05)
+		if not check.check(time, at, 0, blocked, update * 0.05 >= Movement.CLIMB_TIME):
+			refused += 1
+	assert_eq(refused, 0)
+	assert_almost_eq(check.last_position().distance_to(to), 0.0, 0.001)

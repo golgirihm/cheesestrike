@@ -22,6 +22,7 @@ const TEXTS := {
 	"burst": "Cheese burst",
 	"knife": "Knife swing",
 	"throw": "Grenade thrown",
+	"slide": "Slide",
 	"step": "Footsteps",
 	"pickup": "Pickup taken",
 	"overload": "Gouda Overload",

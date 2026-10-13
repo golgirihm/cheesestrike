@@ -137,6 +137,19 @@ var _touch_run := false
 # The player's own speed across the ground, which off the ground can only
 # be steered.
 var _walk := Vector2.ZERO
+# A slide: seconds of it left, the speed and way it began with, and seconds
+# until another can begin; and whether crouch was wanted last frame, to tell
+# when it is first pressed.
+var _slide_left := 0.0
+var _slide_from := 0.0
+var _slide_way := Vector2.ZERO
+var _slide_rest := 0.0
+var _crouch_was_wanted := false
+# Pulling up onto a ledge: seconds into it (below zero when not), and where
+# from and to.
+var _climbing := -1.0
+var _climb_from := Vector3.ZERO
+var _climb_to := Vector3.ZERO
 # Seconds a grenade has been held with its fuse burning, or below zero when
 # none is in hand; and whether a touch has asked for one to be thrown at once.
 var _cooking := -1.0
@@ -772,11 +785,27 @@ func _physics_process(delta: float) -> void:
 		return
 	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * Settings.get_value("stick_sensitivity") * delta)
 
+	if _climbing >= 0.0:
+		# Nothing else moves a player who is pulling themselves up.
+		_climbing += delta
+		global_position = Movement.climb_position(_climb_from, _climb_to, _climbing)
+		velocity = Vector3.ZERO
+		_walk = Vector2.ZERO
+		if _climbing >= Movement.CLIMB_TIME:
+			_climbing = -1.0
+		_jump_pressed = false
+		_touch_jump = false
+		_publish()
+		_use_weapon()
+		return
+
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 	elif _jump_pressed or _touch_jump:
 		velocity.y = Movement.JUMP_VELOCITY
 		Sounds.play("jump", -10.0)
+		# A jump ends a slide.
+		_slide_left = 0.0
 	_jump_pressed = false
 	_touch_jump = false
 
@@ -789,9 +818,15 @@ func _physics_process(delta: float) -> void:
 	# On the ground a player goes where they push; in the air they can only
 	# steer what they left it with.
 	_walk = wanted if is_on_floor() else Movement.air_steer(_walk, wanted, delta)
+	_slide(delta)
 	velocity.x = _walk.x + _knockback.x
 	velocity.z = _walk.y + _knockback.z
 	_fall_speed = maxf(-velocity.y, 0.0)
+	if _begin_climb(direction):
+		_publish()
+		_use_weapon()
+		return
+	_step_up(delta)
 	move_and_slide()
 	# Coming down onto the ground jolts the view and the weapon in it, and a
 	# hard landing winds the player for a moment.
@@ -805,6 +840,113 @@ func _physics_process(delta: float) -> void:
 	_publish()
 
 	_use_weapon()
+
+
+## Whether this player is sliding.
+func is_sliding() -> bool:
+	return _slide_left > 0.0
+
+
+# Begins a slide when crouch is first pressed at a run, and while one lasts
+# carries the player the way they were going.
+func _slide(delta: float) -> void:
+	var wants := _wants_crouch()
+	var pressed := wants and not _crouch_was_wanted
+	_crouch_was_wanted = wants
+	_slide_rest = maxf(_slide_rest - delta, 0.0)
+	# How they were going a moment ago: crouching has already cut what they
+	# are asking for now.
+	var going := Vector2(velocity.x, velocity.z)
+	if pressed and is_on_floor() and _slide_rest <= 0.0 and not is_sliding() and Movement.can_slide(going.length()):
+		_slide_from = going.length()
+		_slide_way = going.normalized()
+		_slide_left = Movement.SLIDE_TIME
+		Sounds.play("slide", -8.0)
+	if not is_sliding():
+		return
+	_slide_left -= delta
+	if not wants or not is_on_floor() or _slide_left <= 0.0:
+		_slide_left = 0.0
+		_slide_rest = Movement.SLIDE_REST
+		return
+	_walk = _slide_way * Movement.slide_speed(_slide_from, Movement.SLIDE_TIME - _slide_left)
+
+
+# Walks up a step in the player's way, if it is low enough: up, over it, and
+# down onto it.
+func _step_up(delta: float) -> void:
+	var across := Vector3(velocity.x, 0.0, velocity.z) * delta
+	if not is_on_floor() or across.length() < 0.001:
+		return
+	var from := global_transform
+	if not test_move(from, across):
+		return
+	var rise := Vector3.UP * Movement.STEP_HEIGHT
+	if test_move(from, rise):
+		return
+	var raised := from.translated(rise)
+	# Far enough over it to stand on, not just to touch it.
+	var onto := across.normalized() * maxf(across.length(), 0.15)
+	if test_move(raised, onto):
+		return
+	var landing := KinematicCollision3D.new()
+	if not test_move(raised.translated(onto), -rise, landing):
+		return
+	var top := raised.origin + onto + landing.get_travel()
+	if top.y - from.origin.y < 0.03 or landing.get_normal().angle_to(Vector3.UP) > floor_max_angle:
+		return
+	global_position = top
+
+
+## The top of a ledge in front of a player at `feet` facing `forward`
+## (level, normalized), if there is one they could pull themselves onto:
+## above stepping height, no higher than CLIMB_HEIGHT, with room to stand. Or
+## null. `space` is the arena, and `shape` the player's own, standing with
+## its bottom `lift` above their feet.
+static func ledge_ahead(space: PhysicsDirectSpaceState3D, feet: Vector3, forward: Vector3, shape: Shape3D, lift: float) -> Variant:
+	var reach := BodyShape.RADIUS + 0.5
+	var above := feet + forward * reach + Vector3.UP * (Movement.CLIMB_HEIGHT + 0.2)
+	var down := PhysicsRayQueryParameters3D.create(above, above + Vector3.DOWN * (Movement.CLIMB_HEIGHT + 0.2), Match.WORLD_MASK)
+	var top := space.intersect_ray(down)
+	if top.is_empty() or (top.normal as Vector3).angle_to(Vector3.UP) > 0.6:
+		return null
+	var height: float = top.position.y - feet.y
+	if height <= Movement.STEP_HEIGHT or height > Movement.CLIMB_HEIGHT:
+		return null
+	var stand: Vector3 = top.position + Vector3.UP * 0.05
+	var room := PhysicsShapeQueryParameters3D.new()
+	room.shape = shape
+	room.collision_mask = Match.WORLD_MASK
+	# Room to stand on it, and to rise to it from here.
+	for at: Vector3 in [stand, Vector3(feet.x, stand.y, feet.z)]:
+		room.transform = Transform3D(Basis.IDENTITY, at + Vector3.UP * lift)
+		if not space.intersect_shape(room, 1).is_empty():
+			return null
+	return stand
+
+
+# Begins pulling up onto a ledge the player is pushing into, if there is one.
+func _begin_climb(direction: Vector3) -> bool:
+	if direction.length() < 0.5 or _wants_crouch() or velocity.y > 2.0:
+		return false
+	var forward := -global_basis.z
+	# Pushing toward it, not along or away from it.
+	if direction.normalized().dot(forward) < 0.7 or not test_move(global_transform, forward * 0.25):
+		return false
+	var ledge: Variant = ledge_ahead(get_world_3d().direct_space_state, global_position, forward, collider.shape, collider.position.y)
+	if ledge == null:
+		return false
+	_climbing = 0.0
+	_climb_from = global_position
+	_climb_to = ledge
+	_slide_left = 0.0
+	Sounds.play("jump", -12.0, 0.8)
+	return true
+
+
+## Whether this player is pulling themselves up onto a ledge.
+func is_climbing() -> bool:
+	return _climbing >= 0.0
 
 
 # Takes a grenade in hand, its fuse burning, if there is one to take.
