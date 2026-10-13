@@ -49,6 +49,8 @@ var _alone_settings: MatchSettings
 ## The tutorial the player is being taken through, or null.
 var tutorial: Tutorial
 var arena_editor: Control
+## Covers the view while the game gets ready (see Warmup).
+var loading_cover: ColorRect
 # Who the pause menu's vote-to-remove button names.
 var _remove_target := 0
 # Whether the mouse was captured as of the last frame. Esc while it is captured
@@ -59,6 +61,20 @@ var copied_link := ""
 
 
 func _ready() -> void:
+	# The first of everything is drawn behind a cover, before anyone plays.
+	loading_cover = ColorRect.new()
+	loading_cover.name = "LoadingCover"
+	loading_cover.color = Color(0.09, 0.08, 0.07)
+	loading_cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var getting_ready := Label.new()
+	getting_ready.text = "Getting ready…"
+	getting_ready.add_theme_font_size_override("font_size", 28)
+	getting_ready.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	getting_ready.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	loading_cover.add_child(getting_ready)
+	menu.get_parent().add_child(loading_cover)
+	world.warmed.connect(loading_cover.hide)
+	world.warm_up.call_deferred()
 	Net.session_started.connect(_on_session_started)
 	Net.session_failed.connect(_on_session_failed)
 	Net.session_ended.connect(_on_session_ended)

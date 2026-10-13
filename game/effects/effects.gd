@@ -214,6 +214,15 @@ func burst_specks(at: Vector3, radius: float) -> void:
 	_puff(at, Vector3.UP, Color(0.25, 0.24, 0.24, 0.42), 14, radius * 0.6, SMOKE_LIFE, radius * 0.3, false, {"spread": 180.0, "gravity": -0.8, "grow": 2.6, "matters": true})
 
 
+## Clears every effect away at once.
+func clear() -> void:
+	for child in get_children():
+		child.queue_free()
+	for kept: Array in [_marks, _prints, _casings, _debris, _tracers, _live]:
+		kept.clear()
+	_projectiles.clear()
+
+
 ## How many specks are in the air.
 func specks_showing() -> int:
 	var total := 0

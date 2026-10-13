@@ -52,6 +52,7 @@ var world: Node3D
 var _hit := 0.0
 var _blur := 0.0
 var _time := 0.0
+var _warming := false
 var _red: ColorRect
 var _blurred: ColorRect
 
@@ -119,9 +120,17 @@ func burst_near(distance: float, radius: float) -> void:
 	_blur = maxf(_blur, blur_from(distance, radius, Settings.get_value("screen_shake")))
 
 
+## Draws both sheets, faintly, while the game gets ready (see Warmup), or
+## stops doing so.
+func warm(on: bool) -> void:
+	_warming = on
+	_red.visible = on
+	_blurred.visible = on
+
+
 ## How red the edges are and how blurred the view is, as drawn.
 func showing() -> Dictionary:
-	return {"red": _red.material.get_shader_parameter("red") if _red.visible else 0.0, "blur": _blur if _blurred.visible else 0.0}
+	return {"red": _red.material.get_shader_parameter("red") if _red.visible and not _warming else 0.0, "blur": _blur if _blurred.visible and not _warming else 0.0}
 
 
 func _process(delta: float) -> void:
@@ -137,10 +146,10 @@ func _process(delta: float) -> void:
 		# Nobody to be hurt: out of a match, watching, or knocked out.
 		_hit = 0.0
 		_blur = 0.0
-	_red.visible = red > 0.005
+	_red.visible = red > 0.005 or _warming
 	_red.material.set_shader_parameter("red", red)
 	# The blur reads the whole picture back, so it is drawn only when wanted.
-	_blurred.visible = _blur > 0.01
+	_blurred.visible = _blur > 0.01 or _warming
 	_blurred.material.set_shader_parameter("amount", _blur)
 
 

@@ -34,6 +34,10 @@ var fixtures := {"pads": [], "ladders": []}
 ## The code of the custom arena to play on (see ArenaCode), when the match is
 ## on one: the host's own, or what the host sent.
 var custom_code := ""
+## Whether the game is getting ready (see warm_up), and when it has.
+var warming := false
+var _warm_frames := 0
+signal warmed
 ## The layer that darkens the corners of the view (see Picture).
 var vignette: CanvasLayer
 var _outlines_in := 0.0
@@ -117,6 +121,36 @@ func _ready() -> void:
 				Detail.thin(map, GraphicsQuality.choice(GraphicsQuality.EFFECTS))
 		elif key in [Picture.BLOOM, Picture.GRADE, Picture.VIGNETTE]:
 			apply_picture())
+
+
+## Draws one of everything a fight shows in front of the view for a few
+## frames, so that the first of each in play doesn't make the game catch
+## (see Warmup). Whoever calls it covers the view meanwhile.
+func warm_up() -> void:
+	if not is_inside_tree():
+		return
+	warming = true
+	var camera := get_viewport().get_camera_3d()
+	var at := camera.global_position - camera.global_basis.z * Warmup.AHEAD if camera != null else Vector3.UP * 3.0
+	var props := Warmup.props()
+	add_child(props)
+	props.global_position = at
+	Outlines.put(props.get_child(0), Color.WHITE, true)
+	Outlines.put(props.get_child(1), Color.WHITE, false)
+	Warmup.fire(effects, at)
+	hurt_view.warm(true)
+	_warm_frames = Warmup.FRAMES
+
+
+# Clears away what was drawn to get ready.
+func _finish_warm_up() -> void:
+	var props := get_node_or_null("Warmup")
+	if props != null:
+		props.queue_free()
+	effects.clear()
+	hurt_view.warm(false)
+	warming = false
+	warmed.emit()
 
 
 ## Puts the chosen graphics quality into effect.
@@ -444,6 +478,10 @@ func _show_pickups() -> void:
 
 
 func _process(delta: float) -> void:
+	if _warm_frames > 0:
+		_warm_frames -= 1
+		if _warm_frames == 0:
+			_finish_warm_up()
 	for pad: Node3D in map.get_node("Pickups").get_children():
 		pad.get_node("Item").rotate_y(delta * 1.5)
 	_outlines_in -= delta
