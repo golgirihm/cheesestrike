@@ -23,6 +23,8 @@ func _ready() -> void:
 static func entry_text(attacker: String, victim: String, weapon: String, head: bool) -> String:
 	var stats := Weapons.find(weapon)
 	var using := stats.display_name if stats != null else weapon
+	if weapon == Melee.ID:
+		using = Melee.NAME
 	if attacker.is_empty():
 		return "%s  knocked themself out  [%s]" % [victim, using]
 	return "%s  [%s%s]  %s" % [attacker, using, ", head" if head else "", victim]

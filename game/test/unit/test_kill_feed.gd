@@ -54,3 +54,7 @@ func test_clearing_empties_the_feed() -> void:
 	feed.add("A", "B", "blaster", false)
 	feed.clear()
 	assert_eq(feed.showing().size(), 0)
+
+
+func test_the_knife_is_named_in_the_feed() -> void:
+	assert_eq(FEED.entry_text("Brie", "Edam", Melee.ID, false), "Brie  [Cheese Knife]  Edam")

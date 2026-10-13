@@ -31,6 +31,10 @@ var _spawn_slots: SpawnSlots
 func _ready() -> void:
 	spawner.spawn_function = _create_player
 	match_.shot_shown.connect(_show_others_shot)
+	match_.strike_shown.connect(func(striker: int) -> void:
+		var player := player_node(striker)
+		if player != null:
+			player.swing_knife())
 	match_.projectile_launched.connect(effects.launch_projectile)
 	match_.projectile_burst.connect(effects.burst_projectile)
 	match_.state_changed.connect(_on_state_changed)

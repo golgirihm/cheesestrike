@@ -13,6 +13,7 @@ const REBINDABLE := {
 	"jump": "Jump",
 	"sprint": "Run",
 	"reload": "Reload",
+	"melee": "Knife",
 	"overload": "Overload",
 	"scoreboard": "Scoreboard",
 }

@@ -20,6 +20,7 @@ const TEXTS := {
 	"grater": "Grater fire",
 	"launcher": "Launcher shot",
 	"burst": "Cheese burst",
+	"knife": "Knife swing",
 	"step": "Footsteps",
 	"pickup": "Pickup taken",
 	"overload": "Gouda Overload",
