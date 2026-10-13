@@ -149,9 +149,11 @@ func test_a_footstep_is_a_heel_and_then_a_sole() -> void:
 
 
 func test_a_sound_can_be_played_a_little_higher_or_lower() -> void:
-	Sounds.play("hit", 0.0, 1.2)
-	var voice: AudioStreamPlayer = Sounds._flat_voices.filter(func(flat: AudioStreamPlayer) -> bool: return flat.playing and flat.stream == SoundBank.get_sound("hit"))[0]
-	assert_almost_eq(voice.pitch_scale, 1.2, 0.0001)
+	# An odd pitch, to tell this voice from any still playing from before.
+	Sounds.play("hit", 0.0, 1.23)
+	var raised := Sounds._flat_voices.filter(func(flat: AudioStreamPlayer) -> bool:
+		return flat.stream == SoundBank.get_sound("hit") and is_equal_approx(flat.pitch_scale, 1.23))
+	assert_eq(raised.size(), 1)
 	for i in 20:
 		assert_between(Sounds.varied(0.1), 0.9, 1.1)
 
