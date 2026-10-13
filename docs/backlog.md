@@ -68,9 +68,7 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* manual rows; a GUT test that each arena has its lighting.
 3. **Inside the buildings.** Open a floor or two of the city's towers: lobbies, stairs, windows to shoot from.
    *Tests:* the arena tests (spots fit, pads reachable, nowhere traps) already run over every arena.
-4. **More arenas.** A dairy with vats and conveyor belts, a kitchen at mouse scale, a market, a cheese cave, a small one for duels.
-   *Tests:* the arena tests.
-5. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
+4. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
    *Tests:* GUT tests of saving and loading; the arena tests run on a saved arena.
 
 ## Milestone 8: A picture that holds up
