@@ -163,6 +163,33 @@ func test_walking_over_a_drop_takes_it_without_changing_what_is_in_hand() -> voi
 	assert_eq(world.drops_shown(), 0)
 
 
+func test_a_player_just_brought_back_does_not_take_what_they_left_where_they_fell() -> void:
+	_add(1, Vector3(0, 0, 9), "blaster")
+	var victim := _add(2, Vector3(5, 0, -9), "grater")
+	match_._harm(1, 2, 500.0, Vector3.ZERO, "blaster", false)
+	# Back in play, but still seen where they fell until they say otherwise.
+	match_._bring_back(2, Vector3(-12, 0, 12))
+	assert_true(match_.state.player(2).alive)
+	match_._physics_process(1.0 / 60.0)
+	assert_eq(match_.state.drops.size(), 1, "it lies there still")
+	# Seen where they were sent, they are themselves again: and can walk back.
+	victim.global_position = Vector3(-12, 0, 12)
+	match_._physics_process(1.0 / 60.0)
+	victim.global_position = Vector3(5, 0, -9)
+	match_._physics_process(1.0 / 60.0)
+	assert_eq(match_.state.drops.size(), 0)
+	assert_true(match_.state.player(2).weapons.has("grater"))
+
+
+func test_the_hosts_own_player_is_always_where_they_are_seen() -> void:
+	var own := _add(1, Vector3(0, 0, 9), "blaster")
+	match_.state.drop("rifle", Vector3(-12, 0, 12))
+	match_._bring_back(1, Vector3(-12, 0, 12))
+	assert_almost_eq(own.global_position.x, -12.0, 0.01)
+	match_._physics_process(1.0 / 60.0)
+	assert_eq(match_.state.drops.size(), 0)
+
+
 func test_a_weapon_found_on_a_pad_still_comes_into_hand() -> void:
 	var own := _add(1, Vector3(0, 0, 9), "blaster")
 	own.equip("blaster")
