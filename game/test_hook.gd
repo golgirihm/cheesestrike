@@ -171,6 +171,7 @@ func snapshot() -> Dictionary:
 		"music": Sounds.is_music_playing(),
 		"replays_seen": _main.world.replay_view.played,
 		"sky": _main.world.atmosphere.showing,
+		"hurt_view": _main.world.hurt_view.showing(),
 		"editor": _main.arena_editor.text() if _main.arena_editor.visible else [],
 		"editor_link": _main.arena_editor.link() if _main.arena_editor.visible else "",
 		"custom_arena": Settings.get_value("custom_arena"),
