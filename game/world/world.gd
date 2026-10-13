@@ -48,6 +48,8 @@ var _frames := 0
 var _frames_took := 0.0
 ## What being hurt looks like to this machine's player.
 var hurt_view: HurtView
+## The voice that tells this machine's player how the match stands.
+var announcer: Announcer
 var _built_code := ""
 ## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
@@ -109,6 +111,8 @@ func _ready() -> void:
 	add_child(vignette)
 	hurt_view = HurtView.new(self)
 	add_child(hurt_view)
+	announcer = Announcer.new(self)
+	add_child(announcer)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()

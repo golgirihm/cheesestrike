@@ -38,6 +38,7 @@ const TOGGLES := [
 	["damage_numbers", "Show the damage of each hit"],
 	["replays", "Show how I was knocked out, and the play of the match"],
 	["mono_sound", "Mono sound"],
+	["announcer", "The announcer's voice"],
 	["outlines", "Outline teammates and nearby pickups"],
 	["dynamic_resolution", "Lower the render scale to hold the frame rate"],
 	["bloom", "Glow on bright things"],

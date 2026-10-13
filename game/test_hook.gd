@@ -182,6 +182,7 @@ func snapshot() -> Dictionary:
 		"music": Sounds.is_music_playing(),
 		"replays_seen": _main.world.replay_view.played,
 		"sky": _main.world.atmosphere.showing,
+		"announcer": _main.world.announcer.spoken.slice(-6),
 		"frames": {"typical": frame_times.typical(), "now": frame_times.now(), "seconds": frame_times.seconds},
 		"hurt_view": _main.world.hurt_view.showing(),
 		"editor": _main.arena_editor.text() if _main.arena_editor.visible else [],
