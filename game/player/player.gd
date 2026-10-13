@@ -531,7 +531,8 @@ func _grow() -> void:
 static func colour_for(id: int) -> Color:
 	# Never yellow, which is kept for cheese that can be eaten: the hues run
 	# from green round through blue and red to orange.
-	return Color.from_hsv(fmod(0.22 + 0.86 * fmod(id * 0.618034, 1.0), 1.0), 0.65, 0.95)
+	# A bot's id is below zero, and is coloured as the same number above it.
+	return Color.from_hsv(fmod(0.22 + 0.86 * fmod(absi(id) * 0.618034, 1.0), 1.0), 0.65, 0.95)
 
 
 # Team colours on the body and name, and a badge over the head whose shape

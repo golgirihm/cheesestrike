@@ -45,6 +45,21 @@ func accuracy(weapon: String) -> float:
 	return float(entry.hits) / entry.shots if entry.shots > 0 else 0.0
 
 
+## A line for each weapon that was used, in the order they were first
+## fired, saying how well: shots, the share that hit, and the damage done.
+func practice_lines() -> Array[String]:
+	var text: Array[String] = []
+	for weapon: String in _by_weapon:
+		var entry: Dictionary = _by_weapon[weapon]
+		if entry.shots <= 0:
+			continue
+		var stats := Weapons.find(weapon)
+		var name := stats.display_name if stats != null else (Melee.NAME if weapon == Melee.ID else weapon)
+		var each: float = float(entry.damage) / entry.hits if entry.hits > 0 else 0.0
+		text.append("%s: %d fired · %d%% hit · %d damage (%.0f a hit)" % [name, entry.shots, roundi(minf(accuracy(weapon), 1.0) * 100.0), entry.damage, each])
+	return text
+
+
 ## A line for each weapon that was used, the one that did most damage first.
 func lines() -> Array[String]:
 	var used := _by_weapon.keys().filter(func(weapon: String) -> bool:

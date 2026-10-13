@@ -43,6 +43,9 @@ extends Node
 
 # Each match setting's button, choices and description, by setting.
 var _match_buttons := {}
+# The settings of a session of this machine alone, such as the practice
+# range's, while one is being started; otherwise null.
+var _alone_settings: MatchSettings
 # Whether the mouse was captured as of the last frame. Esc while it is captured
 # only frees the mouse; the press after that opens the menu.
 var _was_captured := false
@@ -60,6 +63,12 @@ func _ready() -> void:
 	disconnected_button.pressed.connect(_dismiss_disconnected)
 	rejoin_button.pressed.connect(_rejoin)
 	host_button.pressed.connect(_host)
+	var practice_button := Button.new()
+	practice_button.name = "PracticeButton"
+	practice_button.text = "Practice range"
+	practice_button.custom_minimum_size = host_button.custom_minimum_size
+	host_button.add_sibling(practice_button)
+	practice_button.pressed.connect(_practise)
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
 	target_edit.text_submitted.connect(_join)
 	refresh_button.pressed.connect(Net.request_sessions)
@@ -106,7 +115,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if hud.visible:
-		hud.text = "Session %s  ·  %d playing" % [Net.room_code, world.players.get_child_count()]
+		hud.text = "Practice range" if Net.alone else "Session %s  ·  %d playing" % [Net.room_code, world.players.get_child_count()]
 	_was_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	menu_button.visible = hud.visible and not _was_captured and not pause_menu.visible
 
@@ -213,6 +222,13 @@ func _host() -> void:
 	Net.host(host_settings(), Settings.get_value("host_private"))
 
 
+# Starts a session alone on the practice range.
+func _practise() -> void:
+	_remember_name()
+	_alone_settings = MatchSettings.practice()
+	Net.play_alone()
+
+
 func _join(target: String) -> void:
 	if Net.use_webrtc and target.strip_edges().is_empty():
 		status.text = "Enter a session code."
@@ -243,7 +259,9 @@ func _on_session_started() -> void:
 	hud.show()
 	combat_hud.show()
 	touch_controls.show()
-	world.start(host_settings())
+	world.start(_alone_settings if _alone_settings != null else host_settings())
+	_alone_settings = null
+	copy_link_button.visible = Net.use_webrtc and OS.has_feature("web") and not Net.alone
 	if not Settings.get_value("seen_help"):
 		Settings.set_value("seen_help", true)
 		show_help()

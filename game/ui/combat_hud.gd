@@ -71,6 +71,8 @@ var kill_feed: VBoxContainer
 var scoreboard: PanelContainer
 var _match_label: Label
 var _objective_label: Label
+# What each weapon has done, on the practice range.
+var _practice_label: Label
 var _result: PanelContainer
 var _result_title: Label
 var _result_detail: Label
@@ -147,6 +149,8 @@ static func clock_text(seconds: float) -> String:
 static func match_text(state: MatchState) -> String:
 	if not state.is_playing():
 		return "Match over"
+	if state.settings.is_practice():
+		return "Practice range"
 	if state.is_warm_up():
 		return "Warm-up   ·   waiting for players"
 	var clock := clock_text(state.time_left)
@@ -300,6 +304,9 @@ func _process(delta: float) -> void:
 		_weapon_label.text = own.weapon.stats.display_name
 	var state: MatchState = world.match_.state
 	_match_label.text = match_text(state)
+	_practice_label.visible = state.settings.is_practice() and state.is_playing()
+	if _practice_label.visible:
+		_practice_label.text = "\n".join(world.match_.tally.practice_lines())
 	_objective_label.text = state.objective_text(multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else 0)
 	_result.visible = not state.is_playing()
 	if _result.visible:
@@ -334,6 +341,11 @@ func _on_announced(text: String, team: int) -> void:
 	_announce_label.text = text
 	_announce_label.add_theme_color_override("font_color", TeamColors.of(team))
 	_announce_left = ANNOUNCE_LIFE
+
+
+## What the practice range says each weapon has done, a line for each.
+func practice_shown() -> Array:
+	return Array(_practice_label.text.split("\n", false)) if _practice_label.visible else []
 
 
 func objective_shown() -> String:
@@ -508,6 +520,14 @@ func _build() -> void:
 	_announce_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_announce_label.visible = false
 	add_child(_announce_label)
+
+	_practice_label = _outlined_label(14)
+	_practice_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_MINSIZE, 20)
+	_practice_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_practice_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_practice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_practice_label.visible = false
+	add_child(_practice_label)
 
 	var arms := VBoxContainer.new()
 	arms.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)

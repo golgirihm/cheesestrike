@@ -16,9 +16,12 @@ const POINTS := "points"
 const ROUNDS := "rounds"
 ## Every knock-out moves a player to the next weapon (see GunGame).
 const GUN_GAME := "gun"
+## Alone on the practice range: no match, only targets to shoot at. Not
+## among the modes a host chooses from.
+const PRACTICE := "practice"
 const MODES := [FREE_FOR_ALL, TEAMS, CAPTURE, HILL, POINTS, ROUNDS, GUN_GAME]
 const MODE_NAMES := {FREE_FOR_ALL: "Free-for-all", TEAMS: "Cheddar vs Brie", CAPTURE: "Capture the wheel", HILL: "Hold the hill",
-	POINTS: "Three points", ROUNDS: "Last mouse standing", GUN_GAME: "Gun game"}
+	POINTS: "Three points", ROUNDS: "Last mouse standing", GUN_GAME: "Gun game", PRACTICE: "Practice"}
 ## The modes played in two teams.
 const TEAM_MODES := [TEAMS, CAPTURE, HILL, POINTS, ROUNDS]
 ## The modes won on points rather than knock-outs, and the points that win.
@@ -42,6 +45,15 @@ var bot_skill := BotBrain.NORMAL
 
 func is_teams() -> bool:
 	return TEAM_MODES.has(mode)
+
+
+## The settings of a session on the practice range.
+static func practice() -> MatchSettings:
+	return from_dict({"mode": PRACTICE, "map": Maps.RANGE, "max_players": MIN_PLAYERS})
+
+
+func is_practice() -> bool:
+	return mode == PRACTICE
 
 
 ## Whether teams score points for what they do, rather than knock-outs.
@@ -74,7 +86,7 @@ static func from_dict(data: Variant) -> MatchSettings:
 	var settings := MatchSettings.new()
 	if not data is Dictionary:
 		return settings
-	if data.get("mode") in MODES:
+	if data.get("mode") in MODES or data.get("mode") == PRACTICE:
 		settings.mode = data.mode
 	settings.kill_limit = _whole(data.get("kill_limit"), settings.kill_limit, 1, 999)
 	settings.minutes = _whole(data.get("minutes"), settings.minutes, 1, 60)

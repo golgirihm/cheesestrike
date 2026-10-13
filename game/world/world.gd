@@ -29,6 +29,8 @@ var menu_camera: Camera3D
 
 # Which starting spot each player holds. Only the host uses it.
 var _spawn_slots: SpawnSlots
+# Where each player with a place of their own stands: the range's targets.
+var _homes := {}
 
 
 func _ready() -> void:
@@ -106,6 +108,7 @@ func start(settings := MatchSettings.new()) -> void:
 	multiplayer.peer_disconnected.connect(_remove_player)
 	match_.start(settings)
 	_add_player(1)
+	_stand_targets()
 
 
 func stop() -> void:
@@ -164,11 +167,53 @@ func _leave(id: int) -> void:
 		print("player left: %d" % id)
 
 
-## The ids of the bots in the session.
+## Where player `id` belongs, if they have a place of their own, or null.
+func home_of(id: int) -> Variant:
+	return _homes.get(id)
+
+
+## The loaded arena's targets, as the practice range has: each {"position",
+## "distance": metres from the firing line}.
+func target_spots() -> Array:
+	var holder := map.get_node_or_null("Targets") if map != null else null
+	if holder == null:
+		return []
+	return holder.get_children().map(func(marker: Node3D) -> Dictionary:
+		return {"position": marker.global_position, "distance": int(marker.get_meta("distance", 0))})
+
+
+# Host only, on the practice range: stands a target at each of its places,
+# under a sign saying how far off it is. A target is a player that only
+# stands there, so hitting one is exactly like hitting anyone.
+func _stand_targets() -> void:
+	_homes.clear()
+	for sign in get_tree().get_nodes_in_group("range_signs"):
+		sign.queue_free()
+	if not match_.has_state() or not match_.state.settings.is_practice() or not match_.is_host():
+		return
+	var spots := target_spots()
+	for index in spots.size():
+		var id := Bots.target_id(index)
+		var spot: Dictionary = spots[index]
+		_homes[id] = spot.position
+		match_.add_player(id)
+		match_.state.rename(id, "Target %d m" % spot.distance)
+		spawner.spawn([id, spot.position])
+		var sign := Label3D.new()
+		sign.text = "%d m" % spot.distance
+		sign.font_size = 220
+		sign.outline_size = 30
+		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		sign.add_to_group("range_signs")
+		add_child(sign)
+		sign.global_position = spot.position + Vector3.UP * (BodyShape.HEIGHT + 1.6)
+
+
+## The ids of the bots in the session: not the practice range's targets.
 func bot_ids() -> Array:
 	var ids := []
 	for id: int in match_.state.players:
-		if Bots.is_bot(id):
+		if Bots.is_bot(id) and not Bots.is_target(id):
 			ids.append(id)
 	ids.sort()
 	return ids
@@ -180,7 +225,8 @@ func _fill_with_bots() -> void:
 	if not match_.has_state() or not match_.is_host():
 		return
 	var here := bot_ids()
-	var wanted := Bots.wanted(match_.state.settings, match_.state.players.size() - here.size())
+	var humans: int = match_.state.players.keys().filter(func(id: int) -> bool: return not Bots.is_bot(id)).size()
+	var wanted := Bots.wanted(match_.state.settings, humans)
 	# The last to come are the first to go.
 	while here.size() > wanted:
 		_leave(here.pop_front())

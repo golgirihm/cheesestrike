@@ -60,6 +60,13 @@ func test_a_bot_is_known_by_an_id_no_player_has() -> void:
 	assert_ne(Bots.name_for(-1), Bots.name_for(-2))
 
 
+func test_no_bot_or_target_is_the_yellow_of_cheese() -> void:
+	const PLAYER := preload("res://player/player.gd")
+	for index in MatchSettings.MAX_PLAYERS:
+		for id: int in [Bots.id_for(index), Bots.target_id(index)]:
+			assert_false(Scenery.is_yellow(PLAYER.colour_for(id)), str(id))
+
+
 func test_bots_make_way_for_players() -> void:
 	var settings := MatchSettings.from_dict({"bots": 5, "max_players": 6})
 	assert_eq(Bots.wanted(settings, 1), 5)
