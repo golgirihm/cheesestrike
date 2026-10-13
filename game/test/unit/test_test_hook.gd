@@ -21,7 +21,20 @@ func before_each() -> void:
 	await wait_process_frames(2)
 
 
-func test_it_starts_on_the_menu_with_nobody_playing() -> void:
+func test_it_starts_on_the_title_screen_and_names_each_screen_from_there() -> void:
+	assert_eq(hook.snapshot().screen, "title")
+	assert_has(hook.snapshot().controls, "PlayButton")
+	main.front_end.button("credits").pressed.emit()
+	assert_eq(hook.snapshot().screen, "credits")
+	main.front_end.show_credits(false)
+	assert_eq(hook.snapshot().screen, "title")
+	main.front_end.button("play").pressed.emit()
+	assert_eq(hook.snapshot().screen, "menu")
+	assert_does_not_have(hook.snapshot().controls, "PlayButton")
+
+
+func test_it_starts_with_nobody_playing() -> void:
+	main.front_end.button("play").pressed.emit()
 	var seen := hook.snapshot()
 	assert_eq(seen.screen, "menu")
 	assert_eq(seen.players, [])
@@ -30,6 +43,8 @@ func test_it_starts_on_the_menu_with_nobody_playing() -> void:
 
 
 func test_it_says_where_the_visible_controls_are() -> void:
+	main.front_end.button("play").pressed.emit()
+	await wait_process_frames(2)
 	var controls: Dictionary = hook.snapshot().controls
 	assert_has(controls, "HostButton")
 	assert_has(controls, "TargetEdit")
@@ -43,6 +58,8 @@ func test_it_says_where_the_visible_controls_are() -> void:
 
 
 func test_each_control_is_reported_at_its_own_place() -> void:
+	main.front_end.button("play").pressed.emit()
+	await wait_process_frames(2)
 	var controls: Dictionary = hook.snapshot().controls
 	assert_ne(controls.HostButton, controls.JoinButton)
 	assert_ne(controls.TargetEdit, controls.JoinButton)

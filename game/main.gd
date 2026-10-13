@@ -49,6 +49,8 @@ var _alone_settings: MatchSettings
 ## The tutorial the player is being taken through, or null.
 var tutorial: Tutorial
 var arena_editor: Control
+## The title screen.
+var front_end: FrontEnd
 var _mute_target := 0
 ## Milliseconds of each frame spent making sounds while the game gets ready.
 const SOUND_MAKING_MS := 12
@@ -56,6 +58,13 @@ const SOUND_MAKING_MS := 12
 ## everything has been drawn, and every sound has been made.
 var loading_cover: ColorRect
 var _drawn_once := false
+## The bar on the cover, and every amount it has shown, for tests.
+var loading_bar: ProgressBar
+var loading_seen: Array[float] = []
+## What is shown while a session is being joined or started.
+var join_screen: JoinScreen
+# The sessions last listed, to know a session's arena before joining it.
+var _listed: Array = []
 # Who the pause menu's vote-to-remove button names.
 var _remove_target := 0
 # Whether the mouse was captured as of the last frame. Esc while it is captured
@@ -77,6 +86,16 @@ func _ready() -> void:
 	getting_ready.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	getting_ready.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	loading_cover.add_child(getting_ready)
+	loading_bar = ProgressBar.new()
+	loading_bar.name = "LoadingBar"
+	loading_bar.theme = Look.theme()
+	loading_bar.show_percentage = false
+	loading_bar.max_value = 1.0
+	loading_bar.custom_minimum_size = Vector2(280, 14)
+	loading_bar.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	loading_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	loading_bar.position.y += 34
+	loading_cover.add_child(loading_bar)
 	menu.get_parent().add_child(loading_cover)
 	world.warmed.connect(func() -> void: _drawn_once = true)
 	world.warm_up.call_deferred()
@@ -89,32 +108,37 @@ func _ready() -> void:
 	disconnected_button.pressed.connect(_dismiss_disconnected)
 	rejoin_button.pressed.connect(_rejoin)
 	host_button.pressed.connect(_host)
-	var practice_button := Button.new()
-	practice_button.name = "PracticeButton"
-	practice_button.text = "Practice range"
-	practice_button.custom_minimum_size = host_button.custom_minimum_size
-	host_button.add_sibling(practice_button)
-	practice_button.pressed.connect(_practise)
-	var editor_button := Button.new()
-	editor_button.name = "EditorButton"
-	editor_button.text = "Arena editor"
-	editor_button.custom_minimum_size = host_button.custom_minimum_size
-	practice_button.add_sibling(editor_button)
+	# The whole interface has one look (see Look).
+	for screen in menu.get_parent().get_children():
+		if screen is Control:
+			screen.theme = Look.theme()
+	Look.heading(menu.find_child("Title", true, false))
+	# The title screen, which leads to everything else.
+	front_end = FrontEnd.new()
+	menu.get_parent().add_child(front_end)
+	menu.get_parent().move_child(front_end, menu.get_index())
+	front_end.chosen.connect(_on_way_in_chosen)
+	join_screen = JoinScreen.new()
+	menu.get_parent().add_child(join_screen)
 	arena_editor = preload("res://ui/arena_editor.gd").new()
 	arena_editor.name = "ArenaEditor"
+	arena_editor.theme = Look.theme()
 	menu.get_parent().add_child(arena_editor)
-	editor_button.pressed.connect(func() -> void:
-		menu.hide()
-		arena_editor.open(world))
 	arena_editor.closed.connect(func() -> void:
 		_show_match_setting("host_map")
 		_show_menu(""))
-	var tutorial_button := Button.new()
-	tutorial_button.name = "TutorialButton"
-	tutorial_button.text = "How to play"
-	tutorial_button.custom_minimum_size = host_button.custom_minimum_size
-	practice_button.add_sibling(tutorial_button)
-	tutorial_button.pressed.connect(_teach)
+	# From hosting and joining, the way back to the title screen.
+	var back := Button.new()
+	back.name = "BackButton"
+	back.text = "Back"
+	back.icon = Icons.texture("back", 22, Look.CREAM)
+	back.custom_minimum_size = host_button.custom_minimum_size
+	# Beside the button that hosts, where "Settings" is, which the title
+	# screen has now.
+	settings_button.add_sibling(back)
+	settings_button.hide()
+	back.pressed.connect(show_title)
+	Look.emphasise(host_button)
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
 	# Whether to join to play or to watch, and the same choice once in.
 	var watch_button := Button.new()
@@ -203,6 +227,13 @@ func _ready() -> void:
 		target_edit.text = invited
 		_join(invited)
 
+	# Someone who came by a link to an arena or a session is taken straight
+	# to it; anyone else starts at the title screen.
+	if arena.is_empty() and invited.is_empty():
+		show_title()
+	else:
+		front_end.hide()
+
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--host":
 			_host()
@@ -213,8 +244,23 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	# A few sounds are made each frame behind the cover, which goes once
 	# they all are and one of everything has been drawn.
-	if loading_cover.visible and SoundBank.make_some(SOUND_MAKING_MS) and _drawn_once:
-		loading_cover.hide()
+	if loading_cover.visible:
+		var all_made := SoundBank.make_some(SOUND_MAKING_MS)
+		loading_bar.value = loading_progress(SoundBank.made_share(), _drawn_once)
+		if not loading_seen.has(snappedf(loading_bar.value, 0.01)):
+			loading_seen.append(snappedf(loading_bar.value, 0.01))
+		if all_made and _drawn_once:
+			loading_cover.hide()
+	# While joining, the screen that says where to; it goes once the arena
+	# is there to stand in.
+	if join_screen.visible and hud.visible:
+		if world.match_.has_state():
+			join_screen.set_arena(world.match_.state.settings.map)
+		if world.ready_to_play():
+			join_screen.hide()
+	# Behind the title screen the arena is looked at from a view that drifts.
+	if front_end.visible:
+		world.drift_menu_view(Time.get_ticks_msec() / 1000.0)
 	if hud.visible:
 		hud.text = "Practice range" if Net.alone else "Session %s  ·  %d playing" % [Net.room_code, world.players.get_child_count()]
 		# Who is heard talking, by name.
@@ -362,11 +408,10 @@ func host_settings() -> MatchSettings:
 
 func _host() -> void:
 	_remember_name()
-	_set_busy("Starting session…")
+	_set_busy("Starting session…", host_settings().map)
 	Net.host(host_settings(), Settings.get_value("host_private"))
 
 
-## The players this one could ask for a vote on removing, in order.
 ## The other real players in the session, whose talk can be muted.
 func others_here() -> Array:
 	if multiplayer.multiplayer_peer == null or not world.match_.has_state():
@@ -377,6 +422,7 @@ func others_here() -> Array:
 	return found
 
 
+## The players this one could ask for a vote on removing, in order.
 func removable() -> Array:
 	if multiplayer.multiplayer_peer == null or not world.match_.has_state():
 		return []
@@ -436,7 +482,12 @@ func _join(target: String) -> void:
 		status.text = "Enter a session code."
 		return
 	_remember_name()
-	_set_busy("Joining…")
+	# Its arena is known already if it is one of those listed.
+	var map := ""
+	for session: Dictionary in _listed:
+		if String(session.get("code", "")) == target.strip_edges().to_upper():
+			map = MatchSettings.from_dict(session.get("settings")).map
+	_set_busy("Joining %s…" % target.strip_edges().to_upper() if Net.use_webrtc else "Joining…", map)
 	Net.join(target)
 
 
@@ -449,7 +500,15 @@ func _copy_link() -> void:
 	copy_link_button.text = "Copy invite link"
 
 
-func _set_busy(message: String) -> void:
+## How full the bar on the cover is, from 0 to 1, when `sounds` is the share
+## of the sounds that have been made and one of everything has been drawn
+## or not (`drawn`): the sounds are most of the wait.
+static func loading_progress(sounds: float, drawn: bool) -> float:
+	return clampf(sounds, 0.0, 1.0) * 0.85 + (0.15 if drawn else 0.0)
+
+
+func _set_busy(message: String, map := "") -> void:
+	join_screen.open(message, map)
 	status.text = message
 	host_button.disabled = true
 	join_button.disabled = true
@@ -458,6 +517,7 @@ func _set_busy(message: String) -> void:
 func _on_session_started() -> void:
 	Sounds.set_music_quiet(true)
 	menu.hide()
+	front_end.hide()
 	hud.show()
 	combat_hud.show()
 	touch_controls.show()
@@ -524,6 +584,7 @@ func _leave() -> void:
 
 
 func _on_session_ended(reason: String) -> void:
+	join_screen.hide()
 	final_standings.text = standings(world.match_.state)
 	tutorial = null
 	combat_hud.show_tutorial("")
@@ -555,6 +616,34 @@ func _rejoin() -> void:
 	_join(Net.last_joined)
 
 
+## Shows the title screen.
+func show_title() -> void:
+	menu.hide()
+	settings_menu.hide()
+	front_end.open()
+
+
+# One of the title screen's ways in was chosen.
+func _on_way_in_chosen(what: String) -> void:
+	match what:
+		"play":
+			_show_menu("")
+		"practice":
+			_practise()
+		"learn":
+			_teach()
+		"customise":
+			settings_menu.open_part(settings_menu.CUSTOMISE)
+		"edit":
+			menu.hide()
+			front_end.hide()
+			arena_editor.open(world)
+		"settings":
+			settings_menu.open_part(settings_menu.SETTINGS)
+		"credits":
+			front_end.show_credits(true)
+
+
 func _dismiss_disconnected() -> void:
 	disconnected_notice.hide()
 	_show_menu("")
@@ -569,7 +658,9 @@ func _show_menu(message: String) -> void:
 	combat_hud.hide()
 	combat_hud.reset()
 	touch_controls.hide()
-	menu.show()
+	front_end.hide()
+	join_screen.hide()
+	Look.arrive(menu)
 	status.text = message
 	host_button.disabled = false
 	join_button.disabled = false
@@ -584,6 +675,7 @@ static func session_line(session: Dictionary) -> String:
 
 
 func _show_sessions(list: Array) -> void:
+	_listed = list
 	for child in sessions.get_children():
 		child.queue_free()
 	if list.is_empty():

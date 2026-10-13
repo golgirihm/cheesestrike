@@ -110,6 +110,17 @@ static func pick(name: String, last := -1, rng: RandomNumberGenerator = null) ->
 	return (last + 1 + roll % (count - 1)) % count
 
 
+## The share of all the sounds there are that have been made, from 0 to 1.
+static func made_share() -> float:
+	var all := 0
+	var made := 0
+	for name: String in SOUNDS:
+		for take in takes(name):
+			all += 1
+			made += 1 if _made.has([name, take]) else 0
+	return float(made) / maxi(all, 1)
+
+
 ## Makes sounds that haven't been made yet, for up to `milliseconds`, so
 ## that none is made in the middle of play. Returns whether all are made.
 static func make_some(milliseconds: int) -> bool:

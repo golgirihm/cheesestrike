@@ -49,6 +49,9 @@ const DEFAULTS := {
 	"dynamic_range": "headphones",
 	## Whether the player talks with teammates and hears them (see VoiceChat).
 	"voice_chat": true,
+	## How many tips the player has been shown, so that each comes in turn
+	## (see JoinScreen).
+	"tips_seen": 0,
 	## Whether the announcer speaks (see Announcer).
 	"announcer": true,
 	## Whether left and right are made the same.

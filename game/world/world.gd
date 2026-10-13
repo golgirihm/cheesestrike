@@ -34,6 +34,9 @@ var fixtures := {"pads": [], "ladders": []}
 ## The code of the custom arena to play on (see ArenaCode), when the match is
 ## on one: the host's own, or what the host sent.
 var custom_code := ""
+# The menu's view of the arena as its scene has it, which the title screen
+# drifts about.
+var _menu_view := Transform3D.IDENTITY
 ## Whether the game is getting ready (see warm_up), and when it has.
 var warming := false
 var _warm_frames := 0
@@ -164,6 +167,20 @@ func _finish_warm_up() -> void:
 	warmed.emit()
 
 
+## How far the menu's view of the arena swings to either side as it drifts,
+## in radians, and how many seconds a swing there and back takes.
+const DRIFT := 0.22
+const DRIFT_TIME := 48.0
+
+
+## Turns the menu's view of the arena a little way round its middle, as it
+## is `seconds` into drifting: a slow swing to one side and back.
+func drift_menu_view(seconds: float) -> void:
+	if menu_camera == null or not Look.moves():
+		return
+	menu_camera.transform = _menu_view.rotated(Vector3.UP, sin(seconds * TAU / DRIFT_TIME) * DRIFT)
+
+
 ## Puts the chosen graphics quality into effect.
 func apply_quality() -> void:
 	GraphicsQuality.apply(GraphicsQuality.level(Settings.get_value("quality")), get_viewport(), $Sun, GraphicsQuality.chosen())
@@ -207,6 +224,7 @@ func load_map(id: String) -> void:
 	fixtures = Fixtures.of(map)
 	moving_parts = MovingParts.of(map)
 	menu_camera = map.get_node("MenuCamera")
+	_menu_view = menu_camera.transform
 	if was_menu_view:
 		menu_camera.make_current()
 	_build_pickups()

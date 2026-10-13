@@ -50,6 +50,7 @@ class NamesTest(GameTestCase):
         # The browser stores the file a moment after the game writes it.
         game.page.wait_for_timeout(1500)
         game.page.reload()
+        game.to_play()
         game.wait_for("s.screen === 'menu' && s.name_box === 'Saved Raclette'")
 
 
