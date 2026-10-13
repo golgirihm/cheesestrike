@@ -52,8 +52,6 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 4: Characters that are alive
 
-1. **Animation, properly.** Move the character from code-driven poses to an animation tree: idle, walk, run, crouch, slide, jump, fall, land, aim, fire, reload, throw, melee, hurt, with blending between them.
-   *Tests:* GUT tests that each state is reached from the player's motion. Manual: PLR-06 grows.
 
 ## Milestone 5: An arsenal
 

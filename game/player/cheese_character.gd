@@ -7,8 +7,11 @@ extends Node3D
 ## on the player's feet and fits inside their collision capsule.
 ##
 ## The player sets its colour and tells it how it is moving, where it is
-## looking and where its weapon is; it walks, jumps, winces when hurt, melts
-## when knocked out and pops back on returning.
+## looking and where its weapon is. From that it works out what it is doing
+## (see CharacterMotion) and moves its limbs from one pose to the next: it
+## walks, runs, crouches, slides, jumps, falls and lands, steadies its weapon
+## to aim, flinches when hurt, melts when knocked out and pops back on
+## returning.
 
 const INK := Color(0.1, 0.09, 0.09)
 ## The veins of a blue cheese, and the pale rind of a brie.
@@ -81,6 +84,21 @@ var _wince: Node3D
 var _phase := 0.0
 var _speed := 0.0
 var _airborne := false
+# How fast the player is rising, whether they are sliding, and how long
+# since they last touched down.
+var _rising := 0.0
+var _sliding := false
+var _since_landing := INF
+# The state the legs are in and what the free arm is doing (see
+# CharacterMotion), where the limbs have got to on their way to its pose,
+# what is going on that the arm might act on, and the arm itself.
+var _state := CharacterMotion.IDLE
+var _blend: Dictionary = CharacterMotion.POSES[CharacterMotion.IDLE].duplicate()
+var _acting := {}
+var _holding := {}
+var _action := CharacterMotion.NONE
+var _action_for := 0.0
+var _arm := Vector3(0.0, 0.0, Emotes.ARM_REST)
 var _gaze := 0.0
 var _grimace_left := 0.0
 # How far down the player is crouched, 0 to 1, and everything above the legs,
@@ -149,9 +167,38 @@ func _light() -> void:
 
 ## How the player is moving, for the walk: speed across the ground in metres
 ## per second, and whether they are off the ground.
-func set_motion(speed: float, airborne: bool) -> void:
+## `rising` is how fast they are going up (below zero, down), and `sliding`
+## whether they are in a slide.
+func set_motion(speed: float, airborne: bool, rising := 0.0, sliding := false) -> void:
+	if _airborne and not airborne:
+		_since_landing = 0.0
 	_speed = speed
 	_airborne = airborne
+	_rising = rising
+	_sliding = sliding
+
+
+## Whether the player is aiming, or reloading: the free arm steadies the
+## weapon for as long as either is so.
+func set_holding(aiming: bool, reloading: bool) -> void:
+	_holding = {CharacterMotion.AIM: aiming, CharacterMotion.RELOAD: reloading}
+
+
+## Something momentary has happened that the free arm acts out: one of
+## CharacterMotion's FIRE, THROW, MELEE and HURT.
+func act(kind: String) -> void:
+	if CharacterMotion.ACTION_TIME.has(kind):
+		_acting[kind] = CharacterMotion.ACTION_TIME[kind]
+
+
+## The state the legs are in: one of CharacterMotion's, such as RUN or FALL.
+func state() -> String:
+	return _state
+
+
+## What the free arm is doing: one of CharacterMotion's, such as AIM, or NONE.
+func action() -> String:
+	return _action
 
 
 ## Wears `look` (see Looks): the kind of cheese, a hat and something in the
@@ -316,6 +363,7 @@ func set_gaze(pitch: float) -> void:
 ## The player was just hurt: the body flashes for an instant, and the face
 ## screws up for a moment.
 func grimace() -> void:
+	act(CharacterMotion.HURT)
 	_grimace_left = GRIMACE_TIME
 	_flash_left = FLASH_TIME
 	_emote = -1
@@ -449,12 +497,32 @@ func is_melted() -> bool:
 func _process(delta: float) -> void:
 	_phase = fmod(_phase + _speed * STEPS_PER_METRE * TAU * delta, TAU)
 	var swing := leg_swing(_phase, _speed)
+	# What the legs are doing, and the limbs a step nearer its pose.
+	_since_landing += delta
+	_state = CharacterMotion.state(_speed, _rising, _airborne, _crouch, _sliding, _since_landing)
+	var heading: Dictionary = CharacterMotion.POSES[_state]
+	var nearer := CharacterMotion.blend(delta)
+	for key: String in _blend:
+		_blend[key] = lerpf(_blend[key], heading[key], nearer)
 	for index in _legs.size():
 		var side := 1.0 if index == 0 else -1.0
-		# Legs tuck forward in the air.
-		_legs[index].rotation.x = -0.6 if _airborne else swing * side
-	# The free arm swings; the other holds the weapon.
-	_arms[0].rotation = Vector3(-swing * 0.6, 0.0, Emotes.ARM_REST)
+		# Swinging with the stride, drawn up in the air, thrown forward in a
+		# slide, and spread when crouched or landing.
+		var out := -1.0 if (BodyShape.LEGS[index][0] as Vector3).x < 0.0 else 1.0
+		_legs[index].rotation = Vector3(lerpf(swing * side * _blend.stride, -0.6, _blend.tuck) - 1.15 * _blend.reach, 0.0, _blend.splay * out)
+	# What the free arm is doing on top of that; the other holds the weapon.
+	var doing := _holding.duplicate()
+	for kind: String in _acting.keys():
+		_acting[kind] -= delta
+		doing[kind] = _acting[kind] > 0.0
+		if _acting[kind] <= 0.0:
+			_acting.erase(kind)
+	var now := CharacterMotion.action(doing)
+	_action_for = _action_for + delta if now == _action else 0.0
+	_action = now
+	var rest := Vector3(-swing * 0.6 * _blend.pump, 0.0, Emotes.ARM_REST - _blend.lift)
+	_arm = _arm.lerp(CharacterMotion.arm(_action, _action_for, rest), nearer)
+	_arms[0].rotation = _arm
 	var sway := 0.0
 	var hop := 0.0
 	if _emote >= 0:

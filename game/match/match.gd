@@ -18,6 +18,8 @@ signal hit_confirmed(victim: int, dealt: int, knocked_out: bool, head: bool)
 signal hurt(attacker: int, from: Vector3, dealt: int)
 ## Another player fired a shot whose pellets ended at `ends`, for effects.
 signal shot_shown(shooter: int, ends: Array)
+## Player `id` threw a grenade, on everyone's machine, for their arm.
+signal throw_shown(id: int)
 ## Player `id` made emote `kind` (see Emotes), on everyone's machine.
 signal emote_shown(id: int, kind: int)
 ## Another player struck with their knife, for effects.
@@ -282,6 +284,8 @@ func _throw(thrower: int, origin: Vector3, direction: Vector3, cooked: float) ->
 	if not state.throw_grenade(thrower):
 		return
 	tally.shot(Weapons.GRENADE)
+	_throw_seen.rpc(thrower)
+	throw_shown.emit(thrower)
 	record.protected_for = 0.0
 	_changed()
 	var grenade := Weapons.find(Weapons.GRENADE)
@@ -319,6 +323,11 @@ func _emote(id: int, kind: Variant) -> void:
 func _request_emote(kind: Variant) -> void:
 	if is_host():
 		_emote(multiplayer.get_remote_sender_id(), kind)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _throw_seen(id: int) -> void:
+	throw_shown.emit(id)
 
 
 @rpc("authority", "call_remote", "reliable")
