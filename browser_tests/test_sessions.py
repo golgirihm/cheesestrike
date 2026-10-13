@@ -104,9 +104,13 @@ class JoiningTest(GameTestCase):
         moved = {}
         for game in (host, second):
             start = game.own_player()["position"]
+            # Until they have gone a little way, however long the machine
+            # takes over it, rather than for a fixed time.
             game.page.keyboard.down("w")
-            game.page.wait_for_timeout(600)
-            game.page.keyboard.up("w")
+            try:
+                game.wait_for(f"s.players.some((p) => p.mine && Math.hypot(p.position[0] - {start[0]}, p.position[2] - {start[2]}) > 1.5)")
+            finally:
+                game.page.keyboard.up("w")
             rest = game.rest_position()
             self.assertGreater(distance(start, rest), 1.0, "walking forward didn't move the player")
             moved[game.own_player()["id"]] = rest
@@ -116,11 +120,10 @@ class JoiningTest(GameTestCase):
         state = third.wait_for("s.players.length === 3")
         for game in (host, second):
             game.wait_for("s.players.length === 3 && s.hud.includes('3 playing')")
-        # Positions arrive a moment after the players do.
-        third.page.wait_for_timeout(500)
-        seen = {player["id"]: player["position"] for player in third.state()["players"]}
+        # Positions arrive a moment after the players do: looked for until
+        # they have, rather than after a fixed wait.
         for player, position in moved.items():
-            self.assertLess(distance(seen[player], position), 0.1, f"player {player} is shown in the wrong place")
+            third.wait_for(f"s.players.some((p) => p.id === {player} && Math.hypot(p.position[0] - {position[0]}, p.position[2] - {position[2]}) < 0.1)")
 
     def test_a_joiner_leaving_is_removed_from_the_session(self):
         host = self.open_game()

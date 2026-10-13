@@ -138,7 +138,16 @@ class MatchTest(GameTestCase):
         self.assertGreaterEqual(int(won[2].split("Damage ")[1].split(" ")[0]), 500)
         lost = joiner.state()["combat"]["summary"]
         self.assertRegex(lost[2], r"^Accuracy 0%   ·   Damage 0   ·   Best run 0$")
-        self.assertEqual(len(lost), 3, "no medals for the one who lost")
+        self.assertEqual(len(lost), 4, "no medals for the one who lost")
+        # And what it earned them, which is kept.
+        self.assertRegex(won[-1], r"^\+\d+ experience   ·   Level \d+")
+        self.assertRegex(lost[-1], r"^\+\d+ experience   ·   Level 1$")
+        for game in (host, joiner):
+            progress = game.state()["progress"]
+            self.assertEqual(progress["matches"], 1)
+            self.assertEqual(progress["history"], 1)
+            self.assertGreater(progress["xp"], 0)
+        self.assertGreater(host.state()["progress"]["xp"], joiner.state()["progress"]["xp"], "more for the one who won")
         # The host, and only the host, is shown what each weapon did.
         tally = host.wait_for("s.combat.tally !== ''")["combat"]["tally"]
         self.assertRegex(tally, r"Cheddar Blaster: \d+ fired, \d+ hit, \d+ damage, 5 knocked out")

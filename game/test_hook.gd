@@ -126,6 +126,10 @@ func snapshot() -> Dictionary:
 		_main.find_child("PracticeButton", true, false),
 		_main.find_child("TutorialButton", true, false),
 		_main.find_child("PlayButton", true, false),
+		_main.find_child("ProfileButton", true, false),
+		_main.find_child("ProfileDone", true, false),
+		_main.find_child("Profile_record", true, false),
+		_main.find_child("Profile_matches", true, false),
 		_main.find_child("CustomiseButton", true, false),
 		_main.find_child("TitleSettingsButton", true, false),
 		_main.find_child("CreditsButton", true, false),
@@ -190,6 +194,8 @@ func snapshot() -> Dictionary:
 		"music": Sounds.is_music_playing(),
 		"replays_seen": _main.world.replay_view.played,
 		"sky": _main.world.atmosphere.showing,
+		"profile": _main.profile_screen.showing() if _main.profile_screen.visible else {},
+		"progress": {"xp": Progress.xp, "level": Progress.level(), "matches": Progress.record.matches, "history": Progress.history.size()},
 		"photo": {"on": _main.world.photo_mode.on, "saved": _main.world.photo_mode.saved_count},
 		"weapon_bar": _main.combat_hud.weapon_bar.shown().map(func(entry: Dictionary) -> String: return "%d %s%s" % [entry.key, entry.weapon, "*" if entry.held else ""]),
 		"weapon_wheel": _main.combat_hud.weapon_wheel.choices if _main.combat_hud.weapon_wheel.visible else [],
@@ -254,6 +260,8 @@ func _screen() -> String:
 		return "loading"
 	if _main.join_screen.visible:
 		return "joining"
+	if _main.profile_screen.visible:
+		return "profile"
 	if _main.controls_help.visible:
 		return "help"
 	if _main.settings_menu.visible:

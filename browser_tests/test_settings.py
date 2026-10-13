@@ -55,7 +55,7 @@ class SettingsTest(GameTestCase):
         joiner_id = joiner.own_player()["id"]
         look = host.player(joiner_id)["look"]
         host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.look.hat === 'top' && p.look.cheese === 'cheddar')")
-        self.assertEqual(host.player(1)["look"], {"cheese": "swiss", "hat": "none", "held": "none"}, "the host's own is as it was")
+        self.assertEqual(host.player(1)["look"], {"cheese": "swiss", "hat": "none", "held": "none", "title": "none", "level": 1}, "the host's own is as it was")
         self.assertIsNotNone(look)
         # Changed again in the middle of a session: it shows at once.
         joiner.click("MenuButton")

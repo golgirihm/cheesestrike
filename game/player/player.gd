@@ -212,6 +212,8 @@ var _turn_rate := Vector2.ZERO
 var _landing := 0.0
 var _running := 0.0
 var _was_on_floor := true
+# Under the name tag: the player's level and title.
+var _rank_tag: Label3D
 var _from_outside := false
 # When this character last made a voice, by a clock of their own, and what
 # they were last seen doing, for one played on another machine.
@@ -280,6 +282,17 @@ func _ready() -> void:
 	set_process_unhandled_input(_mine)
 	body.shown = not _mine
 	name_tag.visible = not _mine
+	_rank_tag = Label3D.new()
+	_rank_tag.name = "RankTag"
+	_rank_tag.billboard = name_tag.billboard
+	_rank_tag.no_depth_test = name_tag.no_depth_test
+	_rank_tag.fixed_size = name_tag.fixed_size
+	_rank_tag.pixel_size = name_tag.pixel_size
+	_rank_tag.font_size = int(name_tag.font_size * 0.6)
+	_rank_tag.outline_size = int(name_tag.outline_size * 0.6)
+	_rank_tag.visible = false
+	add_child(_rank_tag)
+	_rank_tag.position = name_tag.position - Vector3.UP * 0.085 * BodyShape.SIZE
 	# Everyone places a new character at its spot: until its owner's first
 	# update arrives, it would otherwise stand in the middle of the arena, and
 	# could collect what lies there.
@@ -428,6 +441,11 @@ func _on_match_state_changed() -> void:
 		body.cheer()
 	_kills = own.kills
 	body.wear(own.look)
+	# Under their name, their level and title.
+	if _rank_tag != null:
+		_rank_tag.text = Looks.rank_text(own.look)
+		_rank_tag.visible = name_tag.visible and not _rank_tag.text.is_empty()
+		_rank_tag.modulate = name_tag.modulate
 	if _mine:
 		_carry(own.weapons)
 	else:

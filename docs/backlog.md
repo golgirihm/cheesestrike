@@ -86,26 +86,18 @@ The game uses the Compatibility renderer so it runs in a browser and on phones. 
 
 Everything here needs somewhere to keep what a player has earned. Start with the browser's own storage, which costs nothing and can't be trusted, and move to accounts on a server only when there is something worth protecting.
 
-1. **Who you are.** A profile: a name, a chosen cheese, a title, kept between visits and shown to others.
-   *Tests:* GUT tests of saving and loading; browser test.
-2. **Your record.** Matches played, knock-outs, accuracy, time with each weapon, best streak, kept and shown on a page of their own.
-   *Tests:* GUT tests of the tallies.
-3. **Levels.** Experience for playing, winning and medals, with a level shown by a player's name.
-   *Tests:* GUT tests of the rule.
-4. **Things to earn.** Cheeses, hats, weapon finishes, emotes and titles unlocked by level and by challenges. Never anything that changes a fight.
+1. **Things to earn.** Cheeses, hats, weapon finishes, emotes and titles unlocked by level and by challenges. Never anything that changes a fight.
    *Tests:* GUT test that nothing unlockable changes a weapon's or a body's numbers.
-5. **Challenges.** A few each day and each week (knock-outs with the shotgun, a win on Curd City), and long ones for each weapon.
+2. **Challenges.** A few each day and each week (knock-outs with the shotgun, a win on Curd City), and long ones for each weapon.
    *Tests:* GUT tests of progress.
-6. **Achievements.** One-off feats with a picture and a line each.
+3. **Achievements.** One-off feats with a picture and a line each.
    *Tests:* GUT tests of each trigger.
-7. **Accounts.** Sign in to keep a profile across devices, with the server holding it. Needs a small service and a database, a privacy policy, and a way to delete an account.
+4. **Accounts.** Sign in to keep a profile across devices, with the server holding it. Needs a small service and a database, a privacy policy, and a way to delete an account.
    *Tests:* tests for the service; browser test of signing in.
-8. **Leaderboards.** Best this week and of all time, among friends and everyone, from results the server checked.
+5. **Leaderboards.** Best this week and of all time, among friends and everyone, from results the server checked.
    *Tests:* service tests.
-9. **Ranked play.** A hidden skill rating from match results, used to match players, with visible ranks and seasons.
+6. **Ranked play.** A hidden skill rating from match results, used to match players, with visible ranks and seasons.
    *Tests:* tests of the rating's arithmetic.
-10. **Past matches.** A list of recent matches with their results and numbers.
-    *Tests:* GUT tests of what is kept.
 
 ## Milestone 12: Online, properly
 

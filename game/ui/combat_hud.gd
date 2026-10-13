@@ -129,6 +129,7 @@ var _result_tally: Label
 
 
 func _ready() -> void:
+	add_to_group("combat_hud")
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build()
@@ -446,7 +447,7 @@ func _process(delta: float) -> void:
 		var lines: Array[String] = world.match_.tally.lines() if world.match_.is_host() else ([] as Array[String])
 		_result_tally.text = "\n".join(lines)
 		_result_tally.visible = not lines.is_empty()
-		_result_summary.text = "\n".join(MatchSummary.lines(state, multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else 0, world.match_.stats, medals))
+		_result_summary.text = "\n".join(MatchSummary.lines(state, multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else 0, world.match_.stats, medals) + world.match_keeper.lines())
 	var wants_scores := Input.is_action_pressed("scoreboard") or _touch_held("scores") or _result.visible
 	if wants_scores != scoreboard.visible:
 		scoreboard.visible = wants_scores
