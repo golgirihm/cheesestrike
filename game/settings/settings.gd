@@ -23,6 +23,8 @@ const DEFAULTS := {
 	# Whether a hosted session is left out of the session list, for joining
 	# only by its code or an invite link.
 	"host_private": false,
+	## Whether to join a session to watch it rather than to play.
+	"join_watching": false,
 	# How fast looking turns, as a share of the usual, for each kind of control.
 	"mouse_sensitivity": 1.0,
 	"stick_sensitivity": 1.0,
