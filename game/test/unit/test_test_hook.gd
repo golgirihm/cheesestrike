@@ -14,7 +14,11 @@ func before_each() -> void:
 	hook = TestHook.new(main)
 	autofree(hook)
 	# Let the game get ready and the menu lay itself out.
-	await wait_process_frames(Warmup.FRAMES + 3)
+	for frame in 600:
+		if not main.loading_cover.visible:
+			break
+		await wait_process_frames(1)
+	await wait_process_frames(2)
 
 
 func test_it_starts_on_the_menu_with_nobody_playing() -> void:

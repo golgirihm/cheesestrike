@@ -49,8 +49,12 @@ var _alone_settings: MatchSettings
 ## The tutorial the player is being taken through, or null.
 var tutorial: Tutorial
 var arena_editor: Control
-## Covers the view while the game gets ready (see Warmup).
+## Milliseconds of each frame spent making sounds while the game gets ready.
+const SOUND_MAKING_MS := 12
+## Covers the view while the game gets ready (see Warmup): until one of
+## everything has been drawn, and every sound has been made.
 var loading_cover: ColorRect
+var _drawn_once := false
 # Who the pause menu's vote-to-remove button names.
 var _remove_target := 0
 # Whether the mouse was captured as of the last frame. Esc while it is captured
@@ -73,7 +77,7 @@ func _ready() -> void:
 	getting_ready.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	loading_cover.add_child(getting_ready)
 	menu.get_parent().add_child(loading_cover)
-	world.warmed.connect(loading_cover.hide)
+	world.warmed.connect(func() -> void: _drawn_once = true)
 	world.warm_up.call_deferred()
 	Net.session_started.connect(_on_session_started)
 	Net.session_failed.connect(_on_session_failed)
@@ -193,6 +197,10 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	# A few sounds are made each frame behind the cover, which goes once
+	# they all are and one of everything has been drawn.
+	if loading_cover.visible and SoundBank.make_some(SOUND_MAKING_MS) and _drawn_once:
+		loading_cover.hide()
 	if hud.visible:
 		hud.text = "Practice range" if Net.alone else "Session %s  ·  %d playing" % [Net.room_code, world.players.get_child_count()]
 	if tutorial != null and hud.visible:

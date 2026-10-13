@@ -16,6 +16,11 @@ const SLIDERS := [
 	["master_volume", "Volume", 0.0, 1.0, 0.05, "%d%%"],
 	["music_volume", "Music", 0.0, 1.0, 0.05, "%d%%"],
 	["effects_volume", "Effects", 0.0, 1.0, 0.05, "%d%%"],
+	["weapons_volume", "Effects: weapons", 0.0, 1.0, 0.05, "%d%%"],
+	["steps_volume", "Effects: footsteps", 0.0, 1.0, 0.05, "%d%%"],
+	["voices_volume", "Effects: voices", 0.0, 1.0, 0.05, "%d%%"],
+	["world_volume", "Effects: the arena", 0.0, 1.0, 0.05, "%d%%"],
+	["interface_volume", "Hits and announcements", 0.0, 1.0, 0.05, "%d%%"],
 	["touch_size", "Touch buttons", 0.7, 1.5, 0.05, "%.2f×"],
 	["hud_scale", "Text size", 0.75, 1.5, 0.05, "%.2f×"],
 	["screen_shake", "Screen shake", 0.0, 1.0, 0.05, "%d%%"],
@@ -32,6 +37,7 @@ const TOGGLES := [
 	["toggle_aim", "Press once to aim, again to stop"],
 	["damage_numbers", "Show the damage of each hit"],
 	["replays", "Show how I was knocked out, and the play of the match"],
+	["mono_sound", "Mono sound"],
 	["outlines", "Outline teammates and nearby pickups"],
 	["dynamic_resolution", "Lower the render scale to hold the frame rate"],
 	["bloom", "Glow on bright things"],
@@ -78,6 +84,8 @@ func refresh() -> void:
 		_show_value(row[0])
 	for row: Array in TOGGLES:
 		(find_child("Setting_" + row[0], true, false) as CheckButton).set_pressed_no_signal(Settings.get_value(row[0]))
+	for choice: Array in SOUND_CHOICES:
+		(find_child("Setting_" + choice[0], true, false) as Button).text = sound_choice_text(choice[0])
 	(find_child("Setting_quality", true, false) as Button).text = "Graphics: %s" % GraphicsQuality.NAMES[GraphicsQuality.level(Settings.get_value("quality"))]
 	for part: String in GraphicsQuality.ORDER:
 		var setting: String = GraphicsQuality.PARTS[part].setting
@@ -88,6 +96,23 @@ func refresh() -> void:
 		(find_child("Setting_" + key, true, false) as Button).text = loadout_text(key)
 	for action: String in _key_buttons:
 		_key_buttons[action].text = "Press a key…" if action == _waiting_for else Controls.keys_text(action)
+
+
+## The sound settings that are one of a few: the setting, what it is called,
+## and its choices with what each is called.
+const SOUND_CHOICES := [
+	[Mix.RANGE_SETTING, "Sound for", {"headphones": "Headphones", "speakers": "Speakers", "night": "Night (quiet and even)"}],
+	[SoundCues.HIT_SETTING, "Hit sound", SoundCues.HIT_SOUNDS],
+]
+
+
+## What the button for one of the sound choices says, such as "Hit sound:
+## Bell".
+static func sound_choice_text(key: String) -> String:
+	for choice: Array in SOUND_CHOICES:
+		if choice[0] == key:
+			return "%s: %s" % [choice[1], choice[2].get(Settings.get_value(key), "")]
+	return ""
 
 
 ## The value a slider shows, such as "1.25×" or "80%".
@@ -207,6 +232,14 @@ func _build() -> void:
 		toggle.custom_minimum_size = Vector2(0, 40)
 		toggle.toggled.connect(func(on: bool) -> void: Settings.set_value(row[0], on))
 		_rows.add_child(toggle)
+	# The sound choices that are one of a few.
+	for choice: Array in SOUND_CHOICES:
+		var button := Button.new()
+		button.name = "Setting_" + choice[0]
+		button.custom_minimum_size = Vector2(0, 40)
+		button.pressed.connect(func() -> void:
+			Settings.set_value(choice[0], next_choice(choice[2].keys(), Settings.get_value(choice[0]))))
+		_rows.add_child(button)
 	var quality := Button.new()
 	quality.name = "Setting_quality"
 	quality.custom_minimum_size = Vector2(0, 40)

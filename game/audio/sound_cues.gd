@@ -1,3 +1,4 @@
+class_name SoundCues
 extends Node
 ## Decides which sounds the arena makes, from what happens in the match: shots,
 ## bursts, hits, knock-outs, pickups and Overloads. The world adds this as a
@@ -23,7 +24,7 @@ func _ready() -> void:
 	match_.projectile_burst.connect(func(_id: int, weapon: String, at: Vector3) -> void:
 		Sounds.play_at(burst_sound(weapon), at, world))
 	match_.hit_confirmed.connect(func(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
-		Sounds.play(hit_sound(knocked_out, head), -4.0))
+		Sounds.play(hit_sound(knocked_out, head, Settings.get_value(HIT_SETTING)), -4.0))
 	match_.hurt.connect(func(_attacker: int, _from: Vector3, _dealt: int) -> void:
 		Sounds.play("hurt"))
 	match_.picked_up.connect(func(id: int, _kind: String) -> void:
@@ -37,12 +38,22 @@ func _ready() -> void:
 		_at_player("overload", id))
 
 
-## The sound this player hears when their shot lands: one for a body hit, a
-## sharper one for the head, and another for a knock-out.
-static func hit_sound(knocked_out: bool, head: bool) -> String:
+## The setting for what a hit sounds like, and its choices with what each is
+## called: the sound of a body hit, or "" for none.
+const HIT_SETTING := "hit_sound"
+const HIT_SOUNDS := {"tick": "Tick", "pop": "Pop", "bell": "Bell", "off": "Off"}
+const _HIT_CUES := {"tick": "hit", "pop": "hit_pop", "bell": "hit_bell"}
+
+
+## The sound this player hears when their shot lands: one for a body hit, as
+## they have `chosen` it, a sharper one for the head, and another for a
+## knock-out. "" for none, with hit sounds turned off.
+static func hit_sound(knocked_out: bool, head: bool, chosen := "tick") -> String:
+	if chosen == "off":
+		return ""
 	if knocked_out:
 		return "knock_out"
-	return "hit_head" if head else "hit"
+	return "hit_head" if head else _HIT_CUES.get(chosen, "hit")
 
 
 ## The sound a projectile from `weapon` ends with: a burst, or for one that

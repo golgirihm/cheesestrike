@@ -39,6 +39,18 @@ const DEFAULTS := {
 	"master_volume": 0.8,
 	"music_volume": 0.6,
 	"effects_volume": 0.8,
+	## Each kind of effect on its own, under "effects_volume" (see Mix).
+	"weapons_volume": 1.0,
+	"steps_volume": 1.0,
+	"voices_volume": 1.0,
+	"world_volume": 1.0,
+	"interface_volume": 1.0,
+	## How wide the difference between loud and quiet is left (see Mix).
+	"dynamic_range": "headphones",
+	## Whether left and right are made the same.
+	"mono_sound": false,
+	## What a hit sounds like (see SoundCues).
+	"hit_sound": "tick",
 	# "low", "medium" or "high"; "" until first chosen, when it depends on the
 	# device (see GraphicsQuality).
 	"quality": "",
@@ -109,6 +121,11 @@ const RANGES := {
 	"master_volume": [0.0, 1.0],
 	"music_volume": [0.0, 1.0],
 	"effects_volume": [0.0, 1.0],
+	"weapons_volume": [0.0, 1.0],
+	"steps_volume": [0.0, 1.0],
+	"voices_volume": [0.0, 1.0],
+	"world_volume": [0.0, 1.0],
+	"interface_volume": [0.0, 1.0],
 	"touch_size": [0.7, 1.5],
 	"screen_shake": [0.0, 1.0],
 	"camera_motion": [0.0, 1.0],
@@ -117,6 +134,8 @@ const RANGES := {
 ## The allowed choices of a setting that is one of a few.
 const CHOICES := {
 	"quality": ["", "low", "medium", "high"],
+	"dynamic_range": ["headphones", "speakers", "night"],
+	"hit_sound": ["tick", "pop", "bell", "off"],
 	"gfx_shadows": ["", "off", "on"],
 	"gfx_particles": ["", "low", "medium", "high"],
 	"gfx_effects": ["", "low", "medium", "high"],

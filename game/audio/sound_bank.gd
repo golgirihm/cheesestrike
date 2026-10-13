@@ -43,19 +43,64 @@ const SOUNDS := {
 	"dry": "_dry",
 	"knife": "_knife",
 	"throw": "_knife",
+	"hit_pop": "_hit_pop",
+	"hit_bell": "_hit_bell",
 	"music": "_music",
 }
 
+## How many takes there are of the sounds heard over and over, so that no
+## two in a row need be the same. The rest have one.
+const TAKES := {"pistol": 3, "blaster": 3, "shotgun": 3, "grater": 4, "pistols": 3, "carbine": 3, "rifle": 2, "lmg": 4,
+	"launcher": 2, "burst": 3, "step": 4, "land": 2, "hurt": 2}
+
 static var _made := {}
+# The take being made: 0 is each sound as written, the rest differ from it.
+static var _take := 0
 
 
-## The sound called `name`, or null if there is none.
-static func get_sound(name: String) -> AudioStreamWAV:
+## How many takes there are of the sound called `name`.
+static func takes(name: String) -> int:
+	return TAKES.get(name, 1)
+
+
+## The sound called `name`, or null if there is none: its first take, or the
+## one asked for.
+static func get_sound(name: String, take := 0) -> AudioStreamWAV:
 	if not SOUNDS.has(name):
 		return null
-	if not _made.has(name):
-		_made[name] = Callable(SoundBank, SOUNDS[name]).call()
-	return _made[name]
+	take = clampi(take, 0, takes(name) - 1)
+	var key := [name, take]
+	if not _made.has(key):
+		_take = take
+		_made[key] = Callable(SoundBank, SOUNDS[name]).call()
+		_take = 0
+	return _made[key]
+
+
+## Which take of `name` to play next, when `last` was played before: any
+## other, so that the same one is never heard twice running.
+static func pick(name: String, last := -1, rng: RandomNumberGenerator = null) -> int:
+	var count := takes(name)
+	if count <= 1:
+		return 0
+	var roll := rng.randi() if rng != null else randi()
+	if last < 0 or last >= count:
+		return roll % count
+	return (last + 1 + roll % (count - 1)) % count
+
+
+## Makes sounds that haven't been made yet, for up to `milliseconds`, so
+## that none is made in the middle of play. Returns whether all are made.
+static func make_some(milliseconds: int) -> bool:
+	var began := Time.get_ticks_msec()
+	for name: String in SOUNDS:
+		for take in takes(name):
+			if _made.has([name, take]):
+				continue
+			if Time.get_ticks_msec() - began >= milliseconds:
+				return false
+			get_sound(name, take)
+	return true
 
 
 ## The loudest sample in `stream`, from 0 to 1.
@@ -91,8 +136,17 @@ static func _stream(samples: PackedFloat32Array, rate := RATE, loops := false) -
 
 static func _rng(seed: int) -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed
+	# Each take has its own noise.
+	rng.seed = seed + _take * 7919
 	return rng
+
+
+# `value`, a little more or less for every take but the first: up to `by`
+# of it either way, and the same each time that take is made.
+static func _varied(value: float, by: float, which: int) -> float:
+	if _take == 0:
+		return value
+	return value * (1.0 + by * sin(_take * 12.9898 + which * 78.233))
 
 
 # A sound of `length` seconds, each sample from `shape`, a Callable(t, i)
@@ -123,6 +177,8 @@ static func _decay(t: float, speed: float) -> float:
 #   thump   the push of air, felt as much as heard: a low note falling from
 #           `thump_from` to `thump_to` hertz
 #   tail    the sound coming back off everything around: a longer rumble
+#   click   the weapon's own works a moment later: the slide, bolt or pump,
+#           a tick of metal at `click_at` seconds ringing at `click_note`
 #
 # all pushed hard enough to flatten the loudest part, as a loud bang does
 # to the ear.
@@ -134,19 +190,31 @@ static func _gunshot(seed: int, length: float, spec: Dictionary) -> AudioStreamW
 	var blast := 0.0
 	var tail := 0.0
 	var turn := 0.0
+	# No two takes of a shot are quite alike: a little higher or lower, a
+	# little longer or shorter.
+	var thump_from := _varied(spec.get("thump_from", 150.0), 0.05, 1)
+	var thump_to := _varied(spec.get("thump_to", 50.0), 0.05, 1)
+	var blast_decay := _varied(spec.get("blast_decay", 45.0), 0.1, 2)
+	var tail_decay := _varied(spec.get("tail_decay", 10.0), 0.1, 3)
+	var click: float = spec.get("click", 0.0)
+	var click_at: float = spec.get("click_at", 0.08)
+	var click_note := _varied(spec.get("click_note", 2600.0), 0.04, 4)
 	for i in count:
 		var t := float(i) / RATE
 		var noise := rng.randf_range(-1.0, 1.0)
 		# Noise with its high end taken off, more of it for the tail.
 		blast = lerpf(blast, noise, spec.get("blast_bright", 0.35))
 		tail = lerpf(tail, noise, spec.get("tail_bright", 0.06))
-		var hertz := lerpf(spec.get("thump_to", 50.0), spec.get("thump_from", 150.0), _decay(t, spec.get("thump_fall", 30.0)))
+		var hertz := lerpf(thump_to, thump_from, _decay(t, spec.get("thump_fall", 30.0)))
 		turn += hertz / RATE
 		var sample: float = noise * spec.get("crack", 1.0) * _decay(t, spec.get("crack_decay", 900.0))
-		sample += blast * spec.get("blast", 1.0) * _decay(t, spec.get("blast_decay", 45.0))
+		sample += blast * spec.get("blast", 1.0) * _decay(t, blast_decay)
 		sample += sin(TAU * turn) * spec.get("thump", 0.8) * _decay(t, spec.get("thump_decay", 28.0))
 		# The tail swells for a moment as the first echoes arrive, then dies.
-		sample += tail * spec.get("tail", 1.5) * minf(t * 60.0, 1.0) * _decay(t, spec.get("tail_decay", 10.0))
+		sample += tail * spec.get("tail", 1.5) * minf(t * 60.0, 1.0) * _decay(t, tail_decay)
+		if click > 0.0 and t >= click_at:
+			var since := t - click_at
+			sample += click * (sin(TAU * click_note * since) * 0.7 + sin(TAU * click_note * 1.48 * since) * 0.3 + noise * 0.25) * _decay(since, 160.0)
 		samples[i] = tanh(sample * spec.get("drive", 2.2))
 	return _stream(_shaped(samples, spec.get("volume", 0.9)))
 
@@ -166,50 +234,58 @@ static func _shaped(samples: PackedFloat32Array, peak: float) -> PackedFloat32Ar
 # A pistol: mostly snap, with little behind it.
 static func _pistol() -> AudioStreamWAV:
 	return _gunshot(9, 0.32, {"crack": 1.2, "crack_decay": 700.0, "blast": 0.9, "blast_bright": 0.5, "blast_decay": 70.0,
-		"thump": 0.5, "thump_from": 210.0, "thump_to": 90.0, "thump_decay": 45.0, "tail": 0.8, "tail_bright": 0.12, "tail_decay": 18.0, "volume": 0.75})
+		"thump": 0.5, "thump_from": 210.0, "thump_to": 90.0, "thump_decay": 45.0, "tail": 0.8, "tail_bright": 0.12, "tail_decay": 18.0, "volume": 0.75,
+		"click": 0.22, "click_at": 0.09, "click_note": 3100.0})
 
 
 # A rifle: a hard crack with weight under it, and a tail that carries.
 static func _blaster() -> AudioStreamWAV:
 	return _gunshot(1, 0.42, {"crack": 1.3, "crack_decay": 600.0, "blast": 1.2, "blast_bright": 0.4, "blast_decay": 48.0,
-		"thump": 0.9, "thump_from": 170.0, "thump_to": 60.0, "thump_decay": 30.0, "tail": 1.6, "tail_bright": 0.08, "tail_decay": 11.0, "volume": 0.85})
+		"thump": 0.9, "thump_from": 170.0, "thump_to": 60.0, "thump_decay": 30.0, "tail": 1.6, "tail_bright": 0.08, "tail_decay": 11.0, "volume": 0.85,
+		"click": 0.2, "click_at": 0.075, "click_note": 2500.0})
 
 
 # The grater fires so fast that each shot has to be short, or they smear
 # into a hum.
 static func _grater() -> AudioStreamWAV:
 	return _gunshot(3, 0.15, {"crack": 1.1, "crack_decay": 900.0, "blast": 1.0, "blast_bright": 0.55, "blast_decay": 95.0,
-		"thump": 0.5, "thump_from": 240.0, "thump_to": 110.0, "thump_decay": 70.0, "tail": 0.6, "tail_bright": 0.15, "tail_decay": 34.0, "volume": 0.65})
+		"thump": 0.5, "thump_from": 240.0, "thump_to": 110.0, "thump_decay": 70.0, "tail": 0.6, "tail_bright": 0.15, "tail_decay": 34.0, "volume": 0.65,
+		"click": 0.12, "click_at": 0.045, "click_note": 3400.0})
 
 
 # A shotgun: a boom more than a crack, and a long roll after it.
 static func _shotgun() -> AudioStreamWAV:
 	return _gunshot(2, 0.75, {"crack": 0.9, "crack_decay": 450.0, "blast": 1.6, "blast_bright": 0.22, "blast_decay": 24.0,
-		"thump": 1.3, "thump_from": 120.0, "thump_to": 42.0, "thump_decay": 16.0, "thump_fall": 20.0, "tail": 2.4, "tail_bright": 0.05, "tail_decay": 6.5, "drive": 2.8, "volume": 0.95})
+		"thump": 1.3, "thump_from": 120.0, "thump_to": 42.0, "thump_decay": 16.0, "thump_fall": 20.0, "tail": 2.4, "tail_bright": 0.05, "tail_decay": 6.5, "drive": 2.8, "volume": 0.95,
+		"click": 0.3, "click_at": 0.36, "click_note": 1700.0})
 
 
 # One of a pair of pistols: lighter and sharper than one held in two hands.
 static func _pistols() -> AudioStreamWAV:
 	return _gunshot(21, 0.24, {"crack": 1.3, "crack_decay": 800.0, "blast": 0.8, "blast_bright": 0.6, "blast_decay": 85.0,
-		"thump": 0.4, "thump_from": 250.0, "thump_to": 110.0, "thump_decay": 55.0, "tail": 0.6, "tail_bright": 0.14, "tail_decay": 24.0, "volume": 0.68})
+		"thump": 0.4, "thump_from": 250.0, "thump_to": 110.0, "thump_decay": 55.0, "tail": 0.6, "tail_bright": 0.14, "tail_decay": 24.0, "volume": 0.68,
+		"click": 0.2, "click_at": 0.07, "click_note": 3300.0})
 
 
 # The carbine: three quick cracks, so each is tight and dry.
 static func _carbine() -> AudioStreamWAV:
 	return _gunshot(22, 0.26, {"crack": 1.4, "crack_decay": 750.0, "blast": 1.1, "blast_bright": 0.45, "blast_decay": 70.0,
-		"thump": 0.7, "thump_from": 190.0, "thump_to": 75.0, "thump_decay": 42.0, "tail": 1.0, "tail_bright": 0.1, "tail_decay": 17.0, "volume": 0.8})
+		"thump": 0.7, "thump_from": 190.0, "thump_to": 75.0, "thump_decay": 42.0, "tail": 1.0, "tail_bright": 0.1, "tail_decay": 17.0, "volume": 0.8,
+		"click": 0.18, "click_at": 0.06, "click_note": 2800.0})
 
 
 # The rifle: one heavy shot that rolls round the arena for a second.
 static func _rifle() -> AudioStreamWAV:
 	return _gunshot(23, 0.98, {"crack": 1.6, "crack_decay": 380.0, "blast": 1.7, "blast_bright": 0.3, "blast_decay": 26.0,
-		"thump": 1.4, "thump_from": 140.0, "thump_to": 38.0, "thump_decay": 13.0, "thump_fall": 18.0, "tail": 2.8, "tail_bright": 0.04, "tail_decay": 4.0, "drive": 3.0, "volume": 0.98})
+		"thump": 1.4, "thump_from": 140.0, "thump_to": 38.0, "thump_decay": 13.0, "thump_fall": 18.0, "tail": 2.8, "tail_bright": 0.04, "tail_decay": 4.0, "drive": 3.0, "volume": 0.98,
+		"click": 0.32, "click_at": 0.46, "click_note": 1900.0})
 
 
 # The machine gun: slower and heavier than the grater, with more thump.
 static func _lmg() -> AudioStreamWAV:
 	return _gunshot(24, 0.2, {"crack": 1.0, "crack_decay": 700.0, "blast": 1.3, "blast_bright": 0.35, "blast_decay": 60.0,
-		"thump": 1.0, "thump_from": 150.0, "thump_to": 60.0, "thump_decay": 40.0, "tail": 0.9, "tail_bright": 0.08, "tail_decay": 22.0, "volume": 0.78})
+		"thump": 1.0, "thump_from": 150.0, "thump_to": 60.0, "thump_decay": 40.0, "tail": 0.9, "tail_bright": 0.08, "tail_decay": 22.0, "volume": 0.78,
+		"click": 0.14, "click_at": 0.055, "click_note": 2300.0})
 
 
 # A bow: the string's twang and the breath of the stick leaving.
@@ -376,6 +452,18 @@ static func _emote() -> AudioStreamWAV:
 static func _hit() -> AudioStreamWAV:
 	return _make(0.07, func(t: float, _i: int) -> float:
 		return sin(TAU * 1500.0 * t) * _decay(t, 45.0), 0.6)
+
+
+# The same told another way, for those who choose it: a soft low pop.
+static func _hit_pop() -> AudioStreamWAV:
+	return _make(0.09, func(t: float, _i: int) -> float:
+		return sin(TAU * lerpf(260.0, 520.0, _decay(t, 40.0)) * t) * _decay(t, 38.0), 0.7)
+
+
+# Or a small bell: a clear note with one above it that rings a little.
+static func _hit_bell() -> AudioStreamWAV:
+	return _make(0.22, func(t: float, _i: int) -> float:
+		return (sin(TAU * 1760.0 * t) * 0.7 + sin(TAU * 2640.0 * t) * 0.3) * _decay(t, 18.0), 0.55)
 
 
 # A hit to the head: the same tick, higher, with a second on its heels.

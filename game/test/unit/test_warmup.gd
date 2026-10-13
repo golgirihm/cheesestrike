@@ -91,8 +91,16 @@ func test_the_game_starts_behind_a_cover_that_goes_when_it_is_ready() -> void:
 	assert_eq(main.loading_cover.get_global_rect().size, get_viewport().get_visible_rect().size, "over everything")
 	assert_gt(main.loading_cover.get_index(), main.menu.get_index(), "and over the menu")
 	assert_eq(main.loading_cover.color.a, 1.0, "nothing shows through")
+	# Every sound is made behind it too, a few each frame.
+	SoundBank._made.clear()
 	await wait_process_frames(Warmup.FRAMES + 3)
+	assert_true(main.loading_cover.visible, "still making sounds")
+	for frame in 2000:
+		if not main.loading_cover.visible:
+			break
+		await wait_process_frames(1)
 	assert_false(main.loading_cover.visible)
+	assert_true(SoundBank.make_some(0), "with every sound made")
 	assert_eq(hook._screen(), "menu")
 	assert_eq(main.world.effects.get_child_count(), 0, "with nothing left lying about")
 
