@@ -117,6 +117,10 @@ func bind(of: Node3D) -> void:
 	world.match_.picked_up.connect(_on_picked_up)
 	world.match_.power_taken.connect(_on_power_taken)
 	world.match_.announced.connect(_on_announced)
+	# What the announcer says is written too, for those who can't hear it.
+	world.announcer.said.connect(func(line: String, show: bool) -> void:
+		if show:
+			_on_announced(line, MatchState.NO_TEAM))
 	world.match_.state_changed.connect(_refresh_scoreboard)
 
 
