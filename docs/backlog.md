@@ -59,26 +59,24 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 6: Ways to play
 
-1. **The mice.** The cheese blocks get eaten: through a match, mice come out and gnaw the blocks away, so the cover changes, and a block can be shot to pieces too. This is what the yellow has been kept for.
-   *Tests:* GUT tests of a block's health and of the host deciding it; browser test that everyone sees a block go.
-2. **Warm-up, overtime and sudden death.** A warm-up until enough players are in, extra time when scores are level, and a clear end.
+1. **Warm-up, overtime and sudden death.** A warm-up until enough players are in, extra time when scores are level, and a clear end.
    *Tests:* extend `test_match_rules.gd`.
-3. **Bots.** Computer players that move, take cover, pick things up and shoot with human-like aim, at several skill levels, to fill a session and to practise against. Run on the host, so their cost has to be small.
+2. **Bots.** Computer players that move, take cover, pick things up and shoot with human-like aim, at several skill levels, to fill a session and to practise against. Run on the host, so their cost has to be small.
    *Tests:* GUT tests of their decisions in a test arena; a soak test of a full session of bots.
-4. **A practice range.** An arena alone, with targets at marked distances, every weapon on a rack, and numbers for damage and accuracy.
+3. **A practice range.** An arena alone, with targets at marked distances, every weapon on a rack, and numbers for damage and accuracy.
    *Tests:* GUT tests of the targets.
-5. **A tutorial.** A short guided first session: move, look, shoot, aim, reload, pick up, Overload.
+4. **A tutorial.** A short guided first session: move, look, shoot, aim, reload, pick up, Overload.
    *Tests:* browser test that walks through it.
-6. **Watching.** Join as a spectator, follow any player or fly free; watch a teammate while knocked out.
+5. **Watching.** Join as a spectator, follow any player or fly free; watch a teammate while knocked out.
    *Tests:* GUT tests that a spectator can't be hit or score; browser test.
-7. **How you were knocked out.** A few seconds replayed from the other player's view, from the positions the host already keeps.
+6. **How you were knocked out.** A few seconds replayed from the other player's view, from the positions the host already keeps.
    *Tests:* GUT tests of the recording.
-8. **Play of the match.** A replay of the best moment at the end, chosen by a simple score.
+7. **Play of the match.** A replay of the best moment at the end, chosen by a simple score.
    *Tests:* GUT tests of the choice.
-9. **Host's rules.** Let the host change more: which weapons, health, speed, gravity, respawn time, friendly fire, with named presets (instant-kill, low gravity, launchers only).
+8. **Host's rules.** Let the host change more: which weapons, health, speed, gravity, respawn time, friendly fire, with named presets (instant-kill, low gravity, launchers only).
    *Tests:* extend `test_match_settings.gd` and the signaling tests.
-10. **Voting.** Players vote for the next arena and mode at the end of a match, and can vote to remove someone.
-    *Tests:* GUT tests of the count; browser test.
+9. **Voting.** Players vote for the next arena and mode at the end of a match, and can vote to remove someone.
+   *Tests:* GUT tests of the count; browser test.
 
 ## Milestone 7: Arenas with character
 

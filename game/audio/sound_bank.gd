@@ -37,6 +37,8 @@ const SOUNDS := {
 	"overload": "_overload",
 	"power": "_power",
 	"objective": "_objective",
+	"gnaw": "_gnaw",
+	"crumble": "_crumble",
 	"reload": "_reload",
 	"dry": "_dry",
 	"knife": "_knife",
@@ -413,6 +415,38 @@ static func _pickup() -> AudioStreamWAV:
 	return _make(0.3, func(t: float, _i: int) -> float:
 		var note: float = notes[mini(int(t / 0.1), 2)]
 		return sin(TAU * note * t) * _decay(fmod(t, 0.1), 12.0), 0.5)
+
+
+# Mice at the cheese: a run of small dry scrapes.
+static func _gnaw() -> AudioStreamWAV:
+	var rng := _rng(31)
+	var soft := 0.0
+	var count := int(0.9 * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / RATE
+		soft = lerpf(soft, rng.randf_range(-1.0, 1.0), 0.5)
+		# Eleven nibbles a second, each a scrape that is over at once.
+		samples[i] = soft * _decay(fmod(t, 0.09), 60.0) * minf(t * 8.0, 1.0)
+	return _stream(_shaped(samples, 0.5))
+
+
+# A block of cheese giving way: a soft thud and a patter of crumbs.
+static func _crumble() -> AudioStreamWAV:
+	var rng := _rng(32)
+	var soft := 0.0
+	var turn := 0.0
+	var count := int(0.7 * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / RATE
+		soft = lerpf(soft, rng.randf_range(-1.0, 1.0), 0.18)
+		turn += lerpf(55.0, 120.0, _decay(t, 20.0)) / RATE
+		var patter := rng.randf_range(-1.0, 1.0) * (0.5 if rng.randf() < 0.02 else 0.0)
+		samples[i] = sin(TAU * turn) * _decay(t, 12.0) + soft * 1.4 * _decay(t, 7.0) + patter * _decay(t, 4.0)
+	return _stream(_shaped(samples, 0.8))
 
 
 # Something has happened in the match that everyone is told: two notes.

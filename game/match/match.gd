@@ -33,6 +33,9 @@ signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
 signal overloaded(id: int)
 ## Player `id` collected a pickup of `kind` (on everyone's machine).
 signal picked_up(id: int, kind: String)
+## The mice have come out to gnaw at cheese block `index` (on everyone's
+## machine).
+signal block_gnawed(index: int)
 ## Something everyone is told, across the screen: `text`, in the colour of
 ## `team` (MatchState.NO_TEAM for nobody's).
 signal announced(text: String, team: int)
@@ -124,6 +127,7 @@ func start(settings := MatchSettings.new()) -> void:
 		state = MatchState.new(settings)
 		_has_state = true
 		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
+		state.blocks = BlockRules.new(world.cheese_blocks().size() if world != null else 0, randi())
 		_hold_back_powers()
 		_pending_names.clear()
 		_pending_looks.clear()
@@ -602,6 +606,12 @@ func _process(delta: float) -> void:
 				_ping.rpc_id(peer, _clock)
 		for id in due:
 			_respawn(id)
+		if state.is_playing():
+			var gnawed := state.blocks.tick(delta)
+			if gnawed != -1:
+				_gnaw_seen.rpc(gnawed)
+				block_gnawed.emit(gnawed)
+				_hurt_block(gnawed, BlockRules.GNAW)
 		if state.round_won != -2:
 			var taken: int = state.round_won
 			state.round_won = -2
@@ -693,6 +703,9 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 		# Through thin cover, at a cost; stopped by anything more.
 		var way := Penetration.path(origin, pellet, weapon.max_range, wall_caster(world.get_world_3d().direct_space_state))
 		var hit := HitScan.first_hit(origin, pellet, way.reach, targets)
+		# A shot that meets a block of cheese before anyone takes some of it away.
+		if hit.is_empty() or hit.distance > way.first:
+			_shoot_block(origin, pellet, way.first, weapon.damage_at(way.first))
 		if hit.is_empty():
 			ends.append(origin + pellet * way.reach)
 		else:
@@ -915,6 +928,43 @@ func _collect_drops() -> void:
 			break
 
 
+@rpc("authority", "call_remote", "reliable")
+func _gnaw_seen(index: int) -> void:
+	block_gnawed.emit(index)
+
+
+# Host only: a shot from `origin` along `direction` met the arena `distance`
+# away. If that was a block of cheese, it loses `amount`.
+func _shoot_block(origin: Vector3, direction: Vector3, distance: float, amount: float) -> void:
+	if state.blocks.health.is_empty():
+		return
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * (distance + 0.1), WORLD_MASK)
+	var met := world.get_world_3d().direct_space_state.intersect_ray(query)
+	if not met.is_empty():
+		_hurt_block(world.block_index(met.collider), amount)
+
+
+# Host only: a burst of `weapon` at `at` takes from every block of cheese it
+# reaches, measured to the block's nearest side.
+func _burst_blocks(at: Vector3, weapon: WeaponStats) -> void:
+	var boxes: Array = world.block_boxes()
+	for index in boxes.size():
+		var box: AABB = boxes[index]
+		var nearest := at.clamp(box.position, box.end)
+		_hurt_block(index, Splash.damage_at(at.distance_to(nearest), weapon.splash_damage, weapon.splash_radius))
+
+
+# Host only: block `index` loses `amount`. One that is finished goes, and
+# takes with it whatever blocks stood on it.
+func _hurt_block(index: int, amount: float) -> void:
+	if not state.blocks.standing(index) or amount <= 0.0:
+		return
+	if state.blocks.hurt(index, amount):
+		for above: int in BlockRules.resting_on(world.block_boxes(), index):
+			state.blocks.remove(above)
+	_changed()
+
+
 ## Host only: tells everyone `text`, in `team`'s colour.
 func announce(text: String, team: int) -> void:
 	_announced.rpc(text, team)
@@ -1043,6 +1093,7 @@ func _burst(projectile: Projectile, at: Vector3) -> void:
 		_harm(projectile.shooter, projectile.struck, weapon.impact_damage * (weapon.headshot_multiplier if projectile.struck_head else 1.0), projectile.position - projectile.velocity.normalized(), weapon.credit(), projectile.struck_head)
 	if weapon.splash_radius <= 0.0:
 		return
+	_burst_blocks(at, weapon)
 	var space := world.get_world_3d().direct_space_state
 	# A burst against a wall is at its face; sight lines are checked from a
 	# hand's width back along the way it came, so the wall itself counts.

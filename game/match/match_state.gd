@@ -38,6 +38,8 @@ var phase := PLAYING
 var time_left := float(settings.minutes * 60)
 ## Knock-outs by each team, Cheddar first, in a team match.
 var team_kills := [0, 0]
+## The arena's blocks of cheese, and how much of each is left.
+var blocks := BlockRules.new()
 ## Points each team has, Cheddar first, in a mode won on points.
 var team_points := [0, 0]
 ## The wheels of a match of Capture the wheel, and the zones of Hold the
@@ -489,6 +491,7 @@ func start_match() -> void:
 		zones = ZoneRules.new()
 	winners.clear()
 	pickups.fill(0.0)
+	blocks.reset(blocks.health.size())
 	drops.clear()
 	powers_taken = 0
 	for record: PlayerRecord in players.values():
@@ -590,6 +593,8 @@ func to_dict() -> Dictionary:
 		data["objective"] = capture.to_array() if capture != null else zones.to_array()
 	if settings.mode == MatchSettings.ROUNDS:
 		data["round_break"] = round_break
+	if not blocks.health.is_empty():
+		data["blocks"] = blocks.to_array()
 	if not drops.is_empty():
 		data["drops"] = drops.map(func(lying: Dictionary) -> Array: return [lying.id, Weapons.ORDER.find(lying.weapon), lying.at, lying.left])
 	return data
@@ -625,6 +630,7 @@ static func from_dict(data: Dictionary) -> MatchState:
 	var pause: Variant = data.get("round_break")
 	if (pause is float or pause is int) and is_finite(float(pause)):
 		state.round_break = clampf(float(pause), 0.0, ROUND_BREAK)
+	state.blocks = BlockRules.from_array(data.get("blocks"))
 	var lying: Variant = data.get("drops")
 	if lying is Array:
 		for entry: Variant in lying.slice(0, Pickups.MAX_DROPS):

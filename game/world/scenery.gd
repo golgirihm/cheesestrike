@@ -156,6 +156,71 @@ static func _cheese(body: Node3D) -> void:
 			body.add_child(Rounded.spot(radius, hole, at, normal, 0.008))
 
 
+## Shows the block of cheese `body` as bitten into, `stage` stages of the
+## way to gone (0 for whole): each stage takes more dark bites out of it.
+static func bite(body: Node3D, stage: int) -> void:
+	var bites: Node3D = body.get_node_or_null("Bites")
+	if bites == null:
+		bites = Node3D.new()
+		bites.name = "Bites"
+		body.add_child(bites)
+	var wanted := stage * 5
+	while bites.get_child_count() > wanted:
+		var last := bites.get_child(bites.get_child_count() - 1)
+		bites.remove_child(last)
+		last.queue_free()
+	if bites.get_child_count() >= wanted:
+		return
+	var half := _size(body) / 2.0
+	var eaten := _material(CHEESE.darkened(0.45))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(body.position) + 7
+	var made := 0
+	# The same bites in the same places every time, on every machine.
+	while made < wanted:
+		var normal: Vector3 = [Vector3.LEFT, Vector3.RIGHT, Vector3.FORWARD, Vector3.BACK, Vector3.UP][rng.randi_range(0, 4)]
+		var across := Vector3.UP.cross(normal) if normal != Vector3.UP else Vector3.RIGHT
+		var up := normal.cross(across)
+		var radius := rng.randf_range(0.35, 0.6)
+		var at := normal * half + across * rng.randf_range(-0.8, 0.8) * absf(across.dot(half)) + up * rng.randf_range(-0.8, 0.8) * absf(up.dot(half))
+		if made >= bites.get_child_count():
+			var ball := SphereMesh.new()
+			ball.radius = radius
+			ball.height = radius * 2.0
+			ball.radial_segments = 10
+			ball.rings = 5
+			var mark := Rounded.instance(ball, eaten, at - normal * radius * 0.45)
+			mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			bites.add_child(mark)
+		made += 1
+
+
+## A mouse, come out to eat: a grey body, two round ears and a tail.
+static func mouse() -> Node3D:
+	var fur := _material(Color(0.55, 0.53, 0.52))
+	var pink := _material(Color(0.9, 0.62, 0.66))
+	var mouse := Node3D.new()
+	var body := SphereMesh.new()
+	body.radius = 0.32
+	body.height = 0.5
+	body.radial_segments = 12
+	body.rings = 6
+	var torso := Rounded.instance(body, fur, Vector3(0, 0.25, 0))
+	torso.scale = Vector3(1.0, 1.0, 1.5)
+	mouse.add_child(torso)
+	var ear := SphereMesh.new()
+	ear.radius = 0.12
+	ear.height = 0.24
+	ear.radial_segments = 8
+	ear.rings = 4
+	for side: float in [-1.0, 1.0]:
+		mouse.add_child(Rounded.instance(ear, pink, Vector3(0.16 * side, 0.5, -0.3)))
+	var tail := Rounded.instance(Rounded.cylinder(0.025, 0.6, 0.01, 6), pink, Vector3(0, 0.12, 0.7))
+	tail.rotation.x = PI / 2.0
+	mouse.add_child(tail)
+	return mouse
+
+
 # A tower: rows of windows all the way up, and a flat dark roof.
 static func _building(body: Node3D) -> void:
 	var drawn: MeshInstance3D = body.get_node("MeshInstance3D")
