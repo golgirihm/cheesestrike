@@ -97,6 +97,15 @@ class SignalingServer:
             self._process = None
 
 
+# The buttons of the title screen, and of the screen for hosting and joining
+# that "Play" leads to. "Settings" used to be on the second and is now on
+# the first.
+TITLE_CONTROLS = {"PlayButton", "PracticeButton", "TutorialButton", "CustomiseButton", "EditorButton", "TitleSettingsButton", "CreditsButton"}
+TITLE_ALIASES = {"SettingsButton": "TitleSettingsButton"}
+PLAY_CONTROLS = {"HostButton", "JoinButton", "TargetEdit", "NameEdit", "WatchButton", "RefreshButton", "BackButton", "ModeButton", "MaxPlayersButton",
+                 "KillLimitButton", "MinutesButton", "MapButton", "PrivateButton", "BotsButton", "BotSkillButton", "RulesButton", "SkyButton"}
+
+
 class Game:
     """One browser window running the game."""
 
@@ -105,7 +114,18 @@ class Game:
         self.errors = []
         page.on("pageerror", lambda error: self.errors.append(str(error)))
         page.goto(url)
+        if ready == "s.screen === 'menu'":
+            self.to_play()
         self.wait_for(ready)
+
+    def to_play(self):
+        """Waits for the game's title screen, where it starts and where the
+        settings come back to, and presses "Play" for the screen that hosts
+        and joins. Most tests are about those, so they begin a press in."""
+        self.wait_for("s.screen === 'title' || s.screen === 'menu'")
+        if self.state()["screen"] == "title":
+            self._click("PlayButton")
+        return self.wait_for("s.screen === 'menu'")
 
     def state(self):
         return self.page.evaluate("window.cheeseStrikeTest")
@@ -124,7 +144,20 @@ class Game:
         return handle.json_value()
 
     def click(self, control):
-        """Clicks a control by its node name in the game, e.g. "HostButton"."""
+        """Clicks a control by its node name in the game, e.g. "HostButton".
+        One on the title screen is reached from the screen for hosting and
+        joining, and the other way about, by going there first."""
+        control = TITLE_ALIASES.get(control, control)
+        screen = self.state()["screen"]
+        if control in TITLE_CONTROLS and screen == "menu":
+            self._click("BackButton")
+            self.wait_for("s.screen === 'title'")
+        elif control in PLAY_CONTROLS and screen == "title":
+            self._click("PlayButton")
+            self.wait_for("s.screen === 'menu'")
+        self._click(control)
+
+    def _click(self, control):
         # A control that has just appeared is reported once before the game
         # has laid it out, so wait for it to stop moving.
         at = None
@@ -254,6 +287,8 @@ class Game:
     def choose(self, control, text):
         """Presses one of the menu's match settings buttons, such as
         "KillLimitButton", until it reads `text`."""
+        if self.state()["screen"] == "title":
+            self._click("PlayButton")
         for _ in range(20):
             state = self.wait_for("s.screen === 'menu'")
             buttons = dict(zip(["ModeButton", "MaxPlayersButton", "KillLimitButton", "MinutesButton", "MapButton", "PrivateButton", "BotsButton", "BotSkillButton", "RulesButton", "SkyButton"], state["match_buttons"]))

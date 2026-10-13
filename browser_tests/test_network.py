@@ -87,7 +87,7 @@ class ReconnectTest(GameTestCase):
         deaths = host.player(old_id)["deaths"]
 
         joiner.page.reload()
-        joiner.wait_for("s.screen === 'menu'")
+        joiner.to_play()
         host.wait_for(f"!s.players.some((p) => p.id === {old_id})")
         joiner.join(code)
         new_id = joiner.own_player()["id"]

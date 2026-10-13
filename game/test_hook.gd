@@ -125,6 +125,12 @@ func snapshot() -> Dictionary:
 		_main.host_button,
 		_main.find_child("PracticeButton", true, false),
 		_main.find_child("TutorialButton", true, false),
+		_main.find_child("PlayButton", true, false),
+		_main.find_child("CustomiseButton", true, false),
+		_main.find_child("TitleSettingsButton", true, false),
+		_main.find_child("CreditsButton", true, false),
+		_main.find_child("CreditsBackButton", true, false),
+		_main.find_child("BackButton", true, false),
 		_main.find_child("EditorButton", true, false),
 		_main.target_edit,
 		_main.join_button,
@@ -184,6 +190,8 @@ func snapshot() -> Dictionary:
 		"music": Sounds.is_music_playing(),
 		"replays_seen": _main.world.replay_view.played,
 		"sky": _main.world.atmosphere.showing,
+		"loading": _main.loading_seen,
+		"joining": _main.join_screen.showing() if _main.join_screen.visible else {},
 		"voice": {"sent": _main.world.voice_chat.sent, "heard": _main.world.voice_chat.heard, "talking": _main.world.voice_chat.talking(), "muted": _main.world.voice_chat.muted.keys()},
 		"announcer": _main.world.announcer.spoken.slice(-6),
 		"frames": {"typical": frame_times.typical(), "now": frame_times.now(), "seconds": frame_times.seconds},
@@ -235,6 +243,8 @@ func snapshot() -> Dictionary:
 func _screen() -> String:
 	if _main.loading_cover.visible:
 		return "loading"
+	if _main.join_screen.visible:
+		return "joining"
 	if _main.controls_help.visible:
 		return "help"
 	if _main.settings_menu.visible:
@@ -247,6 +257,8 @@ func _screen() -> String:
 		return "paused"
 	if _main.menu.visible:
 		return "menu"
+	if _main.front_end.visible:
+		return "credits" if _main.front_end.credits.visible else "title"
 	if _main.arena_editor.visible:
 		return "editor"
 	return "game"

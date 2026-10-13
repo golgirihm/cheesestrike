@@ -101,7 +101,7 @@ func test_the_game_starts_behind_a_cover_that_goes_when_it_is_ready() -> void:
 		await wait_process_frames(1)
 	assert_false(main.loading_cover.visible)
 	assert_true(SoundBank.make_some(0), "with every sound made")
-	assert_eq(hook._screen(), "menu")
+	assert_eq(hook._screen(), "title")
 	assert_eq(main.world.effects.get_child_count(), 0, "with nothing left lying about")
 
 

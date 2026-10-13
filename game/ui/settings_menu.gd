@@ -47,7 +47,15 @@ const TOGGLES := [
 	["vignette", "Darker corners of the view"],
 ]
 
+## The parts of this screen that can be shown on their own: the character
+## and weapons, as "Customise", and the rest, as "Settings".
+const CUSTOMISE := "customise"
+const SETTINGS := "settings"
+const EVERYTHING := ""
+
 var _rows: VBoxContainer
+var _title: Label
+var _customise_rows: Array[Control] = []
 var _scroll: ScrollContainer
 var _done: Button
 var _value_labels := {}
@@ -69,6 +77,15 @@ func open() -> void:
 	refresh()
 	show()
 	_done.grab_focus()
+
+
+## Opens the screen at one part of itself: CUSTOMISE for the character and
+## weapons alone, SETTINGS for the rest, EVERYTHING for both.
+func open_part(part: String) -> void:
+	open()
+	_title.text = "Customise" if part == CUSTOMISE else "Settings"
+	for row: Control in _rows.get_children():
+		row.visible = part == EVERYTHING or (_customise_rows.has(row) == (part == CUSTOMISE))
 
 
 func close() -> void:
@@ -210,10 +227,12 @@ func _build() -> void:
 	outer.add_theme_constant_override("separation", 10)
 	margin.add_child(outer)
 	var title := Label.new()
+	title.name = "SettingsTitle"
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 26)
+	Look.heading(title)
 	outer.add_child(title)
+	_title = title
 
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(380, 400)
@@ -258,6 +277,8 @@ func _build() -> void:
 			Settings.set_value(setting, GraphicsQuality.next_choice(part, Settings.get_value(setting))))
 		_rows.add_child(button)
 
+	# From here on is what "Customise" shows on its own.
+	var first_of_customise := _rows.get_child_count()
 	var loadout_title := Label.new()
 	loadout_title.text = "Your weapons, from when you next come back"
 	loadout_title.add_theme_font_size_override("font_size", 20)
@@ -282,6 +303,8 @@ func _build() -> void:
 			Settings.set_value(key, next_choice(Looks.SETTINGS[key][0], Settings.get_value(key))))
 		_rows.add_child(look)
 
+	for index in range(first_of_customise, _rows.get_child_count()):
+		_customise_rows.append(_rows.get_child(index))
 	var keys_title := Label.new()
 	keys_title.text = "Keys"
 	keys_title.add_theme_font_size_override("font_size", 20)

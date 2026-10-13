@@ -17,11 +17,11 @@ class SettingsTest(GameTestCase):
         game.click("Setting_quality")
         game.wait_for("s.settings.quality !== 'high'")
         game.click("SettingsDone")
-        game.wait_for("s.screen === 'menu'")
+        game.to_play()
         # The browser stores the file a moment after the game writes it.
         game.page.wait_for_timeout(1500)
         game.page.reload()
-        state = game.wait_for("s.screen === 'menu'")
+        state = game.to_play()
         self.assertTrue(state["settings"]["invert_look"])
         self.assertNotEqual(state["settings"]["quality"], "high")
 
@@ -42,7 +42,7 @@ class SettingsTest(GameTestCase):
         code = host.host()
         joiner = self.open_game()
         # Chosen on the menu, before joining.
-        joiner.click("SettingsButton")
+        joiner.click("CustomiseButton")
         joiner.wait_for("s.screen === 'settings'")
         joiner.scroll_to("Setting_look_hat")
         joiner.click("Setting_look_hat")
@@ -50,7 +50,7 @@ class SettingsTest(GameTestCase):
         joiner.scroll_to("Setting_look_cheese")
         joiner.click("Setting_look_cheese")
         joiner.click("SettingsDone")
-        joiner.wait_for("s.screen === 'menu'")
+        joiner.to_play()
         joiner.join(code)
         joiner_id = joiner.own_player()["id"]
         look = host.player(joiner_id)["look"]
@@ -71,12 +71,12 @@ class SettingsTest(GameTestCase):
         self.assertEqual(host.own_player()["carrying"], ["pistol", "blaster"], "what a new player has")
         self.assertEqual(host.own_player()["weapon"], "blaster", "the main weapon in hand")
         joiner = self.open_game()
-        joiner.click("SettingsButton")
+        joiner.click("CustomiseButton")
         joiner.wait_for("s.screen === 'settings'")
         joiner.scroll_to("Setting_loadout_main")
         joiner.click("Setting_loadout_main")
         joiner.click("SettingsDone")
-        joiner.wait_for("s.screen === 'menu'")
+        joiner.to_play()
         joiner.join(code)
         joiner.wait_for("s.players.some((p) => p.mine && p.weapon === 'shotgun' && p.carrying.includes('pistol'))")
         joiner_id = joiner.own_player()["id"]
