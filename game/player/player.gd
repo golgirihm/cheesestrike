@@ -610,6 +610,12 @@ func _watch_input(event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# A vote, in whatever is being voted on.
+	if match_ != null and match_.has_state() and match_.state.ballot != null:
+		for option in 3:
+			if event.is_action_pressed("vote_%d" % (option + 1)) and option < match_.state.ballot.options():
+				match_.cast(option)
+				return
 	if not alive:
 		_watch_input(event)
 	for action: String in _toggled:

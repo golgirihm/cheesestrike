@@ -93,6 +93,7 @@ static func lines(on_device: String) -> Array:
 		["Change weapon", "1 to %d, or the mouse wheel" % Weapons.KEYS],
 		["Gouda Overload", "%s, when the meter is full" % Controls.keys_text("overload")],
 		["Scoreboard", "Hold %s" % Controls.keys_text("scoreboard")],
+		["Vote", "F1, F2 or F3, when there is something to vote on"],
 		["Menu", "Esc"],
 	]
 

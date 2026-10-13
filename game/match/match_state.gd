@@ -53,6 +53,8 @@ var overtime := false
 ## everyone.
 var just_started := false
 var just_overtime := false
+## What the players are voting on just now (see Ballot), or null.
+var ballot: Ballot
 ## The arena's blocks of cheese, and how much of each is left.
 var blocks := BlockRules.new()
 ## Points each team has, Cheddar first, in a mode won on points.
@@ -333,8 +335,39 @@ func _level() -> bool:
 	return _leaders().size() != 1
 
 
+## A state for a match on `next` settings with the same players in it: who
+## they are, what they wear and what they have chosen, on new teams if
+## there are teams, and nothing else of the match that was.
+func with_settings(next: MatchSettings) -> MatchState:
+	var fresh := MatchState.new(next)
+	for old: PlayerRecord in players.values():
+		var record := fresh.add_player(old.id)
+		record.name = old.name
+		record.look = old.look
+		record.main = old.main
+		record.side = old.side
+		record.attachment = old.attachment
+		record.overload_kind = old.overload_kind
+		record.ping = old.ping
+		fresh.rearm(record)
+		if old.watching:
+			fresh.set_watching(old.id, true)
+	return fresh
+
+
+## The real players in the session, who may vote: not bots.
+func voters() -> Array[int]:
+	var found: Array[int] = []
+	for record: PlayerRecord in players.values():
+		if not Bots.is_bot(record.id):
+			found.append(record.id)
+	return found
+
+
 func remove_player(id: int) -> void:
 	players.erase(id)
+	if ballot != null:
+		ballot.forget(id)
 	_check_round()
 
 
@@ -552,6 +585,8 @@ func tick(delta: float) -> Array[int]:
 		drops = drops.filter(func(lying: Dictionary) -> bool: return lying.left > 0.0)
 		drop_ended = true
 	round_break = maxf(round_break - delta, 0.0)
+	if ballot != null:
+		ballot.left = maxf(ballot.left - delta, 0.0)
 	# The clock stands still through a warm-up.
 	if is_warm_up():
 		return due
@@ -596,6 +631,8 @@ func match_due() -> bool:
 
 func end_match() -> void:
 	overtime = false
+	# While the result is up, everyone votes on what to play next.
+	ballot = Ballot.for_next(settings) if not settings.is_practice() else null
 	phase = ENDED
 	time_left = INTERMISSION
 	winners = _leaders()
@@ -606,6 +643,7 @@ func end_match() -> void:
 func start_match() -> void:
 	phase = PLAYING
 	overtime = false
+	ballot = null
 	started = playing_count() >= MIN_TO_START and not settings.is_practice()
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
@@ -727,6 +765,8 @@ func to_dict() -> Dictionary:
 		data["round_break"] = round_break
 	if not blocks.health.is_empty():
 		data["blocks"] = blocks.to_array()
+	if ballot != null:
+		data["ballot"] = ballot.to_array()
 	if not drops.is_empty():
 		data["drops"] = drops.map(func(lying: Dictionary) -> Array: return [lying.id, Weapons.ORDER.find(lying.weapon), lying.at, lying.left])
 	return data
@@ -766,6 +806,7 @@ static func from_dict(data: Dictionary) -> MatchState:
 	state.overtime = data.get("overtime") == true
 	state.just_started = false
 	state.blocks = BlockRules.from_array(data.get("blocks"))
+	state.ballot = Ballot.from_array(data.get("ballot"))
 	var lying: Variant = data.get("drops")
 	if lying is Array:
 		for entry: Variant in lying.slice(0, Pickups.MAX_DROPS):

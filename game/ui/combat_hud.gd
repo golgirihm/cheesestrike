@@ -71,6 +71,11 @@ var kill_feed: VBoxContainer
 var scoreboard: PanelContainer
 var _match_label: Label
 var _objective_label: Label
+# What is being voted on, with a button for each choice for those without
+# a keyboard.
+var _vote_panel: VBoxContainer
+var _vote_label: Label
+var _vote_buttons: Array[Button] = []
 # What the clip being shown again is.
 var _replay_label: Label
 # Who a player out of play is watching, and how to change it.
@@ -311,6 +316,12 @@ func _process(delta: float) -> void:
 		_weapon_label.text = own.weapon.stats.display_name
 	var state: MatchState = world.match_.state
 	_match_label.text = match_text(state)
+	var ballot: Ballot = state.ballot
+	_vote_panel.visible = ballot != null
+	if ballot != null:
+		_vote_label.text = "\n".join(ballot.lines(state.name_of))
+		for index in _vote_buttons.size():
+			_vote_buttons[index].visible = index < ballot.options() and (_touch_shown() or Input.mouse_mode != Input.MOUSE_MODE_CAPTURED)
 	_replay_label.text = world.replay_view.title
 	_replay_label.visible = world.replay_view.playing
 	_watch_label.text = world.watch_camera.text(_touch_shown()) if not world.replay_view.playing else ""
@@ -352,6 +363,11 @@ func _on_announced(text: String, team: int) -> void:
 	_announce_label.text = text
 	_announce_label.add_theme_color_override("font_color", TeamColors.of(team))
 	_announce_left = ANNOUNCE_LIFE
+
+
+## What is shown of the vote being held, a line at a time, or nothing.
+func vote_shown() -> Array:
+	return Array(_vote_label.text.split("\n", false)) if _vote_panel.visible else []
 
 
 func replay_shown() -> String:
@@ -555,6 +571,28 @@ func _build() -> void:
 	_announce_label.visible = false
 	add_child(_announce_label)
 
+	_vote_panel = VBoxContainer.new()
+	_vote_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_MINSIZE, 20)
+	_vote_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_vote_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vote_panel.visible = false
+	add_child(_vote_panel)
+	_vote_label = _outlined_label(16)
+	_vote_panel.add_child(_vote_label)
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vote_panel.add_child(row)
+	for option in 3:
+		var button := Button.new()
+		button.name = "Vote%d" % (option + 1)
+		button.text = " %d " % (option + 1)
+		button.custom_minimum_size = Vector2(52, 44)
+		button.focus_mode = Control.FOCUS_NONE
+		button.pressed.connect(func() -> void:
+			if world != null:
+				world.match_.cast(option))
+		row.add_child(button)
+		_vote_buttons.append(button)
 	_replay_label = _outlined_label(24)
 	_replay_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
 	_replay_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
