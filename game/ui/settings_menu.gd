@@ -31,6 +31,7 @@ const TOGGLES := [
 	["toggle_crouch", "Press once to crouch, again to stand"],
 	["toggle_aim", "Press once to aim, again to stop"],
 	["damage_numbers", "Show the damage of each hit"],
+	["replays", "Show how I was knocked out, and the play of the match"],
 ]
 
 var _rows: VBoxContainer

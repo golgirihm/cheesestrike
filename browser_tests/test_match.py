@@ -78,6 +78,9 @@ class MatchTest(GameTestCase):
         host.capture_mouse()
         own_name = host.own_player()["name"]
         host.shoot_until(f"s.combat.result === {own_name + ' wins!'!r}", timeout=180_000)
+        # Everyone is shown the best moment of it again.
+        for game in (host, joiner):
+            game.wait_for(f"s.combat.replay.startsWith({'Play of the match: ' + own_name!r}) && s.combat.replay_ghosts >= 1")
         for game in (host, joiner):
             state = game.wait_for(f"s.combat.result === {own_name + ' wins!'!r}")
             self.assertEqual(state["combat"]["match"], "Match over")

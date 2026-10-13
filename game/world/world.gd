@@ -8,6 +8,7 @@ extends Node3D
 ## one named in the match state when it arrives.
 
 const PLAYER := preload("res://player/player.tscn")
+const PLAYER_COLOURS := preload("res://player/player.gd")
 ## Physics layer of the players, whom a shot stops at where it is shown.
 const PLAYER_MASK := 2
 
@@ -19,6 +20,7 @@ const PLAYER_MASK := 2
 var sound_cues: Node
 var objective_marks: Node3D
 var watch_camera: Camera3D
+var replay_view: Node3D
 
 ## The loaded arena, and which of the Maps it is.
 var map: Node3D
@@ -63,6 +65,12 @@ func _ready() -> void:
 	add_child(objective_marks)
 	watch_camera = preload("res://world/watch_camera.gd").new(self)
 	add_child(watch_camera)
+	replay_view = preload("res://world/replay_view.gd").new(self)
+	add_child(replay_view)
+	match_.replay_shown.connect(func(clip: Dictionary, about: int, title: String) -> void:
+		# For those who want them.
+		if Settings.get_value("replays"):
+			replay_view.play(clip, about, title))
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()
@@ -115,6 +123,7 @@ func start(settings := MatchSettings.new()) -> void:
 
 
 func stop() -> void:
+	replay_view.stop()
 	if multiplayer.peer_connected.is_connected(_add_player):
 		multiplayer.peer_connected.disconnect(_add_player)
 		multiplayer.peer_disconnected.disconnect(_remove_player)
@@ -168,6 +177,14 @@ func _leave(id: int) -> void:
 		players.remove_child(player)
 		player.queue_free()
 		print("player left: %d" % id)
+
+
+## The colour player `id` is drawn in: their team's, or their own.
+func colour_of(id: int) -> Color:
+	var record: PlayerRecord = match_.state.player(id) if match_.has_state() else null
+	if record != null and record.team != MatchState.NO_TEAM:
+		return TeamColors.of(record.team)
+	return PLAYER_COLOURS.colour_for(id)
 
 
 ## Where player `id` belongs, if they have a place of their own, or null.

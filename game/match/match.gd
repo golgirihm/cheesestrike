@@ -33,6 +33,10 @@ signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
 signal overloaded(id: int)
 ## Player `id` collected a pickup of `kind` (on everyone's machine).
 signal picked_up(id: int, kind: String)
+## A clip of the match to show again (see Recording), seen from behind
+## player `about` and headed `title`: on a knocked-out player's machine, how
+## it happened; on everyone's at the end, the play of the match.
+signal replay_shown(clip: Dictionary, about: int, title: String)
 ## The mice have come out to gnaw at cheese block `index` (on everyone's
 ## machine).
 signal block_gnawed(index: int)
@@ -103,6 +107,16 @@ var _pending_names := {}
 var _pending_looks := {}
 # And their loadouts, as [main, side].
 var _pending_loadouts := {}
+## The last few seconds of the match, and the best moment of it so far:
+## the host's, for showing players how they were knocked out and the play
+## of the match.
+var _was_playing := true
+var recording := Recording.new()
+var highlights := Highlights.new()
+## Seconds of a clip of how a player was knocked out: no longer than they
+## wait to come back.
+const KNOCK_OUT_CLIP := 2.6
+const KNOCK_OUT_TITLE := "How you were knocked out"
 # And the kind of Overload each has chosen.
 var _pending_overloads := {}
 # Rains of wheels under way: each {"shooter": id, "at": the feet they fall
@@ -142,6 +156,8 @@ func start(settings := MatchSettings.new()) -> void:
 		_histories.clear()
 		_checks.clear()
 		_put_back_at.clear()
+		recording.clear()
+		highlights.clear()
 		state_changed.emit()
 	else:
 		introduce(Settings.get_value("name"))
@@ -207,6 +223,7 @@ func remove_player(id: int) -> void:
 	state.remove_player(id)
 	_pending_names.erase(id)
 	_rules.erase(id)
+	recording.forget(id)
 	_sent_to.erase(id)
 	_struck_at.erase(id)
 	_emoted_at.erase(id)
@@ -657,6 +674,11 @@ func _process(delta: float) -> void:
 			_changed()
 		if was_playing != state.is_playing():
 			_changed()
+		# A match can end on a knock-out, between one frame and the next, as
+		# well as on the clock just now.
+		if _was_playing and not state.is_playing():
+			_show_play_of_the_match()
+		_was_playing = state.is_playing()
 		if state.match_due():
 			_new_match()
 	_since_sync += delta
@@ -743,6 +765,7 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 			damage_to[hit.id] = damage_to.get(hit.id, 0.0) + amount
 			headshot[hit.id] = headshot.get(hit.id, false) or hit.head
 	_show_shot_to_others(shooter, ends)
+	recording.shot(now(), shooter, shooter_node.muzzle.global_position, ends)
 	for victim: int in damage_to:
 		_harm(shooter, victim, damage_to[victim], origin, credited, headshot[victim])
 
@@ -845,6 +868,7 @@ func record_position(time: float, at: Vector3, id: int, facing := Vector2.ZERO) 
 	if not _histories.has(id):
 		_histories[id] = PositionHistory.new()
 	_histories[id].push(time, at, facing)
+	recording.add(time, id, at, facing)
 
 
 ## `attacker` hurts `victim` for `amount` with `weapon`, from `from`, and
@@ -869,6 +893,7 @@ func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: Str
 	if result.knocked_out and not own:
 		# A little ammunition is taken from whoever is knocked out.
 		_resupply(attacker, SPOILS)
+		_replay_knock_out(attacker, victim, weapon, head)
 	if result.knocked_out:
 		# Nobody is named as knocking out a player who did it themselves.
 		_announce_knockout("" if own else state.name_of(attacker), state.name_of(victim), weapon, head)
@@ -992,6 +1017,36 @@ func _hurt_block(index: int, amount: float) -> void:
 		for above: int in BlockRules.resting_on(world.block_boxes(), index):
 			state.blocks.remove(above)
 	_changed()
+
+
+# Host only: `attacker` has knocked `victim` out. The victim is shown how,
+# from behind the attacker, and the moment is weighed as the play of the
+# match.
+func _replay_knock_out(attacker: int, victim: int, weapon: String, head: bool) -> void:
+	var time := now()
+	var moment := highlights.knock_out(time, attacker, head, weapon == Melee.ID)
+	highlights.consider(moment, recording.clip([attacker, victim], time, Highlights.CLIP), attacker, victim)
+	var clip := recording.clip([attacker, victim], time, KNOCK_OUT_CLIP)
+	if victim == multiplayer.get_unique_id():
+		replay_shown.emit(clip, attacker, KNOCK_OUT_TITLE)
+	elif multiplayer.get_peers().has(victim):
+		_replay.rpc_id(victim, clip, attacker, KNOCK_OUT_TITLE)
+
+
+# Host only: the match is over, and everyone is shown the best moment of it.
+func _show_play_of_the_match() -> void:
+	var best := highlights.best
+	if best.is_empty():
+		return
+	var title := "Play of the match: %s  ·  %s" % [state.name_of(best.attacker), best.text]
+	_replay.rpc(best.clip, best.attacker, title)
+	replay_shown.emit(best.clip, best.attacker, title)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replay(clip: Variant, about: Variant, title: Variant) -> void:
+	if clip is Dictionary and about is int and title is String:
+		replay_shown.emit(clip, about, title.left(120))
 
 
 ## Host only: tells everyone `text`, in `team`'s colour.
@@ -1270,6 +1325,7 @@ func _new_match() -> void:
 	_departed.clear()
 	tally.clear()
 	_rains.clear()
+	highlights.clear()
 	state.start_match()
 	_hold_back_powers()
 	var spots: Array[Vector3] = world.spawn_positions()

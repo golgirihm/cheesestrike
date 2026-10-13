@@ -38,8 +38,11 @@ class WatchingTest(GameTestCase):
         host.page.wait_for_timeout(500)
         host.capture_mouse()
         host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
+        # First how it happened, then the one who did it, until they are back.
+        joiner.wait_for("s.replays_seen >= 1")
+        self.assertEqual(host.state()["replays_seen"], 0, "only the one it happened to")
         joiner.wait_for(f"s.combat.watch === 'Watching {host_name}' || s.players.some((p) => p.mine && p.alive && p.deaths >= 1)")
-        joiner.wait_for("s.players.some((p) => p.mine && p.alive && p.deaths >= 1) && s.combat.watch === ''")
+        joiner.wait_for("s.players.some((p) => p.mine && p.alive && p.deaths >= 1) && s.combat.watch === '' && s.combat.replay === ''")
 
 
 if __name__ == "__main__":
