@@ -39,6 +39,7 @@ const TOGGLES := [
 	["replays", "Show how I was knocked out, and the play of the match"],
 	["mono_sound", "Mono sound"],
 	["announcer", "The announcer's voice"],
+	["voice_chat", "Talk with teammates (hold the Talk key)"],
 	["outlines", "Outline teammates and nearby pickups"],
 	["dynamic_resolution", "Lower the render scale to hold the frame rate"],
 	["bloom", "Glow on bright things"],

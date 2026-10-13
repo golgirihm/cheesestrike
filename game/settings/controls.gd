@@ -22,6 +22,7 @@ const REBINDABLE := {
 	"emote": "Emote",
 	"overload": "Overload",
 	"scoreboard": "Scoreboard",
+	"talk": "Talk",
 }
 
 # Each rebindable action's own keys, as the project sets them, by action.

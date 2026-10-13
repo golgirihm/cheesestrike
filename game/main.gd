@@ -49,6 +49,7 @@ var _alone_settings: MatchSettings
 ## The tutorial the player is being taken through, or null.
 var tutorial: Tutorial
 var arena_editor: Control
+var _mute_target := 0
 ## Milliseconds of each frame spent making sounds while the game gets ready.
 const SOUND_MAKING_MS := 12
 ## Covers the view while the game gets ready (see Warmup): until one of
@@ -135,6 +136,19 @@ func _ready() -> void:
 	for added: Button in [remove_ask, remove_choice]:
 		added.custom_minimum_size = resume_button.custom_minimum_size
 		watch_toggle.add_sibling(added)
+	# Muting someone's talk: the same two buttons again.
+	var mute_choice := Button.new()
+	mute_choice.name = "MuteChoiceButton"
+	var mute_toggle := Button.new()
+	mute_toggle.name = "MuteButton"
+	for added: Button in [mute_toggle, mute_choice]:
+		added.custom_minimum_size = resume_button.custom_minimum_size
+		remove_choice.add_sibling(added)
+	mute_choice.pressed.connect(func() -> void:
+		var others := others_here()
+		_mute_target = others[(others.find(_mute_target) + 1) % others.size()] if not others.is_empty() else 0)
+	mute_toggle.pressed.connect(func() -> void:
+		world.voice_chat.set_muted(_mute_target, not world.voice_chat.is_muted(_mute_target)))
 	remove_choice.pressed.connect(func() -> void:
 		var others := removable()
 		_remove_target = others[(others.find(_remove_target) + 1) % others.size()] if not others.is_empty() else 0)
@@ -203,6 +217,10 @@ func _process(_delta: float) -> void:
 		loading_cover.hide()
 	if hud.visible:
 		hud.text = "Practice range" if Net.alone else "Session %s  ·  %d playing" % [Net.room_code, world.players.get_child_count()]
+		# Who is heard talking, by name.
+		var talking: Array = world.voice_chat.talking().map(func(id: int) -> String: return world.match_.state.name_of(id))
+		if not talking.is_empty():
+			hud.text += "\nTalking: %s" % ", ".join(talking)
 	if tutorial != null and hud.visible:
 		_run_tutorial()
 	if pause_menu.visible:
@@ -218,6 +236,15 @@ func _process(_delta: float) -> void:
 		choice.visible = not others.is_empty()
 		ask.visible = choice.visible
 		choice.text = "Vote to remove: %s" % world.match_.state.name_of(_remove_target)
+		var talkers := others_here()
+		if not talkers.has(_mute_target):
+			_mute_target = talkers[0] if not talkers.is_empty() else 0
+		var mute_choice: Button = pause_menu.find_child("MuteChoiceButton", true, false)
+		var mute_toggle: Button = pause_menu.find_child("MuteButton", true, false)
+		mute_choice.visible = not talkers.is_empty()
+		mute_toggle.visible = mute_choice.visible
+		mute_choice.text = "Talk from: %s" % world.match_.state.name_of(_mute_target)
+		mute_toggle.text = "Unmute them" if world.voice_chat.is_muted(_mute_target) else "Mute them"
 	_was_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	menu_button.visible = hud.visible and not _was_captured and not pause_menu.visible
 
@@ -340,6 +367,16 @@ func _host() -> void:
 
 
 ## The players this one could ask for a vote on removing, in order.
+## The other real players in the session, whose talk can be muted.
+func others_here() -> Array:
+	if multiplayer.multiplayer_peer == null or not world.match_.has_state():
+		return []
+	var own := multiplayer.get_unique_id()
+	var found: Array = world.match_.state.players.keys().filter(func(id: int) -> bool: return id != own and not Bots.is_bot(id))
+	found.sort()
+	return found
+
+
 func removable() -> Array:
 	if multiplayer.multiplayer_peer == null or not world.match_.has_state():
 		return []

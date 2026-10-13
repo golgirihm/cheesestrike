@@ -50,6 +50,8 @@ var _frames_took := 0.0
 var hurt_view: HurtView
 ## The voice that tells this machine's player how the match stands.
 var announcer: Announcer
+## Talking with teammates.
+var voice_chat: VoiceChat
 var _built_code := ""
 ## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
@@ -116,6 +118,8 @@ func _ready() -> void:
 	announcer = Announcer.new(self)
 	add_child(announcer)
 	add_child(MusicDirector.new(self))
+	voice_chat = VoiceChat.new(self)
+	add_child(voice_chat)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()

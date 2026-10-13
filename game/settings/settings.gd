@@ -47,6 +47,8 @@ const DEFAULTS := {
 	"interface_volume": 1.0,
 	## How wide the difference between loud and quiet is left (see Mix).
 	"dynamic_range": "headphones",
+	## Whether the player talks with teammates and hears them (see VoiceChat).
+	"voice_chat": true,
 	## Whether the announcer speaks (see Announcer).
 	"announcer": true,
 	## Whether left and right are made the same.

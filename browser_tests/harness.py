@@ -298,7 +298,9 @@ class GameTestCase(unittest.TestCase):
         cls._browser = cls._playwright.chromium.launch(
             # The game needs WebGL to start, and CI has no graphics card, so
             # use the software renderer. The game doesn't draw under test.
-            args=["--enable-unsafe-swiftshader", "--use-angle=swiftshader"]
+            # A made-up microphone that may be used without asking, for the
+            # test of talking.
+            args=["--enable-unsafe-swiftshader", "--use-angle=swiftshader", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
         )
         # One context for the class, so the engine download is cached between tests.
         # No service worker: it would keep its own copy of the game's files.
