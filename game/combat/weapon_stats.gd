@@ -9,6 +9,12 @@ extends Resource
 ## How a player comes by the weapon: "main" and "side" weapons are chosen in
 ## their loadout, one of each; "power" weapons are found on an arena's pads.
 @export var slot := "main"
+## The other way this weapon fires, on its second trigger: the id of the
+## stats that shot has, or "" if it has none. Those stats name this weapon
+## in `alt_of`, and say how many rounds each such shot uses.
+@export var alt := ""
+@export var alt_of := ""
+@export var rounds := 1
 ## Damage per hit, per pellet for a weapon with several.
 @export var damage := 20.0
 @export var headshot_multiplier := 1.75
@@ -88,6 +94,8 @@ const AIMED := 1
 const MOVING := 2
 const AIRBORNE := 4
 const CROUCHED := 8
+## And whether the shot is the weapon's other way of firing.
+const ALT := 16
 ## The share of the hip spread that the first shot of a run of fire has.
 const HIP_START := 0.55
 ## How much wider shots spread on the move, and off the ground.
@@ -130,6 +138,12 @@ func damage_at(distance: float) -> float:
 		return damage
 	var faded := clampf((distance - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
 	return damage * lerpf(1.0, falloff_floor, faded)
+
+
+## The weapon a shot with these stats is put down to: the weapon itself, or
+## the one this is another way of firing.
+func credit() -> String:
+	return id if alt_of.is_empty() else alt_of
 
 
 ## Seconds between shots on average, over a whole burst for a weapon that

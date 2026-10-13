@@ -35,8 +35,12 @@ var _reserve := {}
 
 
 ## Whether a shot from `weapon` at time `now` (seconds) is allowed, recording it
-## if so.
-func allow_shot(weapon: WeaponStats, now: float) -> bool:
+## if so. `other`, if given, is the weapon's other way of firing: such a shot
+## uses as many rounds as it says, and as much of the rate of fire as the
+## longer wait after it is worth.
+func allow_shot(weapon: WeaponStats, now: float, other: WeaponStats = null) -> bool:
+	var rounds := other.rounds if other != null else 1
+	var cost := clampf(other.fire_interval / weapon.rate_interval(), 1.0, BURST) if other != null else 1.0
 	var id := weapon.id
 	if _reload_done_at.has(id):
 		if now < _reload_done_at[id]:
@@ -47,17 +51,17 @@ func allow_shot(weapon: WeaponStats, now: float) -> bool:
 		_fired[id] = _fired.get(id, 0) - taken
 		if not weapon.unlimited():
 			_reserve[id] = reserve(weapon) - taken
-	if _fired.get(id, 0) >= weapon.magazine:
+	if _fired.get(id, 0) + rounds > weapon.magazine:
 		return false
 	var budget: float = _budget.get(id, BURST)
 	if _budget_at.has(id):
 		budget = minf(budget + (now - _budget_at[id]) / weapon.rate_interval(), BURST)
 	_budget_at[id] = now
-	if budget < 1.0:
+	if budget < cost:
 		_budget[id] = budget
 		return false
-	_budget[id] = budget - 1.0
-	_fired[id] = _fired.get(id, 0) + 1
+	_budget[id] = budget - cost
+	_fired[id] = _fired.get(id, 0) + rounds
 	_run[id] = next_in_run(weapon, _run.get(id, -1), now - _shot_at.get(id, -INF))
 	_shot_at[id] = now
 	return true

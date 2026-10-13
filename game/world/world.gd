@@ -164,8 +164,8 @@ func _process(delta: float) -> void:
 ## This machine's own player fired: show the shot at once, without waiting to
 ## hear from the host where it went.
 func _show_own_shot(origin: Vector3, direction: Vector3, seed: int, stance: int, run: int, player: Node3D) -> void:
-	var weapon: WeaponStats = player.weapon.stats
-	sound_cues.own_shot(weapon.id, player.muzzle.global_position)
+	var weapon: WeaponStats = player.shot_stats if player.shot_stats != null else player.weapon.stats
+	sound_cues.own_shot(weapon.credit(), player.muzzle.global_position)
 	if weapon.fires_projectile():
 		# The projectile itself shows once the host launches it.
 		effects.show_shot(player.muzzle.global_position, [])

@@ -136,6 +136,10 @@ var _reload_pressed := false
 var _jump_pressed := false
 var _overload_pressed := false
 var _melee_pressed := false
+var _alt_pressed := false
+## The stats of the shot this player last fired: their weapon's, or those
+## of its other way of firing.
+var shot_stats: WeaponStats
 # The emote key: whether it is down, whether an emote has been picked by
 # number while it was, and the emote it makes next when it isn't.
 var _emote_held := false
@@ -515,6 +519,9 @@ func _input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("weapon_previous"):
 		_switch_step -= 1
+		return
+	if event.is_action_pressed("alt_fire"):
+		_alt_pressed = true
 		return
 	if event is InputEventScreenTouch:
 		_handle_touch(event)
@@ -1352,23 +1359,34 @@ func _use_weapon() -> void:
 		Sounds.play("dry", -6.0)
 		equip(_fallback_weapon())
 		return
-	if wants and weapon.fire():
-		var origin := camera.global_position
-		# The head's facing, not the camera's, which may be shaking; but
-		# through a scope, wherever it has swayed to.
-		var direction := Recoil.apply(-head.global_basis.z, _scope_sway)
-		var seed := randi()
-		var standing := stance()
-		_run = next_in_run()
-		_since_shot = 0.0
-		# The host is told where the player aims, and adds the kick itself.
-		match_.fire(origin, direction, seed, weapon.stats.id, standing)
-		kick()
-		var kicked := Recoil.apply(direction, Recoil.offset(weapon.stats, _run, standing & WeaponStats.AIMED != 0))
-		fired.emit(origin, kicked, seed, standing, _run)
-		# Firing the last round starts the reload by itself.
-		if weapon.is_reloading():
-			match_.reload(weapon.stats.id)
+	# The weapon's other way of firing, on its second trigger, if it has one.
+	var other := Weapons.alt_of(weapon.stats) if _alt_pressed else null
+	_alt_pressed = false
+	if other != null and weapon.fire_other(other):
+		_loose(other, stance() | WeaponStats.ALT)
+	elif wants and weapon.fire():
+		_loose(weapon.stats, stance())
+
+
+# A shot has left the weapon in hand, with `stats` (its own, or those of its
+# other way of firing): tells the host and shows it here.
+func _loose(stats: WeaponStats, standing: int) -> void:
+	var origin := camera.global_position
+	# The head's facing, not the camera's, which may be shaking; but
+	# through a scope, wherever it has swayed to.
+	var direction := Recoil.apply(-head.global_basis.z, _scope_sway)
+	var seed := randi()
+	_run = next_in_run()
+	_since_shot = 0.0
+	shot_stats = stats
+	# The host is told where the player aims, and adds the kick itself.
+	match_.fire(origin, direction, seed, weapon.stats.id, standing)
+	kick()
+	var kicked := Recoil.apply(direction, Recoil.offset(stats, _run, standing & WeaponStats.AIMED != 0))
+	fired.emit(origin, kicked, seed, standing, _run)
+	# Firing the last round starts the reload by itself.
+	if weapon.is_reloading():
+		match_.reload(weapon.stats.id)
 
 
 func _exit_tree() -> void:
@@ -1425,6 +1443,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_touch_aim = not _touch_aim
 		elif button == "knife":
 			_melee_pressed = true
+		elif button == "alt":
+			_alt_pressed = true
 		elif button == "emote":
 			_make_emote(_next_emote)
 		elif button == "crouch":
