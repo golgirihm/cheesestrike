@@ -231,7 +231,10 @@ static func _building(body: Node3D) -> void:
 	drawn.material_override = _windows(colour)
 	var size := _size(body)
 	body.add_child(Rounded.instance(Rounded.box(Vector3(size.x + 0.8, 1.0, size.z + 0.8), 0.25), _material(INK.lightened(0.15)), Vector3(0, size.y / 2.0 + 0.3, 0)))
-	# A doorway on each side, so it reads as a building from the street.
+	# A doorway on each side, so it reads as a building from the street:
+	# but not on a tower that begins above floors that can be walked into.
+	if body.position.y - size.y / 2.0 > 1.0:
+		return
 	for normal: Vector3 in [Vector3.LEFT, Vector3.RIGHT, Vector3.FORWARD, Vector3.BACK]:
 		var out := absf(normal.dot(size / 2.0))
 		var door := Rounded.instance(Rounded.box(Vector3(3.0, 4.6, 0.3), 0.1), _material(INK.lightened(0.1)), normal * out + Vector3(0, -size.y / 2.0 + 2.3, 0))

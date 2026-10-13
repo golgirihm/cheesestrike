@@ -241,7 +241,9 @@ func test_the_cars_keep_off_the_pads_and_the_starting_spots() -> void:
 	var map: Node3D = await _load("city")
 	var space := world.get_world_3d().direct_space_state
 	for pad: Dictionary in world.pickup_pads():
-		var above: Vector3 = pad.position + Vector3.UP * 8.0
+		# From as high as a player's head, which is under a ceiling indoors:
+		# nothing between there and the pad's own floor.
+		var above: Vector3 = pad.position + Vector3.UP * (BodyShape.HEIGHT + 0.1)
 		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(above, pad.position + Vector3.DOWN, Match.WORLD_MASK))
-		assert_almost_eq(hit.position.y, 0.0, 0.01, "%s pad is under something" % pad.kind)
+		assert_almost_eq(hit.position.y, pad.position.y, 0.01, "%s pad is under something" % pad.kind)
 	assert_not_null(map)

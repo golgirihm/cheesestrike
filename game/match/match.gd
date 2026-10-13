@@ -1190,6 +1190,9 @@ func _replay(clip: Variant, about: Variant, title: Variant) -> void:
 # The host hurts whoever stands in a hazard, and opens doors for whoever
 # comes near.
 func _run_moving_parts(delta: float) -> void:
+	# Only in the arena the match is being played on.
+	if world.map_id != state.settings.map:
+		return
 	var parts: Dictionary = world.moving_parts
 	state.has_lifts = not parts.lifts.is_empty()
 	if parts.hazards.is_empty() and parts.doors.is_empty():

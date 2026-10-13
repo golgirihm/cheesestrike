@@ -33,7 +33,7 @@ const ROUGH := {DIRT: 0.95, ROCK: 0.9, WOOD: 0.75, ASPHALT: 0.9, TILE: 0.45, COB
 const BY_NAME := {
 	"Block": CHEESE, "Mesa": ROCK, "Ridge": ROCK, "Pillar": ROCK, "Arch": ROCK, "Ledge": ROCK, "Rock": ROCK, "Fountain": ROCK, "Clock": ROCK,
 	"Ramp": WOOD, "Board": WOOD, "Shelf": WOOD, "Crate": WOOD, "Cart": WOOD, "Stall": WOOD, "Step": BREAD, "Loaf": BREAD, "Cover": BREAD,
-	"Tank": METAL, "Toaster": METAL, "Kettle": METAL, "Gantry": METAL, "Jar": TILE, "Butter": TILE,
+	"Lobby": PLASTER, "Upper": PLASTER, "Tank": METAL, "Toaster": METAL, "Kettle": METAL, "Gantry": METAL, "Jar": TILE, "Butter": TILE,
 }
 ## What the floor of an arena is made of, by the land round it, unless the
 ## floor says otherwise.
