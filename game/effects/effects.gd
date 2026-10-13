@@ -234,13 +234,19 @@ func _casing(muzzle: Vector3, aside: Vector3) -> void:
 func launch_projectile(id: int, weapon: String, from: Vector3, velocity: Vector3) -> void:
 	var stats := Weapons.find(weapon)
 	var wheel := MeshInstance3D.new()
-	wheel.mesh = _grenade_mesh if stats != null and stats.bounces else _wheel_mesh
-	wheel.material_override = _wheel_material
+	var stick := stats != null and stats.splash_radius <= 0.0
+	if stick:
+		wheel.mesh = _stick_mesh()
+	else:
+		wheel.mesh = _grenade_mesh if stats != null and stats.bounces else _wheel_mesh
+		wheel.material_override = _wheel_material
 	wheel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(wheel)
 	wheel.global_position = from
 	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8) * (stats.projectile_gravity if stats != null else 0.0)
-	_projectiles[id] = {"node": wheel, "from": from, "velocity": velocity, "gravity": gravity, "age": 0.0, "fuse": stats.fuse if stats != null else 3.0}
+	_projectiles[id] = {"node": wheel, "from": from, "velocity": velocity, "gravity": gravity, "age": 0.0, "fuse": stats.fuse if stats != null else 3.0, "stick": stick}
+	if stick:
+		wheel.global_transform = stick_transform(from, velocity)
 	if stats != null and stats.bounces:
 		# One that bounces has no simple path: follow it through this
 		# machine's own copy of the arena, which is the same as the host's.
@@ -254,6 +260,9 @@ func burst_projectile(id: int, weapon: String, at: Vector3) -> void:
 		_projectiles.erase(id)
 	var stats := Weapons.find(weapon)
 	var radius := stats.splash_radius if stats != null else 3.0
+	if radius <= 0.0:
+		# It only struck: nothing bursts.
+		return
 	var burst := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
 	sphere.radius = 1.0
@@ -319,8 +328,40 @@ func _process(delta: float) -> void:
 			if not flight.resting:
 				flying.node.rotate_x(delta * 9.0)
 			continue
-		flying.node.global_position = Projectile.position_at(flying.from, flying.velocity, flying.gravity, flying.age)
+		var at := Projectile.position_at(flying.from, flying.velocity, flying.gravity, flying.age)
+		if flying.stick:
+			# A stick flies point first, tipping over as it falls.
+			flying.node.global_transform = stick_transform(at, flying.velocity + Vector3.DOWN * flying.gravity * flying.age)
+			continue
+		flying.node.global_position = at
 		flying.node.rotate_x(delta * 12.0)
+
+
+## Where a stick at `at` flying along `velocity` sits: its length (the
+## mesh's Y) along the way it goes.
+static func stick_transform(at: Vector3, velocity: Vector3) -> Transform3D:
+	var way := velocity.normalized() if velocity.length() > 0.001 else Vector3.FORWARD
+	return Transform3D(Basis(Quaternion(Vector3.UP, way)), at)
+
+
+static var _stick: Mesh
+
+
+# A breadstick: long, thin and baked brown.
+static func _stick_mesh() -> Mesh:
+	if _stick == null:
+		var stick := CylinderMesh.new()
+		stick.top_radius = 0.018
+		stick.bottom_radius = 0.022
+		stick.height = 0.55
+		stick.radial_segments = 8
+		stick.rings = 1
+		var crust := StandardMaterial3D.new()
+		crust.albedo_color = WeaponModels.CRUST
+		crust.roughness = 0.9
+		stick.material = crust
+		_stick = stick
+	return _stick
 
 
 ## Where the tracer from `from` to `to` sits: a unit-long box stretched along

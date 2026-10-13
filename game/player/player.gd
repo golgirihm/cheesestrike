@@ -191,6 +191,10 @@ var _aim := 0.0
 var _touch_aim := false
 # Seconds left of the weapon in hand coming up, after a change of weapon.
 var _switch_left := 0.0
+# The breath a player holds to steady a scope, and how far the view is
+# off from swaying through it, as (to the right, upward) in radians.
+var breath := Breath.new()
+var _scope_sway := Vector2.ZERO
 # Which shot of a run of fire the last was (-1 before any), how long ago, and
 # how far the view is thrown off by the weapon's kick, as Recoil.offset gives it.
 var _run := -1
@@ -208,6 +212,8 @@ var _fall_speed := 0.0
 # How far the weapon is lowered for a reload, and its magazine out, 0 to 1.
 var _reload_lowered := 0.0
 var _magazine: Node3D
+# The lens of a scoped weapon in hand, which glints when it is looked through.
+var _glint: Node3D
 var _magazine_rest := Vector3.ZERO
 ## How fast the view climbs with a kick, and settles after a run of fire.
 const RECOIL_RISE := 30.0
@@ -335,9 +341,10 @@ func equip(id: String) -> void:
 	if not arsenal.has(id) or weapon.stats.id == id:
 		return
 	weapon.reload_left = 0.0
+	weapon.burst_left = 0
 	weapon = arsenal[id]
 	_run = -1
-	weapon.cooldown = maxf(weapon.cooldown, SWITCH_TIME)
+	weapon.cooldown = maxf(weapon.cooldown, weapon.stats.draw_time)
 	_show_weapon(id)
 	if _mine and match_ != null:
 		match_.select_weapon(id)
@@ -348,7 +355,7 @@ func _show_weapon(id: String) -> void:
 		return
 	# The first weapon is simply there; one changed to comes up from below.
 	if not _shown_weapon.is_empty():
-		_switch_left = SWITCH_TIME
+		_switch_left = draw_time(id)
 	_shown_weapon = id
 	for child in gun.get_children():
 		child.queue_free()
@@ -357,6 +364,7 @@ func _show_weapon(id: String) -> void:
 	WeaponModels.show_own_view(model, is_multiplayer_authority())
 	gun.add_child(model)
 	muzzle = model.get_node("Muzzle")
+	_glint = model.get_node_or_null("Glint")
 	_magazine = model.get_node_or_null("Magazine")
 	_magazine_rest = _magazine.position if _magazine != null else Vector3.ZERO
 
@@ -548,8 +556,8 @@ func _input(event: InputEvent) -> void:
 		_emote_picked = true
 	elif event.is_action_pressed("grenade"):
 		_start_grenade()
-	elif _weapon_key(event) != "":
-		_switch_to = _weapon_key(event)
+	elif _number_key(event) != -1:
+		_switch_to = Weapons.at_key(arsenal.keys(), _number_key(event))
 	elif event.is_action_pressed("jump"):
 		_jump_pressed = true
 	elif event.is_action_pressed("fire"):
@@ -621,7 +629,12 @@ func _animate(delta: float) -> void:
 	head.position = BodyShape.head_offset(smoothstep(0.0, 1.0, _crouch), _lean) * BodyShape.SIZE
 	head.rotation.z = -BodyShape.LEAN_ANGLE * _lean * 0.5
 	# A weapon just changed to swings up from below.
-	var lowered := switch_lowering(_switch_left)
+	var lowered := switch_lowering(_switch_left, draw_time(_shown_weapon))
+	# The owner sees through a scope rather than the weapon it is on; others
+	# see its lens catch the light.
+	gun.visible = not (_mine and is_scoped())
+	if _glint != null:
+		_glint.visible = not _mine and alive and _aim >= 0.9
 	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + (Vector3(0.0, -0.5, 0.1) * lowered + Vector3(0.03, -0.16, 0.04) * reloading) * gun.scale.x
 	gun.rotation = Vector3(0.18 * _kick - 1.1 * lowered + 0.4 * reloading, 0.0, 0.5 * lowered + 0.7 * reloading) + sway_turn
 	if _magazine != null:
@@ -704,11 +717,22 @@ func _nearest_other() -> Vector3:
 	return nearest
 
 
-## How far down a weapon changed to `left` seconds short of SWITCH_TIME ago
+## How far down a weapon changed to `left` seconds short of `time` ago
 ## still is: 1 as the change begins, 0 once it is up.
-static func switch_lowering(left: float) -> float:
-	var share := clampf(left / SWITCH_TIME, 0.0, 1.0)
+static func switch_lowering(left: float, time := SWITCH_TIME) -> float:
+	var share := clampf(left / maxf(time, 0.01), 0.0, 1.0)
 	return share * share
+
+
+## Seconds weapon `id` takes to come up.
+static func draw_time(id: String) -> float:
+	var stats := Weapons.find(id)
+	return stats.draw_time if stats != null else SWITCH_TIME
+
+
+## Whether this player is looking through a scope, which fills their view.
+func is_scoped() -> bool:
+	return alive and weapon.stats.scoped and is_aiming()
 
 
 ## Whether this player is aiming down the sights, so their shots go where
@@ -876,8 +900,11 @@ func _process(delta: float) -> void:
 		var across := Vector2(velocity.x, velocity.z).length() if is_on_floor() else 0.0
 		var sideways := (global_basis.inverse() * velocity).x / Movement.WALK_SPEED
 		camera.position = (WeaponSway.view_bob(_bob_phase, across / Movement.WALK_SPEED) + Vector3.DOWN * WeaponSway.VIEW_DIP * _landing) * motion
-		camera.rotation = Vector3(tip.x + _recoil_view.y, -_recoil_view.x, tip.y - clampf(sideways, -1.0, 1.0) * WeaponSway.VIEW_ROLL * motion)
 		_aim = move_toward(_aim, 1.0 if _wants_aim() else 0.0, delta / AIM_TIME)
+		# A scope sways, until the breath is held.
+		breath.tick(delta, is_scoped() and _wants_run())
+		_scope_sway = breath.sway() * smoothstep(0.0, 1.0, _aim) if weapon.stats.scoped else Vector2.ZERO
+		camera.rotation = Vector3(tip.x + _recoil_view.y + _scope_sway.y, -_recoil_view.x - _scope_sway.x, tip.y - clampf(sideways, -1.0, 1.0) * WeaponSway.VIEW_ROLL * motion)
 		_crouch = move_toward(_crouch, 1.0 if _wants_crouch() else 0.0, delta * Movement.CROUCH_RATE)
 		_lean = move_toward(_lean, _wants_lean(), delta * Movement.CROUCH_RATE)
 		var run_fov := lerpf(1.0, WeaponSway.RUN_FOV, _running * Settings.get_value("camera_motion"))
@@ -910,7 +937,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # Which number key `event` presses, counting from 0, or -1.
 static func _number_key(event: InputEvent) -> int:
-	for index in Weapons.ORDER.size():
+	for index in Weapons.KEYS:
 		if event.is_action_pressed("weapon_%d" % (index + 1)):
 			return index
 	return -1
@@ -942,12 +969,6 @@ func fall(weapon: String, from: Vector3) -> void:
 		world.effects.crumbs(global_position + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE, body.colour(), 36 if scattered else 12, 9.0 if scattered else 4.0)
 
 
-# The weapon a number key asks for, or "".
-static func _weapon_key(event: InputEvent) -> String:
-	for index in Weapons.ORDER.size():
-		if event.is_action_pressed("weapon_%d" % (index + 1)):
-			return Weapons.ORDER[index]
-	return ""
 
 
 func _physics_process(delta: float) -> void:
@@ -1033,7 +1054,7 @@ func _physics_process(delta: float) -> void:
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y).limit_length(1.0)
 	_knockback *= exp(-(KNOCKBACK_GROUND_DECAY if is_on_floor() else KNOCKBACK_AIR_DECAY) * delta)
 	_flinch_left = maxf(_flinch_left - delta, 0.0)
-	var speed := Movement.speed(_wants_run(), _wants_aim(), _flinch_left, Overload.speed_factor(record()), _wants_crouch())
+	var speed := Movement.speed(_wants_run(), _wants_aim(), _flinch_left, Overload.speed_factor(record()), _wants_crouch()) * weapon.stats.carry_speed
 	var wanted := Vector2(direction.x, direction.z) * speed
 	# On the ground a player goes where they push; in the air they can only
 	# steer what they left it with.
@@ -1320,7 +1341,8 @@ func _use_weapon() -> void:
 			match_.reload(weapon.stats.id)
 			Sounds.play("reload", -6.0)
 	var held := Input.is_action_pressed("fire") or _mouse_fire_held or _button_touches.values().has("fire")
-	var wants := _fire_pressed or (held and weapon.stats.automatic)
+	# The rest of a burst follows its first shot without being asked.
+	var wants := _fire_pressed or (held and weapon.stats.automatic) or weapon.in_burst()
 	# A press waits for the weapon to be ready, unless it is empty.
 	if _fire_pressed and (weapon.can_fire() or weapon.is_reloading()):
 		_fire_pressed = false
@@ -1332,8 +1354,9 @@ func _use_weapon() -> void:
 		return
 	if wants and weapon.fire():
 		var origin := camera.global_position
-		# The head's facing, not the camera's, which may be shaking.
-		var direction := -head.global_basis.z
+		# The head's facing, not the camera's, which may be shaking; but
+		# through a scope, wherever it has swayed to.
+		var direction := Recoil.apply(-head.global_basis.z, _scope_sway)
 		var seed := randi()
 		var standing := stance()
 		_run = next_in_run()
@@ -1374,7 +1397,8 @@ func _look(delta: Vector2) -> void:
 		return
 	if Settings.get_value("invert_look"):
 		delta.y = -delta.y
-	delta *= lerpf(1.0, AIM_LOOK_FACTOR, _aim)
+	# Slower at the eye, and slower still through a scope.
+	delta *= lerpf(1.0, minf(AIM_LOOK_FACTOR, weapon.stats.aim_zoom * 1.2), _aim)
 	_looked += Vector2(delta.x, -delta.y)
 	rotate_y(-delta.x)
 	head.rotation.x = clampf(head.rotation.x - delta.y, -PITCH_LIMIT, PITCH_LIMIT)

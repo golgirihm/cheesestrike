@@ -15,6 +15,12 @@ const SOUNDS := {
 	"shotgun": "_shotgun",
 	"grater": "_grater",
 	"launcher": "_launcher",
+	"pistols": "_pistols",
+	"carbine": "_carbine",
+	"rifle": "_rifle",
+	"lmg": "_lmg",
+	"bow": "_bow",
+	"stick": "_stick",
 	"burst": "_burst",
 	"hit": "_hit",
 	"hit_head": "_hit_head",
@@ -176,6 +182,54 @@ static func _grater() -> AudioStreamWAV:
 static func _shotgun() -> AudioStreamWAV:
 	return _gunshot(2, 0.75, {"crack": 0.9, "crack_decay": 450.0, "blast": 1.6, "blast_bright": 0.22, "blast_decay": 24.0,
 		"thump": 1.3, "thump_from": 120.0, "thump_to": 42.0, "thump_decay": 16.0, "thump_fall": 20.0, "tail": 2.4, "tail_bright": 0.05, "tail_decay": 6.5, "drive": 2.8, "volume": 0.95})
+
+
+# One of a pair of pistols: lighter and sharper than one held in two hands.
+static func _pistols() -> AudioStreamWAV:
+	return _gunshot(21, 0.24, {"crack": 1.3, "crack_decay": 800.0, "blast": 0.8, "blast_bright": 0.6, "blast_decay": 85.0,
+		"thump": 0.4, "thump_from": 250.0, "thump_to": 110.0, "thump_decay": 55.0, "tail": 0.6, "tail_bright": 0.14, "tail_decay": 24.0, "volume": 0.68})
+
+
+# The carbine: three quick cracks, so each is tight and dry.
+static func _carbine() -> AudioStreamWAV:
+	return _gunshot(22, 0.26, {"crack": 1.4, "crack_decay": 750.0, "blast": 1.1, "blast_bright": 0.45, "blast_decay": 70.0,
+		"thump": 0.7, "thump_from": 190.0, "thump_to": 75.0, "thump_decay": 42.0, "tail": 1.0, "tail_bright": 0.1, "tail_decay": 17.0, "volume": 0.8})
+
+
+# The rifle: one heavy shot that rolls round the arena for a second.
+static func _rifle() -> AudioStreamWAV:
+	return _gunshot(23, 0.98, {"crack": 1.6, "crack_decay": 380.0, "blast": 1.7, "blast_bright": 0.3, "blast_decay": 26.0,
+		"thump": 1.4, "thump_from": 140.0, "thump_to": 38.0, "thump_decay": 13.0, "thump_fall": 18.0, "tail": 2.8, "tail_bright": 0.04, "tail_decay": 4.0, "drive": 3.0, "volume": 0.98})
+
+
+# The machine gun: slower and heavier than the grater, with more thump.
+static func _lmg() -> AudioStreamWAV:
+	return _gunshot(24, 0.2, {"crack": 1.0, "crack_decay": 700.0, "blast": 1.3, "blast_bright": 0.35, "blast_decay": 60.0,
+		"thump": 1.0, "thump_from": 150.0, "thump_to": 60.0, "thump_decay": 40.0, "tail": 0.9, "tail_bright": 0.08, "tail_decay": 22.0, "volume": 0.78})
+
+
+# A bow: the string's twang and the breath of the stick leaving.
+static func _bow() -> AudioStreamWAV:
+	var rng := _rng(25)
+	var count := int(0.35 * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var air := 0.0
+	var turn := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		air = lerpf(air, rng.randf_range(-1.0, 1.0), 0.2)
+		# The string settles from a high note to its own.
+		turn += lerpf(170.0, 260.0, _decay(t, 40.0)) / RATE
+		samples[i] = sin(TAU * turn) * _decay(t, 16.0) + sin(TAU * turn * 2.01) * 0.3 * _decay(t, 30.0) + air * 0.5 * _decay(t, 24.0)
+	return _stream(_shaped(samples, 0.6))
+
+
+# A breadstick striking something: a short woody knock.
+static func _stick() -> AudioStreamWAV:
+	var rng := _rng(26)
+	return _make(0.12, func(t: float, _i: int) -> float:
+		return rng.randf_range(-1.0, 1.0) * _decay(t, 180.0) + sin(TAU * 620.0 * t) * 0.8 * _decay(t, 60.0) + sin(TAU * 310.0 * t) * 0.5 * _decay(t, 45.0), 0.55)
 
 
 # The launcher has no crack at all: a hollow thump from a wide tube.

@@ -89,7 +89,7 @@ static func lines(on_device: String) -> Array:
 		["Knife", Controls.keys_text("melee")],
 		["Grenade", "Hold %s, let go to throw" % Controls.keys_text("grenade")],
 		["Emote", "Hold %s and press 1 to %d" % [Controls.keys_text("emote"), Emotes.KINDS.size()]],
-		["Change weapon", "1 to %d, or the mouse wheel" % Weapons.ORDER.size()],
+		["Change weapon", "1 to %d, or the mouse wheel" % Weapons.KEYS],
 		["Gouda Overload", "%s, when the meter is full" % Controls.keys_text("overload")],
 		["Scoreboard", "Hold %s" % Controls.keys_text("scoreboard")],
 		["Menu", "Esc"],

@@ -16,6 +16,14 @@ extends Resource
 @export var fire_interval := 0.12
 ## Whether holding the trigger keeps firing.
 @export var automatic := true
+## Shots each pull of the trigger fires, `burst_interval` seconds apart.
+## `fire_interval` is then from the start of one burst to the next.
+@export var burst := 1
+@export var burst_interval := 0.07
+## Seconds the weapon takes to come up when changed to.
+@export var draw_time := 0.35
+## The share of their usual speed a player moves at with it in hand.
+@export var carry_speed := 1.0
 @export var magazine := 24
 ## Rounds carried besides those in the magazine when the weapon is taken up,
 ## and the most that can be carried. Below zero, there is no end to them.
@@ -36,6 +44,9 @@ extends Resource
 @export var hip_spread_degrees := 8.0
 ## The share of the player's field of view left when aiming down the sights.
 @export var aim_zoom := 0.7
+## Whether aiming looks through a scope: the view sways until the player
+## holds their breath, and others see the lens glint.
+@export var scoped := false
 ## From the hip, the first shots of a run of fire spread over only
 ## HIP_START of `hip_spread_degrees`, opening to all of it by shot
 ## `bloom_shots`.
@@ -58,6 +69,8 @@ extends Resource
 ## How strongly gravity pulls the projectile, as a share of normal gravity.
 @export var projectile_gravity := 0.0
 @export var fuse := 3.0
+## Damage to a player the projectile itself strikes, more to the head.
+@export var impact_damage := 0.0
 ## Damage at the middle of the burst, falling to nothing at its edge.
 @export var splash_damage := 0.0
 @export var splash_radius := 0.0
@@ -117,6 +130,17 @@ func damage_at(distance: float) -> float:
 		return damage
 	var faded := clampf((distance - falloff_start) / (falloff_end - falloff_start), 0.0, 1.0)
 	return damage * lerpf(1.0, falloff_floor, faded)
+
+
+## Seconds between shots on average, over a whole burst for a weapon that
+## fires in bursts: what the host holds a player's rate of fire to.
+func rate_interval() -> float:
+	return fire_interval / maxi(burst, 1)
+
+
+## Seconds from the last shot of a burst to the first of the next.
+func burst_rest() -> float:
+	return maxf(fire_interval - burst_interval * (maxi(burst, 1) - 1), burst_interval)
 
 
 ## Whether the weapon never runs out of rounds to reload with.

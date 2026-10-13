@@ -13,6 +13,9 @@ var age := 0.0
 ## Times it has bounced, and whether it has come to rest on the ground.
 var bounces := 0
 var resting := false
+## The player it struck (0 for none), and whether on the head.
+var struck := 0
+var struck_head := false
 
 
 func _init(projectile_id: int, from: int, stats: WeaponStats, at: Vector3, direction: Vector3) -> void:
@@ -62,6 +65,8 @@ func advance(delta: float, wall: Callable, targets: Dictionary) -> Variant:
 			var hit := HitScan.first_hit(position, direction, reach, targets)
 			if not hit.is_empty():
 				position = hit.point
+				struck = hit.id
+				struck_head = hit.head
 				return position
 		if reach < length:
 			position += direction * reach

@@ -115,15 +115,9 @@ func test_an_unknown_weapon_is_not_found() -> void:
 	assert_null(Weapons.find(7))
 
 
-func test_the_weapons_come_in_their_number_key_order() -> void:
-	assert_eq(Weapons.ids(), ["pistol", "blaster", "shotgun", "grater", "launcher"])
-	for index in Weapons.ORDER.size():
-		assert_true(InputMap.has_action("weapon_%d" % (index + 1)), "a number key for %s" % Weapons.ORDER[index])
-
-
 ## Damage a second from `stats` with every shot landing on the body.
 func _damage_rate(stats: WeaponStats) -> float:
-	return stats.damage * stats.pellets / stats.fire_interval
+	return stats.damage * stats.pellets * stats.burst / stats.fire_interval
 
 
 func test_players_start_with_a_sidearm_weaker_than_anything_they_can_find() -> void:
@@ -132,7 +126,11 @@ func test_players_start_with_a_sidearm_weaker_than_anything_they_can_find() -> v
 	assert_false(sidearm.automatic)
 	for id: String in Weapons.ids():
 		var other := Weapons.find(id)
-		if id != Weapons.STARTING and not other.fires_projectile():
+		# A sidearm is only a little better, and a scoped weapon's worth is
+		# in one shot, not in how many.
+		if other.slot == Weapons.SIDE:
+			assert_lte(_damage_rate(sidearm), _damage_rate(other), id)
+		elif not other.fires_projectile() and not other.scoped:
 			assert_lt(_damage_rate(sidearm), _damage_rate(other) / 2.0, id)
 
 
@@ -141,7 +139,7 @@ func test_every_weapon_is_far_less_accurate_from_the_hip() -> void:
 		var stats := Weapons.find(id)
 		assert_gte(stats.spread(false), 6.0, "%s from the hip" % id)
 		assert_gte(stats.spread(false), stats.spread(true) * 2.0, id)
-		assert_between(stats.aim_zoom, 0.4, 0.95, id)
+		assert_between(stats.aim_zoom, 0.25 if stats.scoped else 0.4, 0.95, id)
 
 
 func test_the_launcher_holds_two_wheels_that_knock_out_whoever_they_land_by() -> void:
@@ -161,9 +159,15 @@ func test_each_weapon_is_set_up_sensibly() -> void:
 		assert_gt(stats.magazine, 0, id)
 		assert_gt(stats.fire_interval, 0.0, id)
 		assert_gt(stats.reload_time, 0.0, id)
+		assert_gte(stats.burst, 1, id)
+		assert_gt(stats.burst_interval * stats.burst, 0.0, id)
+		assert_lt(stats.burst_interval * (stats.burst - 1), stats.fire_interval, "%s: a burst is over before the next" % id)
+		assert_gt(stats.draw_time, 0.0, id)
+		assert_between(stats.carry_speed, 0.5, 1.0, id)
 		if stats.fires_projectile():
-			assert_gt(stats.splash_damage, 0.0, id)
-			assert_gt(stats.splash_radius, 0.0, id)
+			# It bursts, or it strikes.
+			assert_gt(stats.splash_damage + stats.impact_damage, 0.0, id)
+			assert_eq(stats.splash_damage > 0.0, stats.splash_radius > 0.0, id)
 			assert_gt(stats.fuse, 0.0, id)
 		else:
 			assert_gt(stats.damage * stats.pellets, 0.0, id)
@@ -246,7 +250,7 @@ func test_the_sidearm_never_runs_out() -> void:
 func test_every_other_weapon_can_run_out_and_carry_more_than_it_starts_with() -> void:
 	for id: String in Weapons.ids():
 		var stats := Weapons.find(id)
-		if id == Weapons.STARTING:
+		if stats.slot == Weapons.SIDE:
 			continue
 		assert_false(stats.unlimited(), id)
 		assert_gte(stats.reserve, stats.magazine, "%s: at least one reload" % id)

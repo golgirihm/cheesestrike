@@ -51,7 +51,7 @@ func allow_shot(weapon: WeaponStats, now: float) -> bool:
 		return false
 	var budget: float = _budget.get(id, BURST)
 	if _budget_at.has(id):
-		budget = minf(budget + (now - _budget_at[id]) / weapon.fire_interval, BURST)
+		budget = minf(budget + (now - _budget_at[id]) / weapon.rate_interval(), BURST)
 	_budget_at[id] = now
 	if budget < 1.0:
 		_budget[id] = budget

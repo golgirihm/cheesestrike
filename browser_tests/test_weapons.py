@@ -31,12 +31,17 @@ class WeaponsTest(GameTestCase):
         host.capture_mouse()
         host.press("1")
         host.wait_for("s.combat.weapon === 'Curd Pistol'")
-        host.press("5")
+        # The keys count off what is carried: a pistol, a blaster, and now this.
+        host.press("3")
         host.wait_for("s.combat.weapon === 'Gouda Launcher'")
-        host.page.mouse.wheel(0, 120)
+        host.press("2")
+        host.wait_for("s.combat.weapon === 'Cheddar Blaster'")
+        host.press("1")
         host.wait_for("s.combat.weapon === 'Curd Pistol'")
         host.page.mouse.wheel(0, -120)
         host.wait_for("s.combat.weapon === 'Gouda Launcher'")
+        host.page.mouse.wheel(0, 120)
+        host.wait_for("s.combat.weapon === 'Curd Pistol'")
 
     def test_a_weapon_fired_dry_gives_way_to_the_sidearm(self):
         host = self.open_game()

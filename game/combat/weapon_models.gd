@@ -23,6 +23,14 @@ const DARK := Color(0.1, 0.1, 0.12)
 const WOOD := Color(0.47, 0.29, 0.16)
 const TEAL := Color(0.13, 0.5, 0.55)
 const PURPLE := Color(0.45, 0.3, 0.62)
+const GREEN := Color(0.22, 0.4, 0.26)
+## The blue of a Roquefort's veins.
+const BLUE := Color(0.24, 0.32, 0.52)
+## A Munster's washed rind, gone to rust.
+const RUST := Color(0.5, 0.2, 0.14)
+## A breadstick's crust.
+const CRUST := Color(0.5, 0.31, 0.17)
+const LENS := Color(0.85, 0.93, 1.0)
 ## The red wax a Gouda comes wrapped in.
 const WAX := Color(0.75, 0.12, 0.1)
 ## The mitten of the hand holding the weapon.
@@ -36,7 +44,15 @@ const OFF_HAND := {
 	"shotgun": Vector3(0.0, -0.1, -0.14),
 	"grater": Vector3(0.0, -0.105, -0.18),
 	"launcher": Vector3(0.0, -0.085, -0.2),
+	# The other hand has a pistol of its own.
+	"pistols": Vector3(-PAIR_GAP, -0.09, 0.12),
+	"carbine": Vector3(0.0, -0.085, -0.17),
+	"rifle": Vector3(0.0, -0.075, -0.24),
+	"lmg": Vector3(0.0, -0.1, -0.2),
+	"bow": Vector3(0.0, -0.06, -0.2),
 }
+## How far to the left of the first the second of a pair of pistols is held.
+const PAIR_GAP := 0.17
 ## Where each arm comes from, below and behind its hand, out of view.
 const SHOULDER_RIGHT := Vector3(0.2, -0.4, 0.5)
 const SHOULDER_LEFT := Vector3(-0.34, -0.4, 0.55)
@@ -58,6 +74,66 @@ static func build(id: String) -> Node3D:
 			_box(model, Vector3(0.045, 0.05, 0.07), Vector3(0.0, -0.165, 0.05), DARK).name = "Magazine"
 			_sights(model, 0.0425, 0.07, -0.16)
 			muzzle_z = -0.18
+		"pistols":
+			# One in each hand; the sights are the right one's.
+			for side: float in [0.0, -PAIR_GAP]:
+				_box(model, Vector3(0.065, 0.08, 0.25), Vector3(side, 0.0, -0.04), GUNMETAL)
+				_box(model, Vector3(0.055, 0.14, 0.08), Vector3(side, -0.085, 0.05), WOOD)
+			_box(model, Vector3(0.042, 0.05, 0.065), Vector3(0.0, -0.16, 0.05), DARK).name = "Magazine"
+			_sights(model, 0.04, 0.065, -0.15)
+			muzzle_z = -0.17
+		"carbine":
+			# Short and square, with a stock and a straight magazine.
+			_box(model, Vector3(0.085, 0.11, 0.4), Vector3(0.0, 0.0, 0.0), GREEN)
+			_box(model, Vector3(0.07, 0.08, 0.16), Vector3(0.0, -0.02, 0.27), DARK)
+			_tube(model, 0.024, 0.2, Vector3(0.0, 0.02, -0.29), GUNMETAL)
+			_box(model, Vector3(0.055, 0.17, 0.07), Vector3(0.0, -0.12, -0.05), GUNMETAL).name = "Magazine"
+			_sights(model, 0.055, 0.14, -0.16)
+			muzzle_z = -0.4
+		"rifle":
+			# Long and thin, with a scope along the top.
+			_box(model, Vector3(0.07, 0.09, 0.62), Vector3(0.0, 0.0, 0.04), BLUE)
+			_tube(model, 0.02, 0.4, Vector3(0.0, 0.015, -0.46), GUNMETAL)
+			_box(model, Vector3(0.05, 0.1, 0.07), Vector3(0.0, -0.085, -0.04), DARK).name = "Magazine"
+			_tube(model, 0.034, 0.3, Vector3(0.0, 0.084, 0.0), DARK)
+			for end: float in [-0.1, 0.1]:
+				_box(model, Vector3(0.03, 0.03, 0.03), Vector3(0.0, 0.05, end), GUNMETAL, 0.006)
+			# The lens, which catches the light for others when it is looked through.
+			var lens := SphereMesh.new()
+			lens.radius = 0.03
+			lens.height = 0.06
+			lens.radial_segments = 10
+			lens.rings = 5
+			var shine := StandardMaterial3D.new()
+			shine.albedo_color = LENS
+			shine.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			var glint := Rounded.instance(lens, shine, Vector3(0.0, 0.084, -0.16))
+			glint.name = "Glint"
+			glint.visible = false
+			model.add_child(glint)
+			_sights(model, 0.118, 0.1, -0.1)
+			muzzle_z = -0.66
+		"lmg":
+			# Heavy, with a box of rounds hung under it.
+			_box(model, Vector3(0.12, 0.14, 0.5), Vector3(0.0, 0.0, 0.04), RUST)
+			_tube(model, 0.034, 0.3, Vector3(0.0, 0.02, -0.34), GUNMETAL)
+			_tube(model, 0.045, 0.1, Vector3(0.0, 0.02, -0.26), DARK)
+			_box(model, Vector3(0.15, 0.13, 0.15), Vector3(0.0, -0.13, -0.06), GUNMETAL).name = "Magazine"
+			_box(model, Vector3(0.08, 0.1, 0.16), Vector3(0.0, -0.02, 0.36), DARK)
+			_sights(model, 0.07, 0.2, -0.16)
+			muzzle_z = -0.49
+		"bow":
+			# A bow held flat across a wooden stock, with a breadstick laid
+			# on it: the stick is what a reload puts back.
+			_box(model, Vector3(0.05, 0.06, 0.42), Vector3(0.0, 0.0, 0.02), WOOD)
+			_box(model, Vector3(0.62, 0.022, 0.04), Vector3(0.0, 0.0, -0.2), GREEN, 0.008)
+			for side: float in [-1.0, 1.0]:
+				_box(model, Vector3(0.012, 0.012, 0.2), Vector3(0.3 * side, 0.0, -0.1), DARK, 0.004)
+			_box(model, Vector3(0.6, 0.006, 0.006), Vector3(0.0, 0.0, 0.0), DARK, 0.002)
+			var stick := _box(model, Vector3(0.022, 0.022, 0.5), Vector3(0.0, 0.019, -0.04), CRUST, 0.008)
+			stick.name = "Magazine"
+			_sights(model, 0.03, 0.2, -0.08)
+			muzzle_z = -0.3
 		"shotgun":
 			# Two barrels on a wooden stock.
 			_box(model, Vector3(0.11, 0.11, 0.3), Vector3(0.0, -0.01, 0.1), WOOD)
