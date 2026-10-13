@@ -44,9 +44,10 @@ class VotingTest(GameTestCase):
         asker.join(code)
         unwanted = self.open_game()
         unwanted.join(code)
-        unwanted_name = unwanted.own_player()["name"]
+        # A player is in the session a moment before the host has their name.
         for game in (host, asker, unwanted):
-            game.wait_for("s.players.length === 3")
+            game.wait_for("s.players.length === 3 && s.players.every((p) => p.name !== 'Player')")
+        unwanted_name = unwanted.own_player()["name"]
 
         # The only one the asker can name: not themselves, and not the host.
         asker.click("MenuButton")
@@ -54,7 +55,7 @@ class VotingTest(GameTestCase):
         asker.click("RemoveVoteButton")
         for game in (host, unwanted):
             state = game.wait_for("s.combat.vote.length === 3")
-            self.assertTrue(state["combat"]["vote"][0].startswith(f"Remove {unwanted_name}?   2 needed"))
+            self.assertTrue(state["combat"]["vote"][0].startswith(f"Remove {unwanted_name}?   2 needed"), state["combat"]["vote"])
             self.assertEqual(state["combat"]["vote"][1], "F1   Yes   (1)")
         # They have no say in it; the host's yes settles it.
         unwanted.press("F2")
