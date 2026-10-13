@@ -5,8 +5,18 @@ extends Node3D
 ## hanging. They have no effect on play, so each machine makes its own, and
 ## makes fewer of them, or none, on lower graphics.
 
-const TRACER_LIFE := 0.09
+## A tracer is a short bright streak that flies from the muzzle to where the
+## shot ended: how fast, in metres a second, and how long the streak is.
+const TRACER_SPEED := 260.0
+const TRACER_LENGTH := 7.0
 const TRACER_WIDTH := 0.03
+## The weapons whose shots leave a faint line hanging in the air, seconds it
+## takes to fade, and how wide it is.
+const TRAILED := ["rifle"]
+const TRAIL_LIFE := 0.7
+const TRAIL_WIDTH := 0.02
+## Seconds between the wisps of smoke a launcher's wheel leaves behind it.
+const WISP_EVERY := 0.05
 const FLASH_LIFE := 0.06
 const TRACER_COLOR := Color(1.0, 0.96, 0.9)
 const FLASH_COLOR := Color(1.0, 0.55, 0.25)
@@ -14,6 +24,7 @@ const FLASH_COLOR := Color(1.0, 0.55, 0.25)
 var _tracer_material := _glow(TRACER_COLOR)
 var _flash_material := _glow(FLASH_COLOR)
 var _tracer_mesh := BoxMesh.new()
+var _trail_mesh := BoxMesh.new()
 var _flash_mesh := SphereMesh.new()
 var _wheel_mesh := Rounded.cylinder(0.16, 0.12, 0.04)
 var _wheel_material := _glow(WeaponModels.WAX)
@@ -25,6 +36,8 @@ var _lump_mesh := BoxMesh.new()
 var _debris: Array[Dictionary] = []
 # Projectiles in flight, by id: {"node", "from", "velocity", "gravity", "age"}.
 var _projectiles := {}
+# Tracers in flight: {"node", "from", "to", "age"}.
+var _tracers: Array[Dictionary] = []
 
 ## Seconds a burst's shockwave takes to reach its edge.
 const BURST_LIFE := 0.35
@@ -89,6 +102,7 @@ func _quality() -> String:
 func _init() -> void:
 	_tracer_mesh.size = Vector3(TRACER_WIDTH, TRACER_WIDTH, 1.0)
 	_tracer_mesh.material = _tracer_material
+	_trail_mesh.size = Vector3(TRAIL_WIDTH, TRAIL_WIDTH, 1.0)
 	_flash_mesh.radius = 0.09
 	_flash_mesh.height = 0.18
 	_flash_mesh.material = _flash_material
@@ -116,13 +130,16 @@ func _init() -> void:
 
 
 ## A shot fired from `muzzle` whose pellets ended at `ends`. A casing is
-## thrown out to `aside`, the weapon's right, if that is given.
-func show_shot(muzzle: Vector3, ends: Array, aside := Vector3.ZERO) -> void:
+## thrown out to `aside`, the weapon's right, if that is given. `weapon` is
+## what fired it, if that is known.
+func show_shot(muzzle: Vector3, ends: Array, aside := Vector3.ZERO, weapon := "") -> void:
 	_flash(muzzle)
 	for end: Variant in ends:
 		if end is Vector3:
 			_tracer(muzzle, end)
 			_impact(muzzle, end)
+			if TRAILED.has(weapon):
+				_trail(muzzle, end)
 	if extras(_quality()):
 		if aside != Vector3.ZERO and not ends.is_empty():
 			_casing(muzzle, aside)
@@ -332,6 +349,8 @@ func launch_projectile(id: int, weapon: String, from: Vector3, velocity: Vector3
 	wheel.global_position = from
 	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8) * (stats.projectile_gravity if stats != null else 0.0) * Projectile.gravity_scale
 	_projectiles[id] = {"node": wheel, "from": from, "velocity": velocity, "gravity": gravity, "age": 0.0, "fuse": stats.fuse if stats != null else 3.0, "stick": stick}
+	# A launcher's wheel smokes as it goes.
+	_projectiles[id].wisp = 0.0 if stats != null and not stick and not stats.bounces else INF
 	if stick:
 		wheel.global_transform = stick_transform(from, velocity)
 	if stats != null and stats.bounces:
@@ -462,6 +481,10 @@ func projectiles_in_flight() -> int:
 
 
 func _process(delta: float) -> void:
+	for index in range(_tracers.size() - 1, -1, -1):
+		if not _place_tracer(_tracers[index], delta):
+			_tracers[index].node.queue_free()
+			_tracers.remove_at(index)
 	for puff in _live:
 		puff.left -= delta
 	_live = _live.filter(func(puff: Dictionary) -> bool: return puff.left > 0.0)
@@ -512,6 +535,10 @@ func _process(delta: float) -> void:
 			continue
 		flying.node.global_position = at
 		flying.node.rotate_x(delta * 12.0)
+		flying.wisp -= delta
+		if flying.wisp <= 0.0:
+			flying.wisp = WISP_EVERY
+			_puff(at, Vector3.UP, Color(0.85, 0.82, 0.78, 0.4), 1, 0.3, 0.55, 0.12, false, {"spread": 180.0, "gravity": -0.4, "grow": 2.4})
 
 
 ## Where a stick at `at` flying along `velocity` sits: its length (the
@@ -552,14 +579,61 @@ static func tracer_transform(from: Vector3, to: Vector3) -> Transform3D:
 	return Transform3D(basis, (from + to) / 2.0)
 
 
+## How far along its path of `length` metres a tracer's tail (x) and head
+## (y) are, `age` seconds after the shot: the streak leaves the muzzle,
+## flies, and runs into where the shot ended.
+static func tracer_span(length: float, age: float) -> Vector2:
+	var head := minf(TRACER_SPEED * maxf(age, 0.0), length)
+	var tail := clampf(TRACER_SPEED * age - TRACER_LENGTH, 0.0, length)
+	return Vector2(tail, head)
+
+
+## Where each tracer in flight is going, for tests.
+func tracer_ends() -> Array:
+	return _tracers.map(func(tracer: Dictionary) -> Vector3: return tracer.to)
+
+
+## Seconds a tracer along `length` metres is seen for.
+static func tracer_life(length: float) -> float:
+	return (length + TRACER_LENGTH) / TRACER_SPEED
+
+
 func _tracer(from: Vector3, to: Vector3) -> void:
 	var tracer := MeshInstance3D.new()
 	tracer.mesh = _tracer_mesh
 	tracer.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	tracer.set_meta("kind", "tracer")
 	add_child(tracer)
-	tracer.global_transform = tracer_transform(from, to)
-	_expire(tracer, TRACER_LIFE)
+	_tracers.append({"node": tracer, "from": from, "to": to, "age": 0.0})
+	# As it is on the frame of the shot: just leaving the muzzle.
+	_place_tracer(_tracers[-1], 1.0 / 120.0)
+
+
+# Moves a tracer on by `delta` seconds. Returns whether it is still flying.
+func _place_tracer(tracer: Dictionary, delta: float) -> bool:
+	tracer.age += delta
+	var length: float = tracer.from.distance_to(tracer.to)
+	if tracer.age >= tracer_life(length) or length < 0.001:
+		return false
+	var span := tracer_span(length, tracer.age)
+	var along: Vector3 = (tracer.to - tracer.from) / length
+	tracer.node.global_transform = tracer_transform(tracer.from + along * span.x, tracer.from + along * span.y)
+	return true
+
+
+# The faint line a heavy shot leaves hanging in the air from `from` to `to`.
+func _trail(from: Vector3, to: Vector3) -> void:
+	var trail := MeshInstance3D.new()
+	var material := _glow(Color(TRACER_COLOR, 0.35))
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	trail.mesh = _trail_mesh
+	trail.material_override = material
+	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	trail.set_meta("kind", "trail")
+	add_child(trail)
+	trail.global_transform = tracer_transform(from, to)
+	create_tween().tween_property(material, "albedo_color:a", 0.0, TRAIL_LIFE)
+	_expire(trail, TRAIL_LIFE)
 
 
 func _flash(at: Vector3) -> void:

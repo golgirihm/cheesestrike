@@ -434,14 +434,15 @@ func _show_own_shot(origin: Vector3, direction: Vector3, seed: int, stance: int,
 		var query := PhysicsRayQueryParameters3D.create(origin, origin + pellet * reach, PLAYER_MASK, [player.get_rid()])
 		var hit := space.intersect_ray(query)
 		ends.append(hit.position if not hit.is_empty() else origin + pellet * reach)
-	effects.show_shot(player.muzzle.global_position, ends, aside)
+	effects.show_shot(player.muzzle.global_position, ends, aside, weapon.credit())
 
 
 func _show_others_shot(shooter: int, ends: Array) -> void:
 	var player := player_node(shooter)
 	if player != null:
 		player.kick()
-		effects.show_shot(player.muzzle.global_position, ends, player.muzzle.global_basis.x)
+		var record: PlayerRecord = match_.state.player(shooter) if match_.has_state() else null
+		effects.show_shot(player.muzzle.global_position, ends, player.muzzle.global_basis.x, record.weapon if record != null else "")
 
 
 ## The arena's pickup pads, in order: [{"position": Vector3, "kind": String}].

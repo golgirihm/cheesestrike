@@ -32,9 +32,95 @@ func test_a_shot_leaves_a_flash_and_a_tracer_per_pellet_that_soon_go() -> void:
 	effects.show_shot(Vector3.ZERO, [Vector3(0, 0, -5), Vector3(1, 0, -5), "not a point"])
 	assert_eq(effects.showing("flash"), 1)
 	assert_eq(effects.showing("tracer"), 2, "one for each pellet")
+	assert_eq(effects.showing("trail"), 0)
 	await wait_seconds(0.2)
 	assert_eq(effects.showing("flash"), 0)
 	assert_eq(effects.showing("tracer"), 0)
+
+
+func test_a_tracer_flies_from_the_muzzle_to_where_the_shot_ended() -> void:
+	var length := 40.0
+	var life := EFFECTS.tracer_life(length)
+	assert_eq(EFFECTS.tracer_span(length, 0.0), Vector2.ZERO, "it starts in the muzzle")
+	assert_eq(EFFECTS.tracer_span(length, -1.0), Vector2.ZERO)
+	# It grows out of the muzzle, flies at its full length, and runs into the end.
+	var last := Vector2.ZERO
+	var longest := 0.0
+	for step in 101:
+		var span := EFFECTS.tracer_span(length, life * step / 100.0)
+		assert_gte(span.x, last.x)
+		assert_gte(span.y, last.y)
+		assert_lte(span.y - span.x, EFFECTS.TRACER_LENGTH + 0.001)
+		assert_between(span.y, 0.0, length)
+		longest = maxf(longest, span.y - span.x)
+		last = span
+	assert_almost_eq(longest, EFFECTS.TRACER_LENGTH, 0.001)
+	assert_almost_eq(last, Vector2(length, length), Vector2.ONE * 0.001, "all of it has arrived")
+	var middle := EFFECTS.tracer_span(length, life / 2.0)
+	assert_gt(middle.x, 5.0, "in between, it has left the muzzle")
+	assert_lt(middle.y, length - 5.0, "and not yet arrived")
+	# A shot at something close is a streak no longer than the way there.
+	assert_eq(EFFECTS.tracer_span(2.0, 1.0 / 60.0).y, 2.0)
+	assert_gt(EFFECTS.tracer_life(100.0), EFFECTS.tracer_life(10.0), "further takes longer")
+	assert_lt(EFFECTS.tracer_life(100.0), 0.5, "but is never slow")
+
+
+func test_the_tracer_shown_moves_along_the_shot_and_goes_when_it_arrives() -> void:
+	var effects: Node3D = EFFECTS.new()
+	add_child_autofree(effects)
+	effects.set_process(false)
+	effects.show_shot(Vector3.ZERO, [Vector3(0, 0, -60)])
+	var tracer: Node3D = effects.get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == "tracer")[0]
+	assert_gt(tracer.global_position.z, -4.0, "it starts at the muzzle")
+	effects._process(0.1)
+	assert_almost_eq(tracer.global_position.z, -(EFFECTS.TRACER_SPEED * (0.1 + 1.0 / 120.0) - EFFECTS.TRACER_LENGTH / 2.0), 0.01)
+	assert_almost_eq(tracer.global_basis.get_scale().z, EFFECTS.TRACER_LENGTH, 0.01)
+	effects._process(0.2)
+	assert_eq(effects.showing("tracer"), 0)
+
+
+func test_a_rifle_shot_leaves_a_line_that_fades_and_other_shots_do_not() -> void:
+	var effects: Node3D = EFFECTS.new()
+	add_child_autofree(effects)
+	effects.show_shot(Vector3.ZERO, [Vector3(0, 0, -30)], Vector3.ZERO, "blaster")
+	assert_eq(effects.showing("trail"), 0)
+	for weapon: String in EFFECTS.TRAILED:
+		assert_not_null(Weapons.find(weapon), weapon)
+	effects.show_shot(Vector3.ZERO, [Vector3(0, 0, -30)], Vector3.ZERO, "rifle")
+	assert_eq(effects.showing("trail"), 1)
+	var trail: MeshInstance3D = effects.get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == "trail")[0]
+	assert_almost_eq(trail.global_position, Vector3(0, 0, -15), Vector3.ONE * 0.001, "the whole way, at once")
+	assert_almost_eq(trail.global_basis.get_scale().z, 30.0, 0.01)
+	var start: float = (trail.material_override as StandardMaterial3D).albedo_color.a
+	await wait_seconds(EFFECTS.TRAIL_LIFE / 2.0)
+	assert_lt((trail.material_override as StandardMaterial3D).albedo_color.a, start)
+	assert_eq(effects.showing("tracer"), 0, "it outlasts the tracer")
+	await wait_seconds(EFFECTS.TRAIL_LIFE / 2.0 + 0.1)
+	assert_eq(effects.showing("trail"), 0)
+
+
+func test_a_launchers_wheel_leaves_smoke_behind_it_and_a_grenade_does_not() -> void:
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var world: Node3D = await _arena()
+	world.effects.set_process(false)
+	world.effects.launch_projectile(1, "launcher", Vector3(0, 3, 0), Vector3(0, 0, -20))
+	for step in 10:
+		world.effects._process(0.02)
+	assert_between(world.effects.showing("puff"), 3, 5)
+	var wisps: Array = world.effects.get_children().filter(func(child: Node) -> bool: return child is CPUParticles3D)
+	assert_lt(wisps[-1].global_position.z, wisps[0].global_position.z - 1.0, "strung out along its path")
+	var made: int = world.effects.puffs_made
+	world.effects.launch_projectile(2, Weapons.GRENADE, Vector3(5, 3, 0), Vector3(0, 0, -8))
+	world.effects.burst_projectile(1, "bow", Vector3.ZERO)
+	for step in 10:
+		world.effects._process(0.02)
+	assert_eq(world.effects.puffs_made, made)
+	# Smoke is a lesser effect: low graphics has none.
+	Settings.set_value("quality", GraphicsQuality.LOW)
+	world.effects.launch_projectile(3, "launcher", Vector3(0, 3, 0), Vector3(0, 0, -20))
+	for step in 10:
+		world.effects._process(0.02)
+	assert_eq(world.effects.puffs_made, made)
 
 
 const WORLD := preload("res://world/world.tscn")
