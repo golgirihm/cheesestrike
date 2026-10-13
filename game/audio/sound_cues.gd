@@ -18,7 +18,8 @@ func _ready() -> void:
 		if weapon == Weapons.GRENADE:
 			Sounds.play_at("throw", from, world, 0.0, 0.75)
 		elif Weapons.find(weapon) != null:
-			Sounds.play_at(Weapons.find(weapon).credit(), from, world))
+			var sound := Weapons.find(weapon).credit()
+			Sounds.play_at(sound if SoundBank.SOUNDS.has(sound) else "launcher", from, world))
 	match_.projectile_burst.connect(func(_id: int, weapon: String, at: Vector3) -> void:
 		Sounds.play_at(burst_sound(weapon), at, world))
 	match_.hit_confirmed.connect(func(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:

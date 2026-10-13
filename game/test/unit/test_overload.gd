@@ -41,6 +41,7 @@ func test_it_can_only_be_set_off_when_full() -> void:
 	assert_true(state.set_off_overload(1))
 	assert_eq(state.player(1).overload, 0.0, "it empties")
 	assert_eq(state.player(1).overload_left, Overload.DURATION)
+	assert_eq(state.player(1).overload_build, Overload.BUILD_UP)
 
 
 func test_it_cannot_be_set_off_twice_at_once_or_while_out() -> void:
@@ -63,6 +64,7 @@ func test_it_cannot_be_set_off_between_matches() -> void:
 func test_it_wears_off() -> void:
 	_fill(1)
 	state.set_off_overload(1)
+	state.tick(Overload.BUILD_UP)
 	state.tick(Overload.DURATION - 0.1)
 	assert_gt(state.player(1).overload_left, 0.0)
 	state.tick(0.1)
@@ -79,6 +81,7 @@ func test_damage_during_an_overload_does_not_fill_the_meter() -> void:
 func test_hits_during_an_overload_melt_the_target_for_a_moment() -> void:
 	_fill(1)
 	state.set_off_overload(1)
+	state.tick(Overload.BUILD_UP)
 	state.damage(1, 2, 10.0)
 	assert_eq(state.player(2).melted_for, Overload.MELT_DURATION)
 	state.tick(Overload.MELT_DURATION)
@@ -146,5 +149,7 @@ func test_the_meter_reads_as_a_share_then_ready_then_counting_down() -> void:
 	_fill(1)
 	assert_eq(HUD.overload_text(record), "Overload ready: Q")
 	state.set_off_overload(1)
+	assert_eq(HUD.overload_text(record), "OVERLOAD…", "building up")
+	state.tick(Overload.BUILD_UP)
 	state.tick(2.5)
 	assert_eq(HUD.overload_text(record), "OVERLOAD  6s")

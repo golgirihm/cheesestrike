@@ -45,6 +45,8 @@ const _ALL := {
 	"shotgun_both": preload("res://combat/weapons/shotgun_both.tres"),
 	"launcher_bounce": preload("res://combat/weapons/launcher_bounce.tres"),
 	"blaster_charged": preload("res://combat/weapons/blaster_charged.tres"),
+	# What a rain of wheels is made of (see Overload.RAIN).
+	"overload_wheel": preload("res://combat/weapons/overload_wheel.tres"),
 }
 
 

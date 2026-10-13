@@ -44,6 +44,10 @@ var team := -1
 ## Overload set off; and seconds left melted by someone else's.
 var overload := 0.0
 var overload_left := 0.0
+## The kind of Overload they have chosen (see Overload), and seconds of
+## build-up left before the one they set off begins.
+var overload_kind := 0
+var overload_build := 0.0
 var melted_for := 0.0
 ## The power-up they have (see Powers; 0 for none) and seconds of it left.
 var power := 0
@@ -136,6 +140,8 @@ func to_dict() -> Dictionary:
 		"armour": armour,
 		"main": main,
 		"attachment": attachment,
+		"overload_kind": overload_kind,
+		"overload_build": overload_build,
 		"fitted": fitted,
 		"fitted_to": fitted_to,
 		"power": power,
@@ -176,7 +182,8 @@ func to_packed() -> Array:
 	numbers[_POWER] = power | (roundi(power_left * 100.0) << 4)
 	numbers[_MAIN] = Weapons.ORDER.find(main)
 	# Likewise: what is chosen, what is fitted, and the weapon it is on.
-	numbers[_FITTED] = attachment | (fitted << 4) | ((Weapons.ORDER.find(fitted_to) + 1) << 8)
+	# And above those, their kind of Overload and hundredths of its build-up.
+	numbers[_FITTED] = attachment | (fitted << 4) | ((Weapons.ORDER.find(fitted_to) + 1) << 8) | (overload_kind << 16) | (roundi(overload_build * 100.0) << 20)
 	numbers[_SIDE] = Weapons.ORDER.find(side)
 	return [name, numbers]
 
@@ -222,7 +229,9 @@ static func from_packed(data: Variant) -> PlayerRecord:
 	record.side = chosen[1]
 	record.attachment = chosen[2]
 	record.fitted = (fit >> 4) & 15 if Attachments.is_kind((fit >> 4) & 15) else Attachments.NONE
-	record.fitted_to = _weapon_at((fit >> 8) - 1)
+	record.fitted_to = _weapon_at(((fit >> 8) & 255) - 1)
+	record.overload_kind = (fit >> 16) & 15 if Overload.is_kind((fit >> 16) & 15) else Overload.MELT
+	record.overload_build = clampf((fit >> 20) / 100.0, 0.0, Overload.BUILD_UP)
 	return record
 
 
@@ -253,6 +262,8 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.side = chosen[1]
 	record.attachment = chosen[2]
 	record.fitted = data.get("fitted") if Attachments.is_kind(data.get("fitted")) else Attachments.NONE
+	record.overload_kind = data.get("overload_kind") if Overload.is_kind(data.get("overload_kind")) else Overload.MELT
+	record.overload_build = clampf(_float(data, "overload_build", 0.0), 0.0, Overload.BUILD_UP)
 	record.fitted_to = data.get("fitted_to") if data.get("fitted_to") is String and Weapons.ids().has(data.get("fitted_to")) else ""
 	var carried: Variant = data.get("weapons")
 	if carried is Array:

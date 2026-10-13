@@ -55,8 +55,6 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 5: An arsenal
 
-1. **More to the Overload.** Different Overloads to choose between (speed and melt, as now; a shield; a rain of wheels), with a build-up others can hear and react to.
-   *Tests:* extend `test_overload.gd`.
 
 ## Milestone 6: Ways to play
 
