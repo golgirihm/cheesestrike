@@ -105,9 +105,9 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* GUT tests of handing over `MatchState`; a browser test that closes the host's window.
 5. **Dedicated servers.** Run a headless build as the host, so no player has the advantage or the burden, started on demand in the region players are in.
    *Tests:* a CI job that plays a match against a headless host.
-6. **Movement you can trust, and feel.** Predict the player's own movement and correct it gently when the host disagrees, in place of snapping back, and have the host own movement on dedicated servers.
+6. **Movement the host owns.** On dedicated servers, have the host own movement, with the player's own game predicting it. (Being put back by the host already carries the view there gently.)
    *Tests:* extend `test_movement_check.gd`; browser tests under a throttled connection.
-7. **Harder to cheat.** The host checks aim that turns impossibly fast, shots through walls it can't see through, and rates of everything; sessions can remove a player; on servers, results are signed. The check on speed needs tightening first: its slack for bunched updates lets a player go several times their top speed as long as their updates keep coming close together.
+7. **Harder to cheat.** The host refuses shots that go where their shooter isn't facing, and speed that many small updates add up to. Left: a check on aim that turns impossibly fast, and on servers, results that are signed.
    *Tests:* GUT tests of each check, with the cheat written as a test.
 8. **Reporting and moderation.** Report a player with a reason, mute and block, and a filter on names and chat.
    *Tests:* service tests; browser test.

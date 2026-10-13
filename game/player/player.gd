@@ -212,6 +212,11 @@ var _turn_rate := Vector2.ZERO
 var _landing := 0.0
 var _running := 0.0
 var _was_on_floor := true
+## After being put back by the host, how far the view still is from where
+## the player now is, the most that can be, and how fast it closes.
+var _view_carry := Vector3.ZERO
+const MAX_VIEW_CARRY := 4.0
+const VIEW_CARRY_TIME := 0.18
 # Under the name tag: the player's level and title.
 var _rank_tag: Label3D
 var _shown_finish := "plain"
@@ -368,6 +373,10 @@ func respawn_at(at: Vector3) -> void:
 ## The host put this player back where they last were, as their movement
 ## couldn't have happened.
 func put_back(at: Vector3) -> void:
+	# The player is where the host says at once, which the host waits to
+	# hear; but their view is carried there over a moment rather than
+	# snapped, which is kinder to the eye.
+	_view_carry = (global_position - at).limit_length(MAX_VIEW_CARRY)
 	global_position = at
 	velocity = Vector3.ZERO
 	_knockback = Vector3.ZERO
@@ -1055,6 +1064,8 @@ func kick() -> void:
 
 func _process(delta: float) -> void:
 	_voice_clock += delta
+	if _view_carry != Vector3.ZERO and _mine:
+		_view_carry = view_carry_after(_view_carry, delta)
 	if not _mine and not driven:
 		_show_smoothed()
 	_animate(delta)
@@ -1072,6 +1083,8 @@ func _process(delta: float) -> void:
 		var across := Vector2(velocity.x, velocity.z).length() if is_on_floor() else 0.0
 		var sideways := (global_basis.inverse() * velocity).x / Movement.WALK_SPEED
 		camera.position = (WeaponSway.view_bob(_bob_phase, across / Movement.WALK_SPEED) + Vector3.DOWN * WeaponSway.VIEW_DIP * _landing) * motion
+		# And is still on its way, just after the host has put the player back.
+		camera.position += camera.get_parent().global_basis.inverse() * _view_carry
 		_aim = move_toward(_aim, 1.0 if _wants_aim() else 0.0, delta / AIM_TIME)
 		# A scope sways, until the breath is held.
 		breath.tick(delta, is_scoped() and _wants_run())
@@ -1102,6 +1115,21 @@ func seen_from_outside(on: bool) -> void:
 func choose_weapon(weapon: String) -> void:
 	if arsenal.has(weapon):
 		_switch_to = weapon
+
+
+## Where the player sees from, as the host is told: where the view is, less
+## whatever it has yet to catch up after a put-back, so that a shot comes
+## from where the player is and not from where they were.
+func eye() -> Vector3:
+	return camera.global_position - _view_carry
+
+
+## What is left of the distance `carry` between the view and the player
+## `delta` seconds on, as the view catches up after a put-back: closing
+## quickly at first, and gone within a moment.
+static func view_carry_after(carry: Vector3, delta: float) -> Vector3:
+	var left := carry * exp(-delta * 4.0 / VIEW_CARRY_TIME)
+	return left if left.length() > 0.01 else Vector3.ZERO
 
 
 ## Whether the keyboard is being typed on, in a box that takes text.
@@ -1468,7 +1496,7 @@ func _hold_grenade(delta: float) -> void:
 	var grenade := Weapons.find(Weapons.GRENADE)
 	var must := _cooking >= grenade.fuse - Match.COOK_MARGIN
 	if _grenade_tapped or must or not Input.is_action_pressed("grenade"):
-		match_.throw_grenade(camera.global_position, throw_direction(), _cooking)
+		match_.throw_grenade(eye(), throw_direction(), _cooking)
 		_drop_grenade()
 		return
 	_show_arc(grenade)
@@ -1574,7 +1602,7 @@ func _use_weapon() -> void:
 			# A step into it.
 			var forward := -global_basis.z
 			_knockback += Vector3(forward.x, 0.0, forward.z) * Melee.LUNGE
-			match_.strike(camera.global_position, -head.global_basis.z)
+			match_.strike(eye(), -head.global_basis.z)
 	if _switch_step != 0:
 		equip(Weapons.cycle(arsenal.keys(), weapon.stats.id, signi(_switch_step)))
 	elif not _switch_to.is_empty():
@@ -1610,7 +1638,7 @@ func _use_weapon() -> void:
 # A shot has left the weapon in hand, with `stats` (its own, or those of its
 # other way of firing): tells the host and shows it here.
 func _loose(stats: WeaponStats, standing: int) -> void:
-	var origin := camera.global_position
+	var origin := eye()
 	# The head's facing, not the camera's, which may be shaking; but
 	# through a scope, wherever it has swayed to.
 	var direction := Recoil.apply(-head.global_basis.z, _scope_sway)

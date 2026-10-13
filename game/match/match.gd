@@ -111,6 +111,13 @@ var _checks := {}
 var _put_back_at := {}
 ## How many times the host has put a player back, for the browser tests.
 var put_backs := 0
+## How many shots the host has refused for going where their shooter wasn't
+## facing, for tests.
+var wild_shots := 0
+# Each player's aim, as the host checks it.
+var _aims := {}
+## How far back the host looks for which way a player faced when they fired.
+const AIM_WINDOW := 0.5
 # The host's measure of each player's round trip, by id.
 var _pings := {}
 var _since_ping := 0.0
@@ -190,6 +197,7 @@ func start(settings := MatchSettings.new()) -> void:
 		_histories.clear()
 		_checks.clear()
 		_put_back_at.clear()
+		_aims.clear()
 		recording.clear()
 		highlights.clear()
 		state_changed.emit()
@@ -1015,6 +1023,11 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 		return
 	if not ShotRules.origin_believable(origin, shooter_node.head.global_position):
 		return
+	# Nor is a shot from someone most of whose shots go where they aren't
+	# facing (see AimCheck). A bot is the host's own, and isn't asked.
+	if not Bots.is_bot(shooter) and not _aim_believable(shooter, direction):
+		wild_shots += 1
+		return
 	# The weapon's other way of firing, if that is what this is.
 	var other := Weapons.alt_of(weapon) if stance & WeaponStats.ALT else null
 	if stance & WeaponStats.ALT and other == null:
@@ -1092,6 +1105,16 @@ static func now() -> float:
 ## only the delay.
 func rewind_for(shooter: int) -> float:
 	return minf(round_trip(shooter) + InterpolationBuffer.DELAY, MAX_REWIND)
+
+
+# Whether a shot by `shooter` along `direction` is one to allow, going by
+# where they have lately been seen to face.
+func _aim_believable(shooter: int, direction: Vector3) -> bool:
+	if not _aims.has(shooter):
+		_aims[shooter] = AimCheck.new()
+	var history: PositionHistory = _histories.get(shooter)
+	var faced: Array = history.facings_since(_clock - AIM_WINDOW) if history != null else []
+	return _aims[shooter].allow(AimCheck.off_by(direction, faced))
 
 
 ## Shortest time between two put-backs of the same player, so that a player

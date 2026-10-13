@@ -1,6 +1,7 @@
 extends GutTest
 
 const WORLD := preload("res://world/world.tscn")
+const PLAYER := preload("res://player/player.gd")
 
 var check: MovementCheck
 var open := func(_from: Vector3, _to: Vector3) -> bool: return false
@@ -25,6 +26,35 @@ func test_running_at_full_speed_is_fine() -> void:
 func test_updates_bunched_together_are_fine() -> void:
 	assert_true(check.check(10.2, Vector3(1.2, 0, 0), 0, open, true))
 	assert_true(check.check(10.201, Vector3(1.5, 0, 0), 0, open, true))
+
+
+## The cheat: a game that sends many small steps close together, each
+## within the slack one update is allowed.
+func test_many_small_steps_bunched_together_dont_add_up_to_speed() -> void:
+	var reached := 0.0
+	for i in 200:
+		if check.check(10.0 + (i + 1) * 0.001, Vector3(reached + 0.5, 0, 0), 0, open, true):
+			reached += 0.5
+	# A fifth of a second has passed: that, and the reserve, is all there is.
+	assert_lte(reached, MovementCheck.MAX_SPEED * 0.2 + MovementCheck.reserve(MovementCheck.MAX_SPEED) + 0.001)
+	assert_gt(reached, 0.0)
+
+
+func test_the_slack_comes_back_with_time_and_no_more_than_it_was() -> void:
+	# Spent at once, then a long wait standing still.
+	assert_true(check.check(10.001, Vector3(MovementCheck.reserve(MovementCheck.MAX_SPEED) - 0.1, 0, 0), 0, open, true))
+	var at := check.last_position()
+	assert_true(check.check(40.0, at, 0, open, true))
+	assert_true(check.check(40.001, at + Vector3(1.5, 0, 0), 0, open, true), "there is slack again")
+	assert_false(check.check(40.002, at + Vector3(60, 0, 0), 0, open, true), "but the wait didn't save any up")
+
+
+func test_many_small_rises_bunched_together_dont_add_up_to_flight() -> void:
+	var height := 0.0
+	for i in 200:
+		if check.check(10.0 + (i + 1) * 0.001, Vector3(0, height + 0.4, 0), 0, open, false):
+			height += 0.4
+	assert_lte(height, MovementCheck.MAX_RISE_SPEED * 0.2 + MovementCheck.reserve(MovementCheck.MAX_RISE_SPEED) + 0.001)
 
 
 func test_moving_far_too_fast_is_refused() -> void:
@@ -87,6 +117,16 @@ func test_a_jump_to_anywhere_else_is_refused() -> void:
 	assert_false(check.check(10.1, Vector3(30, 0, 30), 1, open, true), "not sent anywhere")
 	check.expect_move(Vector3(30, 0, 30))
 	assert_false(check.check(10.1, Vector3(-30, 0, -30), 1, open, true), "sent somewhere else")
+
+
+func test_a_view_put_back_closes_the_gap_quickly_and_then_is_there() -> void:
+	var carry := Vector3(3, 0, 0)
+	var after: Vector3 = PLAYER.view_carry_after(carry, 0.05)
+	assert_lt(after.length(), carry.length() * 0.5)
+	assert_gt(after.length(), 0.0, "but not at once")
+	for i in 30:
+		carry = PLAYER.view_carry_after(carry, 1.0 / 60.0)
+	assert_eq(carry, Vector3.ZERO, "within half a second")
 
 
 func test_nonsense_positions_are_refused() -> void:
