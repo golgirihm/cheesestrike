@@ -176,6 +176,8 @@ func test_every_surface_in_every_arena_has_steps() -> void:
 		assert_has(Footsteps.CUES, kind)
 		assert_has(SoundBank.SOUNDS, Footsteps.cue(kind), kind)
 		assert_eq(Mix.bus_of(Footsteps.cue(kind)), Mix.STEPS, kind)
+		# And is written as footsteps for those who have captions on.
+		assert_eq(preload("res://ui/captions.gd").TEXTS.get(Footsteps.cue(kind), ""), "Footsteps", kind)
 	assert_eq(Footsteps.cue("nonsense"), "step")
 	for id: String in Maps.ORDER + [Maps.RANGE]:
 		await _arena(id)
