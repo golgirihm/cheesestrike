@@ -92,6 +92,10 @@ var _was_captured := false
 ## The invite link last copied, for the browser tests.
 var copied_link := ""
 
+## How often the menu asks for the session list again, in seconds. The list is
+## fetched, not pushed, so this is how stale it can get without Refresh.
+const LIST_REFRESH_SECONDS := 15.0
+
 
 func _ready() -> void:
 	# The first of everything is drawn behind a cover, before anyone plays.
@@ -251,6 +255,11 @@ func _ready() -> void:
 	if not Net.use_webrtc:
 		target_edit.placeholder_text = "Host address (blank for this PC)"
 	Net.request_sessions()
+	var refresh := Timer.new()
+	refresh.wait_time = LIST_REFRESH_SECONDS
+	refresh.timeout.connect(_refresh_sessions_if_showing)
+	add_child(refresh)
+	refresh.start()
 	Sounds.play_music()
 	if TestHook.wanted():
 		add_child(TestHook.new(self))
@@ -794,6 +803,11 @@ func _show_menu(message: String) -> void:
 	host_button.disabled = false
 	join_button.disabled = false
 	Net.request_sessions()
+
+
+func _refresh_sessions_if_showing() -> void:
+	if menu.visible:
+		Net.request_sessions()
 
 
 ## How a session reads in the session list.
