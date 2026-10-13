@@ -1,6 +1,6 @@
 # Manual tests
 
-Behavior that the automated tests don't cover and that has to be checked by a person. The automated suites (`python tools/run_tests.py`) cover the rules for detecting a lost host, the signaling server's protocol and, by playing the game in headless browser windows, hosting, finding, joining and leaving sessions, a late joiner seeing everyone in place, being told when the host closes the page, players' names, shooting (hits, damage, knock-outs, respawning and reloading), aiming down the sights, picking up and changing weapons, matches (settings in the session list, the player limit, winning, teams, joining part way through, each arena) and the in-game menu. The game's own tests cover the rules behind them, and what can be measured of how things look and sound: that every box is rounded, that only cheese is yellow, where the fence and the edge are, and the shape of each gunshot and footstep. What a player sees and feels, input devices, real phones and other browsers are here.
+Behavior that the automated tests don't cover and that has to be checked by a person. The automated suites (`python tools/run_tests.py`) cover the rules for detecting a lost host, the signaling server's rules (in memory and on an imitation of AWS's database), what deploying does to the game's files and, by playing the game in headless browser windows, hosting, finding, joining and leaving sessions, a late joiner seeing everyone in place, being told when the host closes the page, players' names, shooting (hits, damage, knock-outs, respawning and reloading), aiming down the sights, picking up and changing weapons, matches (settings in the session list, the player limit, winning, teams, joining part way through, each arena) and the in-game menu. The game's own tests cover the rules behind them, and what can be measured of how things look and sound: that every box is rounded, that only cheese is yellow, where the fence and the edge are, and the shape of each gunshot and footstep. What a player sees and feels, input devices, real phones and other browsers are here.
 
 More of these could move to the browser tests in `browser_tests/`. A row is here either because it needs a person or real hardware, or because nobody has automated it yet.
 
@@ -315,7 +315,25 @@ Why manual: each combination is a different real device or program.
 | DEV-10 | Install to the home screen | A phone, with the game served over HTTPS (local `http://localhost` doesn't qualify on a phone) | 1. Use the browser's "Install app" or "Add to Home screen".<br>2. Open the game from the new icon. | The icon is a cheese wedge. The game opens without the browser's address bar and plays as in the browser. |
 | DEV-11 | Sending an invite link | Phone and PC | 1. Host on the PC, open the in-game menu and click "Copy invite link".<br>2. Paste the link into a message to the phone (or an email) and open it there. | The button reads "Link copied!" for a moment, and the pasted text is the game's address ending in `join=` and the session code. The phone opens the game straight into the session, without going through the menu. |
 
-DEV-06 can't be run yet: the signaling server only runs on the development PC, so a device on another network can't reach it. It becomes runnable once the server is hosted publicly. DEV-10 needs the game on an HTTPS host, as published builds will be; `tools/serve.py` also turns off the offline cache that installing uses, so a reload always picks up a new build.
+DEV-06 needs the deployed game (see [backend.md](backend.md)): in development the signaling server only runs on the development PC, so a device on another network can't reach it. DEV-10 needs the game on an HTTPS host, as the deployed game is; `tools/serve.py` also turns off the offline cache that installing uses, so a reload always picks up a new build.
+
+## Deployed game
+
+Setup: the game deployed to AWS with `python infra/deploy.py`, opened at the address that prints. Why manual: the automated tests run the same rules against imitations of AWS, never the real services, and can't wait two hours.
+
+Run all of these after the first deploy and after any change under `signaling/` or `infra/`.
+
+| ID | Test | Setup | Steps | Expected |
+|---|---|---|---|---|
+| AWS-01 | Loads from the bucket | One browser | 1. Open the deployed address.<br>2. Open the browser's developer tools, reload, and look at the Network tab. | The menu appears, with "None yet. Host one!" or the open sessions, and no errors in the console. `index.wasm` transfers at roughly a quarter of its size, with `content-encoding: gzip`. |
+| AWS-02 | Host and join | Two browser windows | 1. Host in one.<br>2. In the other, wait for the session to appear in the list without clicking Refresh, and click it. | The session appears within about 15 seconds as "ABCD · 1/16 · …". The second window joins and both read "2 playing". |
+| AWS-03 | The list follows the host's count | Three browser windows | 1. After AWS-02, click Refresh in a third window.<br>2. Close the joined window and click Refresh again after a few seconds. | The session shows 2/16, then 1/16. |
+| AWS-04 | Private session and invite link | Two browser windows | 1. Host with "Private" chosen, and copy the invite link from the in-game menu.<br>2. Check the list in the other window, then open the link there. | The session never appears in the list. The link joins it. |
+| AWS-05 | Host closes the page | Two browser windows | 1. Host and join.<br>2. Close the host's window. | Within a few seconds the other shows "Disconnected" with "The host closed the session." and the standings. The session is gone from the list. |
+| AWS-06 | Host loses the session server briefly | Two browser windows | 1. Host and join.<br>2. In the host's developer tools, Network tab, set throttling to Offline for five seconds, then back. | The match may freeze while offline and then carries on. Within about half a minute of coming back the session is in the list again, under the same code, and a third window can join it. |
+| AWS-07 | A session outlasts two hours | Two browser windows | 1. Host, and leave the window open and visible for two hours and ten minutes.<br>2. Join from the other window. | The session is still listed under the same code, and joining works. AWS closes every connection at two hours, so this passes only if the host reconnected by itself. |
+| AWS-08 | Nothing is left behind | The AWS console | 1. After closing every game window, wait a minute.<br>2. Open the DynamoDB table and list its items. | No session has a `host`. Items left over disappear by themselves within a couple of days, and none appear in the game's list. |
+| AWS-09 | Two networks | As DEV-06 | 1. Run DEV-06 on the deployed game. | As DEV-06. A failure here between a phone on mobile data and a PC usually means the pair needs a relay server, which isn't set up yet. |
 
 ## Native build
 

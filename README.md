@@ -10,7 +10,7 @@ Copyright (c) 2026 Hamid Golgiri. All rights reserved. The source is public for 
 
 ## Development
 
-The game is a [Godot 4.7](https://godotengine.org) project in `game/`. Web builds connect players peer-to-peer over WebRTC; `signaling/` is the small server that lists sessions and brokers those connections.
+The game is a [Godot 4.7](https://godotengine.org) project in `game/`. Web builds connect players peer-to-peer over WebRTC; `signaling/` is the small server that lists sessions and brokers those connections. In development it runs as one Python process; the public one runs the same rules on AWS with nothing left running between players. [docs/backend.md](docs/backend.md) describes that, with a diagram, and how to deploy it.
 
 You need Godot 4.7 with the Web export templates installed, and Python 3.14 with `pip install -r signaling/requirements.txt`.
 
@@ -36,14 +36,14 @@ Then open http://localhost:8060 in two browser windows, host in one and join fro
 
 ### Tests
 
-There are three suites. Run them all with one command, or name one or more (`game`, `signaling`, `browser`) to run only those:
+There are four suites. Run them all with one command, or name one or more (`game`, `signaling`, `infra`, `browser`) to run only those:
 
 ```
 python tools/run_tests.py
 ```
 
 - **Game tests** use [GUT](https://github.com/bitwes/Gut), vendored in `game/addons/gut`, and live in `game/test`.
-- **Signaling tests** are in `signaling/test_server.py`.
+- **Signaling tests** are in `signaling/`. `test_stores.py` tests the rules on their own, over both places they can keep sessions (memory, and DynamoDB as on AWS); `test_server.py` tests the development server over real connections; `test_aws_lambda.py` tests the function AWS runs. **Infra tests**, in `infra/`, check the AWS template and what deploying does to the game's files. Both need `pip install -r signaling/requirements-test.txt`, and use imitations of AWS that run inside the tests: nothing reaches a real account.
 - **Browser tests** are in `browser_tests/`. They export the web build, then play it in headless browser windows that host and join sessions with each other for real, using [Playwright](https://playwright.dev/python/). They need a one-time setup:
 
   ```

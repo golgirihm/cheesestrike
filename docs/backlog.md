@@ -18,7 +18,7 @@ Things about how it works that shape the plan:
 
 - **Each player simulates their own movement** (`game/player/player.gd`) and a `MultiplayerSynchronizer` sends position and facing to everyone else. That is fine for movement, but anything that decides who wins, such as hits, damage and score, is decided by the host, or any player could award themselves kills. Rules live in plain classes (`game/combat/`, `game/match/`) so they can be tested without a network.
 - **The host is a browser tab**, possibly on a phone. Whatever the host simulates for everyone has to stay cheap, and the session ends when the host leaves.
-- **The signaling server only runs on the development PC**, and the game looks for it on the same machine as the page, at port 9080. Nobody outside the local network can play yet.
+- **The signaling server is serverless on AWS** ([backend.md](backend.md)): one Lambda function, a WebSocket API and a DynamoDB table, with the game's files in an S3 bucket. Only hosts stay connected to it. `python infra/deploy.py` deploys it; in development the same rules run as one process on port 9080.
 - **The web export is single-threaded** (`thread_support=false`), which lets it run on any static host without special headers. Keep it that way unless something needs threads badly enough to justify the hosting requirements.
 - **The arena editor needs a keyboard and mouse**, and makes flat arenas: a floor of one of three sizes with blocks, walls, crates and pads on a grid (`game/world/arena_code.gd`). An arena is a short code, kept in the player's settings and shared in a link; the host sends it to whoever joins.
 - **The light is not baked.** Each arena has a sun, a cool fill light, soft dark edges drawn on the ground round what stands on it, and in some a few lamps: all cheap, and all worked out as the game runs. Real baked lighting needs the editor to bake it and the baked maps to be downloaded.
@@ -31,13 +31,12 @@ Things about how it works that shape the plan:
 
 Before there is much more game, make it possible for people on different networks to reach it, so every later milestone can be playtested with real players.
 
-1. **Host the signaling server publicly.** Run `signaling/server.py` behind TLS (`wss://`) on a small server or a container platform, with automatic restarts and a health check. Add a log line per session hosted and closed so problems can be traced. If a proxy in front of it handles TLS, start the server with `--behind-proxy`, or its per-address limits will count every player as the proxy.
-   *Tests:* signaling tests for anything added to the server, such as a health endpoint. Manual: DEV-06 becomes runnable.
-2. **Point the web build at the public server.** Replace the same-host-port-9080 guess in `Net._web_signaling_url()` with a URL set at export time, keeping the `?signal=` override and falling back to the current behavior for local development.
-   *Tests:* pull the URL choice into a plain function and cover it with a GUT test.
+1. **Deploy for the first time, and prove it.** The backend has only ever run against imitations of AWS. Follow the steps in [backend.md](backend.md), run `python infra/deploy.py`, and work through the *Deployed game* manual tests (AWS-01 to AWS-09), fixing whatever the real services do differently.
+   *Tests:* a rule that turns out wrong goes in `signaling/test_stores.py`, so both stores are held to the fix.
+2. **Log sessions on AWS.** A line per session hosted, resumed and closed, so problems can be traced in CloudWatch, with a short retention so the logs cost nothing.
 3. **Add a TURN server.** STUN alone fails between players behind strict NATs, which is common on mobile data. Run a TURN server (coturn, or a hosted one) and hand out short-lived credentials from the signaling server rather than putting a fixed secret in the build.
    *Tests:* signaling tests for issuing credentials. Manual: a DEV row for a phone on mobile data joining a PC on home Wi-Fi.
-4. **Publish the web build.** A workflow that exports the web build on every push to `main` and deploys it to a static host (GitHub Pages or itch.io), so there is always a current build to share.
+4. **Deploy on every push to `main`.** A workflow that runs `infra/deploy.py`, so there is always a current build to share. It should sign in to AWS through GitHub's OIDC provider and a role limited to this stack, not a stored access key.
 5. **Version check on join.** Send the game's version with `host` and `join`, and have the signaling server refuse a join between different versions with a clear message ("This session is running an older version. Reload the page."). Once builds are deployed continuously, mismatched tabs will happen.
    *Tests:* signaling tests for the refusal; a browser test that the message reaches the menu.
 
