@@ -114,6 +114,7 @@ func _ready() -> void:
 			# What is only made on some graphics is made, or cleared away.
 			if map != null and (key == "quality" or key == "gfx_effects"):
 				_show_sky()
+				Detail.thin(map, GraphicsQuality.choice(GraphicsQuality.EFFECTS))
 		elif key in [Picture.BLOOM, Picture.GRADE, Picture.VIGNETTE]:
 			apply_picture())
 
@@ -170,9 +171,9 @@ func load_map(id: String) -> void:
 	lighting.build(map_id, map.get_node("Geometry"))
 	if atmosphere != null:
 		_show_sky()
+	Detail.thin(map, GraphicsQuality.choice(GraphicsQuality.EFFECTS))
 
 
-## Begins the session. `settings` are the host's choice, and only used there.
 ## Loads the custom arena `code` describes.
 func load_custom(code: String) -> void:
 	custom_code = code
@@ -187,6 +188,7 @@ func show_custom(arena: Dictionary) -> void:
 	load_map(Maps.CUSTOM)
 
 
+## Begins the session. `settings` are the host's choice, and only used there.
 func start(settings := MatchSettings.new()) -> void:
 	if not multiplayer.is_server():
 		match_.start()
