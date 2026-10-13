@@ -623,9 +623,7 @@ func _draw() -> void:
 		_draw_scope(own)
 	var gap := crosshair_gap(own.shot_spread(), own.camera.fov, size.y) if own != null else CROSSHAIR_GAP
 	if crosshair_shown():
-		for direction in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
-			draw_line(centre + direction * gap, centre + direction * (gap + CROSSHAIR_LENGTH), CROSSHAIR_COLOR, 2.0, true)
-		draw_circle(centre, 1.5, CROSSHAIR_COLOR)
+		Crosshair.draw(self, centre, Crosshair.chosen(), gap)
 	if _hit_left > 0.0:
 		var color: Color = {HIT: HIT_COLOR, HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[hit_kind]
 		color.a = _hit_left / HIT_MARKER_LIFE

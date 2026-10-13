@@ -25,6 +25,9 @@ const SLIDERS := [
 	["hud_scale", "Text size", 0.75, 1.5, 0.05, "%.2f×"],
 	["screen_shake", "Screen shake", 0.0, 1.0, 0.05, "%d%%"],
 	["camera_motion", "Camera motion", 0.0, 1.0, 0.05, "%d%%"],
+	["crosshair_size", "Crosshair: length", 2.0, 24.0, 1.0, "%d px"],
+	["crosshair_gap", "Crosshair: gap", 0.0, 16.0, 1.0, "%d px"],
+	["crosshair_thickness", "Crosshair: thickness", 1.0, 6.0, 1.0, "%d px"],
 ]
 ## The settings that are on or off, with what each says.
 const TOGGLES := [
@@ -37,6 +40,8 @@ const TOGGLES := [
 	["toggle_aim", "Press once to aim, again to stop"],
 	["damage_numbers", "Show the damage of each hit"],
 	["replays", "Show how I was knocked out, and the play of the match"],
+	["crosshair_outline", "Crosshair: dark edge"],
+	["crosshair_dot", "Crosshair: dot in the middle"],
 	["mono_sound", "Mono sound"],
 	["announcer", "The announcer's voice"],
 	["voice_chat", "Talk with teammates (hold the Talk key)"],
@@ -56,6 +61,8 @@ const EVERYTHING := ""
 
 var _rows: VBoxContainer
 var _title: Label
+var _crosshair_code: LineEdit
+var _crosshair_view: Control
 var _customise_rows: Array[Control] = []
 var _scroll: ScrollContainer
 var _done: Button
@@ -106,6 +113,10 @@ func refresh() -> void:
 		(find_child("Setting_" + row[0], true, false) as CheckButton).set_pressed_no_signal(Settings.get_value(row[0]))
 	for choice: Array in SOUND_CHOICES:
 		(find_child("Setting_" + choice[0], true, false) as Button).text = sound_choice_text(choice[0])
+	# The code follows the crosshair, unless it is being typed in.
+	if _crosshair_code != null and not _crosshair_code.has_focus():
+		_crosshair_code.text = Crosshair.encode(Crosshair.chosen())
+		_crosshair_view.queue_redraw()
 	(find_child("Setting_quality", true, false) as Button).text = "Graphics: %s" % GraphicsQuality.NAMES[GraphicsQuality.level(Settings.get_value("quality"))]
 	for part: String in GraphicsQuality.ORDER:
 		var setting: String = GraphicsQuality.PARTS[part].setting
@@ -118,11 +129,33 @@ func refresh() -> void:
 		_key_buttons[action].text = "Press a key…" if action == _waiting_for else Controls.keys_text(action)
 
 
+## Makes the crosshair `code` describes the player's, if it is a code for
+## one. Returns whether it was.
+func use_crosshair_code(code: String) -> bool:
+	var style := Crosshair.decode(code)
+	if style.is_empty():
+		return false
+	_crosshair_code.release_focus()
+	Crosshair.apply(style)
+	return true
+
+
+## A small view of the crosshair as it is chosen.
+class CrosshairView:
+	extends Control
+
+	func _draw() -> void:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.35, 0.45, 0.4))
+		Crosshair.draw(self, size / 2.0, Crosshair.chosen(), CombatHud.CROSSHAIR_GAP)
+
+
 ## The sound settings that are one of a few: the setting, what it is called,
 ## and its choices with what each is called.
 const SOUND_CHOICES := [
 	[Mix.RANGE_SETTING, "Sound for", {"headphones": "Headphones", "speakers": "Speakers", "night": "Night (quiet and even)"}],
 	[SoundCues.HIT_SETTING, "Hit sound", SoundCues.HIT_SOUNDS],
+	[Crosshair.SHAPE, "Crosshair", Crosshair.SHAPES],
+	[Crosshair.COLOUR, "Crosshair colour", Crosshair.COLOUR_NAMES],
 ]
 
 
@@ -262,6 +295,30 @@ func _build() -> void:
 		button.pressed.connect(func() -> void:
 			Settings.set_value(choice[0], next_choice(choice[2].keys(), Settings.get_value(choice[0]))))
 		_rows.add_child(button)
+	# The crosshair as a code, to copy for someone or to paste in from them,
+	# with the crosshair itself beside it.
+	var code_row := HBoxContainer.new()
+	_rows.add_child(code_row)
+	_crosshair_view = CrosshairView.new()
+	_crosshair_view.name = "CrosshairView"
+	_crosshair_view.custom_minimum_size = Vector2(64, 64)
+	code_row.add_child(_crosshair_view)
+	_crosshair_code = LineEdit.new()
+	_crosshair_code.name = "CrosshairCode"
+	_crosshair_code.placeholder_text = "Crosshair code"
+	_crosshair_code.max_length = 60
+	_crosshair_code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_crosshair_code.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_crosshair_code.text_submitted.connect(use_crosshair_code)
+	code_row.add_child(_crosshair_code)
+	var copy_code := Button.new()
+	copy_code.name = "CrosshairCopy"
+	copy_code.text = "Copy"
+	copy_code.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	copy_code.pressed.connect(func() -> void:
+		if DisplayServer.has_feature(DisplayServer.FEATURE_CLIPBOARD):
+			DisplayServer.clipboard_set(Crosshair.encode(Crosshair.chosen())))
+	code_row.add_child(copy_code)
 	var quality := Button.new()
 	quality.name = "Setting_quality"
 	quality.custom_minimum_size = Vector2(0, 40)

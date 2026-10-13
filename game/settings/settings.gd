@@ -52,6 +52,14 @@ const DEFAULTS := {
 	## How many tips the player has been shown, so that each comes in turn
 	## (see JoinScreen).
 	"tips_seen": 0,
+	## The player's crosshair (see Crosshair).
+	"crosshair_shape": "cross",
+	"crosshair_colour": "white",
+	"crosshair_size": 9.0,
+	"crosshair_gap": 0.0,
+	"crosshair_thickness": 2.0,
+	"crosshair_outline": false,
+	"crosshair_dot": true,
 	## Whether text chat is shown and can be typed (see ChatBox).
 	"text_chat": true,
 	## Whether the announcer speaks (see Announcer).
@@ -130,6 +138,9 @@ const RANGES := {
 	"master_volume": [0.0, 1.0],
 	"music_volume": [0.0, 1.0],
 	"effects_volume": [0.0, 1.0],
+	"crosshair_size": [2.0, 24.0],
+	"crosshair_gap": [0.0, 16.0],
+	"crosshair_thickness": [1.0, 6.0],
 	"weapons_volume": [0.0, 1.0],
 	"steps_volume": [0.0, 1.0],
 	"voices_volume": [0.0, 1.0],
@@ -144,6 +155,8 @@ const RANGES := {
 const CHOICES := {
 	"quality": ["", "low", "medium", "high"],
 	"dynamic_range": ["headphones", "speakers", "night"],
+	"crosshair_shape": ["cross", "tee", "circle", "dot"],
+	"crosshair_colour": ["white", "green", "yellow", "cyan", "magenta", "red"],
 	"hit_sound": ["tick", "pop", "bell", "off"],
 	"gfx_shadows": ["", "off", "on"],
 	"gfx_particles": ["", "low", "medium", "high"],
