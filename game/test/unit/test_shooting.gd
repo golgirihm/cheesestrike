@@ -1266,3 +1266,41 @@ func test_a_players_eyes_turn_to_whoever_is_near_and_in_front() -> void:
 	_add(3, Vector3(4, 0, -4))
 	_add(4, Vector3(-10, 0, -10))
 	assert_eq(other._nearest_other(), Vector3(4, 0, -4))
+
+
+func test_on_low_graphics_a_soft_blob_stands_in_for_a_shadow() -> void:
+	assert_false(GraphicsQuality.real_shadows(GraphicsQuality.LOW))
+	assert_true(GraphicsQuality.real_shadows(GraphicsQuality.MEDIUM))
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var other := _add(2, Vector3(3, 0, -5))
+	other._animate(0.01)
+	assert_null(other.get_node_or_null("BlobShadow"), "real shadows need none")
+	Settings.set_value("quality", GraphicsQuality.LOW)
+	other._animate(0.01)
+	var blob: MeshInstance3D = other.get_node_or_null("BlobShadow")
+	assert_not_null(blob)
+	assert_true(blob.visible)
+	assert_almost_eq(blob.global_position.y, 0.0, 0.05, "on the ground")
+	assert_almost_eq(blob.global_position.x, 3.0, 0.001, "under them")
+	# In the air it stays on the ground, smaller and fainter.
+	var on_ground: float = blob.global_transform.basis.get_scale().x
+	other.global_position.y = 5.0
+	other._animate(0.01)
+	assert_almost_eq(blob.global_position.y, 0.0, 0.05)
+	assert_lt(blob.global_transform.basis.get_scale().x, on_ground)
+	# Knocked out, there is nothing to cast one.
+	match_.state.damage(1, 2, 500.0)
+	match_.state_changed.emit()
+	other._animate(0.01)
+	assert_false(blob.visible)
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	other._animate(0.01)
+	Settings.set_value("quality", "")
+
+
+func test_a_blob_shrinks_and_fades_with_height() -> void:
+	var player := preload("res://player/player.gd")
+	assert_eq(player.blob_look(0.0), Vector2(1.0, 0.45))
+	assert_lt(player.blob_look(4.0).x, 1.0)
+	assert_lt(player.blob_look(4.0).y, 0.45)
+	assert_eq(player.blob_look(100.0), player.blob_look(8.0), "no smaller than that")

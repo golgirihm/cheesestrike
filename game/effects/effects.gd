@@ -32,6 +32,13 @@ const MARK_FADE := 3.0
 const CASING_LIFE := 1.6
 const CASING_COLOR := Color(0.72, 0.42, 0.26)
 
+## Seconds a footprint stays, fading all the while.
+const PRINT_LIFE := 5.0
+## Footprints, oldest first: {"node", "left", "material"}.
+var _prints: Array[Dictionary] = []
+# Which foot the next print is of, for each walker by where they last trod.
+var _left_foot := false
+
 ## Marks left by shots, oldest first: {"node", "left", "material"}.
 var _marks: Array[Dictionary] = []
 ## Casings in the air or come to rest: {"node", "velocity", "floor", "left"}.
@@ -96,6 +103,35 @@ func show_shot(muzzle: Vector3, ends: Array, aside := Vector3.ZERO) -> void:
 ## How many effects of `kind` ("tracer", "flash", "puff") are showing.
 func showing(kind: String) -> int:
 	return get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == kind and not child.is_queued_for_deletion()).size()
+
+
+## A footprint where a player at `feet`, turned by `yaw`, has just trodden on
+## the floor of `map`: left and right in turn, fading away. Not on paving,
+## nor on graphics without the lesser effects.
+func footprint(feet: Vector3, yaw: float, map: Node) -> void:
+	if not is_inside_tree() or not extras(_quality()) or not Surfaces.takes_prints(map):
+		return
+	var below := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * 0.3, feet + Vector3.DOWN * 0.5, WORLD_MASK)
+	var ground := get_world_3d().direct_space_state.intersect_ray(below)
+	if ground.is_empty():
+		return
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.1, 0.07, 0.05, 0.35)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var mark := Rounded.spot(0.16, material, Vector3.ZERO, Vector3.UP, 0.0)
+	add_child(mark)
+	_left_foot = not _left_foot
+	var aside := Basis(Vector3.UP, yaw) * Vector3(-0.45 if _left_foot else 0.45, 0, 0)
+	# A shoe's shape: longer than it is wide, pointing the way they face.
+	mark.global_transform = Transform3D(Basis(Vector3.UP, yaw) * Basis.from_scale(Vector3(0.8, 1.0, 1.7)), ground.position + aside + Vector3.UP * 0.015)
+	_prints.append({"node": mark, "left": PRINT_LIFE, "material": material})
+	while _prints.size() > 48:
+		_prints.pop_front().node.queue_free()
+
+
+func prints_showing() -> int:
+	return _prints.size()
 
 
 ## How many marks shots have left that are still showing.
@@ -242,6 +278,11 @@ func _process(delta: float) -> void:
 		mark.material.albedo_color.a = 0.75 * clampf(mark.left / MARK_FADE, 0.0, 1.0)
 	while not _marks.is_empty() and _marks[0].left <= 0.0:
 		_marks.pop_front().node.queue_free()
+	for trodden in _prints:
+		trodden.left -= delta
+		trodden.material.albedo_color.a = 0.35 * clampf(trodden.left / PRINT_LIFE, 0.0, 1.0)
+	while not _prints.is_empty() and _prints[0].left <= 0.0:
+		_prints.pop_front().node.queue_free()
 	for casing in _casings:
 		casing.left -= delta
 		var node: Node3D = casing.node

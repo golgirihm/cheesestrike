@@ -147,3 +147,44 @@ func test_what_a_shot_knocks_off_depends_on_what_it_hits() -> void:
 	assert_eq(Surfaces.dust(geometry.get_node("BuildingNorthEast")), Surfaces.DUST, "plain dust off a wall of windows")
 	assert_eq(Surfaces.dust(null), Surfaces.DUST)
 	assert_eq(Surfaces.kind(null), Surfaces.STONE)
+
+
+func test_feet_leave_prints_on_earth_that_fade() -> void:
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var world: Node3D = await _arena("canyon")
+	var effects: Node3D = world.effects
+	effects.footprint(Vector3(0, 0, 5), 0.0, world.map)
+	effects.footprint(Vector3(0, 0, 3.3), 0.0, world.map)
+	assert_eq(effects.prints_showing(), 2)
+	var first: Node3D = effects._prints[0].node
+	var second: Node3D = effects._prints[1].node
+	assert_almost_eq(first.global_position.y, 0.0, 0.05, "on the ground")
+	assert_lt(first.global_position.x * second.global_position.x, 0.0, "a left foot and a right")
+	effects._process(effects.PRINT_LIFE / 2.0)
+	assert_lt(effects._prints[0].material.albedo_color.a, 0.2, "fading")
+	effects._process(effects.PRINT_LIFE)
+	assert_eq(effects.prints_showing(), 0)
+
+
+func test_no_prints_on_paving_in_the_air_or_on_low_graphics() -> void:
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var city: Node3D = await _arena("city")
+	city.effects.footprint(Vector3(0, 0, 5), 0.0, city.map)
+	assert_eq(city.effects.prints_showing(), 0, "paving takes no prints")
+	assert_false(Surfaces.takes_prints(city.map))
+	assert_false(Surfaces.takes_prints(null))
+	var canyon: Node3D = await _arena("canyon")
+	assert_true(Surfaces.takes_prints(canyon.map))
+	canyon.effects.footprint(Vector3(0, 6, 5), 0.0, canyon.map)
+	assert_eq(canyon.effects.prints_showing(), 0, "nor does thin air")
+	Settings.set_value("quality", GraphicsQuality.LOW)
+	canyon.effects.footprint(Vector3(0, 0, 5), 0.0, canyon.map)
+	assert_eq(canyon.effects.prints_showing(), 0)
+
+
+func test_only_so_many_prints_are_kept() -> void:
+	Settings.set_value("quality", GraphicsQuality.HIGH)
+	var world: Node3D = await _arena("canyon")
+	for step in 80:
+		world.effects.footprint(Vector3(0, 0, 5 - step * 0.1), 0.0, world.map)
+	assert_lte(world.effects.prints_showing(), 48)

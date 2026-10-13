@@ -121,6 +121,10 @@ var _team := -2
 # The health the host last gave for this player, to notice them being hurt.
 var _health := PlayerRecord.MAX_HEALTH
 var _kills := 0
+# The soft blob under this player on graphics too low for real shadows.
+var _blob: MeshInstance3D
+## How far below a player the ground is looked for, to lay their blob on.
+const BLOB_REACH := 30.0
 ## How near another player must be for a character's eyes to turn to them.
 const GLANCE_RANGE := 14.0
 var _badge: MeshInstance3D
@@ -568,6 +572,7 @@ func _animate(delta: float) -> void:
 		body.set_gaze(head.rotation.x)
 		body.set_glance(glance_toward(_nearest_other()))
 	_animate_knife(delta)
+	_lay_blob()
 	# The eyes, and what is held at them, come down with a crouch and go out
 	# to the side with a lean, tipping a little as they go.
 	head.position = BodyShape.head_offset(smoothstep(0.0, 1.0, _crouch), _lean) * BodyShape.SIZE
@@ -590,6 +595,44 @@ func aim_gun_position() -> Vector3:
 	if not _mine and muzzle != null:
 		# Their weapon arm follows the hand on the weapon.
 		body.reach_for(body.to_local(muzzle.get_parent().to_global(WeaponModels.GRIP)))
+
+
+## Whether this player has a blob for a shadow just now: on graphics without
+## real shadows, while in play.
+func blob_wanted() -> bool:
+	return alive and not GraphicsQuality.real_shadows(GraphicsQuality.level(Settings.get_value("quality")))
+
+
+## How big and how dark the blob under a player `height` metres above the
+## ground is, as (scale, opacity): smaller and fainter the higher they are.
+static func blob_look(height: float) -> Vector2:
+	var near := 1.0 - clampf(height / 8.0, 0.0, 1.0)
+	return Vector2(lerpf(0.55, 1.0, near), lerpf(0.1, 0.45, near))
+
+
+# Lays the blob on the ground under this player, wherever that is.
+func _lay_blob() -> void:
+	if not blob_wanted() or not is_inside_tree():
+		if _blob != null:
+			_blob.visible = false
+		return
+	if _blob == null:
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color(0, 0, 0, 0.45)
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_blob = Rounded.spot(BodyShape.RADIUS * 0.85, material, Vector3.ZERO, Vector3.UP, 0.0)
+		_blob.name = "BlobShadow"
+		_blob.top_level = true
+		add_child(_blob)
+	var from := global_position + Vector3.UP * 0.5
+	var ground := get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * BLOB_REACH, Match.WORLD_MASK))
+	_blob.visible = not ground.is_empty()
+	if ground.is_empty():
+		return
+	var look := blob_look(global_position.y - ground.position.y)
+	_blob.global_transform = Transform3D(Basis.from_scale(Vector3(look.x, 1.0, look.x)), ground.position + Vector3.UP * 0.03)
+	(_blob.material_override as StandardMaterial3D).albedo_color.a = look.y
 
 
 ## Which way this player's eyes turn to look at something at `at`: -1 to
@@ -702,6 +745,8 @@ func _step(distance: float, at: Vector3) -> void:
 	if _since_step < STEP_LENGTH:
 		return
 	_since_step = 0.0
+	if world != null:
+		world.effects.footprint(global_position, rotation.y, world.map)
 	# A crouched player treads softly.
 	var hush := -10.0 * _crouch
 	if at == Vector3.INF:

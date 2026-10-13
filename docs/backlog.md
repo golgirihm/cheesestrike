@@ -62,8 +62,6 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* GUT tests that none change `BodyShape`.
 5. **Emotes and taunts.** A wheel of short animations and sounds (a wave, a dance, a shrug), safe to use only when it doesn't leave the player helpless for long.
    *Tests:* browser test that others see one.
-6. **Footprints and shadows.** A soft blob shadow under each character on low graphics, where real shadows are off, and brief footprints on dusty ground.
-   *Tests:* GUT test of the fallback. Manual row.
 
 ## Milestone 5: An arsenal
 

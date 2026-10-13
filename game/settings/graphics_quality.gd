@@ -22,6 +22,13 @@ static func level(chosen: String, touch_screen := DisplayServer.is_touchscreen_a
 	return chosen if LEVELS.has(chosen) else default_for(touch_screen)
 
 
+## Whether `level` draws real shadows. Where it doesn't, each character gets
+## a soft dark blob under it instead, so that it still looks stood on the
+## ground.
+static func real_shadows(level: String) -> bool:
+	return level != LOW
+
+
 ## Puts `level` into effect on `viewport` and on the arena's `sun`.
 static func apply(level: String, viewport: Viewport, sun: DirectionalLight3D) -> void:
 	if not LEVELS.has(level):
@@ -29,4 +36,4 @@ static func apply(level: String, viewport: Viewport, sun: DirectionalLight3D) ->
 	viewport.scaling_3d_scale = RENDER_SCALE[level]
 	viewport.msaa_3d = Viewport.MSAA_2X if level == HIGH else Viewport.MSAA_DISABLED
 	if sun != null:
-		sun.shadow_enabled = level != LOW
+		sun.shadow_enabled = real_shadows(level)
