@@ -49,15 +49,9 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 3: Movement with depth
 
-1. **Slide.** Crouching while running slides, keeping speed for a moment and carrying down ramps.
-   *Tests:* GUT tests of the slide's speed over time and of the host allowing it.
-2. **Climb what you can reach.** Running into a ledge at chest height or below pulls the player up onto it (a cheese block, a car's bonnet) without a jump.
-   *Tests:* GUT tests in a small test arena for what can and can't be climbed.
-3. **Steps and kerbs.** Walk up small steps without jumping, so arenas can have kerbs, stairs and uneven ground.
-   *Tests:* GUT tests walking a player over steps of several heights.
-4. **Lean.** Peek left and right round a corner without stepping out.
+1. **Lean.** Peek left and right round a corner without stepping out.
    *Tests:* GUT tests of the view offset and the hit shape.
-5. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
+2. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
    *Tests:* GUT tests of the arc and of `MovementCheck` allowing it and nothing more.
 
 ## Milestone 4: Characters that are alive

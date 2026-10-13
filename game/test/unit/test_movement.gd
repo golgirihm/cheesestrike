@@ -57,3 +57,42 @@ func test_in_the_air_a_player_can_only_steer() -> void:
 	var airtime := 2.0 * Movement.JUMP_VELOCITY / gravity
 	assert_gt(Movement.air_steer(forward, -forward, airtime).y, -forward.y * -1.0 - 0.001)
 	assert_lt(Movement.air_steer(forward, -forward, airtime).length(), Movement.WALK_SPEED)
+
+
+func test_a_slide_starts_fast_and_eases_to_a_crouched_walk() -> void:
+	var run := Movement.WALK_SPEED * Movement.RUN_FACTOR
+	assert_almost_eq(Movement.slide_speed(run, 0.0), run * Movement.SLIDE_BOOST, 0.0001)
+	assert_gt(Movement.slide_speed(run, Movement.SLIDE_TIME * 0.3), run, "still quicker than running, a third of the way in")
+	assert_almost_eq(Movement.slide_speed(run, Movement.SLIDE_TIME), Movement.WALK_SPEED * Movement.CROUCH_FACTOR, 0.0001)
+	var last := INF
+	for step in 11:
+		var speed := Movement.slide_speed(run, Movement.SLIDE_TIME * step / 10.0)
+		assert_lte(speed, last, "never speeding up")
+		last = speed
+
+
+func test_only_a_run_can_become_a_slide() -> void:
+	assert_false(Movement.can_slide(Movement.WALK_SPEED))
+	assert_true(Movement.can_slide(Movement.WALK_SPEED * Movement.RUN_FACTOR))
+	assert_false(Movement.can_slide(0.0))
+
+
+func test_the_host_allows_for_a_slide() -> void:
+	var fastest := Movement.slide_speed(Movement.speed(true, false, 0.0, Overload.SPEED_BOOST), 0.0)
+	assert_gt(MovementCheck.MAX_SPEED, fastest)
+	# And for a climb: up the tallest ledge in the time it takes.
+	assert_gt(MovementCheck.MAX_RISE_SPEED, Movement.CLIMB_HEIGHT / (Movement.CLIMB_TIME * 0.7) * 0.8)
+
+
+func test_a_climb_goes_up_the_face_then_over_the_top() -> void:
+	var from := Vector3(0, 0, 0)
+	var to := Vector3(0, 2, -2)
+	assert_eq(Movement.climb_position(from, to, 0.0), from)
+	assert_eq(Movement.climb_position(from, to, Movement.CLIMB_TIME), to)
+	assert_eq(Movement.climb_position(from, to, 99.0), to)
+	var early := Movement.climb_position(from, to, Movement.CLIMB_TIME * 0.4)
+	assert_gt(early.y, 0.5, "well on the way up")
+	assert_eq(early.z, 0.0, "before any of the way over")
+	var late := Movement.climb_position(from, to, Movement.CLIMB_TIME * 0.8)
+	assert_eq(late.y, 2.0, "at the top")
+	assert_lt(late.z, -0.5)

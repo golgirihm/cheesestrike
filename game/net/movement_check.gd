@@ -8,9 +8,9 @@ extends RefCounted
 ## Updates arrive unevenly, so speed is judged with some slack in time and
 ## distance, and a shove from a burst allows more for a moment.
 
-## Fastest a player can move across the ground, running in an Overload, with
-## a margin.
-const MAX_SPEED := Movement.WALK_SPEED * Movement.RUN_FACTOR * Overload.SPEED_BOOST * 1.15
+## Fastest a player can move across the ground, at the start of a slide from
+## a run in an Overload, with a margin.
+const MAX_SPEED := Movement.WALK_SPEED * Movement.RUN_FACTOR * Movement.SLIDE_BOOST * Overload.SPEED_BOOST * 1.15
 const MAX_RISE_SPEED := Movement.JUMP_VELOCITY * 1.15
 ## Slack for updates bunched up on the network.
 const SLACK_TIME := 0.15

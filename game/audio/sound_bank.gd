@@ -24,6 +24,7 @@ const SOUNDS := {
 	"step": "_step",
 	"jump": "_jump",
 	"land": "_land",
+	"slide": "_slide",
 	"pickup": "_pickup",
 	"overload": "_overload",
 	"reload": "_reload",
@@ -277,6 +278,23 @@ static func _land() -> AudioStreamWAV:
 		turn += lerpf(45.0, 100.0, _decay(t, 40.0)) / RATE
 		samples[i] = tanh((dull * 3.0 + sin(TAU * turn) * 1.2) * _decay(t, 28.0))
 	return _stream(_shaped(samples, 0.7))
+
+
+# Sliding across the ground: a rush of grit that dies away.
+static func _slide() -> AudioStreamWAV:
+	var rng := _rng(14)
+	var count := int(0.7 * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var soft := 0.0
+	var dull := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var noise := rng.randf_range(-1.0, 1.0)
+		soft = lerpf(soft, noise, 0.35)
+		dull = lerpf(dull, noise, 0.04)
+		samples[i] = (soft - dull) * minf(t * 30.0, 1.0) * _decay(t, 4.5)
+	return _stream(_shaped(samples, 0.5))
 
 
 static func _hit() -> AudioStreamWAV:

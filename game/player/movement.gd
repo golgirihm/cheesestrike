@@ -18,6 +18,20 @@ const AIR_STEER := 14.0
 ## hit does, for this share of a hit's time.
 const HARD_LANDING := 0.7
 const LANDING_WIND := 0.5
+## Crouching at a run slides: the player keeps going the way they were, a
+## little faster at first, easing down to a crouched walk over SLIDE_TIME
+## seconds, without steering. They must be going at least SLIDE_FROM of
+## walking speed to start one, and wait SLIDE_REST after one for the next.
+const SLIDE_TIME := 0.9
+const SLIDE_BOOST := 1.15
+const SLIDE_FROM := 1.2
+const SLIDE_REST := 0.4
+## The tallest step a player walks up without jumping, in metres.
+const STEP_HEIGHT := 0.6
+## The tallest ledge a player pushing into it pulls themselves up onto, and
+## how long that takes, in seconds.
+const CLIMB_HEIGHT := 2.5
+const CLIMB_TIME := 0.4
 ## On a touch screen, pushing the movement stick this far past its edge runs.
 const TOUCH_RUN_REACH := 1.35
 ## Gravity is strong (see the project's physics settings), so a jump is quick:
@@ -39,6 +53,28 @@ static func flinch_factor(flinch_left: float) -> float:
 ## it is `current` and they are steering for `wanted`.
 static func air_steer(current: Vector2, wanted: Vector2, delta: float) -> Vector2:
 	return current.move_toward(wanted, AIR_STEER * delta)
+
+
+## How fast a player `elapsed` seconds into a slide begun at `from` metres a
+## second is going.
+static func slide_speed(from: float, elapsed: float) -> float:
+	var through := clampf(elapsed / SLIDE_TIME, 0.0, 1.0)
+	# Holding most of its speed at first, then dropping away.
+	return lerpf(from * SLIDE_BOOST, WALK_SPEED * CROUCH_FACTOR, through * through)
+
+
+## Whether a player going at `speed` across the ground can begin a slide.
+static func can_slide(speed: float) -> bool:
+	return speed >= WALK_SPEED * SLIDE_FROM
+
+
+## Where a player `elapsed` seconds into pulling themselves from `from` up
+## onto a ledge at `to` is: up the face of it first, then over onto it.
+static func climb_position(from: Vector3, to: Vector3, elapsed: float) -> Vector3:
+	var through := clampf(elapsed / CLIMB_TIME, 0.0, 1.0)
+	var up := smoothstep(0.0, 0.7, through)
+	var over := smoothstep(0.5, 1.0, through)
+	return Vector3(lerpf(from.x, to.x, over), lerpf(from.y, to.y, up), lerpf(from.z, to.z, over))
 
 
 ## How fast a player moves across the ground. `boost` is anything else that
