@@ -82,6 +82,8 @@ var _projectiles := {}
 var _next_projectile := 1
 # Names asked for by players the host hasn't seen join yet, by player id.
 var _pending_names := {}
+# And the looks they chose, likewise.
+var _pending_looks := {}
 # Each player's key (see WebPage.player_key), by id, including keys sent
 # before the host saw the player join; and the records of players who left,
 # by key, kept for a while in case they come back.
@@ -102,6 +104,7 @@ func start(settings := MatchSettings.new()) -> void:
 		_has_state = true
 		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
 		_pending_names.clear()
+		_pending_looks.clear()
 		_keys.clear()
 		_departed.clear()
 		_rules.clear()
@@ -113,6 +116,7 @@ func start(settings := MatchSettings.new()) -> void:
 		state_changed.emit()
 	else:
 		introduce(Settings.get_value("name"))
+		wear(Looks.chosen())
 
 
 func stop() -> void:
@@ -141,9 +145,13 @@ func add_player(id: int) -> void:
 	state.add_player(id)
 	if id == multiplayer.get_unique_id():
 		state.rename(id, Settings.get_value("name"))
+		state.player(id).look = Looks.chosen()
 	elif _pending_names.has(id):
 		state.rename(id, _pending_names[id])
+	if _pending_looks.has(id):
+		state.player(id).look = _pending_looks[id]
 	_pending_names.erase(id)
+	_pending_looks.erase(id)
 	if _keys.has(id):
 		_welcome_back(id)
 	_changed()
@@ -174,6 +182,30 @@ func introduce(wanted: String, key := WebPage.player_key()) -> void:
 		_rename(1, wanted)
 	elif multiplayer.multiplayer_peer != null:
 		_introduce.rpc_id(1, wanted, key)
+
+
+## Tells the host what this player's character looks like (see Looks).
+func wear(look: int) -> void:
+	if is_host():
+		_wear(1, look)
+	elif multiplayer.multiplayer_peer != null:
+		_request_look.rpc_id(1, look)
+
+
+func _wear(id: int, look: Variant) -> void:
+	var chosen := Looks.clean(look)
+	var record := state.player(id)
+	if record == null:
+		_pending_looks[id] = chosen
+	elif record.look != chosen:
+		record.look = chosen
+		_changed()
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_look(look: Variant) -> void:
+	if is_host():
+		_wear(multiplayer.get_remote_sender_id(), look)
 
 
 ## Host only: a player whose key is `key` has said who they are. If they left

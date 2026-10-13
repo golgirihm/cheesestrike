@@ -37,6 +37,34 @@ class SettingsTest(GameTestCase):
         game.click("SettingsResetKeys")
         game.wait_for("s.settings.jump_keys === 'Space'")
 
+    def test_others_see_the_character_a_player_chose(self):
+        host = self.open_game()
+        code = host.host()
+        joiner = self.open_game()
+        # Chosen on the menu, before joining.
+        joiner.click("SettingsButton")
+        joiner.wait_for("s.screen === 'settings'")
+        joiner.scroll_to("Setting_look_hat")
+        joiner.click("Setting_look_hat")
+        joiner.click("Setting_look_hat")
+        joiner.scroll_to("Setting_look_cheese")
+        joiner.click("Setting_look_cheese")
+        joiner.click("SettingsDone")
+        joiner.wait_for("s.screen === 'menu'")
+        joiner.join(code)
+        joiner_id = joiner.own_player()["id"]
+        look = host.player(joiner_id)["look"]
+        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.look.hat === 'top' && p.look.cheese === 'cheddar')")
+        self.assertEqual(host.player(1)["look"], {"cheese": "swiss", "hat": "none", "held": "none"}, "the host's own is as it was")
+        self.assertIsNotNone(look)
+        # Changed again in the middle of a session: it shows at once.
+        joiner.click("MenuButton")
+        joiner.click("PauseSettingsButton")
+        joiner.wait_for("s.screen === 'settings'")
+        joiner.scroll_to("Setting_look_held")
+        joiner.click("Setting_look_held")
+        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.look.held === 'balloon')")
+
     def test_settings_open_from_the_in_game_menu_and_go_back_to_it(self):
         game = self.open_game()
         game.host()

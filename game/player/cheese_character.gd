@@ -11,6 +11,9 @@ extends Node3D
 ## when knocked out and pops back on returning.
 
 const INK := Color(0.1, 0.09, 0.09)
+## The veins of a blue cheese, and the pale rind of a brie.
+const VEIN := Color(0.16, 0.42, 0.55)
+const BLOOM := Color(0.96, 0.95, 0.92)
 const BLUSH := Color(0.96, 0.5, 0.5)
 const TEETH := Color(0.97, 0.97, 0.95)
 ## How far the legs swing, in radians, at full running speed.
@@ -51,6 +54,15 @@ var shown := true
 
 var _material := StandardMaterial3D.new()
 var _hole_material := StandardMaterial3D.new()
+var _rind_material := StandardMaterial3D.new()
+# The look being worn (see Looks), and the parts that show it: the holes of
+# a Swiss, the veins of a blue, a rind, a hat and something held.
+var _look := -1
+var _holes: Array[Node3D] = []
+var _veins: Array[Node3D] = []
+var _rind: MeshInstance3D
+var _hat: Node3D
+var _held: Node3D
 var _ink := _flat(INK)
 var _wedge: MeshInstance3D
 var _legs: Array[Node3D] = []
@@ -99,6 +111,7 @@ func _init() -> void:
 func set_colour(colour: Color) -> void:
 	_material.albedo_color = colour
 	_hole_material.albedo_color = colour.darkened(0.3)
+	_show_rind()
 
 
 func colour() -> Color:
@@ -123,6 +136,135 @@ func _light() -> void:
 func set_motion(speed: float, airborne: bool) -> void:
 	_speed = speed
 	_airborne = airborne
+
+
+## Wears `look` (see Looks): the kind of cheese, a hat and something in the
+## free hand. None of it changes the shape that can be hit.
+func wear(look: int) -> void:
+	if look == _look:
+		return
+	_look = look
+	var choices := Looks.unpack(look)
+	for hole in _holes:
+		hole.visible = choices.cheese == "swiss"
+	for vein in _veins:
+		vein.visible = choices.cheese == "blue"
+	_show_rind()
+	for old: Node3D in [_hat, _held]:
+		if old != null:
+			_upper.erase(old)
+			remove_child(old)
+			old.queue_free()
+	_hat = _build_hat(choices.hat)
+	_held = _build_held(choices.held)
+	for added: Node3D in [_hat, _held]:
+		if added != null:
+			add_child(added)
+			_upper[added] = added.position
+	set_crouch(_crouch)
+
+
+## What is being worn, as Looks.unpack gives it.
+func worn() -> Dictionary:
+	return Looks.unpack(maxi(_look, 0))
+
+
+# A cheddar has a rind a shade darker than itself, and a brie a pale one.
+func _show_rind() -> void:
+	if _rind == null:
+		return
+	var cheese: String = worn().cheese
+	_rind.visible = cheese == "cheddar" or cheese == "brie"
+	_rind_material.albedo_color = BLOOM if cheese == "brie" else _material.albedo_color.darkened(0.35)
+
+
+# A hat of `kind` for the tip of the wedge, or null for none.
+func _build_hat(kind: String) -> Node3D:
+	if kind == "none":
+		return null
+	var hat := Node3D.new()
+	hat.name = "Hat"
+	# Sitting a little down over the tip.
+	hat.position = Vector3(0, BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y / 2.0 - 0.1, 0)
+	match kind:
+		"party":
+			var cone := CylinderMesh.new()
+			cone.top_radius = 0.0
+			cone.bottom_radius = 0.085
+			cone.height = 0.24
+			cone.radial_segments = 14
+			hat.add_child(Rounded.instance(cone, _flat(Color(0.9, 0.3, 0.6)), Vector3(0, 0.12, 0)))
+			hat.add_child(_dab(0.03, Color(0.95, 0.95, 0.95), Vector3(0, 0.25, 0)))
+		"top":
+			hat.add_child(Rounded.instance(Rounded.cylinder(0.15, 0.025, 0.01), _flat(INK.lightened(0.08)), Vector3(0, 0.0, 0)))
+			hat.add_child(Rounded.instance(Rounded.cylinder(0.095, 0.2, 0.02), _flat(INK.lightened(0.08)), Vector3(0, 0.1, 0)))
+			hat.add_child(Rounded.instance(Rounded.cylinder(0.098, 0.035, 0.01), _flat(Color(0.7, 0.12, 0.12)), Vector3(0, 0.03, 0)))
+		"crown":
+			var silver := Color(0.82, 0.84, 0.88)
+			hat.add_child(Rounded.instance(Rounded.cylinder(0.1, 0.07, 0.015), _flat(silver), Vector3(0, 0.03, 0)))
+			for point in 5:
+				var around := TAU * point / 5.0
+				hat.add_child(_dab(0.028, silver, Vector3(cos(around) * 0.085, 0.085, sin(around) * 0.085)))
+			hat.add_child(_dab(0.022, Color(0.75, 0.12, 0.2), Vector3(0, 0.035, -0.1)))
+		"chef":
+			hat.add_child(Rounded.instance(Rounded.cylinder(0.09, 0.1, 0.02), _flat(BLOOM), Vector3(0, 0.04, 0)))
+			var puff := _dab(0.125, BLOOM, Vector3(0, 0.16, 0))
+			puff.scale = Vector3(1.0, 0.7, 1.0)
+			hat.add_child(puff)
+		"cowboy":
+			var leather := Color(0.42, 0.27, 0.17)
+			hat.add_child(Rounded.instance(Rounded.cylinder(0.2, 0.025, 0.012), _flat(leather), Vector3(0, 0.0, 0)))
+			hat.add_child(Rounded.instance(Rounded.cylinder(0.095, 0.13, 0.04), _flat(leather), Vector3(0, 0.07, 0)))
+			hat.add_child(Rounded.instance(Rounded.cylinder(0.098, 0.025, 0.008), _flat(INK), Vector3(0, 0.03, 0)))
+	return hat
+
+
+# Something of `kind` for the free hand to hold, or null for nothing. It
+# stands up from where that hand hangs.
+func _build_held(kind: String) -> Node3D:
+	if kind == "none":
+		return null
+	var held := Node3D.new()
+	held.name = "Held"
+	var arm: Array = BodyShape.ARMS[0]
+	# Where the mitten is, at rest.
+	held.position = (arm[0] as Vector3) + Vector3(-sin(0.35), -cos(0.35), 0) * arm[1]
+	var stick := CylinderMesh.new()
+	stick.top_radius = 0.006
+	stick.bottom_radius = 0.006
+	stick.radial_segments = 6
+	match kind:
+		"balloon":
+			stick.height = 0.7
+			held.add_child(Rounded.instance(stick, _flat(Color(0.9, 0.9, 0.9)), Vector3(0.02, 0.35, 0)))
+			var balloon := _dab(0.085, Color(0.85, 0.15, 0.2), Vector3(0.02, 0.78, 0))
+			balloon.scale = Vector3(1.0, 1.2, 1.0)
+			held.add_child(balloon)
+		"flag":
+			stick.height = 0.6
+			stick.top_radius = 0.01
+			stick.bottom_radius = 0.01
+			held.add_child(Rounded.instance(stick, _flat(INK.lightened(0.3)), Vector3(0, 0.3, 0)))
+			held.add_child(Rounded.instance(Rounded.box(Vector3(0.012, 0.11, 0.17), 0.004), _flat(Color(0.95, 0.95, 0.95)), Vector3(0, 0.54, -0.09)))
+		"lollipop":
+			stick.height = 0.3
+			stick.top_radius = 0.008
+			stick.bottom_radius = 0.008
+			held.add_child(Rounded.instance(stick, _flat(Color(0.95, 0.95, 0.95)), Vector3(0, 0.15, 0)))
+			var sweet := Rounded.instance(Rounded.cylinder(0.07, 0.025, 0.01), _flat(Color(0.9, 0.3, 0.6)), Vector3(0, 0.33, 0))
+			sweet.rotation.x = PI / 2.0
+			held.add_child(sweet)
+	return held
+
+
+# A small ball of `colour`.
+static func _dab(radius: float, colour: Color, at: Vector3) -> MeshInstance3D:
+	var sphere := SphereMesh.new()
+	sphere.radius = radius
+	sphere.height = radius * 2.0
+	sphere.radial_segments = 10
+	sphere.rings = 5
+	return Rounded.instance(sphere, _flat(colour), at)
 
 
 ## How far the player is crouched, from 0 (standing) to 1: the legs fold
@@ -301,6 +443,23 @@ func _build() -> void:
 		var spot := Rounded.spot(place.radius, _hole_material, place.centre, place.normal, LAYER)
 		spot.name = "Hole%d" % get_child_count()
 		add_child(spot)
+		_holes.append(spot)
+		# A blue cheese has veins where a Swiss has holes: two small marks each.
+		for offset: Vector3 in [Vector3.ZERO, Vector3(0.6, 0.5, 0.6)]:
+			var across: Vector3 = (place.normal as Vector3).cross(Vector3.UP if absf(place.normal.y) < 0.9 else Vector3.RIGHT).normalized()
+			var shifted: Vector3 = place.centre + (across * offset.x + (place.normal as Vector3).cross(across) * offset.y) * place.radius
+			var vein := Rounded.spot(place.radius * 0.42, _flat(VEIN), shifted, place.normal, LAYER)
+			vein.name = "Vein%d" % (_veins.size() + 1)
+			vein.visible = false
+			add_child(vein)
+			_veins.append(vein)
+
+	# A rind over the back of the wedge, a hair proud of it.
+	_rind_material.roughness = 0.9
+	_rind = Rounded.instance(Rounded.wedge(BodyShape.WEDGE_SIZE * Vector3(1.02, 1.02, 0.08), 0.02), _rind_material, BodyShape.WEDGE_CENTRE + Vector3(0, 0, BodyShape.WEDGE_SIZE.z / 2.0 - 0.018))
+	_rind.name = "Rind"
+	_rind.visible = false
+	add_child(_rind)
 
 	_build_face()
 

@@ -256,6 +256,8 @@ func _ready() -> void:
 	if match_ != null:
 		match_.state_changed.connect(_on_match_state_changed)
 		_on_match_state_changed()
+	if _mine:
+		Settings.changed.connect(_on_setting_changed)
 
 
 func _on_hurt(_attacker: int, _from: Vector3, dealt: int) -> void:
@@ -267,6 +269,12 @@ func _on_burst(_id: int, weapon_id: String, at: Vector3) -> void:
 	var stats := Weapons.find(weapon_id)
 	if stats != null:
 		shake.add(Shake.from_burst(global_position.distance_to(at), stats.splash_radius * 2.0))
+
+
+# A change of look in the settings reaches everyone at once.
+func _on_setting_changed(key: String) -> void:
+	if Looks.SETTINGS.has(key) and match_ != null:
+		match_.wear(Looks.chosen())
 
 
 ## The host's record of this player, or null before it has arrived.
@@ -356,6 +364,7 @@ func _on_match_state_changed() -> void:
 	if own.kills > _kills:
 		body.cheer()
 	_kills = own.kills
+	body.wear(own.look)
 	if _mine:
 		_carry(own.weapons)
 	else:
