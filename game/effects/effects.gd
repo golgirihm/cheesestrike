@@ -18,11 +18,25 @@ var _flash_mesh := SphereMesh.new()
 var _wheel_mesh := Rounded.cylinder(0.16, 0.12, 0.04)
 var _wheel_material := _glow(WeaponModels.WAX)
 var _grenade_mesh := SphereMesh.new()
-var _burst_material := _glow(Color(1.0, 0.5, 0.2, 0.7))
+var _ball_mesh := SphereMesh.new()
+var _ring_mesh := TorusMesh.new()
+var _lump_mesh := BoxMesh.new()
+## Lumps thrown up by bursts: as casings are.
+var _debris: Array[Dictionary] = []
 # Projectiles in flight, by id: {"node", "from", "velocity", "gravity", "age"}.
 var _projectiles := {}
 
+## Seconds a burst's shockwave takes to reach its edge.
 const BURST_LIFE := 0.35
+## Seconds its flash lasts, and how big it gets, as a share of the burst.
+const BURST_FLASH_LIFE := 0.16
+const BURST_FLASH_SIZE := 0.8
+## How wide the ground is burnt under a burst, as a share of its radius, and
+## how dark.
+const SCORCH_SIZE := 0.45
+const SCORCH_ALPHA := 0.55
+## Seconds a lump thrown up by a burst is seen for.
+const DEBRIS_LIFE := 3.0
 ## The colour of the sparkle each pickup gives; a weapon's is wax.
 const SPARKLES := {Pickups.HEALTH: Color(1.0, 0.45, 0.4), Pickups.AMMO: Color(1.0, 0.85, 0.4), Pickups.ARMOUR: Color(0.5, 0.75, 1.0), Pickups.POWER: Color(0.8, 0.5, 1.0)}
 ## Seconds the smoke of a burst hangs about.
@@ -78,7 +92,16 @@ func _init() -> void:
 	_flash_mesh.radius = 0.09
 	_flash_mesh.height = 0.18
 	_flash_mesh.material = _flash_material
-	_burst_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_ball_mesh.radius = 1.0
+	_ball_mesh.height = 2.0
+	_ball_mesh.radial_segments = 16
+	_ball_mesh.rings = 8
+	# A ring a metre across, thin and flat, to be stretched to a burst's size.
+	_ring_mesh.inner_radius = 0.9
+	_ring_mesh.outer_radius = 1.0
+	_ring_mesh.rings = 32
+	_ring_mesh.ring_segments = 4
+	_lump_mesh.size = Vector3(0.16, 0.12, 0.2)
 	_casing_material.albedo_color = CASING_COLOR
 	_casing_material.metallic = 0.6
 	_casing_material.roughness = 0.4
@@ -327,25 +350,110 @@ func burst_projectile(id: int, weapon: String, at: Vector3) -> void:
 	if radius <= 0.0:
 		# It only struck: nothing bursts.
 		return
-	var burst := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 1.0
-	sphere.height = 2.0
-	sphere.material = _burst_material
-	burst.mesh = sphere
-	burst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(burst)
-	burst.global_position = at
-	burst.scale = Vector3.ONE * 0.2
+	_burst_flash(at, radius)
+	_shockwave(at, radius)
+	burst_specks(at, radius)
+	# What is under it, if it is near enough to be marked and torn up.
+	if not is_inside_tree():
+		return
+	var below := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.2, at + Vector3.DOWN * radius * 0.6, WORLD_MASK)
+	var ground := get_world_3d().direct_space_state.intersect_ray(below)
+	if ground.is_empty() or String(ground.collider.name).begins_with("Wall"):
+		return
+	_scorch(ground.position, ground.normal, radius)
+	_debris_from(ground.position, Surfaces.dust(ground.collider), radius)
+
+
+# The flash of a burst: a white-hot ball that swells to a part of the
+# burst's size and is gone almost at once, lighting what is round it.
+func _burst_flash(at: Vector3, radius: float) -> void:
+	var flash := MeshInstance3D.new()
+	var material := _glow(Color(1.0, 0.9, 0.65, 0.95))
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flash.mesh = _ball_mesh
+	flash.material_override = material
+	flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	flash.set_meta("kind", "burst_flash")
+	add_child(flash)
+	flash.global_position = at
+	flash.scale = Vector3.ONE * radius * 0.15
 	var light := OmniLight3D.new()
 	light.light_color = FLASH_COLOR
-	light.light_energy = 4.0
-	light.omni_range = radius * 2.0
-	burst.add_child(light)
-	var grow := create_tween()
-	grow.tween_property(burst, "scale", Vector3.ONE * radius, BURST_LIFE)
-	_expire(burst, BURST_LIFE)
-	burst_specks(at, radius)
+	light.light_energy = 6.0
+	light.omni_range = radius * 2.5
+	flash.add_child(light)
+	var going := create_tween().set_parallel()
+	going.tween_property(flash, "scale", Vector3.ONE * radius * BURST_FLASH_SIZE, BURST_FLASH_LIFE).set_ease(Tween.EASE_OUT)
+	going.tween_property(material, "albedo_color:a", 0.0, BURST_FLASH_LIFE).set_ease(Tween.EASE_IN)
+	going.tween_property(light, "light_energy", 0.0, BURST_FLASH_LIFE)
+	_expire(flash, BURST_FLASH_LIFE)
+
+
+# The shockwave of a burst: a thin ring that races out along the ground to
+# the burst's edge, showing how far it reached.
+func _shockwave(at: Vector3, radius: float) -> void:
+	var ring := MeshInstance3D.new()
+	var material := _glow(Color(1.0, 0.85, 0.7, 0.6))
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	ring.mesh = _ring_mesh
+	ring.material_override = material
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.set_meta("kind", "shockwave")
+	add_child(ring)
+	ring.global_position = at
+	ring.scale = Vector3(0.1, 1.0, 0.1)
+	var going := create_tween().set_parallel()
+	going.tween_property(ring, "scale", Vector3(radius, 1.0, radius), BURST_LIFE).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	going.tween_property(material, "albedo_color:a", 0.0, BURST_LIFE).set_ease(Tween.EASE_IN)
+	_expire(ring, BURST_LIFE)
+
+
+# The ground burnt black under a burst, which stays as a shot's mark does.
+func _scorch(at: Vector3, normal: Vector3, radius: float) -> void:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.06, 0.05, 0.05, SCORCH_ALPHA)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var mark := Rounded.spot(1.0, material, Vector3.ZERO, normal, 0.0)
+	mark.set_meta("kind", "scorch")
+	add_child(mark)
+	mark.global_position = at + normal * 0.02
+	mark.scale = Vector3(radius * SCORCH_SIZE, 1.0, radius * SCORCH_SIZE)
+	_marks.append({"node": mark, "left": MARK_LIFE, "material": material, "alpha": SCORCH_ALPHA})
+	while _marks.size() > mark_limit(_quality()):
+		_marks.pop_front().node.queue_free()
+
+
+## How many lumps a burst throws up from the ground on graphics quality
+## `level`.
+static func debris_count(level: String) -> int:
+	return {GraphicsQuality.LOW: 0, GraphicsQuality.MEDIUM: 5}.get(level, 9)
+
+
+# Lumps of the ground, in `colour`, flung up and out from under a burst, to
+# fall, bounce once and lie a while.
+func _debris_from(at: Vector3, colour: Color, radius: float) -> void:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(colour.darkened(0.25), 1.0)
+	material.roughness = 1.0
+	for index in debris_count(_quality()):
+		var lump := Rounded.instance(_lump_mesh, material)
+		lump.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		lump.set_meta("kind", "debris")
+		add_child(lump)
+		lump.global_position = at + Vector3.UP * 0.1
+		lump.scale = Vector3.ONE * randf_range(0.6, 1.4)
+		var out := Vector3.RIGHT.rotated(Vector3.UP, randf() * TAU)
+		var velocity := out * randf_range(0.4, 1.0) * radius * 1.4 + Vector3.UP * randf_range(5.0, 9.0)
+		_debris.append({"node": lump, "velocity": velocity, "floor": at.y, "left": DEBRIS_LIFE})
+	while _debris.size() > 36:
+		_debris.pop_front().node.queue_free()
+
+
+## How many lumps thrown up by bursts are in the air or lying about.
+func debris_showing() -> int:
+	return _debris.size()
 
 
 ## How many projectiles are being drawn, for tests.
@@ -359,7 +467,7 @@ func _process(delta: float) -> void:
 	_live = _live.filter(func(puff: Dictionary) -> bool: return puff.left > 0.0)
 	for mark in _marks:
 		mark.left -= delta
-		mark.material.albedo_color.a = 0.75 * clampf(mark.left / MARK_FADE, 0.0, 1.0)
+		mark.material.albedo_color.a = mark.get("alpha", 0.75) * clampf(mark.left / MARK_FADE, 0.0, 1.0)
 	while not _marks.is_empty() and _marks[0].left <= 0.0:
 		_marks.pop_front().node.queue_free()
 	for trodden in _prints:
@@ -367,19 +475,20 @@ func _process(delta: float) -> void:
 		trodden.material.albedo_color.a = 0.35 * clampf(trodden.left / PRINT_LIFE, 0.0, 1.0)
 	while not _prints.is_empty() and _prints[0].left <= 0.0:
 		_prints.pop_front().node.queue_free()
-	for casing in _casings:
-		casing.left -= delta
-		var node: Node3D = casing.node
-		if casing.velocity != Vector3.ZERO:
-			casing.velocity += Vector3.DOWN * 18.0 * delta
-			node.global_position += casing.velocity * delta
-			node.rotate_x(delta * 20.0)
-			if node.global_position.y <= casing.floor + 0.02:
-				node.global_position.y = casing.floor + 0.02
-				# One bounce, then it lies where it fell.
-				casing.velocity = casing.velocity.bounce(Vector3.UP) * 0.35 if casing.velocity.y < -2.0 else Vector3.ZERO
-	while not _casings.is_empty() and _casings[0].left <= 0.0:
-		_casings.pop_front().node.queue_free()
+	for thrown: Array[Dictionary] in [_casings, _debris]:
+		for casing in thrown:
+			casing.left -= delta
+			var node: Node3D = casing.node
+			if casing.velocity != Vector3.ZERO:
+				casing.velocity += Vector3.DOWN * 18.0 * delta
+				node.global_position += casing.velocity * delta
+				node.rotate_x(delta * 20.0)
+				if node.global_position.y <= casing.floor + 0.02:
+					node.global_position.y = casing.floor + 0.02
+					# One bounce, then it lies where it fell.
+					casing.velocity = casing.velocity.bounce(Vector3.UP) * 0.35 if casing.velocity.y < -2.0 else Vector3.ZERO
+		while not thrown.is_empty() and thrown[0].left <= 0.0:
+			thrown.pop_front().node.queue_free()
 	for id: int in _projectiles.keys():
 		var flying: Dictionary = _projectiles[id]
 		flying.age += delta
