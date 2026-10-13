@@ -268,7 +268,7 @@ static func standings(state: MatchState) -> String:
 	if not state.is_playing():
 		lines.append(state.result_text())
 	if state.settings.is_teams():
-		lines.append("Cheddar %d  –  %d Brie" % [state.team_kills[MatchState.CHEDDAR], state.team_kills[MatchState.BRIE]])
+		lines.append("Cheddar %d  –  %d Brie" % [state.team_score(MatchState.CHEDDAR), state.team_score(MatchState.BRIE)])
 	var rows := preload("res://ui/scoreboard.gd").rows(state)
 	if state.settings.is_teams():
 		rows.sort_custom(func(a: PlayerRecord, b: PlayerRecord) -> bool: return a.kills > b.kills)

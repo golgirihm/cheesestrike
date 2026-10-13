@@ -28,6 +28,8 @@ func _ready() -> void:
 		Sounds.play("hurt"))
 	match_.picked_up.connect(func(id: int, _kind: String) -> void:
 		_at_player("pickup", id))
+	match_.announced.connect(func(_text: String, _team: int) -> void:
+		Sounds.play("objective", -4.0))
 	# Heard by everyone, wherever they are.
 	match_.power_taken.connect(func(_id: int, _power: int) -> void:
 		Sounds.play("power"))

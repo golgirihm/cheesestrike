@@ -163,6 +163,8 @@ func snapshot() -> Dictionary:
 			"tally": _main.combat_hud.tally_shown() if _main.combat_hud.visible else "",
 			"weapon": _main.combat_hud.weapon_shown() if _main.combat_hud.visible else "",
 			"overload": _main.combat_hud.overload_shown() if _main.combat_hud.visible else "",
+			"objective": _main.combat_hud.objective_shown() if _main.combat_hud.visible else "",
+			"points": [_main.world.match_.state.team_score(0), _main.world.match_.state.team_score(1)],
 			"announcement": _main.combat_hud.announcement_shown() if _main.combat_hud.visible else "",
 			"power": _main.combat_hud.power_shown() if _main.combat_hud.visible else "",
 			"hits_shown": _main.combat_hud.hits_shown,

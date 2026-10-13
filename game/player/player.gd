@@ -1119,7 +1119,7 @@ func _physics_process(delta: float) -> void:
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y).limit_length(1.0)
 	_knockback *= exp(-(KNOCKBACK_GROUND_DECAY if is_on_floor() else KNOCKBACK_AIR_DECAY) * delta)
 	_flinch_left = maxf(_flinch_left - delta, 0.0)
-	var speed := Movement.speed(_wants_run(), _wants_aim(), _flinch_left, Overload.speed_factor(record()), _wants_crouch()) * weapon.stats.carry_speed
+	var speed := Movement.speed(_wants_run(), _wants_aim(), _flinch_left, match_.state.speed_factor(record()) if match_ != null else 1.0, _wants_crouch()) * weapon.stats.carry_speed
 	var wanted := Vector2(direction.x, direction.z) * speed
 	# On the ground a player goes where they push; in the air they can only
 	# steer what they left it with.

@@ -70,6 +70,7 @@ var _knocked_out_detail: Label
 var kill_feed: VBoxContainer
 var scoreboard: PanelContainer
 var _match_label: Label
+var _objective_label: Label
 var _result: PanelContainer
 var _result_title: Label
 var _result_detail: Label
@@ -92,6 +93,7 @@ func bind(of: Node3D) -> void:
 	world.match_.knocked_out.connect(kill_feed.add)
 	world.match_.picked_up.connect(_on_picked_up)
 	world.match_.power_taken.connect(_on_power_taken)
+	world.match_.announced.connect(_on_announced)
 	world.match_.state_changed.connect(_refresh_scoreboard)
 
 
@@ -147,8 +149,8 @@ static func match_text(state: MatchState) -> String:
 		return "Match over"
 	var clock := clock_text(state.time_left)
 	if state.settings.is_teams():
-		return "Cheddar %d  –  %d Brie   ·   %s" % [state.team_kills[MatchState.CHEDDAR], state.team_kills[MatchState.BRIE], clock]
-	return "First to %d   ·   %s" % [state.settings.kill_limit, clock]
+		return "Cheddar %d  –  %d Brie   ·   %s" % [state.team_score(MatchState.CHEDDAR), state.team_score(MatchState.BRIE), clock]
+	return "First to %d   ·   %s" % [state.settings.limit(), clock]
 
 
 ## What the Overload meter says: how full it is, that it's ready, or how long
@@ -294,6 +296,7 @@ func _process(delta: float) -> void:
 		_weapon_label.text = own.weapon.stats.display_name
 	var state: MatchState = world.match_.state
 	_match_label.text = match_text(state)
+	_objective_label.text = state.objective_text(multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else 0)
 	_result.visible = not state.is_playing()
 	if _result.visible:
 		_result_title.text = state.result_text()
@@ -321,6 +324,16 @@ func _touch_held(button: String) -> bool:
 func _refresh_scoreboard() -> void:
 	if scoreboard.visible and world != null:
 		scoreboard.show_state(world.match_.state, multiplayer.get_unique_id())
+
+
+func _on_announced(text: String, team: int) -> void:
+	_announce_label.text = text
+	_announce_label.add_theme_color_override("font_color", TeamColors.of(team))
+	_announce_left = ANNOUNCE_LIFE
+
+
+func objective_shown() -> String:
+	return _objective_label.text
 
 
 func _on_power_taken(id: int, power: int) -> void:
@@ -545,6 +558,12 @@ func _build() -> void:
 	_match_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_match_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_match_label)
+	_objective_label = _outlined_label(14)
+	_objective_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
+	_objective_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_objective_label.offset_top = 40.0
+	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(_objective_label)
 
 	var board_holder := CenterContainer.new()
 	board_holder.set_anchors_preset(Control.PRESET_FULL_RECT)
