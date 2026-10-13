@@ -753,3 +753,116 @@ func test_a_weapon_run_dry_gives_way_to_the_sidearm() -> void:
 	await wait_physics_frames(2)
 	assert_eq(own.weapon.stats.id, Weapons.STARTING)
 	assert_true(own.arsenal.has("blaster"), "still carried, for when there is ammunition")
+
+
+func test_a_thrown_grenade_bounces_then_bursts_and_hurts_who_is_near() -> void:
+	var thrower := _add(1, Vector3(0, 0, 12))
+	var other := _add(2, Vector3(-14, 0, 14))
+	watch_signals(match_)
+	var origin: Vector3 = thrower.head.global_position
+	var aim := Vector3(0.25, 0.1, -1).normalized()
+	match_._throw(1, origin, aim, 0.0)
+	assert_eq(match_.state.player(1).grenades, Weapons.GRENADES - 1)
+	assert_signal_emitted(match_, "projectile_launched")
+	assert_eq(get_signal_parameters(match_, "projectile_launched")[1], Weapons.GRENADE)
+	_fly(1.0)
+	assert_signal_not_emitted(match_, "projectile_burst", "its fuse is still burning")
+	_fly(Weapons.find(Weapons.GRENADE).fuse)
+	assert_signal_emitted(match_, "projectile_burst")
+	var at: Vector3 = get_signal_parameters(match_, "projectile_burst")[2]
+	assert_lt(at.y, 1.5, "it came down to the floor")
+	assert_lt(at.z, 4.0, "well ahead of where it was thrown from")
+	assert_eq(match_.state.player(2).health, 100, "nobody was near it")
+	# Thrown the same way again, it goes the same way: at someone standing there.
+	other.global_position = Vector3(at.x, 0, at.z)
+	match_._throw(1, origin, aim, 0.0)
+	_fly(Weapons.find(Weapons.GRENADE).fuse + 0.5)
+	assert_false(match_.state.player(2).alive, "a grenade at their feet")
+
+
+func test_a_grenade_held_too_long_bursts_almost_at_once() -> void:
+	var thrower := _add(1, Vector3(0, 0, 12))
+	watch_signals(match_)
+	match_._throw(1, thrower.head.global_position, Vector3.FORWARD, 999.0)
+	_fly(Match.COOK_MARGIN + 0.1)
+	assert_signal_emitted(match_, "projectile_burst")
+	var at: Vector3 = get_signal_parameters(match_, "projectile_burst")[2]
+	assert_lt(at.distance_to(thrower.head.global_position), 8.0, "barely out of the hand")
+
+
+func test_nobody_throws_a_grenade_they_do_not_have() -> void:
+	var thrower := _add(1, Vector3(0, 0, 12))
+	watch_signals(match_)
+	for throw in Weapons.GRENADES + 3:
+		match_._throw(1, thrower.head.global_position, Vector3.FORWARD, 0.0)
+	assert_signal_emit_count(match_, "projectile_launched", Weapons.GRENADES)
+
+
+func test_a_grenade_reported_from_somewhere_else_is_ignored() -> void:
+	_add(1, Vector3(0, 0, 12))
+	watch_signals(match_)
+	match_._throw(1, Vector3(0, 3, -8), Vector3.FORWARD, 0.0)
+	assert_signal_not_emitted(match_, "projectile_launched")
+	assert_eq(match_.state.player(1).grenades, Weapons.GRENADES)
+
+
+func test_holding_the_key_cooks_a_grenade_and_letting_go_throws_it() -> void:
+	var own := _add(1, Vector3(0, 0, 12))
+	await _settle(own)
+	watch_signals(match_)
+	Input.action_press("grenade")
+	own._start_grenade()
+	await wait_seconds(0.4)
+	assert_signal_not_emitted(match_, "projectile_launched", "held, not thrown")
+	assert_gt(own._cooking, 0.3)
+	var arc: MeshInstance3D = own.get_node_or_null("ThrowArc")
+	assert_not_null(arc, "its path is shown")
+	assert_true(arc.visible)
+	Input.action_release("grenade")
+	await wait_physics_frames(2)
+	assert_signal_emitted(match_, "projectile_launched")
+	assert_false(arc.visible)
+	assert_lt(own._cooking, 0.0)
+	# What it was held for has come off its fuse.
+	var thrown: Projectile = match_._projectiles.values()[0]
+	assert_gt(thrown.age, 0.3)
+
+
+func test_a_grenade_held_to_the_end_of_its_fuse_is_thrown_anyway() -> void:
+	var own := _add(1, Vector3(0, 0, 12))
+	await _settle(own)
+	watch_signals(match_)
+	Input.action_press("grenade")
+	own._start_grenade()
+	own._cooking = Weapons.find(Weapons.GRENADE).fuse - Match.COOK_MARGIN - 0.02
+	await wait_physics_frames(4)
+	Input.action_release("grenade")
+	assert_signal_emitted(match_, "projectile_launched")
+
+
+func test_the_arc_shown_is_the_way_the_grenade_goes() -> void:
+	var own := _add(1, Vector3(0, 0, 12))
+	await _settle(own)
+	var space := world.get_world_3d().direct_space_state
+	var from: Vector3 = own.head.global_position
+	var arc: PackedVector3Array = own.throw_arc(from, own.throw_direction(), Match.wall_finder(space))
+	assert_gt(arc.size(), 5)
+	assert_eq(arc[0], from)
+	assert_gt(arc[3].y, from.y, "up at first")
+	assert_lt(arc[arc.size() - 1].y, 0.3, "and down to where it first lands")
+	for index in range(1, arc.size()):
+		assert_lt(arc[index].z, arc[index - 1].z, "forward all the way")
+
+
+func test_others_see_a_grenade_bounce_through_their_own_copy_of_the_arena() -> void:
+	_add(1, Vector3(0, 0, 12))
+	var grenade := Weapons.find(Weapons.GRENADE)
+	world.effects.launch_projectile(77, Weapons.GRENADE, Vector3(0, 3, 10), Vector3(0, 0, -1) * grenade.projectile_speed)
+	assert_eq(world.effects.projectiles_in_flight(), 1)
+	for frame in 90:
+		world.effects._process(1.0 / 60.0)
+	var flying: Dictionary = world.effects._projectiles[77]
+	assert_gte(flying.flight.bounces, 1)
+	assert_gte(flying.node.global_position.y, 0.0, "it never sinks through the floor")
+	world.effects.burst_projectile(77, Weapons.GRENADE, flying.node.global_position)
+	assert_eq(world.effects.projectiles_in_flight(), 0)

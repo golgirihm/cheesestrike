@@ -52,6 +52,19 @@ class WeaponsTest(GameTestCase):
         self.assertEqual(own["health"], 100, "none of them burst near enough to hurt")
         host.wait_for("s.combat.reserve === '+ ∞'")
 
+    def test_a_thrown_grenade_bursts_and_is_gone_from_the_count(self):
+        host = self.open_game()
+        joiner = self.open_game()
+        joiner.join(host.host())
+        host.wait_for("s.players.length === 2 && s.players.every((p) => p.grenades === 2)")
+        host.capture_mouse()
+        host.press("g")
+        host.wait_for("s.players.some((p) => p.mine && p.grenades === 1)")
+        # Everyone sees it in the air, and then sees it gone.
+        joiner.wait_for("s.projectiles >= 1")
+        joiner.wait_for("s.projectiles === 0 && (s.sounds.burst || 0) >= 1")
+        self.assertEqual(host.own_player()["health"], 100, "it burst well away from the thrower")
+
     def test_others_see_the_weapon_in_hand(self):
         host = self.open_game()
         joiner = self.open_game()

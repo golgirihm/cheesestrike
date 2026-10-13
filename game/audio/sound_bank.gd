@@ -28,6 +28,7 @@ const SOUNDS := {
 	"reload": "_reload",
 	"dry": "_dry",
 	"knife": "_knife",
+	"throw": "_knife",
 	"music": "_music",
 }
 

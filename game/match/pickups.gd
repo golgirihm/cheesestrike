@@ -39,8 +39,9 @@ static func wanted(kind: String, record: PlayerRecord) -> bool:
 	if kind == HEALTH:
 		return record.health < PlayerRecord.MAX_HEALTH
 	if kind == AMMO:
-		# Of use to anyone carrying more than the sidearm, which never runs out.
-		return record.weapons.any(func(id: String) -> bool: return not Weapons.find(id).unlimited())
+		# Of use to anyone short of a grenade, or carrying more than the
+		# sidearm, which never runs out.
+		return record.grenades < Weapons.GRENADES or record.weapons.any(func(id: String) -> bool: return not Weapons.find(id).unlimited())
 	return Weapons.find(kind) != null
 
 
@@ -51,6 +52,7 @@ static func give(kind: String, record: PlayerRecord) -> bool:
 		record.health = mini(record.health + HEALTH_AMOUNT, PlayerRecord.MAX_HEALTH)
 		return false
 	if kind == AMMO:
+		record.grenades = mini(record.grenades + 1, Weapons.GRENADES)
 		return false
 	if record.weapons.has(kind):
 		return true

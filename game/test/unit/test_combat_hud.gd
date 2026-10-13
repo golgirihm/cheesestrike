@@ -154,3 +154,13 @@ func test_the_reserve_is_shown_beside_the_magazine() -> void:
 	blaster.reserve = 0
 	assert_eq(HUD.reserve_text(blaster), "+ 0")
 	assert_eq(HUD.reserve_text(WeaponState.new(Weapons.find(Weapons.STARTING))), "+ ∞")
+
+
+func test_grenades_left_show_as_marks() -> void:
+	var record := PlayerRecord.new(1)
+	assert_eq(HUD.grenade_text(record), "Grenades  ●●")
+	record.grenades = 1
+	assert_eq(HUD.grenade_text(record), "Grenades  ●○")
+	record.grenades = 0
+	assert_eq(HUD.grenade_text(record), "Grenades  ○○")
+	assert_eq(HUD.grenade_text(null), "")

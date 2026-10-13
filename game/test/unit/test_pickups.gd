@@ -125,3 +125,14 @@ func test_ammunition_is_for_anyone_with_a_weapon_that_runs_out() -> void:
 	assert_eq(record.weapons, [Weapons.STARTING, "blaster"], "it adds no weapon")
 	assert_eq(Pickups.display_name(Pickups.AMMO), "Ammunition")
 	assert_lt(Pickups.respawn_time(Pickups.AMMO), Pickups.respawn_time("launcher"))
+
+
+func test_ammunition_gives_back_a_grenade() -> void:
+	var record := PlayerRecord.new(1)
+	record.grenades = 0
+	assert_true(Pickups.wanted(Pickups.AMMO, record), "even with only the sidearm")
+	Pickups.give(Pickups.AMMO, record)
+	assert_eq(record.grenades, 1)
+	Pickups.give(Pickups.AMMO, record)
+	Pickups.give(Pickups.AMMO, record)
+	assert_eq(record.grenades, Weapons.GRENADES, "no more than can be carried")

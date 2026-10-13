@@ -237,6 +237,17 @@ func respawn(id: int) -> void:
 	record.health = PlayerRecord.MAX_HEALTH
 	record.respawn_in = 0.0
 	record.protected_for = PROTECTION
+	record.grenades = Weapons.GRENADES
+
+
+## Player `id` throws a grenade, if they are in play and have one. Returns
+## whether they did.
+func throw_grenade(id: int) -> bool:
+	var record := player(id)
+	if not is_playing() or record == null or not record.alive or record.grenades <= 0:
+		return false
+	record.grenades -= 1
+	return true
 
 
 ## What the end of the last match says, such as "Brie wins!".

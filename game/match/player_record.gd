@@ -31,10 +31,12 @@ var overload_left := 0.0
 var melted_for := 0.0
 ## Round trip to the host, in milliseconds, as the host measures it.
 var ping := 0
+## Grenades left to throw.
+var grenades := Weapons.GRENADES
 
 # Where each number sits in a packed record (see to_packed).
 enum { _ID, _HEALTH, _FLAGS, _RESPAWN, _PROTECTED, _KILLS, _DEATHS, _LAST_ATTACKER,
-	_WEAPON, _WEAPONS, _TEAM, _OVERLOAD, _OVERLOAD_LEFT, _MELTED, _PING, _COUNT }
+	_WEAPON, _WEAPONS, _TEAM, _OVERLOAD, _OVERLOAD_LEFT, _MELTED, _PING, _GRENADES, _COUNT }
 const _ALIVE := 1
 
 
@@ -70,6 +72,7 @@ func to_dict() -> Dictionary:
 		"overload_left": overload_left,
 		"melted_for": melted_for,
 		"ping": ping,
+		"grenades": grenades,
 	}
 
 
@@ -97,6 +100,7 @@ func to_packed() -> Array:
 	numbers[_OVERLOAD_LEFT] = roundi(overload_left * 1000.0)
 	numbers[_MELTED] = roundi(melted_for * 1000.0)
 	numbers[_PING] = ping
+	numbers[_GRENADES] = grenades
 	return [name, numbers]
 
 
@@ -131,6 +135,7 @@ static func from_packed(data: Variant) -> PlayerRecord:
 	record.overload_left = maxi(numbers[_OVERLOAD_LEFT], 0) / 1000.0
 	record.melted_for = maxi(numbers[_MELTED], 0) / 1000.0
 	record.ping = maxi(numbers[_PING], 0)
+	record.grenades = clampi(numbers[_GRENADES], 0, Weapons.GRENADES)
 	return record
 
 
@@ -152,6 +157,7 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.overload_left = maxf(_float(data, "overload_left", 0.0), 0.0)
 	record.melted_for = maxf(_float(data, "melted_for", 0.0), 0.0)
 	record.ping = maxi(_int(data, "ping", 0), 0)
+	record.grenades = clampi(_int(data, "grenades", Weapons.GRENADES), 0, Weapons.GRENADES)
 	var carried: Variant = data.get("weapons")
 	if carried is Array:
 		record.weapons = carried.filter(func(id: Variant) -> bool: return Weapons.find(id) != null)

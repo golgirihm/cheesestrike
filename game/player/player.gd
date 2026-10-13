@@ -125,6 +125,14 @@ var _reload_pressed := false
 var _jump_pressed := false
 var _overload_pressed := false
 var _melee_pressed := false
+# Seconds a grenade has been held with its fuse burning, or below zero when
+# none is in hand; and whether a touch has asked for one to be thrown at once.
+var _cooking := -1.0
+var _grenade_tapped := false
+# The line drawn through the air while a grenade is held, showing its throw.
+var _arc: MeshInstance3D
+## How far above where the player looks a grenade is thrown, in radians.
+const THROW_LIFT := 0.14
 # Seconds since this player last struck with their knife, and the knife as
 # it is seen while it swings.
 var _since_strike := INF
@@ -447,6 +455,8 @@ func _input(event: InputEvent) -> void:
 		_overload_pressed = true
 	elif event.is_action_pressed("melee"):
 		_melee_pressed = true
+	elif event.is_action_pressed("grenade"):
+		_start_grenade()
 	elif _weapon_key(event) != "":
 		_switch_to = _weapon_key(event)
 	elif event.is_action_pressed("jump"):
@@ -703,6 +713,7 @@ func _physics_process(delta: float) -> void:
 		_reload_pressed = false
 		_fire_pressed = false
 		_melee_pressed = false
+		_drop_grenade()
 		return
 	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * Settings.get_value("stick_sensitivity") * delta)
 
@@ -730,6 +741,85 @@ func _physics_process(delta: float) -> void:
 	_publish()
 
 	_use_weapon()
+
+
+# Takes a grenade in hand, its fuse burning, if there is one to take.
+func _start_grenade() -> void:
+	var own := record()
+	if alive and _cooking < 0.0 and own != null and own.grenades > 0 and not _menu_open():
+		_cooking = 0.0
+
+
+# Puts away a grenade that was in hand, unthrown.
+func _drop_grenade() -> void:
+	_cooking = -1.0
+	_grenade_tapped = false
+	if _arc != null:
+		_arc.visible = false
+
+
+## The way a grenade thrown now would leave the hand: a little above where
+## the player looks.
+func throw_direction() -> Vector3:
+	return Recoil.apply(-head.global_basis.z, Vector2(0.0, THROW_LIFT))
+
+
+# Holds a grenade for as long as its key is, showing where it would go, and
+# throws it on letting go, or before its fuse runs out in the hand.
+func _hold_grenade(delta: float) -> void:
+	if _cooking < 0.0:
+		return
+	_cooking += delta
+	var grenade := Weapons.find(Weapons.GRENADE)
+	var must := _cooking >= grenade.fuse - Match.COOK_MARGIN
+	if _grenade_tapped or must or not Input.is_action_pressed("grenade"):
+		match_.throw_grenade(camera.global_position, throw_direction(), _cooking)
+		_drop_grenade()
+		return
+	_show_arc(grenade)
+
+
+## The points of a grenade's flight thrown from `from` along `direction`, up
+## to its first bounce or `seconds` of flight, whichever comes first. `wall`
+## is as Projectile.advance takes it.
+static func throw_arc(from: Vector3, direction: Vector3, wall: Callable, seconds := 1.6) -> PackedVector3Array:
+	var flight := Projectile.new(0, 0, Weapons.find(Weapons.GRENADE), from, direction)
+	var points := PackedVector3Array([from])
+	var step := 0.05
+	for count in int(seconds / step):
+		flight.advance(step, wall, {})
+		points.append(flight.position)
+		if flight.bounces > 0:
+			break
+	return points
+
+
+func _show_arc(grenade: WeaponStats) -> void:
+	if _arc == null:
+		_arc = MeshInstance3D.new()
+		_arc.name = "ThrowArc"
+		_arc.mesh = ImmediateMesh.new()
+		_arc.top_level = true
+		_arc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var line := StandardMaterial3D.new()
+		line.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		line.albedo_color = Color(1, 1, 1, 0.8)
+		line.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_arc.material_override = line
+		add_child(_arc)
+	_arc.visible = true
+	_arc.global_transform = Transform3D.IDENTITY
+	# From the hand rather than the eye, so the line doesn't cross the view.
+	var from := camera.global_position + head.global_basis * Vector3(0.3, -0.3, -0.4)
+	var points := throw_arc(from, throw_direction(), Match.wall_finder(get_world_3d().direct_space_state))
+	var mesh: ImmediateMesh = _arc.mesh
+	mesh.clear_surfaces()
+	if points.size() < 2 or grenade == null:
+		return
+	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	for point in points:
+		mesh.surface_add_vertex(point)
+	mesh.surface_end()
 
 
 ## The knife swings across the weapon hand's side of the view, for a strike
@@ -777,6 +867,7 @@ func _animate_knife(delta: float) -> void:
 
 
 func _use_weapon() -> void:
+	_hold_grenade(get_physics_process_delta_time())
 	if _overload_pressed:
 		_overload_pressed = false
 		match_.set_off_overload()
@@ -877,6 +968,9 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_touch_aim = not _touch_aim
 		elif button == "knife":
 			_melee_pressed = true
+		elif button == "grenade":
+			_start_grenade()
+			_grenade_tapped = true
 		elif button == "overload":
 			_overload_pressed = true
 		elif not button.is_empty():
