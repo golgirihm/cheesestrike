@@ -212,8 +212,8 @@ func test_a_missed_shot_ends_at_the_wall() -> void:
 func test_the_shooters_own_shot_shows_at_once() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	shooter.fired.emit(shooter.head.global_position, Vector3.FORWARD, 1, WeaponStats.AIMED, 0)
-	var tracers: int = world.effects.get_child_count()
-	assert_eq(tracers, 2, "a flash and a tracer")
+	assert_eq(world.effects.showing("flash"), 1)
+	assert_eq(world.effects.showing("tracer"), 1)
 
 
 func test_a_knock_out_is_announced_with_both_names() -> void:
