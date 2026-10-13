@@ -71,6 +71,17 @@ const DEFAULTS := {
 	## What is done to the picture (see Picture): whether bright things glow,
 	## whether each arena has its own cast of colour, and whether the corners
 	## of the view are darkened.
+	## Each part of the graphics chosen on its own (see GraphicsQuality): ""
+	## for as the quality level has it.
+	"gfx_shadows": "",
+	"gfx_particles": "",
+	"gfx_effects": "",
+	"gfx_view_distance": "",
+	"gfx_render_scale": "",
+	"gfx_antialiasing": "",
+	"gfx_filtering": "",
+	## Whether the render scale drops to hold the frame rate.
+	"dynamic_resolution": false,
 	## Whether teammates and pickups close by are outlined (see Outlines).
 	"outlines": true,
 	"bloom": true,
@@ -106,6 +117,13 @@ const RANGES := {
 ## The allowed choices of a setting that is one of a few.
 const CHOICES := {
 	"quality": ["", "low", "medium", "high"],
+	"gfx_shadows": ["", "off", "on"],
+	"gfx_particles": ["", "low", "medium", "high"],
+	"gfx_effects": ["", "low", "medium", "high"],
+	"gfx_view_distance": ["", "near", "middle", "far"],
+	"gfx_render_scale": ["", "50", "60", "70", "80", "90", "100"],
+	"gfx_antialiasing": ["", "off", "2x", "4x"],
+	"gfx_filtering": ["", "off", "4x", "16x"],
 	"look_cheese": Looks.CHEESES,
 	"look_hat": Looks.HATS,
 	"look_held": Looks.HELD,

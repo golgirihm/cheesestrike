@@ -164,6 +164,7 @@ func snapshot() -> Dictionary:
 			"invert_look": Settings.get_value("invert_look"),
 			"fov": Settings.get_value("fov"),
 			"quality": GraphicsQuality.level(Settings.get_value("quality")),
+			"shadows": GraphicsQuality.choice(GraphicsQuality.SHADOWS),
 			"music_volume": Settings.get_value("music_volume"),
 			"jump_keys": Controls.keys_text("jump"),
 			"captions": Settings.get_value("captions"),

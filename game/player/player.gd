@@ -771,7 +771,7 @@ func aim_gun_position() -> Vector3:
 ## Whether this player has a blob for a shadow just now: on graphics without
 ## real shadows, while in play.
 func blob_wanted() -> bool:
-	return alive and not GraphicsQuality.real_shadows(GraphicsQuality.level(Settings.get_value("quality")))
+	return alive and not GraphicsQuality.shadows_on()
 
 
 ## How big and how dark the blob under a player `height` metres above the
