@@ -28,6 +28,17 @@ class MatchTest(GameTestCase):
         joiner.page.wait_for_timeout(1000)
         self.assertGreater(joiner.own_player()["position"][1], -0.5)
 
+    def test_a_match_waits_for_a_second_player_and_then_begins(self):
+        host, code = self.host_with()
+        self.assertEqual(host.state()["combat"]["match"], "Warm-up   ·   waiting for players")
+        host.page.wait_for_timeout(1500)
+        joiner = self.open_game()
+        joiner.join(code)
+        for game in (host, joiner):
+            # The clock has only now started to run.
+            game.wait_for("s.combat.match.startsWith('First to 20   ·   7:5')")
+        host.wait_for("s.combat.announcement === 'The match begins'")
+
     def test_the_city_can_be_played_in(self):
         host, code = self.host_with(map="Curd City")
         self.assertEqual(host.state()["map"], "city")

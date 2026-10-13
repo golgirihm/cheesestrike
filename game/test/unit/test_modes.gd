@@ -450,6 +450,7 @@ func test_the_hud_shows_points_and_what_the_mode_is_up_to() -> void:
 	add_child_autofree(hud)
 	hud.bind(world)
 	_add(1, Vector3(0, 0, 9))
+	_add(2, Vector3(0, 0, -9))
 	match_.state.score(BRIE, 12)
 	match_.state.zones.owners[0] = BRIE
 	hud._process(0.1)

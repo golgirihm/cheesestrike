@@ -21,6 +21,10 @@ const INTERMISSION := 10.0
 const PLAYING := "playing"
 const ENDED := "ended"
 
+## How many players a match waits for before it begins.
+const MIN_TO_START := 2
+## Seconds of extra time when the scores are level at the end.
+const OVERTIME := 60.0
 ## Seconds between one round of Last mouse standing and the next, for
 ## everyone to choose what to bring to it.
 const ROUND_BREAK := 6.0
@@ -38,6 +42,17 @@ var phase := PLAYING
 var time_left := float(settings.minutes * 60)
 ## Knock-outs by each team, Cheddar first, in a team match.
 var team_kills := [0, 0]
+## Whether the match has begun. Until enough players are in, it is a
+## warm-up: everything works, but the clock stands still and nothing done
+## counts once the match begins.
+var started := false
+## Whether the match is in extra time, when the next score that leaves
+## someone ahead wins: sudden death.
+var overtime := false
+## Set as the match begins and as overtime does, for the host to tell
+## everyone.
+var just_started := false
+var just_overtime := false
 ## The arena's blocks of cheese, and how much of each is left.
 var blocks := BlockRules.new()
 ## Points each team has, Cheddar first, in a mode won on points.
@@ -92,7 +107,7 @@ func score(team: int, points: int) -> bool:
 	if not is_playing() or team < 0 or team > 1 or points <= 0:
 		return false
 	team_points[team] += points
-	if _limit_reached():
+	if started and (_limit_reached() or (overtime and not _level())):
 		end_match()
 		return true
 	return false
@@ -197,7 +212,7 @@ func alive_in(team: int) -> int:
 # Last mouse standing: a round is over once a team with players has none
 # left in play. The other takes it, and after a break everyone comes back.
 func _check_round() -> void:
-	if settings.mode != MatchSettings.ROUNDS or not is_playing() or round_break > 0.0:
+	if settings.mode != MatchSettings.ROUNDS or not is_playing() or round_break > 0.0 or not started:
 		return
 	var members := [0, 0]
 	for record: PlayerRecord in players.values():
@@ -226,7 +241,37 @@ func add_player(id: int) -> PlayerRecord:
 			record.team = smaller_team()
 		players[id] = record
 		rearm(record)
+		if not started and players.size() >= MIN_TO_START:
+			_begin()
 	return players[id]
+
+
+## Whether the match is waiting for players before it begins.
+func is_warm_up() -> bool:
+	return is_playing() and not started
+
+
+# Enough players are in: the warm-up is over and the match begins from
+# nothing, with everyone where they stand.
+func _begin() -> void:
+	started = true
+	just_started = true
+	overtime = false
+	time_left = settings.minutes * 60.0
+	team_kills = [0, 0]
+	team_points = [0, 0]
+	blocks.reset(blocks.health.size())
+	for record: PlayerRecord in players.values():
+		record.kills = 0
+		record.deaths = 0
+		record.overload = 0.0
+		if settings.mode == MatchSettings.GUN_GAME:
+			rearm(record)
+
+
+# Whether nobody is ahead: the leaders are level, or nobody has scored.
+func _level() -> bool:
+	return _leaders().size() != 1
 
 
 func remove_player(id: int) -> void:
@@ -324,7 +369,7 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 				# On to the next weapon, at once.
 				rearm(scorer)
 		result.knocked_out = true
-		if _limit_reached():
+		if started and (_limit_reached() or (overtime and not _level())):
 			end_match()
 			result.ended = true
 		_check_round()
@@ -437,9 +482,18 @@ func tick(delta: float) -> Array[int]:
 		drops = drops.filter(func(lying: Dictionary) -> bool: return lying.left > 0.0)
 		drop_ended = true
 	round_break = maxf(round_break - delta, 0.0)
+	# The clock stands still through a warm-up.
+	if is_warm_up():
+		return due
 	time_left = maxf(time_left - delta, 0.0)
 	if is_playing() and time_left == 0.0:
-		end_match()
+		if not overtime and _level() and players.size() >= MIN_TO_START:
+			# Level at the end: extra time, and the next score wins.
+			overtime = true
+			just_overtime = true
+			time_left = OVERTIME
+		else:
+			end_match()
 	return due
 
 
@@ -471,6 +525,7 @@ func match_due() -> bool:
 
 
 func end_match() -> void:
+	overtime = false
 	phase = ENDED
 	time_left = INTERMISSION
 	winners = _leaders()
@@ -480,6 +535,8 @@ func end_match() -> void:
 ## players back into play is up to the host, with respawn().
 func start_match() -> void:
 	phase = PLAYING
+	overtime = false
+	started = players.size() >= MIN_TO_START
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
 	team_points = [0, 0]
@@ -586,7 +643,11 @@ func to_dict() -> Dictionary:
 		"winners": winners,
 		"pickups": pickups,
 	}
-	# Only what the mode being played has, as this is sent often.
+	# Only what is so, and what the mode being played has, as this is sent often.
+	if not started:
+		data["warm_up"] = true
+	if overtime:
+		data["overtime"] = true
 	if settings.by_points():
 		data["points"] = team_points
 	if capture != null or zones != null:
@@ -630,6 +691,9 @@ static func from_dict(data: Dictionary) -> MatchState:
 	var pause: Variant = data.get("round_break")
 	if (pause is float or pause is int) and is_finite(float(pause)):
 		state.round_break = clampf(float(pause), 0.0, ROUND_BREAK)
+	state.started = data.get("warm_up") != true
+	state.overtime = data.get("overtime") == true
+	state.just_started = false
 	state.blocks = BlockRules.from_array(data.get("blocks"))
 	var lying: Variant = data.get("drops")
 	if lying is Array:
