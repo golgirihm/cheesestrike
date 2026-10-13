@@ -505,11 +505,11 @@ func _targets_except(except: int, then := -1.0) -> Dictionary:
 			var history: PositionHistory = _histories.get(id)
 			if then >= 0.0 and history != null and not history.is_empty():
 				var facing := history.facing_at(then)
-				# Where they were then; crouched or not as they are now, which
-				# the host doesn't keep a history of.
-				targets[id] = HitScan.pose(history.at(then), facing.x, facing.y, node.crouch())
+				# Where they were then; crouched and leaning as they are now,
+				# which the host doesn't keep a history of.
+				targets[id] = HitScan.pose(history.at(then), facing.x, facing.y, node.crouch(), node.lean())
 			else:
-				targets[id] = HitScan.pose(node.global_position, node.rotation.y, node.head.rotation.x, node.crouch())
+				targets[id] = HitScan.pose(node.global_position, node.rotation.y, node.head.rotation.x, node.crouch(), node.lean())
 	return targets
 
 
