@@ -479,13 +479,14 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 	var headshot := {}
 	var ends := []
 	for pellet in HitScan.pellet_directions(direction, weapon.pellets, cone, seed):
-		var reach := _distance_to_wall(origin, pellet, weapon.max_range)
-		var hit := HitScan.first_hit(origin, pellet, reach, targets)
+		# Through thin cover, at a cost; stopped by anything more.
+		var way := Penetration.path(origin, pellet, weapon.max_range, wall_caster(world.get_world_3d().direct_space_state))
+		var hit := HitScan.first_hit(origin, pellet, way.reach, targets)
 		if hit.is_empty():
-			ends.append(origin + pellet * reach)
+			ends.append(origin + pellet * way.reach)
 		else:
 			ends.append(hit.point)
-			var amount := weapon.damage_at(hit.distance) * (weapon.headshot_multiplier if hit.head else 1.0)
+			var amount := weapon.damage_at(hit.distance) * (weapon.headshot_multiplier if hit.head else 1.0) * Penetration.share(way, hit.distance)
 			damage_to[hit.id] = damage_to.get(hit.id, 0.0) + amount
 			headshot[hit.id] = headshot.get(hit.id, false) or hit.head
 	_show_shot_to_others(shooter, ends)
@@ -631,6 +632,14 @@ func _physics_process(delta: float) -> void:
 		if burst != null:
 			_projectiles.erase(id)
 			_burst(projectile, burst)
+
+
+## What Penetration is told of the arena in `space`: a Callable(from, to)
+## giving how far along the segment the arena is first met, or INF.
+static func wall_caster(space: PhysicsDirectSpaceState3D) -> Callable:
+	return func(from: Vector3, to: Vector3) -> float:
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, WORLD_MASK))
+		return from.distance_to(hit.position) if not hit.is_empty() else INF
 
 
 ## What a Projectile is told of the arena in `space`: a Callable(from, to)
