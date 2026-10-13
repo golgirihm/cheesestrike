@@ -40,6 +40,7 @@ const TOGGLES := [
 	["mono_sound", "Mono sound"],
 	["announcer", "The announcer's voice"],
 	["voice_chat", "Talk with teammates (hold the Talk key)"],
+	["text_chat", "Text chat"],
 	["outlines", "Outline teammates and nearby pickups"],
 	["dynamic_resolution", "Lower the render scale to hold the frame rate"],
 	["bloom", "Glow on bright things"],
