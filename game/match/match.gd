@@ -200,6 +200,7 @@ func remove_player(id: int) -> void:
 	state.remove_player(id)
 	_pending_names.erase(id)
 	_rules.erase(id)
+	_sent_to.erase(id)
 	_struck_at.erase(id)
 	_emoted_at.erase(id)
 	_pings.erase(id)
@@ -890,7 +891,7 @@ func _collect_drops() -> void:
 	for lying: Dictionary in state.drops.duplicate():
 		for node: Node3D in world.players.get_children():
 			var id := node.name.to_int()
-			if node.is_queued_for_deletion() or not Pickups.within_reach(lying.at, node.global_position):
+			if node.is_queued_for_deletion() or not _is_where_shown(id, node) or not Pickups.within_reach(lying.at, node.global_position):
 				continue
 			var outcome := state.take_drop(lying.id, id)
 			if outcome.is_empty():
@@ -929,7 +930,7 @@ func _collect_pickups() -> void:
 		var pad: Dictionary = pads[index]
 		for node: Node3D in world.players.get_children():
 			var id := node.name.to_int()
-			if node.is_queued_for_deletion() or not Pickups.within_reach(pad.position, node.global_position):
+			if node.is_queued_for_deletion() or not _is_where_shown(id, node) or not Pickups.within_reach(pad.position, node.global_position):
 				continue
 			var outcome := state.collect(index, pad.kind, id)
 			if outcome.is_empty():
@@ -1156,9 +1157,31 @@ func _new_match() -> void:
 	_changed()
 
 
+# Where each player other than the host's own was last sent on coming back,
+# until they are seen there. Players move themselves, so for a moment after
+# one is brought back the host still sees them where they were knocked out,
+# and they must not collect what lies there: least of all the weapon they
+# have just dropped.
+var _sent_to := {}
+## How near to where they were sent a player must be seen to count as there.
+const ARRIVED_WITHIN := 4.0
+
+
+# Whether player `id`, drawn at `node`, is really where the host sees them.
+func _is_where_shown(id: int, node: Node3D) -> bool:
+	if not _sent_to.has(id):
+		return true
+	if node.global_position.distance_to(_sent_to[id]) > ARRIVED_WITHIN:
+		return false
+	_sent_to.erase(id)
+	return true
+
+
 func _bring_back(id: int, at: Vector3) -> void:
 	forget_positions(id)
 	_check_for(id).expect_move(at)
+	if id != multiplayer.get_unique_id():
+		_sent_to[id] = at
 	state.respawn(id)
 	_rules_for(id).refill()
 	_changed()
