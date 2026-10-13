@@ -45,10 +45,12 @@ class MatchTest(GameTestCase):
         code = host.host()
         joiner = self.open_game()
         joiner.join(code)
+        # Said as the second player arrives, and only for a few seconds: looked
+        # for first, before anything that can take a slow machine a while.
+        host.wait_for("s.combat.announcement === 'The match begins  ·  Instant knock-out'")
         joiner_id = joiner.own_player()["id"]
         for game in (host, joiner):
             game.wait_for("s.players.length === 2 && s.combat.health === '1'")
-        host.wait_for("s.combat.announcement === 'The match begins  ·  Instant knock-out'")
         host.page.wait_for_timeout(500)
         host.capture_mouse()
         state = host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
