@@ -45,6 +45,9 @@ func test_each_thing_a_character_does_has_its_voice() -> void:
 		assert_eq(Mix.bus_of(sound), Mix.VOICES, sound)
 		assert_has(Voices.LEVELS, sound)
 		assert_lt(SoundBank.seconds(SoundBank.get_sound(sound)), 0.6, "%s is short" % sound)
+	# What others say is captioned; a grunt of effort is not worth a line.
+	for sound: String in [Voices.PAIN, Voices.TAUNT, Voices.RELOAD, Voices.OUT]:
+		assert_has(preload("res://ui/captions.gd").TEXTS, sound)
 
 
 func test_a_reload_is_called_to_teammates_and_nobody_else() -> void:
