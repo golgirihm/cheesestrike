@@ -152,6 +152,7 @@ func snapshot() -> Dictionary:
 			"health": _main.combat_hud.health_text() if _main.combat_hud.visible else "",
 			"ammo": _main.combat_hud.ammo_shown() if _main.combat_hud.visible else "",
 			"reserve": _main.combat_hud.reserve_shown() if _main.combat_hud.visible else "",
+			"tally": _main.combat_hud.tally_shown() if _main.combat_hud.visible else "",
 			"weapon": _main.combat_hud.weapon_shown() if _main.combat_hud.visible else "",
 			"overload": _main.combat_hud.overload_shown() if _main.combat_hud.visible else "",
 			"hits_shown": _main.combat_hud.hits_shown,

@@ -70,6 +70,10 @@ class MatchTest(GameTestCase):
         for game in (host, joiner):
             state = game.wait_for(f"s.combat.result === {own_name + ' wins!'!r}")
             self.assertEqual(state["combat"]["match"], "Match over")
+        # The host, and only the host, is shown what each weapon did.
+        tally = host.wait_for("s.combat.tally !== ''")["combat"]["tally"]
+        self.assertRegex(tally, r"Curd Pistol: \d+ fired, \d+ hit, \d+ damage, 5 knocked out")
+        self.assertEqual(joiner.state()["combat"]["tally"], "")
         self.assertEqual(host.player(joiner_id)["deaths"], 5)
 
         # After the break, a new match with the scores cleared.
