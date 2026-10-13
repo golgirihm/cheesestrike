@@ -71,6 +71,8 @@ const DEFAULTS := {
 	## What is done to the picture (see Picture): whether bright things glow,
 	## whether each arena has its own cast of colour, and whether the corners
 	## of the view are darkened.
+	## Whether teammates and pickups close by are outlined (see Outlines).
+	"outlines": true,
 	"bloom": true,
 	"colour_grade": true,
 	"vignette": true,

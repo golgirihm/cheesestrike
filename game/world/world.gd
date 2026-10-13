@@ -36,6 +36,7 @@ var fixtures := {"pads": [], "ladders": []}
 var custom_code := ""
 ## The layer that darkens the corners of the view (see Picture).
 var vignette: CanvasLayer
+var _outlines_in := 0.0
 ## What being hurt looks like to this machine's player.
 var hurt_view: HurtView
 var _built_code := ""
@@ -434,6 +435,32 @@ func _show_pickups() -> void:
 func _process(delta: float) -> void:
 	for pad: Node3D in map.get_node("Pickups").get_children():
 		pad.get_node("Item").rotate_y(delta * 1.5)
+	_outlines_in -= delta
+	if _outlines_in <= 0.0:
+		_outlines_in = 0.2
+		show_outlines()
+
+
+## Outlines this machine's player's teammates, through walls, and the
+## pickups near them, and nobody and nothing else (see Outlines).
+func show_outlines() -> void:
+	var wanted: bool = Settings.get_value(Outlines.SETTING) and match_.has_state() and multiplayer.multiplayer_peer != null
+	var own: PlayerRecord = match_.own_record() if wanted else null
+	var teams: bool = wanted and match_.state.settings.is_teams()
+	for player in players.get_children():
+		var id := String(player.name).to_int()
+		if wanted and Outlines.shows(own, match_.state.player(id), teams):
+			Outlines.put(player.body, TeamColors.of(own.team), true)
+		else:
+			Outlines.take(player.body)
+	var viewer: Node3D = player_node(multiplayer.get_unique_id()) if wanted else null
+	var pads := map.get_node("Pickups").get_children()
+	for index in pads.size():
+		var item: Node3D = pads[index].get_node("Item")
+		if viewer != null and own != null and own.alive and Outlines.pickup_shows(viewer.global_position.distance_to(pads[index].global_position), item.visible):
+			Outlines.put(item, Outlines.PICKUP_COLOUR)
+		else:
+			Outlines.take(item)
 
 
 ## This machine's own player fired: show the shot at once, without waiting to
