@@ -71,6 +71,8 @@ var kill_feed: VBoxContainer
 var scoreboard: PanelContainer
 var _match_label: Label
 var _objective_label: Label
+# What the clip being shown again is.
+var _replay_label: Label
 # Who a player out of play is watching, and how to change it.
 var _watch_label: Label
 # What the tutorial asks the player to do next.
@@ -308,7 +310,9 @@ func _process(delta: float) -> void:
 		_weapon_label.text = own.weapon.stats.display_name
 	var state: MatchState = world.match_.state
 	_match_label.text = match_text(state)
-	_watch_label.text = world.watch_camera.text(_touch_shown())
+	_replay_label.text = world.replay_view.title
+	_replay_label.visible = world.replay_view.playing
+	_watch_label.text = world.watch_camera.text(_touch_shown()) if not world.replay_view.playing else ""
 	_watch_label.visible = not _watch_label.text.is_empty()
 	_practice_label.visible = state.settings.is_practice() and state.is_playing()
 	if _practice_label.visible:
@@ -347,6 +351,10 @@ func _on_announced(text: String, team: int) -> void:
 	_announce_label.text = text
 	_announce_label.add_theme_color_override("font_color", TeamColors.of(team))
 	_announce_left = ANNOUNCE_LIFE
+
+
+func replay_shown() -> String:
+	return _replay_label.text if _replay_label.visible else ""
 
 
 func watching_shown() -> String:
@@ -546,6 +554,14 @@ func _build() -> void:
 	_announce_label.visible = false
 	add_child(_announce_label)
 
+	_replay_label = _outlined_label(24)
+	_replay_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
+	_replay_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_replay_label.offset_top = 64.0
+	_replay_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_replay_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.75))
+	_replay_label.visible = false
+	add_child(_replay_label)
 	_watch_label = _outlined_label(18)
 	_watch_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 10)
 	_watch_label.grow_horizontal = Control.GROW_DIRECTION_BOTH

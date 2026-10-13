@@ -46,6 +46,10 @@ func _process(delta: float) -> void:
 	var mine := state.player(id)
 	var own: Node3D = world.player_node(id)
 	var out := mine != null and own != null and not mine.alive
+	# A clip being shown again has the view until it is over.
+	if world.replay_view.playing:
+		_was_out = out
+		return
 	if not out:
 		if _was_out and own != null:
 			own.camera.make_current()
