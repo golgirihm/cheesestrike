@@ -120,6 +120,9 @@ var _since_step := 0.0
 var _team := -2
 # The health the host last gave for this player, to notice them being hurt.
 var _health := PlayerRecord.MAX_HEALTH
+var _kills := 0
+## How near another player must be for a character's eyes to turn to them.
+const GLANCE_RANGE := 14.0
 var _badge: MeshInstance3D
 # Presses noted as their events arrive, so that a click or tap that begins and
 # ends between two physics frames isn't missed.
@@ -341,10 +344,14 @@ func _on_match_state_changed() -> void:
 	_show_overload(own)
 	if own == null:
 		return
-	# Everyone sees a player who has just been hurt wince.
+	# Everyone sees a player who has just been hurt wince, and one who has
+	# just knocked someone out cheer.
 	if own.alive and own.health < _health:
 		body.grimace()
 	_health = own.health
+	if own.kills > _kills:
+		body.cheer()
+	_kills = own.kills
 	if _mine:
 		_carry(own.weapons)
 	else:
@@ -376,6 +383,7 @@ func _show_overload(own: PlayerRecord) -> void:
 	var melted := own != null and own.melted_for > 0.0
 	body.set_glow(glowing)
 	body.set_colour(_base_colour.darkened(0.35) if melted else _base_colour)
+	body.set_dizzy(melted)
 
 
 ## A player's own colour when not on a team: spread round the colour wheel by id.
@@ -558,6 +566,7 @@ func _animate(delta: float) -> void:
 			if alive and not airborne and _ground_speed > 0.5:
 				_step(_ground_speed * delta, global_position)
 		body.set_gaze(head.rotation.x)
+		body.set_glance(glance_toward(_nearest_other()))
 	_animate_knife(delta)
 	# The eyes, and what is held at them, come down with a crouch and go out
 	# to the side with a lean, tipping a little as they go.
@@ -581,6 +590,32 @@ func aim_gun_position() -> Vector3:
 	if not _mine and muzzle != null:
 		# Their weapon arm follows the hand on the weapon.
 		body.reach_for(body.to_local(muzzle.get_parent().to_global(WeaponModels.GRIP)))
+
+
+## Which way this player's eyes turn to look at something at `at`: -1 to
+## their left, 1 to their right, and 0 for something too far away, behind
+## them or dead ahead. Vector3.INF is nothing to look at.
+func glance_toward(at: Vector3) -> float:
+	if at == Vector3.INF or global_position.distance_to(at) > GLANCE_RANGE:
+		return 0.0
+	var to := global_basis.inverse() * (at - global_position)
+	if to.z >= 0.0:
+		return 0.0
+	return clampf(to.x / maxf(-to.z, 0.5), -1.0, 1.0)
+
+
+# Where the nearest other player in play is, or Vector3.INF.
+func _nearest_other() -> Vector3:
+	var nearest := Vector3.INF
+	var parent := get_parent()
+	if parent == null:
+		return nearest
+	for other in parent.get_children():
+		if other == self or not other is CharacterBody3D or not other.alive:
+			continue
+		if nearest == Vector3.INF or global_position.distance_to(other.global_position) < global_position.distance_to(nearest):
+			nearest = other.global_position
+	return nearest
 
 
 ## How far down a weapon changed to `left` seconds short of SWITCH_TIME ago
@@ -729,6 +764,7 @@ func _show_smoothed() -> void:
 ## A shot just left this player's weapon: it kicks back.
 func kick() -> void:
 	_kick = 1.0
+	body.fire_face()
 
 
 func _process(delta: float) -> void:

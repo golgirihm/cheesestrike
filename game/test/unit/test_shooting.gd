@@ -1229,3 +1229,40 @@ func test_a_shot_at_where_a_leaning_player_stood_upright_misses() -> void:
 	match_._rules_for(1).refill()
 	_shoot(shooter, tip)
 	assert_lt(match_.state.player(2).health, 100)
+
+
+func test_a_player_looks_set_when_firing_and_cheers_a_knock_out() -> void:
+	_add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	match_.state_changed.emit()
+	other.kick()
+	assert_eq(other.body.expression(), other.body.SET)
+	match_.state.damage(2, 1, 500.0)
+	match_.state_changed.emit()
+	assert_eq(other.body.expression(), other.body.CHEER)
+
+
+func test_a_melted_player_looks_dizzy() -> void:
+	_add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	match_.state.player(2).melted_for = 1.0
+	match_.state_changed.emit()
+	assert_eq(other.body.expression(), other.body.DIZZY)
+	match_.state.player(2).melted_for = 0.0
+	match_.state_changed.emit()
+	assert_eq(other.body.expression(), other.body.CALM)
+
+
+func test_a_players_eyes_turn_to_whoever_is_near_and_in_front() -> void:
+	var other := _add(2, Vector3(0, 0, 0))
+	# They face -Z, so +X is their right.
+	assert_gt(other.glance_toward(Vector3(4, 0, -4)), 0.5)
+	assert_lt(other.glance_toward(Vector3(-4, 0, -4)), -0.5)
+	assert_eq(other.glance_toward(Vector3(0, 0, -6)), 0.0, "dead ahead")
+	assert_eq(other.glance_toward(Vector3(4, 0, 4)), 0.0, "behind them")
+	assert_eq(other.glance_toward(Vector3(4, 0, -4) * 10.0), 0.0, "too far to bother with")
+	assert_eq(other.glance_toward(Vector3.INF), 0.0, "nobody there")
+	assert_eq(other._nearest_other(), Vector3.INF)
+	_add(3, Vector3(4, 0, -4))
+	_add(4, Vector3(-10, 0, -10))
+	assert_eq(other._nearest_other(), Vector3(4, 0, -4))

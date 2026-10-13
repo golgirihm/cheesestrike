@@ -21,6 +21,22 @@ const MELT_TIME := 0.45
 const POP_TIME := 0.2
 ## Seconds the face stays screwed up after being hurt.
 const GRIMACE_TIME := 0.5
+## The faces a character makes, the first that applies showing: wincing
+## when hurt, dizzy when melted by an Overload, cheering after a knock-out,
+## set when firing, and otherwise calm.
+const WINCE := "wince"
+const DIZZY := "dizzy"
+const CHEER := "cheer"
+const SET := "set"
+const CALM := "calm"
+## Seconds a cheer lasts, and a set face after the last shot.
+const CHEER_TIME := 1.4
+const SET_TIME := 0.5
+## Seconds a blink lasts, and the shortest and longest between two.
+const BLINK_TIME := 0.12
+const BLINK_GAP := Vector2(2.0, 5.5)
+## How far the eyes slide toward someone nearby.
+const GLANCE_SHIFT := 0.012
 ## Seconds the whole body flashes pale when hit.
 const FLASH_TIME := 0.09
 ## How far above the surface each layer of what is drawn on it sits, so that
@@ -52,6 +68,16 @@ var _grimace_left := 0.0
 var _crouch := 0.0
 var _upper := {}
 var _flash_left := 0.0
+var _cheer_left := 0.0
+var _set_left := 0.0
+var _dizzy := false
+var _faces := {}
+var _stars: Node3D
+# Seconds until the next blink, and left of the one going on.
+var _blink_in := 3.0
+var _blink_left := 0.0
+# How far to one side the eyes are turned, -1 to 1, toward someone near.
+var _glance := 0.0
 var _glowing := false
 # 0 standing, 1 fully melted.
 var _melt := 0.0
@@ -130,6 +156,46 @@ func grimace() -> void:
 	_light()
 
 
+## The player has just knocked someone out: a cheer.
+func cheer() -> void:
+	_cheer_left = CHEER_TIME
+
+
+## The player has just fired: a set face, for as long as they keep firing.
+func fire_face() -> void:
+	_set_left = SET_TIME
+
+
+## Whether the player is melted by someone's Overload, and seeing stars.
+func set_dizzy(on: bool) -> void:
+	_dizzy = on
+
+
+## Which way the eyes are turned to look at someone nearby: -1 to the
+## character's left, 1 to its right, 0 straight ahead.
+func set_glance(side: float) -> void:
+	_glance = clampf(side, -1.0, 1.0)
+
+
+## The face the character is making now: one of WINCE, DIZZY, CHEER, SET
+## and CALM.
+func expression() -> String:
+	if is_grimacing():
+		return WINCE
+	if _dizzy:
+		return DIZZY
+	if _cheer_left > 0.0:
+		return CHEER
+	if _set_left > 0.0:
+		return SET
+	return CALM
+
+
+## Whether the eyes are shut in a blink.
+func is_blinking() -> bool:
+	return _blink_left > 0.0
+
+
 func is_flashing() -> bool:
 	return _flash_left > 0.0
 
@@ -184,12 +250,33 @@ func _process(delta: float) -> void:
 	if is_flashing():
 		_flash_left = maxf(_flash_left - delta, 0.0)
 		_light()
-	_calm.visible = not is_grimacing()
-	_wince.visible = is_grimacing()
-	for eye in _eyes:
+	_cheer_left = maxf(_cheer_left - delta, 0.0)
+	_set_left = maxf(_set_left - delta, 0.0)
+	var face := expression()
+	for kind: String in _faces:
+		_faces[kind].visible = kind == face
+	# Blinking, now and then, when nothing else is going on with the eyes.
+	_blink_left = maxf(_blink_left - delta, 0.0)
+	_blink_in -= delta
+	if _blink_in <= 0.0:
+		_blink_in = randf_range(BLINK_GAP.x, BLINK_GAP.y)
+		if face == CALM or face == SET:
+			_blink_left = BLINK_TIME
+	_stars.visible = face == DIZZY
+	_stars.rotate_y(delta * 5.0)
+	for index in _eyes.size():
+		var eye := _eyes[index]
 		eye.position.y = BodyShape.head_height(_crouch) + clampf(_gaze, -1.0, 1.0) * GAZE_SHIFT
-		# Screwed up tight when wincing.
-		eye.scale.z = 0.35 if is_grimacing() else 1.0
+		eye.position.x = BodyShape.eye_centres()[index].x + _glance * GLANCE_SHIFT
+		# Screwed up tight when wincing, shut in a blink, wide in a cheer.
+		var open := 1.0
+		if face == WINCE:
+			open = 0.35
+		elif is_blinking() or face == DIZZY:
+			open = 0.12
+		elif face == CHEER:
+			open = 1.25
+		eye.scale.z = open
 	if _melting:
 		_melt = minf(_melt + delta / MELT_TIME, 1.0)
 	_pop = minf(_pop + delta / POP_TIME, 1.0)
@@ -284,6 +371,65 @@ func _build_face() -> void:
 		var brow := _patch(Vector2(0.07, 0.014), _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.045, front), 2)
 		brow.rotation.z = 0.4 * side
 		_wince.add_child(brow)
+
+	# Firing: a straight mouth under level brows.
+	var set_face := Node3D.new()
+	set_face.name = "Set"
+	add_child(set_face)
+	set_face.add_child(_patch(Vector2(0.075, 0.012), _ink, Vector3(0, eye_level - 0.075, front), 2))
+	for side in [-1.0, 1.0]:
+		var brow := _patch(Vector2(0.065, 0.013), _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.04, front), 2)
+		brow.rotation.z = 0.15 * side
+		set_face.add_child(brow)
+
+	# A knock-out: a wide open grin, cheeks and all.
+	var cheer_face := Node3D.new()
+	cheer_face.name = "Cheer"
+	add_child(cheer_face)
+	for side in [-1.0, 1.0]:
+		cheer_face.add_child(Rounded.spot(0.036, blush, Vector3(0.155 * side, eye_level - 0.05, front), Vector3.FORWARD, LAYER))
+	var grin := MeshInstance3D.new()
+	grin.mesh = _arc(0.03, 0.06, deg_to_rad(180.0), deg_to_rad(360.0))
+	grin.material_override = _ink
+	grin.position = Vector3(0, eye_level - 0.045, front - LAYER * 2.0)
+	cheer_face.add_child(grin)
+	var tongue := MeshInstance3D.new()
+	tongue.mesh = _arc(0.018, 0.03, deg_to_rad(200.0), deg_to_rad(340.0))
+	tongue.material_override = _flat(BLUSH.darkened(0.15))
+	tongue.position = Vector3(0, eye_level - 0.06, front - LAYER * 3.0)
+	cheer_face.add_child(tongue)
+
+	# Melted by an Overload: a wavering mouth, and stars going round the tip.
+	var dizzy_face := Node3D.new()
+	dizzy_face.name = "Dizzy"
+	add_child(dizzy_face)
+	for step in 4:
+		var wave := MeshInstance3D.new()
+		var up := step % 2 == 0
+		wave.mesh = _arc(0.018, 0.01, deg_to_rad(0.0 if up else 180.0), deg_to_rad(180.0 if up else 360.0))
+		wave.material_override = _ink
+		wave.position = Vector3(-0.054 + step * 0.036, eye_level - 0.075, front - LAYER * 2.0)
+		dizzy_face.add_child(wave)
+	_stars = Node3D.new()
+	_stars.name = "Stars"
+	_stars.position = Vector3(0, BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y / 2.0 + 0.06, 0)
+	_stars.visible = false
+	add_child(_stars)
+	var star := _flat(Color(0.95, 0.95, 1.0))
+	for step in 3:
+		var around := TAU * step / 3.0
+		var twinkle := SphereMesh.new()
+		twinkle.radius = 0.028
+		twinkle.height = 0.056
+		twinkle.radial_segments = 4
+		twinkle.rings = 2
+		var point := MeshInstance3D.new()
+		point.mesh = twinkle
+		point.material_override = star
+		point.position = Vector3(cos(around), 0, sin(around)) * 0.16
+		_stars.add_child(point)
+
+	_faces = {WINCE: _wince, DIZZY: dizzy_face, CHEER: cheer_face, SET: set_face, CALM: _calm}
 
 
 static func _flat(colour: Color) -> StandardMaterial3D:
