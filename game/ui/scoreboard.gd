@@ -40,6 +40,8 @@ static func rows(state: MatchState) -> Array[PlayerRecord]:
 
 ## How a player's ping reads: "host" for the host, which has none.
 static func ping_text(record: PlayerRecord, _state: MatchState) -> String:
+	if Bots.is_bot(record.id):
+		return "bot"
 	return "host" if record.id == 1 else "%d ms" % record.ping
 
 

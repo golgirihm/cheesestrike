@@ -59,21 +59,19 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 6: Ways to play
 
-1. **Bots.** Computer players that move, take cover, pick things up and shoot with human-like aim, at several skill levels, to fill a session and to practise against. Run on the host, so their cost has to be small.
-   *Tests:* GUT tests of their decisions in a test arena; a soak test of a full session of bots.
-2. **A practice range.** An arena alone, with targets at marked distances, every weapon on a rack, and numbers for damage and accuracy.
+1. **A practice range.** An arena alone, with targets at marked distances, every weapon on a rack, and numbers for damage and accuracy.
    *Tests:* GUT tests of the targets.
-3. **A tutorial.** A short guided first session: move, look, shoot, aim, reload, pick up, Overload.
+2. **A tutorial.** A short guided first session: move, look, shoot, aim, reload, pick up, Overload.
    *Tests:* browser test that walks through it.
-4. **Watching.** Join as a spectator, follow any player or fly free; watch a teammate while knocked out.
+3. **Watching.** Join as a spectator, follow any player or fly free; watch a teammate while knocked out.
    *Tests:* GUT tests that a spectator can't be hit or score; browser test.
-5. **How you were knocked out.** A few seconds replayed from the other player's view, from the positions the host already keeps.
+4. **How you were knocked out.** A few seconds replayed from the other player's view, from the positions the host already keeps.
    *Tests:* GUT tests of the recording.
-6. **Play of the match.** A replay of the best moment at the end, chosen by a simple score.
+5. **Play of the match.** A replay of the best moment at the end, chosen by a simple score.
    *Tests:* GUT tests of the choice.
-7. **Host's rules.** Let the host change more: which weapons, health, speed, gravity, respawn time, friendly fire, with named presets (instant-kill, low gravity, launchers only).
+6. **Host's rules.** Let the host change more: which weapons, health, speed, gravity, respawn time, friendly fire, with named presets (instant-kill, low gravity, launchers only).
    *Tests:* extend `test_match_settings.gd` and the signaling tests.
-8. **Voting.** Players vote for the next arena and mode at the end of a match, and can vote to remove someone.
+7. **Voting.** Players vote for the next arena and mode at the end of a match, and can vote to remove someone.
    *Tests:* GUT tests of the count; browser test.
 
 ## Milestone 7: Arenas with character

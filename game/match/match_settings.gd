@@ -35,6 +35,9 @@ var minutes := 8
 var max_players := MAX_PLAYERS
 ## Which of the Maps to play on.
 var map := Maps.DEFAULT
+## How many computer players the host wants (see Bots), and how good.
+var bots := 0
+var bot_skill := BotBrain.NORMAL
 
 
 func is_teams() -> bool:
@@ -59,6 +62,9 @@ func limit() -> int:
 func advertised() -> Dictionary:
 	var told := to_dict()
 	told.mode = TEAMS if is_teams() else FREE_FOR_ALL
+	# Nor does it know of bots.
+	told.erase("bots")
+	told.erase("bot_skill")
 	return told
 
 
@@ -75,11 +81,14 @@ static func from_dict(data: Variant) -> MatchSettings:
 	settings.max_players = _whole(data.get("max_players"), settings.max_players, MIN_PLAYERS, MAX_PLAYERS)
 	if Maps.exists(data.get("map")):
 		settings.map = data.map
+	settings.bots = _whole(data.get("bots"), 0, 0, MAX_PLAYERS - 1)
+	if data.get("bot_skill") in BotBrain.SKILLS:
+		settings.bot_skill = data.bot_skill
 	return settings
 
 
 func to_dict() -> Dictionary:
-	return {"mode": mode, "kill_limit": kill_limit, "minutes": minutes, "max_players": max_players, "map": map}
+	return {"mode": mode, "kill_limit": kill_limit, "minutes": minutes, "max_players": max_players, "map": map, "bots": bots, "bot_skill": bot_skill}
 
 
 ## A short description, such as "Free-for-all · first to 20 · 8 min · Cheddar Canyon".

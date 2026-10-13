@@ -11,9 +11,9 @@ func test_the_defaults_are_a_free_for_all_to_20_in_8_minutes_for_16() -> void:
 
 
 func test_settings_survive_the_trip() -> void:
-	var settings := MatchSettings.from_dict({"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6, "map": "box"})
+	var settings := MatchSettings.from_dict({"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6, "map": "box", "bots": 3, "bot_skill": "hard"})
 	var copy := MatchSettings.from_dict(bytes_to_var(var_to_bytes(settings.to_dict())))
-	assert_eq(copy.to_dict(), {"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6, "map": "box"})
+	assert_eq(copy.to_dict(), {"mode": "teams", "kill_limit": 30, "minutes": 5, "max_players": 6, "map": "box", "bots": 3, "bot_skill": "hard"})
 	assert_true(copy.is_teams())
 
 

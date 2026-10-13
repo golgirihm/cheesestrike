@@ -133,18 +133,63 @@ func _on_state_changed() -> void:
 
 
 func _add_player(id: int) -> void:
+	_join(id)
+	_fill_with_bots()
+
+
+func _remove_player(id: int) -> void:
+	_leave(id)
+	_fill_with_bots()
+
+
+func _join(id: int) -> void:
 	match_.add_player(id)
+	if Bots.is_bot(id):
+		var record: PlayerRecord = match_.state.player(id)
+		match_.state.rename(id, Bots.name_for(id))
+		record.look = Bots.look_for(id)
+		record.main = Bots.loadout_for(id)[0]
+		match_.state.rearm(record)
 	spawner.spawn([id, spawn_points.get_child(_spawn_slots.assign(id)).global_position])
 	print("player joined: %d (%d in session)" % [id, players.get_child_count()])
 
 
-func _remove_player(id: int) -> void:
+func _leave(id: int) -> void:
 	_spawn_slots.release(id)
 	match_.remove_player(id)
 	var player := players.get_node_or_null(str(id))
 	if player != null:
+		players.remove_child(player)
 		player.queue_free()
 		print("player left: %d" % id)
+
+
+## The ids of the bots in the session.
+func bot_ids() -> Array:
+	var ids := []
+	for id: int in match_.state.players:
+		if Bots.is_bot(id):
+			ids.append(id)
+	ids.sort()
+	return ids
+
+
+# Host only: brings the number of bots to what the host asked for, less any
+# whose place a real player has taken.
+func _fill_with_bots() -> void:
+	if not match_.has_state() or not match_.is_host():
+		return
+	var here := bot_ids()
+	var wanted := Bots.wanted(match_.state.settings, match_.state.players.size() - here.size())
+	# The last to come are the first to go.
+	while here.size() > wanted:
+		_leave(here.pop_front())
+	var index := 0
+	while here.size() < wanted:
+		if not here.has(Bots.id_for(index)):
+			_join(Bots.id_for(index))
+			here.append(Bots.id_for(index))
+		index += 1
 
 
 # A model floating over each pickup pad, shown while its pickup is there.

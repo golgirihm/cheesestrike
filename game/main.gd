@@ -159,6 +159,17 @@ func _setup_match_buttons() -> void:
 	_cycle(kill_limit_button, "host_kill_limit", MatchSettings.KILL_LIMITS, func(limit: int) -> String: return "First to %d" % limit)
 	_cycle(minutes_button, "host_minutes", MatchSettings.MINUTES, func(minutes: int) -> String: return "%d minutes" % minutes)
 	_cycle(map_button, "host_map", Maps.ORDER, func(map: String) -> String: return "Map: %s" % Maps.NAMES[map])
+	# Computer players, to fill a session or to practise against.
+	var bots_button := Button.new()
+	bots_button.name = "BotsButton"
+	var skill_button := Button.new()
+	skill_button.name = "BotSkillButton"
+	# Each goes straight after the map's button, so the last added comes first.
+	for added: Button in [skill_button, bots_button]:
+		added.custom_minimum_size = map_button.custom_minimum_size
+		map_button.add_sibling(added)
+	_cycle(bots_button, "host_bots", Bots.COUNTS, func(count: int) -> String: return "No bots" if count == 0 else ("1 bot" if count == 1 else "%d bots" % count))
+	_cycle(skill_button, "host_bot_skill", BotBrain.SKILLS, func(skill: String) -> String: return "Bots: %s" % BotBrain.SKILL_NAMES[skill])
 	_cycle(private_button, "host_private", [false, true], func(hidden: bool) -> String: return "Private: invite only" if hidden else "Listed for everyone")
 
 
@@ -191,6 +202,8 @@ func host_settings() -> MatchSettings:
 		"minutes": Settings.get_value("host_minutes"),
 		"max_players": Settings.get_value("host_max_players"),
 		"map": Settings.get_value("host_map"),
+		"bots": Settings.get_value("host_bots"),
+		"bot_skill": Settings.get_value("host_bot_skill"),
 	})
 
 
