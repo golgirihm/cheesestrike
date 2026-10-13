@@ -44,11 +44,11 @@ static func within_reach(pad: Vector3, feet: Vector3) -> bool:
 
 ## Whether `record` would gain anything from a pickup of `kind`: health only
 ## for someone hurt, a weapon always (more ammunition, if already carried).
-static func wanted(kind: String, record: PlayerRecord) -> bool:
+static func wanted(kind: String, record: PlayerRecord, full := PlayerRecord.MAX_HEALTH) -> bool:
 	if record == null or not record.alive:
 		return false
 	if kind == HEALTH:
-		return record.health < PlayerRecord.MAX_HEALTH
+		return record.health < full
 	if kind == ARMOUR:
 		return record.armour < PlayerRecord.MAX_ARMOUR
 	if kind == POWER:
@@ -62,9 +62,9 @@ static func wanted(kind: String, record: PlayerRecord) -> bool:
 
 ## Gives `record` a pickup of `kind`. Returns true if it was a weapon they
 ## already carried, which only refills it.
-static func give(kind: String, record: PlayerRecord) -> bool:
+static func give(kind: String, record: PlayerRecord, full := PlayerRecord.MAX_HEALTH) -> bool:
 	if kind == HEALTH:
-		record.health = mini(record.health + HEALTH_AMOUNT, PlayerRecord.MAX_HEALTH)
+		record.health = mini(record.health + HEALTH_AMOUNT, full)
 		return false
 	if kind == ARMOUR:
 		record.armour = mini(record.armour + ARMOUR_AMOUNT, PlayerRecord.MAX_ARMOUR)

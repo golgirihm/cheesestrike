@@ -5,6 +5,8 @@ extends RefCounted
 ## MatchState).
 
 const MAX_HEALTH := 100
+## The most any rules give a player.
+const MOST_HEALTH := 300
 ## The most armour a player can wear, and the share of each hit it takes in
 ## their place for as long as it lasts.
 const MAX_ARMOUR := 50
@@ -19,6 +21,9 @@ var alive := true
 ## Whether they are watching rather than playing (see Watching): not in the
 ## arena, and not coming back until they choose to.
 var watching := false
+## Whether their weapons never run out, as under rules that give everyone
+## one weapon and nothing else to fall back on.
+var endless := false
 ## Seconds until a knocked-out player comes back.
 var respawn_in := 0.0
 ## Seconds left in which a player who has just come back can't be hurt.
@@ -97,7 +102,8 @@ func give_power(kind: int, seconds: float) -> void:
 func stats(id: String) -> WeaponStats:
 	if not Weapons.ids().has(id):
 		return null
-	return Attachments.fitted(Weapons.find(id), fitted if id == fitted_to else Attachments.NONE)
+	var base := Weapons.endless(Weapons.find(id)) if endless else Weapons.find(id)
+	return Attachments.fitted(base, fitted if id == fitted_to else Attachments.NONE)
 
 
 ## Whether they carry exactly their loadout: nothing found, nothing lost.
@@ -144,6 +150,7 @@ func to_dict() -> Dictionary:
 		"main": main,
 		"attachment": attachment,
 		"watching": watching,
+		"endless": endless,
 		"overload_kind": overload_kind,
 		"overload_build": overload_build,
 		"fitted": fitted,
@@ -187,7 +194,7 @@ func to_packed() -> Array:
 	numbers[_MAIN] = Weapons.ORDER.find(main)
 	# Likewise: what is chosen, what is fitted, and the weapon it is on.
 	# And above those, their kind of Overload and hundredths of its build-up.
-	numbers[_FITTED] = attachment | (fitted << 4) | ((Weapons.ORDER.find(fitted_to) + 1) << 8) | (overload_kind << 16) | (roundi(overload_build * 100.0) << 20) | ((1 if watching else 0) << 28)
+	numbers[_FITTED] = attachment | (fitted << 4) | ((Weapons.ORDER.find(fitted_to) + 1) << 8) | (overload_kind << 16) | (roundi(overload_build * 100.0) << 20) | ((1 if watching else 0) << 28) | ((1 if endless else 0) << 29)
 	numbers[_SIDE] = Weapons.ORDER.find(side)
 	return [name, numbers]
 
@@ -201,7 +208,7 @@ static func from_packed(data: Variant) -> PlayerRecord:
 		return null
 	var record := PlayerRecord.new(numbers[_ID])
 	record.name = data[0]
-	record.health = clampi(numbers[_HEALTH], 0, MAX_HEALTH)
+	record.health = clampi(numbers[_HEALTH], 0, MOST_HEALTH)
 	record.alive = numbers[_FLAGS] & _ALIVE != 0
 	record.respawn_in = maxi(numbers[_RESPAWN], 0) / 1000.0
 	record.protected_for = maxi(numbers[_PROTECTED], 0) / 1000.0
@@ -237,6 +244,7 @@ static func from_packed(data: Variant) -> PlayerRecord:
 	record.overload_kind = (fit >> 16) & 15 if Overload.is_kind((fit >> 16) & 15) else Overload.MELT
 	record.overload_build = clampf(((fit >> 20) & 255) / 100.0, 0.0, Overload.BUILD_UP)
 	record.watching = (fit >> 28) & 1 == 1
+	record.endless = (fit >> 29) & 1 == 1
 	return record
 
 
@@ -270,6 +278,7 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.overload_kind = data.get("overload_kind") if Overload.is_kind(data.get("overload_kind")) else Overload.MELT
 	record.overload_build = clampf(_float(data, "overload_build", 0.0), 0.0, Overload.BUILD_UP)
 	record.watching = data.get("watching") == true
+	record.endless = data.get("endless") == true
 	record.fitted_to = data.get("fitted_to") if data.get("fitted_to") is String and Weapons.ids().has(data.get("fitted_to")) else ""
 	var carried: Variant = data.get("weapons")
 	if carried is Array:

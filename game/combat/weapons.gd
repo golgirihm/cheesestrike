@@ -59,6 +59,22 @@ static func ids() -> Array:
 	return ORDER.duplicate()
 
 
+static var _endless := {}
+
+
+## `weapon` with rounds that never run out: itself if they never do, or else
+## a copy that differs only in that, the same one every time.
+static func endless(weapon: WeaponStats) -> WeaponStats:
+	if weapon == null or weapon.unlimited():
+		return weapon
+	if not _endless.has(weapon.id):
+		var made: WeaponStats = weapon.duplicate()
+		made.reserve = -1
+		made.reserve_max = -1
+		_endless[weapon.id] = made
+	return _endless[weapon.id]
+
+
 ## The stats of the other way `weapon` fires, or null if it has only one.
 static func alt_of(weapon: WeaponStats) -> WeaponStats:
 	return find(weapon.alt) if weapon != null and not weapon.alt.is_empty() else null

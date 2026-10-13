@@ -209,6 +209,11 @@ func _setup_match_buttons() -> void:
 		map_button.add_sibling(added)
 	_cycle(bots_button, "host_bots", Bots.COUNTS, func(count: int) -> String: return "No bots" if count == 0 else ("1 bot" if count == 1 else "%d bots" % count))
 	_cycle(skill_button, "host_bot_skill", BotBrain.SKILLS, func(skill: String) -> String: return "Bots: %s" % BotBrain.SKILL_NAMES[skill])
+	var rules_button := Button.new()
+	rules_button.name = "RulesButton"
+	rules_button.custom_minimum_size = map_button.custom_minimum_size
+	skill_button.add_sibling(rules_button)
+	_cycle(rules_button, "host_rules", MatchSettings.RULES, func(rules: String) -> String: return "Rules: %s" % MatchSettings.RULE_NAMES[rules])
 	_cycle(private_button, "host_private", [false, true], func(hidden: bool) -> String: return "Private: invite only" if hidden else "Listed for everyone")
 
 
@@ -243,6 +248,7 @@ func host_settings() -> MatchSettings:
 		"map": Settings.get_value("host_map"),
 		"bots": Settings.get_value("host_bots"),
 		"bot_skill": Settings.get_value("host_bot_skill"),
+		"rules": Settings.get_value("host_rules"),
 	})
 
 

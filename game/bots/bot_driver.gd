@@ -85,7 +85,7 @@ func _physics_process(delta: float) -> void:
 	if player.is_on_floor():
 		player.velocity.y = Movement.JUMP_VELOCITY if orders.jump else 0.0
 	else:
-		player.velocity.y -= _gravity * delta
+		player.velocity.y -= _gravity * Projectile.gravity_scale * delta
 	player.move_and_slide()
 
 	if orders.reload and weapon.start_reload():

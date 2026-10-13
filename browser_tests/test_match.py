@@ -39,6 +39,21 @@ class MatchTest(GameTestCase):
             game.wait_for("s.combat.match.startsWith('First to 20   ·   7:5')")
         host.wait_for("s.combat.announcement === 'The match begins'")
 
+    def test_everyone_plays_by_the_hosts_rules(self):
+        host = self.open_game()
+        host.choose("RulesButton", "Rules: Instant knock-out")
+        code = host.host()
+        joiner = self.open_game()
+        joiner.join(code)
+        joiner_id = joiner.own_player()["id"]
+        for game in (host, joiner):
+            game.wait_for("s.players.length === 2 && s.combat.health === '1'")
+        host.wait_for("s.combat.announcement === 'The match begins  ·  Instant knock-out'")
+        host.page.wait_for_timeout(500)
+        host.capture_mouse()
+        state = host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
+        self.assertGreaterEqual(next(player for player in state["players"] if player["mine"])["ammo"], 14, "it didn't take many shots")
+
     def test_the_city_can_be_played_in(self):
         host, code = self.host_with(map="Curd City")
         self.assertEqual(host.state()["map"], "city")
