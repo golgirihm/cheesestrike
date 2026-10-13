@@ -164,13 +164,13 @@ func update_objectives(delta: float, spots: Dictionary, standing: Dictionary) ->
 			var other: int = 1 - event.wheel
 			match event.type:
 				CaptureRules.TAKEN:
-					told.append({"text": "%s has the %s wheel!" % [name_of(event.by), wheel], "team": other})
+					told.append({"text": "%s has the %s wheel!" % [name_of(event.by), wheel], "team": other, "by": event.by, "points": Stats.TAKE_POINTS})
 				CaptureRules.FELL:
 					told.append({"text": "The %s wheel is dropped" % wheel, "team": event.wheel})
 				CaptureRules.RETURNED:
 					told.append({"text": "The %s wheel is home" % wheel, "team": event.wheel})
 				CaptureRules.CAPTURED:
-					told.append({"text": "%s scores for %s!" % [name_of(event.by), TEAM_NAMES[other]], "team": other})
+					told.append({"text": "%s scores for %s!" % [name_of(event.by), TEAM_NAMES[other]], "team": other, "by": event.by, "points": Stats.CAPTURE_POINTS})
 					score(other, 1)
 	elif zones != null and settings.mode == MatchSettings.HILL:
 		var hill := zones.update_hill(delta, spots.get("hills", []), standing)

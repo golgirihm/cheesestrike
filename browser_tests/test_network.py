@@ -15,10 +15,10 @@ class NetworkTest(GameTestCase):
         host.page.keyboard.down("Tab")
         try:
             # The host pings once a second.
-            state = host.wait_for("s.combat.scoreboard.length === 3 && s.combat.scoreboard.slice(1).some((row) => row[3].endsWith(' ms'))")
+            state = host.wait_for("s.combat.scoreboard.length === 3 && s.combat.scoreboard.slice(1).some((row) => row[row.length - 1].endsWith(' ms'))")
         finally:
             host.page.keyboard.up("Tab")
-        pings = [row[3] for row in state["combat"]["scoreboard"][1:]]
+        pings = [row[-1] for row in state["combat"]["scoreboard"][1:]]
         self.assertIn("host", pings)
         measured = next(ping for ping in pings if ping != "host")
         self.assertRegex(measured, r"^\d+ ms$")

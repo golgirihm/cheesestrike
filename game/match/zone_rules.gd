@@ -73,6 +73,12 @@ static func holder(spot: Vector3, standing: Dictionary) -> int:
 
 
 static func inside(spot: Vector3, feet: Vector3) -> bool:
+	return within(spot, feet)
+
+
+## Whether someone with their feet at `feet` is standing on the zone at
+## `spot`.
+static func within(spot: Vector3, feet: Vector3) -> bool:
 	return Vector2(feet.x - spot.x, feet.z - spot.z).length() <= RADIUS and feet.y - spot.y >= -0.5 and feet.y - spot.y <= HEIGHT
 
 

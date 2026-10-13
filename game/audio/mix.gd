@@ -39,7 +39,7 @@ const BUS_OF := {
 	"hurt": VOICES, "knocked_out": VOICES, "emote": VOICES,
 	"voice_effort": VOICES, "voice_pain": VOICES, "voice_taunt": VOICES, "voice_reload": VOICES, "voice_out": VOICES,
 	"hit": INTERFACE, "hit_pop": INTERFACE, "hit_bell": INTERFACE, "hit_head": INTERFACE, "knock_out": INTERFACE, "objective": INTERFACE,
-	"ping": INTERFACE, "ui_hover": INTERFACE, "ui_press": INTERFACE, "ui_back": INTERFACE, "ui_error": INTERFACE, "ui_count": INTERFACE,
+	"ping": INTERFACE, "medal": INTERFACE, "ui_hover": INTERFACE, "ui_press": INTERFACE, "ui_back": INTERFACE, "ui_error": INTERFACE, "ui_count": INTERFACE,
 	"music": MUSIC, "music_match": MUSIC, "music_tense": MUSIC, "sting_win": MUSIC, "sting_lose": MUSIC,
 }
 

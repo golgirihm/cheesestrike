@@ -51,10 +51,13 @@ class ScoresTest(GameTestCase):
         target.page.keyboard.down("Tab")
         state = target.wait_for("s.combat.scoreboard.length === 3")
         heading, first, second = state["combat"]["scoreboard"]
-        self.assertEqual(heading, ["Player", "Knock-outs", "Times out", "Ping"])
+        self.assertEqual(heading, ["Player", "Knock-outs", "Assists", "Times out", "Damage", "Ping"])
         self.assertEqual(first[:2], ["Hunter", "1"])
         self.assertEqual(second[0], "Target")
-        self.assertGreaterEqual(int(second[2]), 1)
+        self.assertGreaterEqual(int(second[3]), 1)
+        # What the hunter did reaches the one hunted, a moment after the score.
+        state = target.wait_for("parseInt(s.combat.scoreboard[1][4]) >= 100")
+        self.assertEqual(state["combat"]["scoreboard"][2][4], "0", "and the target dealt none")
         target.page.keyboard.up("Tab")
         target.wait_for("s.combat.scoreboard.length === 0")
 

@@ -12,6 +12,8 @@ class_name Icons
 const SIZE := 48
 ## The things a player does that have an icon.
 const ACTIONS := ["play", "practice", "learn", "customise", "edit", "settings", "credits", "back", "talk", "mute", "ping", "chat"]
+## The medals that have one (see Medals).
+const MEDALS := ["medal_double", "medal_triple", "medal_streak", "medal_long", "medal_head", "medal_comeback", "medal_revenge"]
 ## The pickups that have one.
 const PICKUPS := ["health", "ammo", "armour", "power", "grenade", "knife"]
 
@@ -20,7 +22,7 @@ static var _made := {}
 
 ## Every icon there is, by name.
 static func names() -> Array:
-	return Weapons.ids() + PICKUPS + ACTIONS
+	return Weapons.ids() + PICKUPS + ACTIONS + MEDALS
 
 
 ## Whether there is an icon called `name`.
@@ -173,6 +175,24 @@ static func _shapes(name: String) -> Array:
 		"ping":
 			# A pin dropped on a spot.
 			return [_points([0.5, 0.96, 0.22, 0.44, 0.3, 0.18, 0.5, 0.06, 0.7, 0.18, 0.78, 0.44]), _round(0.5, 0.34, 0.12)]
+		"medal_double":
+			return [_round(0.34, 0.5, 0.26), _round(0.66, 0.5, 0.26)]
+		"medal_triple":
+			return [_round(0.5, 0.3, 0.22), _round(0.26, 0.68, 0.22), _round(0.74, 0.68, 0.22)]
+		"medal_streak":
+			# A flame.
+			return [_points([0.5, 0.04, 0.72, 0.36, 0.84, 0.62, 0.72, 0.86, 0.5, 0.96, 0.28, 0.86, 0.16, 0.62, 0.32, 0.5, 0.38, 0.28]), _points([0.5, 0.52, 0.62, 0.7, 0.5, 0.86, 0.38, 0.7])]
+		"medal_long":
+			# A sight: a ring with a cross through it.
+			return [_round(0.5, 0.5, 0.4), _round(0.5, 0.5, 0.3), _rect(0.47, 0.04, 0.06, 0.92), _rect(0.04, 0.47, 0.92, 0.06)]
+		"medal_head":
+			# A wedge with a spot between its eyes.
+			return [_points([0.14, 0.9, 0.86, 0.9, 0.7, 0.1, 0.3, 0.1]), _round(0.5, 0.4, 0.09), _round(0.34, 0.56, 0.05), _round(0.66, 0.56, 0.05)]
+		"medal_comeback":
+			return [_points([0.5, 0.06, 0.9, 0.5, 0.66, 0.5, 0.66, 0.94, 0.34, 0.94, 0.34, 0.5, 0.1, 0.5])]
+		"medal_revenge":
+			# Two blades crossed.
+			return [_points([0.1, 0.16, 0.22, 0.1, 0.9, 0.8, 0.82, 0.9]), _points([0.9, 0.16, 0.78, 0.1, 0.1, 0.8, 0.18, 0.9])]
 		"chat":
 			return [_points([0.08, 0.14, 0.92, 0.14, 0.92, 0.68, 0.44, 0.68, 0.22, 0.9, 0.24, 0.68, 0.08, 0.68])]
 	return []

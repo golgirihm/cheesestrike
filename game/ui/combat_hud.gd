@@ -64,6 +64,22 @@ var _announce_left := 0.0
 var _waits := {}
 const ANNOUNCE_LIFE := 3.5
 var _pickup_left := 0.0
+## The medals this player earns (see Medals), those waiting to be called
+## out, and the one being called out, which shows for MEDAL_LIFE seconds.
+const MEDAL_LIFE := 2.2
+var medals := Medals.new()
+var _medals_waiting: Array[String] = []
+var _medal_showing := ""
+var _medal_left := 0.0
+var _medal_clock := 0.0
+var _medal_row: HBoxContainer
+var _medal_icon: TextureRect
+var _medal_label: Label
+# Whether this player was in play, and whether a match was on, when last
+# looked at: for telling a knock-out and a new match.
+var _was_alive := true
+var _match_was_on := false
+var _result_summary: Label
 ## Which way everything is, and what is said.
 var compass: Compass
 var chat_box: ChatBox
@@ -144,6 +160,23 @@ func bind(of: Node3D) -> void:
 		if show:
 			_on_announced(line, MatchState.NO_TEAM))
 	world.match_.state_changed.connect(_refresh_scoreboard)
+	world.match_.stats_changed.connect(_refresh_scoreboard)
+	# A medal is called out in the middle of the view, a little below it.
+	_medal_row = HBoxContainer.new()
+	_medal_row.name = "Medal"
+	_medal_row.visible = false
+	_medal_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_medal_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_medal_row.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_medal_row.position = Vector2(-150.0, 90.0)
+	_medal_row.custom_minimum_size = Vector2(300.0, 48.0)
+	add_child(_medal_row)
+	_medal_icon = TextureRect.new()
+	_medal_icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	_medal_row.add_child(_medal_icon)
+	_medal_label = _outlined_label(22)
+	_medal_label.add_theme_color_override("font_color", Look.CHEDDAR)
+	_medal_row.add_child(_medal_label)
 
 
 ## Clears what is left from a session that has ended.
@@ -318,6 +351,7 @@ func _process(delta: float) -> void:
 	if world == null:
 		return
 	_count_down()
+	_run_medals(delta)
 	_hit_left = maxf(_hit_left - delta, 0.0)
 	for number in _damage_numbers:
 		number.left -= delta
@@ -378,6 +412,7 @@ func _process(delta: float) -> void:
 		var lines: Array[String] = world.match_.tally.lines() if world.match_.is_host() else ([] as Array[String])
 		_result_tally.text = "\n".join(lines)
 		_result_tally.visible = not lines.is_empty()
+		_result_summary.text = "\n".join(MatchSummary.lines(state, multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else 0, world.match_.stats, medals))
 	var wants_scores := Input.is_action_pressed("scoreboard") or _touch_held("scores") or _result.visible
 	if wants_scores != scoreboard.visible:
 		scoreboard.visible = wants_scores
@@ -396,11 +431,49 @@ func _touch_held(button: String) -> bool:
 
 func _refresh_scoreboard() -> void:
 	if scoreboard.visible and world != null:
-		scoreboard.show_state(world.match_.state, multiplayer.get_unique_id())
+		scoreboard.show_state(world.match_.state, multiplayer.get_unique_id(), world.match_.stats, world.voice_chat)
 
 
 # Counts the last seconds aloud of the two waits a player watches: to come
 # back after being knocked out, and to the end of the match.
+## The medal being called out, by name, or "".
+func medal_shown() -> String:
+	return Medals.NAMES.get(_medal_showing, "")
+
+
+## What the end of the match says of who did best and what this player did.
+func summary_shown() -> Array:
+	return Array(_result_summary.text.split("\n", false)) if _result.visible else []
+
+
+# Calls medals out one at a time, and keeps up with what ends a run: being
+# knocked out, and a new match.
+func _run_medals(delta: float) -> void:
+	_medal_clock += delta
+	var state: MatchState = world.match_.state if world.match_.has_state() else null
+	var record: PlayerRecord = world.match_.own_record() if state != null else null
+	if record != null:
+		if _was_alive and not record.alive:
+			medals.knocked_out(record.last_attacker if record.last_attacker != record.id else 0)
+		_was_alive = record.alive
+	var on := state != null and state.is_playing()
+	if on and not _match_was_on:
+		medals.clear()
+		_medals_waiting.clear()
+	_match_was_on = on
+	_medal_left = maxf(_medal_left - delta, 0.0)
+	if _medal_left <= 0.0:
+		_medal_showing = ""
+		if not _medals_waiting.is_empty():
+			_medal_showing = _medals_waiting.pop_front()
+			_medal_left = MEDAL_LIFE
+			_medal_icon.texture = Icons.texture(Medals.ICONS[_medal_showing], 44, Look.CHEDDAR)
+			_medal_label.text = Medals.NAMES[_medal_showing]
+			Sounds.play("medal", -6.0)
+	_medal_row.visible = not _medal_showing.is_empty()
+	_medal_row.modulate.a = clampf(_medal_left / 0.4, 0.0, 1.0)
+
+
 func _count_down() -> void:
 	var record: PlayerRecord = world.match_.own_record() if world.match_.has_state() else null
 	var waits := {"respawn": record.respawn_in if record != null and not record.alive else 0.0,
@@ -485,6 +558,13 @@ func _on_picked_up(id: int, kind: String) -> void:
 
 
 func _on_hit_confirmed(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
+	if knocked_out:
+		# How far off they were, for a long shot.
+		var own: Node3D = world.player_node(multiplayer.get_unique_id())
+		var fallen: Node3D = world.player_node(_victim)
+		var distance := own.global_position.distance_to(fallen.global_position) if own != null and fallen != null else 0.0
+		for medal in medals.knock_out(_victim, _medal_clock, distance, head):
+			_medals_waiting.append(medal)
 	hits_shown += 1
 	_hit_left = HIT_MARKER_LIFE
 	hit_kind = hit_kind_for(knocked_out, head)
@@ -768,6 +848,9 @@ func _build() -> void:
 	_result_detail = _outlined_label(16)
 	_result_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_rows.add_child(_result_detail)
+	_result_summary = _outlined_label(15)
+	_result_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_rows.add_child(_result_summary)
 	_result_tally = _outlined_label(12)
 	_result_tally.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_tally.visible = false

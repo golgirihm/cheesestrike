@@ -125,6 +125,20 @@ class MatchTest(GameTestCase):
         for game in (host, joiner):
             state = game.wait_for(f"s.combat.result === {own_name + ' wins!'!r}")
             self.assertEqual(state["combat"]["match"], "Match over")
+        # Each is shown who did best, and what they themselves did.
+        joiner_name = joiner.own_player()["name"]
+        for game in (host, joiner):
+            summary = game.wait_for("s.combat.summary.length >= 3 && s.combat.summary[2].includes('Damage')")["combat"]["summary"]
+            self.assertEqual(summary[0], f"1st   {own_name}   ·   5")
+            self.assertEqual(summary[1], f"2nd   {joiner_name}   ·   0")
+        won = host.state()["combat"]["summary"]
+        self.assertRegex(won[2], r"^Accuracy \d+%   ·   Damage \d+   ·   Best run 5   ·   Favourite: Cheddar Blaster$")
+        self.assertTrue(won[3].startswith("Medals: "), won)
+        self.assertIn("On a run", won[3], "five without being knocked out")
+        self.assertGreaterEqual(int(won[2].split("Damage ")[1].split(" ")[0]), 500)
+        lost = joiner.state()["combat"]["summary"]
+        self.assertRegex(lost[2], r"^Accuracy 0%   ·   Damage 0   ·   Best run 0$")
+        self.assertEqual(len(lost), 3, "no medals for the one who lost")
         # The host, and only the host, is shown what each weapon did.
         tally = host.wait_for("s.combat.tally !== ''")["combat"]["tally"]
         self.assertRegex(tally, r"Cheddar Blaster: \d+ fired, \d+ hit, \d+ damage, 5 knocked out")
