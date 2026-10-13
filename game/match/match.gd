@@ -213,6 +213,44 @@ func fire(origin: Vector3, direction: Vector3, seed: int, weapon := Weapons.STAR
 		_request_shot.rpc_id(1, origin, direction, seed, weapon, stance)
 
 
+## This player throws a grenade from `origin` along `direction`, having held
+## it for `cooked` seconds of its fuse first.
+func throw_grenade(origin: Vector3, direction: Vector3, cooked := 0.0) -> void:
+	if is_host():
+		_throw(1, origin, direction, cooked)
+	elif multiplayer.multiplayer_peer != null:
+		_request_throw.rpc_id(1, origin, direction, cooked)
+
+
+## The longest a grenade can be held before it must be thrown: this much
+## short of its fuse.
+const COOK_MARGIN := 0.3
+
+
+func _throw(thrower: int, origin: Vector3, direction: Vector3, cooked: float) -> void:
+	var record := state.player(thrower)
+	var node: Node3D = world.player_node(thrower)
+	if record == null or node == null:
+		return
+	if not origin.is_finite() or not direction.is_finite() or direction.length() < 0.5 or not is_finite(cooked):
+		return
+	if not ShotRules.origin_believable(origin, node.head.global_position):
+		return
+	if not state.throw_grenade(thrower):
+		return
+	record.protected_for = 0.0
+	_changed()
+	var grenade := Weapons.find(Weapons.GRENADE)
+	var projectile := _launch(thrower, grenade, origin, direction)
+	projectile.age = clampf(cooked, 0.0, grenade.fuse - COOK_MARGIN)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_throw(origin: Variant, direction: Variant, cooked: Variant = 0.0) -> void:
+	if is_host() and origin is Vector3 and direction is Vector3 and (cooked is float or cooked is int):
+		_throw(multiplayer.get_remote_sender_id(), origin, direction, float(cooked))
+
+
 ## This player strikes with their knife from `origin` along `direction`.
 func strike(origin: Vector3, direction: Vector3) -> void:
 	if is_host():
@@ -560,12 +598,13 @@ func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: Str
 		_announce_knockout("" if own else state.name_of(attacker), state.name_of(victim), weapon, head)
 
 
-func _launch(shooter: int, weapon: WeaponStats, origin: Vector3, direction: Vector3) -> void:
+func _launch(shooter: int, weapon: WeaponStats, origin: Vector3, direction: Vector3) -> Projectile:
 	var projectile := Projectile.new(_next_projectile, shooter, weapon, origin, direction)
 	_next_projectile += 1
 	_projectiles[projectile.id] = projectile
 	_projectile_seen.rpc(projectile.id, weapon.id, origin, projectile.velocity)
 	projectile_launched.emit(projectile.id, weapon.id, origin, projectile.velocity)
+	return projectile
 
 
 func _physics_process(delta: float) -> void:
@@ -578,16 +617,24 @@ func _physics_process(delta: float) -> void:
 	_collect_pickups()
 	if _projectiles.is_empty():
 		return
-	var wall := func(from: Vector3, to: Vector3) -> float:
-		var query := PhysicsRayQueryParameters3D.create(from, to, WORLD_MASK)
-		var hit := world.get_world_3d().direct_space_state.intersect_ray(query)
-		return from.distance_to(hit.position) if not hit.is_empty() else INF
+	var wall := wall_finder(world.get_world_3d().direct_space_state)
 	for id: int in _projectiles.keys():
 		var projectile: Projectile = _projectiles[id]
 		var burst: Variant = projectile.advance(delta, wall, _targets_except(projectile.shooter))
 		if burst != null:
 			_projectiles.erase(id)
 			_burst(projectile, burst)
+
+
+## What a Projectile is told of the arena in `space`: a Callable(from, to)
+## giving where along the segment the arena stops it, as {distance, normal},
+## or INF if nowhere.
+static func wall_finder(space: PhysicsDirectSpaceState3D) -> Callable:
+	return func(from: Vector3, to: Vector3) -> Variant:
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, WORLD_MASK))
+		if hit.is_empty():
+			return INF
+		return {"distance": from.distance_to(hit.position), "normal": hit.normal}
 
 
 ## The host hands each pickup that is there to the first player in play

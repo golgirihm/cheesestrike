@@ -60,6 +60,10 @@ extends Resource
 @export var splash_radius := 0.0
 ## How hard the burst shoves players, in metres per second at its middle.
 @export var knockback := 0.0
+## A projectile that bounces comes off whatever it touches with this share of
+## its speed, passes players by, and bursts only when its fuse runs out.
+@export var bounces := false
+@export var bounce := 0.45
 
 
 ## How a player stands as they fire, as bits: what they claim, as the host

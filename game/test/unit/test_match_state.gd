@@ -280,10 +280,11 @@ func test_every_part_of_a_record_survives_packing() -> void:
 
 func test_a_packed_record_with_nonsense_is_set_right() -> void:
 	var numbers := PackedInt32Array()
-	numbers.resize(15)
+	numbers.resize(PlayerRecord._COUNT)
 	numbers.fill(-5)
 	var copy := PlayerRecord.from_packed(["X", numbers])
 	assert_eq(copy.health, 0)
+	assert_eq(copy.grenades, 0)
 	assert_eq(copy.respawn_in, 0.0)
 	assert_eq(copy.team, MatchState.NO_TEAM)
 	assert_eq(copy.overload, 0.0)
@@ -304,3 +305,32 @@ func test_a_full_session_is_small_enough_to_send_often() -> void:
 		record.respawn_in = 1.234
 		record.overload = 55.5
 	assert_lt(var_to_bytes(full.to_dict()).size(), 2500)
+
+
+func test_a_player_has_two_grenades_to_throw_each_time_they_come_back() -> void:
+	state.add_player(1)
+	assert_eq(state.player(1).grenades, Weapons.GRENADES)
+	assert_true(state.throw_grenade(1))
+	assert_true(state.throw_grenade(1))
+	assert_false(state.throw_grenade(1), "none left")
+	assert_eq(state.player(1).grenades, 0)
+	state.respawn(1)
+	assert_eq(state.player(1).grenades, Weapons.GRENADES)
+
+
+func test_nobody_throws_a_grenade_while_knocked_out_or_between_matches() -> void:
+	state.add_player(1)
+	state.add_player(2)
+	state.damage(2, 1, 500.0)
+	assert_false(state.throw_grenade(1))
+	assert_false(state.throw_grenade(7), "nor someone who isn't here")
+	state.end_match()
+	assert_false(state.throw_grenade(2))
+	assert_eq(state.player(2).grenades, Weapons.GRENADES)
+
+
+func test_grenades_left_survive_the_trip() -> void:
+	state.add_player(1)
+	state.throw_grenade(1)
+	var copy := MatchState.from_dict(state.to_dict())
+	assert_eq(copy.player(1).grenades, Weapons.GRENADES - 1)

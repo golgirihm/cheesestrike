@@ -15,6 +15,7 @@ var _tracer_mesh := BoxMesh.new()
 var _flash_mesh := SphereMesh.new()
 var _wheel_mesh := Rounded.cylinder(0.16, 0.12, 0.04)
 var _wheel_material := _glow(WeaponModels.WAX)
+var _grenade_mesh := SphereMesh.new()
 var _burst_material := _glow(Color(1.0, 0.5, 0.2, 0.7))
 # Projectiles in flight, by id: {"node", "from", "velocity", "gravity", "age"}.
 var _projectiles := {}
@@ -29,6 +30,10 @@ func _init() -> void:
 	_flash_mesh.height = 0.18
 	_flash_mesh.material = _flash_material
 	_burst_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_grenade_mesh.radius = 0.14
+	_grenade_mesh.height = 0.28
+	_grenade_mesh.radial_segments = 12
+	_grenade_mesh.rings = 6
 
 
 ## A shot fired from `muzzle` whose pellets ended at `ends`.
@@ -44,13 +49,17 @@ func show_shot(muzzle: Vector3, ends: Array) -> void:
 func launch_projectile(id: int, weapon: String, from: Vector3, velocity: Vector3) -> void:
 	var stats := Weapons.find(weapon)
 	var wheel := MeshInstance3D.new()
-	wheel.mesh = _wheel_mesh
+	wheel.mesh = _grenade_mesh if stats != null and stats.bounces else _wheel_mesh
 	wheel.material_override = _wheel_material
 	wheel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(wheel)
 	wheel.global_position = from
 	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8) * (stats.projectile_gravity if stats != null else 0.0)
 	_projectiles[id] = {"node": wheel, "from": from, "velocity": velocity, "gravity": gravity, "age": 0.0, "fuse": stats.fuse if stats != null else 3.0}
+	if stats != null and stats.bounces:
+		# One that bounces has no simple path: follow it through this
+		# machine's own copy of the arena, which is the same as the host's.
+		_projectiles[id].flight = Projectile.new(id, 0, stats, from, velocity)
 
 
 ## Projectile `id` burst at `at`.
@@ -93,6 +102,14 @@ func _process(delta: float) -> void:
 		if flying.age > flying.fuse + 2.0:
 			flying.node.queue_free()
 			_projectiles.erase(id)
+			continue
+		if flying.has("flight"):
+			var flight: Projectile = flying.flight
+			# Where it bursts is the host's to say: until then, it is only moved.
+			flight.advance(delta, Match.wall_finder(get_world_3d().direct_space_state), {})
+			flying.node.global_position = flight.position
+			if not flight.resting:
+				flying.node.rotate_x(delta * 9.0)
 			continue
 		flying.node.global_position = Projectile.position_at(flying.from, flying.velocity, flying.gravity, flying.age)
 		flying.node.rotate_x(delta * 12.0)

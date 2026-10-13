@@ -66,6 +66,7 @@ func snapshot() -> Dictionary:
 			"overload": record.overload if record != null else null,
 			"overloaded": record.overload_left > 0.0 if record != null else null,
 			"deaths": record.deaths if record != null else null,
+			"grenades": record.grenades if record != null else null,
 			"aiming": player.is_aiming(),
 		}
 		if player.is_multiplayer_authority():
@@ -135,6 +136,7 @@ func snapshot() -> Dictionary:
 		"players": players,
 		"sounds": Sounds.counts,
 		"put_backs": _main.world.match_.put_backs,
+		"projectiles": _main.world.effects.projectiles_in_flight(),
 		"settings": {
 			"mouse_sensitivity": Settings.get_value("mouse_sensitivity"),
 			"invert_look": Settings.get_value("invert_look"),

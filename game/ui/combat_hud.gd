@@ -52,6 +52,7 @@ var _health_bar: ProgressBar
 var _health_label: Label
 var _ammo_label: Label
 var _reserve_label: Label
+var _grenade_label: Label
 var _weapon_label: Label
 var _pickup_label: Label
 var _pickup_left := 0.0
@@ -191,6 +192,17 @@ func ammo_shown() -> String:
 	return _ammo_label.text if _ammo_label.visible else ""
 
 
+## How many grenades are left, as one mark for each.
+static func grenade_text(record: PlayerRecord) -> String:
+	if record == null:
+		return ""
+	return "Grenades  " + "●".repeat(record.grenades) + "○".repeat(Weapons.GRENADES - record.grenades)
+
+
+func grenades_shown() -> String:
+	return _grenade_label.text
+
+
 func reserve_shown() -> String:
 	return _reserve_label.text
 
@@ -243,6 +255,7 @@ func _process(delta: float) -> void:
 	var ready := Overload.is_ready(record) or (record != null and record.overload_left > 0.0)
 	_overload_bar.modulate = Color(1.0, 0.6, 0.15) if ready else Color(1, 1, 1, 0.8)
 	_health_label.text = str(health)
+	_grenade_label.text = grenade_text(record)
 	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
 	if own != null:
 		_ammo_label.text = ammo_text(own.weapon)
@@ -406,6 +419,9 @@ func _build() -> void:
 	_reserve_label = _outlined_label(15)
 	_reserve_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	arms.add_child(_reserve_label)
+	_grenade_label = _outlined_label(15)
+	_grenade_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	arms.add_child(_grenade_label)
 
 	kill_feed = preload("res://ui/kill_feed.gd").new()
 	kill_feed.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 16)

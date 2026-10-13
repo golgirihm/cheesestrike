@@ -14,8 +14,11 @@ func _init(of: Node3D) -> void:
 func _ready() -> void:
 	var match_: Match = world.match_
 	match_.shot_shown.connect(_on_others_shot)
-	match_.projectile_launched.connect(func(_id: int, _weapon: String, from: Vector3, _velocity: Vector3) -> void:
-		Sounds.play_at("launcher", from, world))
+	match_.projectile_launched.connect(func(_id: int, weapon: String, from: Vector3, _velocity: Vector3) -> void:
+		if weapon == Weapons.GRENADE:
+			Sounds.play_at("throw", from, world, 0.0, 0.75)
+		else:
+			Sounds.play_at("launcher", from, world))
 	match_.projectile_burst.connect(func(_id: int, _weapon: String, at: Vector3) -> void:
 		Sounds.play_at("burst", at, world))
 	match_.hit_confirmed.connect(func(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
