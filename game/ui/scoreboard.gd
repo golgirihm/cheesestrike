@@ -56,7 +56,7 @@ func show_state(state: MatchState, own: int) -> void:
 			team = record.team
 			var team_color := TeamColors.of(team)
 			_add_cell(MatchState.TEAM_NAMES[team], team_color)
-			_add_cell(str(state.team_kills[team]), team_color)
+			_add_cell(str(state.team_score(team)), team_color)
 			_add_cell("", team_color)
 			_add_cell("", team_color)
 		var color := OWN_COLOR if record.id == own else Color.WHITE

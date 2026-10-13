@@ -21,6 +21,10 @@ const INTERMISSION := 10.0
 const PLAYING := "playing"
 const ENDED := "ended"
 
+## Seconds between one round of Last mouse standing and the next, for
+## everyone to choose what to bring to it.
+const ROUND_BREAK := 6.0
+
 const NO_TEAM := -1
 const CHEDDAR := 0
 const BRIE := 1
@@ -34,6 +38,17 @@ var phase := PLAYING
 var time_left := float(settings.minutes * 60)
 ## Knock-outs by each team, Cheddar first, in a team match.
 var team_kills := [0, 0]
+## Points each team has, Cheddar first, in a mode won on points.
+var team_points := [0, 0]
+## The wheels of a match of Capture the wheel, and the zones of Hold the
+## hill or Three points; null in any other mode.
+var capture: CaptureRules
+var zones: ZoneRules
+## Seconds left of the break between rounds of Last mouse standing, when
+## nobody can be hurt; and the team that has just won one (NO_TEAM for a
+## round nobody won, -2 when there is nothing to tell), for the host.
+var round_break := 0.0
+var round_won := -2
 ## Who won the last match: player ids, or teams in a team match. More than one
 ## is a draw.
 var winners: Array[int] = []
@@ -59,6 +74,147 @@ var power_ended := false
 func _init(with := MatchSettings.new()) -> void:
 	settings = with
 	time_left = settings.minutes * 60.0
+	if settings.mode == MatchSettings.CAPTURE:
+		capture = CaptureRules.new()
+	elif settings.mode == MatchSettings.HILL or settings.mode == MatchSettings.POINTS:
+		zones = ZoneRules.new()
+
+
+## A team's score in the mode being played: points, or knock-outs.
+func team_score(team: int) -> int:
+	return team_points[team] if settings.by_points() else team_kills[team]
+
+
+## Gives `team` `points`, which may win the match. Returns whether it did.
+func score(team: int, points: int) -> bool:
+	if not is_playing() or team < 0 or team > 1 or points <= 0:
+		return false
+	team_points[team] += points
+	if _limit_reached():
+		end_match()
+		return true
+	return false
+
+
+## Leaves `record`'s owner with what they come into play with: their
+## loadout, or in a gun game the weapon they have worked their way to.
+func rearm(record: PlayerRecord) -> void:
+	record.disarm()
+	if settings.mode == MatchSettings.GUN_GAME:
+		var weapon := GunGame.weapon_for(record.kills)
+		record.weapons = [weapon]
+		record.weapon = weapon
+		record.fitted = Attachments.NONE
+
+
+## How fast `record`'s owner moves, as a share of normal speed.
+func speed_factor(record: PlayerRecord) -> float:
+	var factor := Overload.speed_factor(record)
+	if record != null and capture != null and capture.carried_by(record.id) != -1:
+		factor *= CaptureRules.CARRY_SPEED
+	return factor
+
+
+## Host only: moves the mode's own rules on by `delta` seconds. `spots` are
+## the arena's places for them ({"bases", "hills", "points"}); `standing`
+## maps each player's id to {"at": their feet, "team", "alive"}. Returns
+## what everyone should be told, in order: each {"text", "team": whose
+## colour to write it in}.
+func update_objectives(delta: float, spots: Dictionary, standing: Dictionary) -> Array[Dictionary]:
+	var told: Array[Dictionary] = []
+	if not is_playing():
+		return told
+	if capture != null and spots.get("bases", []).size() == 2:
+		for event: Dictionary in capture.update(delta, spots.bases, standing):
+			var wheel: String = TEAM_NAMES[event.wheel]
+			var other: int = 1 - event.wheel
+			match event.type:
+				CaptureRules.TAKEN:
+					told.append({"text": "%s has the %s wheel!" % [name_of(event.by), wheel], "team": other})
+				CaptureRules.FELL:
+					told.append({"text": "The %s wheel is dropped" % wheel, "team": event.wheel})
+				CaptureRules.RETURNED:
+					told.append({"text": "The %s wheel is home" % wheel, "team": event.wheel})
+				CaptureRules.CAPTURED:
+					told.append({"text": "%s scores for %s!" % [name_of(event.by), TEAM_NAMES[other]], "team": other})
+					score(other, 1)
+	elif zones != null and settings.mode == MatchSettings.HILL:
+		var hill := zones.update_hill(delta, spots.get("hills", []), standing)
+		for team in 2:
+			score(team, hill.points[team])
+		if hill.moved:
+			told.append({"text": "The hill has moved", "team": NO_TEAM})
+	elif zones != null:
+		var held := zones.update_points(delta, spots.get("points", []), standing)
+		for taken: Array in held.taken:
+			told.append({"text": "%s takes point %s" % [TEAM_NAMES[taken[1]], ZoneRules.NAMES[taken[0]]], "team": taken[1]})
+		for team in 2:
+			score(team, held.points[team])
+	return told
+
+
+## What a player is told of the mode's own business, under the score: where
+## the wheels are, when the hill moves, who has which point, how the round
+## stands, or which weapon of the gun game they are on.
+func objective_text(own: int) -> String:
+	if not is_playing():
+		return ""
+	if capture != null:
+		var parts: Array[String] = []
+		for team in 2:
+			var wheel: Dictionary = capture.wheels[team]
+			var where := "home"
+			if wheel.status == CaptureRules.CARRIED:
+				where = "with %s" % name_of(wheel.carrier)
+			elif wheel.status == CaptureRules.DROPPED:
+				where = "dropped"
+			parts.append("%s wheel %s" % [TEAM_NAMES[team], where])
+		return " · ".join(parts)
+	if zones != null and settings.mode == MatchSettings.HILL:
+		return "The hill moves in %ds" % ceili(zones.hill_left)
+	if zones != null:
+		return zones.points_text()
+	if settings.mode == MatchSettings.ROUNDS:
+		if round_break > 0.0:
+			return "Next round in %d: choose your weapons in the menu" % ceili(round_break)
+		return "%d left of Cheddar · %d of Brie" % [alive_in(CHEDDAR), alive_in(BRIE)]
+	if settings.mode == MatchSettings.GUN_GAME and player(own) != null:
+		return GunGame.text(player(own).kills)
+	return ""
+
+
+## How many of `team` are in play.
+func alive_in(team: int) -> int:
+	var count := 0
+	for record: PlayerRecord in players.values():
+		if record.team == team and record.alive:
+			count += 1
+	return count
+
+
+# Last mouse standing: a round is over once a team with players has none
+# left in play. The other takes it, and after a break everyone comes back.
+func _check_round() -> void:
+	if settings.mode != MatchSettings.ROUNDS or not is_playing() or round_break > 0.0:
+		return
+	var members := [0, 0]
+	for record: PlayerRecord in players.values():
+		if record.team != NO_TEAM:
+			members[record.team] += 1
+	if members[CHEDDAR] == 0 or members[BRIE] == 0:
+		return
+	var left := [alive_in(CHEDDAR), alive_in(BRIE)]
+	if left[CHEDDAR] > 0 and left[BRIE] > 0:
+		return
+	round_won = NO_TEAM
+	for team in 2:
+		if left[team] > 0:
+			round_won = team
+	if round_won != NO_TEAM and score(round_won, 1):
+		return
+	round_break = ROUND_BREAK
+	for record: PlayerRecord in players.values():
+		record.respawn_in = ROUND_BREAK
 
 
 func add_player(id: int) -> PlayerRecord:
@@ -67,11 +223,13 @@ func add_player(id: int) -> PlayerRecord:
 		if settings.is_teams():
 			record.team = smaller_team()
 		players[id] = record
+		rearm(record)
 	return players[id]
 
 
 func remove_player(id: int) -> void:
 	players.erase(id)
+	_check_round()
 
 
 func player(id: int) -> PlayerRecord:
@@ -127,7 +285,7 @@ func is_playing() -> bool:
 func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dictionary:
 	var result := {"dealt": 0, "knocked_out": false, "ended": false, "absorbed": 0}
 	var target := player(victim)
-	if not is_playing() or target == null or not target.alive or target.is_protected():
+	if not is_playing() or target == null or not target.alive or target.is_protected() or round_break > 0.0:
 		return result
 	var own := attacker == victim
 	if (own and not own_too) or amount <= 0.0 or (not own and are_allies(attacker, victim)):
@@ -146,10 +304,11 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 			scorer.overload = minf(scorer.overload + dealt * Overload.CHARGE_PER_DAMAGE, Overload.METER_FULL)
 	if target.health <= 0:
 		target.alive = false
-		target.respawn_in = RESPAWN_DELAY
+		# One life a round, in Last mouse standing.
+		target.respawn_in = 0.0 if settings.mode == MatchSettings.ROUNDS else RESPAWN_DELAY
 		target.deaths += 1
 		target.last_attacker = attacker
-		target.disarm()
+		rearm(target)
 		target.overload *= Overload.KEPT_ON_KNOCK_OUT
 		target.overload_left = 0.0
 		target.overload_build = 0.0
@@ -159,10 +318,15 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 			scorer.kills += 1
 			if scorer.team != NO_TEAM:
 				team_kills[scorer.team] += 1
+			if settings.mode == MatchSettings.GUN_GAME and scorer.alive:
+				# On to the next weapon, at once.
+				rearm(scorer)
 		result.knocked_out = true
 		if _limit_reached():
 			end_match()
 			result.ended = true
+		_check_round()
+		result.ended = not is_playing()
 	return result
 
 
@@ -183,6 +347,9 @@ func collect(index: int, kind: String, id: int) -> String:
 	var record := player(id)
 	if not is_playing() or not pickup_ready(index) or not Pickups.wanted(kind, record):
 		return ""
+	# In a gun game the only weapon is the one a player has earned.
+	if settings.mode == MatchSettings.GUN_GAME and Weapons.ids().has(kind):
+		return ""
 	pickups[index] = Pickups.respawn_time(kind)
 	if kind == Pickups.POWER:
 		var power := Powers.next(powers_taken)
@@ -197,6 +364,8 @@ func collect(index: int, kind: String, id: int) -> String:
 func drop(weapon: String, at: Vector3) -> int:
 	var stats := Weapons.find(weapon)
 	if not is_playing() or stats == null or not Weapons.ids().has(weapon) or stats.slot == Weapons.SIDE or not at.is_finite():
+		return 0
+	if settings.mode == MatchSettings.GUN_GAME:
 		return 0
 	drops.append({"id": _next_drop, "weapon": weapon, "at": at, "left": Pickups.DROP_LIFE})
 	_next_drop += 1
@@ -252,7 +421,9 @@ func tick(delta: float) -> Array[int]:
 			if record.power_left == 0.0:
 				record.power = Powers.NONE
 				power_ended = true
-		if not record.alive and record.respawn_in > 0.0:
+		# Whoever is waiting to come back: the knocked out, and at the end of
+		# a round of Last mouse standing, everyone.
+		if record.respawn_in > 0.0:
 			record.respawn_in = maxf(record.respawn_in - delta, 0.0)
 			if record.respawn_in == 0.0:
 				due.append(record.id)
@@ -263,6 +434,7 @@ func tick(delta: float) -> Array[int]:
 	if drops.any(func(lying: Dictionary) -> bool: return lying.left <= 0.0):
 		drops = drops.filter(func(lying: Dictionary) -> bool: return lying.left > 0.0)
 		drop_ended = true
+	round_break = maxf(round_break - delta, 0.0)
 	time_left = maxf(time_left - delta, 0.0)
 	if is_playing() and time_left == 0.0:
 		end_match()
@@ -308,6 +480,13 @@ func start_match() -> void:
 	phase = PLAYING
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
+	team_points = [0, 0]
+	round_break = 0.0
+	round_won = -2
+	if capture != null:
+		capture = CaptureRules.new()
+	if zones != null:
+		zones = ZoneRules.new()
 	winners.clear()
 	pickups.fill(0.0)
 	drops.clear()
@@ -317,7 +496,7 @@ func start_match() -> void:
 		record.kills = 0
 		record.deaths = 0
 		record.last_attacker = 0
-		record.disarm()
+		rearm(record)
 		record.overload = 0.0
 		record.overload_left = 0.0
 		record.overload_build = 0.0
@@ -359,6 +538,10 @@ func result_text() -> String:
 
 
 func _limit_reached() -> bool:
+	if settings.by_points():
+		return team_points.max() >= settings.limit()
+	if settings.mode == MatchSettings.GUN_GAME:
+		return players.values().any(func(record: PlayerRecord) -> bool: return record.kills >= settings.limit())
 	if settings.is_teams():
 		return team_kills.max() >= settings.kill_limit
 	for record: PlayerRecord in players.values():
@@ -371,7 +554,7 @@ func _limit_reached() -> bool:
 func _leaders() -> Array[int]:
 	var scores := {}
 	if settings.is_teams():
-		scores = {CHEDDAR: team_kills[CHEDDAR], BRIE: team_kills[BRIE]}
+		scores = {CHEDDAR: team_score(CHEDDAR), BRIE: team_score(BRIE)}
 	else:
 		for record: PlayerRecord in players.values():
 			scores[record.id] = record.kills
@@ -391,7 +574,7 @@ func to_dict() -> Dictionary:
 	var listed := []
 	for record: PlayerRecord in players.values():
 		listed.append(record.to_packed())
-	return {
+	var data := {
 		"settings": settings.to_dict(),
 		"players": listed,
 		"phase": phase,
@@ -399,8 +582,17 @@ func to_dict() -> Dictionary:
 		"team_kills": team_kills,
 		"winners": winners,
 		"pickups": pickups,
-		"drops": drops.map(func(lying: Dictionary) -> Array: return [lying.id, Weapons.ORDER.find(lying.weapon), lying.at, lying.left]),
 	}
+	# Only what the mode being played has, as this is sent often.
+	if settings.by_points():
+		data["points"] = team_points
+	if capture != null or zones != null:
+		data["objective"] = capture.to_array() if capture != null else zones.to_array()
+	if settings.mode == MatchSettings.ROUNDS:
+		data["round_break"] = round_break
+	if not drops.is_empty():
+		data["drops"] = drops.map(func(lying: Dictionary) -> Array: return [lying.id, Weapons.ORDER.find(lying.weapon), lying.at, lying.left])
+	return data
 
 
 static func from_dict(data: Dictionary) -> MatchState:
@@ -423,6 +615,16 @@ static func from_dict(data: Dictionary) -> MatchState:
 	if pads is Array:
 		for left: Variant in pads:
 			state.pickups.append(maxf(float(left), 0.0) if (left is float or left is int) and is_finite(float(left)) else 0.0)
+	var points: Variant = data.get("points")
+	if points is Array and points.size() == 2 and (points[0] is int or points[0] is float) and (points[1] is int or points[1] is float):
+		state.team_points = [maxi(int(points[0]), 0), maxi(int(points[1]), 0)]
+	if state.capture != null:
+		state.capture = CaptureRules.from_array(data.get("objective"))
+	if state.zones != null:
+		state.zones = ZoneRules.from_array(data.get("objective"))
+	var pause: Variant = data.get("round_break")
+	if (pause is float or pause is int) and is_finite(float(pause)):
+		state.round_break = clampf(float(pause), 0.0, ROUND_BREAK)
 	var lying: Variant = data.get("drops")
 	if lying is Array:
 		for entry: Variant in lying.slice(0, Pickups.MAX_DROPS):

@@ -7,8 +7,22 @@ extends RefCounted
 
 const FREE_FOR_ALL := "ffa"
 const TEAMS := "teams"
-const MODES := [FREE_FOR_ALL, TEAMS]
-const MODE_NAMES := {FREE_FOR_ALL: "Free-for-all", TEAMS: "Cheddar vs Brie"}
+## Two bases, two wheels of cheese to carry off (see CaptureRules).
+const CAPTURE := "ctf"
+## One zone that moves; and three that are kept (see ZoneRules).
+const HILL := "hill"
+const POINTS := "points"
+## Rounds with one life each.
+const ROUNDS := "rounds"
+## Every knock-out moves a player to the next weapon (see GunGame).
+const GUN_GAME := "gun"
+const MODES := [FREE_FOR_ALL, TEAMS, CAPTURE, HILL, POINTS, ROUNDS, GUN_GAME]
+const MODE_NAMES := {FREE_FOR_ALL: "Free-for-all", TEAMS: "Cheddar vs Brie", CAPTURE: "Capture the wheel", HILL: "Hold the hill",
+	POINTS: "Three points", ROUNDS: "Last mouse standing", GUN_GAME: "Gun game"}
+## The modes played in two teams.
+const TEAM_MODES := [TEAMS, CAPTURE, HILL, POINTS, ROUNDS]
+## The modes won on points rather than knock-outs, and the points that win.
+const POINT_LIMITS := {CAPTURE: 3, HILL: 100, POINTS: 150, ROUNDS: 4}
 const KILL_LIMITS := [5, 10, 20, 30, 50]
 const MINUTES := [3, 5, 8, 10, 15]
 const MIN_PLAYERS := 2
@@ -24,7 +38,28 @@ var map := Maps.DEFAULT
 
 
 func is_teams() -> bool:
-	return mode == TEAMS
+	return TEAM_MODES.has(mode)
+
+
+## Whether teams score points for what they do, rather than knock-outs.
+func by_points() -> bool:
+	return POINT_LIMITS.has(mode)
+
+
+## The score that wins: points, knock-outs, or every weapon of the gun game.
+func limit() -> int:
+	if mode == GUN_GAME:
+		return GunGame.LADDER.size()
+	return POINT_LIMITS.get(mode, kill_limit)
+
+
+## The settings as the session list is told them. The server that keeps the
+## list knows only the first two modes, so the others are listed as
+## whichever of those is nearest: teams or not.
+func advertised() -> Dictionary:
+	var told := to_dict()
+	told.mode = TEAMS if is_teams() else FREE_FOR_ALL
+	return told
 
 
 ## The settings described by `data`, as made by to_dict, with anything missing
@@ -49,7 +84,7 @@ func to_dict() -> Dictionary:
 
 ## A short description, such as "Free-for-all · first to 20 · 8 min · Cheddar Canyon".
 func describe() -> String:
-	return "%s · first to %d · %d min · %s" % [MODE_NAMES[mode], kill_limit, minutes, Maps.NAMES[map]]
+	return "%s · first to %d · %d min · %s" % [MODE_NAMES[mode], limit(), minutes, Maps.NAMES[map]]
 
 
 static func _whole(value: Variant, default: int, low: int, high: int) -> int:

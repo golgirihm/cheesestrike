@@ -33,6 +33,9 @@ signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
 signal overloaded(id: int)
 ## Player `id` collected a pickup of `kind` (on everyone's machine).
 signal picked_up(id: int, kind: String)
+## Something everyone is told, across the screen: `text`, in the colour of
+## `team` (MatchState.NO_TEAM for nobody's).
+signal announced(text: String, team: int)
 ## Player `id` took power-up `power` (see Powers), which everyone is told.
 signal power_taken(id: int, power: int)
 ## A projectile was launched, or burst, for effects.
@@ -289,7 +292,7 @@ func _arm(id: int, main: Variant, side: Variant, attachment: Variant = 0) -> voi
 	record.side = chosen[1]
 	record.attachment = chosen[2]
 	if untouched:
-		record.disarm()
+		state.rearm(record)
 		_rules_for(id).refill()
 	_changed()
 
@@ -599,6 +602,12 @@ func _process(delta: float) -> void:
 				_ping.rpc_id(peer, _clock)
 		for id in due:
 			_respawn(id)
+		if state.round_won != -2:
+			var taken: int = state.round_won
+			state.round_won = -2
+			if state.is_playing():
+				announce("Nobody takes the round" if taken == MatchState.NO_TEAM else "%s takes the round" % MatchState.TEAM_NAMES[taken], taken)
+			_changed()
 		# Before any that begins now, whose first wheel is the next frame's.
 		_rain(delta)
 		if not state.overloads_begun.is_empty():
@@ -841,6 +850,7 @@ func _physics_process(delta: float) -> void:
 		record_position(now(), own.global_position, own.name.to_int(), Vector2(own.rotation.y, own.head.rotation.x))
 	_collect_pickups()
 	_collect_drops()
+	_run_objectives(delta)
 	if _projectiles.is_empty():
 		return
 	var wall := wall_finder(world.get_world_3d().direct_space_state)
@@ -903,6 +913,35 @@ func _collect_drops() -> void:
 			_pickup_seen.rpc(id, lying.weapon)
 			picked_up.emit(id, lying.weapon)
 			break
+
+
+## Host only: tells everyone `text`, in `team`'s colour.
+func announce(text: String, team: int) -> void:
+	_announced.rpc(text, team)
+	announced.emit(text, team)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _announced(text: String, team: int) -> void:
+	announced.emit(text, team)
+
+
+# The host moves the mode's own rules on: wheels, the hill, points.
+func _run_objectives(delta: float) -> void:
+	if state.capture == null and state.zones == null:
+		return
+	var standing := {}
+	for node: Node3D in world.players.get_children():
+		var record := state.player(node.name.to_int())
+		if record != null and not node.is_queued_for_deletion():
+			# One just brought back isn't yet where they are seen.
+			standing[record.id] = {"at": node.global_position, "team": record.team, "alive": record.alive and _is_where_shown(record.id, node)}
+	var before := [state.team_points[0], state.team_points[1], state.is_playing()]
+	var told := state.update_objectives(delta, world.objective_spots(), standing)
+	for line: Dictionary in told:
+		announce(line.text, line.team)
+	if not told.is_empty() or before != [state.team_points[0], state.team_points[1], state.is_playing()]:
+		_changed()
 
 
 # A match begins with no power-up on its pad: it comes in a while.

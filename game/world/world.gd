@@ -17,6 +17,7 @@ const PLAYER_MASK := 2
 @onready var effects: Node3D = $Effects
 
 var sound_cues: Node
+var objective_marks: Node3D
 
 ## The loaded arena, and which of the Maps it is.
 var map: Node3D
@@ -54,6 +55,8 @@ func _ready() -> void:
 	match_.state_changed.connect(_on_state_changed)
 	sound_cues = preload("res://audio/sound_cues.gd").new(self)
 	add_child(sound_cues)
+	objective_marks = preload("res://world/objective_marks.gd").new(self)
+	add_child(objective_marks)
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()
@@ -124,6 +127,7 @@ func _on_state_changed() -> void:
 		load_map(match_.state.settings.map)
 	_show_pickups()
 	_show_drops()
+	objective_marks.refresh()
 
 
 func _add_player(id: int) -> void:
@@ -232,6 +236,25 @@ func pickup_pads() -> Array:
 	for pad: Node3D in map.get_node("Pickups").get_children():
 		pads.append({"position": pad.global_position, "kind": String(pad.get_meta("kind", Pickups.HEALTH))})
 	return pads
+
+
+## The loaded arena's places for the modes that have them: {"bases": the
+## teams' bases, Cheddar's first, "hills": where the hill goes in turn,
+## "points": the three points, in order}.
+func objective_spots() -> Dictionary:
+	var spots := {"bases": [], "hills": [], "points": []}
+	var holder := map.get_node_or_null("Objectives") if map != null else null
+	if holder == null:
+		return spots
+	for marker: Node3D in holder.get_children():
+		var kind := String(marker.name)
+		if kind.begins_with("Base"):
+			spots.bases.append(marker.global_position)
+		elif kind.begins_with("Hill"):
+			spots.hills.append(marker.global_position)
+		elif kind.begins_with("Point"):
+			spots.points.append(marker.global_position)
+	return spots
 
 
 ## The player node for peer `id`, or null.

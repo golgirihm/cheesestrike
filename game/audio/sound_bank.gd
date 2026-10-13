@@ -36,6 +36,7 @@ const SOUNDS := {
 	"pickup": "_pickup",
 	"overload": "_overload",
 	"power": "_power",
+	"objective": "_objective",
 	"reload": "_reload",
 	"dry": "_dry",
 	"knife": "_knife",
@@ -412,6 +413,14 @@ static func _pickup() -> AudioStreamWAV:
 	return _make(0.3, func(t: float, _i: int) -> float:
 		var note: float = notes[mini(int(t / 0.1), 2)]
 		return sin(TAU * note * t) * _decay(fmod(t, 0.1), 12.0), 0.5)
+
+
+# Something has happened in the match that everyone is told: two notes.
+static func _objective() -> AudioStreamWAV:
+	return _make(0.4, func(t: float, _i: int) -> float:
+		var note := 587.33 if t < 0.16 else 880.0
+		var since := t if t < 0.16 else t - 0.16
+		return (sin(TAU * note * t) + 0.4 * sin(TAU * note * 2.0 * t)) * _decay(since, 7.0), 0.6)
 
 
 # A power-up taken: a fanfare of rising chords, loud enough for everyone.

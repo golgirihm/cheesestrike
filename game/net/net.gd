@@ -57,7 +57,7 @@ func host(settings := MatchSettings.new(), private := false) -> void:
 	last_joined = ""
 	_connecting = true
 	if use_webrtc:
-		_send({"type": "host", "settings": settings.to_dict(), "private": private})
+		_send({"type": "host", "settings": settings.advertised(), "private": private})
 		return
 	var enet := ENetMultiplayerPeer.new()
 	if enet.create_server(ENET_PORT, settings.max_players - 1) != OK:
