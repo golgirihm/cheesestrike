@@ -99,6 +99,15 @@ class CombatTest(GameTestCase):
         host.page.mouse.up(button="right")
         host.wait_for("!s.players[0].aiming")
 
+    def test_others_see_a_player_aim(self):
+        host, joiner, joiner_id = self.start_pair()
+        host.capture_mouse()
+        host.page.mouse.down(button="right")
+        joiner.wait_for("s.players.some((p) => p.id === 1 && p.aiming)")
+        self.assertFalse(joiner.own_player()["aiming"])
+        host.page.mouse.up(button="right")
+        joiner.wait_for("s.players.some((p) => p.id === 1 && !p.aiming)")
+
     def test_reloading_fills_the_magazine(self):
         host = self.open_game()
         host.host()
