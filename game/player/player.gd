@@ -75,8 +75,9 @@ var net_state := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0]):
 		if not _mine and is_inside_tree():
 			_receive(value)
 
-## The bit of a pose that says a player is aiming down the sights.
+## The bits of a pose: aiming down the sights, and reloading.
 const POSE_AIMING := 1
+const POSE_RELOADING := 2
 # What another player is doing, as their owner last sent it.
 var _pose := 0
 
@@ -137,6 +138,19 @@ var _switch_left := 0.0
 var _run := -1
 var _since_shot := INF
 var _recoil_view := Vector2.ZERO
+# For the sway of the weapon in view (see WeaponSway): how far the view has
+# turned since the last frame and how fast it is turning, smoothed; how hard
+# the last landing was, dying away; and how far into a run the weapon is.
+var _looked := Vector2.ZERO
+var _turn_rate := Vector2.ZERO
+var _landing := 0.0
+var _running := 0.0
+var _was_on_floor := true
+var _fall_speed := 0.0
+# How far the weapon is lowered for a reload, and its magazine out, 0 to 1.
+var _reload_lowered := 0.0
+var _magazine: Node3D
+var _magazine_rest := Vector3.ZERO
 ## How fast the view climbs with a kick, and settles after a run of fire.
 const RECOIL_RISE := 30.0
 const RECOIL_SETTLE := 7.0
@@ -152,9 +166,8 @@ const VIEW_GUN_POSITION := Vector3(0.2, -0.19, -0.55)
 ## Where others see a player hold a weapon they are aiming: up at the eye, in
 ## the character's measurements from the head.
 const SEEN_AIM_GUN_POSITION := Vector3(0.14, -0.05, -0.5)
-## Where it sits when aiming down the sights: in the middle, just under the
-## point being aimed at.
-const AIM_GUN_POSITION := Vector3(0.0, -0.1, -0.42)
+## How far in front of the eye the rear sight is held when aiming.
+const AIM_EYE_RELIEF := 0.32
 const VIEW_GUN_SCALE := 0.6
 ## How high the team badge floats, in the character's measurements.
 const BADGE_HEIGHT := 2.5
@@ -264,6 +277,8 @@ func _show_weapon(id: String) -> void:
 	var model := WeaponModels.build(id)
 	gun.add_child(model)
 	muzzle = model.get_node("Muzzle")
+	_magazine = model.get_node_or_null("Magazine")
+	_magazine_rest = _magazine.position if _magazine != null else Vector3.ZERO
 
 
 func _face_middle() -> void:
@@ -440,16 +455,36 @@ func _animate(delta: float) -> void:
 	_switch_left = maxf(_switch_left - delta, 0.0)
 	var rest := _gun_rest
 	var bob := Vector3.ZERO
+	var sway_turn := Vector3.ZERO
+	var reloading := 0.0
+	var magazine_out := 0.0
 	if _mine:
 		var sights := smoothstep(0.0, 1.0, _aim)
-		rest = _gun_rest.lerp(AIM_GUN_POSITION, sights)
+		rest = _gun_rest.lerp(aim_gun_position(), sights)
 		var across := Vector2(velocity.x, velocity.z).length()
+		# Held steadier at the eye.
+		var steady := 1.0 - 0.8 * sights
 		if is_on_floor() and across > 0.5:
 			_bob_phase = fmod(_bob_phase + across * delta * 1.8, TAU)
-			# Held steadier at the eye.
-			bob = Vector3(sin(_bob_phase) * 0.012, absf(cos(_bob_phase)) * 0.012, 0.0) * (1.0 - 0.8 * sights)
+			bob = Vector3(sin(_bob_phase) * 0.012, absf(cos(_bob_phase)) * 0.012, 0.0) * steady
 			_step(across * delta, Vector3.INF)
+		if delta > 0.0:
+			_turn_rate = _turn_rate.lerp(_looked / delta, minf(delta * 12.0, 1.0))
+		_looked = Vector2.ZERO
+		_landing = maxf(_landing - delta * 5.0, 0.0)
+		var at_a_run := is_on_floor() and across > Movement.WALK_SPEED * 1.2 and _aim <= 0.0
+		_running = move_toward(_running, 1.0 if at_a_run else 0.0, delta * 6.0)
+		var sideways := (global_basis.inverse() * velocity).x / Movement.WALK_SPEED
+		bob += WeaponSway.turning(_turn_rate) * steady + WeaponSway.landing(_landing) + WeaponSway.RUN_OFFSET * _running
+		sway_turn = WeaponSway.RUN_TURN * _running + Vector3(0, 0, WeaponSway.strafing(sideways) * steady)
+		var progress := 1.0 - weapon.reload_left / weapon.stats.reload_time if weapon.is_reloading() else 0.0
+		reloading = WeaponSway.reload_lowering(progress)
+		magazine_out = WeaponSway.magazine_out(progress)
 	else:
+		# Others are seen to lower their weapon for as long as they reload.
+		_reload_lowered = move_toward(_reload_lowered, 1.0 if _pose & POSE_RELOADING and alive else 0.0, delta * 5.0)
+		reloading = smoothstep(0.0, 1.0, _reload_lowered)
+		magazine_out = reloading
 		# Others bring their weapon up to the eye when they aim.
 		_aim = move_toward(_aim, 1.0 if _pose & POSE_AIMING and alive else 0.0, delta / AIM_TIME)
 		rest = _gun_rest.lerp(SEEN_AIM_GUN_POSITION * BodyShape.SIZE, smoothstep(0.0, 1.0, _aim))
@@ -466,8 +501,19 @@ func _animate(delta: float) -> void:
 		body.set_gaze(head.rotation.x)
 	# A weapon just changed to swings up from below.
 	var lowered := switch_lowering(_switch_left)
-	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + Vector3(0.0, -0.5, 0.1) * lowered * gun.scale.x
-	gun.rotation = Vector3(0.18 * _kick - 1.1 * lowered, 0.0, 0.5 * lowered)
+	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + (Vector3(0.0, -0.5, 0.1) * lowered + Vector3(0.03, -0.16, 0.04) * reloading) * gun.scale.x
+	gun.rotation = Vector3(0.18 * _kick - 1.1 * lowered + 0.4 * reloading, 0.0, 0.5 * lowered + 0.7 * reloading) + sway_turn
+	if _magazine != null:
+		_magazine.position = _magazine_rest + Vector3.DOWN * 0.18 * magazine_out
+
+
+## Where the weapon in hand sits in this player's own view when they aim: its
+## rear sight straight ahead of the eye, so that the sights line up on what
+## the middle of the view is on.
+func aim_gun_position() -> Vector3:
+	var sight: Node3D = muzzle.get_parent().get_node_or_null("Sight") if muzzle != null else null
+	var at := sight.position if sight != null else Vector3.ZERO
+	return Vector3(0, 0, -AIM_EYE_RELIEF) - at * VIEW_GUN_SCALE
 	if not _mine and muzzle != null:
 		# Their weapon arm follows the hand on the weapon.
 		body.reach_for(body.to_local(muzzle.get_parent().to_global(WeaponModels.GRIP)))
@@ -540,6 +586,8 @@ static func page_to_view(movement: Vector2, view: Vector2, window: Vector2, pixe
 func _publish() -> void:
 	if _mine:
 		var pose := POSE_AIMING if _aim > 0.5 else 0
+		if weapon.is_reloading():
+			pose |= POSE_RELOADING
 		net_state = PackedFloat32Array([global_position.x, global_position.y, global_position.z, rotation.y, head.rotation.x, _teleports, pose])
 
 
@@ -664,7 +712,12 @@ func _physics_process(delta: float) -> void:
 	var speed := Movement.speed(Input.is_action_pressed("sprint"), _wants_aim(), _flinch_left, Overload.speed_factor(record()))
 	velocity.x = direction.x * speed + _knockback.x
 	velocity.z = direction.z * speed + _knockback.z
+	_fall_speed = maxf(-velocity.y, 0.0)
 	move_and_slide()
+	# Coming down onto the ground jolts the weapon in view.
+	if is_on_floor() and not _was_on_floor:
+		_landing = WeaponSway.impact(_fall_speed)
+	_was_on_floor = is_on_floor()
 	_publish()
 
 	_use_weapon()
@@ -731,6 +784,7 @@ func _look(delta: Vector2) -> void:
 	if Settings.get_value("invert_look"):
 		delta.y = -delta.y
 	delta *= lerpf(1.0, AIM_LOOK_FACTOR, _aim)
+	_looked += Vector2(delta.x, -delta.y)
 	rotate_y(-delta.x)
 	head.rotation.x = clampf(head.rotation.x - delta.y, -PITCH_LIMIT, PITCH_LIMIT)
 

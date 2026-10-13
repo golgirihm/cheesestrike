@@ -162,3 +162,15 @@ func test_the_damage_of_a_hit_is_written_only_if_asked_for() -> void:
 	assert_lte(hud.damage_numbers_shown().size(), 6, "and only a few show at once")
 	Settings.set_value("damage_numbers", false)
 	main.world.stop()
+
+
+func test_the_crosshair_gives_way_to_the_sights_when_aiming() -> void:
+	var main: Node = await _main_in_a_session()
+	var own: Node3D = main.world.player_node(1)
+	assert_not_null(own)
+	assert_true(main.combat_hud.crosshair_shown())
+	own._aim = 1.0
+	assert_false(main.combat_hud.crosshair_shown())
+	own._aim = 0.5
+	assert_true(main.combat_hud.crosshair_shown(), "still there while the weapon is on its way up")
+	main.world.stop()
