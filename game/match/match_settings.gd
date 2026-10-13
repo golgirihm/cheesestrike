@@ -100,6 +100,9 @@ func limit() -> int:
 func advertised() -> Dictionary:
 	var told := to_dict()
 	told.mode = TEAMS if is_teams() else FREE_FOR_ALL
+	# Nor every arena.
+	if not Maps.LISTED.has(map):
+		told.map = Maps.LISTED[0]
 	# Nor does it know of bots.
 	told.erase("bots")
 	told.erase("bot_skill")

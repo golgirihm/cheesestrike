@@ -79,6 +79,7 @@ func _physics_process(delta: float) -> void:
 
 	var aiming: bool = orders.look != null
 	var speed := Movement.speed(orders.run, aiming, 0.0, match_.state.speed_factor(record)) * weapon.stats.carry_speed
+	speed *= MovingParts.speed_factor(world.moving_parts.hazards, at)
 	var move: Vector3 = orders.move
 	player.velocity.x = move.x * speed
 	player.velocity.z = move.z * speed

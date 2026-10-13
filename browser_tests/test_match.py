@@ -54,6 +54,30 @@ class MatchTest(GameTestCase):
         state = host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         self.assertGreaterEqual(next(player for player in state["players"] if player["mine"])["ammo"], 14, "it didn't take many shots")
 
+    def test_everyone_sees_a_door_open_for_whoever_comes_to_it(self):
+        # In the dairy the third player to arrive starts inside the cold
+        # store, facing its door, with the middle of the arena beyond.
+        host, code = self.host_with(map="Double Cream Dairy")
+        joiner = self.open_game()
+        joiner.join(code)
+        host.wait_for("s.players.length === 2")
+        for game in (host, joiner):
+            state = game.wait_for("s.map === 'dairy' && s.doors.length === 1")
+            self.assertEqual(state["doors"], [False], "shut, with nobody near")
+            self.assertEqual(state["doors_shown"], [0])
+        inside = self.open_game()
+        inside.join(code)
+        for game in (host, joiner, inside):
+            game.wait_for("s.players.length === 3 && s.doors[0] === true && s.doors_shown[0] === 1")
+        # Out through the doorway, and it shuts behind them.
+        inside.page.keyboard.down("w")
+        try:
+            inside.wait_for("s.players.some((p) => p.mine && p.position[0] > -4)")
+        finally:
+            inside.page.keyboard.up("w")
+        for game in (host, joiner, inside):
+            game.wait_for("s.doors[0] === false && s.doors_shown[0] === 0")
+
     def test_the_city_can_be_played_in(self):
         host, code = self.host_with(map="Curd City")
         self.assertEqual(host.state()["map"], "city")

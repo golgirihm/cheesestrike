@@ -15,18 +15,22 @@ class_name Maps
 ## it than to any other.
 
 const DEFAULT := "canyon"
-const ORDER := ["canyon", "box", "city"]
+const ORDER := ["canyon", "box", "city", "dairy"]
+## The arenas the session list's server knows of. A session on any other is
+## listed as being on the first of these (see MatchSettings.advertised).
+const LISTED := ["canyon", "box", "city"]
 ## The practice range: an arena for one, not among those a host chooses
 ## from. Besides what every arena has, it has Targets, markers with a
 ## `distance`, where a target stands to be shot at; and its pads hold every
 ## weapon, laid out as a rack.
 const RANGE := "range"
-const NAMES := {"canyon": "Cheddar Canyon", "box": "Brie Box", "city": "Curd City", RANGE: "Practice range"}
+const NAMES := {"canyon": "Cheddar Canyon", "box": "Brie Box", "city": "Curd City", "dairy": "Double Cream Dairy", RANGE: "Practice range"}
 
 const _SCENES := {
 	"canyon": preload("res://world/maps/cheddar_canyon.tscn"),
 	"box": preload("res://world/maps/brie_box.tscn"),
 	"city": preload("res://world/maps/curd_city.tscn"),
+	"dairy": preload("res://world/maps/dairy.tscn"),
 	RANGE: preload("res://world/maps/practice_range.tscn"),
 }
 
