@@ -76,12 +76,10 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* the arena tests.
 7. **Hazards and doors.** A grater that hurts, a vat of fondue, doors that open and lifts that move, all decided by the host.
    *Tests:* GUT tests of each; browser test that both players see a door open.
-8. **Where players come back.** Choose a spot nobody is looking at, away from recent fighting, and with teams, near their own.
-   *Tests:* extend `test_spawn_chooser.gd`.
-9. **Named places.** Names for each part of an arena, shown on the HUD and used in the kill feed and on the map.
+8. **Named places.** Names for each part of an arena, shown on the HUD and used in the kill feed and on the map.
    *Tests:* GUT test that every part of each arena has a name.
-10. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
-    *Tests:* GUT tests of saving and loading; the arena tests run on a saved arena.
+9. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
+   *Tests:* GUT tests of saving and loading; the arena tests run on a saved arena.
 
 ## Milestone 8: A picture that holds up
 

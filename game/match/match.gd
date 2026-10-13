@@ -107,6 +107,11 @@ var _pending_names := {}
 var _pending_looks := {}
 # And their loadouts, as [main, side].
 var _pending_loadouts := {}
+# Where players have lately been knocked out: each {"where", "at": when on
+# the host's clock, "victim"}. A returning player is kept away from them.
+var _fights: Array[Dictionary] = []
+## Seconds a knock-out counts as recent fighting.
+const FIGHT_MEMORY := 10.0
 # The keys (see introduce) of players removed by a vote, who are not let
 # back into the session.
 var _removed_keys := {}
@@ -1004,6 +1009,11 @@ func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: Str
 	var result := state.damage(attacker, victim, amount, own)
 	if result.knocked_out:
 		_leave_behind(victim, in_hand)
+		var fallen: Node3D = world.player_node(victim)
+		if fallen != null:
+			_fights.append({"where": fallen.global_position, "at": _clock, "victim": victim})
+			while _fights.size() > 16:
+				_fights.pop_front()
 		# Told first, so that everyone knows how they went by the time they
 		# hear that they have.
 		_fall_seen.rpc(victim, weapon, from)
@@ -1429,18 +1439,33 @@ func _select(id: int, weapon: String) -> void:
 ## The host brings a knocked-out player back, at the spot farthest from the
 ## players who could hurt them.
 func _respawn(id: int) -> void:
-	var others: Array[Vector3] = []
+	var enemies := []
+	var allies := []
 	for node: Node3D in world.players.get_children():
 		var other := state.player(node.name.to_int())
-		if other != null and other.id != id and other.alive and not state.are_allies(id, other.id):
-			others.append(node.global_position)
+		if other == null or other.id == id or not other.alive or node.is_queued_for_deletion():
+			continue
+		if state.are_allies(id, other.id):
+			allies.append(node.global_position)
+		else:
+			enemies.append({"at": node.global_position, "yaw": node.rotation.y})
 	# One with a place of its own, as a target on the range has, goes back to it.
 	var home: Variant = world.home_of(id)
 	if home != null:
 		_bring_back(id, home)
 		return
+	# Where there has lately been fighting, other than their own knock-out:
+	# whoever did that is already someone to keep away from.
+	var fights := []
+	for fight: Dictionary in _fights:
+		if fight.victim != id and _clock - fight.at <= FIGHT_MEMORY:
+			fights.append(fight.where)
+	var space := world.get_world_3d().direct_space_state
+	var eye := Vector3.UP * BodyShape.HEAD_HEIGHT * BodyShape.SIZE
+	var sees := func(from: Vector3, to: Vector3) -> bool:
+		return space.intersect_ray(PhysicsRayQueryParameters3D.create(from + eye, to + eye, WORLD_MASK)).is_empty()
 	var spots: Array[Vector3] = world.spawn_positions()
-	_bring_back(id, spots[SpawnChooser.farthest(spots, others)])
+	_bring_back(id, spots[SpawnChooser.best(spots, enemies, allies, fights, sees)])
 
 
 ## The host starts the next match, with everyone back in play at a spot of
@@ -1454,12 +1479,22 @@ func _new_match() -> void:
 	_apply_vote()
 	state.start_match()
 	_hold_back_powers()
+	_fights.clear()
 	var spots: Array[Vector3] = world.spawn_positions()
 	spots.shuffle()
+	# In a mode with bases, each team starts on its own side of the arena.
+	var bases: Array = world.objective_spots().bases
+	var sides: Array = SpawnChooser.by_side(spots, bases) if state.capture != null and bases.size() == 2 else []
+	var taken := [0, 0]
 	var index := 0
 	for id: int in state.players:
+		var record := state.player(id)
 		# Not those who are only watching.
-		if state.player(id).watching:
+		if record.watching:
+			continue
+		if not sides.is_empty() and record.team >= 0 and not sides[record.team].is_empty():
+			_bring_back(id, sides[record.team][taken[record.team] % sides[record.team].size()])
+			taken[record.team] += 1
 			continue
 		_bring_back(id, spots[index % spots.size()])
 		index += 1
