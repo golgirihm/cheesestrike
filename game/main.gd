@@ -265,7 +265,7 @@ func _run_tutorial() -> void:
 	for weapon: String in Weapons.ids():
 		shots += world.match_.tally.of(weapon).shots
 	var finished := tutorial.update({"at": own.global_position, "yaw": own.rotation.y, "shots": shots, "aiming": own.is_aiming(),
-		"reloads": reloads, "weapons": own.arsenal.size(), "overloaded": record.overload_left > 0.0})
+		"reloading": own.weapon.is_reloading(), "reloads": reloads, "weapons": own.arsenal.size(), "overloaded": record.overload_left > 0.0})
 	if finished:
 		Sounds.play("objective", -4.0)
 	# The step that asks for an Overload gives the player one to set off.

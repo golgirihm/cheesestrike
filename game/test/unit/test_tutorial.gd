@@ -58,6 +58,13 @@ func test_a_weapon_taken_in_passing_earlier_will_do_for_the_step_that_asks_for_o
 	assert_eq(tutorial.step_name(), "overload")
 
 
+func test_a_reload_begun_is_enough() -> void:
+	for did: Dictionary in [{"at": Vector3(Tutorial.WALK + 1.0, 0, 0)}, {"yaw": 1.0}, {"shots": 1}, {"aiming": true}]:
+		assert_true(_then(did))
+	assert_eq(tutorial.step_name(), "reload")
+	assert_true(_then({"reloading": true}), "one that the rack's pad cuts short still counts")
+
+
 func test_walking_is_added_up_however_it_wanders() -> void:
 	for step in 5:
 		assert_false(_then({"at": Vector3(0.5 if step % 2 == 0 else 0.0, 0, 0)}), "not far yet")
