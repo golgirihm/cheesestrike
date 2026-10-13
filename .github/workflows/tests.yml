@@ -96,8 +96,9 @@ jobs:
         with:
           path: ${{ runner.tool_cache }}/Python/${{ env.PYTHON_VERSION }}
           key: python-${{ env.PYTHON_VERSION }}-ubuntu-24.04-${{ runner.arch }}
-      - run: pip install -r signaling/requirements.txt
-      - run: python tools/run_tests.py signaling
+      - run: pip install -r signaling/requirements-test.txt
+      # The infra tests are quick and need the same packages, so they share this job.
+      - run: python tools/run_tests.py signaling infra
 
   # Exports the web build and plays it in headless browser windows.
   browser:

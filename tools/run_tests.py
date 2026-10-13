@@ -9,6 +9,11 @@ non-zero if any failed.
 The game and browser suites need Godot. It is found through the GODOT
 environment variable, or else as `godot_console` or `godot` on the PATH.
 
+The signaling and infra suites test the session server and what deploys it,
+against imitations of AWS that run in the test process. They need:
+
+    pip install -r signaling/requirements-test.txt
+
 The browser suite exports the web build to build/browser-tests and plays it in
 headless browser windows. Besides Godot's Web export template it needs:
 
@@ -34,7 +39,11 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GAME = ROOT / "game"
 VERSIONS = ROOT / "tools" / "versions.env"
-REQUIREMENTS = [ROOT / "signaling" / "requirements.txt", ROOT / "browser_tests" / "requirements.txt"]
+REQUIREMENTS = [
+    ROOT / "signaling" / "requirements.txt",
+    ROOT / "signaling" / "requirements-test.txt",
+    ROOT / "browser_tests" / "requirements.txt",
+]
 BROWSER_TESTS = ROOT / "browser_tests"
 BROWSER_BUILD = ROOT / "build" / "browser-tests"
 # How many browsers run tests at once: one per processor, which is four on
@@ -61,7 +70,8 @@ def pinned_versions():
         for line in requirements.read_text(encoding="utf-8-sig").splitlines():
             name, separator, value = line.strip().partition("==")
             if separator:
-                pins[name] = value
+                # "moto[dynamodb,s3]" is the package moto.
+                pins[name.partition("[")[0]] = value
     return pins
 
 
@@ -149,9 +159,17 @@ def run_gut(godot):
 
 
 def signaling(pins):
-    if not checked_package(pins, "websockets", "signaling/requirements.txt"):
-        return False
+    for package in ("websockets", "boto3", "moto"):
+        if not checked_package(pins, package, "signaling/requirements-test.txt"):
+            return False
     return run(sys.executable, "-m", "unittest", "discover", "-s", "signaling")
+
+
+def infra(pins):
+    for package in ("boto3", "moto", "cfn-lint"):
+        if not checked_package(pins, package, "signaling/requirements-test.txt"):
+            return False
+    return run(sys.executable, "-m", "unittest", "discover", "-s", "infra")
 
 
 def browser(pins):
@@ -219,7 +237,7 @@ def run_browser_tests():
     return passed
 
 
-SUITES = {"game": game, "signaling": signaling, "browser": browser}
+SUITES = {"game": game, "signaling": signaling, "infra": infra, "browser": browser}
 
 
 def main():
