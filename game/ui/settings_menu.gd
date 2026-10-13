@@ -75,6 +75,8 @@ func refresh() -> void:
 	(find_child("Setting_quality", true, false) as Button).text = "Graphics: %s" % GraphicsQuality.NAMES[GraphicsQuality.level(Settings.get_value("quality"))]
 	for key: String in Looks.SETTINGS:
 		(find_child("Setting_" + key, true, false) as Button).text = look_text(key)
+	for key: String in LOADOUT:
+		(find_child("Setting_" + key, true, false) as Button).text = loadout_text(key)
 	for action: String in _key_buttons:
 		_key_buttons[action].text = "Press a key…" if action == _waiting_for else Controls.keys_text(action)
 
@@ -86,6 +88,17 @@ static func value_text(key: String, value: float) -> String:
 			var shown: float = value * 100.0 if row[5] == "%d%%" else value
 			return row[5] % shown
 	return str(value)
+
+
+## The settings that make up a loadout, with what each is called and the
+## weapons it can be.
+const LOADOUT := {"loadout_main": ["Main weapon", Weapons.MAINS], "loadout_side": ["Sidearm", Weapons.SIDES]}
+
+
+## What the button for one part of the loadout says, such as "Main weapon:
+## Swiss Shotgun".
+static func loadout_text(key: String) -> String:
+	return "%s: %s" % [LOADOUT[key][0], Weapons.find(Settings.get_value(key)).display_name]
 
 
 ## What the button for one of the character's looks says, such as "Hat: Crown".
@@ -187,6 +200,18 @@ func _build() -> void:
 	quality.pressed.connect(func() -> void:
 		Settings.set_value("quality", next_quality(GraphicsQuality.level(Settings.get_value("quality")))))
 	_rows.add_child(quality)
+
+	var loadout_title := Label.new()
+	loadout_title.text = "Your weapons, from when you next come back"
+	loadout_title.add_theme_font_size_override("font_size", 20)
+	_rows.add_child(loadout_title)
+	for key: String in LOADOUT:
+		var slot := Button.new()
+		slot.name = "Setting_" + key
+		slot.custom_minimum_size = Vector2(0, 40)
+		slot.pressed.connect(func() -> void:
+			Settings.set_value(key, next_choice(LOADOUT[key][1], Settings.get_value(key))))
+		_rows.add_child(slot)
 
 	var look_title := Label.new()
 	look_title.text = "Your character, as others see it"

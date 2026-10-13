@@ -227,6 +227,20 @@ class Game:
         finally:
             self.page.mouse.up(button="right")
 
+    def rest_position(self):
+        """Where this window's own character is once it has stopped moving:
+        the same in two looks a little apart. A fixed wait after letting go
+        of a key isn't enough on a busy machine, where the game may be a few
+        frames late in hearing of it."""
+        last = None
+        for _ in range(100):
+            now = self.own_player()["position"]
+            if now == last:
+                return now
+            last = now
+            self.page.wait_for_timeout(200)
+        raise AssertionError(f"the player never came to rest: {last}")
+
     def distance_to(self, player_id):
         """How far this window's own character is from player `player_id`,
         across the ground, in metres."""

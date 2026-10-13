@@ -356,25 +356,25 @@ metadata/kind = "health"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 18)
 metadata/kind = "health"
 
-[node name="Shotgun" type="Marker3D" parent="Pickups"]
+[node name="HealthCorner" type="Marker3D" parent="Pickups"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0, -21)
-metadata/kind = "shotgun"
+metadata/kind = "health"
 
-[node name="Grater" type="Marker3D" parent="Pickups"]
+[node name="AmmoCorner" type="Marker3D" parent="Pickups"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0, 21)
-metadata/kind = "grater"
+metadata/kind = "ammo"
 
 [node name="HealthWest" type="Marker3D" parent="Pickups"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 0)
 metadata/kind = "health"
 
-[node name="BlasterWest" type="Marker3D" parent="Pickups"]
+[node name="AmmoByWest" type="Marker3D" parent="Pickups"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0, 21)
-metadata/kind = "blaster"
+metadata/kind = "ammo"
 
-[node name="BlasterEast" type="Marker3D" parent="Pickups"]
+[node name="AmmoByEast" type="Marker3D" parent="Pickups"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0, -21)
-metadata/kind = "blaster"
+metadata/kind = "ammo"
 
 [node name="AmmoEast" type="Marker3D" parent="Pickups"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, 0)

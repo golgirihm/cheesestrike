@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_stats")
 id = "pistol"
+slot = "side"
 display_name = "Curd Pistol"
 damage = 12.0
 headshot_multiplier = 1.5

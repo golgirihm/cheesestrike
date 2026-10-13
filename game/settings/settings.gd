@@ -62,6 +62,9 @@ const DEFAULTS := {
 	"look_cheese": Looks.CHEESES[0],
 	"look_hat": Looks.HATS[0],
 	"look_held": Looks.HELD[0],
+	## The weapons the player comes into play with (see Weapons.MAINS).
+	"loadout_main": Weapons.DEFAULT_MAIN,
+	"loadout_side": Weapons.STARTING,
 }
 
 ## The allowed range of each number setting. A value outside is brought in.
@@ -84,6 +87,8 @@ const CHOICES := {
 	"look_cheese": Looks.CHEESES,
 	"look_hat": Looks.HATS,
 	"look_held": Looks.HELD,
+	"loadout_main": Weapons.MAINS,
+	"loadout_side": Weapons.SIDES,
 }
 
 ## Where the settings are kept. Tests point their own instances elsewhere.

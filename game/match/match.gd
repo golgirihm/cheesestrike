@@ -93,6 +93,8 @@ var _next_projectile := 1
 var _pending_names := {}
 # And the looks they chose, likewise.
 var _pending_looks := {}
+# And their loadouts, as [main, side].
+var _pending_loadouts := {}
 # Each player's key (see WebPage.player_key), by id, including keys sent
 # before the host saw the player join; and the records of players who left,
 # by key, kept for a while in case they come back.
@@ -114,6 +116,7 @@ func start(settings := MatchSettings.new()) -> void:
 		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
 		_pending_names.clear()
 		_pending_looks.clear()
+		_pending_loadouts.clear()
 		_keys.clear()
 		_departed.clear()
 		_rules.clear()
@@ -126,6 +129,8 @@ func start(settings := MatchSettings.new()) -> void:
 	else:
 		introduce(Settings.get_value("name"))
 		wear(Looks.chosen())
+		var loadout := Weapons.chosen_loadout()
+		choose_loadout(loadout[0], loadout[1])
 
 
 func stop() -> void:
@@ -155,12 +160,16 @@ func add_player(id: int) -> void:
 	if id == multiplayer.get_unique_id():
 		state.rename(id, Settings.get_value("name"))
 		state.player(id).look = Looks.chosen()
+		_pending_loadouts[id] = Weapons.chosen_loadout()
 	elif _pending_names.has(id):
 		state.rename(id, _pending_names[id])
 	if _pending_looks.has(id):
 		state.player(id).look = _pending_looks[id]
+	if _pending_loadouts.has(id):
+		_arm(id, _pending_loadouts[id][0], _pending_loadouts[id][1])
 	_pending_names.erase(id)
 	_pending_looks.erase(id)
+	_pending_loadouts.erase(id)
 	if _keys.has(id):
 		_welcome_back(id)
 	_changed()
@@ -192,6 +201,40 @@ func introduce(wanted: String, key := WebPage.player_key()) -> void:
 		_rename(1, wanted)
 	elif multiplayer.multiplayer_peer != null:
 		_introduce.rpc_id(1, wanted, key)
+
+
+## Tells the host the weapons this player wants to come into play with.
+func choose_loadout(main: String, side: String) -> void:
+	if is_host():
+		_arm(1, main, side)
+	elif multiplayer.multiplayer_peer != null:
+		_request_loadout.rpc_id(1, main, side)
+
+
+# Host only: player `id` has chosen a loadout. It is theirs from when they
+# next come back into play, or at once if they have only just come in and
+# have what they came with.
+func _arm(id: int, main: Variant, side: Variant) -> void:
+	var chosen := Weapons.clean_loadout(main, side)
+	var record := state.player(id)
+	if record == null:
+		_pending_loadouts[id] = chosen
+		return
+	if record.main == chosen[0] and record.side == chosen[1]:
+		return
+	var untouched := record.alive and record.health == PlayerRecord.MAX_HEALTH and record.has_only_loadout()
+	record.main = chosen[0]
+	record.side = chosen[1]
+	if untouched:
+		record.disarm()
+		_rules_for(id).refill()
+	_changed()
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_loadout(main: Variant, side: Variant) -> void:
+	if is_host():
+		_arm(multiplayer.get_remote_sender_id(), main, side)
 
 
 ## Tells the host what this player's character looks like (see Looks).

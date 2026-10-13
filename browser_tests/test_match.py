@@ -72,7 +72,7 @@ class MatchTest(GameTestCase):
             self.assertEqual(state["combat"]["match"], "Match over")
         # The host, and only the host, is shown what each weapon did.
         tally = host.wait_for("s.combat.tally !== ''")["combat"]["tally"]
-        self.assertRegex(tally, r"Curd Pistol: \d+ fired, \d+ hit, \d+ damage, 5 knocked out")
+        self.assertRegex(tally, r"Cheddar Blaster: \d+ fired, \d+ hit, \d+ damage, 5 knocked out")
         self.assertEqual(joiner.state()["combat"]["tally"], "")
         self.assertEqual(host.player(joiner_id)["deaths"], 5)
 

@@ -55,21 +55,19 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 5: An arsenal
 
-1. **Loadouts.** Choose a main weapon, a sidearm and equipment before a match and on coming back, from what has been unlocked or what the host allows. Arena pads then hold only the power weapons.
-   *Tests:* GUT tests in `MatchState` and `PlayerRecord`; the host refuses a loadout that isn't allowed. Browser test.
-2. **A rifle for distance.** A slow, scoped weapon that rewards a head shot, with a glint others can see and a breath to hold.
+1. **A rifle for distance.** A slow, scoped weapon that rewards a head shot, with a glint others can see and a breath to hold.
    *Tests:* GUT tests of its numbers and of the scope's zoom.
-3. **More weapons.** A burst-fire carbine, a light machine gun that is slow to bring up, a pair of pistols, a bow that fires breadsticks. Each needs a role none of the others fill.
+2. **More weapons.** A burst-fire carbine, a light machine gun that is slow to bring up, a pair of pistols, a bow that fires breadsticks. Each needs a role none of the others fill.
    *Tests:* each joins the existing weapon tests, which already run over every weapon.
-4. **Other ways to fire.** A second trigger for some weapons: the shotgun's both barrels, the launcher's bouncing wheel, the blaster's charged shot.
+3. **Other ways to fire.** A second trigger for some weapons: the shotgun's both barrels, the launcher's bouncing wheel, the blaster's charged shot.
    *Tests:* GUT tests in `WeaponState` and `ShotRules`.
-5. **Power-ups.** Rare, loudly announced pickups on a long timer: double damage, speed, a shield, seeing through walls for a moment.
+4. **Power-ups.** Rare, loudly announced pickups on a long timer: double damage, speed, a shield, seeing through walls for a moment.
    *Tests:* GUT tests of each effect and its end; browser test of the announcement.
-6. **Weapons left behind.** A knocked-out player drops the weapon they held, for anyone to take, for a while.
+5. **Weapons left behind.** A knocked-out player drops the weapon they held, for anyone to take, for a while.
    *Tests:* GUT tests in `Pickups`; browser test.
-7. **Attachments.** A sight, a grip, a longer magazine: small trade-offs on each weapon, chosen in the loadout.
+6. **Attachments.** A sight, a grip, a longer magazine: small trade-offs on each weapon, chosen in the loadout.
    *Tests:* GUT tests that each changes only what it says.
-8. **More to the Overload.** Different Overloads to choose between (speed and melt, as now; a shield; a rain of wheels), with a build-up others can hear and react to.
+7. **More to the Overload.** Different Overloads to choose between (speed and melt, as now; a shield; a rain of wheels), with a build-up others can hear and react to.
    *Tests:* extend `test_overload.gd`.
 
 ## Milestone 6: Ways to play

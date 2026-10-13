@@ -20,7 +20,8 @@ func before_each() -> void:
 func _add(id: int, at: Vector3) -> Node3D:
 	match_.add_player(id)
 	# In hand, a Cheddar Blaster, which these tests' numbers are for.
-	match_.state.player(id).weapons.append("blaster")
+	if not match_.state.player(id).weapons.has("blaster"):
+		match_.state.player(id).weapons.append("blaster")
 	match_.state.player(id).weapon = "blaster"
 	var player: Node3D = world._create_player([id, Vector3.ZERO])
 	world.players.add_child(player)

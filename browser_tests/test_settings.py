@@ -65,6 +65,24 @@ class SettingsTest(GameTestCase):
         joiner.click("Setting_look_held")
         host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.look.held === 'balloon')")
 
+    def test_a_player_comes_in_with_the_weapons_they_chose(self):
+        host = self.open_game()
+        code = host.host()
+        self.assertEqual(host.own_player()["carrying"], ["pistol", "blaster"], "what a new player has")
+        self.assertEqual(host.own_player()["weapon"], "blaster", "the main weapon in hand")
+        joiner = self.open_game()
+        joiner.click("SettingsButton")
+        joiner.wait_for("s.screen === 'settings'")
+        joiner.scroll_to("Setting_loadout_main")
+        joiner.click("Setting_loadout_main")
+        joiner.click("SettingsDone")
+        joiner.wait_for("s.screen === 'menu'")
+        joiner.join(code)
+        joiner.wait_for("s.players.some((p) => p.mine && p.weapon === 'shotgun' && p.carrying.includes('pistol'))")
+        joiner_id = joiner.own_player()["id"]
+        host.wait_for(f"s.players.some((p) => p.id === {joiner_id} && p.holding === 'shotgun')")
+        self.assertEqual(joiner.state()["combat"]["weapon"], "Swiss Shotgun")
+
     def test_settings_open_from_the_in_game_menu_and_go_back_to_it(self):
         game = self.open_game()
         game.host()

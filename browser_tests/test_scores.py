@@ -30,7 +30,7 @@ class ScoresTest(GameTestCase):
         host.page.wait_for_timeout(500)
 
         self.knock_out(host, target_id)
-        expected = "Hunter  [Curd Pistol"
+        expected = "Hunter  [Cheddar Blaster"
         for game in (host, target, watcher):
             state = game.wait_for("s.combat.knockouts_announced >= 1")
             self.assertTrue(state["combat"]["latest_knockout"].startswith(expected), state["combat"]["latest_knockout"])

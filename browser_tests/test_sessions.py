@@ -107,10 +107,9 @@ class JoiningTest(GameTestCase):
             game.page.keyboard.down("w")
             game.page.wait_for_timeout(600)
             game.page.keyboard.up("w")
-            game.page.wait_for_timeout(300)
-            player = game.own_player()
-            self.assertGreater(distance(start, player["position"]), 1.0, "walking forward didn't move the player")
-            moved[player["id"]] = player["position"]
+            rest = game.rest_position()
+            self.assertGreater(distance(start, rest), 1.0, "walking forward didn't move the player")
+            moved[game.own_player()["id"]] = rest
 
         third = self.open_game()
         third.join(code)

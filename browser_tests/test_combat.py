@@ -1,7 +1,8 @@
 """Shooting, through real mouse clicks and a real connection: the host of a
 session starts on the first spot and the first joiner on the second, facing
 each other across the arena, so a shot fired down the sights without turning
-hits. Everyone starts with the Curd Pistol, which fires once for each pull.
+hits. Everyone comes in with the loadout a new player has: a Cheddar Blaster
+in hand and a Curd Pistol beside it.
 
 A slow machine can run the game with long gaps between frames, so these wait
 for what lasts (a score, a count of reloads) rather than for a passing moment
@@ -13,7 +14,7 @@ import unittest
 from harness import GameTestCase
 
 FULL_HEALTH = 100
-MAGAZINE = 10
+MAGAZINE = 24
 
 
 class CombatTest(GameTestCase):
@@ -158,7 +159,7 @@ class CombatTest(GameTestCase):
                 break
         joiner.wait_for(f"s.players.some((p) => p.mine && {hurt}) && s.combat.hurts_shown >= 1")
         self.assertGreaterEqual(host.state()["combat"]["hits_shown"], 1)
-        self.assertEqual(host.state()["sounds"].get("pistol", 0), 0, "without a shot fired")
+        self.assertEqual(host.state()["sounds"].get("blaster", 0), 0, "without a shot fired")
 
     def test_reloading_fills_the_magazine(self):
         host = self.open_game()

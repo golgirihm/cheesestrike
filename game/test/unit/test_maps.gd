@@ -133,9 +133,12 @@ func test_every_pad_rests_on_a_floor_and_holds_a_known_pickup() -> void:
 			assert_true(Pickups.is_kind(pad.kind), "%s: %s" % [id, pad.kind])
 			var from: Vector3 = pad.position + Vector3.UP * 0.2
 			assert_false(space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 0.5)).is_empty(), "%s: %s pad floats" % [id, pad.kind])
+		# Weapons a loadout gives aren't lying about: only the power weapons.
 		for weapon: String in Weapons.ids():
-			if weapon != Weapons.STARTING:
+			if Weapons.find(weapon).slot == Weapons.POWER:
 				assert_has(kinds, weapon, id)
+			else:
+				assert_does_not_have(kinds, weapon, id)
 		assert_has(kinds, Pickups.HEALTH, id)
 		assert_has(kinds, Pickups.AMMO, id)
 
