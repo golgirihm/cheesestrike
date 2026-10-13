@@ -505,9 +505,11 @@ func _targets_except(except: int, then := -1.0) -> Dictionary:
 			var history: PositionHistory = _histories.get(id)
 			if then >= 0.0 and history != null and not history.is_empty():
 				var facing := history.facing_at(then)
-				targets[id] = HitScan.pose(history.at(then), facing.x, facing.y)
+				# Where they were then; crouched or not as they are now, which
+				# the host doesn't keep a history of.
+				targets[id] = HitScan.pose(history.at(then), facing.x, facing.y, node.crouch())
 			else:
-				targets[id] = HitScan.pose(node.global_position, node.rotation.y, node.head.rotation.x)
+				targets[id] = HitScan.pose(node.global_position, node.rotation.y, node.head.rotation.x, node.crouch())
 	return targets
 
 
@@ -900,7 +902,7 @@ func _respawned(at: Vector3) -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func _request_shot(origin: Variant, direction: Variant, seed: Variant, weapon: Variant, stance: Variant = 0) -> void:
 	if is_host() and origin is Vector3 and direction is Vector3 and seed is int and weapon is String:
-		_shot(multiplayer.get_remote_sender_id(), origin, direction, seed, weapon, stance & 7 if stance is int else 0)
+		_shot(multiplayer.get_remote_sender_id(), origin, direction, seed, weapon, stance & 15 if stance is int else 0)
 
 
 @rpc("any_peer", "call_remote", "reliable")

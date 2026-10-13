@@ -55,6 +55,10 @@ const EYE_RADIUS := 0.028
 ## Hits on the wedge from just under the eyes up to its tip are headshots.
 const HEAD_FROM := HEAD_HEIGHT - EYE_RADIUS
 
+## How far a player who crouches drops: their legs fold, and the wedge, with
+## the eyes they see from, comes down by this much.
+const CROUCH_DROP := 0.25
+
 ## The capsule the player moves as, which holds all of the above.
 const CAPSULE_RADIUS := 0.4
 const CAPSULE_HEIGHT := 1.8
@@ -93,17 +97,25 @@ static func hole_place(hole: Array) -> Dictionary:
 
 ## Where a ray from `origin` in direction `direction` (normalized) first touches
 ## the wedge of a player standing at `feet` and turned by `yaw`, as {distance,
-## head}; or an empty dictionary if it misses. A ray that starts inside the
-## wedge doesn't hit it.
-static func ray_hit(origin: Vector3, direction: Vector3, feet: Vector3, yaw := 0.0) -> Dictionary:
+## head}; or an empty dictionary if it misses. `crouch` is how far down they
+## are, from 0 standing to 1 crouched. A ray that starts inside the wedge
+## doesn't hit it.
+static func ray_hit(origin: Vector3, direction: Vector3, feet: Vector3, yaw := 0.0, crouch := 0.0) -> Dictionary:
 	# Into the body's own measurements, where it stands at the origin facing -Z.
 	var unturn := Basis(Vector3.UP, -yaw)
-	var local := unturn * (origin - feet) / SIZE
+	var drop := Vector3.DOWN * CROUCH_DROP * clampf(crouch, 0.0, 1.0)
+	var local := unturn * (origin - feet) / SIZE - drop
 	var along := unturn * direction
 	var t := _ray_wedge(local - WEDGE_CENTRE, along)
 	if t == INF:
 		return {}
 	return {"distance": t * SIZE, "head": local.y + along.y * t >= HEAD_FROM}
+
+
+## How high above their feet a player crouched by `crouch` sees from, in the
+## body's measurements.
+static func head_height(crouch := 0.0) -> float:
+	return HEAD_HEIGHT - CROUCH_DROP * clampf(crouch, 0.0, 1.0)
 
 
 ## The point up the middle of a player standing at `feet` that is nearest

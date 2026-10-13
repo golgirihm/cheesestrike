@@ -47,6 +47,10 @@ var _speed := 0.0
 var _airborne := false
 var _gaze := 0.0
 var _grimace_left := 0.0
+# How far down the player is crouched, 0 to 1, and everything above the legs,
+# which comes down with them, with where each rests when standing.
+var _crouch := 0.0
+var _upper := {}
 var _flash_left := 0.0
 var _glowing := false
 # 0 standing, 1 fully melted.
@@ -93,6 +97,23 @@ func _light() -> void:
 func set_motion(speed: float, airborne: bool) -> void:
 	_speed = speed
 	_airborne = airborne
+
+
+## How far the player is crouched, from 0 (standing) to 1: the legs fold
+## and the rest comes down.
+func set_crouch(amount: float) -> void:
+	_crouch = clampf(amount, 0.0, 1.0)
+	var drop := Vector3.DOWN * BodyShape.CROUCH_DROP * _crouch
+	for part: Node3D in _upper:
+		part.position = _upper[part] + drop
+	for index in _legs.size():
+		var hip: Vector3 = BodyShape.LEGS[index][0]
+		_legs[index].position = hip + drop
+		# The legs shorten to keep the feet on the ground, and the shoes keep
+		# their shape.
+		var fold := (hip.y - BodyShape.CROUCH_DROP * _crouch) / hip.y
+		_legs[index].scale.y = fold
+		_legs[index].get_child(1).scale.y = 0.6 / fold
 
 
 ## How far up (or, below zero, down) the player is looking, in radians: the
@@ -166,7 +187,7 @@ func _process(delta: float) -> void:
 	_calm.visible = not is_grimacing()
 	_wince.visible = is_grimacing()
 	for eye in _eyes:
-		eye.position.y = BodyShape.HEAD_HEIGHT + clampf(_gaze, -1.0, 1.0) * GAZE_SHIFT
+		eye.position.y = BodyShape.head_height(_crouch) + clampf(_gaze, -1.0, 1.0) * GAZE_SHIFT
 		# Screwed up tight when wincing.
 		eye.scale.z = 0.35 if is_grimacing() else 1.0
 	if _melting:
@@ -218,6 +239,9 @@ func _build() -> void:
 	# weapon arm's hand is part of the weapon it holds.
 	_arms[0].rotation.z = -0.35
 	_arms[0].add_child(_ball(0.042, Vector3(0, -BodyShape.ARMS[0][1], 0)))
+	for part in get_children():
+		if not _legs.has(part):
+			_upper[part] = part.position
 
 
 # The face, drawn on the front of the wedge: two dot eyes, and either a

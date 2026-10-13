@@ -7,6 +7,10 @@ const WALK_SPEED := 6.0
 const RUN_FACTOR := 1.5
 ## Aiming down the sights slows a player to this share of walking.
 const AIM_FACTOR := 0.6
+## So does crouching, to this share, and it rules out running.
+const CROUCH_FACTOR := 0.5
+## Crouches and stands in about an eighth of a second.
+const CROUCH_RATE := 8.0
 ## Gravity is strong (see the project's physics settings), so a jump is quick:
 ## this still lifts a player about a metre and a half.
 const JUMP_VELOCITY := 7.8
@@ -24,10 +28,12 @@ static func flinch_factor(flinch_left: float) -> float:
 
 ## How fast a player moves across the ground. `boost` is anything else that
 ## changes it, such as an Overload.
-static func speed(running: bool, aiming: bool, flinch_left := 0.0, boost := 1.0) -> float:
+static func speed(running: bool, aiming: bool, flinch_left := 0.0, boost := 1.0, crouching := false) -> float:
 	var factor := boost * flinch_factor(flinch_left)
+	if crouching:
+		factor *= CROUCH_FACTOR
 	if aiming:
 		factor *= AIM_FACTOR
-	elif running and flinch_left <= 0.0:
+	elif running and flinch_left <= 0.0 and not crouching:
 		factor *= RUN_FACTOR
 	return WALK_SPEED * factor

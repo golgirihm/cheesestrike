@@ -907,3 +907,43 @@ func test_the_shooter_sees_their_shot_carry_on_through_thin_cover() -> void:
 	# at the arena's edge.
 	var far_end: Vector3 = tracer.global_transform * Vector3(0, 0, -0.5)
 	assert_lt(far_end.z, -10.0)
+
+
+func test_holding_crouch_lowers_the_owner_and_slows_them() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	var standing: float = own.head.position.y
+	Input.action_press("crouch")
+	await wait_seconds(0.3)
+	assert_eq(own.crouch(), 1.0)
+	assert_almost_eq(own.head.position.y, BodyShape.head_height(1.0) * BodyShape.SIZE, 0.001, "seeing from lower down")
+	assert_eq(own.stance() & WeaponStats.CROUCHED, WeaponStats.CROUCHED)
+	Input.action_press("sprint")
+	var speed: float = await _speed_of(own)
+	Input.action_release("sprint")
+	assert_almost_eq(speed, Movement.WALK_SPEED * Movement.CROUCH_FACTOR, 0.01, "and no running")
+	own._publish()
+	assert_eq(int(own.net_state[6]) & own.POSE_CROUCHING, own.POSE_CROUCHING, "everyone is told")
+	Input.action_release("crouch")
+	await wait_seconds(0.3)
+	assert_eq(own.crouch(), 0.0)
+	assert_almost_eq(own.head.position.y, standing, 0.001)
+
+
+func test_a_shot_over_a_crouched_player_misses() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	var over := Vector3(0, (BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y * 0.45) * BodyShape.SIZE, -5)
+	# Level, so that the shot is as high where it passes them as where it is aimed.
+	var origin := Vector3(0, over.y, 5)
+	shooter.global_position = origin - Vector3.UP * shooter.head.position.y
+	other.net_state = PackedFloat32Array([0, 0, -5, 0, 0, 0, other.POSE_CROUCHING])
+	other._animate(1.0)
+	assert_eq(other.crouch(), 1.0)
+	_shoot(shooter, over)
+	assert_eq(match_.state.player(2).health, 100, "it passes over their head")
+	other.net_state = PackedFloat32Array([0, 0, -5, 0, 0, 0, 0])
+	other._animate(1.0)
+	match_._rules_for(1).refill()
+	_shoot(shooter, over)
+	assert_lt(match_.state.player(2).health, 100, "standing, it catches the tip")

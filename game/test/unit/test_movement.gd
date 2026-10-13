@@ -38,3 +38,9 @@ func test_a_jump_is_short_and_about_a_metre_and_a_half_high() -> void:
 func test_the_host_allows_for_the_fastest_a_player_can_go() -> void:
 	assert_gt(MovementCheck.MAX_SPEED, Movement.speed(true, false, 0.0, Overload.SPEED_BOOST))
 	assert_gt(MovementCheck.MAX_RISE_SPEED, Movement.JUMP_VELOCITY)
+
+
+func test_crouching_is_slow_and_rules_out_running() -> void:
+	assert_almost_eq(Movement.speed(false, false, 0.0, 1.0, true), Movement.WALK_SPEED * Movement.CROUCH_FACTOR, 0.0001)
+	assert_eq(Movement.speed(true, false, 0.0, 1.0, true), Movement.speed(false, false, 0.0, 1.0, true))
+	assert_lt(Movement.speed(false, true, 0.0, 1.0, true), Movement.speed(false, true), "slower still when aiming too")

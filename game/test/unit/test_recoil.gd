@@ -139,3 +139,10 @@ func test_a_weapon_without_a_falloff_does_the_same_everywhere() -> void:
 	var plain := WeaponStats.new()
 	plain.damage = 30.0
 	assert_eq(plain.damage_at(500.0), 30.0)
+
+
+func test_a_crouch_steadies_shots_but_not_in_the_air() -> void:
+	var blaster := Weapons.find("blaster")
+	for aimed in [0, WeaponStats.AIMED]:
+		assert_almost_eq(blaster.spread_for(aimed | WeaponStats.CROUCHED, 2), blaster.spread_for(aimed, 2) * WeaponStats.CROUCHED_SPREAD, 0.0001)
+	assert_eq(blaster.spread_for(WeaponStats.CROUCHED | WeaponStats.AIRBORNE, 2), blaster.spread_for(WeaponStats.AIRBORNE, 2))
