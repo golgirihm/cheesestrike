@@ -49,6 +49,9 @@ var drop_ended := false
 var _next_drop := 1
 ## How many power-ups have been taken this match, which decides the next.
 var powers_taken := 0
+## The ids of players whose Overload has just finished building up and
+## begun, for the host to act on and tell everyone.
+var overloads_begun: Array[int] = []
 ## Set when a power-up runs out, for the host to tell everyone.
 var power_ended := false
 
@@ -131,15 +134,15 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 		return result
 	var scorer := player(attacker) if not own else null
 	# Power-ups: more from an attacker with double damage, less to a shield.
-	amount *= Powers.outgoing(scorer) * Powers.incoming(target)
+	amount *= Powers.outgoing(scorer) * Powers.incoming(target) * Overload.incoming(target)
 	var taken := target.take(roundi(amount))
 	var dealt: int = taken.dealt
 	result.dealt = dealt
 	result.absorbed = taken.absorbed
 	if scorer != null:
-		if scorer.overload_left > 0.0:
+		if Overload.is_active(scorer, Overload.MELT):
 			target.melted_for = Overload.MELT_DURATION
-		else:
+		elif scorer.overload_left <= 0.0:
 			scorer.overload = minf(scorer.overload + dealt * Overload.CHARGE_PER_DAMAGE, Overload.METER_FULL)
 	if target.health <= 0:
 		target.alive = false
@@ -149,6 +152,7 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 		target.disarm()
 		target.overload *= Overload.KEPT_ON_KNOCK_OUT
 		target.overload_left = 0.0
+		target.overload_build = 0.0
 		target.melted_for = 0.0
 		target.give_power(Powers.NONE, 0.0)
 		if scorer != null:
@@ -233,7 +237,15 @@ func tick(delta: float) -> Array[int]:
 	var due: Array[int] = []
 	for record: PlayerRecord in players.values():
 		record.protected_for = maxf(record.protected_for - delta, 0.0)
-		record.overload_left = maxf(record.overload_left - delta, 0.0)
+		if record.overload_build > 0.0:
+			# The Overload itself doesn't start to run down until it begins.
+			var into := delta - record.overload_build
+			record.overload_build = maxf(record.overload_build - delta, 0.0)
+			if record.overload_build == 0.0:
+				overloads_begun.append(record.id)
+				record.overload_left = maxf(record.overload_left - maxf(into, 0.0), 0.0)
+		else:
+			record.overload_left = maxf(record.overload_left - delta, 0.0)
 		record.melted_for = maxf(record.melted_for - delta, 0.0)
 		if record.power != Powers.NONE:
 			record.power_left = maxf(record.power_left - delta, 0.0)
@@ -264,7 +276,18 @@ func set_off_overload(id: int) -> bool:
 	if not is_playing() or not Overload.is_ready(record):
 		return false
 	record.overload = 0.0
-	record.overload_left = Overload.DURATION
+	record.overload_left = Overload.DURATIONS[record.overload_kind]
+	record.overload_build = Overload.BUILD_UP
+	return true
+
+
+## Player `id` chooses Overload `kind` for when they next set one off: not
+## the one already under way.
+func choose_overload(id: int, kind: Variant) -> bool:
+	var record := player(id)
+	if record == null or not Overload.is_kind(kind) or record.overload_kind == kind or record.overload_left > 0.0:
+		return false
+	record.overload_kind = kind
 	return true
 
 
@@ -297,6 +320,7 @@ func start_match() -> void:
 		record.disarm()
 		record.overload = 0.0
 		record.overload_left = 0.0
+		record.overload_build = 0.0
 		record.melted_for = 0.0
 
 

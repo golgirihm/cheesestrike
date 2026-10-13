@@ -294,6 +294,7 @@ func _on_setting_changed(key: String) -> void:
 	if key.begins_with("loadout_") and match_ != null:
 		var loadout := Weapons.chosen_loadout()
 		match_.choose_loadout(loadout[0], loadout[1], loadout[2])
+		match_.choose_overload(Overload.from_id(Settings.get_value("loadout_overload")))
 
 
 # The weapon to fall back on when the one in hand runs dry: one that never

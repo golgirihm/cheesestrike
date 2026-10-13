@@ -575,6 +575,7 @@ func test_setting_off_an_overload_makes_the_owner_faster() -> void:
 	watch_signals(match_)
 	match_.set_off_overload()
 	assert_signal_emitted_with_parameters(match_, "overloaded", [1])
+	match_.state.tick(Overload.BUILD_UP)
 	Input.action_press("move_forward")
 	await wait_physics_frames(2)
 	var speed := Vector2(own.velocity.x, own.velocity.z).length()

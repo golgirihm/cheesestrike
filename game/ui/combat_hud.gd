@@ -156,6 +156,8 @@ static func match_text(state: MatchState) -> String:
 static func overload_text(record: PlayerRecord) -> String:
 	if record == null:
 		return ""
+	if Overload.is_building(record):
+		return "OVERLOAD…"
 	if record.overload_left > 0.0:
 		return "OVERLOAD  %ds" % ceili(record.overload_left)
 	if Overload.is_ready(record):
@@ -275,7 +277,7 @@ func _process(delta: float) -> void:
 	_overload_label.text = overload_text(record)
 	_overload_bar.value = record.overload if record != null else 0.0
 	if record != null and record.overload_left > 0.0:
-		_overload_bar.value = record.overload_left / Overload.DURATION * Overload.METER_FULL
+		_overload_bar.value = record.overload_left / Overload.DURATIONS[record.overload_kind] * Overload.METER_FULL
 	var ready := Overload.is_ready(record) or (record != null and record.overload_left > 0.0)
 	_overload_bar.modulate = Color(1.0, 0.6, 0.15) if ready else Color(1, 1, 1, 0.8)
 	_health_label.text = str(health)

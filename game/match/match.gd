@@ -97,6 +97,11 @@ var _pending_names := {}
 var _pending_looks := {}
 # And their loadouts, as [main, side].
 var _pending_loadouts := {}
+# And the kind of Overload each has chosen.
+var _pending_overloads := {}
+# Rains of wheels under way: each {"shooter": id, "at": the feet they fall
+# round, "next": which wheel is next, "wait": seconds until it falls}.
+var _rains: Array[Dictionary] = []
 # Each player's key (see WebPage.player_key), by id, including keys sent
 # before the host saw the player join; and the records of players who left,
 # by key, kept for a while in case they come back.
@@ -120,6 +125,8 @@ func start(settings := MatchSettings.new()) -> void:
 		_pending_names.clear()
 		_pending_looks.clear()
 		_pending_loadouts.clear()
+		_pending_overloads.clear()
+		_rains.clear()
 		_keys.clear()
 		_departed.clear()
 		_rules.clear()
@@ -134,6 +141,7 @@ func start(settings := MatchSettings.new()) -> void:
 		wear(Looks.chosen())
 		var loadout := Weapons.chosen_loadout()
 		choose_loadout(loadout[0], loadout[1], loadout[2])
+		choose_overload(Overload.from_id(Settings.get_value("loadout_overload")))
 
 
 func stop() -> void:
@@ -164,6 +172,7 @@ func add_player(id: int) -> void:
 		state.rename(id, Settings.get_value("name"))
 		state.player(id).look = Looks.chosen()
 		_pending_loadouts[id] = Weapons.chosen_loadout()
+		_pending_overloads[id] = Overload.from_id(Settings.get_value("loadout_overload"))
 	elif _pending_names.has(id):
 		state.rename(id, _pending_names[id])
 	if _pending_looks.has(id):
@@ -172,7 +181,10 @@ func add_player(id: int) -> void:
 		_arm(id, _pending_loadouts[id][0], _pending_loadouts[id][1], _pending_loadouts[id][2])
 	_pending_names.erase(id)
 	_pending_looks.erase(id)
+	if _pending_overloads.has(id):
+		state.choose_overload(id, _pending_overloads[id])
 	_pending_loadouts.erase(id)
+	_pending_overloads.erase(id)
 	if _keys.has(id):
 		_welcome_back(id)
 	_changed()
@@ -204,6 +216,51 @@ func introduce(wanted: String, key := WebPage.player_key()) -> void:
 		_rename(1, wanted)
 	elif multiplayer.multiplayer_peer != null:
 		_introduce.rpc_id(1, wanted, key)
+
+
+## Tells the host the kind of Overload this player wants to set off.
+func choose_overload(kind: int) -> void:
+	if is_host():
+		_choose_overload(1, kind)
+	elif multiplayer.multiplayer_peer != null:
+		_request_overload_kind.rpc_id(1, kind)
+
+
+func _choose_overload(id: int, kind: Variant) -> void:
+	if state.player(id) == null:
+		if Overload.is_kind(kind):
+			_pending_overloads[id] = kind
+	elif state.choose_overload(id, kind):
+		_changed()
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_overload_kind(kind: Variant) -> void:
+	if is_host():
+		_choose_overload(multiplayer.get_remote_sender_id(), kind)
+
+
+# Host only: the Overloads that have just built up begin. A rain starts to
+# fall round where its player stands now.
+func _begin_overloads() -> void:
+	for id: int in state.overloads_begun:
+		var record := state.player(id)
+		var node: Node3D = world.player_node(id) if world != null else null
+		if record != null and node != null and Overload.is_active(record, Overload.RAIN):
+			_rains.append({"shooter": id, "at": node.global_position, "next": 0, "wait": 0.0})
+	state.overloads_begun.clear()
+	_changed()
+
+
+# Host only: lets fall whichever wheels of the rains under way are due.
+func _rain(delta: float) -> void:
+	for rain: Dictionary in _rains:
+		rain.wait -= delta
+		while rain.wait <= 0.0 and rain.next < Overload.RAIN_WHEELS:
+			_launch(rain.shooter, Weapons.find(Overload.RAIN_WEAPON), Overload.rain_start(rain.at, rain.next), Vector3.DOWN)
+			rain.next += 1
+			rain.wait += Overload.RAIN_INTERVAL
+	_rains = _rains.filter(func(rain: Dictionary) -> bool: return rain.next < Overload.RAIN_WHEELS)
 
 
 ## Tells the host the weapons this player wants to come into play with, and
@@ -541,6 +598,10 @@ func _process(delta: float) -> void:
 				_ping.rpc_id(peer, _clock)
 		for id in due:
 			_respawn(id)
+		# Before any that begins now, whose first wheel is the next frame's.
+		_rain(delta)
+		if not state.overloads_begun.is_empty():
+			_begin_overloads()
 		if state.power_ended or state.drop_ended:
 			state.power_ended = false
 			state.drop_ended = false
@@ -1083,6 +1144,7 @@ func _new_match() -> void:
 	# Scores start again, so there are none to give back.
 	_departed.clear()
 	tally.clear()
+	_rains.clear()
 	state.start_match()
 	_hold_back_powers()
 	var spots: Array[Vector3] = world.spawn_positions()

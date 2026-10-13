@@ -67,6 +67,8 @@ const DEFAULTS := {
 	"loadout_side": Weapons.STARTING,
 	## What is fitted to the main weapon (see Attachments.IDS).
 	"loadout_attachment": Attachments.IDS[0],
+	## The kind of Overload the player sets off (see Overload.IDS).
+	"loadout_overload": Overload.IDS[0],
 }
 
 ## The allowed range of each number setting. A value outside is brought in.
@@ -92,6 +94,7 @@ const CHOICES := {
 	"loadout_main": Weapons.MAINS,
 	"loadout_side": Weapons.SIDES,
 	"loadout_attachment": Attachments.IDS,
+	"loadout_overload": Overload.IDS,
 }
 
 ## Where the settings are kept. Tests point their own instances elsewhere.
