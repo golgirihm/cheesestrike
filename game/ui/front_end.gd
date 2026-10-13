@@ -14,6 +14,7 @@ const CHOICES := [
 	["play", "Play", "PlayButton", "play"],
 	["practice", "Practice range", "PracticeButton", "practice"],
 	["learn", "How to play", "TutorialButton", "learn"],
+	["profile", "Profile", "ProfileButton", "medal_head"],
 	["customise", "Customise", "CustomiseButton", "customise"],
 	["edit", "Arena editor", "EditorButton", "edit"],
 	["settings", "Settings", "TitleSettingsButton", "settings"],
@@ -30,7 +31,7 @@ const CREDITS := [
 	"",
 	"Thank you for playing.",
 ]
-const BUTTON_SIZE := Vector2(250, 46)
+const BUTTON_SIZE := Vector2(250, 42)
 
 ## The panel of ways in, and the panel of credits that takes its place.
 var ways: Control

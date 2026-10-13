@@ -63,6 +63,8 @@ var loading_bar: ProgressBar
 var loading_seen: Array[float] = []
 ## What is shown while a session is being joined or started.
 var join_screen: JoinScreen
+## The player's own page.
+var profile_screen: ProfileScreen
 # The sessions last listed, to know a session's arena before joining it.
 var _listed: Array = []
 # Who the pause menu's vote-to-remove button names.
@@ -120,6 +122,8 @@ func _ready() -> void:
 	front_end.chosen.connect(_on_way_in_chosen)
 	join_screen = JoinScreen.new()
 	menu.get_parent().add_child(join_screen)
+	profile_screen = ProfileScreen.new()
+	menu.get_parent().add_child(profile_screen)
 	arena_editor = preload("res://ui/arena_editor.gd").new()
 	arena_editor.name = "ArenaEditor"
 	arena_editor.theme = Look.theme()
@@ -638,6 +642,8 @@ func _on_way_in_chosen(what: String) -> void:
 			_practise()
 		"learn":
 			_teach()
+		"profile":
+			profile_screen.open()
 		"customise":
 			settings_menu.open_part(settings_menu.CUSTOMISE)
 		"edit":

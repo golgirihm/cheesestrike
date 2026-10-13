@@ -100,7 +100,7 @@ class SignalingServer:
 # The buttons of the title screen, and of the screen for hosting and joining
 # that "Play" leads to. "Settings" used to be on the second and is now on
 # the first.
-TITLE_CONTROLS = {"PlayButton", "PracticeButton", "TutorialButton", "CustomiseButton", "EditorButton", "TitleSettingsButton", "CreditsButton"}
+TITLE_CONTROLS = {"ProfileButton", "PlayButton", "PracticeButton", "TutorialButton", "CustomiseButton", "EditorButton", "TitleSettingsButton", "CreditsButton"}
 TITLE_ALIASES = {"SettingsButton": "TitleSettingsButton"}
 PLAY_CONTROLS = {"HostButton", "JoinButton", "TargetEdit", "NameEdit", "WatchButton", "RefreshButton", "BackButton", "ModeButton", "MaxPlayersButton",
                  "KillLimitButton", "MinutesButton", "MapButton", "PrivateButton", "BotsButton", "BotSkillButton", "RulesButton", "SkyButton"}
