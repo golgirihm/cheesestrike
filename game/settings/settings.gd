@@ -17,6 +17,7 @@ const DEFAULTS := {
 	"host_kill_limit": 20,
 	"host_bots": 0,
 	"host_rules": "standard",
+	"host_sky": "noon",
 	"host_bot_skill": "normal",
 	"host_minutes": 8,
 	"host_max_players": MatchSettings.MAX_PLAYERS,

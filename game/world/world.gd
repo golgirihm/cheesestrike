@@ -21,6 +21,7 @@ var sound_cues: Node
 var objective_marks: Node3D
 var watch_camera: Camera3D
 var replay_view: Node3D
+var atmosphere: Atmosphere
 
 ## The loaded arena, and which of the Maps it is.
 var map: Node3D
@@ -66,6 +67,8 @@ func _ready() -> void:
 	add_child(objective_marks)
 	watch_camera = preload("res://world/watch_camera.gd").new(self)
 	add_child(watch_camera)
+	atmosphere = Atmosphere.new($WorldEnvironment.environment, $Sun)
+	add_child(atmosphere)
 	replay_view = preload("res://world/replay_view.gd").new(self)
 	add_child(replay_view)
 	match_.replay_shown.connect(func(clip: Dictionary, about: int, title: String) -> void:
@@ -126,6 +129,7 @@ func start(settings := MatchSettings.new()) -> void:
 func stop() -> void:
 	replay_view.stop()
 	_set_gravity(1.0)
+	atmosphere.show_look(Atmosphere.NOON, false)
 	if multiplayer.peer_connected.is_connected(_add_player):
 		multiplayer.peer_connected.disconnect(_add_player)
 		multiplayer.peer_disconnected.disconnect(_remove_player)
@@ -144,6 +148,7 @@ func _on_state_changed() -> void:
 	if match_.has_state():
 		load_map(match_.state.settings.map)
 	_apply_gravity()
+	_show_sky()
 	_show_pickups()
 	_show_drops()
 	_show_blocks()
@@ -180,6 +185,13 @@ func _leave(id: int) -> void:
 		players.remove_child(player)
 		player.queue_free()
 		print("player left: %d" % id)
+
+
+# The sky is as the host chose it, with rain or dust in the air only where
+# the graphics setting has room for it.
+func _show_sky() -> void:
+	var extras := GraphicsQuality.level(Settings.get_value("quality")) != GraphicsQuality.LOW
+	atmosphere.show_look(match_.state.settings.sky if match_.has_state() else Atmosphere.NOON, extras)
 
 
 # Gravity pulls as hard as the host's rules say, on this machine as on

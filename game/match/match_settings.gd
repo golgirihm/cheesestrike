@@ -62,6 +62,8 @@ var gravity := 1.0
 var respawn := 3.0
 var friendly_fire := false
 var weapons := ALL_WEAPONS
+## The time of day and the weather (see Atmosphere).
+var sky := Atmosphere.NOON
 ## How many computer players the host wants (see Bots), and how good.
 var bots := 0
 var bot_skill := BotBrain.NORMAL
@@ -132,6 +134,8 @@ static func from_dict(data: Variant) -> MatchSettings:
 			settings.friendly_fire = given.friendly_fire
 		if given.get("weapons") is String and WEAPON_SETS.has(given.weapons):
 			settings.weapons = given.weapons
+	if Atmosphere.is_kind(data.get("sky")):
+		settings.sky = data.sky
 	settings.bots = _whole(data.get("bots"), 0, 0, MAX_PLAYERS - 1)
 	if data.get("bot_skill") in BotBrain.SKILLS:
 		settings.bot_skill = data.bot_skill
@@ -159,7 +163,7 @@ func fixed_weapons() -> bool:
 	return weapons != ALL_WEAPONS
 
 
-const RULE_KEYS := ["rules", "health", "speed", "gravity", "respawn", "friendly_fire", "weapons"]
+const RULE_KEYS := ["rules", "health", "speed", "gravity", "respawn", "friendly_fire", "weapons", "sky"]
 
 
 static func _share(value: Variant, default: float, low: float, high: float) -> float:
