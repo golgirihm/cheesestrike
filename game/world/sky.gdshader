@@ -12,6 +12,8 @@ uniform sampler2D clouds : repeat_enable, filter_linear_mipmap;
 // How much of the sky is clear, from 0 (overcast) to 1 (cloudless).
 uniform float clear = 0.5;
 uniform float drift = 0.004;
+// How bright the stars are: none by day.
+uniform float stars = 0.0;
 
 void sky() {
 	vec3 colour = mix(horizon_color, top_color, pow(clamp(EYEDIR.y, 0.0, 1.0), 0.55));
@@ -26,6 +28,12 @@ void sky() {
 		// Bright where a cloud is thick, greyer at its thin edges.
 		vec3 cloud = mix(cloud_shade, cloud_color, smoothstep(clear + 0.04, clear + 0.3, thick));
 		colour = mix(colour, cloud, cover * smoothstep(0.0, 0.2, EYEDIR.y));
+	}
+	if (stars > 0.0 && EYEDIR.y > 0.0) {
+		// A scatter of points that stay put on the sky.
+		vec3 cell = floor(EYEDIR * 170.0);
+		float chance = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+		colour += vec3(0.9, 0.95, 1.0) * stars * step(0.9965, chance) * smoothstep(0.0, 0.25, EYEDIR.y);
 	}
 	if (LIGHT0_ENABLED) {
 		float toward = max(dot(EYEDIR, LIGHT0_DIRECTION), 0.0);

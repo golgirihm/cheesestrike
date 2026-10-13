@@ -240,6 +240,11 @@ func _setup_match_buttons() -> void:
 	rules_button.custom_minimum_size = map_button.custom_minimum_size
 	skill_button.add_sibling(rules_button)
 	_cycle(rules_button, "host_rules", MatchSettings.RULES, func(rules: String) -> String: return "Rules: %s" % MatchSettings.RULE_NAMES[rules])
+	var sky_button := Button.new()
+	sky_button.name = "SkyButton"
+	sky_button.custom_minimum_size = map_button.custom_minimum_size
+	map_button.add_sibling(sky_button)
+	_cycle(sky_button, "host_sky", Atmosphere.ORDER + [Atmosphere.RANDOM], func(sky: String) -> String: return "Sky: %s" % Atmosphere.NAMES[sky])
 	_cycle(private_button, "host_private", [false, true], func(hidden: bool) -> String: return "Private: invite only" if hidden else "Listed for everyone")
 
 
@@ -275,6 +280,8 @@ func host_settings() -> MatchSettings:
 		"bots": Settings.get_value("host_bots"),
 		"bot_skill": Settings.get_value("host_bot_skill"),
 		"rules": Settings.get_value("host_rules"),
+		# One drawn by lot is drawn here, once, so that everyone gets the same.
+		"sky": Atmosphere.settle(Settings.get_value("host_sky")),
 	})
 
 
