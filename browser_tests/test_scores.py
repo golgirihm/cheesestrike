@@ -34,7 +34,8 @@ class ScoresTest(GameTestCase):
         for game in (host, target, watcher):
             state = game.wait_for("s.combat.knockouts_announced >= 1")
             self.assertTrue(state["combat"]["latest_knockout"].startswith(expected), state["combat"]["latest_knockout"])
-            self.assertTrue(state["combat"]["latest_knockout"].endswith("]  Target"))
+            # And where: the joiner starts in the corner opposite the host's.
+            self.assertTrue(state["combat"]["latest_knockout"].endswith("]  Target  ·  South-East Corner"), state["combat"]["latest_knockout"])
 
     def test_holding_tab_shows_the_scoreboard(self):
         host = self.named_game("Hunter")

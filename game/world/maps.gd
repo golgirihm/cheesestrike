@@ -10,7 +10,9 @@ class_name Maps
 ## Wall bodies are the edge: solid, far taller than anyone can be thrown,
 ## and not drawn. A Block is cheese, a Building a tower, and a Car or a Bus
 ## is only its collision shapes, drawn by Scenery. An arena may also have
-## JumpPads and Ladders (see Fixtures).
+## JumpPads and Ladders (see Fixtures). Its Places are markers with a
+## `label`: the names of its parts, each the name of everywhere nearer to
+## it than to any other.
 
 const DEFAULT := "canyon"
 const ORDER := ["canyon", "box", "city"]

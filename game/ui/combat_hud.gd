@@ -71,6 +71,10 @@ var kill_feed: VBoxContainer
 var scoreboard: PanelContainer
 var _match_label: Label
 var _objective_label: Label
+# The name of where the last player to fall was, for the feed.
+var _fell_at := ""
+# The name of the part of the arena this player is in.
+var _place_label: Label
 # What is being voted on, with a button for each choice for those without
 # a keyboard.
 var _vote_panel: VBoxContainer
@@ -103,7 +107,13 @@ func bind(of: Node3D) -> void:
 	captions.world = of
 	world.match_.hit_confirmed.connect(_on_hit_confirmed)
 	world.match_.hurt.connect(_on_hurt)
-	world.match_.knocked_out.connect(kill_feed.add)
+	# Where a player falls is heard just before who did it and how.
+	world.match_.fell.connect(func(victim: int, _weapon: String, _from: Vector3) -> void:
+		var fallen: Node3D = world.player_node(victim)
+		_fell_at = world.place_at(fallen.global_position) if fallen != null else "")
+	world.match_.knocked_out.connect(func(attacker: String, victim: String, weapon: String, head: bool) -> void:
+		kill_feed.add(attacker, victim, weapon, head, _fell_at)
+		_fell_at = "")
 	world.match_.picked_up.connect(_on_picked_up)
 	world.match_.power_taken.connect(_on_power_taken)
 	world.match_.announced.connect(_on_announced)
@@ -309,6 +319,7 @@ func _process(delta: float) -> void:
 		_power_label.add_theme_color_override("font_color", Powers.COLOURS[record.power])
 	_grenade_label.text = grenade_text(record)
 	_health_bar.modulate = KNOCKOUT_COLOR if health <= LOW_HEALTH else Color.WHITE
+	_place_label.text = world.place_at(own.global_position) if own != null and record != null and record.alive else ""
 	if own != null:
 		_ammo_label.text = ammo_text(own.weapon)
 		_reserve_label.text = reserve_text(own.weapon)
@@ -368,6 +379,10 @@ func _on_announced(text: String, team: int) -> void:
 ## What is shown of the vote being held, a line at a time, or nothing.
 func vote_shown() -> Array:
 	return Array(_vote_label.text.split("\n", false)) if _vote_panel.visible else []
+
+
+func place_shown() -> String:
+	return _place_label.text
 
 
 func replay_shown() -> String:
@@ -571,6 +586,11 @@ func _build() -> void:
 	_announce_label.visible = false
 	add_child(_announce_label)
 
+	_place_label = _outlined_label(14)
+	_place_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT, Control.PRESET_MODE_MINSIZE, 20)
+	_place_label.offset_top = 44.0
+	_place_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
+	add_child(_place_label)
 	_vote_panel = VBoxContainer.new()
 	_vote_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT, Control.PRESET_MODE_MINSIZE, 20)
 	_vote_panel.grow_vertical = Control.GROW_DIRECTION_BOTH

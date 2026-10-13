@@ -20,7 +20,12 @@ func _ready() -> void:
 
 ## How a knock-out reads in the feed. Nobody (an empty `attacker`) knocks out
 ## a player who did it themselves.
-static func entry_text(attacker: String, victim: String, weapon: String, head: bool) -> String:
+static func entry_text(attacker: String, victim: String, weapon: String, head: bool, place := "") -> String:
+	var said := _who(attacker, victim, weapon, head)
+	return said if place.is_empty() else "%s  ·  %s" % [said, place]
+
+
+static func _who(attacker: String, victim: String, weapon: String, head: bool) -> String:
 	var stats := Weapons.find(weapon)
 	var using := stats.display_name if stats != null else weapon
 	if weapon == Melee.ID:
@@ -30,8 +35,10 @@ static func entry_text(attacker: String, victim: String, weapon: String, head: b
 	return "%s  [%s%s]  %s" % [attacker, using, ", head" if head else "", victim]
 
 
-func add(attacker: String, victim: String, weapon: String, head: bool) -> void:
-	latest = entry_text(attacker, victim, weapon, head)
+## Adds a knock-out to the feed, with the name of where in the arena it
+## happened, if that is known.
+func add(attacker: String, victim: String, weapon: String, head: bool, place := "") -> void:
+	latest = entry_text(attacker, victim, weapon, head, place)
 	announced += 1
 	_entries.append({"text": latest, "left": ENTRY_LIFE})
 	while _entries.size() > MAX_ENTRIES:
