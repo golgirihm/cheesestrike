@@ -44,13 +44,9 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 1. **More kinds of grenade.** Beside the wax grenade that bursts: one that blinds with a puff of parmesan, one that sticks to what it hits, and a way to choose between them.
    *Tests:* GUT tests of each in `Projectile` and `Match`; browser test of the choice.
-2. **What shots do to the world.** A mark where each shot lands, with a puff of dust or crumbs coloured by what it hit, and a spark off metal. Marks fade and are limited in number.
-   *Tests:* GUT tests of the limit and of which effect each surface gives. Manual rows.
-3. **Shell casings and muzzle smoke.** Casings flick out of the weapon and bounce; a wisp of smoke hangs after a burst of fire. Off on low graphics.
-   *Tests:* GUT test that low quality makes none. Manual row.
-4. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
+2. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
    *Tests:* GUT tests of the rule and of the host's ray walk.
-5. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
+3. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
    *Tests:* GUT tests of the tallies.
 
 ## Milestone 3: Movement with depth
