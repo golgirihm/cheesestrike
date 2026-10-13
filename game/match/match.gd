@@ -29,6 +29,9 @@ signal strike_shown(striker: int)
 signal fell(victim: int, weapon: String, from: Vector3)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
+## A packet of player `speaker`'s talk, for this machine's player to hear
+## (see VoiceChat).
+signal voice_heard(speaker: int, packet: PackedByteArray)
 ## Player `id` set off their Overload (on everyone's machine).
 signal overloaded(id: int)
 ## Player `id` collected a pickup of `kind` (on everyone's machine).
@@ -79,6 +82,8 @@ var state := MatchState.new()
 
 # Seconds since this node started, as the host's clock for ShotRules.
 var _clock := 0.0
+# Host only: when each player's last packets of talk came, by player.
+var _talk_times := {}
 # The host's ShotRules for each player, by id.
 var _rules := {}
 # Where each player has lately been, as the host saw them, by id.
@@ -384,6 +389,49 @@ func watch(on: bool) -> void:
 func _watch(id: int, on: Variant) -> void:
 	if on is bool and state.set_watching(id, on):
 		_changed()
+
+
+## Sends a packet of this player's talk to whoever should hear it.
+func say(packet: PackedByteArray) -> void:
+	if is_host():
+		_pass_on_talk(multiplayer.get_unique_id(), packet)
+	elif multiplayer.multiplayer_peer != null:
+		_talk.rpc_id(1, packet)
+
+
+@rpc("any_peer", "call_remote", "unreliable")
+func _talk(packet: Variant) -> void:
+	if is_host():
+		_pass_on_talk(multiplayer.get_remote_sender_id(), packet)
+
+
+# Host only: passes a packet of `speaker`'s talk on to each player who
+# should hear it, if it is a packet and they haven't sent too many.
+func _pass_on_talk(speaker: int, packet: Variant) -> void:
+	if not VoiceCodec.is_packet(packet) or state.player(speaker) == null:
+		return
+	# A second's worth of when each of their packets came.
+	var times: Array = _talk_times.get(speaker, [])
+	times = times.filter(func(at: float) -> bool: return _clock - at < 1.0)
+	if not VoiceChat.allowed(times.size()):
+		_talk_times[speaker] = times
+		return
+	times.append(_clock)
+	_talk_times[speaker] = times
+	var teams := state.settings.is_teams()
+	for id: int in state.players:
+		if Bots.is_bot(id) or not VoiceChat.hears(state.player(id), state.player(speaker), teams):
+			continue
+		if id == multiplayer.get_unique_id():
+			voice_heard.emit(speaker, packet)
+		elif multiplayer.get_peers().has(id):
+			_talk_from.rpc_id(id, speaker, packet)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _talk_from(speaker: Variant, packet: Variant) -> void:
+	if speaker is int and VoiceCodec.is_packet(packet):
+		voice_heard.emit(speaker, packet)
 
 
 @rpc("any_peer", "call_remote", "reliable")
