@@ -10,6 +10,8 @@ func before_each() -> void:
 
 
 func _player(id: int, name: String, kills: int, deaths: int) -> void:
+	# Past the warm-up, in which nothing counts.
+	state.started = true
 	var record := state.add_player(id)
 	record.name = name
 	record.kills = kills

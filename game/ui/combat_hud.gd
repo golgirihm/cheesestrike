@@ -147,7 +147,11 @@ static func clock_text(seconds: float) -> String:
 static func match_text(state: MatchState) -> String:
 	if not state.is_playing():
 		return "Match over"
+	if state.is_warm_up():
+		return "Warm-up   ·   waiting for players"
 	var clock := clock_text(state.time_left)
+	if state.overtime:
+		clock = "Sudden death  %s" % clock
 	if state.settings.is_teams():
 		return "Cheddar %d  –  %d Brie   ·   %s" % [state.team_score(MatchState.CHEDDAR), state.team_score(MatchState.BRIE), clock]
 	return "First to %d   ·   %s" % [state.settings.limit(), clock]

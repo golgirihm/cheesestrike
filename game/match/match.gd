@@ -612,6 +612,15 @@ func _process(delta: float) -> void:
 				_gnaw_seen.rpc(gnawed)
 				block_gnawed.emit(gnawed)
 				_hurt_block(gnawed, BlockRules.GNAW)
+		if state.just_started:
+			state.just_started = false
+			announce("The match begins", MatchState.NO_TEAM)
+			_hold_back_powers()
+			_changed()
+		if state.just_overtime:
+			state.just_overtime = false
+			announce("Sudden death: the next score wins", MatchState.NO_TEAM)
+			_changed()
 		if state.round_won != -2:
 			var taken: int = state.round_won
 			state.round_won = -2

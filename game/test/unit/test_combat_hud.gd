@@ -120,11 +120,18 @@ func test_the_clock_reads_minutes_and_seconds() -> void:
 
 func test_a_free_for_all_shows_the_goal_and_the_clock() -> void:
 	var state := MatchState.new(MatchSettings.from_dict({"kill_limit": 30, "minutes": 5}))
+	assert_eq(HUD.match_text(state), "Warm-up   ·   waiting for players", "until there is someone to play")
+	state.add_player(1)
+	state.add_player(2)
 	assert_eq(HUD.match_text(state), "First to 30   ·   5:00")
+	state.overtime = true
+	state.time_left = 42.0
+	assert_eq(HUD.match_text(state), "First to 30   ·   Sudden death  0:42")
 
 
 func test_a_team_match_shows_the_teams_scores() -> void:
 	var state := MatchState.new(MatchSettings.from_dict({"mode": "teams", "minutes": 3}))
+	state.started = true
 	state.team_kills = [4, 7]
 	assert_eq(HUD.match_text(state), "Cheddar 4  –  7 Brie   ·   3:00")
 
