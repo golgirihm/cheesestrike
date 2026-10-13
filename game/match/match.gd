@@ -1279,7 +1279,7 @@ func _is_where_shown(id: int, node: Node3D) -> bool:
 func _bring_back(id: int, at: Vector3) -> void:
 	forget_positions(id)
 	_check_for(id).expect_move(at)
-	if id != multiplayer.get_unique_id():
+	if id != multiplayer.get_unique_id() and not Bots.is_bot(id):
 		_sent_to[id] = at
 	state.respawn(id)
 	_rules_for(id).refill()
@@ -1288,6 +1288,9 @@ func _bring_back(id: int, at: Vector3) -> void:
 		_respawned(at)
 	elif multiplayer.get_peers().has(id):
 		_respawned.rpc_id(id, at)
+	elif Bots.is_bot(id) and world.player_node(id) != null:
+		# The host moves its bots itself.
+		world.player_node(id).respawn_at(at)
 
 
 ## Tells a player where they have come back. Players move themselves, so the

@@ -55,7 +55,7 @@ func snapshot() -> Dictionary:
 		var record: PlayerRecord = _main.world.match_.state.player(id)
 		var described := {
 			"id": id,
-			"mine": player.is_multiplayer_authority(),
+			"mine": player._is_own(),
 			"name": _main.world.match_.state.name_of(id),
 			"position": [at.x, at.y, at.z],
 			"health": record.health if record != null else null,
@@ -76,7 +76,7 @@ func snapshot() -> Dictionary:
 			"crouching": player.crouch() >= 0.9,
 			"leaning": signf(player.lean()) if absf(player.lean()) >= 0.9 else 0.0,
 		}
-		if player.is_multiplayer_authority():
+		if player._is_own():
 			described.ammo = player.weapon.ammo
 			described.reserve = player.weapon.reserve
 			described.reloads = player.weapon.reloads
@@ -107,6 +107,8 @@ func snapshot() -> Dictionary:
 		_main.minutes_button,
 		_main.map_button,
 		_main.private_button,
+		_main.find_child("BotsButton", true, false),
+		_main.find_child("BotSkillButton", true, false),
 		_main.host_button,
 		_main.target_edit,
 		_main.join_button,
@@ -130,7 +132,7 @@ func snapshot() -> Dictionary:
 		"status": _main.status.text,
 		"frame": Engine.get_process_frames(),
 		"name_box": _main.name_edit.text,
-		"match_buttons": [_main.mode_button.text, _main.max_players_button.text, _main.kill_limit_button.text, _main.minutes_button.text, _main.map_button.text, _main.private_button.text],
+		"match_buttons": [_main.mode_button.text, _main.max_players_button.text, _main.kill_limit_button.text, _main.minutes_button.text, _main.map_button.text, _main.private_button.text, (_main.find_child("BotsButton", true, false) as Button).text, (_main.find_child("BotSkillButton", true, false) as Button).text],
 		"map": _main.world.map_id,
 		"mouse_captured": Input.mouse_mode == Input.MOUSE_MODE_CAPTURED,
 		"hud": _main.hud.text if _main.hud.visible else "",

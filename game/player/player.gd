@@ -72,7 +72,7 @@ const KNOCKBACK_AIR_DECAY := 0.8
 var net_state := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0]):
 	set(value):
 		net_state = value
-		if not _mine and is_inside_tree():
+		if not _mine and not driven and is_inside_tree():
 			_receive(value)
 
 ## The bits of a pose: aiming down the sights, and reloading.
@@ -224,8 +224,23 @@ const RECOIL_RISE := 30.0
 const RECOIL_SETTLE := 7.0
 
 
+## Whether this is a computer player (see Bots): the host's to move, and
+## nobody's to see through.
+var is_bot := false
+## Whether this machine moves this player some other way than by its
+## controls: the host, for a bot.
+var driven := false
+
+
 func _enter_tree() -> void:
-	set_multiplayer_authority(name.to_int())
+	is_bot = Bots.is_bot(name.to_int())
+	set_multiplayer_authority(1 if is_bot else name.to_int())
+
+
+# Whether this is this machine's own player: the one it controls and sees
+# through.
+func _is_own() -> bool:
+	return is_multiplayer_authority() and not is_bot
 
 
 ## Where the weapon sits in this player's own view, and how big: smaller and
@@ -243,13 +258,16 @@ const BADGE_HEIGHT := 2.5
 
 func _ready() -> void:
 	_grow()
-	if is_multiplayer_authority():
+	if _is_own():
 		gun.position = VIEW_GUN_POSITION
 		gun.scale = Vector3.ONE * VIEW_GUN_SCALE
 	_gun_rest = gun.position
 	_show_team(MatchState.NO_TEAM)
 
-	_mine = is_multiplayer_authority()
+	_mine = _is_own()
+	driven = is_bot and multiplayer.is_server()
+	if driven:
+		add_child(preload("res://bots/bot_driver.gd").new(self, match_.state.settings.bot_skill if match_ != null and match_.has_state() else BotBrain.NORMAL))
 	set_physics_process(_mine)
 	set_process_input(_mine)
 	set_process_unhandled_input(_mine)
@@ -322,6 +340,8 @@ func respawn_at(at: Vector3) -> void:
 	_face_middle()
 	for carried: WeaponState in arsenal.values():
 		carried.refill()
+	if driven:
+		get_node("BotDriver").refill()
 
 
 ## The host put this player back where they last were, as their movement
@@ -366,7 +386,7 @@ func _show_weapon(id: String) -> void:
 		child.queue_free()
 	var model := WeaponModels.build(id)
 	# Only its holder sees both hands and the arms behind them.
-	WeaponModels.show_own_view(model, is_multiplayer_authority())
+	WeaponModels.show_own_view(model, _is_own())
 	gun.add_child(model)
 	muzzle = model.get_node("Muzzle")
 	_glint = model.get_node_or_null("Glint")
@@ -380,6 +400,9 @@ func _face_middle() -> void:
 
 
 func _on_match_state_changed() -> void:
+	# Not for one that has left and is on its way out.
+	if not is_inside_tree():
+		return
 	var own := record()
 	name_tag.text = match_.state.name_of(name.to_int())
 	_set_alive(own == null or own.alive)
@@ -948,7 +971,7 @@ func kick() -> void:
 
 
 func _process(delta: float) -> void:
-	if not _mine:
+	if not _mine and not driven:
 		_show_smoothed()
 	_animate(delta)
 	if _mine:

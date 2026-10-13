@@ -254,7 +254,7 @@ class Game:
         "KillLimitButton", until it reads `text`."""
         for _ in range(20):
             state = self.wait_for("s.screen === 'menu'")
-            buttons = dict(zip(["ModeButton", "MaxPlayersButton", "KillLimitButton", "MinutesButton", "MapButton", "PrivateButton"], state["match_buttons"]))
+            buttons = dict(zip(["ModeButton", "MaxPlayersButton", "KillLimitButton", "MinutesButton", "MapButton", "PrivateButton", "BotsButton", "BotSkillButton"], state["match_buttons"]))
             if buttons[control] == text:
                 return
             self.click(control)

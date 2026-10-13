@@ -45,7 +45,11 @@ func test_hosting_uses_the_chosen_settings() -> void:
 	Settings.set_value("host_minutes", 15)
 	Settings.set_value("host_max_players", 4)
 	Settings.set_value("host_map", "box")
-	assert_eq(main.host_settings().to_dict(), {"mode": "teams", "kill_limit": 50, "minutes": 15, "max_players": 4, "map": "box"})
+	Settings.set_value("host_bots", 3)
+	Settings.set_value("host_bot_skill", "easy")
+	assert_eq(main.host_settings().to_dict(), {"mode": "teams", "kill_limit": 50, "minutes": 15, "max_players": 4, "map": "box", "bots": 3, "bot_skill": "easy"})
+	Settings.set_value("host_bots", 0)
+	Settings.set_value("host_bot_skill", "normal")
 
 
 func test_the_private_button_switches_between_listed_and_invite_only() -> void:

@@ -15,6 +15,8 @@ const DEFAULTS := {
 	# The match settings last used to host.
 	"host_mode": MatchSettings.FREE_FOR_ALL,
 	"host_kill_limit": 20,
+	"host_bots": 0,
+	"host_bot_skill": "normal",
 	"host_minutes": 8,
 	"host_max_players": MatchSettings.MAX_PLAYERS,
 	"host_map": Maps.DEFAULT,
