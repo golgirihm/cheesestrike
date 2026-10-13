@@ -455,6 +455,7 @@ func _on_host_silent_changed(silent: bool) -> void:
 
 
 func _on_session_failed(reason: String) -> void:
+	Sounds.play(UiSounds.ERROR, -6.0)
 	_show_menu(reason)
 
 

@@ -30,6 +30,14 @@ var last_take := {}
 var _ducker := Mix.Ducker.new()
 var _dip := 0.0
 var _music: AudioStreamPlayer
+# The player the last piece is fading away on.
+var _music_other: AudioStreamPlayer
+var _piece := MusicDirector.MENU
+var _music_db := -8.0
+## Whether the player is in a session, where the music is kept quiet.
+var in_session := false
+## Seconds one piece of music takes to give way to another.
+const MUSIC_FADE := 1.2
 var _voices: Array[AudioStreamPlayer3D] = []
 var _flat_voices: Array[AudioStreamPlayer] = []
 
@@ -66,6 +74,14 @@ func _ready() -> void:
 	_music.bus = MUSIC_BUS
 	_music.volume_db = -8.0
 	add_child(_music)
+	_music_other = AudioStreamPlayer.new()
+	_music_other.bus = MUSIC_BUS
+	_music_other.volume_db = -60.0
+	add_child(_music_other)
+	# Every button, whenever it is made, makes its sounds (see UiSounds).
+	get_tree().node_added.connect(func(node: Node) -> void:
+		if node is BaseButton:
+			UiSounds.wire(node))
 
 
 ## Plays `name` at `at` in `world`'s 3D space. `pitch` plays it higher (above
@@ -123,12 +139,43 @@ func play(name: String, volume_db := 0.0, pitch := 1.0) -> void:
 
 func play_music() -> void:
 	if not _music.playing:
-		_music.stream = SoundBank.get_sound("music")
+		_music.stream = SoundBank.get_sound(_piece)
 		_music.play()
 
 
+## Quietens the music for a session, or brings it back up for the menu.
 func set_music_quiet(quiet: bool) -> void:
-	_music.volume_db = -20.0 if quiet else -8.0
+	in_session = quiet
+	_music_db = -20.0 if quiet else -8.0
+	_music.volume_db = _music_db
+
+
+## Which piece of music plays (see MusicDirector): the one playing fades
+## out as this one fades in.
+func set_piece(name: String) -> void:
+	if name == _piece or SoundBank.get_sound(name) == null:
+		return
+	_piece = name
+	if not _music.playing:
+		return
+	# The two players change places: the old one fades away.
+	var old := _music
+	_music = _music_other
+	_music_other = old
+	_music.stream = SoundBank.get_sound(name)
+	_music.volume_db = -60.0
+	_music.play()
+
+
+## The piece of music that is playing, or would be.
+func piece() -> String:
+	return _piece
+
+
+## Plays the sting `name` over the music, once: "" for none.
+func play_sting(name: String) -> void:
+	if not name.is_empty():
+		play(name, -4.0)
 
 
 func is_music_playing() -> bool:
@@ -151,6 +198,13 @@ func _next_take(name: String) -> AudioStreamWAV:
 
 
 func _process(delta: float) -> void:
+	# One piece of music giving way to another.
+	var step := 52.0 / MUSIC_FADE * delta
+	_music.volume_db = move_toward(_music.volume_db, _music_db, step)
+	if _music_other.playing:
+		_music_other.volume_db = move_toward(_music_other.volume_db, -60.0, step)
+		if _music_other.volume_db <= -59.9:
+			_music_other.stop()
 	var dip := _ducker.tick(delta)
 	if not is_equal_approx(dip, _dip):
 		_dip = dip

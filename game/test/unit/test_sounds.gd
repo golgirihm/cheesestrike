@@ -98,10 +98,13 @@ func test_sounds_are_made_a_few_at_a_time_until_all_are() -> void:
 func test_effects_are_short_and_the_music_is_a_long_loop() -> void:
 	for name: String in SoundBank.SOUNDS:
 		var stream := SoundBank.get_sound(name)
-		if name == "music":
-			assert_gt(SoundBank.seconds(stream), 5.0)
-			assert_eq(stream.loop_mode, AudioStreamWAV.LOOP_FORWARD)
-			assert_eq(stream.loop_end, stream.data.size() / 2)
+		if name.begins_with("music"):
+			assert_gt(SoundBank.seconds(stream), 5.0, name)
+			assert_eq(stream.loop_mode, AudioStreamWAV.LOOP_FORWARD, name)
+			assert_eq(stream.loop_end, stream.data.size() / 2, name)
+		elif name.begins_with("sting"):
+			assert_between(SoundBank.seconds(stream), 1.0, 2.5, name)
+			assert_eq(stream.loop_mode, AudioStreamWAV.LOOP_DISABLED, name)
 		else:
 			assert_between(SoundBank.seconds(stream), 0.04, 1.0, name)
 			assert_eq(stream.loop_mode, AudioStreamWAV.LOOP_DISABLED, name)

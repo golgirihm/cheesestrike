@@ -55,7 +55,16 @@ const SOUNDS := {
 	"voice_out": "_voice_out",
 	"hit_pop": "_hit_pop",
 	"hit_bell": "_hit_bell",
+	"ui_hover": "_ui_hover",
+	"ui_press": "_ui_press",
+	"ui_back": "_ui_back",
+	"ui_error": "_ui_error",
+	"ui_count": "_ui_count",
 	"music": "_music",
+	"music_match": "_music_match",
+	"music_tense": "_music_tense",
+	"sting_win": "_sting_win",
+	"sting_lose": "_sting_lose",
 }
 
 ## How many takes there are of the sounds heard over and over, so that no
@@ -690,6 +699,96 @@ static func _overload() -> AudioStreamWAV:
 
 
 ## A cheerful loop for the menu: a bass line and a tune, four bars long.
+# The pointer coming onto a button: the lightest tick.
+static func _ui_hover() -> AudioStreamWAV:
+	return _make(0.045, func(t: float, _i: int) -> float:
+		return sin(TAU * 1900.0 * t) * _decay(t, 110.0), 0.35)
+
+
+# A button pressed: a click with a note in it.
+static func _ui_press() -> AudioStreamWAV:
+	return _make(0.08, func(t: float, _i: int) -> float:
+		return (sin(TAU * 880.0 * t) * 0.7 + sin(TAU * 1320.0 * t) * 0.3) * _decay(t, 55.0), 0.5)
+
+
+# A button that goes back: the same, a fifth lower and falling.
+static func _ui_back() -> AudioStreamWAV:
+	return _make(0.1, func(t: float, _i: int) -> float:
+		return sin(TAU * lerpf(587.0, 440.0, minf(t / 0.1, 1.0)) * t) * _decay(t, 40.0), 0.5)
+
+
+# Something went wrong: two low buzzes.
+static func _ui_error() -> AudioStreamWAV:
+	return _make(0.3, func(t: float, _i: int) -> float:
+		var since := fmod(t, 0.15)
+		var buzz := 1.0 if sin(TAU * 150.0 * t) > 0.0 else -1.0
+		return (buzz * 0.5 + sin(TAU * 150.0 * t) * 0.5) * _decay(since, 14.0) * (1.0 if since < 0.11 else 0.0), 0.45)
+
+
+# One of the last seconds of a wait: a clear short pip.
+static func _ui_count() -> AudioStreamWAV:
+	return _make(0.12, func(t: float, _i: int) -> float:
+		return sin(TAU * 1046.5 * t) * _decay(t, 26.0), 0.5)
+
+
+# A piece of music from its notes, each [start in beats, length in beats,
+# hertz, how loud, whether a soft triangle rather than a bright note], at
+# `tempo` beats a minute and `beats` long.
+static func _piece(tempo: float, beats: int, notes: Array, loops := true) -> AudioStreamWAV:
+	var beat := 60.0 / tempo
+	var samples := PackedFloat32Array()
+	samples.resize(int(beats * beat * MUSIC_RATE))
+	for note: Array in notes:
+		_add_note(samples, note[0] * beat, note[1] * beat, note[2], note[3], note[4])
+	return _stream(samples, MUSIC_RATE, loops)
+
+
+# Under a match: slow and sparse, a low pulse with a few held notes over
+# it, in a minor key, so that it sits behind the fight.
+static func _music_match() -> AudioStreamWAV:
+	var notes := []
+	var roots := [110.0, 110.0, 87.31, 98.0]
+	for bar in 4:
+		for step in 2:
+			notes.append([bar * 4 + step * 2, 1.6, roots[bar], 0.22, true])
+		notes.append([bar * 4 + 1, 2.5, roots[bar] * [3.0, 2.4, 3.0, 2.67][bar], 0.07, false])
+	return _piece(96.0, 16, notes)
+
+
+# Nearly decided: the same key, faster, the pulse on every half beat and a
+# figure climbing over it.
+static func _music_tense() -> AudioStreamWAV:
+	var notes := []
+	var roots := [110.0, 110.0, 130.81, 123.47]
+	var climb := [440.0, 523.25, 587.33, 659.25]
+	for bar in 4:
+		for step in 8:
+			notes.append([bar * 4 + step * 0.5, 0.4, roots[bar] * (2.0 if step % 4 == 3 else 1.0), 0.24, true])
+		for step in 4:
+			notes.append([bar * 4 + step, 0.45, climb[(step + bar) % 4], 0.11, false])
+	return _piece(144.0, 16, notes)
+
+
+# Won: a quick run up a major chord to a held note.
+static func _sting_win() -> AudioStreamWAV:
+	var notes := []
+	var run := [523.25, 659.25, 783.99, 1046.5]
+	for step in 4:
+		notes.append([step * 0.5, 0.5 if step < 3 else 2.2, run[step], 0.22, false])
+		notes.append([step * 0.5, 0.5 if step < 3 else 2.2, run[step] / 2.0, 0.16, true])
+	return _piece(160.0, 5, notes, false)
+
+
+# Lost: three notes down a minor chord, the last one low and long.
+static func _sting_lose() -> AudioStreamWAV:
+	var notes := []
+	var fall := [392.0, 311.13, 261.63]
+	for step in 3:
+		notes.append([step * 0.75, 0.75 if step < 2 else 2.4, fall[step], 0.2, false])
+		notes.append([step * 0.75, 0.75 if step < 2 else 2.4, fall[step] / 2.0, 0.2, true])
+	return _piece(120.0, 4, notes, false)
+
+
 static func _music() -> AudioStreamWAV:
 	var beat := 60.0 / 120.0
 	# Each note: [start in beats, length in beats, frequency].
