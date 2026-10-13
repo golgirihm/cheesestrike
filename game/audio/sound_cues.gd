@@ -17,8 +17,8 @@ func _ready() -> void:
 	match_.projectile_launched.connect(func(_id: int, weapon: String, from: Vector3, _velocity: Vector3) -> void:
 		if weapon == Weapons.GRENADE:
 			Sounds.play_at("throw", from, world, 0.0, 0.75)
-		else:
-			Sounds.play_at(weapon, from, world))
+		elif Weapons.find(weapon) != null:
+			Sounds.play_at(Weapons.find(weapon).credit(), from, world))
 	match_.projectile_burst.connect(func(_id: int, weapon: String, at: Vector3) -> void:
 		Sounds.play_at(burst_sound(weapon), at, world))
 	match_.hit_confirmed.connect(func(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:

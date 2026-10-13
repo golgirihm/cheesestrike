@@ -6,6 +6,7 @@
 script = ExtResource("1_stats")
 id = "launcher"
 slot = "power"
+alt = "launcher_bounce"
 display_name = "Gouda Launcher"
 damage = 0.0
 headshot_multiplier = 1.0

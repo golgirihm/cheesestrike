@@ -16,6 +16,7 @@ const BUTTONS := {
 	"reload": {"anchor": Vector2(1, 1), "offset": Vector2(-200.0, -74.0), "radius": 34.0, "label": "R", "font_size": 18},
 	"overload": {"anchor": Vector2(1, 1), "offset": Vector2(-62.0, -262.0), "radius": 32.0, "label": "GO", "font_size": 16},
 	"aim": {"anchor": Vector2(1, 1), "offset": Vector2(-150.0, -256.0), "radius": 32.0, "label": "AIM", "font_size": 15},
+	"alt": {"anchor": Vector2(1, 1), "offset": Vector2(-112.0, -44.0), "radius": 30.0, "label": "ALT", "font_size": 13},
 	"knife": {"anchor": Vector2(1, 1), "offset": Vector2(-290.0, -110.0), "radius": 30.0, "label": "KNIFE", "font_size": 12},
 	"grenade": {"anchor": Vector2(1, 1), "offset": Vector2(-292.0, -186.0), "radius": 30.0, "label": "NADE", "font_size": 12},
 	"crouch": {"anchor": Vector2(1, 1), "offset": Vector2(-236.0, -262.0), "radius": 30.0, "label": "DUCK", "font_size": 12},

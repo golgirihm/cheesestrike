@@ -53,6 +53,19 @@ func fire() -> bool:
 	return true
 
 
+## Fires the weapon's other way, with `other`'s stats, if there are the
+## rounds for it and the weapon is ready. Reports whether it did.
+func fire_other(other: WeaponStats) -> bool:
+	if other == null or ammo < other.rounds or cooldown > 0.0 or is_reloading():
+		return false
+	ammo -= other.rounds
+	burst_left = 0
+	cooldown += other.fire_interval
+	if ammo == 0:
+		start_reload()
+	return true
+
+
 ## Whether a burst is under way, with shots still to come.
 func in_burst() -> bool:
 	return burst_left > 0

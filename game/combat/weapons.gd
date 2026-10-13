@@ -41,6 +41,10 @@ const _ALL := {
 	"lmg": preload("res://combat/weapons/lmg.tres"),
 	"bow": preload("res://combat/weapons/bow.tres"),
 	GRENADE: preload("res://combat/weapons/grenade.tres"),
+	# The other ways some weapons fire (see WeaponStats.alt).
+	"shotgun_both": preload("res://combat/weapons/shotgun_both.tres"),
+	"launcher_bounce": preload("res://combat/weapons/launcher_bounce.tres"),
+	"blaster_charged": preload("res://combat/weapons/blaster_charged.tres"),
 }
 
 
@@ -51,6 +55,11 @@ static func find(id: Variant) -> WeaponStats:
 
 static func ids() -> Array:
 	return ORDER.duplicate()
+
+
+## The stats of the other way `weapon` fires, or null if it has only one.
+static func alt_of(weapon: WeaponStats) -> WeaponStats:
+	return find(weapon.alt) if weapon != null and not weapon.alt.is_empty() else null
 
 
 ## Every weapon in `slot`, in the usual order.

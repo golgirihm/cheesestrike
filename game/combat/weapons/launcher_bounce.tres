@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="WeaponStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://combat/weapon_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+id = "launcher_bounce"
+alt_of = "launcher"
+slot = "power"
+display_name = "Gouda Launcher"
+damage = 0.0
+headshot_multiplier = 1.0
+fire_interval = 0.9
+automatic = false
+magazine = 2
+reload_time = 2.4
+pellets = 1
+spread_degrees = 0.0
+hip_spread_degrees = 7.0
+aim_zoom = 0.8
+projectile_speed = 20.0
+projectile_gravity = 0.6
+fuse = 2.2
+bounces = true
+bounce = 0.55
+splash_damage = 240.0
+splash_radius = 5.0
+knockback = 9.0
+bloom_shots = 1
+recoil_up = 2.0
+recoil_cap = 1.0
+recoil_side = 0.0
+recoil_reset = 1.0

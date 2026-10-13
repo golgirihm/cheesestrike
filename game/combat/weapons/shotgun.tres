@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_stats")
 id = "shotgun"
+alt = "shotgun_both"
 display_name = "Swiss Shotgun"
 damage = 10.0
 headshot_multiplier = 1.5

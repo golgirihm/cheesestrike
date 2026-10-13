@@ -85,6 +85,7 @@ static func lines(on_device: String) -> Array:
 		["Jump", Controls.keys_text("jump")],
 		["Crouch", "Hold %s" % Controls.keys_text("crouch")],
 		["Lean", "Hold %s or %s" % [Controls.keys_text("lean_left"), Controls.keys_text("lean_right")]],
+		["Other way to fire", "%s, or the middle mouse button" % Controls.keys_text("alt_fire")],
 		["Reload", Controls.keys_text("reload")],
 		["Knife", Controls.keys_text("melee")],
 		["Grenade", "Hold %s, let go to throw" % Controls.keys_text("grenade")],

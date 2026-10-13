@@ -16,6 +16,7 @@ const REBINDABLE := {
 	"lean_left": "Lean left",
 	"lean_right": "Lean right",
 	"reload": "Reload",
+	"alt_fire": "Other fire",
 	"melee": "Knife",
 	"grenade": "Grenade",
 	"emote": "Emote",

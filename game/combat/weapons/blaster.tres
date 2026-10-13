@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_stats")
 id = "blaster"
+alt = "blaster_charged"
 display_name = "Cheddar Blaster"
 damage = 20.0
 headshot_multiplier = 1.75
