@@ -31,7 +31,7 @@ func test_a_look_survives_being_packed_into_a_number() -> void:
 	for cheese: String in Looks.CHEESES:
 		for hat: String in Looks.HATS:
 			for held: String in Looks.HELD:
-				assert_eq(Looks.unpack(Looks.pack(cheese, hat, held)), {"title": "none", "level": 0, "cheese": cheese, "hat": hat, "held": held})
+				assert_eq(Looks.unpack(Looks.pack(cheese, hat, held)), {"finish": "plain", "title": "none", "level": 0, "cheese": cheese, "hat": hat, "held": held})
 	assert_eq(Looks.pack("swiss", "none", "none"), 0, "the plain look is nothing at all")
 
 
@@ -48,21 +48,21 @@ func test_a_look_from_another_machine_is_put_right() -> void:
 	assert_eq(Looks.clean("fancy"), 0)
 	assert_eq(Looks.clean(null), 0)
 	assert_eq(Looks.clean(3.5), 0)
-	assert_eq(Looks.unpack(Looks.clean(0xFFF)), {"title": "none", "level": 0, "cheese": "swiss", "hat": "none", "held": "none"}, "choices that don't exist become the plain ones")
+	assert_eq(Looks.unpack(Looks.clean(0xFFF)), {"finish": "plain", "title": "none", "level": 0, "cheese": "swiss", "hat": "none", "held": "none"}, "choices that don't exist become the plain ones")
 	var wild := Looks.unpack(Looks.clean(-1))
 	assert_eq([wild.cheese, wild.hat, wild.held, wild.title], ["swiss", "none", "none", "none"])
 	assert_lte(wild.level, Looks.TOP_LEVEL, "and a level no higher than there is")
 	var real := Looks.pack("blue", "crown", "flag")
 	assert_eq(Looks.clean(real), real)
 	assert_eq(Looks.clean(real | 1 << 27), real, "anything extra is dropped")
-	assert_eq(Looks.unpack(99999).keys(), ["title", "level", "cheese", "hat", "held"])
+	assert_eq(Looks.unpack(99999).keys(), ["finish", "title", "level", "cheese", "hat", "held"])
 
 
 func test_the_chosen_look_comes_from_the_settings() -> void:
 	Settings.set_value("look_cheese", "brie")
 	Settings.set_value("look_hat", "chef")
 	Settings.set_value("look_held", "balloon")
-	assert_eq(Looks.unpack(Looks.chosen()), {"title": "none", "level": Progress.level(), "cheese": "brie", "hat": "chef", "held": "balloon"})
+	assert_eq(Looks.unpack(Looks.chosen()), {"finish": "plain", "title": "none", "level": Progress.level(), "cheese": "brie", "hat": "chef", "held": "balloon"})
 	Settings.set_value("look_hat", "sombrero")
 	assert_push_error("can't be sombrero")
 	assert_eq(Settings.get_value("look_hat"), "chef", "a hat that doesn't exist isn't taken")
@@ -154,7 +154,7 @@ func test_a_look_survives_the_trip_with_the_rest_of_the_record() -> void:
 	var state := MatchState.new()
 	state.add_player(1).look = Looks.pack("blue", "cowboy", "lollipop")
 	var copy := MatchState.from_dict(state.to_dict())
-	assert_eq(Looks.unpack(copy.player(1).look), {"title": "none", "level": 0, "cheese": "blue", "hat": "cowboy", "held": "lollipop"})
+	assert_eq(Looks.unpack(copy.player(1).look), {"finish": "plain", "title": "none", "level": 0, "cheese": "blue", "hat": "cowboy", "held": "lollipop"})
 	var numbers := PackedInt32Array()
 	numbers.resize(PlayerRecord._COUNT)
 	numbers.fill(0)
@@ -191,7 +191,7 @@ func test_everyone_sees_what_a_player_wears() -> void:
 	world.players.add_child(other)
 	assert_eq(other.body.worn().hat, "none")
 	match_._wear(2, Looks.pack("blue", "chef", "balloon"))
-	assert_eq(other.body.worn(), {"title": "none", "level": 0, "cheese": "blue", "hat": "chef", "held": "balloon"})
+	assert_eq(other.body.worn(), {"finish": "plain", "title": "none", "level": 0, "cheese": "blue", "hat": "chef", "held": "balloon"})
 	assert_not_null(other.body.get_node_or_null("Hat"))
 
 

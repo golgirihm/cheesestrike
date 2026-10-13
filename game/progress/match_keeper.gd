@@ -31,6 +31,12 @@ func lines() -> Array[String]:
 	var said: Array[String] = ["+%d experience   ·   Level %d" % [last.xp, last.to]]
 	if last.to > last.from:
 		said[0] = "+%d experience   ·   Level %d reached!" % [last.xp, last.to]
+	for challenge: Dictionary in last.get("challenges", []):
+		said.append("Challenge done: %s" % challenge.text)
+	for feat: String in last.get("achievements", []):
+		said.append("Achievement: %s" % Achievements.name_of(feat))
+	for thing: Array in last.get("unlocked", []):
+		said.append("Unlocked   ·   %s" % Unlocks.gained_text(thing))
 	return said
 
 

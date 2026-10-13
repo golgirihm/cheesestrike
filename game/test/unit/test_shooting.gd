@@ -1366,6 +1366,8 @@ func test_the_host_passes_on_an_emote_and_not_too_many() -> void:
 
 
 func test_the_emote_key_makes_the_next_in_turn_or_the_one_picked_by_number() -> void:
+	# With every emote earned: a new player has only the first two.
+	Progress.xp = Levels.needed(30)
 	var own := _add(1, Vector3(0, 0, 5))
 	await _settle(own)
 	watch_signals(match_)
@@ -1421,3 +1423,8 @@ func test_every_arena_has_a_rind_to_find() -> void:
 		world.load_map(id)
 		var kinds: Array = world.pickup_pads().map(func(pad: Dictionary) -> String: return pad.kind)
 		assert_has(kinds, Pickups.ARMOUR, id)
+
+
+func after_each() -> void:
+	# Any level a test gave the player is taken back.
+	Progress.xp = 0

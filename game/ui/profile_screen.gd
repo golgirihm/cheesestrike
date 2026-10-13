@@ -8,7 +8,10 @@ signal closed
 const RECORD := "record"
 const MATCHES := "matches"
 ## The parts of the page, with what the button for each says.
-const PARTS := {RECORD: "Your record", MATCHES: "Past matches"}
+const CHALLENGES := "challenges"
+const ACHIEVEMENTS := "achievements"
+const UNLOCKS := "unlocks"
+const PARTS := {RECORD: "Record", CHALLENGES: "Challenges", ACHIEVEMENTS: "Feats", UNLOCKS: "To earn", MATCHES: "Matches"}
 const WIDE := 440.0
 
 ## The part showing.
@@ -100,6 +103,12 @@ static func lines(id: String, progress: Node) -> Array[String]:
 		for report: Dictionary in progress.history:
 			said.append("%s\n     %s" % [MatchReport.line(report), when_text(report.when, int(Time.get_unix_time_from_system()))])
 		return said if not said.is_empty() else (["No matches yet. Play one, and it will be here."] as Array[String])
+	if id == CHALLENGES:
+		return Challenges.lines(progress.challenges, progress.now())
+	if id == ACHIEVEMENTS:
+		return Achievements.lines(progress.achievements)
+	if id == UNLOCKS:
+		return Unlocks.lines(progress.level(), progress.achievements, progress.challenges_done())
 	return Record.lines(progress.record)
 
 

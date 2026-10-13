@@ -21,6 +21,10 @@ var record := Record.blank()
 var xp := 0
 ## The last matches played, newest first (see MatchReport).
 var history: Array = []
+## The achievements earned, by id (see Achievements), and what has been
+## done toward the challenges that are set (see Challenges).
+var achievements: Array = []
+var challenges := {"progress": {}, "done": []}
 
 
 func _init(at := DEFAULT_PATH) -> void:
@@ -47,6 +51,8 @@ func load_progress() -> void:
 	record = Record.blank()
 	xp = 0
 	history = []
+	achievements = []
+	challenges = {"progress": {}, "done": []}
 	if not FileAccess.file_exists(path):
 		return
 	# A file that can't be read is a fresh start, said quietly.
@@ -59,6 +65,8 @@ func load_progress() -> void:
 	record = Record.tidy(kept.get("record"))
 	var stored: Variant = kept.get("xp")
 	xp = clampi(int(stored), 0, MOST_XP) if stored is float or stored is int else 0
+	achievements = Achievements.tidy(kept.get("achievements"))
+	challenges = Challenges.tidy(kept.get("challenges"), now())
 	var matches: Variant = kept.get("history")
 	if matches is Array:
 		for report: Variant in matches.slice(0, HISTORY):
@@ -72,23 +80,46 @@ func level() -> int:
 	return Levels.level(xp)
 
 
+## The challenges done, by id.
+func challenges_done() -> Array:
+	return challenges.done
+
+
+## The moment, in seconds since 1970: what day's challenges are set goes
+## by it.
+func now() -> int:
+	return int(Time.get_unix_time_from_system())
+
+
 ## Adds the match in `report` (see MatchReport) to everything kept. Returns
 ## what it earned: {"xp": experience, "parts": what for, "from": the level
-## before, "to": the level after}.
+## before, "to": the level after, "challenges": those it finished,
+## "achievements": the ids of those it earned, "unlocked": the things it
+## gave, each [kind, id] (see Unlocks)}.
 func add_match(report: Dictionary) -> Dictionary:
 	var tidied := MatchReport.tidy(report)
 	if tidied.is_empty():
-		return {"xp": 0, "parts": [], "from": level(), "to": level()}
+		return {"xp": 0, "parts": [], "from": level(), "to": level(), "challenges": [], "achievements": [], "unlocked": []}
 	var before := level()
 	var earned := Levels.earned(tidied)
 	record = Record.add(record, tidied)
-	xp = mini(xp + earned.total, MOST_XP)
+	# What the match did toward the challenges, and the feats it was.
+	var stood := Challenges.advance(challenges, tidied, tidied.when if tidied.when > 0 else now())
+	challenges = stood.state
+	var feats := Achievements.newly(achievements, record, tidied)
+	achievements.append_array(feats)
+	var parts: Array = earned.parts
+	if stood.xp > 0:
+		parts.append(["Challenges", stood.xp])
+	xp = mini(xp + earned.total + stood.xp, MOST_XP)
 	history.push_front(tidied)
 	while history.size() > HISTORY:
 		history.pop_back()
 	_save()
 	changed.emit()
-	return {"xp": earned.total, "parts": earned.parts, "from": before, "to": level()}
+	var done_now: Array = stood.completed.map(func(challenge: Dictionary) -> String: return challenge.id)
+	return {"xp": earned.total + stood.xp, "parts": parts, "from": before, "to": level(), "challenges": stood.completed, "achievements": feats,
+		"unlocked": Unlocks.gained(before, level(), feats, done_now)}
 
 
 ## Forgets everything.
@@ -96,6 +127,8 @@ func reset() -> void:
 	record = Record.blank()
 	xp = 0
 	history = []
+	achievements = []
+	challenges = {"progress": {}, "done": []}
 	_save()
 	changed.emit()
 
@@ -103,4 +136,4 @@ func reset() -> void:
 func _save() -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file != null:
-		file.store_string(JSON.stringify({"record": record, "xp": xp, "history": history}))
+		file.store_string(JSON.stringify({"record": record, "xp": xp, "history": history, "achievements": achievements, "challenges": challenges}))

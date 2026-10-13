@@ -129,6 +129,7 @@ const DEFAULTS := {
 	"look_hat": Looks.HATS[0],
 	"look_held": Looks.HELD[0],
 	"look_title": Looks.TITLES[0],
+	"look_finish": Unlocks.FINISHES[0],
 	## The weapons the player comes into play with (see Weapons.MAINS).
 	"loadout_main": Weapons.DEFAULT_MAIN,
 	"loadout_side": Weapons.STARTING,
@@ -165,6 +166,7 @@ const CHOICES := {
 	"quality": ["", "low", "medium", "high"],
 	"dynamic_range": ["headphones", "speakers", "night"],
 	"look_title": Looks.TITLES,
+	"look_finish": Unlocks.FINISHES,
 	"crosshair_shape": ["cross", "tee", "circle", "dot"],
 	"crosshair_colour": ["white", "green", "yellow", "cyan", "magenta", "red"],
 	"hit_sound": ["tick", "pop", "bell", "off"],

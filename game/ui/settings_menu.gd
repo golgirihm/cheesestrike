@@ -426,7 +426,8 @@ func _build() -> void:
 		look.name = "Setting_" + key
 		look.custom_minimum_size = Vector2(0, 40)
 		look.pressed.connect(func() -> void:
-			Settings.set_value(key, next_choice(Looks.SETTINGS[key][0], Settings.get_value(key))))
+			# Through what the player has earned, and no further.
+			Settings.set_value(key, Unlocks.next(Looks.KIND_OF[key], Settings.get_value(key), Progress.level(), Progress.achievements, Progress.challenges_done())))
 		_rows.add_child(look)
 
 	for index in range(first_of_customise, _rows.get_child_count()):
