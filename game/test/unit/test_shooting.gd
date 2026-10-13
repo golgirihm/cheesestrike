@@ -905,11 +905,10 @@ func test_the_shooter_sees_their_shot_carry_on_through_thin_cover() -> void:
 	await _sheet(0.3)
 	var origin: Vector3 = shooter.head.global_position
 	shooter.fired.emit(origin, Vector3.FORWARD, 1, WeaponStats.AIMED, 0)
-	var tracer: Node3D = world.effects.get_children().filter(func(child: Node) -> bool: return child.get_meta("kind", "") == "tracer")[0]
-	# The tracer runs from the muzzle to where the shot ended: past the sheet,
-	# at the arena's edge.
-	var far_end: Vector3 = tracer.global_transform * Vector3(0, 0, -0.5)
-	assert_lt(far_end.z, -10.0)
+	# The tracer flies from the muzzle to where the shot ended: past the
+	# sheet, at the arena's edge.
+	assert_eq(world.effects.tracer_ends().size(), 1)
+	assert_lt(world.effects.tracer_ends()[0].z, -10.0)
 
 
 func test_holding_crouch_lowers_the_owner_and_slows_them() -> void:
