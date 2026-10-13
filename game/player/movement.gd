@@ -11,6 +11,15 @@ const AIM_FACTOR := 0.6
 const CROUCH_FACTOR := 0.5
 ## Crouches and stands in about an eighth of a second.
 const CROUCH_RATE := 8.0
+## Off the ground a player can only steer: their speed across the ground
+## changes by no more than this each second, in metres a second.
+const AIR_STEER := 14.0
+## A landing harder than this (see WeaponSway.impact) winds a player, as a
+## hit does, for this share of a hit's time.
+const HARD_LANDING := 0.7
+const LANDING_WIND := 0.5
+## On a touch screen, pushing the movement stick this far past its edge runs.
+const TOUCH_RUN_REACH := 1.35
 ## Gravity is strong (see the project's physics settings), so a jump is quick:
 ## this still lifts a player about a metre and a half.
 const JUMP_VELOCITY := 7.8
@@ -24,6 +33,12 @@ const FLINCH_SLOW := 0.4
 ## FLINCH_TIME ago still has.
 static func flinch_factor(flinch_left: float) -> float:
 	return 1.0 - (1.0 - FLINCH_SLOW) * clampf(flinch_left / FLINCH_TIME, 0.0, 1.0)
+
+
+## A player's speed across the ground `delta` seconds on, in the air, when
+## it is `current` and they are steering for `wanted`.
+static func air_steer(current: Vector2, wanted: Vector2, delta: float) -> Vector2:
+	return current.move_toward(wanted, AIR_STEER * delta)
 
 
 ## How fast a player moves across the ground. `boost` is anything else that

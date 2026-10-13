@@ -23,6 +23,7 @@ const SOUNDS := {
 	"knocked_out": "_knocked_out",
 	"step": "_step",
 	"jump": "_jump",
+	"land": "_land",
 	"pickup": "_pickup",
 	"overload": "_overload",
 	"reload": "_reload",
@@ -260,6 +261,22 @@ static func _knife() -> AudioStreamWAV:
 		softer = lerpf(softer, noise, 0.05)
 		samples[i] = (soft - softer) * sin(PI * t / 0.16)
 	return _stream(_shaped(samples, 0.5))
+
+
+# Landing from a fall: both feet at once, heavier than a step.
+static func _land() -> AudioStreamWAV:
+	var rng := _rng(13)
+	var count := int(0.22 * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var dull := 0.0
+	var turn := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		dull = lerpf(dull, rng.randf_range(-1.0, 1.0), 0.07)
+		turn += lerpf(45.0, 100.0, _decay(t, 40.0)) / RATE
+		samples[i] = tanh((dull * 3.0 + sin(TAU * turn) * 1.2) * _decay(t, 28.0))
+	return _stream(_shaped(samples, 0.7))
 
 
 static func _hit() -> AudioStreamWAV:

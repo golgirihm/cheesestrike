@@ -19,6 +19,7 @@ const SLIDERS := [
 	["touch_size", "Touch buttons", 0.7, 1.5, 0.05, "%.2f×"],
 	["hud_scale", "Text size", 0.75, 1.5, 0.05, "%.2f×"],
 	["screen_shake", "Screen shake", 0.0, 1.0, 0.05, "%d%%"],
+	["camera_motion", "Camera motion", 0.0, 1.0, 0.05, "%d%%"],
 ]
 ## The settings that are on or off, with what each says.
 const TOGGLES := [
@@ -26,6 +27,9 @@ const TOGGLES := [
 	["touch_left_handed", "Touch buttons on the left"],
 	["touch_fullscreen", "Full screen when touched"],
 	["captions", "Captions for sounds"],
+	["toggle_run", "Press once to run, again to stop"],
+	["toggle_crouch", "Press once to crouch, again to stand"],
+	["toggle_aim", "Press once to aim, again to stop"],
 	["damage_numbers", "Show the damage of each hit"],
 ]
 

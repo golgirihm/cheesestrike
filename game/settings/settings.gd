@@ -47,6 +47,13 @@ const DEFAULTS := {
 	# Seeing and hearing: how much the view shakes (0 for not at all), the size
 	# of the fight's text, and whether important sounds are written on screen.
 	"screen_shake": 1.0,
+	## How much the view bobs, rolls and dips as the player moves: 0 for none.
+	"camera_motion": 1.0,
+	## Whether run, crouch and aim are pressed once to turn on and again to
+	## turn off, rather than held.
+	"toggle_run": false,
+	"toggle_crouch": false,
+	"toggle_aim": false,
 	"hud_scale": 1.0,
 	"captions": false,
 	## Whether the damage of each hit is written by the crosshair.
@@ -64,6 +71,7 @@ const RANGES := {
 	"effects_volume": [0.0, 1.0],
 	"touch_size": [0.7, 1.5],
 	"screen_shake": [0.0, 1.0],
+	"camera_motion": [0.0, 1.0],
 	"hud_scale": [0.75, 1.5],
 }
 ## The allowed choices of a setting that is one of a few.

@@ -44,3 +44,16 @@ func test_crouching_is_slow_and_rules_out_running() -> void:
 	assert_almost_eq(Movement.speed(false, false, 0.0, 1.0, true), Movement.WALK_SPEED * Movement.CROUCH_FACTOR, 0.0001)
 	assert_eq(Movement.speed(true, false, 0.0, 1.0, true), Movement.speed(false, false, 0.0, 1.0, true))
 	assert_lt(Movement.speed(false, true, 0.0, 1.0, true), Movement.speed(false, true), "slower still when aiming too")
+
+
+func test_in_the_air_a_player_can_only_steer() -> void:
+	var forward := Vector2(0, -Movement.WALK_SPEED)
+	var steered := Movement.air_steer(forward, -forward, 0.1)
+	assert_almost_eq(steered.y, -Movement.WALK_SPEED + Movement.AIR_STEER * 0.1, 0.0001, "slowed a little, not turned about")
+	assert_eq(Movement.air_steer(forward, forward, 0.1), forward, "nothing to change")
+	assert_eq(Movement.air_steer(Vector2.ZERO, forward, 10.0), forward, "given long enough, they get there")
+	# A whole jump isn't long enough to turn right round.
+	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+	var airtime := 2.0 * Movement.JUMP_VELOCITY / gravity
+	assert_gt(Movement.air_steer(forward, -forward, airtime).y, -forward.y * -1.0 - 0.001)
+	assert_lt(Movement.air_steer(forward, -forward, airtime).length(), Movement.WALK_SPEED)

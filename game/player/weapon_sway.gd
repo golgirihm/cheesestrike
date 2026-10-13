@@ -47,6 +47,23 @@ static func landing(hardness: float) -> Vector3:
 	return Vector3.DOWN * LANDING_DIP * clampf(hardness, 0.0, 1.0)
 
 
+## How the view itself moves with the player, at full "camera motion" (a
+## setting, which scales all of it): how far it bobs with each stride, how
+## far it rolls into a sidestep, how far it drops on the hardest landing, and
+## how much wider it opens at a run.
+const VIEW_BOB := Vector2(0.018, 0.03)
+const VIEW_ROLL := 0.014
+const VIEW_DIP := 0.3
+const RUN_FOV := 1.06
+
+
+## Where the view is in a stride at `phase` (radians), walking at `share` of
+## walking speed: side to side once a stride, up and down twice.
+static func view_bob(phase: float, share: float) -> Vector3:
+	var size := clampf(share, 0.0, 1.5)
+	return Vector3(sin(phase) * VIEW_BOB.x, -absf(sin(phase)) * VIEW_BOB.y, 0.0) * size
+
+
 ## How far through a reload (`progress`, 0 to 1) the weapon is lowered: down
 ## as the reload begins, held there, and back up as it ends.
 static func reload_lowering(progress: float) -> float:
