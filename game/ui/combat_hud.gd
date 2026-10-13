@@ -71,6 +71,8 @@ var kill_feed: VBoxContainer
 var scoreboard: PanelContainer
 var _match_label: Label
 var _objective_label: Label
+# What the tutorial asks the player to do next.
+var _tutorial_label: Label
 # What each weapon has done, on the practice range.
 var _practice_label: Label
 var _result: PanelContainer
@@ -343,6 +345,16 @@ func _on_announced(text: String, team: int) -> void:
 	_announce_left = ANNOUNCE_LIFE
 
 
+## Shows what the tutorial asks next, or nothing for "".
+func show_tutorial(text: String) -> void:
+	_tutorial_label.text = text
+	_tutorial_label.visible = not text.is_empty()
+
+
+func tutorial_shown() -> String:
+	return _tutorial_label.text if _tutorial_label.visible else ""
+
+
 ## What the practice range says each weapon has done, a line for each.
 func practice_shown() -> Array:
 	return Array(_practice_label.text.split("\n", false)) if _practice_label.visible else []
@@ -521,6 +533,16 @@ func _build() -> void:
 	_announce_label.visible = false
 	add_child(_announce_label)
 
+	_tutorial_label = _outlined_label(22)
+	_tutorial_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
+	_tutorial_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_tutorial_label.offset_top = 132.0
+	_tutorial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tutorial_label.custom_minimum_size = Vector2(520, 0)
+	_tutorial_label.add_theme_color_override("font_color", Color(0.75, 1.0, 0.8))
+	_tutorial_label.visible = false
+	add_child(_tutorial_label)
 	_practice_label = _outlined_label(14)
 	_practice_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT, Control.PRESET_MODE_MINSIZE, 20)
 	_practice_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN

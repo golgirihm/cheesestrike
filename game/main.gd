@@ -46,6 +46,8 @@ var _match_buttons := {}
 # The settings of a session of this machine alone, such as the practice
 # range's, while one is being started; otherwise null.
 var _alone_settings: MatchSettings
+## The tutorial the player is being taken through, or null.
+var tutorial: Tutorial
 # Whether the mouse was captured as of the last frame. Esc while it is captured
 # only frees the mouse; the press after that opens the menu.
 var _was_captured := false
@@ -69,6 +71,12 @@ func _ready() -> void:
 	practice_button.custom_minimum_size = host_button.custom_minimum_size
 	host_button.add_sibling(practice_button)
 	practice_button.pressed.connect(_practise)
+	var tutorial_button := Button.new()
+	tutorial_button.name = "TutorialButton"
+	tutorial_button.text = "How to play"
+	tutorial_button.custom_minimum_size = host_button.custom_minimum_size
+	practice_button.add_sibling(tutorial_button)
+	tutorial_button.pressed.connect(_teach)
 	join_button.pressed.connect(func() -> void: _join(target_edit.text))
 	target_edit.text_submitted.connect(_join)
 	refresh_button.pressed.connect(Net.request_sessions)
@@ -116,6 +124,8 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if hud.visible:
 		hud.text = "Practice range" if Net.alone else "Session %s  ·  %d playing" % [Net.room_code, world.players.get_child_count()]
+	if tutorial != null and hud.visible:
+		_run_tutorial()
 	_was_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	menu_button.visible = hud.visible and not _was_captured and not pause_menu.visible
 
@@ -225,8 +235,46 @@ func _host() -> void:
 # Starts a session alone on the practice range.
 func _practise() -> void:
 	_remember_name()
+	tutorial = null
 	_alone_settings = MatchSettings.practice()
 	Net.play_alone()
+
+
+# Starts the tutorial: a session alone on the practice range, with one
+# thing to do at a time.
+func _teach() -> void:
+	_remember_name()
+	_alone_settings = MatchSettings.practice()
+	# It says how to do everything, a step at a time, so the controls
+	# aren't shown first.
+	tutorial = Tutorial.new()
+	Net.play_alone()
+
+
+# Tells the tutorial how things stand with the player, and shows what it
+# says to do next.
+func _run_tutorial() -> void:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id()) if multiplayer.multiplayer_peer != null else null
+	var record: PlayerRecord = world.match_.own_record()
+	if own == null or record == null:
+		return
+	var shots := 0
+	var reloads := 0
+	for carried: WeaponState in own.arsenal.values():
+		reloads += carried.reloads
+	for weapon: String in Weapons.ids():
+		shots += world.match_.tally.of(weapon).shots
+	var finished := tutorial.update({"at": own.global_position, "yaw": own.rotation.y, "shots": shots, "aiming": own.is_aiming(),
+		"reloads": reloads, "weapons": own.arsenal.size(), "overloaded": record.overload_left > 0.0})
+	if finished:
+		Sounds.play("objective", -4.0)
+	# The step that asks for an Overload gives the player one to set off.
+	if tutorial.step_name() == "overload" and record.overload_left <= 0.0:
+		record.overload = Overload.METER_FULL
+	var keys := {"move": "%s %s %s %s" % [Controls.keys_text("move_forward"), Controls.keys_text("move_left"), Controls.keys_text("move_back"), Controls.keys_text("move_right")],
+		"reload": Controls.keys_text("reload"), "overload": Controls.keys_text("overload")}
+	var device: String = controls_help.device_for(touch_controls.shown, Input.get_connected_joypads().size())
+	combat_hud.show_tutorial(tutorial.text(device, keys, Settings.get_value("touch_left_handed")))
 
 
 func _join(target: String) -> void:
@@ -262,7 +310,7 @@ func _on_session_started() -> void:
 	world.start(_alone_settings if _alone_settings != null else host_settings())
 	_alone_settings = null
 	copy_link_button.visible = Net.use_webrtc and OS.has_feature("web") and not Net.alone
-	if not Settings.get_value("seen_help"):
+	if not Settings.get_value("seen_help") and tutorial == null:
 		Settings.set_value("seen_help", true)
 		show_help()
 
@@ -319,6 +367,8 @@ func _leave() -> void:
 
 func _on_session_ended(reason: String) -> void:
 	final_standings.text = standings(world.match_.state)
+	tutorial = null
+	combat_hud.show_tutorial("")
 	world.stop()
 	pause_menu.hide()
 	controls_help.hide()
