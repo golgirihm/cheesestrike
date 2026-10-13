@@ -63,9 +63,7 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 7: Arenas with character
 
-1. **Inside the buildings.** Open a floor or two of the city's towers: lobbies, stairs, windows to shoot from.
-   *Tests:* the arena tests (spots fit, pads reachable, nowhere traps) already run over every arena.
-2. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
+1. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
    *Tests:* GUT tests of saving and loading; the arena tests run on a saved arena.
 
 ## Milestone 8: A picture that holds up
