@@ -80,6 +80,19 @@ var _medal_label: Label
 var _was_alive := true
 var _match_was_on := false
 var _result_summary: Label
+# The corners of the HUD that hold the player's health and their weapon.
+var _status: Control
+var _arms: Control
+# How far each part has been moved from where it usually is (see HudLayout).
+var _moved := {}
+## The weapons carried, as icons with their keys, and the wheel for choosing
+## one with a stick or a thumb.
+var weapon_bar: WeaponBar
+var weapon_wheel: Wheel
+var _wheel_weapons: Array = []
+var _wheel_push := Vector2.ZERO
+## Numbers for the curious.
+var readings: Readings
 ## Which way everything is, and what is said.
 var compass: Compass
 var chat_box: ChatBox
@@ -143,6 +156,19 @@ func bind(of: Node3D) -> void:
 	add_child(wheel)
 	chat_box.wheel = wheel
 	wheel.chosen.connect(chat_box._on_wheel_chosen)
+	weapon_wheel = Wheel.new()
+	weapon_wheel.name = "WeaponWheel"
+	weapon_wheel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	weapon_wheel.position -= Vector2(Wheel.SIZE, Wheel.SIZE) / 2.0
+	add_child(weapon_wheel)
+	weapon_wheel.chosen.connect(_on_weapon_wheel_chosen)
+	weapon_bar = WeaponBar.new()
+	weapon_bar.touched.connect(open_weapon_wheel)
+	_arms.add_child(weapon_bar)
+	readings = Readings.new(world)
+	readings.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	readings.position = Vector2(20.0, 118.0)
+	add_child(readings)
 	world.match_.hit_confirmed.connect(_on_hit_confirmed)
 	world.match_.hurt.connect(_on_hurt)
 	# Where a player falls is heard just before who did it and how.
@@ -352,6 +378,14 @@ func _process(delta: float) -> void:
 		return
 	_count_down()
 	_run_medals(delta)
+	_lay_out()
+	var holding: Node3D = world.player_node(multiplayer.get_unique_id()) if multiplayer.multiplayer_peer != null else null
+	if holding != null and weapon_bar != null:
+		weapon_bar.show_weapons(holding.arsenal.keys(), holding.weapon.stats.id)
+	if weapon_wheel != null and weapon_wheel.visible:
+		var stick := Input.get_vector("look_left", "look_right", "look_up", "look_down")
+		if stick.length() >= Wheel.DEAD:
+			weapon_wheel.point(stick)
 	_hit_left = maxf(_hit_left - delta, 0.0)
 	for number in _damage_numbers:
 		number.left -= delta
@@ -472,6 +506,76 @@ func _run_medals(delta: float) -> void:
 			Sounds.play("medal", -6.0)
 	_medal_row.visible = not _medal_showing.is_empty()
 	_medal_row.modulate.a = clampf(_medal_left / 0.4, 0.0, 1.0)
+
+
+## The parts of the HUD that can be laid out, by name (see HudLayout).
+func parts() -> Dictionary:
+	return {"health": _status, "weapon": _arms, "score": _match_label, "objective": _objective_label, "feed": kill_feed, "compass": compass,
+		"chat": chat_box, "place": _place_label, "captions": captions}
+
+
+## Where each part is on the screen, as it is laid out: {part: Rect2}.
+func part_rects() -> Dictionary:
+	var rects := {}
+	var all := parts()
+	for id: String in all:
+		if all[id] != null:
+			rects[id] = Rect2(all[id].position, all[id].size * all[id].scale)
+	return rects
+
+
+# Puts each part where the player's layout has it: moved, scaled, faded or
+# turned off, and never off the screen.
+func _lay_out() -> void:
+	var layout: Dictionary = Settings.get_value(HudLayout.SETTING)
+	var all := parts()
+	for id: String in all:
+		var control: Control = all[id]
+		if control == null:
+			continue
+		var how := HudLayout.part(layout, id)
+		# Where it would be if it had not been moved.
+		var home := Rect2(control.position - _moved.get(id, Vector2.ZERO), control.size)
+		var placed := HudLayout.rect_for(home, how, size)
+		control.scale = Vector2.ONE * HudLayout.fitting_scale(home.size, how[HudLayout.SCALE], size)
+		control.position = placed.position
+		_moved[id] = placed.position - home.position
+		control.modulate.a = how[HudLayout.OPACITY] if how[HudLayout.ON] else 0.0
+
+
+## Opens the wheel of the weapons carried, to choose one.
+func open_weapon_wheel() -> void:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id()) if world != null and multiplayer.multiplayer_peer != null else null
+	if own == null or not own.alive or weapon_wheel.visible:
+		return
+	_wheel_weapons = WeaponBar.entries(own.arsenal.keys(), own.weapon.stats.id).map(func(entry: Dictionary) -> String: return entry.weapon)
+	_wheel_push = Vector2.ZERO
+	weapon_wheel.open(_wheel_weapons.map(func(weapon: String) -> String: return Weapons.find(weapon).display_name), _wheel_weapons)
+
+
+## Closes the wheel, taking the weapon picked in hand.
+func close_weapon_wheel() -> void:
+	if weapon_wheel.visible:
+		weapon_wheel.close()
+
+
+func _on_weapon_wheel_chosen(index: int) -> void:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id()) if world != null and multiplayer.multiplayer_peer != null else null
+	if own != null and index >= 0 and index < _wheel_weapons.size():
+		own.choose_weapon(_wheel_weapons[index])
+
+
+func _input(event: InputEvent) -> void:
+	if world == null or not is_visible_in_tree() or weapon_wheel == null:
+		return
+	if weapon_wheel.visible:
+		if event is InputEventMouseMotion:
+			_wheel_push = (_wheel_push + event.relative / 60.0).limit_length(1.0)
+			weapon_wheel.point(_wheel_push)
+		if event.is_action_released("weapon_wheel"):
+			close_weapon_wheel()
+	elif event.is_action_pressed("weapon_wheel"):
+		open_weapon_wheel()
 
 
 func _count_down() -> void:
@@ -667,6 +771,7 @@ func _on_setting_changed(key: String) -> void:
 
 func _build() -> void:
 	var status := VBoxContainer.new()
+	_status = status
 	status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 20)
 	status.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	status.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -767,6 +872,7 @@ func _build() -> void:
 	add_child(_practice_label)
 
 	var arms := VBoxContainer.new()
+	_arms = arms
 	arms.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 20)
 	arms.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	arms.grow_vertical = Control.GROW_DIRECTION_BEGIN

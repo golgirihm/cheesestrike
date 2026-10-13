@@ -23,6 +23,8 @@ const REBINDABLE := {
 	"overload": "Overload",
 	"scoreboard": "Scoreboard",
 	"talk": "Talk",
+	"weapon_wheel": "Weapon wheel",
+	"photo": "Photo mode",
 	"ping": "Ping",
 	"chat_team": "Chat to team",
 	"quick_chat": "Quick messages",

@@ -40,6 +40,10 @@ const TOGGLES := [
 	["toggle_aim", "Press once to aim, again to stop"],
 	["damage_numbers", "Show the damage of each hit"],
 	["replays", "Show how I was knocked out, and the play of the match"],
+	["show_fps", "Show frames a second"],
+	["show_ping", "Show the ping"],
+	["show_loss", "Show what goes astray on the way"],
+	["show_graph", "Show a graph of each frame"],
 	["crosshair_outline", "Crosshair: dark edge"],
 	["crosshair_dot", "Crosshair: dot in the middle"],
 	["mono_sound", "Mono sound"],
@@ -61,6 +65,12 @@ const EVERYTHING := ""
 
 var _rows: VBoxContainer
 var _title: Label
+## The part of the HUD being laid out, and the controls that do it.
+var hud_part: String = HudLayout.PARTS.keys()[0]
+const HUD_SLIDERS := [[HudLayout.X, "Across"], [HudLayout.Y, "Down"], [HudLayout.SCALE, "Size"], [HudLayout.OPACITY, "Opacity"]]
+var _hud_part_button: Button
+var _hud_sliders := {}
+var _hud_on: CheckButton
 var _crosshair_code: LineEdit
 var _crosshair_view: Control
 var _customise_rows: Array[Control] = []
@@ -113,6 +123,13 @@ func refresh() -> void:
 		(find_child("Setting_" + row[0], true, false) as CheckButton).set_pressed_no_signal(Settings.get_value(row[0]))
 	for choice: Array in SOUND_CHOICES:
 		(find_child("Setting_" + choice[0], true, false) as Button).text = sound_choice_text(choice[0])
+	# The HUD's controls show the part that is chosen.
+	if _hud_part_button != null:
+		_hud_part_button.text = "HUD part: %s" % HudLayout.PARTS[hud_part]
+		var how := HudLayout.part(Settings.get_value(HudLayout.SETTING), hud_part)
+		for key: String in _hud_sliders:
+			(_hud_sliders[key] as HSlider).set_value_no_signal(how[key])
+		_hud_on.set_pressed_no_signal(how[HudLayout.ON])
 	# The code follows the crosshair, unless it is being typed in.
 	if _crosshair_code != null and not _crosshair_code.has_focus():
 		_crosshair_code.text = Crosshair.encode(Crosshair.chosen())
@@ -127,6 +144,11 @@ func refresh() -> void:
 		(find_child("Setting_" + key, true, false) as Button).text = loadout_text(key)
 	for action: String in _key_buttons:
 		_key_buttons[action].text = "Press a key…" if action == _waiting_for else Controls.keys_text(action)
+
+
+## Changes `key` (see HudLayout) of the part of the HUD that is chosen.
+func set_hud(key: String, value: Variant) -> void:
+	Settings.set_value(HudLayout.SETTING, HudLayout.with(Settings.get_value(HudLayout.SETTING), hud_part, key, value))
 
 
 ## Makes the crosshair `code` describes the player's, if it is a code for
@@ -319,6 +341,52 @@ func _build() -> void:
 		if DisplayServer.has_feature(DisplayServer.FEATURE_CLIPBOARD):
 			DisplayServer.clipboard_set(Crosshair.encode(Crosshair.chosen())))
 	code_row.add_child(copy_code)
+	# The HUD, a part at a time: which part, then where, how big, how
+	# faint, and whether it is there at all.
+	var hud_title := Label.new()
+	hud_title.text = "The HUD, a part at a time"
+	hud_title.add_theme_font_size_override("font_size", 20)
+	_rows.add_child(hud_title)
+	_hud_part_button = Button.new()
+	_hud_part_button.name = "HudPart"
+	_hud_part_button.custom_minimum_size = Vector2(0, 40)
+	_hud_part_button.pressed.connect(func() -> void:
+		hud_part = next_choice(HudLayout.PARTS.keys(), hud_part)
+		refresh())
+	_rows.add_child(_hud_part_button)
+	for row: Array in HUD_SLIDERS:
+		var line := HBoxContainer.new()
+		_rows.add_child(line)
+		var label := Label.new()
+		label.text = row[1]
+		label.custom_minimum_size = Vector2(110, 0)
+		line.add_child(label)
+		var slider := HSlider.new()
+		slider.name = "Hud_" + row[0]
+		slider.min_value = HudLayout.RANGES[row[0]][0]
+		slider.max_value = HudLayout.RANGES[row[0]][1]
+		slider.step = 0.05
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		slider.value_changed.connect(func(value: float) -> void: set_hud(row[0], value))
+		line.add_child(slider)
+		_hud_sliders[row[0]] = slider
+	_hud_on = CheckButton.new()
+	_hud_on.name = "Hud_on"
+	_hud_on.text = "Show this part"
+	_hud_on.custom_minimum_size = Vector2(0, 40)
+	_hud_on.toggled.connect(func(on: bool) -> void: set_hud(HudLayout.ON, on))
+	_rows.add_child(_hud_on)
+	var presets := HBoxContainer.new()
+	_rows.add_child(presets)
+	for preset: Array in [["HudMinimal", "Minimal HUD", HudLayout.minimal()], ["HudStandard", "Usual HUD", HudLayout.standard()]]:
+		var button := Button.new()
+		button.name = preset[0]
+		button.text = preset[1]
+		button.custom_minimum_size = Vector2(0, 40)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.pressed.connect(func() -> void: Settings.set_value(HudLayout.SETTING, preset[2]))
+		presets.add_child(button)
 	var quality := Button.new()
 	quality.name = "Setting_quality"
 	quality.custom_minimum_size = Vector2(0, 40)

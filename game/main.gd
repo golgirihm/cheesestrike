@@ -187,6 +187,12 @@ func _ready() -> void:
 	target_edit.text_submitted.connect(_join)
 	refresh_button.pressed.connect(Net.request_sessions)
 	combat_hud.bind(world)
+	# With the camera free for a picture, nothing is drawn over the view.
+	world.photo_mode.changed.connect(func() -> void:
+		var showing: bool = not world.photo_mode.on and world.match_.has_state() and not menu.visible and not front_end.visible
+		combat_hud.visible = showing
+		hud.visible = showing
+		touch_controls.visible = showing)
 	_setup_match_buttons()
 	Settings.changed.connect(_show_match_setting)
 	menu_button.pressed.connect(open_pause_menu)
