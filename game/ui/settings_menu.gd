@@ -32,6 +32,9 @@ const TOGGLES := [
 	["toggle_aim", "Press once to aim, again to stop"],
 	["damage_numbers", "Show the damage of each hit"],
 	["replays", "Show how I was knocked out, and the play of the match"],
+	["bloom", "Glow on bright things"],
+	["colour_grade", "A cast of colour for each arena"],
+	["vignette", "Darker corners of the view"],
 ]
 
 var _rows: VBoxContainer
