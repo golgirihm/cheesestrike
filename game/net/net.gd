@@ -1,10 +1,18 @@
 extends Node
 ## Session transport. Web builds connect peer-to-peer over WebRTC, with the
-## signaling server brokering the handshake; native builds use ENet directly,
+## session server brokering the handshake; native builds use ENet directly,
 ## which is what local development and headless testing run on.
 ##
 ## Either way the result is a host (peer 1) with clients attached, exposed
 ## through the regular high-level multiplayer API.
+##
+## The session server (signaling/core.py has its protocol) is used sparingly,
+## since holding a connection to it open is what it costs to run. A host keeps
+## one WebSocket for as long as its session is open, and takes the session
+## back on a new one whenever that drops. A player joining holds one only
+## until they are connected to the host. Everything else is a plain HTTP
+## request: the session list, and asking whether a session whose host has
+## gone quiet is still open.
 
 signal session_started
 signal session_failed(reason: String)
@@ -17,6 +25,13 @@ const ENET_PORT := 7777
 const MAX_PLAYERS := 16
 const SIGNALING_PORT := 9080
 const JOIN_TIMEOUT := 30.0
+## How often a host says it is still there, in seconds. Whatever carries the
+## connection closes one that has been quiet for long; AWS allows ten minutes.
+const HOST_PING_INTERVAL := 240.0
+## How long a host waits before reconnecting to the session server, in
+## seconds: at first, and at most, doubling in between.
+const RESUME_DELAY := 1.0
+const RESUME_DELAY_MAX := 30.0
 const ICE_SERVERS := [{"urls": ["stun:stun.l.google.com:19302"]}]
 
 var use_webrtc := OS.has_feature("web")
@@ -32,6 +47,19 @@ var last_joined := ""
 var host_silent := false
 
 var _signaling_url := "ws://localhost:%d" % SIGNALING_PORT
+var _http_url := "http://localhost:%d" % SIGNALING_PORT
+var _list_request: HTTPRequest
+var _status_request: HTTPRequest
+var _status_timer := 0.0
+## What a host needs to take its session back on a new connection.
+var _host_token := ""
+var _host_settings: Dictionary = {}
+var _host_private := false
+var _ping_timer := 0.0
+var _resume_delay := RESUME_DELAY
+var _resume_timer := 0.0
+var _resuming := false
+var _joining := JoiningPeers.new()
 var _ws: WebSocketPeer
 var _outbox: Array[String] = []
 var _rtc: WebRTCMultiplayerPeer
@@ -46,8 +74,20 @@ func _ready() -> void:
 	multiplayer.connected_to_server.connect(_start)
 	multiplayer.connection_failed.connect(_fail.bind("Couldn't connect to the host."))
 	multiplayer.server_disconnected.connect(leave.bind("The connection to the host was lost."))
+	multiplayer.peer_connected.connect(_send_player_count.unbind(1))
+	multiplayer.peer_disconnected.connect(_send_player_count.unbind(1))
+	_list_request = HTTPRequest.new()
+	_list_request.timeout = 10.0
+	_list_request.request_completed.connect(_on_sessions_listed)
+	add_child(_list_request)
+	_status_request = HTTPRequest.new()
+	_status_request.timeout = 5.0
+	_status_request.request_completed.connect(_on_session_reported)
+	add_child(_status_request)
 	if OS.has_feature("web"):
-		_signaling_url = _web_signaling_url()
+		var urls := _web_backend_urls()
+		_signaling_url = urls.signal
+		_http_url = urls.http
 		WebPage.install()
 		_visibility_callback = JavaScriptBridge.create_callback(_on_visibility_changed)
 		JavaScriptBridge.get_interface("document").addEventListener("visibilitychange", _visibility_callback)
@@ -59,7 +99,9 @@ func host(settings := MatchSettings.new(), private := false) -> void:
 	last_joined = ""
 	_connecting = true
 	if use_webrtc:
-		_send({"type": "host", "settings": settings.advertised(), "private": private})
+		_host_settings = settings.advertised()
+		_host_private = private
+		_send({"type": "host", "settings": _host_settings, "private": private})
 		return
 	var enet := ENetMultiplayerPeer.new()
 	if enet.create_server(ENET_PORT, settings.max_players - 1) != OK:
@@ -105,9 +147,10 @@ func leave(reason := "") -> void:
 		session_ended.emit(reason)
 
 
+## Asks for the session list, which arrives as `sessions_listed`.
 func request_sessions() -> void:
-	if use_webrtc:
-		_send({"type": "list"})
+	if use_webrtc and _list_request.get_http_client_status() == HTTPClient.STATUS_DISCONNECTED:
+		_list_request.request(_http_url + "/sessions")
 
 
 func _process(delta: float) -> void:
@@ -117,11 +160,16 @@ func _process(delta: float) -> void:
 			if _heartbeat_timer >= HostWatch.HEARTBEAT_INTERVAL:
 				_heartbeat_timer = 0.0
 				_heartbeat.rpc()
+			if use_webrtc:
+				_keep_session_listed(delta)
+				_drop_players_who_never_arrived(delta)
 		else:
 			_host_watch.tick(delta)
 			if _host_watch.is_gone():
 				leave("The host closed the session.")
 				return
+			if use_webrtc:
+				_ask_about_silent_host(delta)
 		_update_host_silent()
 	if _connecting and _join_deadline > 0.0 and Time.get_unix_time_from_system() > _join_deadline:
 		_fail("Timed out connecting to the host.")
@@ -144,8 +192,8 @@ func _process(delta: float) -> void:
 	if _ws != null and state == WebSocketPeer.STATE_CLOSED:
 		_ws = null
 		_outbox.clear()
-		# An established session keeps running without signaling; it just
-		# can't take new joiners.
+		# An established session keeps running without the session server; a
+		# host's just can't take new joiners until it has reconnected.
 		if _connecting:
 			_fail("Can't reach the session server at %s." % _signaling_url)
 
@@ -154,6 +202,9 @@ func _start() -> void:
 	_connecting = false
 	_join_deadline = 0.0
 	in_session = true
+	if use_webrtc and not multiplayer.is_server():
+		# Connected to the host, so the session server's part is over.
+		_close_signaling()
 	WebPage.set_wake_lock(true)
 	WebPage.set_keep_alive(true)
 	session_started.emit()
@@ -169,10 +220,15 @@ func _reset() -> void:
 	WebPage.set_keep_alive(false)
 	multiplayer.multiplayer_peer = null
 	_rtc = null
-	if _ws != null:
-		_ws.close()
-		_ws = null
-	_outbox.clear()
+	_close_signaling()
+	_status_request.cancel_request()
+	_status_timer = 0.0
+	_host_token = ""
+	_ping_timer = 0.0
+	_resume_delay = RESUME_DELAY
+	_resume_timer = 0.0
+	_resuming = false
+	_joining = JoiningPeers.new()
 	_connecting = false
 	_join_deadline = 0.0
 	in_session = false
@@ -205,18 +261,106 @@ func _send(msg: Dictionary) -> void:
 		_ws = WebSocketPeer.new()
 		if _ws.connect_to_url(_signaling_url) != OK:
 			_ws = null
-			_fail("Can't reach the session server at %s." % _signaling_url)
+			# A session already under way carries on without the server.
+			if not in_session:
+				_fail("Can't reach the session server at %s." % _signaling_url)
 			return
 	_outbox.append(JSON.stringify(msg))
+
+
+func _close_signaling() -> void:
+	if _ws != null:
+		_ws.close()
+		_ws = null
+	_outbox.clear()
+
+
+## For a host: keeps the session server's record of the session alive, and
+## takes the session back when the connection to it has dropped, as each one
+## does in the end. Nothing in the match waits on this.
+func _keep_session_listed(delta: float) -> void:
+	if _host_token.is_empty():
+		return
+	if _ws != null:
+		_ping_timer += delta
+		if _ping_timer >= HOST_PING_INTERVAL:
+			_ping_timer = 0.0
+			_send({"type": "ping"})
+		return
+	_resume_timer += delta
+	if _resume_timer < _resume_delay:
+		return
+	_resume_timer = 0.0
+	_resume_delay = minf(_resume_delay * 2.0, RESUME_DELAY_MAX)
+	_resuming = true
+	_send({
+		"type": "resume",
+		"code": room_code,
+		"token": _host_token,
+		"settings": _host_settings,
+		"private": _host_private,
+		"players": multiplayer.get_peers().size() + 1,
+	})
+
+
+## For a host: forgets the half-made connections to players who started
+## joining and never arrived; see JoiningPeers.
+func _drop_players_who_never_arrived(delta: float) -> void:
+	if _rtc == null:
+		return
+	for id in multiplayer.get_peers():
+		_joining.connected(id)
+	for id in _joining.tick(delta):
+		if _rtc.has_peer(id):
+			_rtc.remove_peer(id)
+
+
+## For a host: tells the session server how many are playing, which is what the
+## session list shows. It can't count them itself, since players leave it once
+## they are connected here.
+func _send_player_count() -> void:
+	if in_session and use_webrtc and multiplayer.is_server() and _ws != null:
+		_send({"type": "update", "players": multiplayer.get_peers().size() + 1})
+
+
+## For a player whose host has gone quiet: asks the session server whether the
+## session is still open, so a host that has left for good is told apart from
+## one that is only stalled.
+func _ask_about_silent_host(delta: float) -> void:
+	if not _host_watch.is_silent():
+		_status_timer = HostWatch.CHECK_INTERVAL  # So the first question goes at once.
+		return
+	_status_timer += delta
+	if _status_timer < HostWatch.CHECK_INTERVAL or _status_request.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+		return
+	_status_timer = 0.0
+	_status_request.request("%s/sessions/%s" % [_http_url, room_code])
+
+
+func _on_sessions_listed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
+		return
+	var answer: Variant = JSON.parse_string(body.get_string_from_utf8())
+	if answer is Dictionary and answer.get("sessions") is Array:
+		sessions_listed.emit(answer.sessions)
+
+
+func _on_session_reported(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	# No answer says nothing either way: this player's own connection may be
+	# what has failed.
+	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200 or not in_session:
+		return
+	var answer: Variant = JSON.parse_string(body.get_string_from_utf8())
+	if answer is Dictionary and answer.get("open") is bool:
+		_host_watch.session_reported(answer.open)
 
 
 func _handle_signal(msg: Dictionary) -> void:
 	var from := int(msg.get("from", 0))
 	match msg.get("type"):
-		"sessions":
-			sessions_listed.emit(msg.get("sessions", []))
 		"hosted":
 			room_code = msg.code
+			_host_token = str(msg.get("token", ""))
 			_rtc = WebRTCMultiplayerPeer.new()
 			_rtc.create_server()
 			multiplayer.multiplayer_peer = _rtc
@@ -229,9 +373,13 @@ func _handle_signal(msg: Dictionary) -> void:
 			_add_rtc_peer(1, true)
 		"peer_joined":
 			_add_rtc_peer(int(msg.id), false)
+			_joining.started(int(msg.id))
+		"resumed":
+			_resuming = false
+			_resume_delay = RESUME_DELAY
+			_ping_timer = 0.0
 		"peer_left":
-			if _rtc != null and _rtc.has_peer(int(msg.id)):
-				_rtc.remove_peer(int(msg.id))
+			_joining.left_server(int(msg.id))
 		"offer", "answer":
 			if _rtc != null and _rtc.has_peer(from):
 				_rtc.get_peer(from).connection.set_remote_description(msg.type, msg.sdp)
@@ -239,9 +387,18 @@ func _handle_signal(msg: Dictionary) -> void:
 			if _rtc != null and _rtc.has_peer(from):
 				_rtc.get_peer(from).connection.add_ice_candidate(msg.mid, int(msg.index), msg.sdp)
 		"closed":
-			_host_watch.signaling_closed()
+			# Only players still joining are connected to hear this.
+			if _connecting:
+				_fail("The host closed the session.")
 		"error":
-			_fail(msg.get("message", "Session server error."))
+			if in_session:
+				# The match carries on; only the session server is unhappy. A
+				# host refused its session back stops asking for it.
+				push_warning("Session server: %s" % msg.get("message", "error"))
+				if _resuming:
+					_host_token = ""
+			else:
+				_fail(msg.get("message", "Session server error."))
 
 
 func _add_rtc_peer(id: int, make_offer: bool) -> void:
@@ -267,11 +424,13 @@ func _on_ice_candidate_created(mid: String, index: int, sdp: String, id: int) ->
 	_send({"type": "candidate", "to": id, "mid": mid, "index": index, "sdp": sdp})
 
 
-## Defaults to the signaling port on whatever host served the page, so a phone
-## on the LAN reaches the dev machine. `?signal=wss://...` overrides it.
-func _web_signaling_url() -> String:
+## Where the session server is, from what the page says; see BackendUrls.
+func _web_backend_urls() -> Dictionary:
 	var override: Variant = JavaScriptBridge.eval("new URLSearchParams(location.search).get('signal')")
-	if override is String and not override.is_empty():
-		return override
-	var scheme := "wss" if JavaScriptBridge.eval("location.protocol") == "https:" else "ws"
-	return "%s://%s:%d" % [scheme, JavaScriptBridge.eval("location.hostname"), SIGNALING_PORT]
+	var configured: Variant = JSON.parse_string(str(JavaScriptBridge.eval("JSON.stringify(window.cheeseStrikeConfig || {})")))
+	return BackendUrls.choose(
+		override if override is String else "",
+		configured if configured is Dictionary else {},
+		JavaScriptBridge.eval("location.protocol") == "https:",
+		str(JavaScriptBridge.eval("location.hostname")),
+	)

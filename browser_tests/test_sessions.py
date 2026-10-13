@@ -89,6 +89,46 @@ class JoiningTest(GameTestCase):
         other.click("ArenaFilterButton")
         other.wait_for("s.sessions.length === 1 && s.sessions[0].text === 'None like that. Host one!'")
 
+    def test_the_list_shows_how_many_the_host_says_are_playing(self):
+        # The session server can't count players, who leave it once they are
+        # connected to their host, so the number is the host's.
+        host = self.open_game()
+        code = host.host()
+        self.open_game().join(code)
+        host.wait_for("s.players.length === 2")
+        watcher = self.open_game()
+        listed = f"{code}  ·  2/16  ·  Free-for-all  ·  Cheddar Canyon"
+        for attempt in range(20):
+            watcher.click("RefreshButton")
+            try:
+                watcher.wait_for(f"s.sessions.length === 1 && s.sessions[0].text === '{listed}'", timeout=1_000)
+                return
+            except AssertionError:
+                continue
+        self.fail(f"the list never showed two playing: {watcher.state()['sessions']}")
+
+    def test_the_list_catches_up_without_being_asked(self):
+        watcher = self.open_game()
+        state = watcher.wait_for("s.sessions.length === 1")
+        self.assertEqual(state["sessions"][0]["text"], NO_SESSIONS)
+        code = self.open_game().host()
+        # Nobody clicks Refresh: the menu asks again by itself every so often.
+        watcher.wait_for(f"s.sessions.length === 1 && s.sessions[0].text.startsWith('{code}')")
+
+    def test_a_host_takes_its_session_back_when_the_session_server_returns(self):
+        # Every connection to the session server drops in the end. Here the
+        # whole server goes, and comes back remembering nothing.
+        host = self.open_game()
+        code = host.host()
+        self.signaling.stop()
+        self.signaling.start()
+        joiner = self.open_game()
+        joiner.wait_for(f"s.sessions.length === 1 && s.sessions[0].text.startsWith('{code}')")
+        joiner.join(code)
+        for game in (host, joiner):
+            state = game.wait_for("s.players.length === 2 && s.hud.includes('2 playing')")
+            self.assertEqual(state["code"], code)
+
     def test_a_closed_session_leaves_the_list(self):
         host = self.open_game()
         code = host.host()

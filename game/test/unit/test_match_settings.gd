@@ -52,8 +52,8 @@ func test_the_description_says_the_mode_goal_and_length() -> void:
 
 
 func test_the_server_and_the_game_agree_on_the_defaults() -> void:
-	# signaling/server.py keeps its own copy of these, as DEFAULT_SETTINGS.
-	var server := FileAccess.get_file_as_string(ProjectSettings.globalize_path("res://").path_join("../signaling/server.py"))
+	# signaling/core.py keeps its own copy of these, as DEFAULT_SETTINGS.
+	var server := FileAccess.get_file_as_string(ProjectSettings.globalize_path("res://").path_join("../signaling/core.py"))
 	if server.is_empty():
 		pass_test("the server's source isn't reachable from here")
 		return

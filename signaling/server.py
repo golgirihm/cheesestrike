@@ -1,103 +1,38 @@
-"""Signaling server for CheeseStrike.
+"""Signaling server for CheeseStrike, as one process: what development and the
+tests run. The public one runs the same rules on AWS (signaling/aws_lambda.py).
 
-Lists open sessions and relays WebRTC handshake messages between a session's
-host and the players joining it. No game traffic passes through here: once two
-browsers have connected to each other they stop needing this server.
+The rules and the protocol are in signaling/core.py. This carries the
+messages: WebSocket connections for hosts and for players joining, and on the
+same port two plain HTTP addresses for everyone else:
 
-Protocol: JSON text frames over WebSocket.
+    GET /sessions          {"sessions": [{"code": "ABCD", "players": 3, "settings": {...}}]}
+    GET /sessions/ABCD     {"open": true}    whether that session's host is connected
 
-  client -> server
-    {"type": "list"}
-    {"type": "host", "settings": {...}, "private": true}   both optional; see below
-    {"type": "join", "code": "ABCD"}
-    {"type": "offer" | "answer" | "candidate", "to": <peer id>, ...}
-
-  server -> client
-    {"type": "sessions", "sessions": [{"code": "ABCD", "players": 3, "settings": {...}}]}
-    {"type": "hosted", "code": "ABCD"}               to the host
-    {"type": "joined", "code": "ABCD", "id": <id>}   to the joiner
-    {"type": "peer_joined" | "peer_left", "id": <id>}  to the host
-    {"type": "closed"}                               to joiners, when the host drops
-    {"type": "offer" | "answer" | "candidate", "from": <peer id>, ...}
-    {"type": "error", "message": "..."}
-
-The host is always peer 1. Joiners only ever exchange messages with the host.
-
-A host's settings are how its matches are set up, which players see in the list
-before joining: {"mode": "ffa" | "teams", "kill_limit": n, "minutes": n,
-"max_players": n, "map": "canyon" | "box" | "city"}. The server only checks them and passes them on, apart
-from max_players, which it enforces. Anything missing or out of range is replaced by
-the default, as the game itself does.
-
-Limits, so that one machine can't flood the server: a message may be at most
-MAX_MESSAGE_SIZE bytes (a larger one closes the connection); each address may
-have MAX_CONNECTIONS_PER_ADDRESS connections open and MAX_SESSIONS_PER_ADDRESS
-sessions hosted at once; and each address may send MESSAGE_RATE messages a
-second on average, in bursts of up to MESSAGE_BURST. A message over the rate
-is dropped with an error. Behind a reverse proxy, as when the proxy handles
-TLS, start the server with --behind-proxy so it reads each player's address
-from the X-Forwarded-For header the proxy adds, rather than seeing every
-player as the proxy.
-
-Names never pass through here: players exchange them with the host directly,
-and the game cleans them (game/match/player_name.gd).
-
-A private session is left out of the list; players join it by its code, given
-to them by the host, usually in an invite link.
+Limits of its own, on top of the rules': a message may be at most
+MAX_MESSAGE_SIZE bytes (a larger one closes the connection), and each address
+may send MESSAGE_RATE messages a second on average, in bursts of up to
+MESSAGE_BURST. A message over the rate is dropped with an error. Behind a
+reverse proxy, as when the proxy handles TLS, start the server with
+--behind-proxy so it reads each player's address from the X-Forwarded-For
+header the proxy adds, rather than seeing every player as the proxy.
 """
 
 import argparse
 import asyncio
+import http
 import json
-import math
-import random
 import time
 
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
-HOST_ID = 1
-MAX_PLAYERS = 16
+import core
+from memory_store import MemoryStore
+
 MAX_SESSIONS = 1000
-CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # no I or O
-CODE_LENGTH = 4
-RELAYED = ("offer", "answer", "candidate")
-MODES = ("ffa", "teams")
-MAPS = ("canyon", "box", "city")
-DEFAULT_SETTINGS = {"mode": "ffa", "kill_limit": 20, "minutes": 8, "max_players": MAX_PLAYERS, "map": "canyon"}
 MAX_MESSAGE_SIZE = 64 * 1024
-MAX_CONNECTIONS_PER_ADDRESS = 32
-MAX_SESSIONS_PER_ADDRESS = 8
 MESSAGE_RATE = 50.0
 MESSAGE_BURST = 200.0
-# Allowed range of each number in a host's settings.
-SETTING_RANGES = {"kill_limit": (1, 999), "minutes": (1, 60), "max_players": (2, MAX_PLAYERS)}
-
-
-def clean_settings(given):
-    """A host's settings with anything missing, of the wrong kind or out of
-    range replaced by the default."""
-    settings = dict(DEFAULT_SETTINGS)
-    if not isinstance(given, dict):
-        return settings
-    if given.get("mode") in MODES:
-        settings["mode"] = given["mode"]
-    if given.get("map") in MAPS:
-        settings["map"] = given["map"]
-    for key, (low, high) in SETTING_RANGES.items():
-        value = given.get(key)
-        # bool is an int to Python, but not a number of anything here.
-        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-            settings[key] = max(low, min(high, int(value)))
-    return settings
-
-
-class Session:
-    def __init__(self, code, host, settings=None, private=False):
-        self.code = code
-        self.peers = {HOST_ID: host}  # peer id -> websocket
-        self.settings = clean_settings(settings)
-        self.private = private is True
 
 
 class RateLimit:
@@ -122,17 +57,25 @@ class RateLimit:
 
 
 class Address:
-    """What one address is using: its connections, sessions and message rate."""
+    """What one address is using here: its connections and message rate."""
 
     def __init__(self):
         self.connections = 0
-        self.sessions = 0
         self.rate = RateLimit(MESSAGE_RATE, MESSAGE_BURST)
 
 
-sessions = {}  # code -> Session
+signaling = core.Signaling(MemoryStore(), max_sessions=MAX_SESSIONS)
+sockets = {}  # connection name -> websocket
 addresses = {}  # address -> Address
 behind_proxy = False
+
+
+def reset():
+    """Forgets every session and connection, as a fresh start would."""
+    global signaling
+    signaling = core.Signaling(MemoryStore(), max_sessions=MAX_SESSIONS)
+    sockets.clear()
+    addresses.clear()
 
 
 def address_of(ws):
@@ -146,117 +89,69 @@ def address_of(ws):
     return ws.remote_address[0] if ws.remote_address else "?"
 
 
-async def send(ws, **msg):
-    try:
-        await ws.send(json.dumps(msg))
-    except ConnectionClosed:
-        pass
+async def deliver(out):
+    """Sends what the rules said to send, in order."""
+    for connection, msg in out:
+        ws = sockets.get(connection)
+        if ws is None:
+            continue
+        try:
+            if msg is None:
+                await ws.close()
+            else:
+                await ws.send(json.dumps(msg))
+        except ConnectionClosed:
+            pass
 
 
-def new_code():
-    while True:
-        code = "".join(random.choices(CODE_ALPHABET, k=CODE_LENGTH))
-        if code not in sessions:
-            return code
+def answer_http(ws, request):
+    """Answers the plain HTTP addresses; leaves WebSocket requests alone."""
+    if request.headers.get("Upgrade", "").lower() == "websocket":
+        return None
+    path = request.path.split("?")[0].rstrip("/")
+    if path == "/sessions":
+        body = {"sessions": signaling.list_sessions()}
+    elif path.startswith("/sessions/"):
+        body = {"open": signaling.session_open(path.removeprefix("/sessions/"))}
+    else:
+        return ws.respond(http.HTTPStatus.NOT_FOUND, "Not found.\n")
+    response = ws.respond(http.HTTPStatus.OK, json.dumps(body))
+    response.headers["Content-Type"] = "application/json"
+    # The game's page comes from another address, and may read this from there.
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 async def handle(ws):
     address = address_of(ws)
-    usage = addresses.setdefault(address, Address())
-    if usage.connections >= MAX_CONNECTIONS_PER_ADDRESS:
+    connection = str(ws.id)
+    if not signaling.connect(connection, address):
         await ws.close(1008, "Too many connections from this address.")
         return
+    sockets[connection] = ws
+    usage = addresses.setdefault(address, Address())
     usage.connections += 1
-    try:
-        await serve_connection(ws, usage)
-    finally:
-        usage.connections -= 1
-        if usage.connections == 0 and usage.sessions == 0:
-            addresses.pop(address, None)
-
-
-async def serve_connection(ws, usage):
-    session = None
-    peer_id = None
     try:
         async for raw in ws:
             if not usage.rate.allow():
-                await send(ws, type="error", message="Too many messages. Slow down.")
+                await deliver([(connection, {"type": "error", "message": "Too many messages. Slow down."})])
                 continue
-            try:
-                msg = json.loads(raw)
-                kind = msg["type"]
-            except (ValueError, TypeError, KeyError):
-                await send(ws, type="error", message="Malformed message.")
-                continue
-
-            if kind == "list":
-                listing = [{"code": s.code, "players": len(s.peers), "settings": s.settings} for s in sessions.values() if not s.private]
-                await send(ws, type="sessions", sessions=listing)
-
-            elif kind == "host" and session is None:
-                if len(sessions) >= MAX_SESSIONS:
-                    await send(ws, type="error", message="The session server is full.")
-                    continue
-                if usage.sessions >= MAX_SESSIONS_PER_ADDRESS:
-                    await send(ws, type="error", message="Too many sessions hosted from this address.")
-                    continue
-                usage.sessions += 1
-                session = Session(new_code(), ws, msg.get("settings"), msg.get("private"))
-                peer_id = HOST_ID
-                sessions[session.code] = session
-                print(f"[{session.code}] hosted{' (private)' if session.private else ''}")
-                await send(ws, type="hosted", code=session.code)
-
-            elif kind == "join" and session is None:
-                target = sessions.get(str(msg.get("code", "")).upper())
-                if target is None:
-                    await send(ws, type="error", message="No session with that code.")
-                    continue
-                if len(target.peers) >= target.settings["max_players"]:
-                    await send(ws, type="error", message="That session is full.")
-                    continue
-                session = target
-                peer_id = random.randrange(2, 2**31)
-                while peer_id in session.peers:
-                    peer_id = random.randrange(2, 2**31)
-                session.peers[peer_id] = ws
-                print(f"[{session.code}] peer {peer_id} joined ({len(session.peers)} players)")
-                await send(ws, type="joined", code=session.code, id=peer_id)
-                await send(session.peers[HOST_ID], type="peer_joined", id=peer_id)
-
-            elif kind in RELAYED and session is not None:
-                to = HOST_ID if peer_id != HOST_ID else msg.get("to")
-                target_ws = session.peers.get(to)
-                if target_ws is not None:
-                    relayed = {k: v for k, v in msg.items() if k != "to"}
-                    relayed["from"] = peer_id
-                    await send(target_ws, **relayed)
+            await deliver(signaling.message(connection, raw))
     except ConnectionClosed:
         pass
     finally:
-        if session is None:
-            pass  # Never hosted or joined, so there is nothing to clean up.
-        elif peer_id == HOST_ID:
-            # WebRTC links between host and players are already up and survive
-            # this; the session just stops being listed or joinable.
-            sessions.pop(session.code, None)
-            usage.sessions -= 1
-            print(f"[{session.code}] closed")
-            for other_id, other in list(session.peers.items()):
-                if other_id != HOST_ID:
-                    await send(other, type="closed")
-                    await other.close()
-        else:
-            session.peers.pop(peer_id, None)
-            print(f"[{session.code}] peer {peer_id} left")
-            if session.code in sessions:
-                await send(session.peers[HOST_ID], type="peer_left", id=peer_id)
+        out = signaling.disconnect(connection)
+        del sockets[connection]
+        usage.connections -= 1
+        if usage.connections == 0:
+            addresses.pop(address, None)
+        await deliver(out)
 
 
 def serving(host, port):
     """The server, with its limits, ready to start with `async with`."""
-    return serve(handle, host, port, max_size=MAX_MESSAGE_SIZE)
+    return serve(handle, host, port, max_size=MAX_MESSAGE_SIZE, process_request=answer_http)
 
 
 async def main():
