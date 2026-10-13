@@ -33,6 +33,14 @@ var _spawn_slots: SpawnSlots
 func _ready() -> void:
 	spawner.spawn_function = _create_player
 	match_.shot_shown.connect(_show_others_shot)
+	match_.fell.connect(func(victim: int, weapon: String, from: Vector3) -> void:
+		var player := player_node(victim)
+		if player != null:
+			player.fall(weapon, from))
+	match_.emote_shown.connect(func(id: int, kind: int) -> void:
+		var player := player_node(id)
+		if player != null:
+			player.show_emote(kind))
 	match_.strike_shown.connect(func(striker: int) -> void:
 		var player := player_node(striker)
 		if player != null:

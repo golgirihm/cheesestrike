@@ -26,6 +26,7 @@ const SOUNDS := {
 	"land": "_land",
 	"slide": "_slide",
 	"pad": "_pad",
+	"emote": "_emote",
 	"pickup": "_pickup",
 	"overload": "_overload",
 	"reload": "_reload",
@@ -303,6 +304,15 @@ static func _pad() -> AudioStreamWAV:
 	return _make(0.3, func(t: float, _i: int) -> float:
 		var hertz := lerpf(180.0, 720.0, sqrt(t / 0.3))
 		return (sin(TAU * hertz * t) * 0.7 + sin(TAU * hertz * 2.0 * t) * 0.2) * _decay(t, 7.0), 0.5)
+
+
+# An emote: two quick squeaks, the second higher.
+static func _emote() -> AudioStreamWAV:
+	return _make(0.26, func(t: float, _i: int) -> float:
+		var second := t >= 0.13
+		var since := t - 0.13 if second else t
+		var hertz := (1250.0 if second else 950.0) + 500.0 * since / 0.13
+		return sin(TAU * hertz * since) * sin(PI * minf(since / 0.11, 1.0)), 0.4)
 
 
 static func _hit() -> AudioStreamWAV:

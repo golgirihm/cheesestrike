@@ -134,6 +134,13 @@ func prints_showing() -> int:
 	return _prints.size()
 
 
+## Crumbs of `colour` thrown out from `at`: `count` of them, as when a
+## character is knocked out. More, and further, for one blown apart.
+func crumbs(at: Vector3, colour: Color, count: int, speed := 5.0) -> void:
+	if extras(_quality()):
+		_puff(at, Vector3.UP, colour, count, speed, 0.7, 0.22)
+
+
 ## How many marks shots have left that are still showing.
 func marks_showing() -> int:
 	return _marks.size()

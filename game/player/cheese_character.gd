@@ -21,6 +21,14 @@ const STRIDE := 0.7
 ## Steps per metre walked.
 const STEPS_PER_METRE := 0.9
 const MELT_TIME := 0.45
+## How a knocked-out character goes, by what did it: thrown back by a shot
+## or a strike and melting where it lands, or blown to crumbs by a burst.
+const THROWN := "thrown"
+const SCATTERED := "scattered"
+## How fast a thrown character leaves, in its own measurements a second, and
+## how far over it tips.
+const THROW_SPEED := 2.2
+const THROW_TIP := 1.1
 const POP_TIME := 0.2
 ## Seconds the face stays screwed up after being hurt.
 const GRIMACE_TIME := 0.5
@@ -78,9 +86,13 @@ var _grimace_left := 0.0
 # How far down the player is crouched, 0 to 1, and everything above the legs,
 # which comes down with them, with where each rests when standing.
 var _crouch := 0.0
+var _lean := 0.0
 var _upper := {}
 var _flash_left := 0.0
 var _cheer_left := 0.0
+# The emote being made (see Emotes), or -1, and seconds into it.
+var _emote := -1
+var _emote_for := 0.0
 var _set_left := 0.0
 var _dizzy := false
 var _faces := {}
@@ -96,6 +108,10 @@ var _melt := 0.0
 var _melting := false
 # 0 just appeared, 1 full size.
 var _pop := 1.0
+# How the character was knocked out, and the way it is being thrown, in the
+# player's own directions, slowing as it goes.
+var _ending := THROWN
+var _thrown := Vector3.ZERO
 
 
 func _init() -> void:
@@ -284,6 +300,13 @@ func set_crouch(amount: float) -> void:
 		_legs[index].get_child(1).scale.y = 0.6 / fold
 
 
+## How far the player leans: -1 to their left, 1 to their right.
+func set_lean(lean: float) -> void:
+	_lean = clampf(lean, -1.0, 1.0)
+	if not _melting:
+		rotation = BodyShape.lean_basis(_lean).get_euler()
+
+
 ## How far up (or, below zero, down) the player is looking, in radians: the
 ## eyes follow.
 func set_gaze(pitch: float) -> void:
@@ -295,7 +318,20 @@ func set_gaze(pitch: float) -> void:
 func grimace() -> void:
 	_grimace_left = GRIMACE_TIME
 	_flash_left = FLASH_TIME
+	_emote = -1
 	_light()
+
+
+## Makes emote `kind` (see Emotes): a few moments of arm and body, which
+## being hurt or firing cuts short.
+func emote(kind: int) -> void:
+	_emote = kind
+	_emote_for = 0.0
+
+
+## The emote being made, or -1.
+func emoting() -> int:
+	return _emote
 
 
 ## The player has just knocked someone out: a cheer.
@@ -306,6 +342,7 @@ func cheer() -> void:
 ## The player has just fired: a set face, for as long as they keep firing.
 func fire_face() -> void:
 	_set_left = SET_TIME
+	_emote = -1
 
 
 ## Whether the player is melted by someone's Overload, and seeing stars.
@@ -326,7 +363,7 @@ func expression() -> String:
 		return WINCE
 	if _dizzy:
 		return DIZZY
-	if _cheer_left > 0.0:
+	if _cheer_left > 0.0 or _emote == Emotes.CHEER:
 		return CHEER
 	if _set_left > 0.0:
 		return SET
@@ -359,14 +396,44 @@ func reach_for(hand: Vector3) -> void:
 	arm.get_child(0).scale.y = length / BodyShape.ARMS[1][1]
 
 
+## How a character knocked out with `weapon` goes: SCATTERED by anything
+## that bursts, THROWN by anything else.
+static func ending_for(weapon: String) -> String:
+	var stats := Weapons.find(weapon)
+	return SCATTERED if stats != null and stats.fires_projectile() else THROWN
+
+
+## The character is about to be knocked out by `weapon`, from the direction
+## `away` points away from, in the player's own directions: it is thrown
+## that way as it melts, or, by a burst, gone at once in a scatter of crumbs.
+func knock(weapon: String, away: Vector3) -> void:
+	_ending = ending_for(weapon)
+	var level := Vector3(away.x, 0.0, away.z)
+	_thrown = level.normalized() * THROW_SPEED if level.length() > 0.001 else Vector3.ZERO
+	# Should word of how arrive after word that they are out.
+	if _melting and _ending == SCATTERED:
+		_melt = 1.0
+
+
+## How the character was last knocked out: THROWN or SCATTERED.
+func ending() -> String:
+	return _ending
+
+
 ## Knocked out (melting away) or back in play (popping up).
 func set_in_play(in_play: bool) -> void:
 	if in_play and _melting:
 		_melting = false
 		_melt = 0.0
 		_pop = 0.0
-	elif not in_play:
+		_ending = THROWN
+		_thrown = Vector3.ZERO
+		position = Vector3.ZERO
+	elif not in_play and not _melting:
 		_melting = true
+		# A burst leaves nothing to melt.
+		if _ending == SCATTERED:
+			_melt = 1.0
 
 
 ## How far a leg swings forward at walk phase `phase` (radians) when moving at
@@ -387,7 +454,22 @@ func _process(delta: float) -> void:
 		# Legs tuck forward in the air.
 		_legs[index].rotation.x = -0.6 if _airborne else swing * side
 	# The free arm swings; the other holds the weapon.
-	_arms[0].rotation.x = -swing * 0.6
+	_arms[0].rotation = Vector3(-swing * 0.6, 0.0, Emotes.ARM_REST)
+	var sway := 0.0
+	var hop := 0.0
+	if _emote >= 0:
+		_emote_for += delta
+		if _emote_for >= Emotes.TIME or _melting:
+			_emote = -1
+		else:
+			var pose := Emotes.pose(_emote, _emote_for)
+			_arms[0].rotation = Vector3(0.0, 0.0, pose.arm)
+			sway = pose.sway
+			hop = pose.hop
+	if not _melting:
+		# Tipped on its feet by a lean or a dance, and lifted by a hop.
+		rotation = BodyShape.lean_basis(_lean).get_euler() + Vector3(0.0, 0.0, sway)
+		position = Vector3(0.0, hop * BodyShape.SIZE, 0.0)
 	_grimace_left = maxf(_grimace_left - delta, 0.0)
 	if is_flashing():
 		_flash_left = maxf(_flash_left - delta, 0.0)
@@ -421,6 +503,12 @@ func _process(delta: float) -> void:
 		eye.scale.z = open
 	if _melting:
 		_melt = minf(_melt + delta / MELT_TIME, 1.0)
+		# Thrown back, tipping over, and slowing to a stop as it melts.
+		position += _thrown * delta * BodyShape.SIZE
+		_thrown *= exp(-5.0 * delta)
+		if _thrown != Vector3.ZERO:
+			rotation = Vector3(0, 0, 0)
+			rotate(_thrown.normalized().cross(Vector3.DOWN).normalized(), THROW_TIP * _melt)
 	_pop = minf(_pop + delta / POP_TIME, 1.0)
 	# Melting sags and spreads the body; popping back grows it from the floor.
 	var sag := 1.0 - 0.85 * _melt

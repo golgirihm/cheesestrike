@@ -1304,3 +1304,88 @@ func test_a_blob_shrinks_and_fades_with_height() -> void:
 	assert_lt(player.blob_look(4.0).x, 1.0)
 	assert_lt(player.blob_look(4.0).y, 0.45)
 	assert_eq(player.blob_look(100.0), player.blob_look(8.0), "no smaller than that")
+
+
+func test_everyone_sees_a_knocked_out_player_thrown_away_from_the_shot() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	watch_signals(match_)
+	match_._harm(1, 2, 500.0, shooter.head.global_position, "blaster", false)
+	assert_signal_emitted(match_, "fell")
+	assert_eq(get_signal_parameters(match_, "fell")[0], 2)
+	match_.state_changed.emit()
+	assert_eq(other.body.ending(), other.body.THROWN)
+	other.body._process(0.2)
+	# They stood facing -Z and were shot from +Z: thrown toward -Z, which is
+	# forward for them.
+	assert_lt(other.body.position.z, -0.2)
+
+
+func test_a_burst_scatters_whoever_it_knocks_out() -> void:
+	_add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	match_._harm(1, 2, 500.0, Vector3(0, 0, -4), "launcher", false)
+	match_.state_changed.emit()
+	other.body._process(0.01)
+	assert_eq(other.body.ending(), other.body.SCATTERED)
+	assert_false(other.body.visible)
+
+
+func test_a_hit_that_does_not_knock_out_throws_nobody() -> void:
+	_add(1, Vector3(0, 0, 5))
+	_add(2, Vector3(0, 0, -5))
+	watch_signals(match_)
+	match_._harm(1, 2, 10.0, Vector3(0, 0, 5), "blaster", false)
+	assert_signal_not_emitted(match_, "fell")
+
+
+func test_the_host_passes_on_an_emote_and_not_too_many() -> void:
+	_add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	watch_signals(match_)
+	var before: int = Sounds.counts.get("emote", 0)
+	match_._emote(2, Emotes.DANCE)
+	assert_signal_emitted_with_parameters(match_, "emote_shown", [2, Emotes.DANCE])
+	assert_eq(other.body.emoting(), Emotes.DANCE)
+	assert_eq(Sounds.counts.get("emote", 0), before + 1)
+	match_._emote(2, Emotes.WAVE)
+	assert_signal_emit_count(match_, "emote_shown", 1, "one at a time")
+	match_._clock += Emotes.INTERVAL + 0.01
+	match_._emote(2, Emotes.WAVE)
+	assert_signal_emit_count(match_, "emote_shown", 2)
+	match_._clock += Emotes.INTERVAL + 0.01
+	match_._emote(2, 99)
+	match_._emote(2, "dance")
+	assert_signal_emit_count(match_, "emote_shown", 2, "nor one that doesn't exist")
+	match_.state.damage(1, 2, 500.0)
+	match_._clock += Emotes.INTERVAL + 0.01
+	match_._emote(2, Emotes.WAVE)
+	assert_signal_emit_count(match_, "emote_shown", 2, "nor from someone knocked out")
+
+
+func test_the_emote_key_makes_the_next_in_turn_or_the_one_picked_by_number() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	watch_signals(match_)
+	var send := func(action: String, pressed: bool) -> void:
+		var event := InputEventAction.new()
+		event.action = action
+		event.pressed = pressed
+		own._input(event)
+	send.call("emote", true)
+	send.call("emote", false)
+	assert_signal_emitted_with_parameters(match_, "emote_shown", [1, Emotes.WAVE])
+	match_._clock += Emotes.INTERVAL + 0.01
+	send.call("emote", true)
+	send.call("emote", false)
+	assert_signal_emitted_with_parameters(match_, "emote_shown", [1, Emotes.DANCE])
+	# Held, a number picks one, and doesn't change weapon.
+	match_._clock += Emotes.INTERVAL + 0.01
+	var held: String = own.weapon.stats.id
+	send.call("emote", true)
+	send.call("weapon_4", true)
+	send.call("emote", false)
+	await wait_physics_frames(2)
+	assert_signal_emitted_with_parameters(match_, "emote_shown", [1, Emotes.CHEER])
+	assert_signal_emit_count(match_, "emote_shown", 3, "letting go afterwards adds no other")
+	assert_eq(own.weapon.stats.id, held)

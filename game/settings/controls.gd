@@ -18,6 +18,7 @@ const REBINDABLE := {
 	"reload": "Reload",
 	"melee": "Knife",
 	"grenade": "Grenade",
+	"emote": "Emote",
 	"overload": "Overload",
 	"scoreboard": "Scoreboard",
 }

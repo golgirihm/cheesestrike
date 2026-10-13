@@ -129,6 +129,14 @@ class CombatTest(GameTestCase):
         host.page.keyboard.up("z")
         joiner.wait_for("s.players.some((p) => p.id === 1 && p.leaning === 0)")
 
+    def test_others_see_an_emote(self):
+        host, joiner, joiner_id = self.start_pair()
+        host.capture_mouse()
+        host.press("t")
+        joiner.wait_for("s.players.some((p) => p.id === 1 && p.emote === 'Wave')")
+        joiner.wait_for("(s.sounds.emote || 0) >= 1")
+        joiner.wait_for("s.players.some((p) => p.id === 1 && p.emote === '')")
+
     def test_a_knife_strike_hurts_a_player_within_reach(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()
