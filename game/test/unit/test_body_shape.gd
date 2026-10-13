@@ -202,3 +202,60 @@ func test_a_crouched_wedge_is_hit_where_it_is_drawn() -> void:
 				disagreements += 1
 	assert_lte(float(disagreements) / rays, ALLOWED_DISAGREEMENT, "%d of %d rays" % [disagreements, rays])
 	player.free()
+
+
+func test_leaning_tips_a_player_to_one_side_on_their_feet() -> void:
+	var right := BodyShape.head_offset(0.0, 1.0)
+	var left := BodyShape.head_offset(0.0, -1.0)
+	assert_gt(right.x, 0.2, "the eyes go out to the right")
+	assert_almost_eq(left.x, -right.x, 0.0001)
+	assert_lt(right.y, BodyShape.HEAD_HEIGHT, "and come down a little")
+	assert_almost_eq(right.length(), BodyShape.HEAD_HEIGHT, 0.0001, "the same distance from the feet")
+	assert_eq(BodyShape.head_offset(0.0, 0.0), Vector3(0, BodyShape.HEAD_HEIGHT, 0))
+	assert_almost_eq(BodyShape.head_offset(1.0, 1.0).length(), BodyShape.head_height(1.0), 0.0001, "crouched as well")
+	assert_eq(BodyShape.lean_basis(5.0), BodyShape.lean_basis(1.0), "no further than all the way")
+
+
+func test_shots_follow_a_leaning_player() -> void:
+	var feet := Vector3.ZERO
+	# Facing -Z, so their right is +X. A shot from in front, at where the
+	# tip of the wedge is when they stand upright.
+	var tip := Vector3(0, (BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y * 0.45) * BodyShape.SIZE, -5)
+	assert_false(BodyShape.ray_hit(tip, Vector3.BACK, feet).is_empty())
+	assert_true(BodyShape.ray_hit(tip, Vector3.BACK, feet, 0.0, 0.0, 1.0).is_empty(), "leaning, the tip has gone to one side")
+	# It is where their head now is.
+	var head := BodyShape.head_offset(0.0, 1.0) * BodyShape.SIZE + Vector3(0, 0, -5)
+	var hit := BodyShape.ray_hit(head, Vector3.BACK, feet, 0.0, 0.0, 1.0)
+	assert_false(hit.is_empty())
+	assert_true(hit.head)
+	# And the other way for the other lean, and for a player turned about.
+	assert_true(BodyShape.ray_hit(head, Vector3.BACK, feet, 0.0, 0.0, -1.0).is_empty())
+	var mirrored := Vector3(-head.x, head.y, 5)
+	assert_false(BodyShape.ray_hit(mirrored, Vector3.FORWARD, feet, PI, 0.0, 1.0).is_empty(), "their right is the other way when they face the other way")
+
+
+func test_a_leaning_wedge_is_hit_where_it_is_drawn() -> void:
+	var space := get_viewport().world_3d.direct_space_state
+	var player := _player(0.6, 0.0)
+	player.net_state = PackedFloat32Array([0, 0, 0, 0.6, 0, 0, player.POSE_LEAN_RIGHT])
+	await wait_process_frames(1)
+	player._animate(1.0)
+	assert_eq(player.lean(), 1.0)
+	_collide_as_drawn(player.body.get_node("Wedge"))
+	await wait_physics_frames(2)
+	var feet := player.global_position
+	var reach := (BodyShape.RADIUS + 3.0) * 2.0 + BodyShape.HEIGHT
+	var rays := 0
+	var hits := 0
+	var disagreements := 0
+	for side in [Vector3.FORWARD, Vector3.LEFT, Vector3(1, 0.4, 1)]:
+		for ray: Array in _rays_from(feet, side):
+			var drawn := space.intersect_ray(PhysicsRayQueryParameters3D.create(ray[0], ray[0] + ray[1] * reach, DRAWN_LAYER))
+			var tested := BodyShape.ray_hit(ray[0], ray[1], feet, 0.6, 0.0, 1.0)
+			rays += 1
+			hits += 0 if tested.is_empty() else 1
+			if drawn.is_empty() != tested.is_empty():
+				disagreements += 1
+	assert_gt(hits, rays / 10)
+	assert_lte(float(disagreements) / rays, ALLOWED_DISAGREEMENT, "%d of %d rays" % [disagreements, rays])
+	player.free()

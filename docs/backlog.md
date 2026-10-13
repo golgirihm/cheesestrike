@@ -49,9 +49,7 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 3: Movement with depth
 
-1. **Lean.** Peek left and right round a corner without stepping out.
-   *Tests:* GUT tests of the view offset and the hit shape.
-2. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
+1. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
    *Tests:* GUT tests of the arc and of `MovementCheck` allowing it and nothing more.
 
 ## Milestone 4: Characters that are alive

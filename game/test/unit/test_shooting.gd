@@ -1169,3 +1169,63 @@ func test_the_host_accepts_a_climb_onto_a_block_as_movement() -> void:
 			refused += 1
 	assert_eq(refused, 0)
 	assert_almost_eq(check.last_position().distance_to(to), 0.0, 0.001)
+
+
+func test_holding_lean_puts_the_owners_eyes_out_to_the_side() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	Input.action_press("lean_right")
+	await wait_seconds(0.3)
+	assert_eq(own.lean(), 1.0)
+	assert_gt(own.head.position.x, 0.5, "to their right")
+	assert_almost_eq(own.head.position.x, BodyShape.head_offset(0.0, 1.0).x * BodyShape.SIZE, 0.001)
+	own._publish()
+	assert_eq(int(own.net_state[6]) & own.POSE_LEAN_RIGHT, own.POSE_LEAN_RIGHT, "everyone is told")
+	# Shots still go straight ahead, from where the eyes now are.
+	assert_almost_eq((-own.head.global_basis.z).dot(-own.global_basis.z), 1.0, 0.0001)
+	Input.action_release("lean_right")
+	Input.action_press("lean_left")
+	await wait_seconds(0.4)
+	Input.action_release("lean_left")
+	assert_eq(own.lean(), -1.0)
+	assert_lt(own.head.position.x, -0.5)
+	await wait_seconds(0.3)
+	assert_eq(own.lean(), 0.0)
+	assert_almost_eq(own.head.position.x, 0.0, 0.001)
+
+
+func test_a_lean_never_reaches_past_the_players_own_width() -> void:
+	# So leaning against a wall can't put the eyes through it.
+	for crouch in [0.0, 1.0]:
+		assert_lt(absf(BodyShape.head_offset(crouch, 1.0).x) * BodyShape.SIZE, BodyShape.RADIUS - 0.2)
+
+
+func test_a_running_player_does_not_lean() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	Input.action_press("lean_right")
+	Input.action_press("sprint")
+	Input.action_press("move_forward")
+	await wait_seconds(0.3)
+	var leaned: float = own.lean()
+	Input.action_release("lean_right")
+	Input.action_release("sprint")
+	Input.action_release("move_forward")
+	assert_eq(leaned, 0.0)
+
+
+func test_a_shot_at_where_a_leaning_player_stood_upright_misses() -> void:
+	var shooter := _add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5), )
+	other.rotation.y = PI
+	var tip := Vector3(0, (BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y * 0.45) * BodyShape.SIZE, -5)
+	shooter.global_position = Vector3(0, tip.y - shooter.head.position.y, 5)
+	other.net_state = PackedFloat32Array([0, 0, -5, PI, 0, 0, other.POSE_LEAN_LEFT])
+	other._animate(1.0)
+	_shoot(shooter, tip)
+	assert_eq(match_.state.player(2).health, 100)
+	other.net_state = PackedFloat32Array([0, 0, -5, PI, 0, 0, 0])
+	other._animate(1.0)
+	match_._rules_for(1).refill()
+	_shoot(shooter, tip)
+	assert_lt(match_.state.player(2).health, 100)

@@ -59,6 +59,10 @@ const HEAD_FROM := HEAD_HEIGHT - EYE_RADIUS
 ## the eyes they see from, comes down by this much.
 const CROUCH_DROP := 0.25
 
+## How far a player who leans tips to one side, pivoting on their feet, in
+## radians: enough to put their eyes most of a metre out past a corner.
+const LEAN_ANGLE := 0.3
+
 ## The capsule the player moves as, which holds all of the above.
 const CAPSULE_RADIUS := 0.4
 const CAPSULE_HEIGHT := 1.8
@@ -98,11 +102,13 @@ static func hole_place(hole: Array) -> Dictionary:
 ## Where a ray from `origin` in direction `direction` (normalized) first touches
 ## the wedge of a player standing at `feet` and turned by `yaw`, as {distance,
 ## head}; or an empty dictionary if it misses. `crouch` is how far down they
-## are, from 0 standing to 1 crouched. A ray that starts inside the wedge
+## are, from 0 standing to 1 crouched, and `lean` how far they lean, from -1
+## to their left to 1 to their right. A ray that starts inside the wedge
 ## doesn't hit it.
-static func ray_hit(origin: Vector3, direction: Vector3, feet: Vector3, yaw := 0.0, crouch := 0.0) -> Dictionary:
-	# Into the body's own measurements, where it stands at the origin facing -Z.
-	var unturn := Basis(Vector3.UP, -yaw)
+static func ray_hit(origin: Vector3, direction: Vector3, feet: Vector3, yaw := 0.0, crouch := 0.0, lean := 0.0) -> Dictionary:
+	# Into the body's own measurements, where it stands at the origin facing
+	# -Z, upright.
+	var unturn := lean_basis(lean).inverse() * Basis(Vector3.UP, -yaw)
 	var drop := Vector3.DOWN * CROUCH_DROP * clampf(crouch, 0.0, 1.0)
 	var local := unturn * (origin - feet) / SIZE - drop
 	var along := unturn * direction
@@ -110,6 +116,18 @@ static func ray_hit(origin: Vector3, direction: Vector3, feet: Vector3, yaw := 0
 	if t == INF:
 		return {}
 	return {"distance": t * SIZE, "head": local.y + along.y * t >= HEAD_FROM}
+
+
+## How a player leaning by `lean` (-1 to their left, 1 to their right) is
+## tipped, pivoting on their feet.
+static func lean_basis(lean: float) -> Basis:
+	return Basis(Vector3.BACK, -LEAN_ANGLE * clampf(lean, -1.0, 1.0))
+
+
+## Where a player crouched by `crouch` and leaning by `lean` sees from, from
+## their feet, in the body's measurements and before they are turned.
+static func head_offset(crouch := 0.0, lean := 0.0) -> Vector3:
+	return lean_basis(lean) * Vector3(0, head_height(crouch), 0)
 
 
 ## How high above their feet a player crouched by `crouch` sees from, in the

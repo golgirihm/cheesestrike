@@ -79,6 +79,8 @@ var net_state := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0]):
 const POSE_AIMING := 1
 const POSE_RELOADING := 2
 const POSE_CROUCHING := 4
+const POSE_LEAN_LEFT := 8
+const POSE_LEAN_RIGHT := 16
 # What another player is doing, as their owner last sent it.
 var _pose := 0
 
@@ -130,6 +132,8 @@ var _melee_pressed := false
 # screen's crouch button, which stays on until pressed again, is on.
 var _crouch := 0.0
 var _touch_crouch := false
+# How far this player leans: -1 to their left, 1 to their right.
+var _lean := 0.0
 # Run, crouch and aim as turned on by a press, for players who have chosen
 # to press once rather than hold; and running by the touch stick's edge.
 var _toggled := {"sprint": false, "crouch": false, "aim": false}
@@ -532,6 +536,9 @@ func _animate(delta: float) -> void:
 		magazine_out = reloading
 		_crouch = move_toward(_crouch, 1.0 if _pose & POSE_CROUCHING and alive else 0.0, delta * Movement.CROUCH_RATE)
 		body.set_crouch(smoothstep(0.0, 1.0, _crouch))
+		var leaning := (1.0 if _pose & POSE_LEAN_RIGHT else 0.0) - (1.0 if _pose & POSE_LEAN_LEFT else 0.0)
+		_lean = move_toward(_lean, leaning if alive else 0.0, delta * Movement.CROUCH_RATE)
+		body.rotation = BodyShape.lean_basis(_lean).get_euler()
 		# Others bring their weapon up to the eye when they aim.
 		_aim = move_toward(_aim, 1.0 if _pose & POSE_AIMING and alive else 0.0, delta / AIM_TIME)
 		rest = _gun_rest.lerp(SEEN_AIM_GUN_POSITION * BodyShape.SIZE, smoothstep(0.0, 1.0, _aim))
@@ -547,8 +554,10 @@ func _animate(delta: float) -> void:
 				_step(_ground_speed * delta, global_position)
 		body.set_gaze(head.rotation.x)
 	_animate_knife(delta)
-	# The eyes, and what is held at them, come down with a crouch.
-	head.position.y = BodyShape.head_height(smoothstep(0.0, 1.0, _crouch)) * BodyShape.SIZE
+	# The eyes, and what is held at them, come down with a crouch and go out
+	# to the side with a lean, tipping a little as they go.
+	head.position = BodyShape.head_offset(smoothstep(0.0, 1.0, _crouch), _lean) * BodyShape.SIZE
+	head.rotation.z = -BodyShape.LEAN_ANGLE * _lean * 0.5
 	# A weapon just changed to swings up from below.
 	var lowered := switch_lowering(_switch_left)
 	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + (Vector3(0.0, -0.5, 0.1) * lowered + Vector3(0.03, -0.16, 0.04) * reloading) * gun.scale.x
@@ -592,6 +601,20 @@ func crouch() -> float:
 func _on(action: String) -> bool:
 	var setting := "toggle_run" if action == "sprint" else "toggle_" + action
 	return _toggled[action] if Settings.get_value(setting) else Input.is_action_pressed(action)
+
+
+## How far this player leans: -1 to their left, 1 to their right.
+func lean() -> float:
+	return _lean
+
+
+# The way this player wants to lean: -1, 0 or 1. Not at a run. A lean never
+# reaches as far as the player is wide, so it can't put their eyes through
+# anything they are standing against.
+func _wants_lean() -> float:
+	if not alive or Net.host_silent or _menu_open() or is_climbing() or (_wants_run() and _walk.length() > 0.5):
+		return 0.0
+	return signf(Input.get_axis("lean_left", "lean_right"))
 
 
 func _wants_crouch() -> bool:
@@ -664,6 +687,8 @@ func _publish() -> void:
 		var pose := POSE_AIMING if _aim > 0.5 else 0
 		if _crouch > 0.5:
 			pose |= POSE_CROUCHING
+		if absf(_lean) > 0.5:
+			pose |= POSE_LEAN_RIGHT if _lean > 0.0 else POSE_LEAN_LEFT
 		if weapon.is_reloading():
 			pose |= POSE_RELOADING
 		net_state = PackedFloat32Array([global_position.x, global_position.y, global_position.z, rotation.y, head.rotation.x, _teleports, pose])
@@ -722,6 +747,7 @@ func _process(delta: float) -> void:
 		camera.rotation = Vector3(tip.x + _recoil_view.y, -_recoil_view.x, tip.y - clampf(sideways, -1.0, 1.0) * WeaponSway.VIEW_ROLL * motion)
 		_aim = move_toward(_aim, 1.0 if _wants_aim() else 0.0, delta / AIM_TIME)
 		_crouch = move_toward(_crouch, 1.0 if _wants_crouch() else 0.0, delta * Movement.CROUCH_RATE)
+		_lean = move_toward(_lean, _wants_lean(), delta * Movement.CROUCH_RATE)
 		var run_fov := lerpf(1.0, WeaponSway.RUN_FOV, _running * Settings.get_value("camera_motion"))
 		camera.fov = Settings.get_value("fov") * lerpf(1.0, weapon.stats.aim_zoom, smoothstep(0.0, 1.0, _aim)) * run_fov
 	if OS.has_feature("web") and _mine:

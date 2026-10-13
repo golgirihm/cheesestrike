@@ -69,6 +69,7 @@ func snapshot() -> Dictionary:
 			"grenades": record.grenades if record != null else null,
 			"aiming": player.is_aiming(),
 			"crouching": player.crouch() >= 0.9,
+			"leaning": signf(player.lean()) if absf(player.lean()) >= 0.9 else 0.0,
 		}
 		if player.is_multiplayer_authority():
 			described.ammo = player.weapon.ammo
