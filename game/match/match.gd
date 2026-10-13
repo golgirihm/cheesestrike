@@ -866,6 +866,10 @@ func _burst(projectile: Projectile, at: Vector3) -> void:
 	_burst_seen.rpc(projectile.id, projectile.weapon.id, at)
 	projectile_burst.emit(projectile.id, projectile.weapon.id, at)
 	var weapon := projectile.weapon
+	if projectile.struck != 0 and weapon.impact_damage > 0.0:
+		_harm(projectile.shooter, projectile.struck, weapon.impact_damage * (weapon.headshot_multiplier if projectile.struck_head else 1.0), projectile.position - projectile.velocity.normalized(), weapon.id, projectile.struck_head)
+	if weapon.splash_radius <= 0.0:
+		return
 	var space := world.get_world_3d().direct_space_state
 	# A burst against a wall is at its face; sight lines are checked from a
 	# hand's width back along the way it came, so the wall itself counts.

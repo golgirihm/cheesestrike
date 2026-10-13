@@ -18,9 +18,9 @@ func _ready() -> void:
 		if weapon == Weapons.GRENADE:
 			Sounds.play_at("throw", from, world, 0.0, 0.75)
 		else:
-			Sounds.play_at("launcher", from, world))
-	match_.projectile_burst.connect(func(_id: int, _weapon: String, at: Vector3) -> void:
-		Sounds.play_at("burst", at, world))
+			Sounds.play_at(weapon, from, world))
+	match_.projectile_burst.connect(func(_id: int, weapon: String, at: Vector3) -> void:
+		Sounds.play_at(burst_sound(weapon), at, world))
 	match_.hit_confirmed.connect(func(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
 		Sounds.play(hit_sound(knocked_out, head), -4.0))
 	match_.hurt.connect(func(_attacker: int, _from: Vector3, _dealt: int) -> void:
@@ -37,6 +37,13 @@ static func hit_sound(knocked_out: bool, head: bool) -> String:
 	if knocked_out:
 		return "knock_out"
 	return "hit_head" if head else "hit"
+
+
+## The sound a projectile from `weapon` ends with: a burst, or for one that
+## only strikes, a knock.
+static func burst_sound(weapon: String) -> String:
+	var stats := Weapons.find(weapon)
+	return "burst" if stats == null or stats.splash_radius > 0.0 else "stick"
 
 
 ## This machine's own player fired `weapon` from `muzzle`.

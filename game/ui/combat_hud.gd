@@ -341,11 +341,40 @@ func _on_hurt(_attacker: int, from: Vector3, _dealt: int) -> void:
 	_indicators.append({"from": from, "left": DAMAGE_INDICATOR_LIFE})
 
 
+## Whether the view is through a scope, with all but a circle blacked out.
+func scope_shown() -> bool:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id()) if world != null and multiplayer.multiplayer_peer != null else null
+	return own != null and own.is_scoped()
+
+
+## The radius of a scope's view on a screen `view` in size.
+static func scope_radius(view: Vector2) -> float:
+	return minf(view.x, view.y) * 0.44
+
+
+func _draw_scope(own: Node3D) -> void:
+	var centre := size / 2.0
+	var radius := scope_radius(size)
+	# A ring wide enough to reach the corners blacks out the rest.
+	var width := size.length()
+	draw_arc(centre, radius + width / 2.0, 0.0, TAU, 96, Color.BLACK, width, true)
+	draw_arc(centre, radius, 0.0, TAU, 96, Color(0.05, 0.05, 0.05), 6.0, true)
+	for direction in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+		draw_line(centre + direction * 10.0, centre + direction * radius, Color.BLACK, 1.5, true)
+	draw_circle(centre, 1.5, HEADSHOT_COLOR)
+	# The breath left to hold, as an arc under the middle.
+	var air: float = own.breath.air
+	var arc := PI * 0.3 * air
+	draw_arc(centre, radius * 0.5, PI / 2.0 - arc, PI / 2.0 + arc, 24, Color(1, 1, 1, 0.75 if own.breath.holding else 0.35), 3.0, true)
+
+
 func _draw() -> void:
 	if world == null or _knocked_out.visible:
 		return
 	var centre := size / 2.0
 	var own: Node3D = world.player_node(multiplayer.get_unique_id())
+	if own != null and own.is_scoped():
+		_draw_scope(own)
 	var gap := crosshair_gap(own.shot_spread(), own.camera.fov, size.y) if own != null else CROSSHAIR_GAP
 	if crosshair_shown():
 		for direction in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:

@@ -15,6 +15,9 @@ var cooldown := 0.0
 var reload_left := 0.0
 ## Reloads finished since this weapon was picked up.
 var reloads := 0
+## Shots of the burst in progress still to come, for a weapon that fires in
+## bursts: they follow the first without the trigger being asked.
+var burst_left := 0
 
 
 func _init(weapon: WeaponStats) -> void:
@@ -37,11 +40,22 @@ func fire() -> bool:
 	if not can_fire():
 		return false
 	ammo -= 1
-	# Added rather than set, so a frame that runs late doesn't slow the rate.
-	cooldown += stats.fire_interval
+	if stats.burst > 1:
+		burst_left = burst_left - 1 if burst_left > 0 else stats.burst - 1
+		if ammo == 0:
+			burst_left = 0
+		cooldown += stats.burst_interval if burst_left > 0 else stats.burst_rest()
+	else:
+		# Added rather than set, so a frame that runs late doesn't slow the rate.
+		cooldown += stats.fire_interval
 	if ammo == 0:
 		start_reload()
 	return true
+
+
+## Whether a burst is under way, with shots still to come.
+func in_burst() -> bool:
+	return burst_left > 0
 
 
 ## Whether there is nothing left to fire or to reload with.
@@ -91,3 +105,4 @@ func refill() -> void:
 	reserve = maxi(stats.reserve, 0)
 	reload_left = 0.0
 	cooldown = 0.0
+	burst_left = 0

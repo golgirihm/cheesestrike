@@ -13,11 +13,15 @@ const SIDE := "side"
 const POWER := "power"
 ## The weapons a loadout can have in each slot, in the order they are
 ## offered. Kept by hand, and checked against each weapon's own slot.
-const MAINS := ["blaster", "shotgun", "grater"]
-const SIDES := ["pistol"]
+const MAINS := ["blaster", "shotgun", "grater", "carbine", "rifle", "lmg", "bow"]
+const SIDES := ["pistol", "pistols"]
 
-## In the order the number keys choose them.
-const ORDER := ["pistol", "blaster", "shotgun", "grater", "launcher"]
+## In the order they are stepped through, and that the number keys choose
+## among those carried. Added to at the end only: a weapon is sent as its
+## place here.
+const ORDER := ["pistol", "blaster", "shotgun", "grater", "launcher", "pistols", "carbine", "rifle", "lmg", "bow"]
+## How many number keys choose weapons (the actions weapon_1 and up).
+const KEYS := 5
 
 ## What is thrown rather than held: carried by everyone, beside their weapons.
 const GRENADE := "grenade"
@@ -31,6 +35,11 @@ const _ALL := {
 	"shotgun": preload("res://combat/weapons/shotgun.tres"),
 	"grater": preload("res://combat/weapons/grater.tres"),
 	"launcher": preload("res://combat/weapons/launcher.tres"),
+	"pistols": preload("res://combat/weapons/pistols.tres"),
+	"carbine": preload("res://combat/weapons/carbine.tres"),
+	"rifle": preload("res://combat/weapons/rifle.tres"),
+	"lmg": preload("res://combat/weapons/lmg.tres"),
+	"bow": preload("res://combat/weapons/bow.tres"),
 	GRENADE: preload("res://combat/weapons/grenade.tres"),
 }
 
@@ -58,6 +67,13 @@ static func clean_loadout(main: Variant, side: Variant) -> Array:
 ## The loadout this player has chosen in their settings, as [main, side].
 static func chosen_loadout() -> Array:
 	return clean_loadout(Settings.get_value("loadout_main"), Settings.get_value("loadout_side"))
+
+
+## Which of `owned` number key `key` (0 for the first) chooses: they are
+## counted off in the usual order, sidearm first. "" if there aren't so many.
+static func at_key(owned: Array, key: int) -> String:
+	var held := ORDER.filter(func(id: String) -> bool: return owned.has(id))
+	return held[key] if key >= 0 and key < held.size() else ""
 
 
 ## The weapon after (or with `step` -1, before) `current` among `owned`, in
