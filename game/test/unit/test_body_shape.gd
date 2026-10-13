@@ -162,3 +162,43 @@ func test_a_burst_is_measured_to_the_nearest_point_up_the_middle() -> void:
 	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, 4.5, 3)), Vector3(1, 4.5, 3))
 	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, -10, 3)), feet + Vector3.UP * BodyShape.RADIUS, "from below, low down")
 	assert_eq(BodyShape.nearest_middle(feet, Vector3(5, 99, 3)), feet + Vector3.UP * (BodyShape.HEIGHT - BodyShape.RADIUS), "from above, high up")
+
+
+func test_a_crouched_player_is_lower_and_shots_follow() -> void:
+	var feet := Vector3.ZERO
+	var tip := Vector3(0, (BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y * 0.45) * BodyShape.SIZE, -5)
+	assert_false(BodyShape.ray_hit(tip, Vector3.BACK, feet).is_empty(), "standing, the tip is there")
+	assert_true(BodyShape.ray_hit(tip, Vector3.BACK, feet, 0.0, 1.0).is_empty(), "crouched, it has come down")
+	# What was between the legs is now the bottom of the wedge.
+	var low := Vector3(0, (BodyShape.HIP_HEIGHT - 0.1) * BodyShape.SIZE, -5)
+	assert_true(BodyShape.ray_hit(low, Vector3.BACK, feet).is_empty())
+	assert_false(BodyShape.ray_hit(low, Vector3.BACK, feet, 0.0, 1.0).is_empty())
+	# The face is still the head, wherever it is.
+	var eye := Vector3(0, BodyShape.head_height(1.0) * BodyShape.SIZE, -5)
+	assert_true(BodyShape.ray_hit(eye, Vector3.BACK, feet, 0.0, 1.0).head)
+	assert_eq(BodyShape.head_height(0.0), BodyShape.HEAD_HEIGHT)
+	assert_almost_eq(BodyShape.head_height(1.0), BodyShape.HEAD_HEIGHT - BodyShape.CROUCH_DROP, 0.0001)
+	assert_lt(BodyShape.CROUCH_DROP, BodyShape.HIP_HEIGHT, "the legs fold; they don't vanish")
+
+
+func test_a_crouched_wedge_is_hit_where_it_is_drawn() -> void:
+	var space := get_viewport().world_3d.direct_space_state
+	var player := _player(0.6, 0.0)
+	player.body.set_crouch(1.0)
+	await wait_process_frames(1)
+	player.body.set_crouch(1.0)
+	_collide_as_drawn(player.body.get_node("Wedge"))
+	await wait_physics_frames(2)
+	var feet := player.global_position
+	var reach := (BodyShape.RADIUS + 3.0) * 2.0 + BodyShape.HEIGHT
+	var rays := 0
+	var disagreements := 0
+	for side in [Vector3.FORWARD, Vector3.LEFT, Vector3(1, 0.4, 1)]:
+		for ray: Array in _rays_from(feet, side):
+			var drawn := space.intersect_ray(PhysicsRayQueryParameters3D.create(ray[0], ray[0] + ray[1] * reach, DRAWN_LAYER))
+			var tested := BodyShape.ray_hit(ray[0], ray[1], feet, 0.6, 1.0)
+			rays += 1
+			if drawn.is_empty() != tested.is_empty():
+				disagreements += 1
+	assert_lte(float(disagreements) / rays, ALLOWED_DISAGREEMENT, "%d of %d rays" % [disagreements, rays])
+	player.free()

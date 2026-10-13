@@ -109,6 +109,15 @@ class CombatTest(GameTestCase):
         host.page.mouse.up(button="right")
         joiner.wait_for("s.players.some((p) => p.id === 1 && !p.aiming)")
 
+    def test_others_see_a_player_crouch(self):
+        host, joiner, joiner_id = self.start_pair()
+        host.capture_mouse()
+        host.page.keyboard.down("c")
+        host.wait_for("s.players.some((p) => p.mine && p.crouching)")
+        joiner.wait_for("s.players.some((p) => p.id === 1 && p.crouching)")
+        host.page.keyboard.up("c")
+        joiner.wait_for("s.players.some((p) => p.id === 1 && !p.crouching)")
+
     def test_a_knife_strike_hurts_a_player_within_reach(self):
         host, joiner, joiner_id = self.start_pair()
         host.capture_mouse()

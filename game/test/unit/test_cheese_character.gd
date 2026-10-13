@@ -229,3 +229,24 @@ func test_a_flash_gives_way_to_an_overloads_glow() -> void:
 	character._process(CHARACTER.FLASH_TIME + 0.01)
 	assert_true(character._material.emission_enabled)
 	assert_ne(character._material.emission, Color.WHITE)
+
+
+func test_crouching_folds_the_legs_and_brings_everything_else_down() -> void:
+	var wedge: Node3D = character.get_node("Wedge")
+	var eye: Node3D = _named("Eye")[0]
+	var stood := wedge.position.y
+	character.set_crouch(1.0)
+	character._process(0.016)
+	assert_almost_eq(wedge.position.y, stood - BodyShape.CROUCH_DROP, 0.0001)
+	assert_almost_eq(eye.position.y, BodyShape.head_height(1.0), 0.0001)
+	for leg: Node3D in _named("Leg"):
+		assert_lt(leg.scale.y, 1.0, "shorter")
+		# Still from the bottom of the wedge to the ground.
+		assert_almost_eq(leg.position.y, BodyShape.HIP_HEIGHT - BodyShape.CROUCH_DROP, 0.0001)
+		assert_almost_eq(leg.position.y - BodyShape.LEGS[0][1] * leg.scale.y, 0.0, 0.0001)
+	for hole: Node3D in _named("Hole"):
+		assert_lt(hole.position.y, BodyShape.WEDGE_CENTRE.y + 0.5, "the holes come with the wedge")
+	character.set_crouch(0.0)
+	character._process(0.016)
+	assert_almost_eq(wedge.position.y, stood, 0.0001)
+	assert_almost_eq(_named("Leg")[0].scale.y, 1.0, 0.0001)

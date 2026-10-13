@@ -49,23 +49,21 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 3: Movement with depth
 
-1. **Crouch.** Hold or toggle to crouch: a lower view, a smaller wedge to hit, slower and quieter steps, tighter spread. The hit shape and the host's movement check follow.
-   *Tests:* GUT tests in `BodyShape`, `Movement` and `MovementCheck`; browser test that others see it.
-2. **Slide.** Crouching while running slides, keeping speed for a moment and carrying down ramps.
+1. **Slide.** Crouching while running slides, keeping speed for a moment and carrying down ramps.
    *Tests:* GUT tests of the slide's speed over time and of the host allowing it.
-3. **Climb what you can reach.** Running into a ledge at chest height or below pulls the player up onto it (a cheese block, a car's bonnet) without a jump.
+2. **Climb what you can reach.** Running into a ledge at chest height or below pulls the player up onto it (a cheese block, a car's bonnet) without a jump.
    *Tests:* GUT tests in a small test arena for what can and can't be climbed.
-4. **Steps and kerbs.** Walk up small steps without jumping, so arenas can have kerbs, stairs and uneven ground.
+3. **Steps and kerbs.** Walk up small steps without jumping, so arenas can have kerbs, stairs and uneven ground.
    *Tests:* GUT tests walking a player over steps of several heights.
-5. **Air control and landing.** A little steering in the air, a view dip and a thud on landing scaled by the fall, and a short slow-down after a long one.
+4. **Air control and landing.** A little steering in the air, a view dip and a thud on landing scaled by the fall, and a short slow-down after a long one.
    *Tests:* GUT tests of the rules. Manual row for feel.
-6. **Run on a touch screen, and toggles.** Push the movement stick to its edge to run. Settings for hold or toggle on run, crouch and aim.
+5. **Run on a touch screen, and toggles.** Push the movement stick to its edge to run. Settings for hold or toggle on run, crouch and aim.
    *Tests:* GUT tests of the touch stick and the toggles.
-7. **Lean.** Peek left and right round a corner without stepping out.
+6. **Lean.** Peek left and right round a corner without stepping out.
    *Tests:* GUT tests of the view offset and the hit shape.
-8. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
+7. **Jump pads and ladders.** Arena pieces that launch a player along a set arc, and ones that can be climbed. The host's movement check knows about both.
    *Tests:* GUT tests of the arc and of `MovementCheck` allowing it and nothing more.
-9. **A view that moves like a head.** Gentle bob when walking, more when running, a tilt when strafing and a widening of the view at a run, all scaled by a "camera motion" setting that can be turned off.
+8. **A view that moves like a head.** Gentle bob when walking, more when running, a tilt when strafing and a widening of the view at a run, all scaled by a "camera motion" setting that can be turned off.
    *Tests:* GUT tests of the setting at zero. Manual row.
 
 ## Milestone 4: Characters that are alive

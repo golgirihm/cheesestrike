@@ -78,6 +78,7 @@ var net_state := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0]):
 ## The bits of a pose: aiming down the sights, and reloading.
 const POSE_AIMING := 1
 const POSE_RELOADING := 2
+const POSE_CROUCHING := 4
 # What another player is doing, as their owner last sent it.
 var _pose := 0
 
@@ -125,6 +126,10 @@ var _reload_pressed := false
 var _jump_pressed := false
 var _overload_pressed := false
 var _melee_pressed := false
+# How far down this player is crouched, 0 to 1, and whether the touch
+# screen's crouch button, which stays on until pressed again, is on.
+var _crouch := 0.0
+var _touch_crouch := false
 # Seconds a grenade has been held with its fuse burning, or below zero when
 # none is in hand; and whether a touch has asked for one to be thrown at once.
 var _cooking := -1.0
@@ -502,6 +507,8 @@ func _animate(delta: float) -> void:
 		_reload_lowered = move_toward(_reload_lowered, 1.0 if _pose & POSE_RELOADING and alive else 0.0, delta * 5.0)
 		reloading = smoothstep(0.0, 1.0, _reload_lowered)
 		magazine_out = reloading
+		_crouch = move_toward(_crouch, 1.0 if _pose & POSE_CROUCHING and alive else 0.0, delta * Movement.CROUCH_RATE)
+		body.set_crouch(smoothstep(0.0, 1.0, _crouch))
 		# Others bring their weapon up to the eye when they aim.
 		_aim = move_toward(_aim, 1.0 if _pose & POSE_AIMING and alive else 0.0, delta / AIM_TIME)
 		rest = _gun_rest.lerp(SEEN_AIM_GUN_POSITION * BodyShape.SIZE, smoothstep(0.0, 1.0, _aim))
@@ -517,6 +524,8 @@ func _animate(delta: float) -> void:
 				_step(_ground_speed * delta, global_position)
 		body.set_gaze(head.rotation.x)
 	_animate_knife(delta)
+	# The eyes, and what is held at them, come down with a crouch.
+	head.position.y = BodyShape.head_height(smoothstep(0.0, 1.0, _crouch)) * BodyShape.SIZE
 	# A weapon just changed to swings up from below.
 	var lowered := switch_lowering(_switch_left)
 	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + (Vector3(0.0, -0.5, 0.1) * lowered + Vector3(0.03, -0.16, 0.04) * reloading) * gun.scale.x
@@ -550,9 +559,22 @@ func is_aiming() -> bool:
 	return _aim >= 0.9
 
 
+## How far down this player is crouched: 0 standing, 1 crouched.
+func crouch() -> float:
+	return _crouch
+
+
+func _wants_crouch() -> bool:
+	if not alive or Net.host_silent or _menu_open():
+		return false
+	return _touch_crouch or Input.is_action_pressed("crouch")
+
+
 ## How this player stands, as a shot fired now would report it.
 func stance() -> int:
 	var bits := WeaponStats.AIMED if is_aiming() else 0
+	if _crouch >= 0.9:
+		bits |= WeaponStats.CROUCHED
 	if not is_on_floor():
 		bits |= WeaponStats.AIRBORNE
 	elif Vector2(velocity.x, velocity.z).length() > 1.0:
@@ -583,10 +605,12 @@ func _step(distance: float, at: Vector3) -> void:
 	if _since_step < STEP_LENGTH:
 		return
 	_since_step = 0.0
+	# A crouched player treads softly.
+	var hush := -10.0 * _crouch
 	if at == Vector3.INF:
-		Sounds.play("step", -9.0, Sounds.varied(0.1))
+		Sounds.play("step", -9.0 + hush, Sounds.varied(0.1))
 	elif world != null:
-		Sounds.play_at("step", at, world, -3.0, Sounds.varied(0.1))
+		Sounds.play_at("step", at, world, -3.0 + hush, Sounds.varied(0.1))
 
 
 ## A mouse movement measured in the page's pixels, as the browser reports it,
@@ -604,6 +628,8 @@ static func page_to_view(movement: Vector2, view: Vector2, window: Vector2, pixe
 func _publish() -> void:
 	if _mine:
 		var pose := POSE_AIMING if _aim > 0.5 else 0
+		if _crouch > 0.5:
+			pose |= POSE_CROUCHING
 		if weapon.is_reloading():
 			pose |= POSE_RELOADING
 		net_state = PackedFloat32Array([global_position.x, global_position.y, global_position.z, rotation.y, head.rotation.x, _teleports, pose])
@@ -655,6 +681,7 @@ func _process(delta: float) -> void:
 		_recoil_view = _recoil_view.lerp(kicked, minf(delta * (RECOIL_RISE if firing else RECOIL_SETTLE), 1.0))
 		camera.rotation = Vector3(tip.x + _recoil_view.y, -_recoil_view.x, tip.y)
 		_aim = move_toward(_aim, 1.0 if _wants_aim() else 0.0, delta / AIM_TIME)
+		_crouch = move_toward(_crouch, 1.0 if _wants_crouch() else 0.0, delta * Movement.CROUCH_RATE)
 		camera.fov = Settings.get_value("fov") * lerpf(1.0, weapon.stats.aim_zoom, smoothstep(0.0, 1.0, _aim))
 	if OS.has_feature("web") and _mine:
 		var moved := WebPage.take_mouse_movement()
@@ -729,7 +756,7 @@ func _physics_process(delta: float) -> void:
 	var direction := transform.basis * Vector3(input.x, 0.0, input.y).limit_length(1.0)
 	_knockback *= exp(-(KNOCKBACK_GROUND_DECAY if is_on_floor() else KNOCKBACK_AIR_DECAY) * delta)
 	_flinch_left = maxf(_flinch_left - delta, 0.0)
-	var speed := Movement.speed(Input.is_action_pressed("sprint"), _wants_aim(), _flinch_left, Overload.speed_factor(record()))
+	var speed := Movement.speed(Input.is_action_pressed("sprint"), _wants_aim(), _flinch_left, Overload.speed_factor(record()), _wants_crouch())
 	velocity.x = direction.x * speed + _knockback.x
 	velocity.z = direction.z * speed + _knockback.z
 	_fall_speed = maxf(-velocity.y, 0.0)
@@ -928,6 +955,7 @@ func _release_controls() -> void:
 	_mouse_fire_held = false
 	_fire_pressed = false
 	_touch_aim = false
+	_touch_crouch = false
 	_button_touches.clear()
 
 
@@ -968,6 +996,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 			_touch_aim = not _touch_aim
 		elif button == "knife":
 			_melee_pressed = true
+		elif button == "crouch":
+			_touch_crouch = not _touch_crouch
 		elif button == "grenade":
 			_start_grenade()
 			_grenade_tapped = true
@@ -993,7 +1023,7 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		if Time.get_ticks_msec() - _look_touch_start_msec < TOUCH_TAP_MSEC:
 			_touch_jump = true
 	if controls != null:
-		controls.held = _button_touches.values() + (["aim"] if _touch_aim else [])
+		controls.held = _button_touches.values() + (["aim"] if _touch_aim else []) + (["crouch"] if _touch_crouch else [])
 
 
 func _handle_drag(event: InputEventScreenDrag) -> void:

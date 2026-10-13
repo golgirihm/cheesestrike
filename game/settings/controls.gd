@@ -12,6 +12,7 @@ const REBINDABLE := {
 	"move_right": "Right",
 	"jump": "Jump",
 	"sprint": "Run",
+	"crouch": "Crouch",
 	"reload": "Reload",
 	"melee": "Knife",
 	"grenade": "Grenade",

@@ -71,11 +71,14 @@ extends Resource
 const AIMED := 1
 const MOVING := 2
 const AIRBORNE := 4
+const CROUCHED := 8
 ## The share of the hip spread that the first shot of a run of fire has.
 const HIP_START := 0.55
 ## How much wider shots spread on the move, and off the ground.
 const MOVING_SPREAD := 1.25
 const AIRBORNE_SPREAD := 1.6
+## How much tighter they are from a crouch.
+const CROUCHED_SPREAD := 0.75
 ## How much wider aimed shots spread at the end of a long run of fire.
 const AIMED_BLOOM := 1.5
 
@@ -100,6 +103,8 @@ func spread_for(stance: int, run := 0) -> float:
 		cone *= AIRBORNE_SPREAD
 	elif stance & MOVING:
 		cone *= MOVING_SPREAD
+	if stance & CROUCHED and not stance & AIRBORNE:
+		cone *= CROUCHED_SPREAD
 	return cone
 
 

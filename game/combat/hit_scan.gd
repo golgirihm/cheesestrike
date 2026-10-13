@@ -41,10 +41,10 @@ static func ray_capsule(origin: Vector3, direction: Vector3, feet: Vector3, radi
 
 ## A player standing at `feet`, turned by `yaw` and looking up or down by
 ## `pitch`, as `targets` in first_hit() hold them. Looking up or down doesn't
-## move the wedge, so only where they stand and how they are turned decide
-## what hits.
-static func pose(feet: Vector3, yaw := 0.0, pitch := 0.0) -> Dictionary:
-	return {"feet": feet, "yaw": yaw, "pitch": pitch}
+## move the wedge, so only where they stand, how they are turned and how
+## far they `crouch` (0 standing to 1 crouched) decide what hits.
+static func pose(feet: Vector3, yaw := 0.0, pitch := 0.0, crouch := 0.0) -> Dictionary:
+	return {"feet": feet, "yaw": yaw, "pitch": pitch, "crouch": crouch}
 
 
 ## The first of `targets` that the ray hits within `max_distance`, as {id,
@@ -56,7 +56,7 @@ static func first_hit(origin: Vector3, direction: Vector3, max_distance: float, 
 	for id: int in targets:
 		var target: Variant = targets[id]
 		var at: Dictionary = target if target is Dictionary else pose(target)
-		var hit := BodyShape.ray_hit(origin, direction, at.feet, at.yaw)
+		var hit := BodyShape.ray_hit(origin, direction, at.feet, at.yaw, at.get("crouch", 0.0))
 		if not hit.is_empty() and hit.distance <= best_distance:
 			best_distance = hit.distance
 			best = {"id": id, "distance": hit.distance, "point": origin + direction * hit.distance, "head": hit.head}
