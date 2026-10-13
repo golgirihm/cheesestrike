@@ -41,6 +41,10 @@ func _ready() -> void:
 		var player := player_node(id)
 		if player != null:
 			player.show_emote(kind))
+	match_.throw_shown.connect(func(id: int) -> void:
+		var player := player_node(id)
+		if player != null:
+			player.body.act(CharacterMotion.THROW))
 	match_.strike_shown.connect(func(striker: int) -> void:
 		var player := player_node(striker)
 		if player != null:

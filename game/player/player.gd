@@ -81,6 +81,7 @@ const POSE_RELOADING := 2
 const POSE_CROUCHING := 4
 const POSE_LEAN_LEFT := 8
 const POSE_LEAN_RIGHT := 16
+const POSE_SLIDING := 32
 # What another player is doing, as their owner last sent it.
 var _pose := 0
 
@@ -592,7 +593,8 @@ func _animate(delta: float) -> void:
 			# Updates arrive in steps, so smooth the speed they give.
 			_ground_speed = lerpf(_ground_speed, minf(speed, 12.0), minf(delta * 10.0, 1.0))
 			var airborne := absf(moved.y) / delta > 0.5
-			body.set_motion(_ground_speed, airborne)
+			body.set_motion(_ground_speed, airborne, moved.y / delta, _pose & POSE_SLIDING != 0)
+			body.set_holding(_pose & POSE_AIMING != 0, _pose & POSE_RELOADING != 0)
 			if alive and not airborne and _ground_speed > 0.5:
 				_step(_ground_speed * delta, global_position)
 		body.set_gaze(head.rotation.x)
@@ -800,6 +802,8 @@ func _publish() -> void:
 			pose |= POSE_CROUCHING
 		if absf(_lean) > 0.5:
 			pose |= POSE_LEAN_RIGHT if _lean > 0.0 else POSE_LEAN_LEFT
+		if is_sliding():
+			pose |= POSE_SLIDING
 		if weapon.is_reloading():
 			pose |= POSE_RELOADING
 		net_state = PackedFloat32Array([global_position.x, global_position.y, global_position.z, rotation.y, head.rotation.x, _teleports, pose])
@@ -836,6 +840,7 @@ func _show_smoothed() -> void:
 func kick() -> void:
 	_kick = 1.0
 	body.fire_face()
+	body.act(CharacterMotion.FIRE)
 
 
 func _process(delta: float) -> void:
@@ -1234,6 +1239,7 @@ func _show_arc(grenade: WeaponStats) -> void:
 ## by this player that everyone should see.
 func swing_knife() -> void:
 	_since_strike = 0.0
+	body.act(CharacterMotion.MELEE)
 	if _knife == null:
 		_knife = _build_knife()
 		head.add_child(_knife)

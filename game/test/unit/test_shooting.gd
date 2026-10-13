@@ -1389,3 +1389,13 @@ func test_the_emote_key_makes_the_next_in_turn_or_the_one_picked_by_number() -> 
 	assert_signal_emitted_with_parameters(match_, "emote_shown", [1, Emotes.CHEER])
 	assert_signal_emit_count(match_, "emote_shown", 3, "letting go afterwards adds no other")
 	assert_eq(own.weapon.stats.id, held)
+
+
+func test_everyone_sees_the_arm_of_a_player_who_throws() -> void:
+	_add(1, Vector3(0, 0, 12))
+	var other := _add(2, Vector3(0, 0, 2))
+	watch_signals(match_)
+	match_._throw(2, other.head.global_position, Vector3.RIGHT, 0.0)
+	assert_signal_emitted_with_parameters(match_, "throw_shown", [2])
+	other.body._process(0.016)
+	assert_eq(other.body.action(), CharacterMotion.THROW)
