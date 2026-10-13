@@ -6,10 +6,13 @@ class_name Pickups
 const HEALTH := "health"
 ## A box of ammunition: a magazine's worth for every weapon carried.
 const AMMO := "ammo"
+## A rind to wear: armour, up to the most that can be worn.
+const ARMOUR := "armour"
+const ARMOUR_AMOUNT := 50
 ## Health a wedge gives back, up to full.
 const HEALTH_AMOUNT := 50
 ## Seconds before a collected pickup is back.
-const RESPAWN := {HEALTH: 15.0, AMMO: 12.0}
+const RESPAWN := {HEALTH: 15.0, AMMO: 12.0, ARMOUR: 25.0}
 const WEAPON_RESPAWN := 20.0
 ## How close a player's feet must come to a pad to collect from it.
 const REACH := 1.3
@@ -18,7 +21,7 @@ const REACH_UP := 2.0
 
 ## Whether `kind` is something a pad can hold.
 static func is_kind(kind: String) -> bool:
-	return kind == HEALTH or kind == AMMO or Weapons.find(kind) != null
+	return kind == HEALTH or kind == AMMO or kind == ARMOUR or Weapons.find(kind) != null
 
 
 static func respawn_time(kind: String) -> float:
@@ -38,6 +41,8 @@ static func wanted(kind: String, record: PlayerRecord) -> bool:
 		return false
 	if kind == HEALTH:
 		return record.health < PlayerRecord.MAX_HEALTH
+	if kind == ARMOUR:
+		return record.armour < PlayerRecord.MAX_ARMOUR
 	if kind == AMMO:
 		# Of use to anyone short of a grenade, or carrying more than the
 		# sidearm, which never runs out.
@@ -50,6 +55,9 @@ static func wanted(kind: String, record: PlayerRecord) -> bool:
 static func give(kind: String, record: PlayerRecord) -> bool:
 	if kind == HEALTH:
 		record.health = mini(record.health + HEALTH_AMOUNT, PlayerRecord.MAX_HEALTH)
+		return false
+	if kind == ARMOUR:
+		record.armour = mini(record.armour + ARMOUR_AMOUNT, PlayerRecord.MAX_ARMOUR)
 		return false
 	if kind == AMMO:
 		record.grenades = mini(record.grenades + 1, Weapons.GRENADES)
@@ -65,5 +73,7 @@ static func display_name(kind: String) -> String:
 		return "Cheese wedge"
 	if kind == AMMO:
 		return "Ammunition"
+	if kind == ARMOUR:
+		return "Rind armour"
 	var weapon := Weapons.find(kind)
 	return weapon.display_name if weapon != null else kind

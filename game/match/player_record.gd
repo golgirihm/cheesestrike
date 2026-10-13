@@ -5,10 +5,16 @@ extends RefCounted
 ## MatchState).
 
 const MAX_HEALTH := 100
+## The most armour a player can wear, and the share of each hit it takes in
+## their place for as long as it lasts.
+const MAX_ARMOUR := 50
+const ARMOUR_SHARE := 0.5
 
 var id: int
 var name := PlayerName.FALLBACK
 var health := MAX_HEALTH
+## Armour left: a rind that takes part of each hit until it is gone.
+var armour := 0
 var alive := true
 ## Seconds until a knocked-out player comes back.
 var respawn_in := 0.0
@@ -38,7 +44,7 @@ var look := 0
 
 # Where each number sits in a packed record (see to_packed).
 enum { _ID, _HEALTH, _FLAGS, _RESPAWN, _PROTECTED, _KILLS, _DEATHS, _LAST_ATTACKER,
-	_WEAPON, _WEAPONS, _TEAM, _OVERLOAD, _OVERLOAD_LEFT, _MELTED, _PING, _GRENADES, _LOOK, _COUNT }
+	_WEAPON, _WEAPONS, _TEAM, _OVERLOAD, _OVERLOAD_LEFT, _MELTED, _PING, _GRENADES, _LOOK, _ARMOUR, _COUNT }
 const _ALIVE := 1
 
 
@@ -50,6 +56,17 @@ func _init(player_id := 0) -> void:
 func disarm() -> void:
 	weapons = [Weapons.STARTING]
 	weapon = Weapons.STARTING
+
+
+## Takes a hit of `amount`: armour absorbs its share for as long as it
+## lasts, and health the rest. Returns {"dealt": health lost, "absorbed":
+## armour lost}.
+func take(amount: int) -> Dictionary:
+	var absorbed := mini(armour, roundi(amount * ARMOUR_SHARE))
+	var dealt := mini(amount - absorbed, health)
+	armour -= absorbed
+	health -= dealt
+	return {"dealt": dealt, "absorbed": absorbed}
 
 
 func is_protected() -> bool:
@@ -76,6 +93,7 @@ func to_dict() -> Dictionary:
 		"ping": ping,
 		"grenades": grenades,
 		"look": look,
+		"armour": armour,
 	}
 
 
@@ -105,6 +123,7 @@ func to_packed() -> Array:
 	numbers[_PING] = ping
 	numbers[_GRENADES] = grenades
 	numbers[_LOOK] = look
+	numbers[_ARMOUR] = armour
 	return [name, numbers]
 
 
@@ -141,6 +160,7 @@ static func from_packed(data: Variant) -> PlayerRecord:
 	record.ping = maxi(numbers[_PING], 0)
 	record.grenades = clampi(numbers[_GRENADES], 0, Weapons.GRENADES)
 	record.look = Looks.clean(numbers[_LOOK])
+	record.armour = clampi(numbers[_ARMOUR], 0, MAX_ARMOUR)
 	return record
 
 
@@ -164,6 +184,7 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.ping = maxi(_int(data, "ping", 0), 0)
 	record.grenades = clampi(_int(data, "grenades", Weapons.GRENADES), 0, Weapons.GRENADES)
 	record.look = Looks.clean(_int(data, "look", 0))
+	record.armour = clampi(_int(data, "armour", 0), 0, MAX_ARMOUR)
 	var carried: Variant = data.get("weapons")
 	if carried is Array:
 		record.weapons = carried.filter(func(id: Variant) -> bool: return Weapons.find(id) != null)

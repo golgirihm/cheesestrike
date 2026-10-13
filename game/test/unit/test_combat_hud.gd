@@ -164,3 +164,11 @@ func test_grenades_left_show_as_marks() -> void:
 	record.grenades = 0
 	assert_eq(HUD.grenade_text(record), "Grenades  ○○")
 	assert_eq(HUD.grenade_text(null), "")
+
+
+func test_armour_shows_beside_health_only_while_worn() -> void:
+	var record := PlayerRecord.new(1)
+	assert_eq(HUD.armour_text(record), "")
+	record.armour = 35
+	assert_eq(HUD.armour_text(record), "+ 35 rind")
+	assert_eq(HUD.armour_text(null), "")

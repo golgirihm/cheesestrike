@@ -136,3 +136,17 @@ func test_ammunition_gives_back_a_grenade() -> void:
 	Pickups.give(Pickups.AMMO, record)
 	Pickups.give(Pickups.AMMO, record)
 	assert_eq(record.grenades, Weapons.GRENADES, "no more than can be carried")
+
+
+func test_a_rind_is_armour_for_anyone_short_of_it() -> void:
+	assert_true(Pickups.is_kind(Pickups.ARMOUR))
+	var record := PlayerRecord.new(1)
+	assert_true(Pickups.wanted(Pickups.ARMOUR, record))
+	assert_false(Pickups.give(Pickups.ARMOUR, record))
+	assert_eq(record.armour, Pickups.ARMOUR_AMOUNT)
+	assert_false(Pickups.wanted(Pickups.ARMOUR, record), "wearing all they can")
+	record.armour = 10
+	Pickups.give(Pickups.ARMOUR, record)
+	assert_eq(record.armour, PlayerRecord.MAX_ARMOUR, "topped up, not piled on")
+	assert_eq(Pickups.display_name(Pickups.ARMOUR), "Rind armour")
+	assert_gt(Pickups.respawn_time(Pickups.ARMOUR), Pickups.respawn_time(Pickups.HEALTH), "rarer than health")
