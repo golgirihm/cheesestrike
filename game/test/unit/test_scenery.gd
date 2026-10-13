@@ -97,7 +97,9 @@ func test_a_short_fence_shows_where_the_edge_is() -> void:
 			# Along one side of the edge, end to end.
 			var on_side := is_equal_approx(absf(rail.position.x), edge.end.x) or is_equal_approx(absf(rail.position.z), edge.end.y)
 			assert_true(on_side, "%s: %s isn't on the edge" % [id, rail.name])
-			assert_almost_eq(maxf(box.size.x, box.size.z), edge.size.x, 0.3, id)
+			# As long as the side it is on, which needn't be the other's length.
+			var length := maxf(box.size.x, box.size.z)
+			assert_true(absf(length - edge.size.x) < 0.3 or absf(length - edge.size.y) < 0.3, "%s: %s is %.1f long" % [id, rail.name, length])
 		var posts: MultiMeshInstance3D = fence.get_node("Posts")
 		assert_gt(posts.multimesh.instance_count, 20, id)
 		assert_almost_eq(posts.multimesh.mesh.get_aabb().size.y, Scenery.FENCE_HEIGHT, 0.001)

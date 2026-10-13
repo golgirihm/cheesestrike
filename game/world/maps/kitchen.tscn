@@ -1,0 +1,489 @@
+[gd_scene load_steps=35 format=3]
+
+[sub_resource type="StandardMaterial3D" id="S1"]
+albedo_color = Color(0.62, 0.44, 0.28, 1)
+
+[sub_resource type="BoxMesh" id="S2"]
+material = SubResource("S1")
+size = Vector3(52, 1, 36)
+
+[sub_resource type="BoxShape3D" id="S3"]
+size = Vector3(52, 1, 36)
+
+[sub_resource type="BoxShape3D" id="S4"]
+size = Vector3(60, 2000, 4)
+
+[sub_resource type="BoxShape3D" id="S5"]
+size = Vector3(4, 2000, 36)
+
+[sub_resource type="StandardMaterial3D" id="S6"]
+albedo_color = Color(0.62, 0.66, 0.72, 1)
+
+[sub_resource type="BoxMesh" id="S7"]
+material = SubResource("S6")
+size = Vector3(7, 7, 5)
+
+[sub_resource type="BoxShape3D" id="S8"]
+size = Vector3(7, 7, 5)
+
+[sub_resource type="StandardMaterial3D" id="S9"]
+albedo_color = Color(0.72, 0.5, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="S10"]
+material = SubResource("S9")
+size = Vector3(9, 5, 5)
+
+[sub_resource type="BoxShape3D" id="S11"]
+size = Vector3(9, 5, 5)
+
+[sub_resource type="StandardMaterial3D" id="S12"]
+albedo_color = Color(0.5, 0.32, 0.18, 1)
+
+[sub_resource type="BoxMesh" id="S13"]
+material = SubResource("S12")
+size = Vector3(1.4, 4.4, 4.6)
+
+[sub_resource type="BoxShape3D" id="S14"]
+size = Vector3(1.4, 4.4, 4.6)
+
+[sub_resource type="StandardMaterial3D" id="S15"]
+albedo_color = Color(0.4, 0.27, 0.17, 1)
+
+[sub_resource type="BoxMesh" id="S16"]
+material = SubResource("S15")
+size = Vector3(11, 0.5, 8)
+
+[sub_resource type="BoxShape3D" id="S17"]
+size = Vector3(11, 0.5, 8)
+
+[sub_resource type="StandardMaterial3D" id="S18"]
+albedo_color = Color(0.75, 0.2, 0.18, 1)
+
+[sub_resource type="BoxMesh" id="S19"]
+material = SubResource("S18")
+size = Vector3(2.6, 6.4, 2.6)
+
+[sub_resource type="BoxShape3D" id="S20"]
+size = Vector3(2.6, 6.4, 2.6)
+
+[sub_resource type="StandardMaterial3D" id="S21"]
+albedo_color = Color(0.25, 0.5, 0.32, 1)
+
+[sub_resource type="BoxMesh" id="S22"]
+material = SubResource("S21")
+size = Vector3(2.6, 6.4, 2.6)
+
+[sub_resource type="StandardMaterial3D" id="S23"]
+albedo_color = Color(0.28, 0.42, 0.66, 1)
+
+[sub_resource type="BoxMesh" id="S24"]
+material = SubResource("S23")
+size = Vector3(2.6, 6.4, 2.6)
+
+[sub_resource type="StandardMaterial3D" id="S25"]
+albedo_color = Color(0.92, 0.92, 0.9, 1)
+
+[sub_resource type="BoxMesh" id="S26"]
+material = SubResource("S25")
+size = Vector3(5, 8, 5)
+
+[sub_resource type="BoxShape3D" id="S27"]
+size = Vector3(5, 8, 5)
+
+[sub_resource type="BoxMesh" id="S28"]
+material = SubResource("S25")
+size = Vector3(5, 2.4, 4)
+
+[sub_resource type="BoxShape3D" id="S29"]
+size = Vector3(5, 2.4, 4)
+
+[sub_resource type="BoxMesh" id="S30"]
+material = SubResource("S15")
+size = Vector3(26, 0.5, 4)
+
+[sub_resource type="BoxShape3D" id="S31"]
+size = Vector3(26, 0.5, 4)
+
+[sub_resource type="StandardMaterial3D" id="S32"]
+albedo_color = Color(1, 0.82, 0.22, 1)
+
+[sub_resource type="BoxMesh" id="S33"]
+material = SubResource("S32")
+size = Vector3(2, 2, 2)
+
+[sub_resource type="BoxShape3D" id="S34"]
+size = Vector3(2, 2, 2)
+
+[node name="Kitchen" type="Node3D"]
+metadata/scenery = "meadow"
+
+[node name="Geometry" type="Node3D" parent="."]
+
+[node name="Floor" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Floor"]
+mesh = SubResource("S2")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Floor"]
+shape = SubResource("S3")
+
+[node name="WallNorth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 999, -20)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/WallNorth"]
+shape = SubResource("S4")
+
+[node name="WallSouth" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 999, 20)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/WallSouth"]
+shape = SubResource("S4")
+
+[node name="WallEast" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28, 999, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/WallEast"]
+shape = SubResource("S5")
+
+[node name="WallWest" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28, 999, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/WallWest"]
+shape = SubResource("S5")
+
+[node name="Toaster" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 3.5, 9)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Toaster"]
+mesh = SubResource("S7")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Toaster"]
+shape = SubResource("S8")
+
+[node name="Loaf" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 2.5, -9)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Loaf"]
+mesh = SubResource("S10")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Loaf"]
+shape = SubResource("S11")
+
+[node name="LoafEnd" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.2, 2.2, -9)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/LoafEnd"]
+mesh = SubResource("S13")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/LoafEnd"]
+shape = SubResource("S14")
+
+[node name="Board" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0.25, -10)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Board"]
+mesh = SubResource("S16")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Board"]
+shape = SubResource("S17")
+
+[node name="JarOne" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 3.2, 13)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/JarOne"]
+mesh = SubResource("S19")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/JarOne"]
+shape = SubResource("S20")
+
+[node name="JarTwo" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 3.2, 13)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/JarTwo"]
+mesh = SubResource("S22")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/JarTwo"]
+shape = SubResource("S20")
+
+[node name="JarThree" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 3.2, 13)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/JarThree"]
+mesh = SubResource("S24")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/JarThree"]
+shape = SubResource("S20")
+
+[node name="Kettle" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23, 4, 9)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Kettle"]
+mesh = SubResource("S26")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Kettle"]
+shape = SubResource("S27")
+
+[node name="ButterDish" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 1.2, -13)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/ButterDish"]
+mesh = SubResource("S28")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/ButterDish"]
+shape = SubResource("S29")
+
+[node name="Shelf" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 6.75, 15.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Shelf"]
+mesh = SubResource("S30")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Shelf"]
+shape = SubResource("S31")
+
+[node name="Block1" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1.5, -11)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block1"]
+mesh = SubResource("S33")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block1"]
+shape = SubResource("S34")
+
+[node name="Block2" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1.5, -11)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block2"]
+mesh = SubResource("S33")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block2"]
+shape = SubResource("S34")
+
+[node name="Block3" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, -2)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block3"]
+mesh = SubResource("S33")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block3"]
+shape = SubResource("S34")
+
+[node name="Block4" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 1, 2)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block4"]
+mesh = SubResource("S33")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block4"]
+shape = SubResource("S34")
+
+[node name="Block5" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 3, 2)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block5"]
+mesh = SubResource("S33")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block5"]
+shape = SubResource("S34")
+
+[node name="Block6" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -14)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block6"]
+mesh = SubResource("S33")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block6"]
+shape = SubResource("S34")
+
+[node name="Block7" type="StaticBody3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 1, -2)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Block7"]
+mesh = SubResource("S33")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/Block7"]
+shape = SubResource("S34")
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19, 0.1, -6)
+
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0.1, 6)
+
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 0.1, 3)
+
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0.1, -2)
+
+[node name="Spawn5" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0.1, 14)
+
+[node name="Spawn6" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.1, -15)
+
+[node name="Spawn7" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.1, -5)
+
+[node name="Spawn8" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.1, 6)
+
+[node name="Spawn9" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0.1, -8)
+
+[node name="Spawn10" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 0.1, 14)
+
+[node name="Spawn11" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.1, 4)
+
+[node name="Spawn12" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0.1, -3)
+
+[node name="Spawn13" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.1, -16)
+
+[node name="Spawn14" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0.1, 16)
+
+[node name="Spawn15" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.1, -9)
+
+[node name="Spawn16" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.1, 10)
+
+[node name="Objectives" type="Node3D" parent="."]
+
+[node name="BaseCheddar" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19, 0, -6)
+
+[node name="BaseBrie" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0, 6)
+
+[node name="Hill1" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="Hill2" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, 4)
+
+[node name="Hill3" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, -3)
+
+[node name="Hill4" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 9)
+
+[node name="Hill5" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -8)
+
+[node name="PointA" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, 4)
+
+[node name="PointB" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="PointC" type="Marker3D" parent="Objectives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, -3)
+
+[node name="Pickups" type="Node3D" parent="."]
+
+[node name="Launcher" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+metadata/kind = "launcher"
+
+[node name="Power" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0.5, -8)
+metadata/kind = "power"
+
+[node name="Armour" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23, 0, -14)
+metadata/kind = "armour"
+
+[node name="HealthWest" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23, 0, 14)
+metadata/kind = "health"
+
+[node name="HealthEast" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 0, 1)
+metadata/kind = "health"
+
+[node name="HealthShelf" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 7, 15.5)
+metadata/kind = "health"
+
+[node name="AmmoNorth" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, -14)
+metadata/kind = "ammo"
+
+[node name="AmmoSouth" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, 10)
+metadata/kind = "ammo"
+
+[node name="AmmoWest" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, -2)
+metadata/kind = "ammo"
+
+[node name="AmmoShelf" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 7, 15.5)
+metadata/kind = "ammo"
+
+[node name="Places" type="Node3D" parent="."]
+
+[node name="Place1" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+metadata/label = "The Worktop"
+
+[node name="Place2" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0, 9)
+metadata/label = "Toaster"
+
+[node name="Place3" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -9)
+metadata/label = "The Loaf"
+
+[node name="Place4" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0.5, -10)
+metadata/label = "Chopping Board"
+
+[node name="Place5" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 11)
+metadata/label = "Spice Rack"
+
+[node name="Place6" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 7, 15.5)
+metadata/label = "The Shelf"
+
+[node name="Place7" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23, 0, 13)
+metadata/label = "Kettle Corner"
+
+[node name="Place8" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, -2)
+metadata/label = "The Hob"
+
+[node name="Place9" type="Marker3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0, -13)
+metadata/label = "Butter Dish"
+
+[node name="JumpPads" type="Node3D" parent="."]
+
+[node name="PadShelf" type="Marker3D" parent="JumpPads"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21.5, 0, 16.5)
+metadata/launch = Vector3(5.5, 18, 0)
+
+[node name="Hazards" type="Node3D" parent="."]
+
+[node name="Pan" type="Marker3D" parent="Hazards"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, -2)
+metadata/kind = "fondue"
+metadata/size = Vector3(5, 1, 5)
+
+[node name="GraterFlat" type="Marker3D" parent="Hazards"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 0, 7)
+metadata/kind = "the_grater"
+metadata/size = Vector3(3, 1, 8)
+
+[node name="MenuCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.83957, 0.543251, 0, -0.543251, 0.83957, 0, 22, 30)

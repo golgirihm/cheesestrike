@@ -197,7 +197,12 @@ func _build_life() -> void:
 	var extras := GraphicsQuality.level(Settings.get_value("quality")) != GraphicsQuality.LOW
 	ambient_life = preload("res://world/ambient_life.gd").new()
 	map.add_child(ambient_life)
-	ambient_life.build(String(map.get_meta("scenery", Scenery.MEADOW)), Scenery.bounds(map.get_node("Geometry")), extras)
+	# Traffic lights and a train belong to the city's streets, not to every
+	# arena that has a city round it.
+	var kind := String(map.get_meta("scenery", Scenery.MEADOW))
+	if kind == Scenery.CITY and map_id != "city":
+		kind = "town"
+	ambient_life.build(kind, Scenery.bounds(map.get_node("Geometry")), extras)
 
 
 # The sky is as the host chose it, with rain or dust in the air only where
