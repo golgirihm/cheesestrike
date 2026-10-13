@@ -29,6 +29,8 @@ var step := 0
 # How things stood when the step began, and how far they have walked and
 # turned in it.
 var _from := {}
+# And how they stood when the tutorial began.
+var _began := {}
 var _walked := 0.0
 var _turned := 0.0
 var _last := {}
@@ -53,6 +55,7 @@ func update(now: Dictionary) -> bool:
 		return false
 	if _from.is_empty():
 		_from = now
+		_began = now
 		_last = now
 		return false
 	_walked += Vector2(now.at.x - _last.at.x, now.at.z - _last.at.z).length()
@@ -71,7 +74,9 @@ func update(now: Dictionary) -> bool:
 		"reload":
 			done = now.reloads > _from.reloads
 		"pick_up":
-			done = now.weapons > _from.weapons
+			# One taken from the rack earlier, in passing, will do: there may
+			# be no other within easy reach.
+			done = now.weapons > _began.weapons
 		"overload":
 			done = now.overloaded
 	if done:
