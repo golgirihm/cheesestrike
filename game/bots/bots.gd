@@ -10,8 +10,22 @@ const NAMES := ["Stilton", "Feta", "Edam", "Gruyère", "Manchego", "Halloumi", "
 const TAG := "[bot] "
 
 
+## Ids from here down are the practice range's targets: bots that only stand.
+const FIRST_TARGET := -100
+
+
 static func is_bot(id: int) -> bool:
 	return id < 0
+
+
+## Whether `id` is one of the practice range's targets.
+static func is_target(id: int) -> bool:
+	return id <= FIRST_TARGET
+
+
+## The id of the range's target number `index`, counting from 0.
+static func target_id(index: int) -> int:
+	return FIRST_TARGET - index
 
 
 ## The id of bot number `index`, counting from 0.

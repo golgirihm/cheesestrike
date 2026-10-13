@@ -176,6 +176,8 @@ func update_objectives(delta: float, spots: Dictionary, standing: Dictionary) ->
 func objective_text(own: int) -> String:
 	if not is_playing():
 		return ""
+	if settings.is_practice():
+		return "Every weapon is on the rack behind you  ·  what each has done is on the right"
 	if capture != null:
 		var parts: Array[String] = []
 		for team in 2:
@@ -241,7 +243,8 @@ func add_player(id: int) -> PlayerRecord:
 			record.team = smaller_team()
 		players[id] = record
 		rearm(record)
-		if not started and players.size() >= MIN_TO_START:
+		# The practice range has no match to begin.
+		if not started and players.size() >= MIN_TO_START and not settings.is_practice():
 			_begin()
 	return players[id]
 
@@ -397,7 +400,11 @@ func collect(index: int, kind: String, id: int) -> String:
 	# In a gun game the only weapon is the one a player has earned.
 	if settings.mode == MatchSettings.GUN_GAME and Weapons.ids().has(kind):
 		return ""
-	pickups[index] = Pickups.respawn_time(kind)
+	# On the practice range everything is back at once, and a weapon taken
+	# from the rack comes into hand.
+	pickups[index] = Pickups.respawn_time(kind) if not settings.is_practice() else 1.0
+	if settings.is_practice() and Weapons.ids().has(kind) and not record.weapons.has(kind):
+		record.weapon = kind
 	if kind == Pickups.POWER:
 		var power := Powers.next(powers_taken)
 		powers_taken += 1
@@ -536,7 +543,7 @@ func end_match() -> void:
 func start_match() -> void:
 	phase = PLAYING
 	overtime = false
-	started = players.size() >= MIN_TO_START
+	started = players.size() >= MIN_TO_START and not settings.is_practice()
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
 	team_points = [0, 0]

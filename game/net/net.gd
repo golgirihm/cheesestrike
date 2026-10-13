@@ -21,6 +21,8 @@ const ICE_SERVERS := [{"urls": ["stun:stun.l.google.com:19302"]}]
 
 var use_webrtc := OS.has_feature("web")
 var in_session := false
+## Whether the session is one of this machine alone (see play_alone).
+var alone := false
 var room_code := ""
 ## The session this player last joined, as given to join(), kept after
 ## leaving so they can rejoin it.
@@ -65,6 +67,15 @@ func host(settings := MatchSettings.new(), private := false) -> void:
 		return
 	multiplayer.multiplayer_peer = enet
 	room_code = "port %d" % ENET_PORT
+	_start()
+
+
+## Starts a session of one, on this machine alone, with nobody told and
+## nothing for anyone to join: for the practice range.
+func play_alone() -> void:
+	_reset()
+	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	alone = true
 	_start()
 
 
@@ -165,6 +176,7 @@ func _reset() -> void:
 	_connecting = false
 	_join_deadline = 0.0
 	in_session = false
+	alone = false
 	room_code = ""
 	_host_watch = HostWatch.new()
 	_heartbeat_timer = 0.0

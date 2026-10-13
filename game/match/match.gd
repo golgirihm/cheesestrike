@@ -1234,6 +1234,11 @@ func _respawn(id: int) -> void:
 		var other := state.player(node.name.to_int())
 		if other != null and other.id != id and other.alive and not state.are_allies(id, other.id):
 			others.append(node.global_position)
+	# One with a place of its own, as a target on the range has, goes back to it.
+	var home: Variant = world.home_of(id)
+	if home != null:
+		_bring_back(id, home)
+		return
 	var spots: Array[Vector3] = world.spawn_positions()
 	_bring_back(id, spots[SpawnChooser.farthest(spots, others)])
 
