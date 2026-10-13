@@ -67,15 +67,17 @@ static func in_slot(slot: String) -> Array:
 	return ORDER.filter(func(id: String) -> bool: return find(id).slot == slot)
 
 
-## A loadout as chosen, put right: [main, side], with a main weapon that
-## isn't one made none ("") and a sidearm that isn't one made the usual.
-static func clean_loadout(main: Variant, side: Variant) -> Array:
-	return [main if main is String and MAINS.has(main) else "", side if side is String and SIDES.has(side) else STARTING]
+## A loadout as chosen, put right: [main, side, attachment], with a main
+## weapon that isn't one made none (""), a sidearm that isn't one made the
+## usual, and an attachment (see Attachments) that isn't one made none.
+static func clean_loadout(main: Variant, side: Variant, attachment: Variant = 0) -> Array:
+	return [main if main is String and MAINS.has(main) else "", side if side is String and SIDES.has(side) else STARTING, attachment if Attachments.is_kind(attachment) else Attachments.NONE]
 
 
-## The loadout this player has chosen in their settings, as [main, side].
+## The loadout this player has chosen in their settings, as [main, side,
+## attachment].
 static func chosen_loadout() -> Array:
-	return clean_loadout(Settings.get_value("loadout_main"), Settings.get_value("loadout_side"))
+	return clean_loadout(Settings.get_value("loadout_main"), Settings.get_value("loadout_side"), Attachments.from_id(Settings.get_value("loadout_attachment")))
 
 
 ## Which of `owned` number key `key` (0 for the first) chooses: they are

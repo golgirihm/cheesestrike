@@ -65,6 +65,8 @@ const DEFAULTS := {
 	## The weapons the player comes into play with (see Weapons.MAINS).
 	"loadout_main": Weapons.DEFAULT_MAIN,
 	"loadout_side": Weapons.STARTING,
+	## What is fitted to the main weapon (see Attachments.IDS).
+	"loadout_attachment": Attachments.IDS[0],
 }
 
 ## The allowed range of each number setting. A value outside is brought in.
@@ -89,6 +91,7 @@ const CHOICES := {
 	"look_held": Looks.HELD,
 	"loadout_main": Weapons.MAINS,
 	"loadout_side": Weapons.SIDES,
+	"loadout_attachment": Attachments.IDS,
 }
 
 ## Where the settings are kept. Tests point their own instances elsewhere.

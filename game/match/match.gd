@@ -133,7 +133,7 @@ func start(settings := MatchSettings.new()) -> void:
 		introduce(Settings.get_value("name"))
 		wear(Looks.chosen())
 		var loadout := Weapons.chosen_loadout()
-		choose_loadout(loadout[0], loadout[1])
+		choose_loadout(loadout[0], loadout[1], loadout[2])
 
 
 func stop() -> void:
@@ -169,7 +169,7 @@ func add_player(id: int) -> void:
 	if _pending_looks.has(id):
 		state.player(id).look = _pending_looks[id]
 	if _pending_loadouts.has(id):
-		_arm(id, _pending_loadouts[id][0], _pending_loadouts[id][1])
+		_arm(id, _pending_loadouts[id][0], _pending_loadouts[id][1], _pending_loadouts[id][2])
 	_pending_names.erase(id)
 	_pending_looks.erase(id)
 	_pending_loadouts.erase(id)
@@ -206,28 +206,30 @@ func introduce(wanted: String, key := WebPage.player_key()) -> void:
 		_introduce.rpc_id(1, wanted, key)
 
 
-## Tells the host the weapons this player wants to come into play with.
-func choose_loadout(main: String, side: String) -> void:
+## Tells the host the weapons this player wants to come into play with, and
+## what they want fitted to the main one.
+func choose_loadout(main: String, side: String, attachment := 0) -> void:
 	if is_host():
-		_arm(1, main, side)
+		_arm(1, main, side, attachment)
 	elif multiplayer.multiplayer_peer != null:
-		_request_loadout.rpc_id(1, main, side)
+		_request_loadout.rpc_id(1, main, side, attachment)
 
 
 # Host only: player `id` has chosen a loadout. It is theirs from when they
 # next come back into play, or at once if they have only just come in and
 # have what they came with.
-func _arm(id: int, main: Variant, side: Variant) -> void:
-	var chosen := Weapons.clean_loadout(main, side)
+func _arm(id: int, main: Variant, side: Variant, attachment: Variant = 0) -> void:
+	var chosen := Weapons.clean_loadout(main, side, attachment)
 	var record := state.player(id)
 	if record == null:
 		_pending_loadouts[id] = chosen
 		return
-	if record.main == chosen[0] and record.side == chosen[1]:
+	if record.main == chosen[0] and record.side == chosen[1] and record.attachment == chosen[2]:
 		return
 	var untouched := record.alive and record.health == PlayerRecord.MAX_HEALTH and record.has_only_loadout()
 	record.main = chosen[0]
 	record.side = chosen[1]
+	record.attachment = chosen[2]
 	if untouched:
 		record.disarm()
 		_rules_for(id).refill()
@@ -235,9 +237,9 @@ func _arm(id: int, main: Variant, side: Variant) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _request_loadout(main: Variant, side: Variant) -> void:
+func _request_loadout(main: Variant, side: Variant, attachment: Variant = 0) -> void:
 	if is_host():
-		_arm(multiplayer.get_remote_sender_id(), main, side)
+		_arm(multiplayer.get_remote_sender_id(), main, side, attachment)
 
 
 ## Tells the host what this player's character looks like (see Looks).
@@ -583,7 +585,8 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 		return
 	if weapon_id.is_empty():
 		weapon_id = record.weapon
-	var weapon := Weapons.find(weapon_id)
+	# As this player has it: with whatever they have fitted.
+	var weapon := record.stats(weapon_id)
 	if weapon == null or not record.weapons.has(weapon_id):
 		return
 	if not origin.is_finite() or not direction.is_finite() or direction.length() < 0.5:
@@ -891,7 +894,7 @@ func _resupply(id: int, magazines: float) -> void:
 	if record == null:
 		return
 	for carried: String in record.weapons:
-		var weapon := Weapons.find(carried)
+		var weapon := record.stats(carried)
 		_rules_for(id).add_reserve(weapon, roundi(weapon.magazine * magazines))
 	if id == multiplayer.get_unique_id():
 		_resupplied(magazines)
@@ -1050,7 +1053,7 @@ func _distance_to_wall(origin: Vector3, direction: Vector3, max_range: float) ->
 
 func _reload(id: int, weapon_id: String) -> void:
 	var record := state.player(id)
-	var weapon := Weapons.find(weapon_id)
+	var weapon := record.stats(weapon_id) if record != null else null
 	if record != null and weapon != null and record.weapons.has(weapon_id):
 		_rules_for(id).reload(weapon, _clock)
 

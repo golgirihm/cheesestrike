@@ -92,12 +92,14 @@ static func value_text(key: String, value: float) -> String:
 
 ## The settings that make up a loadout, with what each is called and the
 ## weapons it can be.
-const LOADOUT := {"loadout_main": ["Main weapon", Weapons.MAINS], "loadout_side": ["Sidearm", Weapons.SIDES]}
+const LOADOUT := {"loadout_main": ["Main weapon", Weapons.MAINS], "loadout_side": ["Sidearm", Weapons.SIDES], "loadout_attachment": ["Fitted to it", Attachments.IDS]}
 
 
 ## What the button for one part of the loadout says, such as "Main weapon:
 ## Swiss Shotgun".
 static func loadout_text(key: String) -> String:
+	if key == "loadout_attachment":
+		return "%s: %s" % [LOADOUT[key][0], Attachments.text(Attachments.from_id(Settings.get_value(key)))]
 	return "%s: %s" % [LOADOUT[key][0], Weapons.find(Settings.get_value(key)).display_name]
 
 
