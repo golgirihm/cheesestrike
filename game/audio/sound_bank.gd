@@ -28,6 +28,11 @@ const SOUNDS := {
 	"hurt": "_hurt",
 	"knocked_out": "_knocked_out",
 	"step": "_step",
+	"step_rock": "_step_rock",
+	"step_grass": "_step_grass",
+	"step_wood": "_step_wood",
+	"step_metal": "_step_metal",
+	"step_cheese": "_step_cheese",
 	"jump": "_jump",
 	"land": "_land",
 	"slide": "_slide",
@@ -51,7 +56,8 @@ const SOUNDS := {
 ## How many takes there are of the sounds heard over and over, so that no
 ## two in a row need be the same. The rest have one.
 const TAKES := {"pistol": 3, "blaster": 3, "shotgun": 3, "grater": 4, "pistols": 3, "carbine": 3, "rifle": 2, "lmg": 4,
-	"launcher": 2, "burst": 3, "step": 4, "land": 2, "hurt": 2}
+	"launcher": 2, "burst": 3, "step": 4, "land": 2, "hurt": 2,
+	"step_rock": 4, "step_grass": 4, "step_wood": 4, "step_metal": 4, "step_cheese": 4}
 
 static var _made := {}
 # The take being made: 0 is each sound as written, the rest differ from it.
@@ -357,6 +363,72 @@ static func _step() -> AudioStreamWAV:
 		var scuff := (soft - dull) * 1.4 * _decay(t - sole, 80.0) if t >= sole else 0.0
 		samples[i] = tanh(heel + scuff)
 	return _stream(_shaped(samples, 0.6))
+
+
+# A footstep on something else. `spec` says what the ground gives back:
+#
+#   knock      how much of a knock the heel makes, and the notes it falls
+#              between (`knock_from` to `knock_to` hertz)
+#   dull       how much dull noise is in it, and how fast it dies (`decay`)
+#   scuff      how much the sole scuffs after, and how bright (`grit`)
+#   ring       how much the ground rings, at `ring_note` hertz, dying at
+#              `ring_decay`: a board, or a sheet of metal
+#   swell      seconds the sound takes to arrive: none for a hard floor, a
+#              moment for something that gives
+static func _footstep(seed: int, length: float, spec: Dictionary, volume := 0.6) -> AudioStreamWAV:
+	var rng := _rng(seed)
+	var count := int(length * RATE)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var dull := 0.0
+	var soft := 0.0
+	var turn := 0.0
+	var sole: float = spec.get("sole", 0.055)
+	var decay := _varied(spec.get("decay", 65.0), 0.12, 1)
+	var ring_note := _varied(spec.get("ring_note", 200.0), 0.06, 2)
+	var knock_from := _varied(spec.get("knock_from", 120.0), 0.08, 3)
+	for i in count:
+		var t := float(i) / RATE
+		var noise := rng.randf_range(-1.0, 1.0)
+		dull = lerpf(dull, noise, spec.get("dullness", 0.1))
+		soft = lerpf(soft, noise, spec.get("grit", 0.4))
+		turn += lerpf(spec.get("knock_to", 55.0), knock_from, _decay(t, 60.0)) / RATE
+		var arrive := minf(t / spec.swell, 1.0) if spec.get("swell", 0.0) > 0.0 else 1.0
+		var heel: float = (dull * spec.get("dull", 2.6) + sin(TAU * turn) * spec.get("knock", 0.9)) * _decay(t, decay) * arrive
+		var scuff: float = (soft - dull) * spec.get("scuff", 1.4) * _decay(t - sole, spec.get("scuff_decay", 80.0)) if t >= sole else 0.0
+		var ring: float = (sin(TAU * ring_note * t) + sin(TAU * ring_note * 2.76 * t) * 0.5) * spec.get("ring", 0.0) * _decay(t, spec.get("ring_decay", 30.0))
+		samples[i] = tanh(heel + scuff + ring)
+	return _stream(_shaped(samples, volume))
+
+
+# On rock: a harder, higher knock, and more grit under the sole.
+static func _step_rock() -> AudioStreamWAV:
+	return _footstep(31, 0.17, {"knock": 0.7, "knock_from": 190.0, "knock_to": 90.0, "dull": 2.0, "dullness": 0.16, "decay": 80.0, "scuff": 2.2, "grit": 0.6, "scuff_decay": 60.0})
+
+
+# On grass and earth: no knock at all, a soft press and a long swish.
+static func _step_grass() -> AudioStreamWAV:
+	return _footstep(32, 0.22, {"knock": 0.15, "knock_from": 80.0, "knock_to": 45.0, "dull": 1.6, "dullness": 0.05, "decay": 34.0, "swell": 0.012,
+		"scuff": 1.9, "grit": 0.3, "scuff_decay": 26.0, "sole": 0.03}, 0.5)
+
+
+# On wood: a hollow knock, with the board ringing under it.
+static func _step_wood() -> AudioStreamWAV:
+	return _footstep(33, 0.2, {"knock": 1.1, "knock_from": 230.0, "knock_to": 150.0, "dull": 1.6, "dullness": 0.12, "decay": 55.0, "scuff": 0.6,
+		"ring": 0.55, "ring_note": 185.0, "ring_decay": 26.0})
+
+
+# On metal: a clank, and the sheet ringing on after.
+static func _step_metal() -> AudioStreamWAV:
+	return _footstep(34, 0.26, {"knock": 0.5, "knock_from": 320.0, "knock_to": 200.0, "dull": 1.2, "dullness": 0.3, "decay": 90.0, "scuff": 0.8, "grit": 0.7,
+		"ring": 0.7, "ring_note": 540.0, "ring_decay": 16.0})
+
+
+# On cheese, and on bread: it gives underfoot, a dull squash with nothing
+# sharp in it.
+static func _step_cheese() -> AudioStreamWAV:
+	return _footstep(35, 0.2, {"knock": 0.8, "knock_from": 95.0, "knock_to": 50.0, "dull": 2.2, "dullness": 0.035, "decay": 30.0, "swell": 0.02,
+		"scuff": 0.5, "grit": 0.12, "scuff_decay": 30.0, "sole": 0.07}, 0.55)
 
 
 # A reload: the magazine out, a new one in, and the bolt run forward. Each

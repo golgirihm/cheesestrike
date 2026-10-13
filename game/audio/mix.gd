@@ -21,10 +21,21 @@ const SENDS := {WEAPONS: EFFECTS, STEPS: EFFECTS, VOICES: EFFECTS, WORLD: EFFECT
 const VOLUMES := {"master_volume": MASTER, "music_volume": MUSIC, "effects_volume": EFFECTS, "weapons_volume": WEAPONS,
 	"steps_volume": STEPS, "voices_volume": VOICES, "world_volume": WORLD, "interface_volume": INTERFACE}
 
+## The kinds of sound that the place they are made in changes, and how each
+## kind of place does: how big the room sounds, how much of what comes back
+## is heard, and how dull it is (see Acoustics). Each has a bus of its own
+## under its kind's, named for both, such as "WeaponsIndoors".
+const PLACED := [WEAPONS, STEPS]
+const ROOMS := {
+	"Indoors": {"room_size": 0.45, "wet": 0.3, "damping": 0.55},
+	"Alley": {"room_size": 0.8, "wet": 0.2, "damping": 0.35},
+}
+
 ## The bus of each sound that isn't a weapon's shot or part of the world.
 const BUS_OF := {
 	"burst": WEAPONS, "stick": WEAPONS, "reload": WEAPONS, "dry": WEAPONS, "knife": WEAPONS, "throw": WEAPONS,
 	"step": STEPS, "jump": STEPS, "land": STEPS, "slide": STEPS,
+	"step_rock": STEPS, "step_grass": STEPS, "step_wood": STEPS, "step_metal": STEPS, "step_cheese": STEPS,
 	"hurt": VOICES, "knocked_out": VOICES, "emote": VOICES,
 	"hit": INTERFACE, "hit_pop": INTERFACE, "hit_bell": INTERFACE, "hit_head": INTERFACE, "knock_out": INTERFACE, "objective": INTERFACE,
 	"music": MUSIC,
@@ -85,6 +96,27 @@ static func build() -> void:
 			index = AudioServer.bus_count - 1
 			AudioServer.set_bus_name(index, bus)
 		AudioServer.set_bus_send(index, SENDS[bus])
+	for kind: String in PLACED:
+		for place: String in ROOMS:
+			var name := kind + place
+			if AudioServer.get_bus_index(name) != -1:
+				continue
+			AudioServer.add_bus()
+			var index := AudioServer.bus_count - 1
+			AudioServer.set_bus_name(index, name)
+			AudioServer.set_bus_send(index, kind)
+			var room := AudioEffectReverb.new()
+			room.room_size = ROOMS[place].room_size
+			room.wet = ROOMS[place].wet
+			room.damping = ROOMS[place].damping
+			room.dry = 1.0
+			AudioServer.add_bus_effect(index, room)
+
+
+## The bus a sound on `bus` goes through when it is made in a place of kind
+## `place`: its own, or the one that makes it sound of that place.
+static func treated(bus: String, place: String) -> String:
+	return bus + place if PLACED.has(bus) and ROOMS.has(place) else bus
 
 
 ## Puts the dynamic range `choice` and whether the sound is `mono` into
