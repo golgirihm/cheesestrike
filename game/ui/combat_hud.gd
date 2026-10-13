@@ -170,6 +170,13 @@ static func knocked_out_text(state: MatchState, id: int) -> Array:
 	return [by, "Back in %d…" % ceili(record.respawn_in) if record.respawn_in > 0.0 else "Coming back…"]
 
 
+## Whether the crosshair is drawn: not when aiming, when the weapon's own
+## sights are what the player aims with.
+func crosshair_shown() -> bool:
+	var own: Node3D = world.player_node(multiplayer.get_unique_id()) if world != null and multiplayer.multiplayer_peer != null else null
+	return own == null or not own.is_aiming()
+
+
 func health_text() -> String:
 	return _health_label.text
 
@@ -294,9 +301,10 @@ func _draw() -> void:
 	var centre := size / 2.0
 	var own: Node3D = world.player_node(multiplayer.get_unique_id())
 	var gap := crosshair_gap(own.shot_spread(), own.camera.fov, size.y) if own != null else CROSSHAIR_GAP
-	for direction in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
-		draw_line(centre + direction * gap, centre + direction * (gap + CROSSHAIR_LENGTH), CROSSHAIR_COLOR, 2.0, true)
-	draw_circle(centre, 1.5, CROSSHAIR_COLOR)
+	if crosshair_shown():
+		for direction in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+			draw_line(centre + direction * gap, centre + direction * (gap + CROSSHAIR_LENGTH), CROSSHAIR_COLOR, 2.0, true)
+		draw_circle(centre, 1.5, CROSSHAIR_COLOR)
 	if _hit_left > 0.0:
 		var color: Color = {HIT: HIT_COLOR, HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[hit_kind]
 		color.a = _hit_left / HIT_MARKER_LIFE
