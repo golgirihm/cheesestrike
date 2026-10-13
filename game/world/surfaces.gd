@@ -24,6 +24,12 @@ static func kind(body: Node) -> String:
 	return STONE
 
 
+## Whether feet leave prints on the floor of `map`: on earth and dust, not
+## on paving.
+static func takes_prints(map: Node) -> bool:
+	return map != null and String(map.get_meta("scenery", "")) != Scenery.CITY
+
+
 ## Whether a shot strikes sparks off `body`.
 static func sparks(body: Node) -> bool:
 	return kind(body) == METAL
