@@ -26,6 +26,7 @@ const TOGGLES := [
 	["touch_left_handed", "Touch buttons on the left"],
 	["touch_fullscreen", "Full screen when touched"],
 	["captions", "Captions for sounds"],
+	["damage_numbers", "Show the damage of each hit"],
 ]
 
 var _rows: VBoxContainer

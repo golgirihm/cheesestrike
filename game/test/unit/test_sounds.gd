@@ -154,3 +154,26 @@ func test_a_sound_can_be_played_a_little_higher_or_lower() -> void:
 	assert_almost_eq(voice.pitch_scale, 1.2, 0.0001)
 	for i in 20:
 		assert_between(Sounds.varied(0.1), 0.9, 1.1)
+
+
+func test_a_hit_a_head_hit_and_a_knock_out_each_sound_different() -> void:
+	const CUES := preload("res://audio/sound_cues.gd")
+	assert_eq(CUES.hit_sound(false, false), "hit")
+	assert_eq(CUES.hit_sound(false, true), "hit_head")
+	assert_eq(CUES.hit_sound(true, false), "knock_out")
+	assert_eq(CUES.hit_sound(true, true), "knock_out")
+	var sounds := ["hit", "hit_head", "knock_out"].map(func(name: String) -> PackedByteArray: return SoundBank.get_sound(name).data)
+	assert_ne(sounds[0], sounds[1])
+	assert_ne(sounds[1], sounds[2])
+	assert_gt(SoundBank.seconds(SoundBank.get_sound("knock_out")), SoundBank.seconds(SoundBank.get_sound("hit")), "a knock-out is the one to savour")
+
+
+func test_the_shooter_hears_the_kind_of_hit_they_landed() -> void:
+	var world: Node3D = WORLD.instantiate()
+	add_child_autofree(world)
+	var before := Sounds.counts.duplicate()
+	world.match_.hit_confirmed.emit(2, 20, false, false)
+	world.match_.hit_confirmed.emit(2, 35, false, true)
+	world.match_.hit_confirmed.emit(2, 35, true, true)
+	for name: String in ["hit", "hit_head", "knock_out"]:
+		assert_eq(Sounds.counts.get(name, 0), before.get(name, 0) + 1, name)

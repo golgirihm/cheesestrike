@@ -207,3 +207,25 @@ func test_firing_kicks_the_weapon_back_and_it_settles() -> void:
 	assert_gt(player.gun.position.z, rest.z)
 	player._animate(1.0)
 	assert_almost_eq(player.gun.position.distance_to(rest), 0.0, 0.02)
+
+
+func test_a_hit_flashes_the_whole_body_for_an_instant() -> void:
+	character.set_colour(Color.BLUE)
+	character._process(0.016)
+	assert_false(character.is_flashing())
+	character.grimace()
+	assert_true(character.is_flashing())
+	assert_true(character._material.emission_enabled)
+	assert_eq(character._material.emission, Color.WHITE)
+	character._process(CHARACTER.FLASH_TIME + 0.01)
+	assert_false(character.is_flashing(), "long before the wince is over")
+	assert_true(character.is_grimacing())
+	assert_false(character._material.emission_enabled)
+
+
+func test_a_flash_gives_way_to_an_overloads_glow() -> void:
+	character.set_glow(true)
+	character.grimace()
+	character._process(CHARACTER.FLASH_TIME + 0.01)
+	assert_true(character._material.emission_enabled)
+	assert_ne(character._material.emission, Color.WHITE)

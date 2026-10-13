@@ -58,11 +58,9 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* GUT test that low quality makes none. Manual row.
 8. **Weapon sway and weight.** The weapon lags a little behind the view when turning, dips on landing, lowers when running, and tilts when strafing.
    *Tests:* GUT tests of each offset from a plain function. Manual row.
-9. **Hit feedback, finished.** A sound for a body hit, a sharper one for a head hit and a satisfying one for a knock-out; optional floating damage numbers; the victim flashes for a frame.
-   *Tests:* extend the sound and HUD tests. Manual rows.
-10. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
-    *Tests:* GUT tests of the rule and of the host's ray walk.
-11. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
+9. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
+   *Tests:* GUT tests of the rule and of the host's ray walk.
+10. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
     *Tests:* GUT tests of the tallies.
 
 ## Milestone 3: Movement with depth

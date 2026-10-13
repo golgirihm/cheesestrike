@@ -17,6 +17,8 @@ const SOUNDS := {
 	"launcher": "_launcher",
 	"burst": "_burst",
 	"hit": "_hit",
+	"hit_head": "_hit_head",
+	"knock_out": "_knock_out",
 	"hurt": "_hurt",
 	"knocked_out": "_knocked_out",
 	"step": "_step",
@@ -235,6 +237,21 @@ static func _reload() -> AudioStreamWAV:
 static func _hit() -> AudioStreamWAV:
 	return _make(0.07, func(t: float, _i: int) -> float:
 		return sin(TAU * 1500.0 * t) * _decay(t, 45.0), 0.6)
+
+
+# A hit to the head: the same tick, higher, with a second on its heels.
+static func _hit_head() -> AudioStreamWAV:
+	return _make(0.12, func(t: float, _i: int) -> float:
+		var second := sin(TAU * 2900.0 * (t - 0.04)) * _decay(t - 0.04, 40.0) if t >= 0.04 else 0.0
+		return (sin(TAU * 2200.0 * t) * _decay(t, 55.0) + second) * 0.7, 0.6)
+
+
+# Knocking someone out: a low knock under two rising notes.
+static func _knock_out() -> AudioStreamWAV:
+	return _make(0.3, func(t: float, _i: int) -> float:
+		var note := 880.0 if t < 0.09 else 1320.0
+		var since := t if t < 0.09 else t - 0.09
+		return sin(TAU * note * since) * _decay(since, 14.0) * 0.6 + sin(TAU * 140.0 * t) * _decay(t, 30.0) * 0.6, 0.6)
 
 
 static func _hurt() -> AudioStreamWAV:

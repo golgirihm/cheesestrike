@@ -49,6 +49,8 @@ const DEFAULTS := {
 	"screen_shake": 1.0,
 	"hud_scale": 1.0,
 	"captions": false,
+	## Whether the damage of each hit is written by the crosshair.
+	"damage_numbers": false,
 }
 
 ## The allowed range of each number setting. A value outside is brought in.
