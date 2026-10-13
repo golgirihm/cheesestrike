@@ -14,6 +14,87 @@ func test_every_sound_is_made_and_is_audible_without_clipping() -> void:
 		assert_lte(loudest, 1.0, name)
 
 
+func test_every_take_of_every_cue_has_a_sound_a_length_and_a_level() -> void:
+	for name: String in SoundBank.SOUNDS:
+		assert_gte(SoundBank.takes(name), 1, name)
+		for take in SoundBank.takes(name):
+			var stream := SoundBank.get_sound(name, take)
+			assert_not_null(stream, "%s take %d" % [name, take])
+			assert_gt(SoundBank.seconds(stream), 0.04, "%s take %d has a length" % [name, take])
+			assert_between(SoundBank.peak(stream), 0.1, 1.0, "%s take %d is heard, and doesn't clip" % [name, take])
+			# Every take of a sound is as long and about as loud as the first.
+			var first := SoundBank.get_sound(name)
+			assert_almost_eq(SoundBank.seconds(stream), SoundBank.seconds(first), 0.001, name)
+			assert_almost_eq(SoundBank.peak(stream), SoundBank.peak(first), 0.05, name)
+	for name: String in SoundBank.TAKES:
+		assert_has(SoundBank.SOUNDS, name)
+		assert_gt(SoundBank.TAKES[name], 1, name)
+
+
+func test_what_is_heard_over_and_over_has_several_takes_that_differ() -> void:
+	for weapon: String in Weapons.ids():
+		if not Weapons.find(weapon).fires_projectile():
+			assert_gte(SoundBank.takes(weapon), 2, weapon)
+	assert_gte(SoundBank.takes("step"), 3)
+	assert_gte(SoundBank.takes("burst"), 2)
+	assert_eq(SoundBank.takes("music"), 1)
+	assert_eq(SoundBank.takes("kazoo"), 1)
+	for name: String in SoundBank.TAKES:
+		for take in range(1, SoundBank.takes(name)):
+			assert_ne(SoundBank.get_sound(name, take).data, SoundBank.get_sound(name, take - 1).data, "%s takes %d and %d" % [name, take - 1, take])
+		assert_same(SoundBank.get_sound(name, 1), SoundBank.get_sound(name, 1), "each made once")
+	# A take there isn't is the nearest there is.
+	assert_same(SoundBank.get_sound("step", 99), SoundBank.get_sound("step", SoundBank.takes("step") - 1))
+	assert_same(SoundBank.get_sound("step", -3), SoundBank.get_sound("step"))
+
+
+func test_the_same_take_is_never_played_twice_running() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	for name: String in ["step", "grater", "rifle"]:
+		var last := -1
+		var heard := {}
+		for play in 200:
+			var take := SoundBank.pick(name, last, rng)
+			assert_between(take, 0, SoundBank.takes(name) - 1)
+			assert_ne(take, last, name)
+			heard[take] = true
+			last = take
+		assert_eq(heard.size(), SoundBank.takes(name), "every take of %s gets played" % name)
+	assert_eq(SoundBank.pick("hit", 0, rng), 0, "one with a single take is always that")
+	# In play too.
+	var before: int = Sounds.last_take.get("step", -1)
+	Sounds.play("step")
+	assert_ne(Sounds.last_take["step"], before)
+	var then: int = Sounds.last_take["step"]
+	Sounds.play("step")
+	assert_ne(Sounds.last_take["step"], then)
+
+
+func test_a_gun_has_its_works_clicking_after_the_shot() -> void:
+	# The click is a ring of metal a moment after the bang: with it the
+	# sound has more high notes just there than without.
+	var with_click: AudioStreamWAV = SoundBank._gunshot(9, 0.4, {"click": 0.5, "click_at": 0.2, "tail": 0.0})
+	var without: AudioStreamWAV = SoundBank._gunshot(9, 0.4, {"tail": 0.0})
+	assert_gt(_level(with_click, 0.2, 0.22), _level(without, 0.2, 0.22) * 3.0)
+	assert_almost_eq(_level(with_click, 0.15, 0.19), _level(without, 0.15, 0.19), 0.02, "and not before")
+	for weapon: String in ["pistol", "blaster", "shotgun", "rifle", "carbine", "lmg", "grater", "pistols"]:
+		assert_not_null(SoundBank.get_sound(weapon), weapon)
+
+
+func test_sounds_are_made_a_few_at_a_time_until_all_are() -> void:
+	SoundBank._made.clear()
+	assert_false(SoundBank.make_some(0), "none in no time")
+	var rounds := 0
+	while not SoundBank.make_some(10) and rounds < 2000:
+		rounds += 1
+	assert_gt(rounds, 2, "not all at once")
+	for name: String in SoundBank.SOUNDS:
+		for take in SoundBank.takes(name):
+			assert_has(SoundBank._made, [name, take])
+	assert_true(SoundBank.make_some(0), "nothing left to make")
+
+
 func test_effects_are_short_and_the_music_is_a_long_loop() -> void:
 	for name: String in SoundBank.SOUNDS:
 		var stream := SoundBank.get_sound(name)
@@ -58,7 +139,7 @@ func test_arena_sounds_play_where_they_happen() -> void:
 	var voices := world.find_children("*", "AudioStreamPlayer3D", false, false)
 	assert_eq(voices.size(), 1)
 	assert_eq(voices[0].global_position, Vector3(3, 1, 2))
-	assert_eq(voices[0].bus, Sounds.EFFECTS_BUS)
+	assert_eq(String(voices[0].bus), Mix.WEAPONS)
 
 
 func test_the_arena_never_has_too_many_sounds_at_once() -> void:
