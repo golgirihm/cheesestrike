@@ -115,6 +115,7 @@ func _ready() -> void:
 	add_child(hurt_view)
 	announcer = Announcer.new(self)
 	add_child(announcer)
+	add_child(MusicDirector.new(self))
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()

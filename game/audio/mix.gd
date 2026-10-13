@@ -39,7 +39,8 @@ const BUS_OF := {
 	"hurt": VOICES, "knocked_out": VOICES, "emote": VOICES,
 	"voice_effort": VOICES, "voice_pain": VOICES, "voice_taunt": VOICES, "voice_reload": VOICES, "voice_out": VOICES,
 	"hit": INTERFACE, "hit_pop": INTERFACE, "hit_bell": INTERFACE, "hit_head": INTERFACE, "knock_out": INTERFACE, "objective": INTERFACE,
-	"music": MUSIC,
+	"ui_hover": INTERFACE, "ui_press": INTERFACE, "ui_back": INTERFACE, "ui_error": INTERFACE, "ui_count": INTERFACE,
+	"music": MUSIC, "music_match": MUSIC, "music_tense": MUSIC, "sting_win": MUSIC, "sting_lose": MUSIC,
 }
 
 ## The buses that dip, how far in decibels under a shot and under a cue that
@@ -47,7 +48,7 @@ const BUS_OF := {
 const DUCKED := [MUSIC, WORLD]
 const DUCK_FOR_SHOT := -4.0
 const DUCK_FOR_CUE := -8.0
-const CUES := ["objective", "power", "knock_out", "knocked_out", "overload"]
+const CUES := ["objective", "power", "knock_out", "knocked_out", "overload", "ui_error"]
 ## Seconds a dip takes to arrive, is held for, and takes to go.
 const ATTACK := 0.04
 const HOLD := 0.25

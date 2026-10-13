@@ -60,6 +60,8 @@ var _power_label: Label
 # What everyone is told when a power-up is taken, and seconds it stays up.
 var _announce_label: Label
 var _announce_left := 0.0
+# How long each wait that is counted aloud had left when last looked at.
+var _waits := {}
 const ANNOUNCE_LIFE := 3.5
 var _pickup_left := 0.0
 ## Pickups this player has collected, for the browser tests.
@@ -293,6 +295,7 @@ func indicators_showing() -> int:
 func _process(delta: float) -> void:
 	if world == null:
 		return
+	_count_down()
 	_hit_left = maxf(_hit_left - delta, 0.0)
 	for number in _damage_numbers:
 		number.left -= delta
@@ -372,6 +375,18 @@ func _touch_held(button: String) -> bool:
 func _refresh_scoreboard() -> void:
 	if scoreboard.visible and world != null:
 		scoreboard.show_state(world.match_.state, multiplayer.get_unique_id())
+
+
+# Counts the last seconds aloud of the two waits a player watches: to come
+# back after being knocked out, and to the end of the match.
+func _count_down() -> void:
+	var record: PlayerRecord = world.match_.own_record() if world.match_.has_state() else null
+	var waits := {"respawn": record.respawn_in if record != null and not record.alive else 0.0,
+		"match": world.match_.state.time_left if record != null and world.match_.state.phase == MatchState.PLAYING and not world.match_.state.is_warm_up() else 0.0}
+	for wait: String in waits:
+		if UiSounds.counts(_waits.get(wait, 0.0), waits[wait]):
+			Sounds.play(UiSounds.COUNT, -8.0)
+	_waits = waits
 
 
 func _on_announced(text: String, team: int) -> void:
