@@ -56,6 +56,7 @@ const SOUNDS := {
 	"hit_pop": "_hit_pop",
 	"hit_bell": "_hit_bell",
 	"ping": "_ping",
+	"medal": "_medal",
 	"ui_hover": "_ui_hover",
 	"ui_press": "_ui_press",
 	"ui_back": "_ui_back",
@@ -711,6 +712,17 @@ static func _overload() -> AudioStreamWAV:
 
 
 ## A cheerful loop for the menu: a bass line and a tune, four bars long.
+# A medal: three bright notes climbing quickly, the last held a moment.
+static func _medal() -> AudioStreamWAV:
+	return _make(0.4, func(t: float, _i: int) -> float:
+		var sample := 0.0
+		var notes := [[0.0, 783.99], [0.08, 987.77], [0.16, 1318.5]]
+		for note: Array in notes:
+			if t >= note[0]:
+				sample += (sin(TAU * note[1] * (t - note[0])) + sin(TAU * note[1] * 2.0 * (t - note[0])) * 0.25) * _decay(t - note[0], 12.0)
+		return sample * 0.4, 0.55)
+
+
 # A ping: two quick notes, the second higher, like a tap on a glass.
 static func _ping() -> AudioStreamWAV:
 	return _make(0.22, func(t: float, _i: int) -> float:

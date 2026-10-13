@@ -140,11 +140,11 @@ func test_a_capture_is_told_and_scored() -> void:
 	var spots := {"bases": [Vector3(-20, 0, 0), Vector3(20, 0, 0)], "hills": [], "points": []}
 	var standing := {1: {"at": Vector3(20, 0, 0), "team": CHEDDAR, "alive": true}}
 	var told := state.update_objectives(0.1, spots, standing)
-	assert_eq(told, [{"text": "Hunter has the Brie wheel!", "team": CHEDDAR}] as Array[Dictionary])
+	assert_eq(told, [{"text": "Hunter has the Brie wheel!", "team": CHEDDAR, "by": 1, "points": Stats.TAKE_POINTS}] as Array[Dictionary])
 	assert_eq(state.objective_text(1), "Cheddar wheel home · Brie wheel with Hunter")
 	standing[1].at = Vector3(-20, 0, 0)
 	told = state.update_objectives(0.1, spots, standing)
-	assert_eq(told, [{"text": "Hunter scores for Cheddar!", "team": CHEDDAR}] as Array[Dictionary])
+	assert_eq(told, [{"text": "Hunter scores for Cheddar!", "team": CHEDDAR, "by": 1, "points": Stats.CAPTURE_POINTS}] as Array[Dictionary])
 	assert_eq(state.team_score(CHEDDAR), 1)
 	state.end_match()
 	assert_eq(state.update_objectives(0.1, spots, {1: {"at": Vector3(20, 0, 0), "team": CHEDDAR, "alive": true}}), [] as Array[Dictionary], "nothing between matches")

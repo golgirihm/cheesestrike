@@ -29,6 +29,9 @@ signal strike_shown(striker: int)
 signal fell(victim: int, weapon: String, from: Vector3)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
+## What each player has done in the match (see Stats) has been heard from
+## the host.
+signal stats_changed
 ## Player `by` pinged `at`, for this machine's player to see (see Pings).
 signal pinged(by: int, at: Vector3, kind: String)
 ## Player `by` said `text` in the chat, to their team alone or to everyone,
@@ -89,6 +92,9 @@ var state := MatchState.new()
 var _clock := 0.0
 # Host only: when each player's last packets of talk came, by player.
 var _talk_times := {}
+## What each player has done in the match beyond their score: kept by the
+## host, and sent to everyone every so often.
+var stats := Stats.new()
 # Host only: when each player last pinged, and when they lately chatted.
 var _point_times := {}
 var _chat_times := {}
@@ -193,6 +199,7 @@ func start(settings := MatchSettings.new()) -> void:
 
 
 func stop() -> void:
+	stats = Stats.new()
 	state = MatchState.new()
 	_has_state = false
 	_dirty = false
@@ -235,6 +242,8 @@ func add_player(id: int) -> void:
 	_pending_overloads.erase(id)
 	if _keys.has(id):
 		_welcome_back(id)
+	# Whoever has just come is sent what everyone has done, with the next ping.
+	stats.changed = true
 	# Someone joining a match on a custom arena is sent it.
 	if is_host() and state.settings.map == Maps.CUSTOM and multiplayer.get_peers().has(id):
 		_custom_arena.rpc_id(id, world.custom_code)
@@ -701,6 +710,7 @@ func _throw(thrower: int, origin: Vector3, direction: Vector3, cooked: float) ->
 	if not state.throw_grenade(thrower):
 		return
 	tally.shot(Weapons.GRENADE)
+	stats.shot(thrower)
 	_throw_seen.rpc(thrower)
 	throw_shown.emit(thrower)
 	record.protected_for = 0.0
@@ -777,6 +787,7 @@ func _strike(striker: int, origin: Vector3, direction: Vector3) -> void:
 		return
 	_struck_at[striker] = _clock
 	tally.shot(Melee.ID)
+	stats.shot(striker)
 	if record.is_protected():
 		record.protected_for = 0.0
 		_changed()
@@ -908,6 +919,11 @@ func _process(delta: float) -> void:
 			_since_ping = 0.0
 			for peer in multiplayer.get_peers():
 				_ping.rpc_id(peer, _clock)
+			# With it, what everyone has done, if that has changed.
+			if stats.changed:
+				stats.changed = false
+				_stats_from.rpc(stats.to_array())
+				stats_changed.emit()
 		for id in due:
 			_respawn(id)
 		if state.is_playing():
@@ -1002,6 +1018,7 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 	if not _rules_for(shooter).allow_shot(weapon, _clock, other):
 		return
 	tally.shot(weapon.id)
+	stats.shot(shooter)
 	var credited := weapon.id
 	if other != null:
 		weapon = other
@@ -1150,6 +1167,9 @@ func _harm(attacker: int, victim: int, amount: float, from: Vector3, weapon: Str
 	var own := attacker == victim
 	var in_hand := state.player(victim).weapon if state.player(victim) != null else ""
 	var result := state.damage(attacker, victim, amount, own)
+	stats.hit(attacker, victim, result.dealt, weapon, result.knocked_out, _clock)
+	if result.knocked_out:
+		stats.knocked_out(victim)
 	if result.knocked_out:
 		_leave_behind(victim, in_hand)
 		var fallen: Node3D = world.player_node(victim)
@@ -1380,9 +1400,24 @@ func _run_objectives(delta: float) -> void:
 			# One just brought back isn't yet where they are seen.
 			standing[record.id] = {"at": node.global_position, "team": record.team, "alive": record.alive and _is_where_shown(record.id, node)}
 	var before := [state.team_points[0], state.team_points[1], state.is_playing()]
-	var told := state.update_objectives(delta, world.objective_spots(), standing)
+	var spots: Dictionary = world.objective_spots()
+	var told := state.update_objectives(delta, spots, standing)
 	for line: Dictionary in told:
 		announce(line.text, line.team)
+		# Whoever took a wheel, or brought it home, is credited with it.
+		if line.has("by"):
+			stats.objective(line.by, line.points)
+	# And whoever stands on the hill, or on a point, with the time they do.
+	if state.zones != null and state.is_playing():
+		var hill := state.settings.mode == MatchSettings.HILL
+		var zones: Array = spots.get("hills", []) if hill else spots.get("points", [])
+		for id: int in standing:
+			if not standing[id].alive:
+				continue
+			for index in zones.size():
+				if (not hill or index == state.zones.hill) and ZoneRules.within(zones[index], standing[id].at):
+					stats.objective(id, delta)
+					break
 	if not told.is_empty() or before != [state.team_points[0], state.team_points[1], state.is_playing()]:
 		_changed()
 
@@ -1642,9 +1677,16 @@ func _respawn(id: int) -> void:
 	_bring_back(id, spots[SpawnChooser.best(spots, enemies, allies, fights, sees)])
 
 
+@rpc("authority", "call_remote", "reliable")
+func _stats_from(sent: Variant) -> void:
+	stats = Stats.from_array(sent)
+	stats_changed.emit()
+
+
 ## The host starts the next match, with everyone back in play at a spot of
 ## their own.
 func _new_match() -> void:
+	stats.clear()
 	# Scores start again, so there are none to give back.
 	_departed.clear()
 	tally.clear()
