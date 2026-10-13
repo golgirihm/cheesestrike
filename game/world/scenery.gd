@@ -42,8 +42,9 @@ static var _window_texture: ImageTexture
 ## Finishes the arena `map`.
 static func dress(map: Node3D) -> void:
 	var geometry := map.get_node("Geometry")
+	var land := String(map.get_meta("scenery", MEADOW))
 	for body: Node3D in geometry.get_children():
-		_round(body)
+		_round(body, Textures.kind_for(body, land))
 		if body.name.begins_with("Block"):
 			_cheese(body)
 		elif body.name.begins_with("Building"):
@@ -121,14 +122,16 @@ static func _tinted() -> StandardMaterial3D:
 
 
 # Draws the boxes of `body` with their edges rounded off.
-static func _round(body: Node3D) -> void:
+static func _round(body: Node3D, surface := Textures.PLASTER) -> void:
 	for child in body.get_children():
 		var drawn := child as MeshInstance3D
 		if drawn == null or not drawn.mesh is BoxMesh:
 			continue
 		var box: BoxMesh = drawn.mesh
 		var least := minf(box.size.x, minf(box.size.y, box.size.z))
-		drawn.material_override = box.material
+		# Its own colour, in what it is made of.
+		var plain := box.material as StandardMaterial3D
+		drawn.material_override = Textures.material(plain.albedo_color, surface) if plain != null else box.material
 		drawn.mesh = Rounded.box(box.size, clampf(least * 0.2, 0.04, 0.3))
 
 
@@ -140,7 +143,7 @@ static func _size(body: Node3D) -> Vector3:
 # A block of cheese: yellow, with holes on every side that shows.
 static func _cheese(body: Node3D) -> void:
 	var drawn: MeshInstance3D = body.get_node("MeshInstance3D")
-	drawn.material_override = _material(CHEESE)
+	drawn.material_override = Textures.material(CHEESE, Textures.CHEESE)
 	var half := _size(body) / 2.0
 	var hole := _material(CHEESE.darkened(0.28))
 	var rng := RandomNumberGenerator.new()
@@ -254,6 +257,7 @@ static func _windows(colour: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = colour.lightened(0.25)
 	material.albedo_texture = _window_texture
+	material.set_meta("windows", true)
 	material.uv1_triplanar = true
 	material.uv1_world_triplanar = true
 	material.uv1_scale = Vector3.ONE / 5.0

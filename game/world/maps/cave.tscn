@@ -95,6 +95,7 @@ metadata/scenery = "canyon"
 
 [node name="Floor" type="StaticBody3D" parent="Geometry"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+metadata/surface = "rock"
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Geometry/Floor"]
 mesh = SubResource("S2")
