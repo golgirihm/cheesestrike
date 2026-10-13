@@ -23,6 +23,10 @@ var _burst_material := _glow(Color(1.0, 0.5, 0.2, 0.7))
 var _projectiles := {}
 
 const BURST_LIFE := 0.35
+## The colour of the sparkle each pickup gives; a weapon's is wax.
+const SPARKLES := {Pickups.HEALTH: Color(1.0, 0.45, 0.4), Pickups.AMMO: Color(1.0, 0.85, 0.4), Pickups.ARMOUR: Color(0.5, 0.75, 1.0), Pickups.POWER: Color(0.8, 0.5, 1.0)}
+## Seconds the smoke of a burst hangs about.
+const SMOKE_LIFE := 2.2
 ## Physics layer of the arena, which shots leave marks on.
 const WORLD_MASK := 1
 ## Seconds a mark stays, fading over the last of them.
@@ -48,6 +52,8 @@ var _casing_material := StandardMaterial3D.new()
 var _puff_mesh := SphereMesh.new()
 ## How many puffs of dust, sparks and smoke have been made, for tests.
 var puffs_made := 0
+# The puffs in the air: {"amount": how many specks, "left": seconds}.
+var _live: Array[Dictionary] = []
 
 
 ## The most marks kept at once for graphics quality `level`; beyond it the
@@ -137,8 +143,43 @@ func prints_showing() -> int:
 ## Crumbs of `colour` thrown out from `at`: `count` of them, as when a
 ## character is knocked out. More, and further, for one blown apart.
 func crumbs(at: Vector3, colour: Color, count: int, speed := 5.0) -> void:
-	if extras(_quality()):
-		_puff(at, Vector3.UP, colour, count, speed, 0.7, 0.22)
+	_puff(at, Vector3.UP, colour, count, speed, 0.7, 0.22, false, {"matters": true})
+
+
+## Dust kicked up where a player comes down at `feet`, more of it the
+## harder they land (`hardness` from 0 to 1).
+func landing(feet: Vector3, hardness: float, colour := Color(0.62, 0.55, 0.45, 0.6)) -> void:
+	if hardness > 0.2:
+		_puff(feet + Vector3.UP * 0.1, Vector3.UP, colour, roundi(lerpf(6.0, 18.0, hardness)), lerpf(2.0, 4.5, hardness), 0.6, 0.3, false, {"spread": 88.0, "gravity": 3.0, "grow": 1.8})
+
+
+## A sparkle rising from `at`, where a pickup of `kind` was taken, in its
+## colour.
+func sparkle(at: Vector3, kind: String) -> void:
+	var colour: Color = SPARKLES.get(kind, WeaponModels.WAX)
+	_puff(at + Vector3.UP * 0.6, Vector3.UP, colour, 12, 3.0, 0.6, 0.09, true, {"spread": 40.0, "gravity": -1.5, "grow": 0.2})
+
+
+## Fire and sparks thrown up round a player at `at` who sets off an Overload.
+func overload_flare(at: Vector3, colour: Color) -> void:
+	_puff(at, Vector3.UP, Color(colour, 0.85), 34, 6.0, 0.8, 0.34, true, {"spread": 75.0, "gravity": -4.0, "grow": 0.3, "matters": true})
+	_puff(at, Vector3.UP, Color(1.0, 0.9, 0.6), 22, 11.0, 0.5, 0.06, true, {"spread": 90.0, "matters": true})
+
+
+## What a burst of `radius` metres at `at` throws out: fire that is gone in a
+## moment, sparks, and smoke that hangs and drifts up.
+func burst_specks(at: Vector3, radius: float) -> void:
+	_puff(at, Vector3.UP, Color(1.0, 0.6, 0.2, 0.9), 18, radius * 2.2, 0.35, radius * 0.22, true, {"spread": 180.0, "gravity": -2.0, "grow": 0.3, "matters": true})
+	_puff(at, Vector3.UP, Color(1.0, 0.85, 0.5), 26, radius * 4.5, 0.5, 0.06, true, {"spread": 120.0, "matters": true})
+	_puff(at, Vector3.UP, Color(0.25, 0.24, 0.24, 0.42), 14, radius * 0.6, SMOKE_LIFE, radius * 0.3, false, {"spread": 180.0, "gravity": -0.8, "grow": 2.6, "matters": true})
+
+
+## How many specks are in the air.
+func specks_showing() -> int:
+	var total := 0
+	for puff in _live:
+		total += puff.amount
+	return total
 
 
 ## How many marks shots have left that are still showing.
@@ -181,28 +222,51 @@ func _impact(from: Vector3, to: Vector3) -> void:
 
 
 # A few specks of `colour` thrown out from `at` along `normal`, at about
-# `speed` metres a second, lasting `life` seconds, each `size` across.
-func _puff(at: Vector3, normal: Vector3, colour: Color, count: int, speed: float, life: float, size: float, bright := false) -> void:
+# `speed` metres a second, lasting `life` seconds, each `size` across. As
+# many of `count` as there is room for (see ParticleBudget). `look` can
+# give: "spread" in degrees, "gravity" downward (negative to rise), "grow",
+# how many times its size a speck ends at, and "matters", for an effect that
+# shows something happening.
+func _puff(at: Vector3, normal: Vector3, colour: Color, count: int, speed: float, life: float, size: float, bright := false, look := {}) -> void:
 	if not is_inside_tree():
 		return
+	count = ParticleBudget.grant(count, specks_showing(), _quality(), look.get("matters", false))
+	if count == 0:
+		return
 	puffs_made += 1
+	_live.append({"amount": count, "left": life})
 	var specks := CPUParticles3D.new()
 	specks.one_shot = true
 	specks.explosiveness = 0.95
 	specks.amount = count
 	specks.lifetime = life
 	specks.direction = normal
-	specks.spread = 50.0
+	specks.spread = look.get("spread", 50.0)
 	specks.initial_velocity_min = speed * 0.4
 	specks.initial_velocity_max = speed
-	specks.gravity = Vector3.DOWN * (9.0 if speed > 1.0 else -0.6)
+	specks.gravity = Vector3.DOWN * look.get("gravity", 9.0 if speed > 1.0 else -0.6)
 	specks.scale_amount_min = size * 0.6
 	specks.scale_amount_max = size
+	if look.has("grow"):
+		# From its size to `grow` times it, or the other way for one that shrinks.
+		var most: float = maxf(look.grow, 1.0)
+		var curve := Curve.new()
+		curve.add_point(Vector2(0.0, 1.0 / most))
+		curve.add_point(Vector2(1.0, look.grow / most))
+		specks.scale_amount_curve = curve
+		specks.scale_amount_min *= most
+		specks.scale_amount_max *= most
 	specks.mesh = _puff_mesh
 	var material := _glow(colour) if bright else StandardMaterial3D.new()
 	material.albedo_color = colour
 	if colour.a < 1.0:
+		# Something see-through thins away rather than vanishing.
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.vertex_color_use_as_albedo = true
+		var fade := Gradient.new()
+		fade.set_color(0, Color.WHITE)
+		fade.set_color(1, Color(1, 1, 1, 0))
+		specks.color_ramp = fade
 	specks.material_override = material
 	specks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	specks.set_meta("kind", "puff")
@@ -281,6 +345,7 @@ func burst_projectile(id: int, weapon: String, at: Vector3) -> void:
 	var grow := create_tween()
 	grow.tween_property(burst, "scale", Vector3.ONE * radius, BURST_LIFE)
 	_expire(burst, BURST_LIFE)
+	burst_specks(at, radius)
 
 
 ## How many projectiles are being drawn, for tests.
@@ -289,6 +354,9 @@ func projectiles_in_flight() -> int:
 
 
 func _process(delta: float) -> void:
+	for puff in _live:
+		puff.left -= delta
+	_live = _live.filter(func(puff: Dictionary) -> bool: return puff.left > 0.0)
 	for mark in _marks:
 		mark.left -= delta
 		mark.material.albedo_color.a = 0.75 * clampf(mark.left / MARK_FADE, 0.0, 1.0)
