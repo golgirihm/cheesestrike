@@ -39,17 +39,17 @@ func test_every_sidearm_never_runs_out() -> void:
 
 
 func test_a_loadout_from_another_machine_is_put_right() -> void:
-	assert_eq(Weapons.clean_loadout("shotgun", "pistol"), ["shotgun", "pistol"])
-	assert_eq(Weapons.clean_loadout("launcher", "pistol"), ["", "pistol"], "a power weapon is found, not chosen")
-	assert_eq(Weapons.clean_loadout("pistol", "blaster"), ["", "pistol"], "each in its own slot")
-	assert_eq(Weapons.clean_loadout(7, null), ["", Weapons.STARTING])
-	assert_eq(Weapons.clean_loadout("banana", "spoon"), ["", Weapons.STARTING])
+	assert_eq(Weapons.clean_loadout("shotgun", "pistol").slice(0, 2), ["shotgun", "pistol"])
+	assert_eq(Weapons.clean_loadout("launcher", "pistol").slice(0, 2), ["", "pistol"], "a power weapon is found, not chosen")
+	assert_eq(Weapons.clean_loadout("pistol", "blaster").slice(0, 2), ["", "pistol"], "each in its own slot")
+	assert_eq(Weapons.clean_loadout(7, null).slice(0, 2), ["", Weapons.STARTING])
+	assert_eq(Weapons.clean_loadout("banana", "spoon").slice(0, 2), ["", Weapons.STARTING])
 
 
 func test_the_chosen_loadout_comes_from_the_settings() -> void:
-	assert_eq(Weapons.chosen_loadout(), [Weapons.DEFAULT_MAIN, Weapons.STARTING], "to begin with")
+	assert_eq(Weapons.chosen_loadout().slice(0, 2), [Weapons.DEFAULT_MAIN, Weapons.STARTING], "to begin with")
 	Settings.set_value("loadout_main", "grater")
-	assert_eq(Weapons.chosen_loadout(), ["grater", Weapons.STARTING])
+	assert_eq(Weapons.chosen_loadout().slice(0, 2), ["grater", Weapons.STARTING])
 
 
 func test_a_record_with_no_loadout_has_only_the_sidearm() -> void:

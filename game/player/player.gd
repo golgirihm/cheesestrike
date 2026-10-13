@@ -293,7 +293,7 @@ func _on_setting_changed(key: String) -> void:
 		match_.wear(Looks.chosen())
 	if key.begins_with("loadout_") and match_ != null:
 		var loadout := Weapons.chosen_loadout()
-		match_.choose_loadout(loadout[0], loadout[1])
+		match_.choose_loadout(loadout[0], loadout[1], loadout[2])
 
 
 # The weapon to fall back on when the one in hand runs dry: one that never
@@ -406,10 +406,21 @@ func _on_match_state_changed() -> void:
 # one is taken in hand at once, and a lost one is put away.
 func _carry(carried: Array) -> void:
 	var picked_up := ""
+	var own_now := record()
 	for id: String in carried:
-		if not arsenal.has(id) and Weapons.find(id) != null:
-			arsenal[id] = WeaponState.new(Weapons.find(id))
+		# As the host has it, with whatever is fitted.
+		var stats := own_now.stats(id) if own_now != null else Weapons.find(id)
+		if stats == null:
+			continue
+		if not arsenal.has(id):
+			arsenal[id] = WeaponState.new(stats)
 			picked_up = id
+		elif arsenal[id].stats != stats:
+			# The same weapon, fitted differently: a fresh one.
+			var was_held: bool = weapon == arsenal[id]
+			arsenal[id] = WeaponState.new(stats)
+			if was_held:
+				weapon = arsenal[id]
 	for id: String in arsenal.keys():
 		if not carried.has(id):
 			arsenal.erase(id)
