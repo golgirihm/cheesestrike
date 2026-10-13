@@ -25,6 +25,10 @@ var _budget := {}
 var _budget_at := {}
 var _fired := {}
 var _reload_done_at := {}
+# Per weapon id: when its last shot was, and which shot of a run of fire
+# that was (0 for the first), for its recoil and spread.
+var _shot_at := {}
+var _run := {}
 
 
 ## Whether a shot from `weapon` at time `now` (seconds) is allowed, recording it
@@ -47,7 +51,22 @@ func allow_shot(weapon: WeaponStats, now: float) -> bool:
 		return false
 	_budget[id] = budget - 1.0
 	_fired[id] = _fired.get(id, 0) + 1
+	_run[id] = next_in_run(weapon, _run.get(id, -1), now - _shot_at.get(id, -INF))
+	_shot_at[id] = now
 	return true
+
+
+## Which shot of a run of fire the next from `weapon` is, `since` seconds
+## after one that was number `last` (-1 if there was none): the first (0) of
+## a new run after a pause, or else the one after.
+static func next_in_run(weapon: WeaponStats, last: int, since: float) -> int:
+	return 0 if last < 0 or since > weapon.recoil_reset else last + 1
+
+
+## Which shot of a run of fire the last allowed from `weapon` was: 0 for the
+## first.
+func run(weapon: WeaponStats) -> int:
+	return _run.get(weapon.id, 0)
 
 
 ## The player has started reloading `weapon` at time `now`.
@@ -61,6 +80,8 @@ func refill(weapon := "") -> void:
 	if weapon.is_empty():
 		_fired.clear()
 		_reload_done_at.clear()
+		_run.clear()
+		_shot_at.clear()
 	else:
 		_fired.erase(weapon)
 		_reload_done_at.erase(weapon)

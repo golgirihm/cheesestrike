@@ -195,13 +195,14 @@ func _welcome_back(id: int) -> void:
 
 
 ## This player fires `weapon` from `origin` along `direction`. `seed` decides
-## where any spread sends each pellet, and `aimed` whether they are aiming
-## down the sights, which spreads far less than firing from the hip.
-func fire(origin: Vector3, direction: Vector3, seed: int, weapon := Weapons.STARTING, aimed := false) -> void:
+## where any spread sends each pellet, and `stance` how they stand as they
+## fire (see WeaponStats.AIMED and the rest), which sets how wide it is.
+## `direction` is where they aim: the host adds the weapon's kick itself.
+func fire(origin: Vector3, direction: Vector3, seed: int, weapon := Weapons.STARTING, stance := 0) -> void:
 	if is_host():
-		_shot(1, origin, direction, seed, weapon, aimed)
+		_shot(1, origin, direction, seed, weapon, stance)
 	elif multiplayer.multiplayer_peer != null:
-		_request_shot.rpc_id(1, origin, direction, seed, weapon, aimed)
+		_request_shot.rpc_id(1, origin, direction, seed, weapon, stance)
 
 
 ## This player has started reloading `weapon`.
@@ -337,7 +338,7 @@ func _rules_for(id: int) -> ShotRules:
 
 ## The host checks and carries out a shot from `weapon` that `shooter`
 ## reports; by default, the weapon the host last saw in their hands.
-func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_id := "", aimed := true) -> void:
+func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_id := "", stance := WeaponStats.AIMED) -> void:
 	var record := state.player(shooter)
 	var shooter_node: Node3D = world.player_node(shooter)
 	if record == null or not record.alive or shooter_node == null:
@@ -356,22 +357,26 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 	if record.is_protected():
 		record.protected_for = 0.0
 		_changed()
+	# The kick and the spread of this shot of the run, as the host counts it.
+	var run := _rules_for(shooter).run(weapon)
+	var cone := weapon.spread_for(stance, run)
+	direction = Recoil.apply(direction.normalized(), Recoil.offset(weapon, run, stance & WeaponStats.AIMED != 0))
 	if weapon.fires_projectile():
-		_launch(shooter, weapon, origin, HitScan.pellet_directions(direction, 1, weapon.spread(aimed), seed)[0])
+		_launch(shooter, weapon, origin, HitScan.pellet_directions(direction, 1, cone, seed)[0])
 		return
 
 	var targets := _targets_except(shooter, now() - rewind_for(shooter))
 	var damage_to := {}
 	var headshot := {}
 	var ends := []
-	for pellet in HitScan.pellet_directions(direction, weapon.pellets, weapon.spread(aimed), seed):
+	for pellet in HitScan.pellet_directions(direction, weapon.pellets, cone, seed):
 		var reach := _distance_to_wall(origin, pellet, weapon.max_range)
 		var hit := HitScan.first_hit(origin, pellet, reach, targets)
 		if hit.is_empty():
 			ends.append(origin + pellet * reach)
 		else:
 			ends.append(hit.point)
-			var amount := weapon.damage * (weapon.headshot_multiplier if hit.head else 1.0)
+			var amount := weapon.damage_at(hit.distance) * (weapon.headshot_multiplier if hit.head else 1.0)
 			damage_to[hit.id] = damage_to.get(hit.id, 0.0) + amount
 			headshot[hit.id] = headshot.get(hit.id, false) or hit.head
 	_show_shot_to_others(shooter, ends)
@@ -735,9 +740,9 @@ func _respawned(at: Vector3) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _request_shot(origin: Variant, direction: Variant, seed: Variant, weapon: Variant, aimed: Variant = false) -> void:
+func _request_shot(origin: Variant, direction: Variant, seed: Variant, weapon: Variant, stance: Variant = 0) -> void:
 	if is_host() and origin is Vector3 and direction is Vector3 and seed is int and weapon is String:
-		_shot(multiplayer.get_remote_sender_id(), origin, direction, seed, weapon, aimed is bool and aimed)
+		_shot(multiplayer.get_remote_sender_id(), origin, direction, seed, weapon, stance & 7 if stance is int else 0)
 
 
 @rpc("any_peer", "call_remote", "reliable")
