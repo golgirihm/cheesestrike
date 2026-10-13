@@ -32,8 +32,13 @@ static func position_at(at: Vector3, launch_velocity: Vector3, gravity: float, t
 	return at + launch_velocity * time + Vector3.DOWN * gravity * 0.5 * time * time
 
 
+## How hard gravity pulls in the match being played, as a share of the usual
+## (see MatchSettings.gravity). The same on every machine in a session.
+static var gravity_scale := 1.0
+
+
 func gravity() -> float:
-	return ProjectSettings.get_setting("physics/3d/default_gravity", 9.8) * weapon.projectile_gravity
+	return ProjectSettings.get_setting("physics/3d/default_gravity", 9.8) * weapon.projectile_gravity * gravity_scale
 
 
 ## Slower than this, a bouncing projectile that lands stays where it is.

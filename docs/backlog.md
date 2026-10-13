@@ -59,9 +59,7 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 6: Ways to play
 
-1. **Host's rules.** Let the host change more: which weapons, health, speed, gravity, respawn time, friendly fire, with named presets (instant-kill, low gravity, launchers only).
-   *Tests:* extend `test_match_settings.gd` and the signaling tests.
-2. **Voting.** Players vote for the next arena and mode at the end of a match, and can vote to remove someone.
+1. **Voting.** Players vote for the next arena and mode at the end of a match, and can vote to remove someone.
    *Tests:* GUT tests of the count; browser test.
 
 ## Milestone 7: Arenas with character

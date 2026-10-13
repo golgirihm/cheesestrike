@@ -34,6 +34,7 @@ var menu_camera: Camera3D
 var _spawn_slots: SpawnSlots
 # Where each player with a place of their own stands: the range's targets.
 var _homes := {}
+var _gravity_set := false
 
 
 func _ready() -> void:
@@ -124,6 +125,7 @@ func start(settings := MatchSettings.new()) -> void:
 
 func stop() -> void:
 	replay_view.stop()
+	_set_gravity(1.0)
 	if multiplayer.peer_connected.is_connected(_add_player):
 		multiplayer.peer_connected.disconnect(_add_player)
 		multiplayer.peer_disconnected.disconnect(_remove_player)
@@ -141,6 +143,7 @@ func ready_to_play() -> bool:
 func _on_state_changed() -> void:
 	if match_.has_state():
 		load_map(match_.state.settings.map)
+	_apply_gravity()
 	_show_pickups()
 	_show_drops()
 	_show_blocks()
@@ -177,6 +180,22 @@ func _leave(id: int) -> void:
 		players.remove_child(player)
 		player.queue_free()
 		print("player left: %d" % id)
+
+
+# Gravity pulls as hard as the host's rules say, on this machine as on
+# every other: on players, and on what they throw and launch.
+func _apply_gravity() -> void:
+	_set_gravity(match_.state.settings.gravity if match_.has_state() else 1.0)
+
+
+func _set_gravity(share: float) -> void:
+	if Projectile.gravity_scale == share and _gravity_set:
+		return
+	_gravity_set = true
+	Projectile.gravity_scale = share
+	var usual: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
+	if is_inside_tree():
+		PhysicsServer3D.area_set_param(get_world_3d().space, PhysicsServer3D.AREA_PARAM_GRAVITY, usual * share)
 
 
 ## The colour player `id` is drawn in: their team's, or their own.

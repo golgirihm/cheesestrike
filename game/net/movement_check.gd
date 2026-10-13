@@ -24,6 +24,11 @@ const MAX_AIRTIME := 3.5
 ## moved at once.
 const PLACE_TOLERANCE := 2.0
 
+## How much faster than usual the host's rules let players move, and how
+## much longer they let them stay in the air.
+var speed_scale := 1.0
+var air_scale := 1.0
+
 var _last_time := -1.0
 var _last_position := Vector3.ZERO
 var _last_teleports := 0
@@ -70,14 +75,14 @@ func check(time: float, at: Vector3, teleports: int, blocked: Callable, on_groun
 	var elapsed := maxf(time - _last_time, 0.0) + SLACK_TIME
 	var shoved := _push_speed if time < _push_until else 0.0
 	var across := Vector2(at.x - _last_position.x, at.z - _last_position.z).length()
-	if across > (MAX_SPEED + shoved) * elapsed + SLACK_DISTANCE:
+	if across > (MAX_SPEED * maxf(speed_scale, 1.0) + shoved) * elapsed + SLACK_DISTANCE:
 		return false
 	var rise := at.y - _last_position.y
 	if rise > (MAX_RISE_SPEED + shoved) * elapsed + SLACK_DISTANCE:
 		return false
 	if blocked.call(_last_position, at):
 		return false
-	if not on_ground and _airborne_since >= 0.0 and time - _airborne_since > MAX_AIRTIME:
+	if not on_ground and _airborne_since >= 0.0 and time - _airborne_since > MAX_AIRTIME * maxf(air_scale, 1.0):
 		return false
 	_accept(time, at, teleports, on_ground)
 	return true

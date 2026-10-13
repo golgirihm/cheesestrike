@@ -243,7 +243,7 @@ func launch_projectile(id: int, weapon: String, from: Vector3, velocity: Vector3
 	wheel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(wheel)
 	wheel.global_position = from
-	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8) * (stats.projectile_gravity if stats != null else 0.0)
+	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8) * (stats.projectile_gravity if stats != null else 0.0) * Projectile.gravity_scale
 	_projectiles[id] = {"node": wheel, "from": from, "velocity": velocity, "gravity": gravity, "age": 0.0, "fuse": stats.fuse if stats != null else 3.0, "stick": stick}
 	if stick:
 		wheel.global_transform = stick_transform(from, velocity)

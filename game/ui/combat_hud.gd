@@ -289,6 +289,7 @@ func _process(delta: float) -> void:
 	var own: Node3D = world.player_node(multiplayer.get_unique_id()) if multiplayer.multiplayer_peer != null else null
 	var record: PlayerRecord = world.match_.own_record()
 	var health := record.health if record != null else PlayerRecord.MAX_HEALTH
+	_health_bar.max_value = world.match_.state.settings.health
 	_health_bar.value = health
 	_overload_label.text = overload_text(record)
 	_overload_bar.value = record.overload if record != null else 0.0

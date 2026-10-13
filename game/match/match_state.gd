@@ -117,16 +117,24 @@ func score(team: int, points: int) -> bool:
 ## loadout, or in a gun game the weapon they have worked their way to.
 func rearm(record: PlayerRecord) -> void:
 	record.disarm()
+	record.endless = false
 	if settings.mode == MatchSettings.GUN_GAME:
 		var weapon := GunGame.weapon_for(record.kills)
 		record.weapons = [weapon]
 		record.weapon = weapon
 		record.fitted = Attachments.NONE
+	elif settings.fixed_weapons():
+		# The rules say what everyone has: that, and it never runs out, as
+		# there is nothing else to fall back on.
+		record.weapons = MatchSettings.WEAPON_SETS[settings.weapons].duplicate()
+		record.weapon = record.weapons[0]
+		record.fitted = Attachments.NONE
+		record.endless = true
 
 
 ## How fast `record`'s owner moves, as a share of normal speed.
 func speed_factor(record: PlayerRecord) -> float:
-	var factor := Overload.speed_factor(record)
+	var factor := Overload.speed_factor(record) * settings.speed
 	if record != null and capture != null and capture.carried_by(record.id) != -1:
 		factor *= CaptureRules.CARRY_SPEED
 	return factor
@@ -239,6 +247,7 @@ func _check_round() -> void:
 func add_player(id: int) -> PlayerRecord:
 	if not players.has(id):
 		var record := PlayerRecord.new(id)
+		record.health = settings.health
 		if settings.is_teams():
 			record.team = smaller_team()
 		players[id] = record
@@ -388,9 +397,12 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 	# What someone threw before they turned to watching does nothing.
 	if not own and player(attacker) != null and player(attacker).watching:
 		return result
-	if (own and not own_too) or amount <= 0.0 or (not own and are_allies(attacker, victim)):
+	# Teammates can't hurt each other, unless the host's rules say they can:
+	# then it does them no good.
+	var mates := not own and are_allies(attacker, victim)
+	if (own and not own_too) or amount <= 0.0 or (mates and not settings.friendly_fire):
 		return result
-	var scorer := player(attacker) if not own else null
+	var scorer := player(attacker) if not own and not mates else null
 	# Power-ups: more from an attacker with double damage, less to a shield.
 	amount *= Powers.outgoing(scorer) * Powers.incoming(target) * Overload.incoming(target)
 	var taken := target.take(roundi(amount))
@@ -405,7 +417,7 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 	if target.health <= 0:
 		target.alive = false
 		# One life a round, in Last mouse standing.
-		target.respawn_in = 0.0 if settings.mode == MatchSettings.ROUNDS else RESPAWN_DELAY
+		target.respawn_in = 0.0 if settings.mode == MatchSettings.ROUNDS else settings.respawn
 		target.deaths += 1
 		target.last_attacker = attacker
 		rearm(target)
@@ -445,10 +457,11 @@ func pickup_ready(index: int) -> bool:
 ## or "taken".
 func collect(index: int, kind: String, id: int) -> String:
 	var record := player(id)
-	if not is_playing() or not pickup_ready(index) or not Pickups.wanted(kind, record):
+	if not is_playing() or not pickup_ready(index) or not Pickups.wanted(kind, record, settings.health):
 		return ""
-	# In a gun game the only weapon is the one a player has earned.
-	if settings.mode == MatchSettings.GUN_GAME and Weapons.ids().has(kind):
+	# In a gun game the only weapon is the one a player has earned, and under
+	# some rules the only ones are those the rules give.
+	if (settings.mode == MatchSettings.GUN_GAME or settings.fixed_weapons()) and Weapons.ids().has(kind):
 		return ""
 	# On the practice range everything is back at once, and a weapon taken
 	# from the rack comes into hand.
@@ -460,7 +473,7 @@ func collect(index: int, kind: String, id: int) -> String:
 		powers_taken += 1
 		record.give_power(power, Powers.DURATION[power])
 		return "taken"
-	return "refill" if Pickups.give(kind, record) else "taken"
+	return "refill" if Pickups.give(kind, record, settings.health) else "taken"
 
 
 ## Leaves `weapon` lying at `at`. Returns the drop's id, or 0 if it is not
@@ -469,7 +482,7 @@ func drop(weapon: String, at: Vector3) -> int:
 	var stats := Weapons.find(weapon)
 	if not is_playing() or stats == null or not Weapons.ids().has(weapon) or stats.slot == Weapons.SIDE or not at.is_finite():
 		return 0
-	if settings.mode == MatchSettings.GUN_GAME:
+	if settings.mode == MatchSettings.GUN_GAME or settings.fixed_weapons():
 		return 0
 	drops.append({"id": _next_drop, "weapon": weapon, "at": at, "left": Pickups.DROP_LIFE})
 	_next_drop += 1
@@ -626,7 +639,7 @@ func respawn(id: int) -> void:
 	if record == null or record.watching:
 		return
 	record.alive = true
-	record.health = PlayerRecord.MAX_HEALTH
+	record.health = settings.health
 	record.respawn_in = 0.0
 	record.protected_for = PROTECTION
 	record.armour = 0

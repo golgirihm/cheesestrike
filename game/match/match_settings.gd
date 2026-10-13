@@ -26,6 +26,19 @@ const MODE_NAMES := {FREE_FOR_ALL: "Free-for-all", TEAMS: "Cheddar vs Brie", CAP
 const TEAM_MODES := [TEAMS, CAPTURE, HILL, POINTS, ROUNDS]
 ## The modes won on points rather than knock-outs, and the points that win.
 const POINT_LIMITS := {CAPTURE: 3, HILL: 100, POINTS: 150, ROUNDS: 4}
+## The host's rules: named sets of changes to how a match plays. Each
+## changes some of `health`, `speed`, `gravity`, `respawn`, `friendly_fire`
+## and `weapons` below from what they usually are.
+const STANDARD := "standard"
+const RULES := [STANDARD, "instant", "low_gravity", "launchers", "pistols", "frantic", "tough", "friendly"]
+const RULE_NAMES := {STANDARD: "Standard", "instant": "Instant knock-out", "low_gravity": "Low gravity", "launchers": "Launchers only",
+	"pistols": "Pistols only", "frantic": "Fast and frantic", "tough": "Tough cheese", "friendly": "Friendly fire"}
+const PRESETS := {STANDARD: {}, "instant": {"health": 1}, "low_gravity": {"gravity": 0.4}, "launchers": {"weapons": "launchers"},
+	"pistols": {"weapons": "pistols"}, "frantic": {"speed": 1.25, "respawn": 1.0}, "tough": {"health": 200}, "friendly": {"friendly_fire": true}}
+## The weapons everyone has, and only has, under rules that say so; with
+## "all", players have their loadouts and what they find.
+const ALL_WEAPONS := "all"
+const WEAPON_SETS := {ALL_WEAPONS: [], "launchers": ["launcher"], "pistols": ["pistol"]}
 const KILL_LIMITS := [5, 10, 20, 30, 50]
 const MINUTES := [3, 5, 8, 10, 15]
 const MIN_PLAYERS := 2
@@ -38,6 +51,17 @@ var minutes := 8
 var max_players := MAX_PLAYERS
 ## Which of the Maps to play on.
 var map := Maps.DEFAULT
+## Which of the RULES the host chose, and what they come to: the health a
+## player has, how fast they move and how hard gravity pulls (as shares of
+## the usual), seconds a knocked-out player waits, whether teammates can
+## hurt each other, and which of the WEAPON_SETS everyone has.
+var rules := STANDARD
+var health := PlayerRecord.MAX_HEALTH
+var speed := 1.0
+var gravity := 1.0
+var respawn := 3.0
+var friendly_fire := false
+var weapons := ALL_WEAPONS
 ## How many computer players the host wants (see Bots), and how good.
 var bots := 0
 var bot_skill := BotBrain.NORMAL
@@ -77,6 +101,9 @@ func advertised() -> Dictionary:
 	# Nor does it know of bots.
 	told.erase("bots")
 	told.erase("bot_skill")
+	# Nor of the host's rules.
+	for key: String in RULE_KEYS:
+		told.erase(key)
 	return told
 
 
@@ -93,6 +120,18 @@ static func from_dict(data: Variant) -> MatchSettings:
 	settings.max_players = _whole(data.get("max_players"), settings.max_players, MIN_PLAYERS, MAX_PLAYERS)
 	if Maps.exists(data.get("map")):
 		settings.map = data.map
+	if data.get("rules") in RULES:
+		settings.rules = data.rules
+	# The rules chosen, and then anything said besides, kept within reason.
+	for given: Dictionary in [PRESETS[settings.rules], data]:
+		settings.health = _whole(given.get("health"), settings.health, 1, PlayerRecord.MOST_HEALTH)
+		settings.speed = _share(given.get("speed"), settings.speed, 0.5, 2.0)
+		settings.gravity = _share(given.get("gravity"), settings.gravity, 0.2, 2.0)
+		settings.respawn = _share(given.get("respawn"), settings.respawn, 0.5, 15.0)
+		if given.get("friendly_fire") is bool:
+			settings.friendly_fire = given.friendly_fire
+		if given.get("weapons") is String and WEAPON_SETS.has(given.weapons):
+			settings.weapons = given.weapons
 	settings.bots = _whole(data.get("bots"), 0, 0, MAX_PLAYERS - 1)
 	if data.get("bot_skill") in BotBrain.SKILLS:
 		settings.bot_skill = data.bot_skill
@@ -100,12 +139,33 @@ static func from_dict(data: Variant) -> MatchSettings:
 
 
 func to_dict() -> Dictionary:
-	return {"mode": mode, "kill_limit": kill_limit, "minutes": minutes, "max_players": max_players, "map": map, "bots": bots, "bot_skill": bot_skill}
+	var data := {"mode": mode, "kill_limit": kill_limit, "minutes": minutes, "max_players": max_players, "map": map, "bots": bots, "bot_skill": bot_skill}
+	# The rules only where they aren't the usual, as this is sent often.
+	var usual := MatchSettings.new()
+	for key: String in RULE_KEYS:
+		if get(key) != usual.get(key):
+			data[key] = get(key)
+	return data
 
 
 ## A short description, such as "Free-for-all · first to 20 · 8 min · Cheddar Canyon".
 func describe() -> String:
-	return "%s · first to %d · %d min · %s" % [MODE_NAMES[mode], limit(), minutes, Maps.NAMES[map]]
+	var said := "%s · first to %d · %d min · %s" % [MODE_NAMES[mode], limit(), minutes, Maps.NAMES[map]]
+	return said if rules == STANDARD else "%s · %s" % [said, RULE_NAMES[rules]]
+
+
+## Whether everyone has the same weapons and no others.
+func fixed_weapons() -> bool:
+	return weapons != ALL_WEAPONS
+
+
+const RULE_KEYS := ["rules", "health", "speed", "gravity", "respawn", "friendly_fire", "weapons"]
+
+
+static func _share(value: Variant, default: float, low: float, high: float) -> float:
+	if not (value is int or value is float) or not is_finite(float(value)):
+		return default
+	return clampf(float(value), low, high)
 
 
 static func _whole(value: Variant, default: int, low: int, high: int) -> int:

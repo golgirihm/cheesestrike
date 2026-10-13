@@ -328,7 +328,7 @@ func _arm(id: int, main: Variant, side: Variant, attachment: Variant = 0) -> voi
 		return
 	if record.main == chosen[0] and record.side == chosen[1] and record.attachment == chosen[2]:
 		return
-	var untouched := record.alive and record.health == PlayerRecord.MAX_HEALTH and record.has_only_loadout()
+	var untouched := record.alive and record.health == state.settings.health and record.has_only_loadout()
 	record.main = chosen[0]
 	record.side = chosen[1]
 	record.attachment = chosen[2]
@@ -651,7 +651,8 @@ func _process(delta: float) -> void:
 				_hurt_block(gnawed, BlockRules.GNAW)
 		if state.just_started:
 			state.just_started = false
-			announce("The match begins", MatchState.NO_TEAM)
+			var rules: String = state.settings.rules
+			announce("The match begins" if rules == MatchSettings.STANDARD else "The match begins  ·  %s" % MatchSettings.RULE_NAMES[rules], MatchState.NO_TEAM)
 			_hold_back_powers()
 			_changed()
 		if state.just_overtime:
@@ -811,6 +812,9 @@ const PUT_BACK_INTERVAL := 0.5
 func _check_for(id: int) -> MovementCheck:
 	if not _checks.has(id):
 		_checks[id] = MovementCheck.new()
+		# As the host's rules have players move.
+		_checks[id].speed_scale = state.settings.speed
+		_checks[id].air_scale = 1.0 / state.settings.gravity
 	return _checks[id]
 
 
