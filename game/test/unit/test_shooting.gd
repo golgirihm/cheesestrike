@@ -211,7 +211,7 @@ func test_a_missed_shot_ends_at_the_wall() -> void:
 
 func test_the_shooters_own_shot_shows_at_once() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
-	shooter.fired.emit(shooter.head.global_position, Vector3.FORWARD, 1, true)
+	shooter.fired.emit(shooter.head.global_position, Vector3.FORWARD, 1, WeaponStats.AIMED, 0)
 	var tracers: int = world.effects.get_child_count()
 	assert_eq(tracers, 2, "a flash and a tracer")
 
@@ -366,15 +366,16 @@ func test_a_shot_from_the_hip_strays_and_an_aimed_one_does_not() -> void:
 	var origin: Vector3 = shooter.head.global_position
 	var straight := (Vector3(10, 2.3, -100) - origin).normalized()
 	var blaster := Weapons.find("blaster")
-	match_._shot(2, origin, straight, 5, "blaster", true)
+	match_._shot(2, origin, straight, 5, "blaster", WeaponStats.AIMED)
 	var aimed: Vector3 = get_signal_parameters(match_, "shot_shown")[1][0]
-	match_._shot(2, origin, straight, 5, "blaster", false)
+	match_._rules_for(2).refill()
+	match_._shot(2, origin, straight, 5, "blaster", 0)
 	var hip: Vector3 = get_signal_parameters(match_, "shot_shown")[1][0]
 	var off_aimed := rad_to_deg(straight.angle_to(aimed - origin))
 	var off_hip := rad_to_deg(straight.angle_to(hip - origin))
 	assert_lte(off_aimed, blaster.spread_degrees / 2.0 + 0.01)
 	assert_gt(off_hip, off_aimed)
-	assert_lte(off_hip, blaster.hip_spread_degrees / 2.0 + 0.01)
+	assert_lte(off_hip, blaster.spread_for(0) / 2.0 + 0.01)
 
 
 ## Lets this process's own player finish taking its weapon in hand.
@@ -410,13 +411,13 @@ func test_the_owner_tells_the_host_whether_a_shot_was_aimed() -> void:
 	watch_signals(own)
 	own._fire_pressed = true
 	await wait_physics_frames(2)
-	assert_false(get_signal_parameters(own, "fired")[3], "from the hip")
+	assert_eq(get_signal_parameters(own, "fired")[3] & WeaponStats.AIMED, 0, "from the hip")
 	Input.action_press("aim")
 	await wait_seconds(own.AIM_TIME + own.weapon.stats.fire_interval + 0.1)
 	own._fire_pressed = true
 	await wait_physics_frames(2)
 	Input.action_release("aim")
-	assert_true(get_signal_parameters(own, "fired")[3], "down the sights")
+	assert_eq(get_signal_parameters(own, "fired")[3] & WeaponStats.AIMED, WeaponStats.AIMED, "down the sights")
 
 
 func test_a_weapon_changed_to_swings_up_from_below() -> void:
@@ -650,3 +651,69 @@ func test_no_player_is_coloured_like_cheese_to_eat() -> void:
 	for id in range(1, 200):
 		var hue: float = preload("res://player/player.gd").colour_for(id).h
 		assert_false(hue > 0.11 and hue < 0.2, "player %d is yellow" % id)
+
+
+func test_the_host_adds_the_weapons_kick_to_a_run_of_fire() -> void:
+	_add(1, Vector3(-5, 0, 0))
+	var shooter := _add(2, Vector3(10, 0, 5))
+	watch_signals(match_)
+	var origin: Vector3 = shooter.head.global_position
+	var heights := []
+	for shot in 3:
+		match_._shot(2, origin, Vector3.FORWARD, 5, "blaster", WeaponStats.AIMED)
+		var end: Vector3 = get_signal_parameters(match_, "shot_shown")[1][0]
+		heights.append(rad_to_deg(asin((end - origin).normalized().y)))
+	var blaster := Weapons.find("blaster")
+	# Each within the weapon's aimed spread of where the kick puts it.
+	var slack := blaster.spread_for(WeaponStats.AIMED, 2) / 2.0 + 0.01
+	for shot in 3:
+		var kick := rad_to_deg(Recoil.offset(blaster, shot, true).y)
+		assert_almost_eq(heights[shot], kick, slack, "shot %d" % shot)
+	assert_gt(heights[2], heights[0], "the third lands above the first")
+
+
+func test_a_pause_lets_the_kick_settle() -> void:
+	_add(1, Vector3(-5, 0, 0))
+	var shooter := _add(2, Vector3(10, 0, 5))
+	var origin: Vector3 = shooter.head.global_position
+	for shot in 3:
+		match_._shot(2, origin, Vector3.FORWARD, 5, "blaster", WeaponStats.AIMED)
+	assert_eq(match_._rules_for(2).run(Weapons.find("blaster")), 2)
+	match_._clock += 1.0
+	match_._shot(2, origin, Vector3.FORWARD, 5, "blaster", WeaponStats.AIMED)
+	assert_eq(match_._rules_for(2).run(Weapons.find("blaster")), 0)
+
+
+func test_a_hit_from_far_away_does_less() -> void:
+	var shooter := _add(1, Vector3(-14, 0, 14))
+	_add(2, Vector3(-14, 0, -14))
+	_give(1, "grater")
+	var origin: Vector3 = shooter.head.global_position
+	var grater := Weapons.find("grater")
+	# Tried with one seed after another until a shot lands: the grater
+	# spreads a little even when aimed.
+	for seed in 20:
+		match_._rules_for(1).refill()
+		match_._shot(1, origin, (Vector3(-14, CHEST, -14) - origin).normalized(), seed, "grater", WeaponStats.AIMED)
+		if match_.state.player(2).health < 100:
+			break
+	var dealt: int = 100 - match_.state.player(2).health
+	assert_gt(dealt, 0, "it still hits")
+	assert_lt(dealt, roundi(grater.damage), "but for less than up close")
+
+
+func test_the_owners_view_climbs_with_a_run_of_fire_and_settles() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	watch_signals(own)
+	Input.action_press("fire")
+	await wait_seconds(0.5)
+	Input.action_release("fire")
+	assert_gt(own._run, 1, "a run of several shots")
+	assert_gt(own.camera.rotation.x, 0.002, "the view has climbed")
+	var last: Array = get_signal_parameters(own, "fired")
+	assert_gt(last[1].y, 0.0, "and the shots with it")
+	assert_eq(last[4], own._run)
+	await wait_seconds(1.0)
+	assert_almost_eq(own.camera.rotation.x, 0.0, 0.002, "it settles")
+	assert_eq(own.next_in_run(), 0)

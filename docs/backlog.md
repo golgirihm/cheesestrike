@@ -42,35 +42,29 @@ Before there is much more game, make it possible for people on different network
 
 The shooting works and is fair. This milestone is about how it feels in the hand: what a big-budget shooter spends most of its polish on.
 
-1. **Recoil.** Each shot kicks the view up and a little sideways along a pattern of its own for each weapon, which the player can learn and pull against, and which settles when they stop firing. Less when aiming down sights. The host applies the same pattern, so nothing is gained by removing it.
-   *Tests:* a plain `Recoil` class, with GUT tests for the pattern, the recovery and that host and shooter agree.
-2. **Spread that grows and settles.** Hip-fire spread starts tighter than now and opens with sustained fire, with moving, and in the air; it closes when the player stops. The crosshair follows it.
-   *Tests:* GUT tests on the spread rule; extend the crosshair test.
-3. **Damage falls off with distance.** Each weapon does full damage out to a range and less beyond it, so the shotgun, the grater and the blaster each own a distance.
-   *Tests:* GUT tests on the falloff curve and on `Match._shot` at each range.
-4. **Sights worth aiming down.** Model iron sights or a simple optic on each weapon and line them up with where shots go, in place of the weapon sitting under the crosshair. The crosshair hides when fully aimed.
+1. **Sights worth aiming down.** Model iron sights or a simple optic on each weapon and line them up with where shots go, in place of the weapon sitting under the crosshair. The crosshair hides when fully aimed.
    *Tests:* a GUT test that each model's sight line passes through the camera's aim. Manual: a row for each weapon's sight picture.
-5. **Others see you aim.** Send whether a player is aiming with their position, and raise their weapon to their eye in everyone's view.
+2. **Others see you aim.** Send whether a player is aiming with their position, and raise their weapon to their eye in everyone's view.
    *Tests:* GUT test of the packed state; a browser test that a second window sees it.
-6. **Reload animations.** The magazine comes out, a new one goes in, and the bolt runs, timed to the reload sound and to when the weapon can fire, in first person and on the character. Reloading can be cut short by switching weapons.
+3. **Reload animations.** The magazine comes out, a new one goes in, and the bolt runs, timed to the reload sound and to when the weapon can fire, in first person and on the character. Reloading can be cut short by switching weapons.
    *Tests:* GUT tests that the animation's length matches `reload_time`. Manual rows.
-7. **Ammunition to run out of.** A reserve for each weapon as well as the magazine, shown on the HUD, with ammunition pickups on the arenas and a little taken from fallen players. The sidearm stays unlimited.
+4. **Ammunition to run out of.** A reserve for each weapon as well as the magazine, shown on the HUD, with ammunition pickups on the arenas and a little taken from fallen players. The sidearm stays unlimited.
    *Tests:* GUT tests in `WeaponState`, `ShotRules` and `Pickups`; a browser test of running dry.
-8. **Melee.** A quick strike with a cheese knife on its own key, always available: short reach, a lunge, and a knock-out from behind.
+5. **Melee.** A quick strike with a cheese knife on its own key, always available: short reach, a lunge, and a knock-out from behind.
    *Tests:* GUT tests of reach and of the host's checks; a browser test.
-9. **Thrown grenades.** A second kind of equipment beside the weapons: a wax-wrapped cheese that bounces, with a fuse, a cooked throw, and an arc shown while the key is held. Later kinds: one that blinds with a puff of parmesan, one that sticks.
+6. **Thrown grenades.** A second kind of equipment beside the weapons: a wax-wrapped cheese that bounces, with a fuse, a cooked throw, and an arc shown while the key is held. Later kinds: one that blinds with a puff of parmesan, one that sticks.
    *Tests:* GUT tests on the bounce and fuse in `Projectile`; browser test of a throw hurting a player.
-10. **What shots do to the world.** A mark where each shot lands, with a puff of dust or crumbs coloured by what it hit, and a spark off metal. Marks fade and are limited in number.
-    *Tests:* GUT tests of the limit and of which effect each surface gives. Manual rows.
-11. **Shell casings and muzzle smoke.** Casings flick out of the weapon and bounce; a wisp of smoke hangs after a burst of fire. Off on low graphics.
-    *Tests:* GUT test that low quality makes none. Manual row.
-12. **Weapon sway and weight.** The weapon lags a little behind the view when turning, dips on landing, lowers when running, and tilts when strafing.
-    *Tests:* GUT tests of each offset from a plain function. Manual row.
-13. **Hit feedback, finished.** A sound for a body hit, a sharper one for a head hit and a satisfying one for a knock-out; optional floating damage numbers; the victim flashes for a frame.
+7. **What shots do to the world.** A mark where each shot lands, with a puff of dust or crumbs coloured by what it hit, and a spark off metal. Marks fade and are limited in number.
+   *Tests:* GUT tests of the limit and of which effect each surface gives. Manual rows.
+8. **Shell casings and muzzle smoke.** Casings flick out of the weapon and bounce; a wisp of smoke hangs after a burst of fire. Off on low graphics.
+   *Tests:* GUT test that low quality makes none. Manual row.
+9. **Weapon sway and weight.** The weapon lags a little behind the view when turning, dips on landing, lowers when running, and tilts when strafing.
+   *Tests:* GUT tests of each offset from a plain function. Manual row.
+10. **Hit feedback, finished.** A sound for a body hit, a sharper one for a head hit and a satisfying one for a knock-out; optional floating damage numbers; the victim flashes for a frame.
     *Tests:* extend the sound and HUD tests. Manual rows.
-14. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
+11. **Shooting through thin cover.** Shots pass through thin things (a fence rail, a car door) at reduced damage, by a thickness rule, so cover matters by how solid it is.
     *Tests:* GUT tests of the rule and of the host's ray walk.
-15. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
+12. **A balance pass with numbers.** Record, per weapon, shots, hits, damage and knock-outs in a session, show them to the host at the end, and tune every weapon's numbers from playtests. Repeat after each milestone that adds weapons.
     *Tests:* GUT tests of the tallies.
 
 ## Milestone 3: Movement with depth

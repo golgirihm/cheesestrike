@@ -29,6 +29,9 @@ WEB_BUILD = pathlib.Path(os.environ.get("CHEESESTRIKE_WEB_BUILD", ROOT / "build"
 # Generous, for a slow CI machine with several windows playing at once. Waits
 # end as soon as their condition holds, so this costs nothing on success.
 TIMEOUT_MS = 60_000
+# Longer than the sidearm and the automatic weapons take to settle after a
+# shot (their recoil_reset).
+SHOT_PAUSE_MS = 400
 
 VIEWPORT = {"width": 640, "height": 400}
 
@@ -214,10 +217,13 @@ class Game:
                     return state
                 if time.monotonic() > deadline:
                     raise AssertionError(f"never became true while shooting: {condition}\nstate: {self._state_or_none()}")
+                # Unhurried, so that each shot is the first of a run of fire
+                # and goes where it is aimed: a weapon fired fast kicks upward,
+                # and nothing here pulls it back down.
                 self.page.mouse.down()
                 self.page.wait_for_timeout(60)
                 self.page.mouse.up()
-                self.page.wait_for_timeout(60)
+                self.page.wait_for_timeout(SHOT_PAUSE_MS)
         finally:
             self.page.mouse.up(button="right")
 

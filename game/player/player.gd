@@ -7,9 +7,10 @@ extends CharacterBody3D
 ## the host (see Match), which decides what it hit. Health and whether the
 ## player is in play are the host's to decide, and arrive with the match state.
 
-## A shot this player fired, for effects on this machine; `aimed` if down
-## the sights rather than from the hip.
-signal fired(origin: Vector3, direction: Vector3, seed: int, aimed: bool)
+## A shot this player fired, for effects on this machine: where it went once
+## the weapon had kicked, how the player stood (see WeaponStats.AIMED) and
+## which shot of a run of fire it was.
+signal fired(origin: Vector3, direction: Vector3, seed: int, stance: int, run: int)
 ## Another player's update arrived at `time` (this machine's clock, seconds)
 ## placing them at `at`, after being moved at once `teleports` times.
 signal received(time: float, at: Vector3, teleports: int, facing: Vector2)
@@ -125,6 +126,14 @@ var _aim := 0.0
 var _touch_aim := false
 # Seconds left of the weapon in hand coming up, after a change of weapon.
 var _switch_left := 0.0
+# Which shot of a run of fire the last was (-1 before any), how long ago, and
+# how far the view is thrown off by the weapon's kick, as Recoil.offset gives it.
+var _run := -1
+var _since_shot := INF
+var _recoil_view := Vector2.ZERO
+## How fast the view climbs with a kick, and settles after a run of fire.
+const RECOIL_RISE := 30.0
+const RECOIL_SETTLE := 7.0
 
 
 func _enter_tree() -> void:
@@ -227,6 +236,7 @@ func equip(id: String) -> void:
 		return
 	weapon.reload_left = 0.0
 	weapon = arsenal[id]
+	_run = -1
 	weapon.cooldown = maxf(weapon.cooldown, SWITCH_TIME)
 	_show_weapon(id)
 	if _mine and match_ != null:
@@ -464,9 +474,24 @@ func is_aiming() -> bool:
 	return _aim >= 0.9
 
 
+## How this player stands, as a shot fired now would report it.
+func stance() -> int:
+	var bits := WeaponStats.AIMED if is_aiming() else 0
+	if not is_on_floor():
+		bits |= WeaponStats.AIRBORNE
+	elif Vector2(velocity.x, velocity.z).length() > 1.0:
+		bits |= WeaponStats.MOVING
+	return bits
+
+
+## Which shot of a run of fire the next would be: 0 for the first.
+func next_in_run() -> int:
+	return ShotRules.next_in_run(weapon.stats, _run, _since_shot)
+
+
 ## How wide a cone this player's next shot spreads over, in degrees.
 func shot_spread() -> float:
-	return weapon.stats.spread(is_aiming())
+	return weapon.stats.spread_for(stance(), next_in_run())
 
 
 func _wants_aim() -> bool:
@@ -542,7 +567,13 @@ func _process(delta: float) -> void:
 	_animate(delta)
 	if _mine:
 		var tip := shake.tick(delta, Settings.get_value("screen_shake"))
-		camera.rotation = Vector3(tip.x, 0.0, tip.y)
+		# The view climbs with the weapon's kick, and settles once the run of
+		# fire is over.
+		_since_shot += delta
+		var firing := _run >= 0 and _since_shot <= weapon.stats.recoil_reset
+		var kicked := Recoil.offset(weapon.stats, _run, is_aiming()) if firing else Vector2.ZERO
+		_recoil_view = _recoil_view.lerp(kicked, minf(delta * (RECOIL_RISE if firing else RECOIL_SETTLE), 1.0))
+		camera.rotation = Vector3(tip.x + _recoil_view.y, -_recoil_view.x, tip.y)
 		_aim = move_toward(_aim, 1.0 if _wants_aim() else 0.0, delta / AIM_TIME)
 		camera.fov = Settings.get_value("fov") * lerpf(1.0, weapon.stats.aim_zoom, smoothstep(0.0, 1.0, _aim))
 	if OS.has_feature("web") and _mine:
@@ -650,10 +681,14 @@ func _use_weapon() -> void:
 		# The head's facing, not the camera's, which may be shaking.
 		var direction := -head.global_basis.z
 		var seed := randi()
-		var aimed := is_aiming()
-		match_.fire(origin, direction, seed, weapon.stats.id, aimed)
+		var standing := stance()
+		_run = next_in_run()
+		_since_shot = 0.0
+		# The host is told where the player aims, and adds the kick itself.
+		match_.fire(origin, direction, seed, weapon.stats.id, standing)
 		kick()
-		fired.emit(origin, direction, seed, aimed)
+		var kicked := Recoil.apply(direction, Recoil.offset(weapon.stats, _run, standing & WeaponStats.AIMED != 0))
+		fired.emit(origin, kicked, seed, standing, _run)
 		# Firing the last round starts the reload by itself.
 		if weapon.is_reloading():
 			match_.reload(weapon.stats.id)
