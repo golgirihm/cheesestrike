@@ -186,3 +186,42 @@ func test_the_view_moves_only_as_much_as_the_player_asks() -> void:
 	assert_eq(own.camera.position, Vector3.ZERO, "unless they have turned it off")
 	assert_eq(own.camera.rotation.z, 0.0)
 	Settings.set_value("camera_motion", 1.0)
+
+
+func test_every_weapon_is_held_in_two_hands_on_the_ends_of_two_arms() -> void:
+	for id: String in Weapons.ids():
+		var model := WeaponModels.build(id)
+		var hand: Node3D = model.get_node_or_null("Hand")
+		var other: Node3D = model.get_node_or_null("OffHand")
+		assert_not_null(hand, id)
+		assert_not_null(other, id)
+		assert_true(WeaponModels.OFF_HAND.has(id), "%s has a place for the other hand" % id)
+		assert_gt(hand.position.distance_to(other.position), 0.04, "%s: two hands, not one on the other" % id)
+		assert_lt(other.position.y, model.get_node("Sight").position.y - 0.05, "%s: the other hand is under the weapon, clear of the sights" % id)
+		for arm_name: String in ["ViewArmRight", "ViewArmLeft"]:
+			var arm: MeshInstance3D = model.get_node_or_null(arm_name)
+			assert_not_null(arm, "%s %s" % [id, arm_name])
+			# One end at its hand, the other below and behind it, out of view.
+			var grip: Vector3 = hand.position if arm_name == "ViewArmRight" else other.position
+			var half: Vector3 = arm.transform.basis.y * (arm.mesh as CapsuleMesh).height / 2.0
+			var ends := [arm.position + half, arm.position - half]
+			var near: Vector3 = ends[0] if ends[0].distance_to(grip) < ends[1].distance_to(grip) else ends[1]
+			var far: Vector3 = ends[1] if near == ends[0] else ends[0]
+			assert_almost_eq(near.distance_to(grip), 0.0, 0.001, "%s %s reaches its hand" % [id, arm_name])
+			assert_lt(far.y, grip.y - 0.3, "%s %s comes up from below" % [id, arm_name])
+			assert_gt(far.z, grip.z + 0.3, "%s %s comes from behind" % [id, arm_name])
+		model.free()
+
+
+func test_only_the_holder_sees_both_hands_and_the_arms() -> void:
+	var own := _own()
+	var other := _other()
+	await wait_process_frames(1)
+	for part: String in ["OffHand", "ViewArmRight", "ViewArmLeft"]:
+		assert_true(own.muzzle.get_parent().get_node(part).visible, "own %s" % part)
+		assert_false(other.muzzle.get_parent().get_node(part).visible, "another player's %s" % part)
+	assert_true(other.muzzle.get_parent().get_node("Hand").visible, "their hand on the grip is what their arm reaches to")
+	var pickup := PickupModels.build("blaster")
+	for part: String in ["Hand", "OffHand", "ViewArmRight", "ViewArmLeft"]:
+		assert_false(pickup.find_child(part, true, false).visible, "nobody holds a weapon lying on a pad")
+	pickup.free()

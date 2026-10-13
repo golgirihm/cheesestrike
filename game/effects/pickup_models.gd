@@ -33,6 +33,7 @@ static func build(kind: String) -> Node3D:
 		model.rotation.y = PI / 2.0
 		# Nobody is holding it yet.
 		model.get_node("Hand").visible = false
+		WeaponModels.show_own_view(model, false)
 		holder.add_child(model)
 	return holder
 
