@@ -65,14 +65,20 @@ const KNOCKBACK_GROUND_DECAY := 6.0
 const KNOCKBACK_AIR_DECAY := 0.8
 
 ## Where this player is and which way they face, as their owner sends it to
-## everyone: [x, y, z, yaw, pitch, teleports]. The last counts the times the
-## player has been moved at once, as on coming back into play, so that the
-## move is shown at once rather than smoothed.
-var net_state := PackedFloat32Array([0, 0, 0, 0, 0, 0]):
+## everyone: [x, y, z, yaw, pitch, teleports, pose]. `teleports` counts the
+## times the player has been moved at once, as on coming back into play, so
+## that the move is shown at once rather than smoothed. `pose` is what they
+## are doing that others should see, as bits (POSE_AIMING).
+var net_state := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0]):
 	set(value):
 		net_state = value
 		if not _mine and is_inside_tree():
 			_receive(value)
+
+## The bit of a pose that says a player is aiming down the sights.
+const POSE_AIMING := 1
+# What another player is doing, as their owner last sent it.
+var _pose := 0
 
 ## Others' movement, drawn smoothly a moment behind (see InterpolationBuffer).
 var smoothing := InterpolationBuffer.new()
@@ -143,6 +149,9 @@ func _enter_tree() -> void:
 ## Where the weapon sits in this player's own view, and how big: smaller and
 ## further out than in their hand as others see it, so it doesn't fill the screen.
 const VIEW_GUN_POSITION := Vector3(0.2, -0.19, -0.55)
+## Where others see a player hold a weapon they are aiming: up at the eye, in
+## the character's measurements from the head.
+const SEEN_AIM_GUN_POSITION := Vector3(0.14, -0.05, -0.5)
 ## Where it sits when aiming down the sights: in the middle, just under the
 ## point being aimed at.
 const AIM_GUN_POSITION := Vector3(0.0, -0.1, -0.42)
@@ -441,6 +450,9 @@ func _animate(delta: float) -> void:
 			bob = Vector3(sin(_bob_phase) * 0.012, absf(cos(_bob_phase)) * 0.012, 0.0) * (1.0 - 0.8 * sights)
 			_step(across * delta, Vector3.INF)
 	else:
+		# Others bring their weapon up to the eye when they aim.
+		_aim = move_toward(_aim, 1.0 if _pose & POSE_AIMING and alive else 0.0, delta / AIM_TIME)
+		rest = _gun_rest.lerp(SEEN_AIM_GUN_POSITION * BodyShape.SIZE, smoothstep(0.0, 1.0, _aim))
 		var moved := global_position - _last_position
 		_last_position = global_position
 		if delta > 0.0:
@@ -527,7 +539,8 @@ static func page_to_view(movement: Vector2, view: Vector2, window: Vector2, pixe
 ## The owner's current position and facing, ready to send.
 func _publish() -> void:
 	if _mine:
-		net_state = PackedFloat32Array([global_position.x, global_position.y, global_position.z, rotation.y, head.rotation.x, _teleports])
+		var pose := POSE_AIMING if _aim > 0.5 else 0
+		net_state = PackedFloat32Array([global_position.x, global_position.y, global_position.z, rotation.y, head.rotation.x, _teleports, pose])
 
 
 ## Another player's update arrived.
@@ -535,6 +548,7 @@ func _receive(state: PackedFloat32Array) -> void:
 	if state.size() < 6:
 		return
 	var now := Time.get_ticks_usec() / 1000000.0
+	_pose = int(state[6]) if state.size() > 6 else 0
 	if int(state[5]) != _teleports:
 		# Moved at once: show it at once, without sliding there.
 		_teleports = int(state[5])

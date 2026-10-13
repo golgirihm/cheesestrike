@@ -66,6 +66,7 @@ func snapshot() -> Dictionary:
 			"overload": record.overload if record != null else null,
 			"overloaded": record.overload_left > 0.0 if record != null else null,
 			"deaths": record.deaths if record != null else null,
+			"aiming": player.is_aiming(),
 		}
 		if player.is_multiplayer_authority():
 			described.ammo = player.weapon.ammo
@@ -74,7 +75,6 @@ func snapshot() -> Dictionary:
 			described.carrying = player.arsenal.keys()
 			described.facing = [player.rotation.y, player.head.rotation.x]
 			described.reloading = player.weapon.is_reloading()
-			described.aiming = player.is_aiming()
 		players.append(described)
 
 	# Each line of the session list: a session to click, or the note shown when

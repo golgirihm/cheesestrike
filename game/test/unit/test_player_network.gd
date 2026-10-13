@@ -68,3 +68,36 @@ func test_the_owners_own_updates_are_not_smoothed_back_onto_them() -> void:
 	await wait_physics_frames(1)
 	own.net_state = PackedFloat32Array([9, 9, 9, 0, 0, 0])
 	assert_true(own.smoothing.is_empty())
+
+
+func test_the_owner_tells_everyone_when_they_aim() -> void:
+	var own := _player(1)
+	own._publish()
+	assert_eq(int(own.net_state[6]) & own.POSE_AIMING, 0)
+	own._aim = 1.0
+	own._publish()
+	assert_eq(int(own.net_state[6]) & own.POSE_AIMING, own.POSE_AIMING)
+
+
+func test_others_are_seen_to_bring_their_weapon_up_to_aim() -> void:
+	var other := _player(2)
+	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, 0])
+	other._animate(1.0)
+	var hip: Vector3 = other.gun.position
+	assert_false(other.is_aiming())
+	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, other.POSE_AIMING])
+	other._animate(other.AIM_TIME / 2.0)
+	assert_gt(other.gun.position.y, hip.y, "on its way up")
+	other._animate(1.0)
+	assert_true(other.is_aiming())
+	assert_almost_eq(other.gun.position.distance_to(other.SEEN_AIM_GUN_POSITION * BodyShape.SIZE), 0.0, 0.01, "at the eye")
+	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, 0])
+	other._animate(1.0)
+	assert_almost_eq(other.gun.position.distance_to(hip), 0.0, 0.01, "and back down")
+
+
+func test_an_update_without_a_pose_is_someone_not_aiming() -> void:
+	var other := _player(2)
+	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0])
+	other._animate(1.0)
+	assert_false(other.is_aiming())
