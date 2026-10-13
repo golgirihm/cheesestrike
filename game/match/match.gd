@@ -29,6 +29,9 @@ signal strike_shown(striker: int)
 signal fell(victim: int, weapon: String, from: Vector3)
 ## Someone knocked someone out, for the kill feed. Names are as they were then.
 signal knocked_out(attacker: String, victim: String, weapon: String, head: bool)
+## One of the host's once-a-second messages arrived, sent when its clock
+## read `sent`: for telling how many go astray (see Readings).
+signal heard_from_host(sent: float)
 ## What each player has done in the match (see Stats) has been heard from
 ## the host.
 signal stats_changed
@@ -838,6 +841,7 @@ func round_trip(id: int) -> float:
 @rpc("authority", "call_remote", "unreliable")
 func _ping(sent: float) -> void:
 	_pong.rpc_id(1, sent)
+	heard_from_host.emit(sent)
 
 
 @rpc("any_peer", "call_remote", "unreliable")

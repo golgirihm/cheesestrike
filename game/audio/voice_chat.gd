@@ -134,7 +134,8 @@ func _process(delta: float) -> void:
 	for id: int in _speakers.keys():
 		if _clock - _last_heard.get(id, -INF) > 5.0:
 			_drop_speaker(id)
-	var wanted := can_talk() and Input.is_action_pressed(ACTION)
+	# Not while something is being typed, where the key is a letter.
+	var wanted := can_talk() and Input.is_action_pressed(ACTION) and not get_viewport().gui_get_focus_owner() is LineEdit
 	if not wanted:
 		if _mic != null and _mic.playing:
 			_mic.stop()

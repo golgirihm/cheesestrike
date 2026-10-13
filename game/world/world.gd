@@ -57,6 +57,8 @@ var announcer: Announcer
 var voice_chat: VoiceChat
 ## The markers players have put down for their teammates.
 var pings: Pings
+## The camera come free, for taking a picture.
+var photo_mode: PhotoMode
 var _built_code := ""
 ## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
@@ -127,6 +129,12 @@ func _ready() -> void:
 	add_child(voice_chat)
 	pings = Pings.new(self)
 	add_child(pings)
+	photo_mode = PhotoMode.new(self)
+	add_child(photo_mode)
+	photo_mode.changed.connect(func() -> void:
+		var own: Node3D = player_node(multiplayer.get_unique_id()) if multiplayer.multiplayer_peer != null else null
+		if own != null:
+			own.seen_from_outside(photo_mode.on))
 	load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 	apply_quality()
@@ -283,6 +291,8 @@ func stop() -> void:
 		multiplayer.peer_disconnected.disconnect(_remove_player)
 	for player in players.get_children():
 		player.queue_free()
+	if photo_mode.on:
+		photo_mode.toggle()
 	match_.stop()
 	pings.clear()
 	# The next host's custom arena is theirs to send.

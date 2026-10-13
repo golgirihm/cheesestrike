@@ -212,6 +212,7 @@ var _turn_rate := Vector2.ZERO
 var _landing := 0.0
 var _running := 0.0
 var _was_on_floor := true
+var _from_outside := false
 # When this character last made a voice, by a clock of their own, and what
 # they were last seen doing, for one played on another machine.
 var _voice_clock := 0.0
@@ -768,7 +769,7 @@ func _animate(delta: float) -> void:
 	var lowered := switch_lowering(_switch_left, draw_time(_shown_weapon))
 	# The owner sees through a scope rather than the weapon it is on; others
 	# see its lens catch the light.
-	gun.visible = not (_mine and is_scoped())
+	gun.visible = not (_mine and (is_scoped() or _from_outside))
 	if _glint != null:
 		_glint.visible = not _mine and alive and _aim >= 0.9
 	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + (Vector3(0.0, -0.5, 0.1) * lowered + Vector3(0.03, -0.16, 0.04) * reloading) * gun.scale.x
@@ -1061,12 +1062,28 @@ func _process(delta: float) -> void:
 
 ## Whether the in-game menu, or anything else in its group such as the controls
 ## help, is open, so this player's controls are set aside.
+## Shows this machine's own player as others see them, or goes back to
+## their own view: for a camera that has come free of them (see PhotoMode).
+func seen_from_outside(on: bool) -> void:
+	_from_outside = on
+	body.shown = on or not _mine
+
+
+## Takes `weapon` in hand, if it is carried.
+func choose_weapon(weapon: String) -> void:
+	if arsenal.has(weapon):
+		_switch_to = weapon
+
+
 ## Whether the keyboard is being typed on, in a box that takes text.
 func typing() -> bool:
 	return is_inside_tree() and get_viewport().gui_get_focus_owner() is LineEdit
 
 
 func _menu_open() -> bool:
+	# With the camera free for a picture, the player stands where they are.
+	if world != null and world.get("photo_mode") != null and world.photo_mode.on:
+		return true
 	for menu in get_tree().get_nodes_in_group("pause_menu"):
 		if menu is CanvasItem and menu.visible:
 			return true

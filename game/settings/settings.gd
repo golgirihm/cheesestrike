@@ -52,6 +52,14 @@ const DEFAULTS := {
 	## How many tips the player has been shown, so that each comes in turn
 	## (see JoinScreen).
 	"tips_seen": 0,
+	## How the HUD is laid out, where it differs from the usual (see
+	## HudLayout).
+	"hud_layout": {},
+	## Numbers for the curious (see Readings).
+	"show_fps": false,
+	"show_ping": false,
+	"show_loss": false,
+	"show_graph": false,
 	## The player's crosshair (see Crosshair).
 	"crosshair_shape": "cross",
 	"crosshair_colour": "white",
