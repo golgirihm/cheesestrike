@@ -48,6 +48,16 @@ func test_what_was_done_before_a_step_began_does_not_count_for_it() -> void:
 	assert_true(_then({"shots": 4}))
 
 
+func test_a_weapon_taken_in_passing_earlier_will_do_for_the_step_that_asks_for_one() -> void:
+	_then({"weapons": 3})
+	assert_eq(tutorial.step_name(), "move", "it isn't what was asked yet")
+	for did: Dictionary in [{"at": Vector3(Tutorial.WALK + 1.0, 0, 0)}, {"yaw": 1.0}, {"shots": 1}, {"aiming": true}, {"reloads": 1}]:
+		assert_true(_then(did))
+	assert_eq(tutorial.step_name(), "pick_up")
+	assert_true(tutorial.update(now), "ticked off as soon as it is asked")
+	assert_eq(tutorial.step_name(), "overload")
+
+
 func test_walking_is_added_up_however_it_wanders() -> void:
 	for step in 5:
 		assert_false(_then({"at": Vector3(0.5 if step % 2 == 0 else 0.0, 0, 0)}), "not far yet")
