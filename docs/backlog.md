@@ -66,15 +66,13 @@ The shooting works and is fair. This milestone is about how it feels in the hand
    *Tests:* GUT test of the build's size budget. Manual rows.
 2. **Light.** Baked lighting for each arena, warm sun and cool shade, lamps in the city, with the real-time sun kept for players.
    *Tests:* manual rows; a GUT test that each arena has its lighting.
-3. **Things that move.** Flags, birds, clouds' shadows, a train beyond the fence, traffic lights changing, steam from a grate.
-   *Tests:* GUT test that none of it is solid or costs the host anything.
-4. **Inside the buildings.** Open a floor or two of the city's towers: lobbies, stairs, windows to shoot from.
+3. **Inside the buildings.** Open a floor or two of the city's towers: lobbies, stairs, windows to shoot from.
    *Tests:* the arena tests (spots fit, pads reachable, nowhere traps) already run over every arena.
-5. **More arenas.** A dairy with vats and conveyor belts, a kitchen at mouse scale, a market, a cheese cave, a small one for duels.
+4. **More arenas.** A dairy with vats and conveyor belts, a kitchen at mouse scale, a market, a cheese cave, a small one for duels.
    *Tests:* the arena tests.
-6. **Hazards and doors.** A grater that hurts, a vat of fondue, doors that open and lifts that move, all decided by the host.
+5. **Hazards and doors.** A grater that hurts, a vat of fondue, doors that open and lifts that move, all decided by the host.
    *Tests:* GUT tests of each; browser test that both players see a door open.
-7. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
+6. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
    *Tests:* GUT tests of saving and loading; the arena tests run on a saved arena.
 
 ## Milestone 8: A picture that holds up
