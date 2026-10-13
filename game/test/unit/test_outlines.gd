@@ -108,8 +108,12 @@ func test_an_outline_goes_on_every_mesh_and_comes_off_again() -> void:
 	# One that doesn't show through walls is hidden by what is in front.
 	Outlines.put(thing, Color.RED, false)
 	assert_false(Outlines.through_walls(thing))
-	assert_false((meshes[0].material_overlay.next_pass as StandardMaterial3D).no_depth_test)
-	assert_eq(meshes[0].material_overlay.stencil_flags & BaseMaterial3D.STENCIL_FLAG_WRITE_DEPTH_FAIL, 0)
+	var plain: StandardMaterial3D = meshes[0].material_overlay
+	assert_false(plain.no_depth_test)
+	assert_eq(plain.cull_mode, BaseMaterial3D.CULL_FRONT, "the fatter copy inside out: the thing covers all but its rim")
+	assert_eq(plain.stencil_mode, BaseMaterial3D.STENCIL_MODE_DISABLED, "with no marks to look at")
+	assert_null(plain.next_pass)
+	assert_eq(plain.albedo_color, Color.RED)
 	Outlines.take(thing)
 	assert_null(Outlines.colour_on(thing))
 	for mesh in meshes:
