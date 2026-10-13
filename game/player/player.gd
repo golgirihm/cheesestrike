@@ -320,6 +320,8 @@ func _show_weapon(id: String) -> void:
 	for child in gun.get_children():
 		child.queue_free()
 	var model := WeaponModels.build(id)
+	# Only its holder sees both hands and the arms behind them.
+	WeaponModels.show_own_view(model, is_multiplayer_authority())
 	gun.add_child(model)
 	muzzle = model.get_node("Muzzle")
 	_magazine = model.get_node_or_null("Magazine")

@@ -52,21 +52,19 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 4: Characters that are alive
 
-1. **First-person arms.** Two stick arms and mittens holding the weapon in the player's own view, in place of one floating hand, used by every weapon animation.
-   *Tests:* GUT test that every weapon has both hands placed. Manual rows.
-2. **Animation, properly.** Move the character from code-driven poses to an animation tree: idle, walk, run, crouch, slide, jump, fall, land, aim, fire, reload, throw, melee, hurt, with blending between them.
+1. **Animation, properly.** Move the character from code-driven poses to an animation tree: idle, walk, run, crouch, slide, jump, fall, land, aim, fire, reload, throw, melee, hurt, with blending between them.
    *Tests:* GUT tests that each state is reached from the player's motion. Manual: PLR-06 grows.
-3. **A better end.** A knocked-out character is thrown by what hit it and then melts, with crumbs; a burst scatters it.
+2. **A better end.** A knocked-out character is thrown by what hit it and then melts, with crumbs; a burst scatters it.
    *Tests:* GUT tests of which ending each cause gives. Manual row.
-4. **More faces.** Blinking, looking at nearby players, a determined face when firing, a cheer on a knock-out, dizzy stars when melted by an Overload.
+3. **More faces.** Blinking, looking at nearby players, a determined face when firing, a cheer on a knock-out, dizzy stars when melted by an Overload.
    *Tests:* GUT tests of each trigger.
-5. **Kinds of cheese.** Let players choose their character: Swiss, cheddar, blue, brie, each a different wedge, rind and hole pattern on the same hit shape. Shown on the menu.
+4. **Kinds of cheese.** Let players choose their character: Swiss, cheddar, blue, brie, each a different wedge, rind and hole pattern on the same hit shape. Shown on the menu.
    *Tests:* GUT test that every kind fits the hit shape; browser test that others see the choice.
-6. **Hats and accessories.** Things worn on the tip of the wedge and held in the free hand, chosen on the menu, which don't change what can be hit.
+5. **Hats and accessories.** Things worn on the tip of the wedge and held in the free hand, chosen on the menu, which don't change what can be hit.
    *Tests:* GUT tests that none change `BodyShape`.
-7. **Emotes and taunts.** A wheel of short animations and sounds (a wave, a dance, a shrug), safe to use only when it doesn't leave the player helpless for long.
+6. **Emotes and taunts.** A wheel of short animations and sounds (a wave, a dance, a shrug), safe to use only when it doesn't leave the player helpless for long.
    *Tests:* browser test that others see one.
-8. **Footprints and shadows.** A soft blob shadow under each character on low graphics, where real shadows are off, and brief footprints on dusty ground.
+7. **Footprints and shadows.** A soft blob shadow under each character on low graphics, where real shadows are off, and brief footprints on dusty ground.
    *Tests:* GUT test of the fallback. Manual row.
 
 ## Milestone 5: An arsenal
