@@ -48,6 +48,7 @@ var _match_buttons := {}
 var _alone_settings: MatchSettings
 ## The tutorial the player is being taken through, or null.
 var tutorial: Tutorial
+var arena_editor: Control
 # Who the pause menu's vote-to-remove button names.
 var _remove_target := 0
 # Whether the mouse was captured as of the last frame. Esc while it is captured
@@ -73,6 +74,20 @@ func _ready() -> void:
 	practice_button.custom_minimum_size = host_button.custom_minimum_size
 	host_button.add_sibling(practice_button)
 	practice_button.pressed.connect(_practise)
+	var editor_button := Button.new()
+	editor_button.name = "EditorButton"
+	editor_button.text = "Arena editor"
+	editor_button.custom_minimum_size = host_button.custom_minimum_size
+	practice_button.add_sibling(editor_button)
+	arena_editor = preload("res://ui/arena_editor.gd").new()
+	arena_editor.name = "ArenaEditor"
+	menu.get_parent().add_child(arena_editor)
+	editor_button.pressed.connect(func() -> void:
+		menu.hide()
+		arena_editor.open(world))
+	arena_editor.closed.connect(func() -> void:
+		_show_match_setting("host_map")
+		_show_menu(""))
 	var tutorial_button := Button.new()
 	tutorial_button.name = "TutorialButton"
 	tutorial_button.text = "How to play"
@@ -141,6 +156,13 @@ func _ready() -> void:
 	Sounds.play_music()
 	if TestHook.wanted():
 		add_child(TestHook.new(self))
+
+	# A link to an arena someone made: kept, and offered to host.
+	var arena := WebPage.take_arena_code()
+	if not arena.is_empty():
+		Settings.set_value("custom_arena", arena)
+		Settings.set_value("host_map", Maps.CUSTOM)
+		status.text = "The arena from the link is ready: host it, or change it in the editor."
 
 	var invited := WebPage.take_invite_code()
 	if not invited.is_empty():
@@ -223,7 +245,9 @@ func _setup_match_buttons() -> void:
 	_cycle(max_players_button, "host_max_players", player_counts, func(count: int) -> String: return "Up to %d players" % count)
 	_cycle(kill_limit_button, "host_kill_limit", MatchSettings.KILL_LIMITS, func(limit: int) -> String: return "First to %d" % limit)
 	_cycle(minutes_button, "host_minutes", MatchSettings.MINUTES, func(minutes: int) -> String: return "%d minutes" % minutes)
-	_cycle(map_button, "host_map", Maps.ORDER, func(map: String) -> String: return "Map: %s" % Maps.NAMES[map])
+	_cycle(map_button, "host_map", Maps.ORDER + [Maps.CUSTOM], func(map: String) -> String:
+		var none: bool = map == Maps.CUSTOM and ArenaCode.decode(Settings.get_value("custom_arena")).is_empty()
+		return "Map: %s%s" % [Maps.NAMES[map], " (none made yet)" if none else ""])
 	# Computer players, to fill a session or to practise against.
 	var bots_button := Button.new()
 	bots_button.name = "BotsButton"

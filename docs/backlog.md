@@ -20,9 +20,10 @@ Things about how it works that shape the plan:
 - **The host is a browser tab**, possibly on a phone. Whatever the host simulates for everyone has to stay cheap, and the session ends when the host leaves.
 - **The signaling server only runs on the development PC**, and the game looks for it on the same machine as the page, at port 9080. Nobody outside the local network can play yet.
 - **The web export is single-threaded** (`thread_support=false`), which lets it run on any static host without special headers. Keep it that way unless something needs threads badly enough to justify the hosting requirements.
+- **The arena editor needs a keyboard and mouse**, and makes flat arenas: a floor of one of three sizes with blocks, walls, crates and pads on a grid (`game/world/arena_code.gd`). An arena is a short code, kept in the player's settings and shared in a link; the host sends it to whoever joins.
 - **The light is not baked.** Each arena has a sun, a cool fill light, soft dark edges drawn on the ground round what stands on it, and in some a few lamps: all cheap, and all worked out as the game runs. Real baked lighting needs the editor to bake it and the baked maps to be downloaded.
 - **The renderer is Compatibility**, the one that runs in browsers and on phones. It has no ambient occlusion, volumetric light or screen-space reflections, so the look has to come from shapes, colour, baked light and particles.
-- **The session list knows two modes and three arenas.** The server that keeps the list accepts only free-for-all and teams, and only the first three arenas, so a session in any newer mode is listed as whichever of those two is nearer, and one on a newer arena as Cheddar Canyon (`MatchSettings.advertised`). Nor is it told of bots, the host's rules or the sky. Players get all of it once they join. Listing it properly means teaching `signaling/` the rest.
+- **The session list knows two modes and three arenas.** The server that keeps the list accepts only free-for-all and teams, and only the first three arenas, so a session in any newer mode is listed as whichever of those two is nearer, and one on a newer arena, or on one a player laid out, as Cheddar Canyon (`MatchSettings.advertised`). Nor is it told of bots, the host's rules or the sky. Players get all of it once they join. Listing it properly means teaching `signaling/` the rest.
 - **There is no server that keeps anything.** Names and settings live in each browser. Anything a player earns and keeps (Milestone 11) needs either that, which can't be trusted, or a service and a database, which have to be run and paid for.
 - **Almost everything is made in code**: meshes, sounds, arenas' dressing. That has kept the build small and the look consistent, and it has a ceiling. Recorded sound, textures and animation (Milestones 4, 7 and 9) mean taking on assets, their licences and their size.
 
@@ -63,8 +64,6 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 7: Arenas with character
 
-1. **An arena editor.** Let players lay out their own arenas from the pieces and share them by link.
-   *Tests:* GUT tests of saving and loading; the arena tests run on a saved arena.
 
 ## Milestone 8: A picture that holds up
 

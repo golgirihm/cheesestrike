@@ -17,6 +17,8 @@ const DEFAULTS := {
 	"host_kill_limit": 20,
 	"host_bots": 0,
 	"host_rules": "standard",
+	## The arena the player laid out in the editor, as a code (see ArenaCode).
+	"custom_arena": "",
 	"host_sky": "noon",
 	"host_bot_skill": "normal",
 	"host_minutes": 8,

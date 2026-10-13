@@ -31,6 +31,10 @@ var map_id := ""
 var spawn_points: Node3D
 ## The loaded arena's jump pads and ladders, as Fixtures.of gives them.
 var fixtures := {"pads": [], "ladders": []}
+## The code of the custom arena to play on (see ArenaCode), when the match is
+## on one: the host's own, or what the host sent.
+var custom_code := ""
+var _built_code := ""
 ## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
 var menu_camera: Camera3D
@@ -96,13 +100,19 @@ func apply_quality() -> void:
 func load_map(id: String) -> void:
 	if not Maps.exists(id):
 		id = Maps.DEFAULT
-	if id == map_id:
+	# A custom arena is built from its code, which a player other than the
+	# host may still be waiting for.
+	var arena := ArenaCode.decode(custom_code) if id == Maps.CUSTOM else {}
+	if id == Maps.CUSTOM and arena.is_empty():
+		return
+	if id == map_id and (id != Maps.CUSTOM or custom_code == _built_code):
 		return
 	var was_menu_view := menu_camera != null and menu_camera.current
 	if map != null:
 		remove_child(map)
 		map.queue_free()
-	map = Maps.scene(id).instantiate()
+	_built_code = custom_code if id == Maps.CUSTOM else ""
+	map = ArenaCode.build(arena) if id == Maps.CUSTOM else Maps.scene(id).instantiate()
 	map.name = "Map"
 	Scenery.dress(map)
 	add_child(map)
@@ -124,10 +134,29 @@ func load_map(id: String) -> void:
 
 
 ## Begins the session. `settings` are the host's choice, and only used there.
+## Loads the custom arena `code` describes.
+func load_custom(code: String) -> void:
+	custom_code = code
+	load_map(Maps.CUSTOM)
+
+
+## Shows `arena` (see ArenaCode) as it is being laid out, in the editor.
+func show_custom(arena: Dictionary) -> void:
+	# Even one with nothing on it, which has no code to keep.
+	custom_code = ArenaCode.encode(arena)
+	_built_code = "*"
+	load_map(Maps.CUSTOM)
+
+
 func start(settings := MatchSettings.new()) -> void:
 	if not multiplayer.is_server():
 		match_.start()
 		return
+	# The host's own custom arena, or the usual one if they have made none.
+	if settings.map == Maps.CUSTOM:
+		custom_code = Settings.get_value("custom_arena")
+		if ArenaCode.decode(custom_code).is_empty():
+			settings.map = Maps.DEFAULT
 	load_map(settings.map)
 	_spawn_slots = SpawnSlots.new(spawn_points.get_child_count())
 	multiplayer.peer_connected.connect(_add_player)
@@ -147,6 +176,10 @@ func stop() -> void:
 	for player in players.get_children():
 		player.queue_free()
 	match_.stop()
+	# The next host's custom arena is theirs to send.
+	custom_code = ""
+	if map_id == Maps.CUSTOM:
+		load_map(Maps.DEFAULT)
 	menu_camera.make_current()
 
 
