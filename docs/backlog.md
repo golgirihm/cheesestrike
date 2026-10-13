@@ -86,17 +86,11 @@ The game uses the Compatibility renderer so it runs in a browser and on phones. 
 
 Everything here needs somewhere to keep what a player has earned. Start with the browser's own storage, which costs nothing and can't be trusted, and move to accounts on a server only when there is something worth protecting.
 
-1. **Things to earn.** Cheeses, hats, weapon finishes, emotes and titles unlocked by level and by challenges. Never anything that changes a fight.
-   *Tests:* GUT test that nothing unlockable changes a weapon's or a body's numbers.
-2. **Challenges.** A few each day and each week (knock-outs with the shotgun, a win on Curd City), and long ones for each weapon.
-   *Tests:* GUT tests of progress.
-3. **Achievements.** One-off feats with a picture and a line each.
-   *Tests:* GUT tests of each trigger.
-4. **Accounts.** Sign in to keep a profile across devices, with the server holding it. Needs a small service and a database, a privacy policy, and a way to delete an account.
+1. **Accounts.** Sign in to keep a profile across devices, with the server holding it. Needs a small service and a database, a privacy policy, and a way to delete an account.
    *Tests:* tests for the service; browser test of signing in.
-5. **Leaderboards.** Best this week and of all time, among friends and everyone, from results the server checked.
+2. **Leaderboards.** Best this week and of all time, among friends and everyone, from results the server checked.
    *Tests:* service tests.
-6. **Ranked play.** A hidden skill rating from match results, used to match players, with visible ranks and seasons.
+3. **Ranked play.** A hidden skill rating from match results, used to match players, with visible ranks and seasons.
    *Tests:* tests of the rating's arithmetic.
 
 ## Milestone 12: Online, properly

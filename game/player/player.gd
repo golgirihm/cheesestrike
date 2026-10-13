@@ -214,6 +214,7 @@ var _running := 0.0
 var _was_on_floor := true
 # Under the name tag: the player's level and title.
 var _rank_tag: Label3D
+var _shown_finish := "plain"
 var _from_outside := false
 # When this character last made a voice, by a clock of their own, and what
 # they were last seen doing, for one played on another machine.
@@ -405,6 +406,10 @@ func _show_weapon(id: String) -> void:
 	for child in gun.get_children():
 		child.queue_free()
 	var model := WeaponModels.build(id)
+	# In the finish its holder chose.
+	var holder := record()
+	_shown_finish = Looks.unpack(holder.look).finish if holder != null else Unlocks.FINISHES[0]
+	Unlocks.paint(model, _shown_finish)
 	# Only its holder sees both hands and the arms behind them.
 	WeaponModels.show_own_view(model, _is_own())
 	gun.add_child(model)
@@ -441,6 +446,12 @@ func _on_match_state_changed() -> void:
 		body.cheer()
 	_kills = own.kills
 	body.wear(own.look)
+	# A finish chosen since the weapon was taken in hand is put on it.
+	if Looks.unpack(own.look).finish != _shown_finish and not _shown_weapon.is_empty():
+		var held := _shown_weapon
+		_shown_weapon = ""
+		_show_weapon(held)
+		_switch_left = 0.0
 	# Under their name, their level and title.
 	if _rank_tag != null:
 		_rank_tag.text = Looks.rank_text(own.look)
@@ -1127,6 +1138,9 @@ static func _number_key(event: InputEvent) -> int:
 
 # Asks the host to show everyone emote `kind`.
 func _make_emote(kind: int) -> void:
+	# Only the ones that have been earned.
+	if not Unlocks.mine(Unlocks.EMOTE, kind):
+		kind = Unlocks.next(Unlocks.EMOTE, kind, Progress.level(), Progress.achievements, Progress.challenges_done())
 	if alive and match_ != null and not _menu_open():
 		match_.emote(kind)
 		_next_emote = Emotes.next(kind)

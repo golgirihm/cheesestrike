@@ -347,8 +347,8 @@ func test_a_match_that_ends_is_kept_once_and_adds_to_the_summary() -> void:
 	assert_eq(Progress.history[0].kills, 3)
 	assert_almost_eq(Progress.history[0].seconds, 30.0, 0.1)
 	assert_almost_eq(float(Progress.history[0].held.values()[0]), 30.0, 0.1, "the weapon that was in hand")
-	assert_eq(keeper.lines().size(), 1)
 	assert_string_starts_with(keeper.lines()[0], "+%d experience" % keeper.last.xp)
+	assert_has(keeper.lines(), "Achievement: %s" % Achievements.name_of("first_blood"), "and the feats it was")
 	# The next match starts the count again.
 	world.match_.state.start_match()
 	keeper._process(0.016)

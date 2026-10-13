@@ -28,13 +28,17 @@ const SETTINGS := {
 	"look_hat": [HATS, HAT_NAMES, "Hat"],
 	"look_held": [HELD, HELD_NAMES, "Holding"],
 	"look_title": [TITLES, TITLE_NAMES, "Title"],
+	"look_finish": [Unlocks.FINISHES, Unlocks.FINISH_NAMES, "Weapon finish"],
 }
+## The kind of thing to earn (see Unlocks) each of those settings chooses.
+const KIND_OF := {"look_cheese": Unlocks.CHEESE, "look_hat": Unlocks.HAT, "look_held": Unlocks.HELD, "look_title": Unlocks.TITLE, "look_finish": Unlocks.FINISH}
 
 
 ## The look with these choices, as a number. Anything unknown is the first
 ## of its kind.
-static func pack(cheese: String, hat: String, held: String, title := "none", level := 0) -> int:
-	return maxi(CHEESES.find(cheese), 0) | maxi(HATS.find(hat), 0) << 4 | maxi(HELD.find(held), 0) << 8 | maxi(TITLES.find(title), 0) << 12 | clampi(level, 0, TOP_LEVEL) << 18
+static func pack(cheese: String, hat: String, held: String, title := "none", level := 0, finish := "plain") -> int:
+	return maxi(CHEESES.find(cheese), 0) | maxi(HATS.find(hat), 0) << 4 | maxi(HELD.find(held), 0) << 8 | maxi(TITLES.find(title), 0) << 12 \
+		| clampi(level, 0, TOP_LEVEL) << 18 | maxi(Unlocks.FINISHES.find(finish), 0) << 25
 
 
 ## The choices in `look`, as {cheese, hat, held}. Anything out of range is
@@ -44,7 +48,9 @@ static func unpack(look: int) -> Dictionary:
 	var hat := look >> 4 & 15
 	var held := look >> 8 & 15
 	var title := look >> 12 & 63
+	var finish := look >> 25 & 7
 	return {
+		"finish": Unlocks.FINISHES[finish] if finish < Unlocks.FINISHES.size() else Unlocks.FINISHES[0],
 		"title": TITLES[title] if title < TITLES.size() else TITLES[0],
 		"level": clampi(look >> 18 & 127, 0, TOP_LEVEL),
 		"cheese": CHEESES[cheese] if cheese < CHEESES.size() else CHEESES[0],
@@ -59,12 +65,13 @@ static func clean(look: Variant) -> int:
 	if not look is int:
 		return 0
 	var choices := unpack(look)
-	return pack(choices.cheese, choices.hat, choices.held, choices.title, choices.level)
+	return pack(choices.cheese, choices.hat, choices.held, choices.title, choices.level, choices.finish)
 
 
 ## The look this player has chosen in their settings.
 static func chosen() -> int:
-	return pack(Settings.get_value("look_cheese"), Settings.get_value("look_hat"), Settings.get_value("look_held"), Settings.get_value(TITLE_SETTING), Progress.level())
+	return pack(Settings.get_value("look_cheese"), Settings.get_value("look_hat"), Settings.get_value("look_held"), Settings.get_value(TITLE_SETTING), Progress.level(),
+		Settings.get_value(Unlocks.FINISH_SETTING))
 
 
 ## What is written under a player's name for `look`: their level and, if

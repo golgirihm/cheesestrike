@@ -139,8 +139,13 @@ class MatchTest(GameTestCase):
         lost = joiner.state()["combat"]["summary"]
         self.assertRegex(lost[2], r"^Accuracy 0%   ·   Damage 0   ·   Best run 0$")
         self.assertEqual(len(lost), 4, "no medals for the one who lost")
-        # And what it earned them, which is kept.
-        self.assertRegex(won[-1], r"^\+\d+ experience   ·   Level \d+")
+        # And what it earned them, which is kept: experience, and for the
+        # winner a level, their first feats and what those and the level gave.
+        earned = next(line for line in won if line.startswith("+"))
+        self.assertRegex(earned, r"^\+\d+ experience   ·   Level \d+ reached!$")
+        self.assertIn("Achievement: First Crumb", won)
+        self.assertIn("Achievement: Top of the Board", won)
+        self.assertTrue(any(line.startswith("Unlocked   ·   ") for line in won), won)
         self.assertRegex(lost[-1], r"^\+\d+ experience   ·   Level 1$")
         for game in (host, joiner):
             progress = game.state()["progress"]
