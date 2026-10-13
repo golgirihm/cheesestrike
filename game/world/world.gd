@@ -370,6 +370,34 @@ func pickup_pads() -> Array:
 	return pads
 
 
+## The loaded arena's named places: each {"name", "at"}.
+func places() -> Array:
+	var holder := map.get_node_or_null("Places") if map != null else null
+	if holder == null:
+		return []
+	return holder.get_children().map(func(marker: Node3D) -> Dictionary:
+		return {"name": String(marker.get_meta("label", "")), "at": marker.global_position})
+
+
+## What the part of the arena at `at` is called: the name of the nearest of
+## its places, with a floor's difference in height counting double. "" in an
+## arena with none.
+func place_at(at: Vector3) -> String:
+	return nearest_place(places(), at)
+
+
+static func nearest_place(named: Array, at: Vector3) -> String:
+	var found := ""
+	var nearest := INF
+	for place: Dictionary in named:
+		var off: Vector3 = at - place.at
+		var distance := Vector3(off.x, off.y * 2.0, off.z).length()
+		if distance < nearest:
+			nearest = distance
+			found = place.name
+	return found
+
+
 ## The loaded arena's blocks of cheese, in an order that is the same on
 ## every machine.
 func cheese_blocks() -> Array:

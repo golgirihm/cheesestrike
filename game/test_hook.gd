@@ -177,6 +177,7 @@ func snapshot() -> Dictionary:
 			"overload": _main.combat_hud.overload_shown() if _main.combat_hud.visible else "",
 			"objective": _main.combat_hud.objective_shown() if _main.combat_hud.visible else "",
 			"points": [_main.world.match_.state.team_score(0), _main.world.match_.state.team_score(1)],
+			"place": _main.combat_hud.place_shown() if _main.combat_hud.visible else "",
 			"vote": _main.combat_hud.vote_shown() if _main.combat_hud.visible else [],
 			"replay": _main.combat_hud.replay_shown() if _main.combat_hud.visible else "",
 			"replay_ghosts": _main.world.replay_view.ghosts(),
