@@ -1073,7 +1073,7 @@ func _process(delta: float) -> void:
 		_show_smoothed()
 	_animate(delta)
 	if _mine:
-		var tip := shake.tick(delta, Settings.get_value("screen_shake"))
+		var tip := shake.tick(delta, Settings.motion("screen_shake"))
 		# The view climbs with the weapon's kick, and settles once the run of
 		# fire is over.
 		_since_shot += delta
@@ -1082,7 +1082,7 @@ func _process(delta: float) -> void:
 		_recoil_view = _recoil_view.lerp(kicked, minf(delta * (RECOIL_RISE if firing else RECOIL_SETTLE), 1.0))
 		# The view moves with the body, as much as the player has asked for:
 		# a bob with each stride, a roll into a sidestep, a dip on landing.
-		var motion: float = Settings.get_value("camera_motion") * (1.0 - 0.7 * smoothstep(0.0, 1.0, _aim))
+		var motion: float = Settings.motion("camera_motion") * (1.0 - 0.7 * smoothstep(0.0, 1.0, _aim))
 		var across := Vector2(velocity.x, velocity.z).length() if is_on_floor() else 0.0
 		var sideways := (global_basis.inverse() * velocity).x / Movement.WALK_SPEED
 		camera.position = (WeaponSway.view_bob(_bob_phase, across / Movement.WALK_SPEED) + Vector3.DOWN * WeaponSway.VIEW_DIP * _landing) * motion
@@ -1095,7 +1095,7 @@ func _process(delta: float) -> void:
 		camera.rotation = Vector3(tip.x + _recoil_view.y + _scope_sway.y, -_recoil_view.x - _scope_sway.x, tip.y - clampf(sideways, -1.0, 1.0) * WeaponSway.VIEW_ROLL * motion)
 		_crouch = move_toward(_crouch, 1.0 if _wants_crouch() else 0.0, delta * Movement.CROUCH_RATE)
 		_lean = move_toward(_lean, _wants_lean(), delta * Movement.CROUCH_RATE)
-		var run_fov := lerpf(1.0, WeaponSway.RUN_FOV, _running * Settings.get_value("camera_motion"))
+		var run_fov := lerpf(1.0, WeaponSway.RUN_FOV, _running * Settings.motion("camera_motion"))
 		camera.fov = Settings.get_value("fov") * lerpf(1.0, weapon.stats.aim_zoom, smoothstep(0.0, 1.0, _aim)) * run_fov
 	if OS.has_feature("web") and _mine:
 		var moved := WebPage.take_mouse_movement()

@@ -90,7 +90,7 @@ static func emphasise(button: Button) -> void:
 ## Whether screens move as they change: not for someone who has turned the
 ## camera's motion right down.
 static func moves() -> bool:
-	return Settings.get_value("camera_motion") > 0.0
+	return Settings.motion("camera_motion") > 0.0
 
 
 ## Shows `screen`, which fades in and settles into place. Returns the tween
