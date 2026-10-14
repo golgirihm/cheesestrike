@@ -17,6 +17,12 @@ const HEARD := 30
 ## The height of the graph stands for this long a frame, in milliseconds.
 const GRAPH_TOP_MS := 50.0
 const WIDE := 150.0
+## A round trip this long, in milliseconds, or this share of the host's
+## messages going astray, is warned of whether or not the numbers are asked
+## for; and the loss only once this many messages have been counted.
+const SLOW_PING := 200
+const BAD_LOSS := 10
+const LOSS_AFTER := 8
 
 var world: Node3D
 # How long each recent frame took, in seconds, oldest first.
@@ -110,6 +116,25 @@ func lines(wanted: Dictionary, ping: int, host: bool) -> Array[String]:
 	return said
 
 
+## A warning of a poor connection to the host, for a round trip of `ping`
+## milliseconds with `loss` per cent going astray, or "" if it is fine or
+## this is the `host`.
+static func warning(ping: int, loss_share: int, host: bool) -> String:
+	if host:
+		return ""
+	if loss_share >= BAD_LOSS:
+		return "⚠ Losing %d%% of updates" % loss_share
+	if ping >= SLOW_PING:
+		return "⚠ Slow connection: %d ms" % ping
+	return ""
+
+
+## The share gone astray (see loss), or 0 until enough have been counted to
+## say.
+func settled_loss() -> int:
+	return loss() if _arrived.size() >= LOSS_AFTER else 0
+
+
 ## The heights of the graph's bars, from 0 to 1, oldest first: how long each
 ## frame took against the longest the graph can show.
 func bars() -> Array[float]:
@@ -131,7 +156,12 @@ func _process(delta: float) -> void:
 	frame(delta)
 	var asked := wanted()
 	var record: PlayerRecord = world.match_.own_record() if world != null and world.match_.has_state() and multiplayer.multiplayer_peer != null else null
-	_label.text = "\n".join(lines(asked, record.ping if record != null else 0, world != null and world.match_.is_host()))
+	var shown := lines(asked, record.ping if record != null else 0, world != null and world.match_.is_host())
+	# A poor connection is said whatever has been asked for.
+	var warned := warning(record.ping, settled_loss(), world.match_.is_host()) if record != null else ""
+	if not warned.is_empty():
+		shown.append(warned)
+	_label.text = "\n".join(shown)
 	_label.visible = not _label.text.is_empty()
 	queue_redraw()
 

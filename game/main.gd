@@ -75,6 +75,13 @@ var mode_filter_button: Button
 var arena_filter_button: Button
 var hide_full_button: CheckBox
 var _list_sort := SessionList.FULLEST
+# Seconds until a dropped session is tried again, or below 0 for none; how
+# many times it has been tried since the last that was joined, and at most.
+var _reconnect_left := -1.0
+var _auto_rejoins := 0
+var _reason_shown := ""
+const RECONNECT_WAIT := 3.0
+const AUTO_REJOINS := 1
 var _list_mode := SessionList.ANY
 var _list_arena := SessionList.ANY
 # Who the pause menu's vote-to-remove button names.
@@ -274,6 +281,14 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _reconnect_left > 0.0:
+		_reconnect_left -= _delta
+		if not disconnected_notice.visible:
+			_reconnect_left = -1.0
+		elif _reconnect_left <= 0.0:
+			_rejoin()
+		else:
+			disconnected_detail.text = reconnect_text(_reason_shown, _reconnect_left)
 	# A few sounds are made each frame behind the cover, which goes once
 	# they all are and one of everything has been drawn.
 	if loading_cover.visible:
@@ -606,6 +621,8 @@ func _set_busy(message: String, map := "") -> void:
 
 
 func _on_session_started() -> void:
+	_auto_rejoins = 0
+	_reconnect_left = -1.0
 	Sounds.set_music_quiet(true)
 	menu.hide()
 	front_end.hide()
@@ -693,6 +710,13 @@ func _on_session_ended(reason: String) -> void:
 	rejoin_button.visible = can_rejoin(reason, Net.last_joined) and reason != Match.REMOVED
 	disconnected_notice.show()
 	disconnected_button.grab_focus()
+	# A dropped connection is tried again once, after a short wait, unless
+	# the player chooses otherwise.
+	_reason_shown = reason
+	_reconnect_left = RECONNECT_WAIT if rejoin_button.visible and _auto_rejoins < AUTO_REJOINS else -1.0
+	if _reconnect_left > 0.0:
+		_auto_rejoins += 1
+		disconnected_detail.text = reconnect_text(reason, _reconnect_left)
 
 
 ## Whether a player who lost their session for `reason` can try joining it
@@ -701,7 +725,14 @@ static func can_rejoin(reason: String, joined: String) -> bool:
 	return not joined.is_empty() and not reason.is_empty() and not reason in ["The host closed the session.", Match.HOST_ENDED]
 
 
+## What the notice of a lost session says while it waits `left` seconds to
+## try again.
+static func reconnect_text(reason: String, left: float) -> String:
+	return "%s\nTrying again in %d…" % [reason, ceili(left)]
+
+
 func _rejoin() -> void:
+	_reconnect_left = -1.0
 	disconnected_notice.hide()
 	menu.show()
 	_join(Net.last_joined)

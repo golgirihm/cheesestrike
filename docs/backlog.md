@@ -111,7 +111,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* GUT tests of each check, with the cheat written as a test.
 8. **Reporting.** Report a player with a reason, to a service that keeps reports for someone to act on. (Muting, blocking in every session, and a filter on names and chat are done.)
    *Tests:* service tests; browser test.
-9. **A bad connection, handled.** Icons for high ping and packet loss, a clear message and a short wait to reconnect on a drop, and a warning before joining a far-off host.
+9. **A far-off host, warned of.** Warn before joining a host far away, which needs the session server to measure it. (A slow or lossy connection is now warned of in play, and a dropped one is tried again after a short wait.)
    *Tests:* browser tests with a throttled and a cut connection.
 10. **Knowing what breaks.** Collect crashes and errors from builds in the wild, with the version and device, and anonymous counts of what players do, with consent.
     *Tests:* tests of what is sent and that nothing is without consent.
