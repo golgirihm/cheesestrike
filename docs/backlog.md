@@ -95,9 +95,9 @@ Everything here needs somewhere to keep what a player has earned. Start with the
 
 ## Milestone 12: Online, properly
 
-1. **Play now.** One button that finds a session with room, a good connection and players of similar skill, or hosts one.
+1. **Play now by connection and skill.** "Play now" joins the fullest session with room in the mode the player would host, or hosts one. Have it also weigh the connection to each host and the players' skill, which the session server would need to know.
    *Tests:* signaling tests of the choice; browser test.
-2. **A session browser worth using.** Sort and filter by mode, arena, players, ping and region; favourites; a password for private sessions.
+2. **A session browser worth using.** The list sorts by players and arena and filters by mode, arena and room. Left, all needing the session server: ping and region, favourites, and a password for private sessions.
    *Tests:* signaling tests; browser tests.
 3. **Parties and friends.** Invite friends, see who is playing, and join a session together and stay together between matches.
    *Tests:* signaling tests; browser test with three windows.
