@@ -30,11 +30,14 @@ concurrency:
 # the actions and packages.
 
 # The job names are the names of the checks on a pull request, and the buildci
-# command workflow reports results under the same names.
+# command workflow reports results under the same names. Each job has a limit
+# well beyond how long it takes, so that one that has stalled fails within the
+# hour rather than holding a pull request up for six.
 jobs:
   game:
     name: Game tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,6 +66,7 @@ jobs:
   signaling:
     name: Signaling tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,6 +103,7 @@ jobs:
   browser:
     name: Browser tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
