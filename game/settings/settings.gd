@@ -37,6 +37,9 @@ const DEFAULTS := {
 	"stick_curve": "linear",
 	"aim_assist": true,
 	"rumble": true,
+	# Aiming by turning the device (see GyroAim).
+	"gyro_aim": false,
+	"gyro_sensitivity": 1.0,
 	"touch_sensitivity": 1.0,
 	"invert_look": false,
 	"fov": 75.0,
@@ -149,6 +152,7 @@ const RANGES := {
 	"mouse_sensitivity": [0.1, 4.0],
 	"stick_sensitivity": [0.1, 4.0],
 	"stick_dead_zone": [0.0, 0.5],
+	"gyro_sensitivity": [0.2, 3.0],
 	"touch_sensitivity": [0.1, 4.0],
 	"fov": [60.0, 110.0],
 	"master_volume": [0.0, 1.0],
