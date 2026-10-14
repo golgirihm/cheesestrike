@@ -128,8 +128,8 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* manual rows.
 4. **Phones, properly.** Android and iOS builds, or the installed web app made good enough: a touch layout that can be rearranged, haptics, a battery-saving mode and a frame-rate cap.
    *Tests:* extend `test_touch_controls.gd`. Manual rows on real phones.
-5. **Gamepads, properly.** Aim assist that slows the view over a target and nothing more, response curves, dead zones, rumble, button pictures that match the controller, and every menu usable without a mouse.
-   *Tests:* GUT tests of the assist's rule and of menu focus on every screen.
+5. **Gamepads in the menus.** Button pictures that match the controller, and every menu usable without a mouse. (Aim assist that only slows the view, response curves, a dead zone and rumble are done.)
+   *Tests:* GUT tests of menu focus on every screen.
 6. **Gyro aim.** Aim by tilting a phone or a controller that can.
    *Tests:* GUT tests of the mapping.
 7. **A smaller, faster download.** Shrink and compress the web build, load arenas and sounds when needed, and keep a copy for the next visit.

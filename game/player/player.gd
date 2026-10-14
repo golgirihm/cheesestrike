@@ -322,6 +322,9 @@ func _ready() -> void:
 
 func _on_hurt(_attacker: int, _from: Vector3, dealt: int) -> void:
 	shake.add(Shake.from_damage(dealt))
+	if Settings.get_value(StickAim.RUMBLE) and not Input.get_connected_joypads().is_empty():
+		var rumble := StickAim.hurt_rumble(dealt)
+		Input.start_joy_vibration(Input.get_connected_joypads()[0], rumble.x * 0.6, rumble.x, rumble.y)
 	_flinch_left = Movement.FLINCH_TIME
 
 
@@ -1117,6 +1120,29 @@ func choose_weapon(weapon: String) -> void:
 		_switch_to = weapon
 
 
+# The middles of the opponents this player can see, for the gamepad's aim
+# assist: alive, not on their side, and with nothing in the way.
+func _assist_targets() -> Array:
+	var found := []
+	if match_ == null or not match_.has_state() or world == null:
+		return found
+	var own := multiplayer.get_unique_id()
+	var space := get_world_3d().direct_space_state
+	for other: Node3D in world.players.get_children():
+		var record: PlayerRecord = match_.state.player(int(String(other.name))) if String(other.name).is_valid_int() else null
+		if other == self or record == null or not record.alive or match_.state.are_allies(own, record.id):
+			continue
+		var middle: Vector3 = other.global_position + Vector3.UP * 1.0
+		if eye().distance_to(middle) > StickAim.ASSIST_RANGE:
+			continue
+		var ray := PhysicsRayQueryParameters3D.create(eye(), middle)
+		ray.exclude = [get_rid()]
+		var hit := space.intersect_ray(ray)
+		if hit.is_empty() or hit.collider == other:
+			found.append(middle)
+	return found
+
+
 ## Where the player sees from, as the host is told: where the view is, less
 ## whatever it has yet to catch up after a put-back, so that a shot comes
 ## from where the player is and not from where they were.
@@ -1262,7 +1288,11 @@ func _physics_process(delta: float) -> void:
 		_melee_pressed = false
 		_drop_grenade()
 		return
-	_look(Input.get_vector("look_left", "look_right", "look_up", "look_down") * STICK_LOOK_SPEED * Settings.get_value("stick_sensitivity") * delta)
+	var stick := StickAim.shaped(Input.get_vector("look_left", "look_right", "look_up", "look_down", 0.001),
+		Settings.get_value(StickAim.DEAD_ZONE), Settings.get_value(StickAim.CURVE))
+	if stick != Vector2.ZERO and Settings.get_value(StickAim.ASSIST):
+		stick *= StickAim.slowdown_among(eye(), -head.global_basis.z, _assist_targets())
+	_look(stick * STICK_LOOK_SPEED * Settings.get_value("stick_sensitivity") * delta)
 
 	if _climbing >= 0.0:
 		# Nothing else moves a player who is pulling themselves up.
