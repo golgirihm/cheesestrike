@@ -103,7 +103,8 @@ class SignalingServer:
 TITLE_CONTROLS = {"ProfileButton", "PlayButton", "PracticeButton", "TutorialButton", "CustomiseButton", "EditorButton", "TitleSettingsButton", "CreditsButton"}
 TITLE_ALIASES = {"SettingsButton": "TitleSettingsButton"}
 PLAY_CONTROLS = {"HostButton", "JoinButton", "TargetEdit", "NameEdit", "WatchButton", "RefreshButton", "BackButton", "ModeButton", "MaxPlayersButton",
-                 "KillLimitButton", "MinutesButton", "MapButton", "PrivateButton", "BotsButton", "BotSkillButton", "RulesButton", "SkyButton"}
+                 "KillLimitButton", "MinutesButton", "MapButton", "PrivateButton", "BotsButton", "BotSkillButton", "RulesButton", "SkyButton",
+                 "PlayNowButton", "SortButton", "ModeFilterButton", "ArenaFilterButton", "HideFullButton"}
 
 
 class Game:

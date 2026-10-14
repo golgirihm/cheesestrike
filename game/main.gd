@@ -67,6 +67,16 @@ var join_screen: JoinScreen
 var profile_screen: ProfileScreen
 # The sessions last listed, to know a session's arena before joining it.
 var _listed: Array = []
+## The button that joins the best session listed, or hosts one, and those
+## that sort and filter the list.
+var play_now_button: Button
+var sort_button: Button
+var mode_filter_button: Button
+var arena_filter_button: Button
+var hide_full_button: CheckBox
+var _list_sort := SessionList.FULLEST
+var _list_mode := SessionList.ANY
+var _list_arena := SessionList.ANY
 # Who the pause menu's vote-to-remove button names.
 var _remove_target := 0
 # Whether the mouse was captured as of the last frame. Esc while it is captured
@@ -110,6 +120,7 @@ func _ready() -> void:
 	disconnected_button.pressed.connect(_dismiss_disconnected)
 	rejoin_button.pressed.connect(_rejoin)
 	host_button.pressed.connect(_host)
+	_add_session_controls()
 	# The whole interface has one look (see Look).
 	for screen in menu.get_parent().get_children():
 		if screen is Control:
@@ -416,6 +427,58 @@ func host_settings() -> MatchSettings:
 	})
 
 
+# The button for playing at once, beside the one for hosting, and those for
+# sorting and filtering the session list, in its heading.
+func _add_session_controls() -> void:
+	play_now_button = Button.new()
+	play_now_button.name = "PlayNowButton"
+	play_now_button.text = "Play now"
+	play_now_button.tooltip_text = "Join the session with room and the most players, or host one if there is none"
+	play_now_button.custom_minimum_size = Vector2(0, 44)
+	play_now_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	host_button.get_parent().add_child(play_now_button)
+	host_button.get_parent().move_child(play_now_button, 0)
+	play_now_button.pressed.connect(play_now)
+	# In the list's heading, before Refresh.
+	var row := refresh_button.get_parent()
+	sort_button = _list_option(row, "SortButton", func() -> void: _list_sort = SessionList.next_of(SessionList.SORTS, _list_sort))
+	var modes := [SessionList.ANY]
+	modes.append_array(MatchSettings.MODES.filter(func(mode: String) -> bool: return mode != MatchSettings.PRACTICE))
+	mode_filter_button = _list_option(row, "ModeFilterButton", func() -> void: _list_mode = SessionList.next_of(modes, _list_mode))
+	var arenas := [SessionList.ANY]
+	arenas.append_array(Maps.ORDER)
+	arena_filter_button = _list_option(row, "ArenaFilterButton", func() -> void: _list_arena = SessionList.next_of(arenas, _list_arena))
+	hide_full_button = CheckBox.new()
+	hide_full_button.name = "HideFullButton"
+	hide_full_button.text = "Hide full"
+	hide_full_button.toggled.connect(func(_on: bool) -> void: _draw_sessions())
+	row.add_child(hide_full_button)
+	row.move_child(refresh_button, -1)
+	_draw_sessions()
+
+
+func _list_option(row: Node, id: String, step: Callable) -> Button:
+	var button := Button.new()
+	button.name = id
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.clip_text = true
+	button.pressed.connect(func() -> void:
+		step.call()
+		_draw_sessions())
+	row.add_child(button)
+	return button
+
+
+## Joins the best session listed for the mode chosen to host, or hosts one
+## if none has room (see SessionList.play_now).
+func play_now() -> void:
+	var best := SessionList.play_now(_listed, host_settings().mode)
+	if best.is_empty():
+		_host()
+	else:
+		_join(String(best.code))
+
+
 func _host() -> void:
 	_remember_name()
 	_set_busy("Starting session…", host_settings().map)
@@ -688,13 +751,22 @@ static func session_line(session: Dictionary) -> String:
 
 func _show_sessions(list: Array) -> void:
 	_listed = list
+	_draw_sessions()
+
+
+# The sessions listed, sorted and filtered as the player has asked.
+func _draw_sessions() -> void:
 	for child in sessions.get_children():
 		child.queue_free()
-	if list.is_empty():
+	sort_button.text = SessionList.SORT_NAMES[_list_sort]
+	mode_filter_button.text = MatchSettings.MODE_NAMES[_list_mode] if _list_mode != SessionList.ANY else "Any mode"
+	arena_filter_button.text = Maps.NAMES[_list_arena] if _list_arena != SessionList.ANY else "Any arena"
+	var shown := SessionList.arranged(_listed, _list_sort, _list_mode, _list_arena, hide_full_button.button_pressed)
+	if shown.is_empty():
 		var none := Label.new()
-		none.text = "None yet. Host one!"
+		none.text = "None yet. Host one!" if _listed.is_empty() else "None like that. Host one!"
 		sessions.add_child(none)
-	for session: Dictionary in list:
+	for session: Dictionary in shown:
 		var button := Button.new()
 		button.text = session_line(session)
 		button.pressed.connect(_join.bind(session.code))

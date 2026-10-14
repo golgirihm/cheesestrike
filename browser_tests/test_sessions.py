@@ -60,6 +60,35 @@ class JoiningTest(GameTestCase):
         for game in (host, joiner):
             game.wait_for("s.screen === 'game' && s.players.length === 2 && s.hud.includes('2 playing')")
 
+    def test_play_now_joins_a_session_with_room(self):
+        host = self.open_game()
+        code = host.host()
+        joiner = self.open_game()
+        joiner.wait_for(f"s.sessions.length === 1 && s.sessions[0].text.startsWith('{code}')")
+        joiner.click("PlayNowButton")
+        for game in (host, joiner):
+            state = game.wait_for("s.screen === 'game' && s.players.length === 2")
+            self.assertEqual(state["code"], code)
+
+    def test_play_now_with_nothing_listed_hosts(self):
+        game = self.open_game()
+        game.wait_for(f"s.sessions.length === 1 && s.sessions[0].text === '{NO_SESSIONS}'")
+        game.click("PlayNowButton")
+        state = game.wait_for("s.screen === 'game' && s.players.length === 1")
+        self.assertRegex(state["code"], r"^[A-Z]{4}$")
+
+    def test_the_list_can_be_filtered_by_arena(self):
+        host = self.open_game()
+        code = host.host()
+        other = self.open_game()
+        other.wait_for(f"s.sessions.length === 1 && s.sessions[0].text.startsWith('{code}')")
+        # The first arena after "any" is Cheddar Canyon, where the host is;
+        # the next is not.
+        other.click("ArenaFilterButton")
+        other.wait_for(f"s.sessions.length === 1 && s.sessions[0].text.startsWith('{code}')")
+        other.click("ArenaFilterButton")
+        other.wait_for("s.sessions.length === 1 && s.sessions[0].text === 'None like that. Host one!'")
+
     def test_a_closed_session_leaves_the_list(self):
         host = self.open_game()
         code = host.host()
