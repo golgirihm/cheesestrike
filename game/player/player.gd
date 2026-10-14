@@ -1293,6 +1293,10 @@ func _physics_process(delta: float) -> void:
 	if stick != Vector2.ZERO and Settings.get_value(StickAim.ASSIST):
 		stick *= StickAim.slowdown_among(eye(), -head.global_basis.z, _assist_targets())
 	_look(stick * STICK_LOOK_SPEED * Settings.get_value("stick_sensitivity") * delta)
+	if Settings.get_value(GyroAim.SETTING):
+		var flipped := DisplayServer.screen_get_orientation() in [DisplayServer.SCREEN_REVERSE_LANDSCAPE, DisplayServer.SCREEN_SENSOR_LANDSCAPE] \
+			and Input.get_gravity().x > 0.0
+		_look(GyroAim.look_from(Input.get_gyroscope(), flipped, Settings.get_value(GyroAim.SENSITIVITY), delta))
 
 	if _climbing >= 0.0:
 		# Nothing else moves a player who is pulling themselves up.
