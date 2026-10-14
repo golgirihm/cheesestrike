@@ -43,6 +43,12 @@ const DEFAULTS := {
 	"less_motion": false,
 	"gyro_sensitivity": 1.0,
 	"touch_sensitivity": 1.0,
+	# The share of it while aiming, through a scope, and up and down against
+	# across (see Sensitivity), and the game whose feel was last matched.
+	"aim_sensitivity": 1.0,
+	"scope_sensitivity": 1.0,
+	"look_vertical": 1.0,
+	"match_game": "source",
 	"invert_look": false,
 	"fov": 75.0,
 	# Loudness from 0 (silent) to 1.
@@ -156,6 +162,9 @@ const RANGES := {
 	"stick_dead_zone": [0.0, 0.5],
 	"gyro_sensitivity": [0.2, 3.0],
 	"touch_sensitivity": [0.1, 4.0],
+	"aim_sensitivity": [0.2, 2.0],
+	"scope_sensitivity": [0.2, 2.0],
+	"look_vertical": [0.2, 2.0],
 	"fov": [60.0, 110.0],
 	"master_volume": [0.0, 1.0],
 	"music_volume": [0.0, 1.0],
@@ -183,6 +192,7 @@ const CHOICES := {
 	"crosshair_colour": ["white", "green", "yellow", "cyan", "magenta", "red"],
 	"hit_sound": ["tick", "pop", "bell", "off"],
 	"stick_curve": ["linear", "classic", "precise"],
+	"match_game": ["source", "valorant", "overwatch", "apex", "quake"],
 	"gfx_shadows": ["", "off", "on"],
 	"gfx_particles": ["", "low", "medium", "high"],
 	"gfx_effects": ["", "low", "medium", "high"],

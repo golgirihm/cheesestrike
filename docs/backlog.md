@@ -139,19 +139,17 @@ Everything here needs somewhere to keep what a player has earned. Start with the
 
 1. **Every control, any key.** Rebind every action, including the mouse buttons and wheel and every gamepad button, with a second binding for each and a warning on clashes.
    *Tests:* extend `test_preferences.gd`.
-2. **Sensitivity in full.** Separate sensitivity when aiming and for each zoom, separate across and up, acceleration off, and a way to match another game's.
-   *Tests:* GUT tests of each.
-3. **Colour.** Presets for the common kinds of colour blindness and free choice of the enemy, team and hit colours.
+2. **Colour.** Presets for the common kinds of colour blindness and free choice of the enemy, team and hit colours.
    *Tests:* extend `test_accessibility.gd`.
-4. **A warning of flashing.** Warn before anything that flashes, pointing to Less motion. (The Less motion switch, which calms bob, sway, shake, the running view and flashes, is done.)
+3. **A warning of flashing.** Warn before anything that flashes, pointing to Less motion. (The Less motion switch, which calms bob, sway, shake, the running view and flashes, is done.)
    *Tests:* GUT tests of when the warning shows.
-5. **Hearing.** Captions with speaker, direction and distance, a ring on the HUD that shows where sounds come from, and mono sound.
+4. **Hearing.** Captions with speaker, direction and distance, a ring on the HUD that shows where sounds come from, and mono sound.
    *Tests:* extend the caption tests.
-6. **Seeing.** A high-contrast mode, larger text everywhere including menus, and menus read aloud by a screen reader.
+5. **Seeing.** A high-contrast mode, larger text everywhere including menus, and menus read aloud by a screen reader.
    *Tests:* GUT tests that every control has a name to read.
-7. **Hands.** Hold or toggle for everything, one-handed layouts, and nothing that needs keys mashed.
+6. **Hands.** Hold or toggle for everything, one-handed layouts, and nothing that needs keys mashed.
    *Tests:* GUT tests of the presets.
-8. **Other languages.** Move every word on screen into translation files, lay the interface out for longer words and right-to-left scripts, and translate into the first few languages.
+7. **Other languages.** Move every word on screen into translation files, lay the interface out for longer words and right-to-left scripts, and translate into the first few languages.
    *Tests:* a GUT test that no text on screen is missing from the files, and that every screen fits in every language.
 
 ## Milestone 15: Release
