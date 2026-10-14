@@ -117,7 +117,7 @@ func hit(dealt: float) -> void:
 
 ## A burst of `radius` went off `distance` away from the player.
 func burst_near(distance: float, radius: float) -> void:
-	_blur = maxf(_blur, blur_from(distance, radius, Settings.get_value("screen_shake")))
+	_blur = maxf(_blur, blur_from(distance, radius, Settings.motion("screen_shake")))
 
 
 ## Draws both sheets, faintly, while the game gets ready (see Warmup), or
@@ -141,7 +141,9 @@ func _process(delta: float) -> void:
 	var red := 0.0
 	if record != null and record.health > 0:
 		var full := float(PlayerRecord.MAX_HEALTH)
-		red = minf(redness(record.health, full) * beat(record.health, full, _time) + _hit, 0.85)
+		# Steady, not beating, with less motion asked for.
+		var pulse := beat(record.health, full, _time) if Settings.flash() == 1.0 else 1.0
+		red = minf(redness(record.health, full) * pulse + _hit * Settings.flash(), 0.85)
 	else:
 		# Nobody to be hurt: out of a match, watching, or knocked out.
 		_hit = 0.0

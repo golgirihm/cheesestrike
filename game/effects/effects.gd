@@ -407,9 +407,10 @@ func _burst_flash(at: Vector3, radius: float) -> void:
 	flash.scale = Vector3.ONE * radius * 0.15
 	var light := OmniLight3D.new()
 	light.light_color = FLASH_COLOR
-	light.light_energy = 6.0
+	light.light_energy = 6.0 * Settings.flash()
 	light.omni_range = radius * 2.5
 	flash.add_child(light)
+	material.albedo_color.a *= Settings.flash()
 	var going := create_tween().set_parallel()
 	going.tween_property(flash, "scale", Vector3.ONE * radius * BURST_FLASH_SIZE, BURST_FLASH_LIFE).set_ease(Tween.EASE_OUT)
 	going.tween_property(material, "albedo_color:a", 0.0, BURST_FLASH_LIFE).set_ease(Tween.EASE_IN)

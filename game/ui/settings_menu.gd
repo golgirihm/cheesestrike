@@ -34,6 +34,7 @@ const SLIDERS := [
 ## The settings that are on or off, with what each says.
 const TOGGLES := [
 	["invert_look", "Invert looking up and down"],
+	["less_motion", "Less motion: no shake, bob or sway, and softer flashes"],
 	["aim_assist", "Gamepad: slow the view over an opponent"],
 	["rumble", "Gamepad: rumble"],
 	["gyro_aim", "Aim by turning the phone"],

@@ -39,6 +39,8 @@ const DEFAULTS := {
 	"rumble": true,
 	# Aiming by turning the device (see GyroAim).
 	"gyro_aim": false,
+	# One switch that calms everything that moves the view or flashes.
+	"less_motion": false,
 	"gyro_sensitivity": 1.0,
 	"touch_sensitivity": 1.0,
 	"invert_look": false,
@@ -221,6 +223,22 @@ func load_settings() -> void:
 	if PlayerName.clean(_values.name).is_empty():
 		set_value("name", PlayerName.random_default())
 
+
+
+## How much of the motion that `key` ("screen_shake" or "camera_motion")
+## asks for there is: none at all with less motion asked for.
+func motion(key: String) -> float:
+	return 0.0 if get_value(LESS_MOTION) else float(get_value(key))
+
+
+## How bright a flash is, as a share of its full brightness: dimmed with
+## less motion asked for.
+func flash() -> float:
+	return CALM_FLASH if get_value(LESS_MOTION) else 1.0
+
+
+const LESS_MOTION := "less_motion"
+const CALM_FLASH := 0.25
 
 func get_value(key: String) -> Variant:
 	var value: Variant = _values[key]

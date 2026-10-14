@@ -143,8 +143,8 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* GUT tests of each.
 3. **Colour.** Presets for the common kinds of colour blindness and free choice of the enemy, team and hit colours.
    *Tests:* extend `test_accessibility.gd`.
-4. **Less motion.** One switch that calms bob, sway, shake, flashes and the field-of-view changes, and a warning before anything that flashes.
-   *Tests:* GUT tests that each is at rest with it on.
+4. **A warning of flashing.** Warn before anything that flashes, pointing to Less motion. (The Less motion switch, which calms bob, sway, shake, the running view and flashes, is done.)
+   *Tests:* GUT tests of when the warning shows.
 5. **Hearing.** Captions with speaker, direction and distance, a ring on the HUD that shows where sounds come from, and mono sound.
    *Tests:* extend the caption tests.
 6. **Seeing.** A high-contrast mode, larger text everywhere including menus, and menus read aloud by a screen reader.
