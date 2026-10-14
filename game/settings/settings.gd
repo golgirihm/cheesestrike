@@ -32,6 +32,11 @@ const DEFAULTS := {
 	# How fast looking turns, as a share of the usual, for each kind of control.
 	"mouse_sensitivity": 1.0,
 	"stick_sensitivity": 1.0,
+	# How a gamepad's stick looks (see StickAim).
+	"stick_dead_zone": 0.15,
+	"stick_curve": "linear",
+	"aim_assist": true,
+	"rumble": true,
 	"touch_sensitivity": 1.0,
 	"invert_look": false,
 	"fov": 75.0,
@@ -143,6 +148,7 @@ const DEFAULTS := {
 const RANGES := {
 	"mouse_sensitivity": [0.1, 4.0],
 	"stick_sensitivity": [0.1, 4.0],
+	"stick_dead_zone": [0.0, 0.5],
 	"touch_sensitivity": [0.1, 4.0],
 	"fov": [60.0, 110.0],
 	"master_volume": [0.0, 1.0],
@@ -170,6 +176,7 @@ const CHOICES := {
 	"crosshair_shape": ["cross", "tee", "circle", "dot"],
 	"crosshair_colour": ["white", "green", "yellow", "cyan", "magenta", "red"],
 	"hit_sound": ["tick", "pop", "bell", "off"],
+	"stick_curve": ["linear", "classic", "precise"],
 	"gfx_shadows": ["", "off", "on"],
 	"gfx_particles": ["", "low", "medium", "high"],
 	"gfx_effects": ["", "low", "medium", "high"],

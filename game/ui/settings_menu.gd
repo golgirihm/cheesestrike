@@ -11,6 +11,7 @@ signal closed
 const SLIDERS := [
 	["mouse_sensitivity", "Mouse look", 0.1, 4.0, 0.05, "%.2f×"],
 	["stick_sensitivity", "Stick look", 0.1, 4.0, 0.05, "%.2f×"],
+	["stick_dead_zone", "Stick dead zone", 0.0, 0.5, 0.01, "%d%%"],
 	["touch_sensitivity", "Touch look", 0.1, 4.0, 0.05, "%.2f×"],
 	["fov", "Field of view", 60.0, 110.0, 1.0, "%d°"],
 	["master_volume", "Volume", 0.0, 1.0, 0.05, "%d%%"],
@@ -32,6 +33,8 @@ const SLIDERS := [
 ## The settings that are on or off, with what each says.
 const TOGGLES := [
 	["invert_look", "Invert looking up and down"],
+	["aim_assist", "Gamepad: slow the view over an opponent"],
+	["rumble", "Gamepad: rumble"],
 	["touch_left_handed", "Touch buttons on the left"],
 	["touch_fullscreen", "Full screen when touched"],
 	["captions", "Captions for sounds"],
@@ -178,6 +181,7 @@ const SOUND_CHOICES := [
 	[SoundCues.HIT_SETTING, "Hit sound", SoundCues.HIT_SOUNDS],
 	[Crosshair.SHAPE, "Crosshair", Crosshair.SHAPES],
 	[Crosshair.COLOUR, "Crosshair colour", Crosshair.COLOUR_NAMES],
+	[StickAim.CURVE, "Stick response", StickAim.CURVE_NAMES],
 ]
 
 
