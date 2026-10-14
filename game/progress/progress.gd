@@ -25,6 +25,11 @@ var history: Array = []
 ## done toward the challenges that are set (see Challenges).
 var achievements: Array = []
 var challenges := {"progress": {}, "done": []}
+## The players blocked, whose talk and chat are never heard: each {"tag",
+## "name": what they were called when blocked}. Kept through a reset.
+var blocked: Array = []
+## The most that are kept, the oldest forgotten first.
+const MOST_BLOCKED := 200
 
 
 func _init(at := DEFAULT_PATH) -> void:
@@ -53,6 +58,7 @@ func load_progress() -> void:
 	history = []
 	achievements = []
 	challenges = {"progress": {}, "done": []}
+	blocked = []
 	if not FileAccess.file_exists(path):
 		return
 	# A file that can't be read is a fresh start, said quietly.
@@ -67,6 +73,7 @@ func load_progress() -> void:
 	xp = clampi(int(stored), 0, MOST_XP) if stored is float or stored is int else 0
 	achievements = Achievements.tidy(kept.get("achievements"))
 	challenges = Challenges.tidy(kept.get("challenges"), now())
+	blocked = tidy_blocked(kept.get("blocked"))
 	var matches: Variant = kept.get("history")
 	if matches is Array:
 		for report: Variant in matches.slice(0, HISTORY):
@@ -122,7 +129,36 @@ func add_match(report: Dictionary) -> Dictionary:
 		"unlocked": Unlocks.gained(before, level(), feats, done_now)}
 
 
-## Forgets everything.
+## Whether the player with `tag` is blocked.
+func is_blocked(tag: String) -> bool:
+	return not tag.is_empty() and blocked.any(func(entry: Dictionary) -> bool: return entry.tag == tag)
+
+
+## Blocks the player with `tag`, called `name`, or lets them be heard again.
+func set_blocked(tag: String, name: String, on: bool) -> void:
+	if tag.is_empty() or is_blocked(tag) == on:
+		return
+	if on:
+		blocked.append({"tag": tag, "name": PlayerName.clean(name)})
+		while blocked.size() > MOST_BLOCKED:
+			blocked.pop_front()
+	else:
+		blocked = blocked.filter(func(entry: Dictionary) -> bool: return entry.tag != tag)
+	_save()
+	changed.emit()
+
+
+## What is kept of a block list read back: only entries that could be ones.
+static func tidy_blocked(stored: Variant) -> Array:
+	var kept := []
+	if stored is Array:
+		for entry: Variant in stored.slice(-MOST_BLOCKED):
+			if entry is Dictionary and entry.get("tag") is String and not Match.clean_tag(entry.tag).is_empty():
+				kept.append({"tag": entry.tag, "name": PlayerName.clean(String(entry.get("name", ""))) if entry.get("name") is String else ""})
+	return kept
+
+
+## Forgets everything but who is blocked.
 func reset() -> void:
 	record = Record.blank()
 	xp = 0
@@ -136,4 +172,5 @@ func reset() -> void:
 func _save() -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file != null:
-		file.store_string(JSON.stringify({"record": record, "xp": xp, "history": history, "achievements": achievements, "challenges": challenges}))
+		file.store_string(JSON.stringify({"record": record, "xp": xp, "history": history, "achievements": achievements, "challenges": challenges,
+			"blocked": blocked}))

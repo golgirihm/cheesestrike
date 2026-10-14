@@ -109,7 +109,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* extend `test_movement_check.gd`; browser tests under a throttled connection.
 7. **Harder to cheat.** The host refuses shots that go where their shooter isn't facing, and speed that many small updates add up to. Left: a check on aim that turns impossibly fast, and on servers, results that are signed.
    *Tests:* GUT tests of each check, with the cheat written as a test.
-8. **Reporting and moderation.** Report a player with a reason, mute and block, and a filter on names and chat.
+8. **Reporting.** Report a player with a reason, to a service that keeps reports for someone to act on. (Muting, blocking in every session, and a filter on names and chat are done.)
    *Tests:* service tests; browser test.
 9. **A bad connection, handled.** Icons for high ping and packet loss, a clear message and a short wait to reconnect on a drop, and a warning before joining a far-off host.
    *Tests:* browser tests with a throttled and a cut connection.

@@ -180,6 +180,9 @@ func _ready() -> void:
 	mute_choice.name = "MuteChoiceButton"
 	var mute_toggle := Button.new()
 	mute_toggle.name = "MuteButton"
+	# Once muted, the same button blocks them in every session, and then lets
+	# them be heard again.
+	mute_toggle.tooltip_text = "Muting stops their talk and chat here; blocking stops it in every session"
 	for added: Button in [mute_toggle, mute_choice]:
 		added.custom_minimum_size = resume_button.custom_minimum_size
 		remove_choice.add_sibling(added)
@@ -187,7 +190,15 @@ func _ready() -> void:
 		var others := others_here()
 		_mute_target = others[(others.find(_mute_target) + 1) % others.size()] if not others.is_empty() else 0)
 	mute_toggle.pressed.connect(func() -> void:
-		world.voice_chat.set_muted(_mute_target, not world.voice_chat.is_muted(_mute_target)))
+		var record: PlayerRecord = world.match_.state.player(_mute_target)
+		var tag := record.tag if record != null else ""
+		if Progress.is_blocked(tag):
+			Progress.set_blocked(tag, "", false)
+			world.voice_chat.set_muted(_mute_target, false)
+		elif world.voice_chat.is_muted(_mute_target) and not tag.is_empty():
+			Progress.set_blocked(tag, record.name, true)
+		else:
+			world.voice_chat.set_muted(_mute_target, not world.voice_chat.is_muted(_mute_target)))
 	remove_choice.pressed.connect(func() -> void:
 		var others := removable()
 		_remove_target = others[(others.find(_remove_target) + 1) % others.size()] if not others.is_empty() else 0)
@@ -311,7 +322,14 @@ func _process(_delta: float) -> void:
 		mute_choice.visible = not talkers.is_empty()
 		mute_toggle.visible = mute_choice.visible
 		mute_choice.text = "Talk from: %s" % world.match_.state.name_of(_mute_target)
-		mute_toggle.text = "Unmute them" if world.voice_chat.is_muted(_mute_target) else "Mute them"
+		var target: PlayerRecord = world.match_.state.player(_mute_target)
+		var tag := target.tag if target != null else ""
+		if Progress.is_blocked(tag):
+			mute_toggle.text = "Blocked  ·  unblock them"
+		elif world.voice_chat.is_muted(_mute_target):
+			mute_toggle.text = "Muted  ·  block for good" if not tag.is_empty() else "Unmute them"
+		else:
+			mute_toggle.text = "Mute them"
 	_was_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	menu_button.visible = hud.visible and not _was_captured and not pause_menu.visible
 
