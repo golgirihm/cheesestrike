@@ -5,7 +5,7 @@ game's web build to the bucket that template makes.
     python infra/deploy.py backend    only the backend
     python infra/deploy.py game       only the game
 
-It acts on whatever AWS account the AWS CLI is signed in to (`aws configure`),
+It acts on whatever AWS account the AWS CLI is signed in to (`aws login`),
 in REGION, under the stack name STACK. Deploying again updates what is there.
 
 The backend needs the SAM CLI (`sam`). The game needs Godot with the Web

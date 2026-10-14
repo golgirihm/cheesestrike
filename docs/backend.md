@@ -125,16 +125,26 @@ Set a budget alert (step 2 below) so that a surprise is an email, not a bill.
 2. **Set a budget alert.** Billing and Cost Management → Budgets → Create budget → a monthly cost budget of about $5, with an email alert.
 3. **Allow a public bucket.** S3 → *Block Public Access settings for this account*. "Block public and cross-account access to buckets and objects through any public bucket or access point policies" and "Block public access to buckets and objects granted through new public bucket or access point policies" must be off, or the game's bucket can't be made readable.
 4. **Check the Lambda limit.** Service Quotas → AWS Lambda → *Concurrent executions*. New accounts can start at 10; ask for 1,000. It is free, and only matters under load.
-5. **Make an identity to deploy with.** IAM → Users → Create user, with the `AdministratorAccess` policy, then create an access key for it (Security credentials → Create access key → Command Line Interface).
+5. **Choose who deploys.** The deploy runs with the permissions of whoever is signed in to the console, so sign in as an administrator user (IAM, or IAM Identity Center) rather than the account's root user, which no policy can limit. No access key is needed.
 
 ### Once, on the machine that deploys
 
-Install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and the [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html), then give the AWS CLI the access key and `us-east-2` as the region:
+Install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and the [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html), then:
 
 ```
-aws configure
-pip install boto3
+aws configure set region us-east-2
+pip install "boto3[crt]"
 ```
+
+`[crt]` is what lets the deploy script use a browser sign-in, below.
+
+### Each time you sit down to deploy
+
+```
+aws login
+```
+
+It opens the browser to sign in to the console, and gives the CLI credentials that expire and refresh on their own, so no permanent key is kept on the machine. `aws sts get-caller-identity` shows who it is signed in as.
 
 ### Each time
 
