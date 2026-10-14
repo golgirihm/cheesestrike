@@ -36,6 +36,20 @@ static func clean(text: String) -> String:
 	return kept.left(MAX_LENGTH).strip_edges()
 
 
+## Whether `name` is fit to show: no bad language in any word of it, nor
+## hidden by running the words together (see Chat).
+static func decent(name: String) -> bool:
+	for word in name.split(" ", false):
+		if Chat.is_blocked(word):
+			return false
+	return not Chat.is_blocked(name.replace(" ", ""))
+
+
+## The name given to player `id` in place of one that isn't decent.
+static func stand_in(id: int) -> String:
+	return "%s %d" % [FALLBACK, id % 1000]
+
+
 ## A name for someone who hasn't chosen one, such as "Brie 42".
 static func random_default(rng := RandomNumberGenerator.new()) -> String:
 	return "%s %d" % [CHEESES[rng.randi_range(0, CHEESES.size() - 1)], rng.randi_range(10, 99)]

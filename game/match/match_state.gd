@@ -403,10 +403,13 @@ func are_allies(a: int, b: int) -> bool:
 
 
 ## Sets a player's name, cleaned. A name that cleans to nothing is refused and
-## the player keeps the name they had. Returns whether anything changed.
+## the player keeps the name they had; one with bad language in it is
+## replaced (see PlayerName.decent). Returns whether anything changed.
 func rename(id: int, wanted: String) -> bool:
 	var record := player(id)
 	var cleaned := PlayerName.clean(wanted)
+	if not cleaned.is_empty() and not PlayerName.decent(cleaned):
+		cleaned = PlayerName.stand_in(id)
 	if record == null or cleaned.is_empty() or cleaned == record.name:
 		return false
 	record.name = cleaned

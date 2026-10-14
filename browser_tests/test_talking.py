@@ -21,7 +21,7 @@ class TalkingTest(GameTestCase):
         talker_id = talker.own_player()["id"]
         for game in (host, talker):
             game.wait_for("s.players.length === 2")
-        self.assertEqual(host.state()["voice"], {"sent": 0, "heard": 0, "talking": [], "muted": []})
+        self.assertEqual(host.state()["voice"], {"sent": 0, "heard": 0, "talking": [], "muted": [], "unheard": []})
 
         # The microphone starts on the first press, so hold it a while.
         talker.page.keyboard.down("k")
@@ -50,6 +50,30 @@ class TalkingTest(GameTestCase):
         host.page.wait_for_timeout(500)
         self.assertEqual(host.state()["voice"]["heard"], heard)
         self.assertEqual(host.state()["voice"]["talking"], [])
+
+
+    def test_a_blocked_player_stays_unheard_when_they_come_back(self):
+        host = self.open_game()
+        code = host.host()
+        other = self.open_game(fresh=True)
+        other.join(code)
+        first_id = other.own_player()["id"]
+        host.wait_for("s.players.length === 2")
+        host.click("MenuButton")
+        # Mute, then the same button again to block them for good.
+        host.click("MuteButton")
+        host.wait_for(f"s.voice.muted.includes({first_id})")
+        host.click("MuteButton")
+        host.page.wait_for_timeout(300)
+        host.click("ResumeButton")
+
+        # They leave and join again, as someone new to the session.
+        other.page.reload()
+        other.wait_for("s.screen === 'menu' || s.screen === 'title'")
+        other.join(code)
+        second_id = other.own_player()["id"]
+        self.assertNotEqual(second_id, first_id)
+        host.wait_for(f"s.players.length === 2 && s.voice.unheard.includes({second_id})")
 
 
 if __name__ == "__main__":

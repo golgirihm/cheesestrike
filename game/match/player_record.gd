@@ -66,6 +66,10 @@ var ping := 0
 var grenades := Weapons.GRENADES
 ## What their character looks like, as they chose it (see Looks).
 var look := 0
+## What tells this player apart from one session to the next, so that a
+## player can block them for good: made by the host from the key their
+## game keeps (see Match.tag_of), and telling nothing of the key itself.
+var tag := ""
 
 # Where each number sits in a packed record (see to_packed).
 enum { _ID, _HEALTH, _FLAGS, _RESPAWN, _PROTECTED, _KILLS, _DEATHS, _LAST_ATTACKER,
@@ -146,6 +150,7 @@ func to_dict() -> Dictionary:
 		"ping": ping,
 		"grenades": grenades,
 		"look": look,
+		"tag": tag,
 		"armour": armour,
 		"main": main,
 		"attachment": attachment,
@@ -268,6 +273,7 @@ static func from_dict(data: Dictionary) -> PlayerRecord:
 	record.ping = maxi(_int(data, "ping", 0), 0)
 	record.grenades = clampi(_int(data, "grenades", Weapons.GRENADES), 0, Weapons.GRENADES)
 	record.look = Looks.clean(_int(data, "look", 0))
+	record.tag = Match.clean_tag(_string(data, "tag", ""))
 	record.armour = clampi(_int(data, "armour", 0), 0, MAX_ARMOUR)
 	record.give_power(_int(data, "power", 0), maxf(_float(data, "power_left", 0.0), 0.0))
 	var chosen := Weapons.clean_loadout(data.get("main"), data.get("side"), data.get("attachment"))

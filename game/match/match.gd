@@ -243,6 +243,8 @@ func add_player(id: int) -> void:
 		state.rename(id, _pending_names[id])
 	if _pending_looks.has(id):
 		state.player(id).look = _pending_looks[id]
+	if _keys.has(id):
+		state.player(id).tag = tag_of(_keys[id])
 	if _pending_loadouts.has(id):
 		_arm(id, _pending_loadouts[id][0], _pending_loadouts[id][1], _pending_loadouts[id][2])
 	_pending_names.erase(id)
@@ -655,6 +657,19 @@ func _request_look(look: Variant) -> void:
 		_wear(multiplayer.get_remote_sender_id(), look)
 
 
+## The tag (see PlayerRecord.tag) of a player whose key is `key`.
+static func tag_of(key: String) -> String:
+	return ("cheesestrike-tag:" + key).sha256_text().left(TAG_LENGTH)
+
+
+## `tag` if it could be one, or "".
+static func clean_tag(tag: String) -> String:
+	return tag if tag.length() == TAG_LENGTH and tag.is_valid_hex_number() else ""
+
+
+const TAG_LENGTH := 16
+
+
 ## Host only: a player whose key is `key` has said who they are. If they left
 ## lately, their score is theirs again.
 func _known_as(id: int, key: String) -> void:
@@ -662,6 +677,7 @@ func _known_as(id: int, key: String) -> void:
 		return
 	_keys[id] = key
 	if state.player(id) != null:
+		state.player(id).tag = tag_of(key)
 		_welcome_back(id)
 
 

@@ -68,8 +68,12 @@ func set_muted(id: int, on: bool) -> void:
 		muted.erase(id)
 
 
+## Whether player `id` is muted here, or blocked in every session.
 func is_muted(id: int) -> bool:
-	return muted.has(id)
+	if muted.has(id):
+		return true
+	var record: PlayerRecord = world.match_.state.player(id) if world != null and world.match_.has_state() else null
+	return record != null and Progress.is_blocked(record.tag)
 
 
 ## The players heard talking just now, by id.
