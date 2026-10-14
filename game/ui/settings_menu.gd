@@ -13,6 +13,9 @@ const SLIDERS := [
 	["stick_sensitivity", "Stick look", 0.1, 4.0, 0.05, "%.2f×"],
 	["stick_dead_zone", "Stick dead zone", 0.0, 0.5, 0.01, "%d%%"],
 	["touch_sensitivity", "Touch look", 0.1, 4.0, 0.05, "%.2f×"],
+	["aim_sensitivity", "Look while aiming", 0.2, 2.0, 0.05, "%.2f×"],
+	["scope_sensitivity", "Look through a scope", 0.2, 2.0, 0.05, "%.2f×"],
+	["look_vertical", "Look up and down, against across", 0.2, 2.0, 0.05, "%.2f×"],
 	["gyro_sensitivity", "Tilt to aim", 0.2, 3.0, 0.05, "%.2f×"],
 	["fov", "Field of view", 60.0, 110.0, 1.0, "%d°"],
 	["master_volume", "Volume", 0.0, 1.0, 0.05, "%d%%"],
@@ -129,6 +132,7 @@ func refresh() -> void:
 		(find_child("Setting_" + row[0], true, false) as CheckButton).set_pressed_no_signal(Settings.get_value(row[0]))
 	for choice: Array in SOUND_CHOICES:
 		(find_child("Setting_" + choice[0], true, false) as Button).text = sound_choice_text(choice[0])
+	(find_child("Setting_" + Sensitivity.OTHER_GAME, true, false) as Button).text = "Match the mouse of: %s" % Sensitivity.OTHER_GAMES[Settings.get_value(Sensitivity.OTHER_GAME)][0]
 	# The HUD's controls show the part that is chosen.
 	if _hud_part_button != null:
 		_hud_part_button.text = "HUD part: %s" % HudLayout.PARTS[hud_part]
@@ -324,6 +328,27 @@ func _build() -> void:
 		button.pressed.connect(func() -> void:
 			Settings.set_value(choice[0], next_choice(choice[2].keys(), Settings.get_value(choice[0]))))
 		_rows.add_child(button)
+	# The mouse made to turn as far as it does in another game.
+	var match_row := HBoxContainer.new()
+	_rows.add_child(match_row)
+	var match_game := Button.new()
+	match_game.name = "Setting_" + Sensitivity.OTHER_GAME
+	match_game.custom_minimum_size = Vector2(0, 40)
+	match_game.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	match_game.pressed.connect(func() -> void:
+		Settings.set_value(Sensitivity.OTHER_GAME, next_choice(Sensitivity.OTHER_GAMES.keys(), Settings.get_value(Sensitivity.OTHER_GAME))))
+	match_row.add_child(match_game)
+	var theirs := LineEdit.new()
+	theirs.name = "MatchSensitivity"
+	theirs.placeholder_text = "Its sensitivity"
+	theirs.custom_minimum_size = Vector2(130, 40)
+	theirs.text_submitted.connect(func(text: String) -> void:
+		var ours := Sensitivity.matching(Settings.get_value(Sensitivity.OTHER_GAME), text.to_float() if text.is_valid_float() else -1.0)
+		if ours > 0.0:
+			Settings.set_value("mouse_sensitivity", ours)
+			theirs.clear()
+		theirs.release_focus())
+	match_row.add_child(theirs)
 	# The crosshair as a code, to copy for someone or to paste in from them,
 	# with the crosshair itself beside it.
 	var code_row := HBoxContainer.new()

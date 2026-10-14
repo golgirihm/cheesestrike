@@ -17,7 +17,7 @@ signal received(time: float, at: Vector3, teleports: int, facing: Vector2)
 ## Another player was moved at once to somewhere new, as on coming back.
 signal teleported
 
-const MOUSE_SENSITIVITY := 0.0025
+const MOUSE_SENSITIVITY := Sensitivity.MOUSE_RADIANS
 const STICK_LOOK_SPEED := 2.8
 const TOUCH_LOOK_SENSITIVITY := 0.006
 const TOUCH_STICK_RADIUS := 80.0
@@ -1717,7 +1717,9 @@ func _look(delta: Vector2) -> void:
 	if Settings.get_value("invert_look"):
 		delta.y = -delta.y
 	# Slower at the eye, and slower still through a scope.
-	delta *= lerpf(1.0, minf(AIM_LOOK_FACTOR, weapon.stats.aim_zoom * 1.2), _aim)
+	delta *= Sensitivity.aim_factor(weapon.stats.aim_zoom, _aim, weapon.stats.scoped, Settings.get_value(Sensitivity.AIMING),
+		Settings.get_value(Sensitivity.SCOPED), AIM_LOOK_FACTOR)
+	delta.y *= Settings.get_value(Sensitivity.UP_AND_DOWN)
 	_looked += Vector2(delta.x, -delta.y)
 	rotate_y(-delta.x)
 	head.rotation.x = clampf(head.rotation.x - delta.y, -PITCH_LIMIT, PITCH_LIMIT)
