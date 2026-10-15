@@ -1021,6 +1021,67 @@ func test_run_crouch_and_aim_can_be_pressed_once_rather_than_held() -> void:
 	assert_false(own._wants_crouch(), "held, a press alone does nothing")
 
 
+func test_leaning_can_be_pressed_once_and_one_way_ends_the_other() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	var press := func(action: String) -> void:
+		var event := InputEventAction.new()
+		event.action = action
+		event.pressed = true
+		own._input(event)
+	Settings.set_value("toggle_lean", true)
+	press.call("lean_left")
+	assert_eq(own._wants_lean(), -1.0, "on, without holding")
+	press.call("lean_right")
+	assert_eq(own._wants_lean(), 1.0, "the other way, not both")
+	press.call("lean_right")
+	assert_eq(own._wants_lean(), 0.0, "and off again")
+	Settings.set_value("toggle_lean", false)
+	press.call("lean_left")
+	assert_eq(own._wants_lean(), 0.0, "held, a press alone does nothing")
+
+
+func test_a_one_shot_weapon_keeps_firing_while_held_if_asked() -> void:
+	var own := _add(1, Vector3(0, 0, 5))
+	await _settle(own)
+	own.choose_weapon("pistol")
+	await wait_seconds(0.6)
+	assert_eq(own.weapon.stats.id, "pistol")
+	assert_false(own.weapon.stats.automatic)
+	var before: int = Sounds.counts.get("pistol", 0)
+	Settings.set_value(own.HOLD_TO_FIRE, true)
+	Input.action_press("fire")
+	await wait_seconds(1.2)
+	Input.action_release("fire")
+	Settings.set_value(own.HOLD_TO_FIRE, false)
+	assert_gt(Sounds.counts.get("pistol", 0) - before, 1, "more than one shot from one press")
+
+
+func test_the_scoreboard_and_talk_can_be_pressed_once() -> void:
+	var hud: Control = preload("res://ui/combat_hud.gd").new()
+	add_child_autofree(hud)
+	var press := InputEventAction.new()
+	press.action = "scoreboard"
+	press.pressed = true
+	Settings.set_value(hud.TOGGLE_SCORES, true)
+	hud._input(press)
+	assert_true(hud._scores_on)
+	hud._input(press)
+	assert_false(hud._scores_on)
+	Settings.set_value(hud.TOGGLE_SCORES, false)
+	hud._input(press)
+	assert_false(hud._scores_on, "held, a press alone does nothing")
+	var voice: Node = preload("res://audio/voice_chat.gd").new()
+	add_child_autofree(voice)
+	press.action = VoiceChat.ACTION
+	Settings.set_value(VoiceChat.TOGGLE, true)
+	voice._input(press)
+	assert_true(voice._talk_on)
+	voice._input(press)
+	assert_false(voice._talk_on)
+	Settings.set_value(VoiceChat.TOGGLE, false)
+
+
 func test_pushing_the_touch_stick_to_its_edge_runs() -> void:
 	var own := _add(1, Vector3(0, 0, 5))
 	await _settle(own)

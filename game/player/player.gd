@@ -153,7 +153,10 @@ var _touch_crouch := false
 var _lean := 0.0
 # Run, crouch and aim as turned on by a press, for players who have chosen
 # to press once rather than hold; and running by the touch stick's edge.
-var _toggled := {"sprint": false, "crouch": false, "aim": false}
+## The setting that has a weapon that fires once a press keep firing while
+## the button is held.
+const HOLD_TO_FIRE := "hold_to_fire"
+var _toggled := {"sprint": false, "crouch": false, "aim": false, "lean_left": false, "lean_right": false}
 var _touch_run := false
 # The player's own speed across the ground, which off the ground can only
 # be steered.
@@ -675,6 +678,9 @@ func _input(event: InputEvent) -> void:
 	for action: String in _toggled:
 		if event.is_action_pressed(action):
 			_toggled[action] = not _toggled[action]
+			# Leaning one way stops leaning the other.
+			if action.begins_with("lean") and _toggled[action]:
+				_toggled["lean_right" if action == "lean_left" else "lean_left"] = false
 	# Before the rest, as the mouse wheel's events are mouse buttons.
 	if event.is_action_pressed("weapon_next"):
 		_switch_step += 1
@@ -927,7 +933,7 @@ func crouch() -> float:
 # Whether `action` (run, crouch or aim) is wanted: held, or, for a player
 # who has chosen that in the settings, pressed on and not yet off.
 func _on(action: String) -> bool:
-	var setting := "toggle_run" if action == "sprint" else "toggle_" + action
+	var setting := "toggle_run" if action == "sprint" else ("toggle_lean" if action.begins_with("lean") else "toggle_" + action)
 	return _toggled[action] if Settings.get_value(setting) else Input.is_action_pressed(action)
 
 
@@ -942,7 +948,7 @@ func lean() -> float:
 func _wants_lean() -> float:
 	if not alive or Net.host_silent or _menu_open() or is_climbing() or (_wants_run() and _walk.length() > 0.5):
 		return 0.0
-	return signf(Input.get_axis("lean_left", "lean_right"))
+	return signf(float(_on("lean_right")) - float(_on("lean_left")))
 
 
 func _wants_crouch() -> bool:
@@ -1650,7 +1656,9 @@ func _use_weapon() -> void:
 			Sounds.play("reload", -6.0)
 	var held := Input.is_action_pressed("fire") or _mouse_fire_held or _button_touches.values().has("fire")
 	# The rest of a burst follows its first shot without being asked.
-	var wants := _fire_pressed or (held and weapon.stats.automatic) or weapon.in_burst()
+	# A weapon that fires once a press keeps firing while held, for a player
+	# who has asked for that, so that nothing needs a button pressed fast.
+	var wants: bool = _fire_pressed or (held and (weapon.stats.automatic or Settings.get_value(HOLD_TO_FIRE))) or weapon.in_burst()
 	# A press waits for the weapon to be ready, unless it is empty.
 	if _fire_pressed and (weapon.can_fire() or weapon.is_reloading()):
 		_fire_pressed = false

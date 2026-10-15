@@ -143,7 +143,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* extend `test_accessibility.gd`.
 3. **Seeing.** A high-contrast mode, larger text everywhere including menus, and menus read aloud by a screen reader.
    *Tests:* GUT tests that every control has a name to read.
-4. **Hands.** Hold or toggle for everything, one-handed layouts, and nothing that needs keys mashed.
+4. **One-handed layouts.** Sets of keys for playing with one hand, chosen in one go. (Pressing once in place of holding, for everything that is held, and holding to keep firing a weapon that fires once a press, are done.)
    *Tests:* GUT tests of the presets.
 5. **Other languages.** Move every word on screen into translation files, lay the interface out for longer words and right-to-left scripts, and translate into the first few languages.
    *Tests:* a GUT test that no text on screen is missing from the files, and that every screen fits in every language.
