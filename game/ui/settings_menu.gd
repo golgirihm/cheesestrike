@@ -189,6 +189,10 @@ const SOUND_CHOICES := [
 	[Crosshair.SHAPE, "Crosshair", Crosshair.SHAPES],
 	[Crosshair.COLOUR, "Crosshair colour", Crosshair.COLOUR_NAMES],
 	[StickAim.CURVE, "Stick response", StickAim.CURVE_NAMES],
+	[TeamColors.PRESET, "Colours", TeamColors.PRESET_NAMES],
+	[TeamColors.OWN_CHEDDAR, "Cheddar's colour", TeamColors.OWN_NAMES],
+	[TeamColors.OWN_BRIE, "Brie's colour", TeamColors.OWN_NAMES],
+	[TeamColors.OWN_HIT, "Hit mark colour", TeamColors.OWN_NAMES],
 ]
 
 

@@ -41,6 +41,11 @@ const DEFAULTS := {
 	"gyro_aim": false,
 	# One switch that calms everything that moves the view or flashes.
 	"less_motion": false,
+	# The colours of the teams and of a hit (see TeamColors).
+	"colour_preset": "standard",
+	"colour_cheddar": "",
+	"colour_brie": "",
+	"colour_hit": "",
 	"gyro_sensitivity": 1.0,
 	"touch_sensitivity": 1.0,
 	# The share of it while aiming, through a scope, and up and down against
@@ -192,6 +197,10 @@ const CHOICES := {
 	"crosshair_colour": ["white", "green", "yellow", "cyan", "magenta", "red"],
 	"hit_sound": ["tick", "pop", "bell", "off"],
 	"stick_curve": ["linear", "classic", "precise"],
+	"colour_preset": ["standard", "protanopia", "deuteranopia", "tritanopia"],
+	"colour_cheddar": ["", "red", "orange", "yellow", "green", "teal", "blue", "sky", "purple", "pink", "white"],
+	"colour_brie": ["", "red", "orange", "yellow", "green", "teal", "blue", "sky", "purple", "pink", "white"],
+	"colour_hit": ["", "red", "orange", "yellow", "green", "teal", "blue", "sky", "purple", "pink", "white"],
 	"match_game": ["source", "valorant", "overwatch", "apex", "quake"],
 	"gfx_shadows": ["", "off", "on"],
 	"gfx_particles": ["", "low", "medium", "high"],

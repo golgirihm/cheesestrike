@@ -139,7 +139,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
 
 1. **Every control, any key.** Rebind every action, including the mouse buttons and wheel and every gamepad button, with a second binding for each and a warning on clashes.
    *Tests:* extend `test_preferences.gd`.
-2. **Colour.** Presets for the common kinds of colour blindness and free choice of the enemy, team and hit colours.
+2. **An enemy colour.** A colour of one's own for opponents outside teams, as in free-for-all. (Sets for the common kinds of colour blindness, and free choice of each team's colour and of the hit mark's, are done.)
    *Tests:* extend `test_accessibility.gd`.
 3. **A warning of flashing.** Warn before anything that flashes, pointing to Less motion. (The Less motion switch, which calms bob, sway, shake, the running view and flashes, is done.)
    *Tests:* GUT tests of when the warning shows.

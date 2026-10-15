@@ -434,7 +434,7 @@ func test_the_arena_shows_three_points_in_their_owners_colours() -> void:
 	assert_eq(marks.counts().shown, 3)
 	match_.state.zones.owners[1] = BRIE
 	match_.state_changed.emit()
-	assert_eq(marks._zones[1].get_meta("colour"), TeamColors.BRIE)
+	assert_eq(marks._zones[1].get_meta("colour"), TeamColors.of(MatchState.BRIE))
 	assert_eq(marks._zones[0].get_meta("colour"), marks.NEUTRAL)
 
 

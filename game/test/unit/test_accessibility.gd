@@ -174,3 +174,44 @@ func test_the_crosshair_gives_way_to_the_sights_when_aiming() -> void:
 	own._aim = 0.5
 	assert_true(main.combat_hud.crosshair_shown(), "still there while the weapon is on its way up")
 	main.world.stop()
+
+
+func _colours_back() -> void:
+	for key: String in [TeamColors.OWN_CHEDDAR, TeamColors.OWN_BRIE, TeamColors.OWN_HIT]:
+		Settings.set_value(key, "")
+	Settings.set_value(TeamColors.PRESET, "standard")
+
+
+func test_each_colour_set_keeps_the_teams_apart() -> void:
+	for preset: String in TeamColors.PRESETS:
+		var pair: Array = TeamColors.PRESETS[preset]
+		assert_gt(TeamColors.apart(pair[0], pair[1]), 0.5, preset)
+		assert_true(TeamColors.PRESET_NAMES.has(preset), preset)
+		assert_true(Settings.CHOICES[TeamColors.PRESET].has(preset), preset)
+
+
+func test_a_set_chosen_colours_the_teams() -> void:
+	Settings.set_value(TeamColors.PRESET, "tritanopia")
+	assert_eq(TeamColors.of(MatchState.CHEDDAR), TeamColors.PRESETS.tritanopia[0])
+	assert_eq(TeamColors.of(MatchState.BRIE), TeamColors.PRESETS.tritanopia[1])
+	assert_eq(TeamColors.of(MatchState.NO_TEAM), Color.WHITE)
+	_colours_back()
+	assert_eq(TeamColors.of(MatchState.CHEDDAR), TeamColors.CHEDDAR, "the standard set is as it always was")
+
+
+func test_a_colour_of_ones_own_wins_over_the_set() -> void:
+	Settings.set_value(TeamColors.PRESET, "protanopia")
+	Settings.set_value(TeamColors.OWN_BRIE, "purple")
+	Settings.set_value(TeamColors.OWN_HIT, "yellow")
+	assert_eq(TeamColors.of(MatchState.BRIE), TeamColors.OWN.purple)
+	assert_eq(TeamColors.of(MatchState.CHEDDAR), TeamColors.PRESETS.protanopia[0], "the other keeps the set's")
+	assert_eq(TeamColors.hit(), TeamColors.OWN.yellow)
+	_colours_back()
+	assert_eq(TeamColors.hit(), Color.WHITE)
+
+
+func test_every_colour_of_ones_own_has_a_name_and_can_be_chosen() -> void:
+	for own: String in TeamColors.OWN:
+		assert_true(TeamColors.OWN_NAMES.has(own), own)
+		for key: String in [TeamColors.OWN_CHEDDAR, TeamColors.OWN_BRIE, TeamColors.OWN_HIT]:
+			assert_true(Settings.CHOICES[key].has(own), "%s for %s" % [own, key])
