@@ -434,6 +434,8 @@ func _cycle(button: Button, key: String, choices: Array, describe: Callable) -> 
 func _apply_page_setting(key: String) -> void:
 	if key in [FramePace.CAP, FramePace.BATTERY_SAVER]:
 		FramePace.apply()
+	if key in [Look.MENU_TEXT, Look.HIGH_CONTRAST]:
+		Look.refresh()
 	if key == "touch_fullscreen":
 		WebPage.set_fullscreen_on_touch(Settings.get_value("touch_fullscreen"))
 

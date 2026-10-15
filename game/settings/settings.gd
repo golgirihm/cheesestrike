@@ -57,6 +57,10 @@ const DEFAULTS := {
 	# How many frames a second are drawn at most (see FramePace).
 	"frame_cap": "",
 	"battery_saver": false,
+	# The size of menus' text, and whether the interface is drawn starkly
+	# for those who see little contrast (see Look).
+	"menu_text": 1.0,
+	"high_contrast": false,
 	"colour_cheddar": "",
 	"colour_brie": "",
 	"colour_hit": "",
@@ -200,6 +204,7 @@ const RANGES := {
 	"screen_shake": [0.0, 1.0],
 	"camera_motion": [0.0, 1.0],
 	"hud_scale": [0.75, 1.5],
+	"menu_text": [1.0, 1.25],
 }
 ## The allowed choices of a setting that is one of a few.
 const CHOICES := {

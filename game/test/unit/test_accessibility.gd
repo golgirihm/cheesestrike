@@ -251,3 +251,60 @@ func test_the_ring_marks_where_sounds_come_from_only_when_asked() -> void:
 func test_every_sound_with_a_caption_can_have_a_mark() -> void:
 	for name: String in SoundRing.LOUDNESS:
 		assert_true(CAPTIONS.TEXTS.has(name), name)
+
+
+func _seeing_back() -> void:
+	Settings.set_value(Look.MENU_TEXT, 1.0)
+	Settings.set_value(Look.HIGH_CONTRAST, false)
+	Look.refresh()
+
+
+func test_menus_text_grows_with_its_setting() -> void:
+	var theme := Look.theme()
+	Settings.set_value(Look.MENU_TEXT, 1.25)
+	Look.refresh()
+	assert_eq(theme.default_font_size, roundi(Look.TEXT_SIZE * 1.25))
+	_seeing_back()
+	assert_eq(theme.default_font_size, Look.TEXT_SIZE)
+
+
+func test_high_contrast_draws_solid_black_with_white_edges() -> void:
+	var theme := Look.theme()
+	Settings.set_value(Look.HIGH_CONTRAST, true)
+	Look.refresh()
+	var panel: StyleBoxFlat = theme.get_stylebox("panel", "PanelContainer")
+	assert_eq(panel.bg_color, Color.BLACK)
+	assert_eq(panel.border_color, Color.WHITE)
+	var button: StyleBoxFlat = theme.get_stylebox("normal", "Button")
+	assert_eq(button.border_color, Color.WHITE)
+	_seeing_back()
+	assert_ne((theme.get_stylebox("panel", "PanelContainer") as StyleBoxFlat).bg_color, Color.BLACK)
+
+
+func test_every_screen_fits_with_the_largest_menu_text() -> void:
+	Settings.set_value(Look.MENU_TEXT, Look.MOST_TEXT)
+	Look.refresh()
+	var main: Node = load("res://main.tscn").instantiate()
+	add_child_autofree(main)
+	await wait_process_frames(3)
+	var base := Vector2(ProjectSettings.get_setting("display/window/size/viewport_width"), ProjectSettings.get_setting("display/window/size/viewport_height"))
+	for screen: Control in [main.menu.get_node("Panel"), main.settings_menu.get_child(0), main.front_end.ways]:
+		screen.get_parent().show()
+		screen.show()
+		await wait_process_frames(1)
+		var needed := screen.get_combined_minimum_size()
+		assert_lte(needed.y, base.y, "%s is too tall" % screen.name)
+		assert_lte(needed.x, base.x, "%s is too wide" % screen.name)
+	_seeing_back()
+
+
+func test_every_button_has_a_name_to_read() -> void:
+	var main: Node = load("res://main.tscn").instantiate()
+	add_child_autofree(main)
+	await wait_process_frames(2)
+	var nameless := []
+	# Those on the menu and title screens; others are named as they are shown.
+	for button: Node in main.find_children("*", "BaseButton", true, false):
+		if button is Button and (button as Button).is_visible_in_tree() and (button as Button).text.strip_edges().is_empty() and (button as Button).tooltip_text.is_empty():
+			nameless.append(button.get_path())
+	assert_eq(nameless, [], "a screen reader would have nothing to say for these")
