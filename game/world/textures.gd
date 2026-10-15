@@ -134,7 +134,9 @@ static func shade_at(kind: String, x: int, y: int) -> float:
 			var pore := _speck(x, y) * _speck(x + 5, y + 11)
 			return 0.9 + 0.08 * _cloud(x, y, 8) - (0.18 if pore > 0.82 else 0.0)
 		CHEESE:
-			return 0.93 + 0.07 * _cloud(x, y, 16)
+			# Soft blotches, and here and there a round pit with a dark floor.
+			var pit := _pit(x, y, 16)
+			return 0.93 + 0.07 * _cloud(x, y, 16) - 0.3 * pit
 	return 0.92 + 0.07 * _cloud(x, y, 16)
 
 
@@ -144,6 +146,27 @@ static func _hash(x: int, y: int) -> float:
 	var n := posmod(x, SIZE) * 374761393 + posmod(y, SIZE) * 668265263
 	n = (n ^ (n >> 13)) * 1274126177
 	return float((n ^ (n >> 16)) & 0xffff) / 65535.0
+
+
+# How deep into a round pit pixel (x, y) is, from 0 outside one to 1 in its
+# middle: most cells `cell` pixels across have one, of their own size and
+# somewhere of their own, and they come round at the picture's edge.
+static func _pit(x: int, y: int, cell: int) -> float:
+	var deepest := 0.0
+	var across := SIZE / cell
+	for cy in range(-1, 2):
+		for cx in range(-1, 2):
+			var gx := floori(float(x) / cell) + cx
+			var gy := floori(float(y) / cell) + cy
+			var wx := posmod(gx, across)
+			var wy := posmod(gy, across)
+			if _hash(wx * 5 + 1, wy * 3 + 2) < 0.35:
+				continue
+			var middle := Vector2((gx + 0.25 + 0.5 * _hash(wx, wy + 11)) * cell, (gy + 0.25 + 0.5 * _hash(wy + 7, wx)) * cell)
+			var radius := cell * (0.14 + 0.16 * _hash(wx + 3, wy + 5))
+			var distance := Vector2(x, y).distance_to(middle)
+			deepest = maxf(deepest, 1.0 - smoothstep(radius * 0.7, radius, distance))
+	return deepest
 
 
 static func _speck(x: int, y: int) -> float:

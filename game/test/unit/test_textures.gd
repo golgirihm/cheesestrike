@@ -105,7 +105,7 @@ func test_shots_still_knock_dust_of_a_things_own_colour_off_it() -> void:
 	var geometry: Node = world.map.get_node("Geometry")
 	assert_true(Scenery.is_yellow(Surfaces.dust(geometry.get_node("Block1"))))
 	assert_ne(Surfaces.dust(geometry.get_node("Floor")), Surfaces.DUST, "the floor's colour, though it has a picture on it")
-	assert_eq(Surfaces.dust(geometry.get_node("BuildingNorthEast")), Surfaces.DUST)
+	assert_eq(Surfaces.dust(geometry.get_node("Building1")), Surfaces.DUST)
 
 
 func test_the_game_is_small_enough_to_download() -> void:

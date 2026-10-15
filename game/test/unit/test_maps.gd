@@ -100,10 +100,16 @@ func test_a_player_starts_at_their_spot_facing_the_middle() -> void:
 			player.free()
 
 
+# The arenas small enough to cross in a few seconds: not the large maps,
+# whose two sides start a minute apart (see test_big_maps).
+func _small_maps() -> Array:
+	return _each_map().filter(func(id: String) -> bool: return not Maps.is_large(id))
+
+
 func test_the_first_two_spots_see_each_other() -> void:
 	# The browser tests shoot from the first spot at a player on the second
 	# without aiming, as each starts facing the middle.
-	for id: String in _each_map():
+	for id: String in _small_maps():
 		var space: PhysicsDirectSpaceState3D = await _load(id)
 		var from: Vector3 = world.spawn_positions()[0] + EYE
 		var to: Vector3 = world.spawn_positions()[1] + EYE
@@ -114,7 +120,7 @@ func test_the_first_two_spots_see_each_other() -> void:
 
 func test_a_launcher_lies_straight_ahead_of_the_first_spot_with_a_clear_walk() -> void:
 	# The browser tests walk straight ahead from the first spot to pick it up.
-	for id: String in _each_map():
+	for id: String in _small_maps():
 		var space: PhysicsDirectSpaceState3D = await _load(id)
 		var start: Vector3 = world.spawn_positions()[0]
 		var launchers: Array = world.pickup_pads().filter(func(pad: Dictionary) -> bool: return pad.kind == "launcher")

@@ -66,6 +66,17 @@ var _built_code := ""
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
 var menu_camera: Camera3D
 
+# The loaded arena's cheese (see cheese_blocks), each block's index by its
+# body, the space each fills, and which stand on which.
+var _blocks: Array = []
+var _block_indices := {}
+var _block_boxes: Array = []
+var _block_supports: Array[PackedInt32Array] = []
+## Ways across a large map, for bots (see Routes); empty on an arena.
+var routes := Routes.new()
+## The loaded map's buildings, each drawn as one (see Clusters).
+var clusters: Clusters
+
 # Which starting spot each player holds. Only the host uses it.
 var _spawn_slots: SpawnSlots
 # Where each player with a place of their own stands: the range's targets.
@@ -228,15 +239,20 @@ func load_map(id: String) -> void:
 		remove_child(map)
 		map.queue_free()
 	_built_code = custom_code if id == Maps.CUSTOM else ""
-	map = ArenaCode.build(arena) if id == Maps.CUSTOM else Maps.scene(id).instantiate()
+	map = ArenaCode.build(arena) if id == Maps.CUSTOM else Maps.build(id)
 	map.name = "Map"
 	Scenery.dress(map)
 	add_child(map)
 	move_child(map, 0)
+	clusters = Clusters.new()
+	map.add_child(clusters)
+	clusters.build(map.get_node("Geometry"))
 	map_id = id
 	if vignette != null:
 		apply_picture()
 	spawn_points = map.get_node("SpawnPoints")
+	_find_blocks()
+	routes = Routes.new(map.get_meta("routes", {}))
 	fixtures = Fixtures.of(map)
 	moving_parts = MovingParts.of(map)
 	menu_camera = map.get_node("MenuCamera")
@@ -306,6 +322,11 @@ func stop() -> void:
 	menu_camera.make_current()
 
 
+## Whether the loaded map is one of the large ones (see BigMap).
+func is_large() -> bool:
+	return map != null and map.get_meta("large", false)
+
+
 ## Whether this machine has the arena the host chose, so its player can move.
 func ready_to_play() -> bool:
 	return match_.has_state() and map_id == match_.state.settings.map
@@ -340,7 +361,13 @@ func _join(id: int) -> void:
 		record.look = Bots.look_for(id)
 		record.main = Bots.loadout_for(id)[0]
 		match_.state.rearm(record)
-	spawner.spawn([id, spawn_points.get_child(_spawn_slots.assign(id)).global_position])
+	var slot := _spawn_slots.assign(id)
+	var at: Vector3 = spawn_points.get_child(slot).global_position
+	# On a large map, someone joining a team starts at its own end.
+	var own: Array[Vector3] = match_.own_side(id, spawn_positions())
+	if not own.has(at):
+		at = own[slot % own.size()]
+	spawner.spawn([id, at])
 	print("player joined: %d (%d in session)" % [id, players.get_child_count()])
 
 
@@ -684,21 +711,38 @@ static func nearest_place(named: Array, at: Vector3) -> String:
 ## The loaded arena's blocks of cheese, in an order that is the same on
 ## every machine.
 func cheese_blocks() -> Array:
-	if map == null:
-		return []
-	return map.get_node("Geometry").get_children().filter(func(body: Node) -> bool: return String(body.name).begins_with("Block"))
+	return _blocks
 
 
 ## Which of the cheese blocks `collider` is, or -1 if it is none of them.
 func block_index(collider: Object) -> int:
-	return cheese_blocks().find(collider)
+	return _block_indices.get(collider, -1)
 
 
 ## The space each cheese block fills, in the same order.
 func block_boxes() -> Array:
-	return cheese_blocks().map(func(body: Node3D) -> AABB:
+	return _block_boxes
+
+
+## Which blocks go when block `index` does: those standing on it, and on
+## those (see BlockRules).
+func blocks_above(index: int) -> Array[int]:
+	return BlockRules.above(_block_supports, index)
+
+
+# Notes the loaded arena's cheese, once, as a large map has hundreds of
+# blocks and every shot asks after them.
+func _find_blocks() -> void:
+	_blocks = map.get_node("Geometry").get_children().filter(func(body: Node) -> bool: return String(body.name).begins_with("Block"))
+	_block_indices.clear()
+	_block_boxes.clear()
+	for index in _blocks.size():
+		var body: Node3D = _blocks[index]
+		_block_indices[body] = index
 		var size: Vector3 = (body.get_node("CollisionShape3D").shape as BoxShape3D).size
-		return AABB(body.global_position - size / 2.0, size))
+		# Where it is in the arena, which is where it is in the map.
+		_block_boxes.append(AABB(body.position - size / 2.0, size))
+	_block_supports = BlockRules.supports(_block_boxes)
 
 
 # Shows each block of cheese as the match state has it: whole, bitten into,
@@ -721,6 +765,8 @@ func _show_blocks() -> void:
 			effects.crumbs(body.global_position, Scenery.CHEESE, 40, 7.0)
 			Sounds.play_at("crumble", body.global_position, self)
 		Scenery.bite(body, 0 if gone else stage)
+	if clusters != null:
+		clusters.refresh()
 
 
 ## How many cheese blocks are standing, as they are shown.
