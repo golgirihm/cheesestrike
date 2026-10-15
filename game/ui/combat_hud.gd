@@ -264,11 +264,9 @@ static func match_text(state: MatchState) -> String:
 		return "Match over"
 	if state.settings.is_practice():
 		return "Practice range"
-	if state.is_warm_up():
-		return "Warm-up   ·   waiting for players"
+	if state.is_counting_down():
+		return "The match begins in %d" % ceili(state.countdown)
 	var clock := clock_text(state.time_left)
-	if state.overtime:
-		clock = "Sudden death  %s" % clock
 	if state.settings.is_teams():
 		return "Cheddar %d  –  %d Brie   ·   %s" % [state.team_score(MatchState.CHEDDAR), state.team_score(MatchState.BRIE), clock]
 	return "First to %d   ·   %s" % [state.settings.limit(), clock]
@@ -589,7 +587,7 @@ func _input(event: InputEvent) -> void:
 func _count_down() -> void:
 	var record: PlayerRecord = world.match_.own_record() if world.match_.has_state() else null
 	var waits := {"respawn": record.respawn_in if record != null and not record.alive else 0.0,
-		"match": world.match_.state.time_left if record != null and world.match_.state.phase == MatchState.PLAYING and not world.match_.state.is_warm_up() else 0.0}
+		"match": world.match_.state.time_left if record != null and world.match_.state.is_live() else 0.0}
 	for wait: String in waits:
 		if UiSounds.counts(_waits.get(wait, 0.0), waits[wait]):
 			Sounds.play(UiSounds.COUNT, -8.0)

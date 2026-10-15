@@ -5,27 +5,38 @@ const WORLD := preload("res://world/world.tscn")
 
 var announcer: Announcer
 var now: Dictionary
+var clock := 0.0
 
 
 func before_each() -> void:
 	announcer = Announcer.new()
 	add_child_autofree(announcer)
 	announcer.set_process(false)
-	now = {"playing": false, "ended": false, "won": null, "leading": null, "teams": false, "time_left": 480.0, "sudden": false}
-	announcer.update(now)
+	now = {"playing": false, "ended": false, "won": null, "leading": null, "teams": false, "time_left": 480.0}
+	clock = 0.0
+	announcer.update(now, clock)
 
 
-# What is said when the match comes to stand as it did but for `changed`.
-func _then(changed: Dictionary) -> Array[String]:
+# What is said when the match comes to stand as it did but for `changed`,
+# `after` seconds on.
+func _then(changed: Dictionary, after := 0.0) -> Array[String]:
 	now = now.duplicate()
 	now.merge(changed, true)
-	return announcer.update(now)
+	clock += after
+	return announcer.update(now, clock)
+
+
+# What is said when the match has stood as it does for long enough for the
+# lead to settle.
+func _settled() -> Array[String]:
+	return _then({}, Announcer.LEAD_SETTLE)
 
 
 func test_nothing_is_said_of_what_went_before_someone_arrived() -> void:
 	var late := Announcer.new()
 	autofree(late)
-	assert_eq(late.update({"playing": true, "ended": false, "won": null, "leading": true, "teams": false, "time_left": 30.0, "sudden": true}), [])
+	assert_eq(late.update({"playing": true, "ended": false, "won": null, "leading": true, "teams": false, "time_left": 30.0}, 0.0), [])
+	assert_eq(late.update({"playing": true, "ended": false, "won": null, "leading": true, "teams": false, "time_left": 25.0}, 5.0), [], "nor of a lead they found")
 
 
 func test_the_match_beginning_is_said_once() -> void:
@@ -46,21 +57,51 @@ func test_the_end_says_who_it_was_for() -> void:
 	assert_eq(_then({"playing": false, "ended": true, "won": null}), [Announcer.DRAW])
 
 
-func test_the_lead_changing_hands_is_said_each_way() -> void:
+func test_the_lead_changing_hands_is_said_each_way_once_it_settles() -> void:
 	_then({"playing": true})
-	assert_eq(_then({"leading": true}), [Announcer.LEAD_TAKEN])
-	assert_eq(_then({}), [], "still ahead: nothing more")
-	assert_eq(_then({"leading": null}), [Announcer.LEAD_LOST], "caught up with")
-	assert_eq(_then({"leading": false}), [], "and then passed: already said")
-	assert_eq(_then({"leading": null}), [], "level again is not the lead")
-	assert_eq(_then({"leading": true}), [Announcer.LEAD_TAKEN])
-	assert_eq(_then({"leading": false}), [Announcer.LEAD_LOST])
+	assert_eq(_then({"leading": true}), [], "not at once")
+	assert_eq(_then({}, Announcer.LEAD_SETTLE - 0.5), [])
+	assert_eq(_then({}, 0.5), [Announcer.LEAD_TAKEN])
+	assert_eq(_settled(), [], "still ahead: nothing more")
+	_then({"leading": null})
+	assert_eq(_settled(), [Announcer.LEAD_LOST], "caught up with")
+	_then({"leading": false})
+	assert_eq(_settled(), [], "and then passed: already said")
+	_then({"leading": null})
+	assert_eq(_settled(), [], "level again is not the lead")
+	_then({"leading": true})
+	assert_eq(_settled(), [Announcer.LEAD_TAKEN])
+	_then({"leading": false})
+	assert_eq(_settled(), [Announcer.LEAD_LOST])
+
+
+func test_a_lead_traded_back_and_forth_is_not_said_until_it_settles() -> void:
+	_then({"playing": true})
+	for swap in 6:
+		assert_eq(_then({"leading": swap % 2 == 0}, 1.0), [], "swap %d" % swap)
+	assert_eq(_settled(), [], "it ended where it began")
+	_then({"leading": true}, 1.0)
+	assert_eq(_settled(), [Announcer.LEAD_TAKEN])
 
 
 func test_a_team_is_told_of_its_lead() -> void:
 	_then({"playing": true, "teams": true})
-	assert_eq(_then({"leading": true}), [Announcer.TEAM_LEAD_TAKEN])
-	assert_eq(_then({"leading": false}), [Announcer.TEAM_LEAD_LOST])
+	_then({"leading": true})
+	assert_eq(_settled(), [Announcer.TEAM_LEAD_TAKEN])
+	_then({"leading": false})
+	assert_eq(_settled(), [Announcer.TEAM_LEAD_LOST])
+
+
+func test_the_lead_of_the_last_match_is_not_lost_as_the_next_begins() -> void:
+	_then({"playing": true})
+	_then({"leading": true})
+	assert_eq(_settled(), [Announcer.LEAD_TAKEN])
+	_then({"playing": false, "ended": true, "won": true})
+	# The scores go back to nothing, and the countdown of the next match runs.
+	_then({"ended": false, "won": null, "leading": null}, 10.0)
+	assert_eq(_then({"playing": true}, 5.0), [Announcer.BEGINS])
+	assert_eq(_settled(), [], "nobody leads a match that has just begun")
+	assert_eq(_settled(), [])
 
 
 func test_a_minute_from_time_is_said_as_it_is_reached() -> void:
@@ -72,20 +113,13 @@ func test_a_minute_from_time_is_said_as_it_is_reached() -> void:
 
 
 func test_a_match_begun_with_under_a_minute_left_does_not_say_so() -> void:
-	# As in sudden death, which is given a minute of its own.
 	assert_eq(_then({"playing": true, "time_left": 45.0}), [Announcer.BEGINS])
 	assert_eq(_then({"time_left": 44.0}), [])
 
 
-func test_sudden_death_is_said_and_not_the_minute_it_is_given() -> void:
-	_then({"playing": true})
-	_then({"time_left": 0.5})
-	assert_eq(_then({"sudden": true, "time_left": 60.0}), [Announcer.SUDDEN_DEATH])
-	assert_eq(_then({"time_left": 59.0}), [])
-
-
-func test_nothing_is_said_of_the_lead_or_the_time_in_the_warm_up() -> void:
-	assert_eq(_then({"leading": true}), [])
+func test_nothing_is_said_of_the_lead_or_the_time_in_the_countdown() -> void:
+	_then({"leading": true})
+	assert_eq(_settled(), [])
 	assert_eq(_then({"time_left": 30.0}), [])
 
 
@@ -170,12 +204,16 @@ func test_in_a_match_the_lines_are_said_shown_and_kept() -> void:
 	await wait_physics_frames(2)
 	var heard := []
 	world.announcer.said.connect(func(line: String, show: bool) -> void: heard.append([line, show]))
-	# Alone it is a warm-up; with a second player the match begins.
+	# The match begins once its countdown has run.
 	world.match_.add_player(2)
-	world.match_.state.start_match()
+	world.match_.state.countdown = 1.0
+	await wait_process_frames(3)
+	world.match_.state.countdown = 0.001
 	await wait_process_frames(3)
 	assert_has(heard, [Announcer.BEGINS, false], "said, but the match writes it itself")
 	world.match_.state.player(1).kills = 1
+	await wait_process_frames(3)
+	world.announcer._clock += Announcer.LEAD_SETTLE
 	await wait_process_frames(3)
 	assert_has(heard, [Announcer.LEAD_TAKEN, true], "said and written")
 	world.match_.hit_confirmed.emit(2, 100, true, false)

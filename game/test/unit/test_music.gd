@@ -19,7 +19,7 @@ func after_each() -> void:
 
 
 func _standing(changed := {}) -> Dictionary:
-	var standing := {"playing": true, "ended": false, "won": null, "leading": null, "teams": false, "time_left": 300.0, "sudden": false}
+	var standing := {"playing": true, "ended": false, "won": null, "leading": null, "teams": false, "time_left": 300.0}
 	standing.merge(changed, true)
 	return standing
 
@@ -37,15 +37,14 @@ func test_the_menu_has_its_theme_and_a_match_a_quieter_piece() -> void:
 	assert_eq(MusicDirector.piece(false, _standing(), true), MusicDirector.MENU, "whatever the match, on the menu")
 	assert_eq(MusicDirector.piece(true, {}, false), MusicDirector.MENU, "in a session with no match yet")
 	assert_eq(MusicDirector.piece(true, _standing(), false), MusicDirector.MATCH)
-	assert_eq(MusicDirector.piece(true, _standing({"playing": false}), false), MusicDirector.MATCH, "in the warm-up")
+	assert_eq(MusicDirector.piece(true, _standing({"playing": false}), false), MusicDirector.MATCH, "in the countdown")
 
 
-func test_the_music_builds_in_the_last_minute_at_match_point_and_in_sudden_death() -> void:
+func test_the_music_builds_in_the_last_minute_and_at_match_point() -> void:
 	assert_eq(MusicDirector.piece(true, _standing({"time_left": MusicDirector.LAST + 0.5}), false), MusicDirector.MATCH)
 	assert_eq(MusicDirector.piece(true, _standing({"time_left": MusicDirector.LAST}), false), MusicDirector.TENSE)
 	assert_eq(MusicDirector.piece(true, _standing({"time_left": 5.0}), false), MusicDirector.TENSE)
 	assert_eq(MusicDirector.piece(true, _standing(), true), MusicDirector.TENSE, "match point")
-	assert_eq(MusicDirector.piece(true, _standing({"sudden": true}), false), MusicDirector.TENSE)
 	# Not once it is over, nor before it has begun.
 	assert_eq(MusicDirector.piece(true, _standing({"playing": false, "ended": true, "time_left": 0.0}), true), MusicDirector.MATCH)
 	assert_eq(MusicDirector.piece(true, _standing({"playing": false, "time_left": 10.0}), false), MusicDirector.MATCH)

@@ -13,7 +13,8 @@ extends Node
 ## then stops drawing, so `?test` is no use for looking at it, unless `&draw`
 ## is added too, as for taking screenshots. Windows start as players who have
 ## seen the controls help, so it doesn't cover what a test came to click,
-## unless `&help` is added too.
+## unless `&help` is added too. Matches begin at once, without counting down
+## (see MatchState.COUNTDOWN), unless `&countdown` is added too.
 
 const PUBLISH_INTERVAL := 0.05
 
@@ -33,6 +34,8 @@ var _last_frame := 0
 func _init(main: Node) -> void:
 	_main = main
 	Settings.set_value("seen_help", not JavaScriptBridge.eval("new URLSearchParams(location.search).has('help')"))
+	if not JavaScriptBridge.eval("new URLSearchParams(location.search).has('countdown')"):
+		MatchState.countdown_length = 0.0
 
 
 func _ready() -> void:

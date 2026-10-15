@@ -1,8 +1,8 @@
 class_name Announcer
 extends Node
 ## The announcer: a voice that tells a player how the match stands for them.
-## It speaks at the start and end of a match, when the lead changes hands, a
-## minute from time, at sudden death, when they knock several out one after
+## It speaks at the start and end of a match, when the lead changes hands and
+## stays changed, a minute from time, when they knock several out one after
 ## another, and when a power-up is taken.
 ##
 ## What is said is decided here from how the match stands, the same on every
@@ -18,19 +18,21 @@ const BEGINS := "The match begins"
 const VICTORY := "Victory"
 const DEFEAT := "Defeat"
 const DRAW := "A draw"
-const LEAD_TAKEN := "You have taken the lead"
-const LEAD_LOST := "You have lost the lead"
-const TEAM_LEAD_TAKEN := "Your team has taken the lead"
-const TEAM_LEAD_LOST := "Your team has lost the lead"
+const LEAD_TAKEN := "Gained the lead"
+const LEAD_LOST := "Lost the lead"
+const TEAM_LEAD_TAKEN := "Team gained the lead"
+const TEAM_LEAD_LOST := "Team lost the lead"
 const MINUTE := "One minute left"
-const SUDDEN_DEATH := "Sudden death"
+## Seconds the lead must stay where it is before it is spoken of, so that a
+## lead traded back and forth, or level for a moment, is not.
+const LEAD_SETTLE := 3.0
 ## What is said for knocking out this many, one soon after another.
 const STREAKS := {2: "Double knock-out", 3: "Triple knock-out", 4: "Rampage"}
 ## Seconds after a knock-out in which the next counts as one after another.
 const STREAK_WINDOW := 4.5
 ## The lines the match already puts on the screen itself, as it does when a
 ## power-up is taken.
-const SHOWN_ALREADY := [BEGINS, SUDDEN_DEATH]
+const SHOWN_ALREADY := [BEGINS]
 ## The setting that turns the voice off.
 const SETTING := "announcer"
 
@@ -44,6 +46,11 @@ var _was := {}
 var _streak := 0
 var _last_knock_out := -INF
 var _clock := 0.0
+# Whether the player leads, as they were last told it and as it has been
+# since `_lead_since`.
+var _lead_told := false
+var _lead_now := false
+var _lead_since := 0.0
 
 
 func _init(of: Node3D = null) -> void:
@@ -66,14 +73,14 @@ func _process(delta: float) -> void:
 	if world == null or not world.match_.has_state() or multiplayer.multiplayer_peer == null:
 		_was = {}
 		return
-	for line in update(standing(world.match_.state, multiplayer.get_unique_id())):
+	for line in update(standing(world.match_.state, multiplayer.get_unique_id()), _clock):
 		_say(line)
 
 
 ## How the match in `state` stands for player `own`: {"playing": the match
 ## proper is under way, "ended", "won": true, false, or null for a draw or
 ## for someone only watching, "leading": true, false, or null with nothing
-## in it, "teams", "time_left", "sudden": in sudden death}.
+## in it, "teams", "time_left"}.
 static func standing(state: MatchState, own: int) -> Dictionary:
 	var record := state.player(own)
 	var teams := state.settings.is_teams()
@@ -82,40 +89,52 @@ static func standing(state: MatchState, own: int) -> Dictionary:
 	var leaders := state._leaders()
 	var winners: Array = state.winners
 	return {
-		"playing": state.phase == MatchState.PLAYING and not state.is_warm_up(),
+		"playing": state.is_live(),
 		"ended": state.phase == MatchState.ENDED,
 		"won": (winners == [side] if winners.size() == 1 else null) if playing and not winners.is_empty() else null,
 		"leading": (leaders == [side] if leaders.size() == 1 else null) if playing else null,
 		"teams": teams,
 		"time_left": state.time_left,
-		"sudden": state.overtime,
 	}
 
 
-## Told how the match stands now (see standing); returns what there is to
-## say about what has changed since it was last told.
-func update(now: Dictionary) -> Array[String]:
+## Told how the match stands now (see standing), `clock` seconds in; returns
+## what there is to say about what has changed since it was last told.
+func update(now: Dictionary, clock := 0.0) -> Array[String]:
 	var lines: Array[String] = []
 	var was := _was
 	_was = now
 	if was.is_empty():
 		# Someone who has only just arrived is told nothing of what went before.
+		_lead_told = now.leading == true
+		_lead_now = _lead_told
+		_lead_since = clock
 		return lines
 	if now.playing and not was.playing:
+		# Every match begins with nobody in the lead.
+		_lead_told = false
+		_lead_now = false
+		_lead_since = clock
 		lines.append(BEGINS)
 	if now.ended and not was.ended:
 		lines.append(DRAW if now.won == null else (VICTORY if now.won else DEFEAT))
 		return lines
 	if not now.playing:
 		return lines
-	if now.sudden and not was.sudden:
-		lines.append(SUDDEN_DEATH)
-	elif was.playing and was.time_left > 60.0 and now.time_left <= 60.0 and not now.sudden:
+	if was.playing and was.time_left > 60.0 and now.time_left <= 60.0:
 		lines.append(MINUTE)
-	if now.leading == true and was.leading != true:
-		lines.append(TEAM_LEAD_TAKEN if now.teams else LEAD_TAKEN)
-	elif was.leading == true and now.leading != true:
-		lines.append(TEAM_LEAD_LOST if now.teams else LEAD_LOST)
+	# The lead is spoken of once it has settled, and only if it has changed
+	# from what the player was last told.
+	var leading: bool = now.leading == true
+	if leading != _lead_now:
+		_lead_now = leading
+		_lead_since = clock
+	if _lead_now != _lead_told and clock - _lead_since >= LEAD_SETTLE:
+		_lead_told = _lead_now
+		if _lead_told:
+			lines.append(TEAM_LEAD_TAKEN if now.teams else LEAD_TAKEN)
+		else:
+			lines.append(TEAM_LEAD_LOST if now.teams else LEAD_LOST)
 	return lines
 
 

@@ -5,26 +5,31 @@ extends RefCounted
 ## and sends the whole of it to everyone whenever it changes (see Match); the
 ## others replace theirs with what arrives.
 ##
-## A match runs until someone (or, in teams, a team) reaches the kill limit or
+## A match begins with a COUNTDOWN, while everyone stands where they are,
+## then runs until someone (or, in teams, a team) reaches the kill limit or
 ## the time runs out. Then everyone sees the result for INTERMISSION seconds,
-## during which nobody can be hurt, and a new match begins with scores at zero.
+## during which nobody can move or be hurt, and a new match begins with scores
+## at zero.
 ##
 ## Kept free of nodes and networking so the rules can be tested on their own.
 
 ## Seconds a knocked-out player waits before coming back.
 const RESPAWN_DELAY := 3.0
 ## Seconds a player who has come back can't be hurt, unless they fire first.
-const PROTECTION := 2.0
+## They look like a ghost meanwhile.
+const PROTECTION := 3.0
 ## Seconds between one match ending and the next beginning.
 const INTERMISSION := 10.0
 
 const PLAYING := "playing"
 const ENDED := "ended"
 
-## How many players a match waits for before it begins.
-const MIN_TO_START := 2
-## Seconds of extra time when the scores are level at the end.
-const OVERTIME := 60.0
+## Seconds a match counts down before it begins, while nobody can move,
+## fire or be hurt.
+const COUNTDOWN := 5.0
+## The countdown each new match has: COUNTDOWN, but the game's tests set it
+## to nothing unless they are about the countdown (see test/pre_run.gd).
+static var countdown_length := COUNTDOWN
 ## Seconds between one round of Last mouse standing and the next, for
 ## everyone to choose what to bring to it.
 const ROUND_BREAK := 6.0
@@ -42,17 +47,11 @@ var phase := PLAYING
 var time_left := float(settings.minutes * 60)
 ## Knock-outs by each team, Cheddar first, in a team match.
 var team_kills := [0, 0]
-## Whether the match has begun. Until enough players are in, it is a
-## warm-up: everything works, but the clock stands still and nothing done
-## counts once the match begins.
-var started := false
-## Whether the match is in extra time, when the next score that leaves
-## someone ahead wins: sudden death.
-var overtime := false
-## Set as the match begins and as overtime does, for the host to tell
-## everyone.
+## Seconds left before the match begins; 0 once it has. The practice range
+## has none.
+var countdown := 0.0
+## Set as the countdown ends, for the host to tell everyone.
 var just_started := false
-var just_overtime := false
 ## Which of the arena's doors are open (see MovingParts), in its own order.
 var doors: Array = []
 ## The most doors an arena may have: a large map has two for each house.
@@ -102,6 +101,7 @@ var power_ended := false
 func _init(with := MatchSettings.new()) -> void:
 	settings = with
 	time_left = settings.minutes * 60.0
+	countdown = _countdown_for(settings)
 	if settings.mode == MatchSettings.CAPTURE:
 		capture = CaptureRules.new()
 	elif settings.mode == MatchSettings.HILL or settings.mode == MatchSettings.POINTS:
@@ -118,7 +118,7 @@ func score(team: int, points: int) -> bool:
 	if not is_playing() or team < 0 or team > 1 or points <= 0:
 		return false
 	team_points[team] += points
-	if started and (_limit_reached() or (overtime and not _level())):
+	if _limit_reached():
 		end_match()
 		return true
 	return false
@@ -158,7 +158,7 @@ func speed_factor(record: PlayerRecord) -> float:
 ## colour to write it in}.
 func update_objectives(delta: float, spots: Dictionary, standing: Dictionary) -> Array[Dictionary]:
 	var told: Array[Dictionary] = []
-	if not is_playing():
+	if not is_live():
 		return told
 	if capture != null and spots.get("bases", []).size() == 2:
 		for event: Dictionary in capture.update(delta, spots.bases, standing):
@@ -233,7 +233,7 @@ func alive_in(team: int) -> int:
 # Last mouse standing: a round is over once a team with players has none
 # left in play. The other takes it, and after a break everyone comes back.
 func _check_round() -> void:
-	if settings.mode != MatchSettings.ROUNDS or not is_playing() or round_break > 0.0 or not started:
+	if settings.mode != MatchSettings.ROUNDS or not is_live() or round_break > 0.0:
 		return
 	var members := [0, 0]
 	for record: PlayerRecord in players.values():
@@ -263,9 +263,6 @@ func add_player(id: int) -> PlayerRecord:
 			record.team = smaller_team()
 		players[id] = record
 		rearm(record)
-		# The practice range has no match to begin.
-		if not started and playing_count() >= MIN_TO_START and not settings.is_practice():
-			_begin()
 	return players[id]
 
 
@@ -295,58 +292,27 @@ func set_watching(id: int, on: bool) -> bool:
 		record.overload_build = 0.0
 		record.give_power(Powers.NONE, 0.0)
 		_check_round()
-		# Someone who joined to watch was a player for a moment, which may
-		# have begun the match: with too few left to play and nothing yet
-		# scored, it goes back to waiting.
-		if started and playing_count() < MIN_TO_START and _nothing_scored():
-			started = false
-			overtime = false
-			time_left = settings.minutes * 60.0
 	else:
 		if settings.is_teams():
 			record.team = smaller_team()
 		rearm(record)
 		record.respawn_in = RESPAWN_DELAY
-		if not started and playing_count() >= MIN_TO_START and not settings.is_practice():
-			_begin()
 	return true
 
 
-## Whether the match is waiting for players before it begins.
-func is_warm_up() -> bool:
-	return is_playing() and not started
+## Whether the match is counting down to its beginning.
+func is_counting_down() -> bool:
+	return is_playing() and countdown > 0.0
 
 
-# Enough players are in: the warm-up is over and the match begins from
-# nothing, with everyone where they stand.
-func _begin() -> void:
-	started = true
-	just_started = true
-	overtime = false
-	time_left = settings.minutes * 60.0
-	team_kills = [0, 0]
-	team_points = [0, 0]
-	# The hill's clock and the points taken run in the warm-up too.
-	if capture != null:
-		capture = CaptureRules.new()
-	if zones != null:
-		zones = ZoneRules.new()
-	blocks.reset(blocks.health.size())
-	for record: PlayerRecord in players.values():
-		record.kills = 0
-		record.deaths = 0
-		record.overload = 0.0
-		if settings.mode == MatchSettings.GUN_GAME:
-			rearm(record)
+## Whether the match is under way: begun, and not yet over. Only then can
+## anyone move, fire or be hurt.
+func is_live() -> bool:
+	return is_playing() and countdown <= 0.0
 
 
-func _nothing_scored() -> bool:
-	return team_points == [0, 0] and players.values().all(func(record: PlayerRecord) -> bool: return record.kills == 0)
-
-
-# Whether nobody is ahead: the leaders are level, or nobody has scored.
-func _level() -> bool:
-	return _leaders().size() != 1
+static func _countdown_for(match_settings: MatchSettings) -> float:
+	return 0.0 if match_settings.is_practice() else maxf(countdown_length, 0.0)
 
 
 ## A state for a match on `next` settings with the same players in it: who
@@ -442,7 +408,7 @@ func is_playing() -> bool:
 func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dictionary:
 	var result := {"dealt": 0, "knocked_out": false, "ended": false, "absorbed": 0}
 	var target := player(victim)
-	if not is_playing() or target == null or not target.alive or target.is_protected() or round_break > 0.0:
+	if not is_live() or target == null or not target.alive or target.is_protected() or round_break > 0.0:
 		return result
 	var own := attacker == victim
 	# What someone threw before they turned to watching does nothing.
@@ -485,7 +451,7 @@ func damage(attacker: int, victim: int, amount: float, own_too := false) -> Dict
 				# On to the next weapon, at once.
 				rearm(scorer)
 		result.knocked_out = true
-		if started and (_limit_reached() or (overtime and not _level())):
+		if _limit_reached():
 			end_match()
 			result.ended = true
 		_check_round()
@@ -606,18 +572,18 @@ func tick(delta: float) -> Array[int]:
 	uptime += delta
 	if ballot != null:
 		ballot.left = maxf(ballot.left - delta, 0.0)
-	# The clock stands still through a warm-up.
-	if is_warm_up():
+	# The clock stands still through the countdown, and on the practice
+	# range, where there is no match to win.
+	if is_counting_down():
+		countdown = maxf(countdown - delta, 0.0)
+		if countdown == 0.0:
+			just_started = true
+		return due
+	if is_playing() and settings.is_practice():
 		return due
 	time_left = maxf(time_left - delta, 0.0)
 	if is_playing() and time_left == 0.0:
-		if not overtime and _level() and playing_count() >= MIN_TO_START:
-			# Level at the end: extra time, and the next score wins.
-			overtime = true
-			just_overtime = true
-			time_left = OVERTIME
-		else:
-			end_match()
+		end_match()
 	return due
 
 
@@ -625,7 +591,7 @@ func tick(delta: float) -> Array[int]:
 ## whether it began.
 func set_off_overload(id: int) -> bool:
 	var record := player(id)
-	if not is_playing() or not Overload.is_ready(record):
+	if not is_live() or not Overload.is_ready(record):
 		return false
 	record.overload = 0.0
 	record.overload_left = Overload.DURATIONS[record.overload_kind]
@@ -649,7 +615,7 @@ func match_due() -> bool:
 
 
 func end_match() -> void:
-	overtime = false
+	countdown = 0.0
 	# While the result is up, everyone votes on what to play next.
 	ballot = Ballot.for_next(settings) if not settings.is_practice() else null
 	phase = ENDED
@@ -661,9 +627,8 @@ func end_match() -> void:
 ## players back into play is up to the host, with respawn().
 func start_match() -> void:
 	phase = PLAYING
-	overtime = false
 	ballot = null
-	started = playing_count() >= MIN_TO_START and not settings.is_practice()
+	countdown = _countdown_for(settings)
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
 	team_points = [0, 0]
@@ -707,7 +672,7 @@ func respawn(id: int) -> void:
 ## whether they did.
 func throw_grenade(id: int) -> bool:
 	var record := player(id)
-	if not is_playing() or record == null or not record.alive or record.grenades <= 0:
+	if not is_live() or record == null or not record.alive or record.grenades <= 0:
 		return false
 	record.grenades -= 1
 	return true
@@ -726,6 +691,8 @@ func result_text() -> String:
 
 
 func _limit_reached() -> bool:
+	if settings.is_practice():
+		return false
 	if settings.by_points():
 		return team_points.max() >= settings.limit()
 	if settings.mode == MatchSettings.GUN_GAME:
@@ -776,10 +743,8 @@ func to_dict(with_blocks := true) -> Dictionary:
 		"pickups": pickups,
 	}
 	# Only what is so, and what the mode being played has, as this is sent often.
-	if not started:
-		data["warm_up"] = true
-	if overtime:
-		data["overtime"] = true
+	if countdown > 0.0:
+		data["countdown"] = countdown
 	if settings.by_points():
 		data["points"] = team_points
 	if capture != null or zones != null:
@@ -830,8 +795,8 @@ static func from_dict(data: Dictionary) -> MatchState:
 	var pause: Variant = data.get("round_break")
 	if (pause is float or pause is int) and is_finite(float(pause)):
 		state.round_break = clampf(float(pause), 0.0, ROUND_BREAK)
-	state.started = data.get("warm_up") != true
-	state.overtime = data.get("overtime") == true
+	var counting: Variant = data.get("countdown", 0.0)
+	state.countdown = clampf(float(counting), 0.0, COUNTDOWN) if (counting is float or counting is int) and is_finite(float(counting)) else 0.0
 	state.just_started = false
 	state.blocks = BlockRules.from_array(data.get("blocks"))
 	state.ballot = Ballot.from_array(data.get("ballot"))

@@ -39,8 +39,9 @@ func _physics_process(delta: float) -> void:
 	var record := match_.state.player(id)
 	if record == null:
 		return
-	# One knocked out stands still; and a target never does anything else.
-	if not record.alive or not match_.state.is_playing() or Bots.is_target(id):
+	# One knocked out stands still, as everyone does before a match begins
+	# and once it is over; and a target never does anything else.
+	if not record.alive or not match_.state.is_live() or Bots.is_target(id):
 		player.velocity = Vector3.ZERO
 		_publish(match_, id, 0)
 		return

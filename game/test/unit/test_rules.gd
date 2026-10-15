@@ -260,8 +260,10 @@ func test_the_health_bar_is_as_long_as_the_rules_health() -> void:
 func test_the_match_begins_by_saying_what_rules_it_is_played_by() -> void:
 	await _start("instant")
 	_add(1, Vector3(0, 0, 9))
-	watch_signals(match_)
 	_add(2, Vector3(0, 0, -9))
+	# As the countdown runs out.
+	match_.state.countdown = 0.005
+	watch_signals(match_)
 	match_._process(0.01)
 	assert_signal_emitted_with_parameters(match_, "announced", ["The match begins  ·  Instant knock-out", MatchState.NO_TEAM])
 

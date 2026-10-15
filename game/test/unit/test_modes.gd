@@ -115,24 +115,18 @@ func test_a_new_match_clears_points_wheels_and_zones() -> void:
 	assert_eq(held.zones.owners[1], ZoneRules.NOBODY)
 
 
-
-func test_the_match_beginning_after_the_warm_up_clears_wheels_and_zones() -> void:
+func test_nothing_of_the_modes_own_runs_until_the_countdown_is_over() -> void:
+	MatchState.countdown_length = MatchState.COUNTDOWN
 	var spots := {"bases": [], "hills": [Vector3.ZERO, Vector3(9, 0, 0)], "points": []}
-	var hill := _state(MatchSettings.HILL, [1])
-	hill.update_objectives(ZoneRules.HILL_TIME - 1.0, spots, {1: {"at": Vector3.ZERO, "team": CHEDDAR, "alive": true}})
-	hill.add_player(2)
-	assert_false(hill.is_warm_up())
-	assert_eq(hill.team_points, [0, 0])
-	assert_eq(hill.zones.hill, 0)
-	assert_eq(hill.zones.hill_left, ZoneRules.HILL_TIME, "the first hill gets its full time")
-	var held := _state(MatchSettings.POINTS, [1])
-	held.zones.owners[1] = CHEDDAR
-	held.add_player(2)
-	assert_eq(held.zones.owners[1], ZoneRules.NOBODY)
-	var capture := _state(MatchSettings.CAPTURE, [1])
-	capture.capture.wheels[BRIE].status = CaptureRules.DROPPED
-	capture.add_player(2)
-	assert_eq(capture.capture.wheels[BRIE].status, CaptureRules.HOME)
+	var hill := _state(MatchSettings.HILL, [1, 2])
+	var standing := {1: {"at": Vector3.ZERO, "team": CHEDDAR, "alive": true}}
+	hill.update_objectives(ZoneRules.HILL_TIME - 1.0, spots, standing)
+	assert_eq(hill.team_points, [0, 0], "nothing scored")
+	assert_eq(hill.zones.hill_left, ZoneRules.HILL_TIME, "and the first hill keeps its full time")
+	hill.tick(MatchState.COUNTDOWN)
+	hill.update_objectives(1.0, spots, standing)
+	assert_lt(hill.zones.hill_left, ZoneRules.HILL_TIME, "until the match begins")
+	MatchState.countdown_length = 0.0
 
 
 func test_points_and_the_modes_own_state_survive_the_trip() -> void:

@@ -335,6 +335,8 @@ func test_a_match_that_ends_is_kept_once_and_adds_to_the_summary() -> void:
 	world.match_.add_player(2)
 	world.match_.state.start_match()
 	var keeper: MatchKeeper = world.match_keeper
+	# Counted from here, not from the frames the match has already run.
+	keeper._begin()
 	watch_signals(keeper)
 	for frame in 30:
 		keeper._process(1.0)

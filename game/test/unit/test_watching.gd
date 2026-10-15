@@ -82,29 +82,12 @@ func test_a_watcher_is_on_no_team_and_takes_one_on_coming_back() -> void:
 	assert_true(state.player(4).alive)
 
 
-func test_watchers_do_not_count_as_players_for_a_match_to_begin() -> void:
+func test_watchers_do_not_count_as_players() -> void:
 	var waiting := _state("ffa", [1, 2])
 	waiting.set_watching(2, true)
-	waiting.start_match()
-	assert_true(waiting.is_warm_up(), "one to play and one to watch is still a warm-up")
 	assert_eq(waiting.playing_count(), 1)
 	waiting.set_watching(2, false)
-	assert_false(waiting.is_warm_up(), "until the watcher plays")
-
-
-func test_a_match_begun_by_someone_who_came_to_watch_goes_back_to_waiting() -> void:
-	var state := _state("ffa", [1, 2])
-	assert_false(state.is_warm_up(), "for a moment they were a player")
-	state.tick(5.0)
-	state.set_watching(2, true)
-	assert_true(state.is_warm_up())
-	assert_eq(state.time_left, state.settings.minutes * 60.0, "with the clock put back")
-	# But not a match in which something has happened.
-	var played := _state("ffa", [1, 2, 3])
-	played.damage(1, 2, 500.0)
-	played.set_watching(2, true)
-	played.set_watching(3, true)
-	assert_false(played.is_warm_up())
+	assert_eq(waiting.playing_count(), 2)
 
 
 func test_a_watcher_does_not_keep_a_round_going_or_end_one() -> void:
