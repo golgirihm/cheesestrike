@@ -18,7 +18,6 @@ const CROSSHAIR_LENGTH := 9.0
 const CROSSHAIR_COLOR := Color(1, 1, 1, 0.9)
 const HIT_MARKER_LIFE := 0.25
 const HIT_MARKER_SIZE := 11.0
-const HIT_COLOR := Color(1, 1, 1)
 const HEADSHOT_COLOR := Color(0.94, 0.89, 0.26)
 const KNOCKOUT_COLOR := Color(0.84, 0.37, 0.0)
 ## The kinds of hit mark.
@@ -730,7 +729,7 @@ func _draw() -> void:
 	if crosshair_shown():
 		Crosshair.draw(self, centre, Crosshair.chosen(), gap)
 	if _hit_left > 0.0:
-		var color: Color = {HIT: HIT_COLOR, HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[hit_kind]
+		var color: Color = {HIT: TeamColors.hit(), HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[hit_kind]
 		color.a = _hit_left / HIT_MARKER_LIFE
 		var reach := HIT_MARKER_SIZE * (1.0 if hit_kind == HIT else 1.4)
 		var width := 2.5 if hit_kind == HIT else 3.5
@@ -743,7 +742,7 @@ func _draw() -> void:
 	for index in _damage_numbers.size():
 		var number: Dictionary = _damage_numbers[index]
 		var age: float = 1.0 - number.left / DAMAGE_NUMBER_LIFE
-		var tint: Color = {HIT: HIT_COLOR, HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[number.kind]
+		var tint: Color = {HIT: TeamColors.hit(), HEADSHOT: HEADSHOT_COLOR, KNOCKOUT: KNOCKOUT_COLOR}[number.kind]
 		tint.a = 1.0 - age * age
 		# Each a little to one side of the last, so a burst of hits can be read.
 		var at := centre + Vector2(26.0 + (index % 3) * 22.0, -18.0 - age * 34.0)
