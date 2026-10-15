@@ -16,6 +16,7 @@ const OWN_DISTANCE := 1.5
 const TEXTS := {
 	"pistol": "Pistol fire",
 	"gnaw": "Mice gnawing",
+	"squeak": "Mouse squeaking",
 	"crumble": "Cheese crumbling",
 	"blaster": "Blaster fire",
 	"shotgun": "Shotgun blast",

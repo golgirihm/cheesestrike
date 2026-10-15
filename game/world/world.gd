@@ -78,6 +78,9 @@ var _block_supports: Array[PackedInt32Array] = []
 var routes := Routes.new()
 ## The loaded map's buildings, each drawn as one (see Clusters).
 var clusters: Clusters
+## The giant mice, as they are seen (see MouseRules).
+var mice_view: MiceView
+var _edge := Rect2()
 
 # Which starting spot each player holds. Only the host uses it.
 var _spawn_slots: SpawnSlots
@@ -118,7 +121,8 @@ func _ready() -> void:
 		if player != null:
 			effects.sparkle(player.global_position, kind))
 	match_.state_changed.connect(_on_state_changed)
-	match_.block_gnawed.connect(_show_mice)
+	mice_view = MiceView.new(self)
+	add_child(mice_view)
 	sound_cues = preload("res://audio/sound_cues.gd").new(self)
 	add_child(sound_cues)
 	objective_marks = preload("res://world/objective_marks.gd").new(self)
@@ -255,6 +259,7 @@ func load_map(id: String) -> void:
 		apply_picture()
 	spawn_points = map.get_node("SpawnPoints")
 	_find_blocks()
+	_edge = Scenery.bounds(map.get_node("Geometry"))
 	routes = Routes.new(map.get_meta("routes", {}))
 	fixtures = Fixtures.of(map)
 	moving_parts = MovingParts.of(map)
@@ -323,6 +328,11 @@ func stop() -> void:
 	if map_id == Maps.CUSTOM:
 		load_map(Maps.DEFAULT)
 	menu_camera.make_current()
+
+
+## The loaded arena's edge, across X and Z (see Scenery.bounds).
+func edge() -> Rect2:
+	return _edge
 
 
 ## Whether the loaded map is one of the large ones (see BigMap).
@@ -774,29 +784,6 @@ func _show_blocks() -> void:
 ## How many cheese blocks are standing, as they are shown.
 func blocks_standing() -> int:
 	return cheese_blocks().filter(func(body: Node3D) -> bool: return body.visible).size()
-
-
-# Mice come out round block `index` for a few seconds, and are heard.
-func _show_mice(index: int) -> void:
-	var bodies := cheese_blocks()
-	if index < 0 or index >= bodies.size() or not is_inside_tree():
-		return
-	var body: Node3D = bodies[index]
-	var half: Vector3 = (body.get_node("CollisionShape3D").shape as BoxShape3D).size / 2.0
-	Sounds.play_at("gnaw", body.global_position, self)
-	for mouse_index in 3:
-		var mouse := Scenery.mouse()
-		mouse.add_to_group("mice")
-		add_child(mouse)
-		# Round its foot, each on a side of its own, nose to the cheese.
-		var angle := mouse_index * TAU / 3.0 + index
-		var out := Vector3(cos(angle), 0.0, sin(angle))
-		mouse.global_position = body.global_position + out * (maxf(half.x, half.z) + 0.5) + Vector3.DOWN * half.y
-		mouse.rotation.y = atan2(out.x, out.z)
-		var nibble := create_tween().set_loops(8)
-		nibble.tween_property(mouse, "scale", Vector3(1.0, 0.85, 1.1), 0.18)
-		nibble.tween_property(mouse, "scale", Vector3.ONE, 0.18)
-		get_tree().create_timer(3.0).timeout.connect(mouse.queue_free)
 
 
 ## The loaded arena's places for the modes that have them: {"bases": the

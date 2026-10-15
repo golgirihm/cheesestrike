@@ -1,5 +1,6 @@
 extends GutTest
-## The cheese blocks get eaten: by mice, through a match, and by shots.
+## The cheese blocks get eaten: by shots and bursts, and by the mice (see
+## test_mice.gd).
 
 const WORLD := preload("res://world/world.tscn")
 const CHEST := BodyShape.CHEST.y * BodyShape.SIZE
@@ -70,48 +71,6 @@ func test_a_block_shows_how_far_gone_it_is() -> void:
 			seen.append(rules.stage(0))
 	assert_eq(seen, range(BlockRules.STAGES + 2), "whole, each stage, then gone")
 	assert_eq(rules.stage(7), BlockRules.STAGES + 1, "one that isn't there is gone")
-
-
-func test_the_mice_come_out_after_a_while_and_then_every_so_often() -> void:
-	var rules := BlockRules.new(4, 5)
-	assert_eq(rules.tick(BlockRules.FIRST_GNAW - 0.5), -1)
-	var first := rules.tick(1.0)
-	assert_between(first, 0, 3)
-	assert_eq(rules.tick(BlockRules.GNAW_EVERY - 0.5), -1)
-	assert_between(rules.tick(1.0), 0, 3)
-	assert_gt(BlockRules.GNAW * 3, BlockRules.HEALTH - 1, "three visits finish a block")
-	assert_lt(BlockRules.GNAW * 2, BlockRules.HEALTH, "two do not")
-
-
-func test_the_mice_go_only_to_blocks_that_are_left_and_nowhere_when_none_are() -> void:
-	var rules := BlockRules.new(3, 11)
-	rules.remove(0)
-	rules.remove(2)
-	for visit in 6:
-		rules.gnaw_in = 0.0
-		assert_eq(rules.tick(0.1), 1)
-	rules.remove(1)
-	rules.gnaw_in = 0.0
-	assert_eq(rules.tick(0.1), -1)
-	assert_eq(BlockRules.new(0).tick(BlockRules.FIRST_GNAW + 1.0), -1, "an arena with no cheese")
-
-
-func test_the_same_seed_sends_them_to_the_same_blocks() -> void:
-	var one := BlockRules.new(8, 42)
-	var other := BlockRules.new(8, 42)
-	for visit in 10:
-		one.gnaw_in = 0.0
-		other.gnaw_in = 0.0
-		assert_eq(one.tick(0.1), other.tick(0.1))
-
-
-func test_a_new_match_makes_every_block_whole_and_sends_the_mice_home() -> void:
-	var rules := BlockRules.new(2)
-	rules.hurt(0, 9999.0)
-	rules.tick(BlockRules.FIRST_GNAW - 1.0)
-	rules.reset(2)
-	assert_eq(rules.health, [BlockRules.HEALTH, BlockRules.HEALTH] as Array[int])
-	assert_eq(rules.gnaw_in, BlockRules.FIRST_GNAW)
 
 
 func test_what_stands_on_a_block_goes_with_it() -> void:
@@ -264,36 +223,8 @@ func test_a_block_shows_bites_as_it_is_eaten() -> void:
 	assert_eq(block.get_node("Bites").get_child_count(), 0, "whole again")
 
 
-func test_the_host_sends_the_mice_out_and_everyone_sees_and_hears_them() -> void:
-	await _start()
-	_add(1, Vector3(0, 0, 12))
-	watch_signals(match_)
-	match_._process(BlockRules.FIRST_GNAW + 0.1)
-	assert_signal_emitted(match_, "block_gnawed")
-	var index: int = get_signal_parameters(match_, "block_gnawed")[0]
-	assert_eq(match_.state.blocks.health[index], BlockRules.HEALTH - BlockRules.GNAW)
-	assert_eq(get_tree().get_nodes_in_group("mice").size(), 3)
-	assert_gt(Sounds.counts.get("gnaw", 0), 0)
-	for mouse: Node3D in get_tree().get_nodes_in_group("mice"):
-		assert_eq(mouse.find_children("*", "CollisionObject3D", true, false).size(), 0, "nothing to bump into")
-		for part: MeshInstance3D in mouse.find_children("*", "MeshInstance3D", true, false):
-			assert_false(Scenery.is_yellow((part.material_override as StandardMaterial3D).albedo_color))
-	# Three visits to the same block finish it.
-	match_._hurt_block(index, BlockRules.GNAW)
-	match_._hurt_block(index, BlockRules.GNAW)
-	assert_false(match_.state.blocks.standing(index))
-
-
-func test_the_mice_stay_in_between_matches() -> void:
-	await _start()
-	match_.state.end_match()
-	watch_signals(match_)
-	match_._process(MatchState.INTERMISSION - 1.0)
-	assert_signal_not_emitted(match_, "block_gnawed")
-
-
 func test_there_are_sounds_and_captions_for_it() -> void:
 	const CAPTIONS := preload("res://ui/captions.gd")
-	for sound: String in ["gnaw", "crumble"]:
+	for sound: String in ["gnaw", "squeak", "crumble"]:
 		assert_not_null(SoundBank.get_sound(sound))
 		assert_true(CAPTIONS.TEXTS.has(sound))
