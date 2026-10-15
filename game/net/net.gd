@@ -19,6 +19,9 @@ signal session_failed(reason: String)
 ## `reason` is empty when this player chose to leave.
 signal session_ended(reason: String)
 signal sessions_listed(sessions: Array)
+## The session list couldn't be had: the session server didn't answer, or
+## answered with something that isn't a list. `reason` says so, for a player.
+signal sessions_unreachable(reason: String)
 signal host_silent_changed(silent: bool)
 
 const ENET_PORT := 7777
@@ -33,6 +36,13 @@ const HOST_PING_INTERVAL := 240.0
 const RESUME_DELAY := 1.0
 const RESUME_DELAY_MAX := 30.0
 const ICE_SERVERS := [{"urls": ["stun:stun.l.google.com:19302"]}]
+## How long hosting or joining waits for the session server to answer at all,
+## in seconds, before saying it can't be reached. A server that is down
+## usually refuses at once; one on a machine that has gone may never answer.
+const SERVER_WAIT := 8.0
+## What a developer runs to start the session server, said in development
+## builds when it can't be reached.
+const START_SERVER := "python signaling/server.py"
 
 var use_webrtc := OS.has_feature("web")
 var in_session := false
@@ -61,6 +71,8 @@ var _resume_timer := 0.0
 var _resuming := false
 var _joining := JoiningPeers.new()
 var _ws: WebSocketPeer
+# Seconds the connection to the session server has been opening.
+var _ws_opening := 0.0
 var _outbox: Array[String] = []
 var _rtc: WebRTCMultiplayerPeer
 var _connecting := false
@@ -150,7 +162,8 @@ func leave(reason := "") -> void:
 ## Asks for the session list, which arrives as `sessions_listed`.
 func request_sessions() -> void:
 	if use_webrtc and _list_request.get_http_client_status() == HTTPClient.STATUS_DISCONNECTED:
-		_list_request.request(_http_url + "/sessions")
+		if _list_request.request(_http_url + "/sessions") != OK:
+			sessions_unreachable.emit(unreachable(_http_url))
 
 
 func _process(delta: float) -> void:
@@ -177,6 +190,11 @@ func _process(delta: float) -> void:
 		return
 	_ws.poll()
 	var state := _ws.get_ready_state()
+	if state == WebSocketPeer.STATE_CONNECTING:
+		_ws_opening += delta
+		if _connecting and _ws_opening >= SERVER_WAIT:
+			_fail(unreachable(_signaling_url))
+			return
 	if state == WebSocketPeer.STATE_OPEN:
 		for text in _outbox:
 			_ws.send_text(text)
@@ -195,7 +213,18 @@ func _process(delta: float) -> void:
 		# An established session keeps running without the session server; a
 		# host's just can't take new joiners until it has reconnected.
 		if _connecting:
-			_fail("Can't reach the session server at %s." % _signaling_url)
+			_fail(unreachable(_signaling_url))
+
+
+## What a player is told when the session server at `url` can't be reached:
+## that it is needed, for what, and what can still be played without it. In
+## a development build, how to start it too, as there it is most often only
+## that it isn't running.
+static func unreachable(url: String, development := OS.is_debug_build()) -> String:
+	var said := "Can't reach the session server at %s. Hosting and joining need it; practice and the tutorial work without it." % url
+	if development:
+		said += "\nIs it running? Start it with: %s" % START_SERVER
+	return said
 
 
 func _start() -> void:
@@ -259,11 +288,12 @@ func _update_host_silent() -> void:
 func _send(msg: Dictionary) -> void:
 	if _ws == null:
 		_ws = WebSocketPeer.new()
+		_ws_opening = 0.0
 		if _ws.connect_to_url(_signaling_url) != OK:
 			_ws = null
 			# A session already under way carries on without the server.
 			if not in_session:
-				_fail("Can't reach the session server at %s." % _signaling_url)
+				_fail(unreachable(_signaling_url))
 			return
 	_outbox.append(JSON.stringify(msg))
 
@@ -338,11 +368,16 @@ func _ask_about_silent_host(delta: float) -> void:
 
 
 func _on_sessions_listed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
-		return
-	var answer: Variant = JSON.parse_string(body.get_string_from_utf8())
+	var answer: Variant = null
+	# Something in the way may answer with a page of its own, which isn't
+	# worth an error in the log.
+	var json := JSON.new()
+	if result == HTTPRequest.RESULT_SUCCESS and response_code == 200 and json.parse(body.get_string_from_utf8()) == OK:
+		answer = json.data
 	if answer is Dictionary and answer.get("sessions") is Array:
 		sessions_listed.emit(answer.sessions)
+	else:
+		sessions_unreachable.emit(unreachable(_http_url))
 
 
 func _on_session_reported(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:

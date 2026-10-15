@@ -32,6 +32,48 @@ func test_each_match_button_steps_through_its_choices_and_comes_round() -> void:
 	assert_eq(Settings.get_value("host_kill_limit"), MatchSettings.KILL_LIMITS[0])
 
 
+# What the session list shows, line by line.
+func _list_lines() -> Array:
+	return main.sessions.get_children().filter(func(line: Node) -> bool: return not line.is_queued_for_deletion()).map(func(line: Node) -> String: return line.text)
+
+
+func test_a_session_server_that_cant_be_reached_is_explained() -> void:
+	var said := Net.unreachable("ws://example.test:9080", false)
+	assert_string_starts_with(said, "Can't reach the session server at ws://example.test:9080.")
+	assert_string_contains(said, "Hosting and joining need it")
+	assert_string_contains(said, "practice and the tutorial work without it", "what can still be played")
+	assert_false(said.contains(Net.START_SERVER), "a player can't start it")
+	assert_string_contains(Net.unreachable("ws://localhost:9080", true), Net.START_SERVER, "a developer can")
+
+
+func test_the_menu_says_when_the_session_list_cant_be_had_and_stops_once_it_can() -> void:
+	var reason := Net.unreachable("http://localhost:9080")
+	Net.sessions_unreachable.emit(reason)
+	assert_eq(_list_lines(), [main.UNREACHABLE_LIST], "not that there are none to join")
+	assert_eq(main.status.text, reason, "and why, under the buttons")
+	Net.sessions_listed.emit([])
+	assert_eq(_list_lines(), ["None yet. Host one!"])
+	assert_eq(main.status.text, "", "said no longer once the list comes")
+	# Something else already said under the buttons stays said.
+	main.status.text = "Enter a session code."
+	Net.sessions_unreachable.emit(reason)
+	assert_eq(main.status.text, "Enter a session code.")
+	assert_eq(_list_lines(), [main.UNREACHABLE_LIST])
+
+
+func test_no_answer_or_a_wrong_one_from_the_session_server_is_said() -> void:
+	watch_signals(Net)
+	Net._on_sessions_listed(HTTPRequest.RESULT_CANT_CONNECT, 0, PackedStringArray(), PackedByteArray())
+	assert_signal_emit_count(Net, "sessions_unreachable", 1, "no answer")
+	Net._on_sessions_listed(HTTPRequest.RESULT_SUCCESS, 502, PackedStringArray(), "Bad gateway".to_utf8_buffer())
+	assert_signal_emit_count(Net, "sessions_unreachable", 2, "an error")
+	Net._on_sessions_listed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), "<html>".to_utf8_buffer())
+	assert_signal_emit_count(Net, "sessions_unreachable", 3, "something that isn't a list")
+	Net._on_sessions_listed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), JSON.stringify({"sessions": []}).to_utf8_buffer())
+	assert_signal_emit_count(Net, "sessions_unreachable", 3)
+	assert_signal_emitted_with_parameters(Net, "sessions_listed", [[]])
+
+
 func test_the_buttons_say_what_is_chosen() -> void:
 	Settings.set_value("host_mode", "teams")
 	Settings.set_value("host_minutes", 3)
