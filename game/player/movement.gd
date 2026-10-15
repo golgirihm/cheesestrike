@@ -37,10 +37,23 @@ const TOUCH_RUN_REACH := 1.35
 ## Gravity is strong (see the project's physics settings), so a jump is quick:
 ## this still lifts a player about a metre and a half.
 const JUMP_VELOCITY := 7.8
+## Landing faster than SAFE_FALL metres a second hurts, by FALL_DAMAGE for
+## each metre a second over it: a drop of about five metres is safe, one of
+## about twenty is the end. A landing after a jump pad's throw never hurts.
+const SAFE_FALL := 14.0
+const FALL_DAMAGE := 8.0
+## What a fall is called where a knock-out is told, as a weapon would be.
+const FALL := "fall"
+const FALL_NAME := "Fall"
 ## Being hit slows a player to FLINCH_SLOW of their speed, easing back to all
 ## of it over FLINCH_TIME seconds, and they can't run until it has.
 const FLINCH_TIME := 0.7
 const FLINCH_SLOW := 0.4
+
+
+## How much a landing at `speed` metres a second, downward, hurts.
+static func fall_damage(speed: float) -> float:
+	return maxf(speed - SAFE_FALL, 0.0) * FALL_DAMAGE
 
 
 ## The share of their speed a player hit `flinch_left` seconds short of

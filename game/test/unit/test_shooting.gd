@@ -1117,6 +1117,134 @@ func _box(size: Vector3, at: Vector2) -> void:
 	await wait_physics_frames(2)
 
 
+## A ramp `length` long rising `angle` radians toward -X, its foot at `at`.
+func _ramp(length: float, angle: float, at: Vector2) -> void:
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(length, 0.4, 6.0)
+	var collider := CollisionShape3D.new()
+	collider.shape = shape
+	var ramp := StaticBody3D.new()
+	ramp.add_child(collider)
+	ramp.rotation.z = -angle
+	# Its top face runs from the foot, at floor level, up and away.
+	var along := Vector3(-cos(angle), sin(angle), 0.0)
+	var up := Vector3(sin(angle), cos(angle), 0.0)
+	ramp.position = Vector3(at.x, 0.0, at.y) + along * length / 2.0 - up * 0.2
+	world.add_child(ramp)
+	await wait_physics_frames(2)
+
+
+# How fast `own` covers ground across, in metres a second, over `seconds`
+# of pushing forward.
+func _ground_speed(own: Node3D, seconds: float) -> float:
+	var from := Vector2(own.global_position.x, own.global_position.z)
+	await wait_seconds(seconds)
+	return Vector2(own.global_position.x, own.global_position.z).distance_to(from) / seconds
+
+
+func test_a_ramp_is_no_quicker_than_flat_ground_up_or_down() -> void:
+	var own := _add(1, Vector3(2, 0, 14))
+	# Facing -X, toward the ramp.
+	own.rotation.y = PI / 2.0
+	await _settle(own)
+	await _ramp(14.0, deg_to_rad(20.0), Vector2(-4, 14))
+	Input.action_press("move_forward")
+	await wait_seconds(0.2)
+	var flat := await _ground_speed(own, 0.5)
+	await wait_seconds(0.8)
+	var up := await _ground_speed(own, 0.6)
+	assert_gt(own.global_position.y, 1.0, "on the ramp")
+	Input.action_release("move_forward")
+	assert_lte(up, flat * 1.02, "up it")
+	own.rotation.y = -PI / 2.0
+	await wait_physics_frames(2)
+	Input.action_press("move_forward")
+	await wait_seconds(0.2)
+	var down := await _ground_speed(own, 0.5)
+	assert_gt(own.global_position.y, 0.5, "still on the ramp")
+	Input.action_release("move_forward")
+	assert_lte(down, flat * 1.02, "or down it")
+
+
+func test_a_long_drop_hurts_and_a_short_one_does_not() -> void:
+	assert_eq(Movement.fall_damage(Movement.JUMP_VELOCITY), 0.0, "landing from a jump")
+	assert_eq(Movement.fall_damage(Movement.SAFE_FALL), 0.0)
+	assert_gt(Movement.fall_damage(Movement.SAFE_FALL + 5.0), 0.0)
+	var own := _add(1, Vector3(-10, 3, 14))
+	match_.state.player(1).protected_for = 0.0
+	await wait_seconds(1.0)
+	assert_true(own.is_on_floor())
+	assert_eq(match_.state.player(1).health, PlayerRecord.MAX_HEALTH, "three metres is nothing")
+	# Twelve metres: some 22 metres a second at the bottom.
+	own.global_position = Vector3(-10, 12, 14)
+	await wait_seconds(1.5)
+	var record := match_.state.player(1)
+	assert_true(record.alive)
+	assert_lt(record.health, PlayerRecord.MAX_HEALTH, "a long drop hurts")
+	assert_gt(record.health, 0)
+	# Higher still is the end, and told as a fall.
+	watch_signals(match_)
+	own.global_position = Vector3(-10, 30, 14)
+	await wait_seconds(2.0)
+	assert_false(record.alive)
+	assert_signal_emitted(match_, "knocked_out")
+	assert_eq(get_signal_parameters(match_, "knocked_out")[2], Movement.FALL)
+
+
+func test_a_jump_pads_throw_lands_unhurt() -> void:
+	var own := _add(1, Vector3(-10, 0, 14))
+	match_.state.player(1).protected_for = 0.0
+	await _settle(own)
+	world.fixtures.pads.append({"position": Vector3(-10, 0, 14), "launch": Vector3(0, 30, 0)})
+	await wait_physics_frames(2)
+	world.fixtures.pads.clear()
+	await wait_seconds(3.5)
+	assert_true(own.is_on_floor())
+	assert_eq(match_.state.player(1).health, PlayerRecord.MAX_HEALTH)
+
+
+func test_nobody_moves_or_fires_in_the_countdown_or_after_the_match() -> void:
+	var own := _add(1, Vector3(-10, 0, 14))
+	await _settle(own)
+	for hold: String in ["countdown", "ended"]:
+		if hold == "countdown":
+			match_.state.countdown = 5.0
+		else:
+			match_.state.end_match()
+		assert_true(own.held_still(), hold)
+		var from: Vector3 = own.global_position
+		var ammo: int = own.weapon.ammo
+		Input.action_press("move_forward")
+		Input.action_press("fire")
+		await wait_physics_frames(20)
+		Input.action_release("move_forward")
+		Input.action_release("fire")
+		assert_almost_eq(own.global_position.distance_to(from), 0.0, 0.01, "%s: standing still" % hold)
+		assert_eq(own.weapon.ammo, ammo, "%s: not firing" % hold)
+		match_.state.start_match()
+		match_.state.countdown = 0.0
+	assert_false(own.held_still())
+	Input.action_press("move_forward")
+	await wait_physics_frames(20)
+	Input.action_release("move_forward")
+	assert_gt(own.global_position.distance_to(Vector3(-10, 0, 14)), 1.0, "and moving once it is under way")
+
+
+func test_a_player_just_back_is_a_ghost_until_they_can_be_hurt() -> void:
+	_add(1, Vector3(0, 0, 5))
+	var other := _add(2, Vector3(0, 0, -5))
+	match_.state.respawn(2)
+	await wait_process_frames(2)
+	assert_true(other.is_ghost())
+	assert_true(Ghost.is_on(other.body), "see-through")
+	assert_true(Ghost.is_on(other.gun), "and so is what they hold")
+	match_.state.tick(MatchState.PROTECTION)
+	await wait_process_frames(2)
+	assert_false(other.is_ghost())
+	assert_false(Ghost.is_on(other.body))
+	assert_false(Ghost.is_on(other.gun))
+
+
 func test_crouching_at_a_run_slides() -> void:
 	var own := _add(1, Vector3(-10, 0, 14))
 	own.rotation.y = -PI / 2.0

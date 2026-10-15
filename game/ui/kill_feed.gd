@@ -30,6 +30,8 @@ static func _who(attacker: String, victim: String, weapon: String, head: bool) -
 	var using := stats.display_name if stats != null else weapon
 	if weapon == Melee.ID:
 		using = Melee.NAME
+	elif weapon == Movement.FALL:
+		using = Movement.FALL_NAME
 	elif MovingParts.HAZARD_NAMES.has(weapon):
 		using = MovingParts.HAZARD_NAMES[weapon]
 	if attacker.is_empty():

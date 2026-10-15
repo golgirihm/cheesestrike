@@ -19,10 +19,15 @@ const VEIN := Color(0.16, 0.42, 0.55)
 const BLOOM := Color(0.96, 0.95, 0.92)
 const BLUSH := Color(0.96, 0.5, 0.5)
 const TEETH := Color(0.97, 0.97, 0.95)
-## How far the legs swing, in radians, at full running speed.
-const STRIDE := 0.7
-## Steps per metre walked.
-const STEPS_PER_METRE := 0.9
+## How far the legs swing either way, in radians, at FULL_STRIDE_SPEED and
+## above.
+const STRIDE := 0.8
+## The speed, in metres a second, at which the legs take their longest stride:
+## a run.
+const FULL_STRIDE_SPEED := 9.0
+## The shortest stride the walk is timed by, as a share of the longest, so
+## that a shuffle doesn't patter.
+const SHORTEST_STRIDE := 0.35
 const MELT_TIME := 0.45
 ## How a knocked-out character goes, by what did it: thrown back by a shot
 ## or a strike and melting where it lands, or blown to crumbs by a burst.
@@ -99,6 +104,9 @@ var _holding := {}
 var _action := CharacterMotion.NONE
 var _action_for := 0.0
 var _arm := Vector3(0.0, 0.0, Emotes.ARM_REST)
+# Where the free hand steadies the weapon, in this node's measurements, or
+# not finite for nowhere.
+var _steady := Vector3.INF
 var _gaze := 0.0
 var _grimace_left := 0.0
 # How far down the player is crouched, 0 to 1, and everything above the legs,
@@ -434,14 +442,35 @@ func is_grimacing() -> bool:
 ## Stretches the weapon arm to the hand holding the weapon, at `hand` in this
 ## node's own measurements.
 func reach_for(hand: Vector3) -> void:
-	var arm := _arms[1]
+	_point_arm(1, hand)
+
+
+## Where the free hand steadies the weapon, at `hand` in this node's own
+## measurements: it holds it there whenever it has nothing else to do, so the
+## weapon is held in both hands. Not finite for nowhere.
+func steady_with(hand: Vector3) -> void:
+	_steady = hand
+
+
+# Points arm `index` from its shoulder to `hand`, stretching it to reach.
+func _point_arm(index: int, hand: Vector3) -> void:
+	var arm := _arms[index]
 	var reach := hand - arm.position
 	var length := reach.length()
 	if length < 0.001:
 		return
 	# The stick hangs down its own Y axis, so point that at the hand.
 	arm.quaternion = Quaternion(Vector3.DOWN, reach / length)
-	arm.get_child(0).scale.y = length / BodyShape.ARMS[1][1]
+	arm.get_child(0).scale.y = length / BodyShape.ARMS[index][1]
+	# The free arm's mitten goes to the end of it.
+	if arm.get_child_count() > 1:
+		(arm.get_child(1) as Node3D).position.y = -length
+
+
+# Puts the free arm back to its own length, for it to swing and wave.
+func _free_arm() -> void:
+	_arms[0].get_child(0).scale.y = 1.0
+	(_arms[0].get_child(1) as Node3D).position.y = -BodyShape.ARMS[0][1]
 
 
 ## How a character knocked out with `weapon` goes: SCATTERED by anything
@@ -487,7 +516,16 @@ func set_in_play(in_play: bool) -> void:
 ## How far a leg swings forward at walk phase `phase` (radians) when moving at
 ## `speed`: a sine wave, larger at speed, nothing standing still.
 static func leg_swing(phase: float, speed: float) -> float:
-	return sin(phase) * STRIDE * clampf(speed / 6.0, 0.0, 1.0)
+	return sin(phase) * STRIDE * clampf(speed / FULL_STRIDE_SPEED, 0.0, 1.0)
+
+
+## Metres covered in one whole walk cycle, a step with each foot, at `speed`:
+## what a stride of legs that long, swinging that far, carries the body. The
+## walk goes through its cycle at the speed across the ground divided by this,
+## so the feet keep pace with the ground rather than paddling.
+static func cycle_length(speed: float) -> float:
+	var swing := STRIDE * clampf(speed / FULL_STRIDE_SPEED, SHORTEST_STRIDE, 1.0)
+	return 4.0 * BodyShape.HIP_HEIGHT * BodyShape.SIZE * sin(swing)
 
 
 func is_melted() -> bool:
@@ -495,7 +533,7 @@ func is_melted() -> bool:
 
 
 func _process(delta: float) -> void:
-	_phase = fmod(_phase + _speed * STEPS_PER_METRE * TAU * delta, TAU)
+	_phase = fmod(_phase + _speed / cycle_length(_speed) * TAU * delta, TAU)
 	var swing := leg_swing(_phase, _speed)
 	# What the legs are doing, and the limbs a step nearer its pose.
 	_since_landing += delta
@@ -522,7 +560,12 @@ func _process(delta: float) -> void:
 	_action = now
 	var rest := Vector3(-swing * 0.6 * _blend.pump, 0.0, Emotes.ARM_REST - _blend.lift)
 	_arm = _arm.lerp(CharacterMotion.arm(_action, _action_for, rest), nearer)
-	_arms[0].rotation = _arm
+	# With nothing else to do, the free hand steadies the weapon.
+	if _action == CharacterMotion.NONE and _emote < 0 and not _melting and _steady.is_finite():
+		_point_arm(0, _steady)
+	else:
+		_free_arm()
+		_arms[0].rotation = _arm
 	var sway := 0.0
 	var hop := 0.0
 	if _emote >= 0:

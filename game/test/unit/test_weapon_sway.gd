@@ -225,3 +225,39 @@ func test_only_the_holder_sees_both_hands_and_the_arms() -> void:
 	for part: String in ["Hand", "OffHand", "ViewArmRight", "ViewArmLeft"]:
 		assert_false(pickup.find_child(part, true, false).visible, "nobody holds a weapon lying on a pad")
 	pickup.free()
+
+
+func test_the_weapon_is_lowered_at_a_run_and_lower_still_in_a_slide() -> void:
+	var still := WeaponSway.carried(0.0, 0.0)
+	assert_eq(still[0], Vector3.ZERO, "where it rests, walking or standing")
+	assert_eq(still[1], Vector3.ZERO)
+	var running := WeaponSway.carried(1.0, 0.0)
+	var sliding := WeaponSway.carried(1.0, 1.0)
+	assert_lt(running[0].y, 0.0)
+	assert_lt(sliding[0].y, running[0].y, "lower in a slide")
+	assert_lt(sliding[1].x, running[1].x, "and tipped further down")
+
+
+func test_another_players_arms_hold_their_weapon() -> void:
+	var other := _other()
+	await wait_process_frames(2)
+	var model: Node3D = other.muzzle.get_parent()
+	var body: Node3D = other.body
+	for pair: Array in [["Arm2", model.to_global(WeaponModels.GRIP)], ["Arm1", model.get_node("OffHand").global_position]]:
+		var arm: Node3D = body.get_node(pair[0])
+		var stick: Node3D = arm.get_child(0)
+		var length: float = BodyShape.ARMS[0][1] * stick.scale.y
+		var end: Vector3 = arm.global_transform * Vector3(0, -length, 0)
+		assert_almost_eq(end.distance_to(pair[1]), 0.0, 0.05, "%s reaches the weapon" % pair[0])
+
+
+func test_a_knocked_out_players_weapon_goes_with_them() -> void:
+	var other := _other()
+	await wait_process_frames(1)
+	assert_true(other.gun.visible)
+	other._set_alive(false)
+	await wait_process_frames(2)
+	assert_false(other.gun.visible, "not left floating where they were")
+	other._set_alive(true)
+	await wait_process_frames(1)
+	assert_true(other.gun.visible)
