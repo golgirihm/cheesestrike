@@ -66,6 +66,8 @@ var has_lifts := false
 var ballot: Ballot
 ## The arena's blocks of cheese, and how much of each is left.
 var blocks := BlockRules.new()
+## The giant mice that eat them, and how long until they come.
+var mice := MouseRules.new()
 ## Points each team has, Cheddar first, in a mode won on points.
 var team_points := [0, 0]
 ## The wheels of a match of Capture the wheel, and the zones of Hold the
@@ -583,6 +585,10 @@ func tick(delta: float) -> Array[int]:
 	if is_playing() and settings.is_practice():
 		return due
 	time_left = maxf(time_left - delta, 0.0)
+	# The mice's countdown runs on every machine, so that it shows smoothly
+	# between updates; only the host sends them in when it runs out.
+	if is_playing() and not blocks.health.is_empty():
+		mice.invade_in = maxf(mice.invade_in - delta, 0.0)
 	if is_playing() and time_left == 0.0:
 		end_match()
 	return due
@@ -645,6 +651,7 @@ func start_match() -> void:
 	winners.clear()
 	pickups.fill(0.0)
 	blocks.reset(blocks.health.size())
+	mice.reset()
 	drops.clear()
 	powers_taken = 0
 	for record: PlayerRecord in players.values():
@@ -757,6 +764,8 @@ func to_dict(with_blocks := true) -> Dictionary:
 		data["round_break"] = round_break
 	if not blocks.health.is_empty() and with_blocks:
 		data["blocks"] = blocks.to_array()
+	if not blocks.health.is_empty():
+		data["mice"] = mice.to_array()
 	if ballot != null:
 		data["ballot"] = ballot.to_array()
 	if not doors.is_empty():
@@ -803,6 +812,7 @@ static func from_dict(data: Dictionary) -> MatchState:
 	state.countdown = clampf(float(counting), 0.0, COUNTDOWN) if (counting is float or counting is int) and is_finite(float(counting)) else 0.0
 	state.just_started = false
 	state.blocks = BlockRules.from_array(data.get("blocks"))
+	state.mice = MouseRules.from_array(data.get("mice"))
 	state.ballot = Ballot.from_array(data.get("ballot"))
 	var open: Variant = data.get("doors")
 	if open is Array:

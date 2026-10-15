@@ -109,6 +109,9 @@ var kill_feed: VBoxContainer
 var scoreboard: PanelContainer
 var _match_label: Label
 var _objective_label: Label
+# How long until the giant mice come, in red.
+var _mice_label: Label
+const MICE_COLOUR := Color(1.0, 0.28, 0.22)
 # The name of where the last player to fall was, for the feed.
 var _fell_at := ""
 # The name of the part of the arena this player is in.
@@ -297,6 +300,19 @@ static func match_text(state: MatchState) -> String:
 	return "First to %d   ·   %s" % [state.settings.limit(), clock]
 
 
+## The countdown to the giant mice coming, under the match's line, while a
+## match on an arena with cheese is under way and they haven't come yet.
+static func mice_text(state: MatchState) -> String:
+	if not state.is_playing() or state.settings.is_practice() or state.blocks.health.is_empty() or state.mice.arrived:
+		return ""
+	return "Mice invade in %s" % clock_text(state.mice.invade_in)
+
+
+## What the countdown to the mice says, for tests.
+func mice_shown() -> String:
+	return _mice_label.text
+
+
 ## What the Overload meter says: how full it is, that it's ready, or how long
 ## an Overload has left.
 static func overload_text(record: PlayerRecord) -> String:
@@ -454,6 +470,7 @@ func _process(delta: float) -> void:
 		_weapon_label.text = own.weapon.stats.display_name
 	var state: MatchState = world.match_.state
 	_match_label.text = match_text(state)
+	_mice_label.text = mice_text(state)
 	var ballot: Ballot = state.ballot
 	_vote_panel.visible = ballot != null
 	if ballot != null:
@@ -973,6 +990,14 @@ func _build() -> void:
 	_objective_label.offset_top = OBJECTIVE_TOP
 	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_objective_label)
+	_mice_label = _outlined_label(18)
+	_mice_label.name = "MiceCountdown"
+	_mice_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
+	_mice_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_mice_label.offset_top = 64.0
+	_mice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mice_label.add_theme_color_override("font_color", MICE_COLOUR)
+	add_child(_mice_label)
 
 	var board_holder := CenterContainer.new()
 	board_holder.set_anchors_preset(Control.PRESET_FULL_RECT)

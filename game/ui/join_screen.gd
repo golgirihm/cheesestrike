@@ -10,6 +10,7 @@ const TIPS := [
 	"A crouched player treads softly: opponents hear running from across the arena.",
 	"Dealing damage fills your Overload. Set it off when it is full.",
 	"Cheese blocks can be shot away. Cover that is cheese is cover for a while.",
+	"A minute in, giant mice come to eat the cheese. Shoot one to send it running, but it will give you away.",
 	"Power-ups come back on a timer, and everyone is told when one is taken.",
 	"Teammates are outlined through walls. Opponents never are.",
 	"A hit to the head does more. A hit from far away does less.",

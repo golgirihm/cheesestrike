@@ -51,9 +51,9 @@ signal picked_up(id: int, kind: String)
 ## player `about` and headed `title`: on a knocked-out player's machine, how
 ## it happened; on everyone's at the end, the play of the match.
 signal replay_shown(clip: Dictionary, about: int, title: String)
-## The mice have come out to gnaw at cheese block `index` (on everyone's
+## Giant mouse `index` was scared off by a shot or a burst (on everyone's
 ## machine).
-signal block_gnawed(index: int)
+signal mouse_scared(index: int)
 ## Something everyone is told, across the screen: `text`, in the colour of
 ## `team` (MatchState.NO_TEAM for nobody's).
 signal announced(text: String, team: int)
@@ -186,7 +186,8 @@ func start(settings := MatchSettings.new()) -> void:
 		state.just_started = state.countdown == 0.0 and not settings.is_practice()
 		_has_state = true
 		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
-		state.blocks = BlockRules.new(world.cheese_blocks().size() if world != null else 0, randi())
+		state.blocks = BlockRules.new(world.cheese_blocks().size() if world != null else 0)
+		state.mice = MouseRules.new(randi())
 		_hold_back_powers()
 		_pending_names.clear()
 		_pending_looks.clear()
@@ -458,7 +459,8 @@ func _apply_vote() -> void:
 	state = state.with_settings(next)
 	world.load_map(next.map)
 	state.set_pickup_count(world.pickup_pads().size())
-	state.blocks = BlockRules.new(world.cheese_blocks().size(), randi())
+	state.blocks = BlockRules.new(world.cheese_blocks().size())
+	state.mice = MouseRules.new(randi())
 	_projectiles.clear()
 	_rules.clear()
 	_histories.clear()
@@ -1015,11 +1017,7 @@ func _process(delta: float) -> void:
 		for id in due:
 			_respawn(id)
 		if state.is_live():
-			var gnawed := state.blocks.tick(delta)
-			if gnawed != -1:
-				_gnaw_seen.rpc(gnawed)
-				block_gnawed.emit(gnawed)
-				_hurt_block(gnawed, BlockRules.GNAW)
+			_run_mice(delta)
 		if state.just_started:
 			state.just_started = false
 			var rules: String = state.settings.rules
@@ -1136,6 +1134,8 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 		# Through thin cover, at a cost; stopped by anything more.
 		var way := Penetration.path(origin, pellet, weapon.max_range, wall_caster(world.get_world_3d().direct_space_state))
 		var hit := HitScan.first_hit(origin, pellet, way.reach, targets)
+		# A mouse in the way runs off, and the shot goes on past it.
+		_scare_mice(origin, pellet, way.first)
 		# A shot that meets a block of cheese before anyone takes some of it away.
 		if hit.is_empty() or hit.distance > way.first:
 			_shoot_block(origin, pellet, way.first, weapon.damage_at(way.first))
@@ -1386,9 +1386,40 @@ func _collect_drops() -> void:
 			break
 
 
+# Host only: the giant mice come when their countdown runs out, and go about
+# eating the cheese. Everyone is sent where they are as they go.
+func _run_mice(delta: float) -> void:
+	var done := state.mice.tick(delta, state.blocks, world.block_boxes(), world.edge())
+	if done.came > 0:
+		# The first come together; the rest one at a time.
+		announce("The mice are here!" if done.came > 1 else "Another mouse!", MatchState.NO_TEAM)
+	for bite: Dictionary in done.bites:
+		_hurt_block(bite.index, bite.amount)
+	if not state.mice.mice.is_empty():
+		_dirty = true
+
+
+# Host only: whichever giant mice a shot from `origin` along `direction`,
+# reaching `reach`, or a burst at `at` reaching `radius`, catches run off.
+func _scare_mice(origin: Vector3, direction: Vector3, reach: float) -> void:
+	_scared(state.mice.hit(origin, direction, reach), origin)
+
+
+func _scare_mice_near(at: Vector3, radius: float) -> void:
+	for index: int in state.mice.near(at, radius):
+		_scared(index, at)
+
+
+func _scared(index: int, from: Vector3) -> void:
+	if state.mice.scare(index, from):
+		_mouse_scared.rpc(index)
+		mouse_scared.emit(index)
+		_changed()
+
+
 @rpc("authority", "call_remote", "reliable")
-func _gnaw_seen(index: int) -> void:
-	block_gnawed.emit(index)
+func _mouse_scared(index: int) -> void:
+	mouse_scared.emit(index)
 
 
 # Host only: a shot from `origin` along `direction` met the arena `distance`
@@ -1632,6 +1663,7 @@ func _burst(projectile: Projectile, at: Vector3) -> void:
 	if weapon.splash_radius <= 0.0:
 		return
 	_burst_blocks(at, weapon)
+	_scare_mice_near(at, weapon.splash_radius)
 	var space := world.get_world_3d().direct_space_state
 	# A burst against a wall is at its face; sight lines are checked from a
 	# hand's width back along the way it came, so the wall itself counts.

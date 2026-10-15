@@ -43,6 +43,7 @@ const SOUNDS := {
 	"power": "_power",
 	"objective": "_objective",
 	"gnaw": "_gnaw",
+	"squeak": "_mouse_squeak",
 	"crumble": "_crumble",
 	"reload": "_reload",
 	"dry": "_dry",
@@ -666,6 +667,16 @@ static func _gnaw() -> AudioStreamWAV:
 		# Eleven nibbles a second, each a scrape that is over at once.
 		samples[i] = soft * _decay(fmod(t, 0.09), 60.0) * minf(t * 8.0, 1.0)
 	return _stream(_shaped(samples, 0.5))
+
+
+# A giant mouse, scared: two high squeaks that slide up and break off, big
+# enough to be heard across a town.
+static func _mouse_squeak() -> AudioStreamWAV:
+	return _make(0.5, func(t: float, _i: int) -> float:
+		var into := fmod(t, 0.25)
+		var pitch := lerpf(1400.0, 2300.0, into / 0.18)
+		var wobble := 1.0 + 0.04 * sin(TAU * 31.0 * t)
+		return sin(TAU * pitch * wobble * into) * minf(into * 60.0, 1.0) * _decay(into, 9.0), 0.6)
 
 
 # A block of cheese giving way: a soft thud and a patter of crumbs.

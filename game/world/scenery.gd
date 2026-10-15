@@ -233,6 +233,33 @@ static func mouse() -> Node3D:
 	var tail := Rounded.instance(Rounded.cylinder(0.025, 0.6, 0.01, 6), pink, Vector3(0, 0.12, 0.7))
 	tail.rotation.x = PI / 2.0
 	mouse.add_child(tail)
+	# A face at the front: two shiny black eyes, a pink nose and whiskers.
+	var dot := SphereMesh.new()
+	dot.radius = 0.045
+	dot.height = 0.09
+	dot.radial_segments = 8
+	dot.rings = 4
+	var eye := _material(INK)
+	for side: float in [-1.0, 1.0]:
+		mouse.add_child(Rounded.instance(dot, eye, Vector3(0.11 * side, 0.36, -0.38)))
+		for tilt: float in [-0.12, 0.12]:
+			var whisker := Rounded.instance(Rounded.cylinder(0.006, 0.34, 0.002, 4), _material(INK.lightened(0.4)), Vector3(0.14 * side, 0.27, -0.44))
+			whisker.rotation = Vector3(tilt, 0.0, PI / 2.0 + tilt * side)
+			mouse.add_child(whisker)
+	var nose := Rounded.instance(dot, pink, Vector3(0, 0.27, -0.49))
+	nose.scale = Vector3.ONE * 1.3
+	mouse.add_child(nose)
+	# Four pink feet under it.
+	var foot := SphereMesh.new()
+	foot.radius = 0.07
+	foot.height = 0.08
+	foot.radial_segments = 8
+	foot.rings = 4
+	for side: float in [-1.0, 1.0]:
+		for end: float in [-1.0, 1.0]:
+			var paw := Rounded.instance(foot, pink, Vector3(0.17 * side, 0.03, 0.22 * end))
+			paw.scale = Vector3(1.0, 1.0, 1.4)
+			mouse.add_child(paw)
 	return mouse
 
 

@@ -1,20 +1,16 @@
 class_name BlockRules
 extends RefCounted
 ## The cheese blocks get eaten. Each of an arena's blocks of cheese has some
-## health; shots and bursts take it away, and every so often through a match
-## mice come out and gnaw at one. A block with none left is gone, and so is
-## whatever cover it gave, until the next match.
+## health; shots, bursts and the giant mice (see MouseRules) take it away. A
+## block with none left is gone, and so is whatever cover it gave, until the
+## next match.
 ##
 ## Kept free of nodes so the rules can be tested alone: the host tells it
 ## what hit which block, and takes away the blocks it says have gone.
 
-## What a block can take: a magazine or two of most weapons, or three visits
-## from the mice.
+## What a block can take: a magazine or two of most weapons, or a few
+## seconds of a mouse.
 const HEALTH := 400
-const GNAW := 150
-## Seconds into a match before the mice first come out, and between visits.
-const FIRST_GNAW := 30.0
-const GNAW_EVERY := 20.0
 ## How many stages of being eaten a block shows before it is gone.
 const STAGES := 3
 ## The most blocks an arena may have: a large map's houses are built of
@@ -23,13 +19,9 @@ const MOST := 2000
 
 ## Each block's health, in the order the arena lists them.
 var health: Array[int] = []
-## Seconds until the mice next come out.
-var gnaw_in := FIRST_GNAW
-var _rng := RandomNumberGenerator.new()
 
 
-func _init(count := 0, seed := 0) -> void:
-	_rng.seed = seed
+func _init(count := 0) -> void:
 	reset(count)
 
 
@@ -38,7 +30,6 @@ func reset(count: int) -> void:
 	health.clear()
 	for index in count:
 		health.append(HEALTH)
-	gnaw_in = FIRST_GNAW
 
 
 func standing(index: int) -> bool:
@@ -67,20 +58,6 @@ func remove(index: int) -> bool:
 		return false
 	health[index] = 0
 	return true
-
-
-## Moves on by `delta` seconds. Returns the block the mice have come out to
-## gnaw at now, for the host to hurt() by GNAW, or -1 for none.
-func tick(delta: float) -> int:
-	gnaw_in -= delta
-	if gnaw_in > 0.0:
-		return -1
-	gnaw_in = GNAW_EVERY
-	var left: Array[int] = []
-	for index in health.size():
-		if health[index] > 0:
-			left.append(index)
-	return left[_rng.randi_range(0, left.size() - 1)] if not left.is_empty() else -1
 
 
 ## Which of the blocks with these `boxes` (each an AABB, in the arena's own
