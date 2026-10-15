@@ -51,6 +51,14 @@ var world: Node3D
 var _entries: Array[Dictionary] = []
 
 
+## The ring round the crosshair that shows where sounds come from, if any.
+var ring: SoundRing
+
+
+static func listener_far_enough(listener: Vector3, at: Vector3) -> bool:
+	return listener.distance_to(at) >= OWN_DISTANCE
+
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	alignment = BoxContainer.ALIGNMENT_END
@@ -58,13 +66,44 @@ func _ready() -> void:
 
 
 ## The caption for the sound `name` made at `at`, heard by a player at
-## `listener` facing `yaw`, or "" for none.
-static func caption(name: String, at: Variant, listener: Vector3, yaw: float) -> String:
+## `listener` facing `yaw`, or "" for none: what, by `who` if they are
+## known, where, and how near or far if it is either.
+static func caption(name: String, at: Variant, listener: Vector3, yaw: float, who := "") -> String:
 	if not TEXTS.has(name) or not at is Vector3:
 		return ""
 	if listener.distance_to(at) < OWN_DISTANCE:
 		return ""
-	return "%s, %s" % [TEXTS[name], direction_word(CombatHud.damage_direction(listener, yaw, at))]
+	var said: String = "%s (%s)" % [TEXTS[name], who] if not who.is_empty() else TEXTS[name]
+	said += ", " + direction_word(CombatHud.damage_direction(listener, yaw, at))
+	var far := distance_word(listener.distance_to(at))
+	return said + (", " + far if not far.is_empty() else "")
+
+
+## How near a sound `distance` metres away is said to be: "near", "far", or
+## nothing in between.
+static func distance_word(distance: float) -> String:
+	if distance <= NEAR:
+		return "near"
+	return "far" if distance >= FAR else ""
+
+
+const NEAR := 6.0
+const FAR := 30.0
+## A sound this close to a player, in metres, is taken to be theirs.
+const MADE_BY := 2.0
+
+
+## The name of whoever, of the `players` ({name: place}), stands within
+## MADE_BY of `at`, the nearest; or "".
+static func maker(at: Vector3, players: Dictionary) -> String:
+	var found := ""
+	var nearest := MADE_BY
+	for who: String in players:
+		var distance := at.distance_to(players[who])
+		if distance <= nearest:
+			nearest = distance
+			found = who
+	return found
 
 
 ## A word for a direction from straight ahead, as damage_direction gives it.
@@ -124,7 +163,14 @@ func _on_played(name: String, at: Variant) -> void:
 	var own: Node3D = world.player_node(multiplayer.get_unique_id())
 	if own == null:
 		return
-	var text := caption(name, at, own.global_position, own.rotation.y)
+	if at is Vector3 and ring != null and listener_far_enough(own.global_position, at):
+		ring.heard(name, at)
+	var others := {}
+	if world.match_.has_state():
+		for other: Node3D in world.players.get_children():
+			if other != own and String(other.name).is_valid_int():
+				others[world.match_.state.name_of(int(String(other.name)))] = other.global_position
+	var text := caption(name, at, own.global_position, own.rotation.y, maker(at, others) if at is Vector3 else "")
 	if not text.is_empty():
 		add(text)
 

@@ -45,6 +45,8 @@ const DEFAULTS := {
 	"colour_preset": "standard",
 	# Whether the title screen's word about flashing has been put away.
 	"flash_warning_seen": false,
+	# Whether a ring round the crosshair shows where sounds come from.
+	"sound_ring": false,
 	"colour_cheddar": "",
 	"colour_brie": "",
 	"colour_hit": "",

@@ -37,6 +37,7 @@ var hurts_shown := 0
 ## The kind of the latest hit mark.
 var hit_kind := ""
 var captions: VBoxContainer
+var sound_ring: SoundRing
 
 var _hit_left := 0.0
 ## Seconds a hit's damage stays written by the crosshair, drifting upward.
@@ -963,7 +964,10 @@ func _build() -> void:
 	scoreboard.visible = false
 	board_rows.add_child(scoreboard)
 
+	sound_ring = SoundRing.new()
+	add_child(sound_ring)
 	captions = preload("res://ui/captions.gd").new()
+	captions.ring = sound_ring
 	captions.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 70)
 	captions.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	captions.grow_vertical = Control.GROW_DIRECTION_BEGIN

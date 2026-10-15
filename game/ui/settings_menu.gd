@@ -44,6 +44,7 @@ const TOGGLES := [
 	["touch_left_handed", "Touch buttons on the left"],
 	["touch_fullscreen", "Full screen when touched"],
 	["captions", "Captions for sounds"],
+	["sound_ring", "Show where sounds come from, round the crosshair"],
 	["toggle_run", "Press once to run, again to stop"],
 	["toggle_crouch", "Press once to crouch, again to stand"],
 	["toggle_aim", "Press once to aim, again to stop"],
