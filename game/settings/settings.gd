@@ -43,6 +43,8 @@ const DEFAULTS := {
 	"less_motion": false,
 	# The colours of the teams and of a hit (see TeamColors).
 	"colour_preset": "standard",
+	# Whether the title screen's word about flashing has been put away.
+	"flash_warning_seen": false,
 	"colour_cheddar": "",
 	"colour_brie": "",
 	"colour_hit": "",

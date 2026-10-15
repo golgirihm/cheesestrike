@@ -141,15 +141,13 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* extend `test_preferences.gd`.
 2. **An enemy colour.** A colour of one's own for opponents outside teams, as in free-for-all. (Sets for the common kinds of colour blindness, and free choice of each team's colour and of the hit mark's, are done.)
    *Tests:* extend `test_accessibility.gd`.
-3. **A warning of flashing.** Warn before anything that flashes, pointing to Less motion. (The Less motion switch, which calms bob, sway, shake, the running view and flashes, is done.)
-   *Tests:* GUT tests of when the warning shows.
-4. **Hearing.** Captions with speaker, direction and distance, a ring on the HUD that shows where sounds come from, and mono sound.
+3. **Hearing.** Captions with speaker, direction and distance, a ring on the HUD that shows where sounds come from, and mono sound.
    *Tests:* extend the caption tests.
-5. **Seeing.** A high-contrast mode, larger text everywhere including menus, and menus read aloud by a screen reader.
+4. **Seeing.** A high-contrast mode, larger text everywhere including menus, and menus read aloud by a screen reader.
    *Tests:* GUT tests that every control has a name to read.
-6. **Hands.** Hold or toggle for everything, one-handed layouts, and nothing that needs keys mashed.
+5. **Hands.** Hold or toggle for everything, one-handed layouts, and nothing that needs keys mashed.
    *Tests:* GUT tests of the presets.
-7. **Other languages.** Move every word on screen into translation files, lay the interface out for longer words and right-to-left scripts, and translate into the first few languages.
+6. **Other languages.** Move every word on screen into translation files, lay the interface out for longer words and right-to-left scripts, and translate into the first few languages.
    *Tests:* a GUT test that no text on screen is missing from the files, and that every screen fits in every language.
 
 ## Milestone 15: Release
