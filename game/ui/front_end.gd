@@ -51,6 +51,14 @@ func _init() -> void:
 	add_child(credits)
 	flash_warning = _flash_warning()
 	add_child(flash_warning)
+	var version := Label.new()
+	version.name = "Version"
+	version.text = "Version %s" % Changes.version()
+	version.add_theme_font_size_override("font_size", 13)
+	version.modulate.a = 0.7
+	add_child(version)
+	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 10)
+	version.grow_vertical = Control.GROW_DIRECTION_BEGIN
 
 
 ## A word, until it is put away, that the game flashes, and what calms it.
@@ -185,6 +193,18 @@ func _credits() -> Control:
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.custom_minimum_size = Vector2(396, 0)
 	rows.add_child(text)
+	# What is new, in a box of its own that scrolls.
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(396, 150)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rows.add_child(scroll)
+	var news := Label.new()
+	news.name = "Changes"
+	news.text = "\n".join(Changes.lines())
+	news.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	news.custom_minimum_size = Vector2(380, 0)
+	news.add_theme_font_size_override("font_size", 14)
+	scroll.add_child(news)
 	var back := Button.new()
 	back.name = "CreditsBackButton"
 	back.text = "Back"

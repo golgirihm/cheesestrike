@@ -157,7 +157,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
 3. **Playtests.** A regular session with people outside the project, a form for what they found, and a build channel for them.
 4. **The words.** Credits, licences for everything used, a privacy policy, terms, and an age rating.
 5. **Telling people.** A logo and key art, a trailer, screenshots, a store page, a press kit and a place for the community.
-6. **Release.** Version number on the menu, a changelog shown in the game, a page on itch.io, and the full manual test list run first.
+6. **Release.** A page on itch.io, and the full manual test list run first. (The version on the title screen, and what is new in it in the credits, are done; `game/changes.gd` says what is new, and a test holds it to the version in `project.godot`.)
 7. **After release.** A cadence for updates, a public list of known problems, and a way to turn a feature off without a new build if it breaks.
 
 ## Later
