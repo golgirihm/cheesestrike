@@ -57,6 +57,18 @@ func test_many_small_rises_bunched_together_dont_add_up_to_flight() -> void:
 	assert_lte(height, MovementCheck.MAX_RISE_SPEED * 0.2 + MovementCheck.reserve(MovementCheck.MAX_RISE_SPEED) + 0.001)
 
 
+func test_updates_held_up_and_arriving_together_are_fine() -> void:
+	# Running at full speed, updates every 50 ms, but a stall holds ten of
+	# them up and they arrive within a few milliseconds.
+	var speed := MovementCheck.MAX_SPEED / 1.2
+	for i in 10:
+		assert_true(check.check(10.0 + (i + 1) * 0.05, Vector3(speed * (i + 1) * 0.05, 0, 0), 0, open, true), "before, %d" % i)
+	var at := 0.5
+	for i in 10:
+		at += 0.05
+		assert_true(check.check(11.0 + i * 0.002, Vector3(speed * at, 0, 0), 0, open, true), "held up, %d" % i)
+
+
 func test_moving_far_too_fast_is_refused() -> void:
 	assert_false(check.check(10.05, Vector3(10, 0, 0), 0, open, true))
 	assert_eq(check.last_position(), Vector3.ZERO, "the last good place is kept")

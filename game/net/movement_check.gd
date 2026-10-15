@@ -18,6 +18,10 @@ const MAX_SPEED := Movement.WALK_SPEED * Movement.RUN_FACTOR * Movement.SLIDE_BO
 const MAX_RISE_SPEED := Movement.JUMP_VELOCITY * 1.15
 ## Slack for updates bunched up on the network.
 const SLACK_TIME := 0.15
+## How long a player's unused time is kept for them. Updates held up on the
+## way arrive together, each with almost no time since the last, and need
+## the time that went by while they were held up; but no more than this.
+const KEPT_TIME := 1.0
 const SLACK_DISTANCE := 0.6
 ## How long after a shove extra speed is allowed, and how much.
 const PUSH_WINDOW := 1.5
@@ -85,9 +89,9 @@ func check(time: float, at: Vector3, teleports: int, blocked: Callable, on_groun
 	var speed := MAX_SPEED * maxf(speed_scale, 1.0) + shoved
 	var rise_speed := MAX_RISE_SPEED + shoved
 	# What the time since the last update allows, on top of what was left,
-	# and never more than the reserve and that together.
-	var reach := minf(_reach, reserve(speed)) + speed * elapsed
-	var lift := minf(_lift, reserve(rise_speed)) + rise_speed * elapsed
+	# and never more than a moment's worth kept from before.
+	var reach := minf(_reach, kept(speed)) + speed * elapsed
+	var lift := minf(_lift, kept(rise_speed)) + rise_speed * elapsed
 	var across := Vector2(at.x - _last_position.x, at.z - _last_position.z).length()
 	if across > reach:
 		return false
@@ -106,6 +110,11 @@ func check(time: float, at: Vector3, teleports: int, blocked: Callable, on_groun
 
 ## The most a player moving at `speed` can have in hand: the slack for
 ## updates bunched up on the way.
+## The most a player moving at `speed` can keep of the time they didn't use.
+static func kept(speed: float) -> float:
+	return speed * KEPT_TIME + SLACK_DISTANCE
+
+
 static func reserve(speed: float) -> float:
 	return speed * SLACK_TIME + SLACK_DISTANCE
 
