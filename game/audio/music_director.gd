@@ -2,7 +2,7 @@ class_name MusicDirector
 extends Node
 ## Music that follows the match: a theme on the menu, a quieter piece under a
 ## match, one that drives when the match is nearly decided (its last minute,
-## sudden death, or one side a score or two from winning), and a short
+## or one side a score or two from winning), and a short
 ## sting at the end for whoever won and whoever lost.
 
 const MENU := "music"
@@ -33,7 +33,7 @@ func _init(of: Node3D = null) -> void:
 static func piece(in_session: bool, standing: Dictionary, match_point: bool) -> String:
 	if not in_session or standing.is_empty():
 		return MENU
-	if standing.playing and (standing.sudden or standing.time_left <= LAST or match_point):
+	if standing.playing and (standing.time_left <= LAST or match_point):
 		return TENSE
 	return MATCH
 
@@ -49,7 +49,7 @@ static func sting(won: Variant) -> String:
 ## Whether the match in `state` is at match point: whoever leads is within a
 ## score, or a tenth of the limit, of winning.
 static func match_point(state: MatchState) -> bool:
-	if state.phase != MatchState.PLAYING or state.is_warm_up():
+	if not state.is_live():
 		return false
 	var limit := state.settings.limit()
 	var best := 0

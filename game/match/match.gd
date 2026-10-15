@@ -956,7 +956,7 @@ func _process(delta: float) -> void:
 				stats_changed.emit()
 		for id in due:
 			_respawn(id)
-		if state.is_playing():
+		if state.is_live():
 			var gnawed := state.blocks.tick(delta)
 			if gnawed != -1:
 				_gnaw_seen.rpc(gnawed)
@@ -967,10 +967,6 @@ func _process(delta: float) -> void:
 			var rules: String = state.settings.rules
 			announce("The match begins" if rules == MatchSettings.STANDARD else "The match begins  ·  %s" % MatchSettings.RULE_NAMES[rules], MatchState.NO_TEAM)
 			_hold_back_powers()
-			_changed()
-		if state.just_overtime:
-			state.just_overtime = false
-			announce("Sudden death: the next score wins", MatchState.NO_TEAM)
 			_changed()
 		if state.ballot != null and state.ballot.kind == Ballot.REMOVE:
 			_settle_removal()

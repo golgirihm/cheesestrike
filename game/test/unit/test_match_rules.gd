@@ -55,142 +55,91 @@ func test_running_out_of_time_ends_the_match_with_the_leader_winning() -> void:
 	assert_eq(state.winners, [2] as Array[int])
 
 
-func test_level_at_the_end_goes_to_sudden_death() -> void:
-	_knock_out(1, 3)
-	_knock_out(2, 3)
-	state.tick(300.0)
-	assert_true(state.is_playing(), "not over yet")
-	assert_true(state.overtime)
-	assert_true(state.just_overtime, "for the host to tell everyone")
-	assert_eq(state.time_left, MatchState.OVERTIME)
-
-
-func test_the_next_score_in_sudden_death_wins() -> void:
-	_knock_out(1, 3)
-	_knock_out(2, 3)
-	state.tick(300.0)
-	var result := _knock_out(2, 1)
-	assert_true(result.ended)
-	assert_false(state.is_playing())
-	assert_false(state.overtime)
-	assert_eq(state.winners, [2] as Array[int])
-
-
-func test_a_score_that_leaves_it_level_does_not_end_sudden_death() -> void:
-	state = _free_for_all(10)
-	for id in [1, 2, 3]:
-		state.add_player(id)
-	_knock_out(1, 3)
-	_knock_out(1, 3)
-	_knock_out(2, 3)
-	_knock_out(2, 3)
-	state.tick(300.0)
-	assert_true(state.overtime)
-	_knock_out(3, 1)
-	assert_true(state.is_playing(), "the two in front are still level")
-
-
-func test_sudden_death_that_runs_out_level_is_a_draw() -> void:
+func test_level_at_the_end_is_a_draw_with_no_extra_time() -> void:
 	state.rename(1, "Brie")
 	state.rename(2, "Edam")
 	_knock_out(1, 3)
 	_knock_out(2, 3)
 	state.tick(300.0)
-	state.tick(MatchState.OVERTIME)
 	assert_false(state.is_playing(), "a clear end")
 	assert_eq(state.winners, [1, 2] as Array[int])
 	assert_eq(state.result_text(), "Draw: Brie and Edam")
 
 
-func test_nobody_scoring_goes_to_sudden_death_and_then_nobody_wins() -> void:
+func test_nobody_scoring_by_the_end_means_nobody_wins() -> void:
 	state.tick(300.0)
-	assert_true(state.overtime)
-	state.tick(MatchState.OVERTIME)
 	assert_false(state.is_playing())
 	assert_eq(state.winners.size(), 0)
 	assert_eq(state.result_text(), "Nobody wins")
 
 
-func test_teams_level_at_the_end_play_sudden_death_too() -> void:
+func test_teams_level_at_the_end_draw() -> void:
 	state = _teams(10)
 	for id in [1, 2]:
 		state.add_player(id)
-	state.tick(state.time_left)
-	assert_true(state.overtime)
 	_knock_out(1, 2)
+	_knock_out(2, 1)
+	state.tick(state.time_left)
 	assert_false(state.is_playing())
-	assert_eq(state.winners, [state.player(1).team] as Array[int])
+	assert_eq(state.winners, [MatchState.CHEDDAR, MatchState.BRIE] as Array[int])
 
 
-func test_a_new_match_is_not_in_sudden_death() -> void:
-	state.tick(300.0)
-	state.tick(MatchState.OVERTIME)
-	state.start_match()
-	assert_false(state.overtime)
-	assert_true(state.started)
-
-
-func test_a_match_waits_for_a_second_player() -> void:
+func test_a_match_with_one_player_runs_its_clock() -> void:
 	state = _free_for_all()
-	assert_true(state.is_warm_up())
 	state.add_player(1)
-	assert_true(state.is_warm_up())
-	state.tick(60.0)
-	assert_eq(state.time_left, 300.0, "the clock stands still")
-	state.add_player(2)
-	assert_false(state.is_warm_up())
-	assert_true(state.just_started, "for the host to tell everyone")
+	assert_true(state.is_live(), "there is no waiting for a second player")
 	state.tick(60.0)
 	assert_eq(state.time_left, 240.0)
+	state.tick(240.0)
+	assert_false(state.is_playing())
 
 
-func test_nothing_done_in_the_warm_up_counts() -> void:
-	state = _free_for_all(1)
-	state.add_player(1)
-	state.player(1).overload = 80.0
-	state.damage(1, 1, 500.0, true)
-	assert_eq(state.player(1).deaths, 1)
-	assert_true(state.is_playing(), "and a warm-up never ends")
-	state.respawn(1)
-	state.add_player(2)
-	assert_eq(state.player(1).deaths, 0)
-	assert_eq(state.player(1).overload, 0.0)
-	assert_true(state.player(1).alive, "they stay where they are, in play")
-
-
-func test_a_warm_up_with_one_player_runs_no_clock_however_long() -> void:
+func test_each_match_counts_down_before_it_begins() -> void:
+	MatchState.countdown_length = MatchState.COUNTDOWN
 	state = _free_for_all()
 	state.add_player(1)
-	state.tick(10000.0)
+	state.add_player(2)
 	assert_true(state.is_playing())
-	assert_false(state.overtime)
-
-
-func test_a_match_that_has_begun_carries_on_when_someone_leaves() -> void:
-	state = _free_for_all()
-	state.add_player(1)
-	state.add_player(2)
-	state.remove_player(2)
-	assert_false(state.is_warm_up())
+	assert_true(state.is_counting_down())
+	assert_false(state.is_live())
+	assert_eq(state.countdown, MatchState.COUNTDOWN)
+	state.tick(MatchState.COUNTDOWN - 1.0)
+	assert_eq(state.time_left, 300.0, "the clock stands still")
+	assert_eq(state.damage(1, 2, 50.0).dealt, 0, "nobody can be hurt")
+	assert_false(state.throw_grenade(1), "nor throw")
+	assert_false(state.just_started)
+	state.tick(1.0)
+	assert_true(state.is_live())
+	assert_true(state.just_started, "for the host to tell everyone")
 	state.tick(10.0)
 	assert_eq(state.time_left, 290.0)
-	# But the next match waits again, and one player can't go to overtime.
-	state.tick(290.0)
-	assert_false(state.is_playing(), "nobody to be level with")
+	state.end_match()
+	state.tick(MatchState.INTERMISSION)
 	state.start_match()
-	assert_true(state.is_warm_up())
+	assert_true(state.is_counting_down(), "and so does the next")
+	MatchState.countdown_length = 0.0
 
 
-func test_warm_up_and_sudden_death_survive_the_trip() -> void:
+func test_the_practice_range_has_no_countdown_and_no_end() -> void:
+	MatchState.countdown_length = MatchState.COUNTDOWN
+	state = MatchState.new(MatchSettings.practice())
+	state.add_player(1)
+	assert_true(state.is_live())
+	state.tick(10000.0)
+	assert_true(state.is_playing())
+	MatchState.countdown_length = 0.0
+
+
+func test_the_countdown_survives_the_trip() -> void:
+	MatchState.countdown_length = MatchState.COUNTDOWN
 	state = _free_for_all()
 	state.add_player(1)
-	assert_true(MatchState.from_dict(state.to_dict()).is_warm_up())
-	state.add_player(2)
+	state.tick(2.0)
 	var copy := MatchState.from_dict(state.to_dict())
-	assert_false(copy.is_warm_up())
-	assert_false(copy.overtime)
-	state.tick(300.0)
-	assert_true(MatchState.from_dict(state.to_dict()).overtime)
+	assert_almost_eq(copy.countdown, MatchState.COUNTDOWN - 2.0, 0.001)
+	state.tick(MatchState.COUNTDOWN)
+	assert_true(MatchState.from_dict(state.to_dict()).is_live())
+	MatchState.countdown_length = 0.0
 
 
 func test_the_next_match_is_due_after_the_break() -> void:

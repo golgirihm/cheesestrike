@@ -54,7 +54,7 @@ func _process(delta: float) -> void:
 		# The next match.
 		_begin()
 	_was_over = over
-	if over or state.is_warm_up():
+	if not state.is_live():
 		return
 	var record := state.player(own)
 	if record == null or record.watching:

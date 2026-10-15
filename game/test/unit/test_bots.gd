@@ -304,7 +304,7 @@ func test_the_host_adds_the_bots_it_asked_for_and_the_match_begins() -> void:
 	await _start({"map": "box", "bots": 3})
 	assert_eq(world.bot_ids(), [-3, -2, -1])
 	assert_eq(world.players.get_child_count(), 4)
-	assert_false(match_.state.is_warm_up(), "someone to play against")
+	assert_true(match_.state.is_live())
 	for id: int in world.bot_ids():
 		var record := match_.state.player(id)
 		var node: Node3D = world.player_node(id)
@@ -346,7 +346,6 @@ func test_a_session_without_bots_has_none() -> void:
 	await _start({"map": "box"})
 	assert_eq(world.bot_ids(), [])
 	assert_eq(world.players.get_child_count(), 1)
-	assert_true(match_.state.is_warm_up())
 
 
 func test_the_scoreboard_marks_a_bot() -> void:

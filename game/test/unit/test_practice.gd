@@ -77,13 +77,13 @@ func test_targets_are_not_bots_and_no_match_begins() -> void:
 	assert_eq(match_.state.players.size(), 6)
 	assert_true(Bots.is_target(Bots.target_id(0)))
 	assert_false(Bots.is_target(Bots.id_for(MatchSettings.MAX_PLAYERS)), "no bot is taken for one")
-	assert_true(match_.state.is_warm_up(), "nothing to win")
+	assert_true(match_.state.is_live(), "nothing to count down to")
 	match_._process(600.0)
 	assert_true(match_.state.is_playing(), "however long it is left")
 	assert_eq(HUD.match_text(match_.state), "Practice range")
 	assert_string_contains(match_.state.objective_text(1), "rack")
 	match_._new_match()
-	assert_true(match_.state.is_warm_up())
+	assert_true(match_.state.is_live())
 
 
 func test_a_target_only_stands_there() -> void:
