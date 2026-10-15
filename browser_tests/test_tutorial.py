@@ -72,9 +72,10 @@ class TutorialTest(GameTestCase):
         self.assertGreater(len(game.own_player()["carrying"]), 2)
         game.wait_for("s.combat.tutorial.includes('Overload is full') && s.combat.overload.startsWith('Overload ready')")
 
+        # Ticked off while the Overload is on, and checked in the same look:
+        # read a moment later, on a busy machine, it may already be over.
         game.press("q")
-        game.wait_for("s.combat.tutorial.startsWith(\"That's everything\")")
-        self.assertTrue(game.own_player()["overloaded"])
+        game.wait_for("s.combat.tutorial.startsWith(\"That's everything\") && s.players.some((player) => player.mine && player.overloaded)")
 
 
 if __name__ == "__main__":
