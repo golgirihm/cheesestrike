@@ -215,3 +215,39 @@ func test_every_colour_of_ones_own_has_a_name_and_can_be_chosen() -> void:
 		assert_true(TeamColors.OWN_NAMES.has(own), own)
 		for key: String in [TeamColors.OWN_CHEDDAR, TeamColors.OWN_BRIE, TeamColors.OWN_HIT]:
 			assert_true(Settings.CHOICES[key].has(own), "%s for %s" % [own, key])
+
+
+func test_a_caption_says_who_and_how_near_or_far() -> void:
+	assert_eq(CAPTIONS.caption("step", Vector3(0, 0, -3), Vector3.ZERO, 0.0, "Brie 42"), "Footsteps (Brie 42), ahead, near")
+	assert_eq(CAPTIONS.caption("shotgun", Vector3(40, 0, 0), Vector3.ZERO, 0.0), "Shotgun blast, right, far")
+
+
+func test_a_sound_is_put_to_whoever_stands_where_it_was_made() -> void:
+	var players := {"Brie 42": Vector3(5, 0, 0), "Feta 10": Vector3(0, 0, 9)}
+	assert_eq(CAPTIONS.maker(Vector3(5.5, 1, 0), players), "Brie 42")
+	assert_eq(CAPTIONS.maker(Vector3(20, 0, 0), players), "", "nobody near it")
+
+
+func test_the_ring_marks_where_sounds_come_from_only_when_asked() -> void:
+	var ring := SoundRing.new()
+	add_child_autofree(ring)
+	Settings.set_value(SoundRing.SETTING, false)
+	ring.heard("shotgun", Vector3(10, 0, 0))
+	assert_eq(ring.marks(Vector3.ZERO, 0.0).size(), 0)
+	Settings.set_value(SoundRing.SETTING, true)
+	ring.heard("shotgun", Vector3(10, 0, 0))
+	ring.heard("step", Vector3(0, 0, 10))
+	ring.heard("not a sound", Vector3(0, 0, 10))
+	var marks := ring.marks(Vector3.ZERO, 0.0)
+	assert_eq(marks.size(), 2)
+	assert_almost_eq(marks[0].angle, PI / 2.0, 0.001, "to the right")
+	assert_almost_eq(absf(marks[1].angle), PI, 0.001, "behind")
+	assert_gt(marks[0].alpha, marks[1].alpha, "a blast shows more than a step")
+	ring._process(SoundRing.LIFE + 0.1)
+	assert_eq(ring.marks(Vector3.ZERO, 0.0).size(), 0, "and fades")
+	Settings.set_value(SoundRing.SETTING, false)
+
+
+func test_every_sound_with_a_caption_can_have_a_mark() -> void:
+	for name: String in SoundRing.LOUDNESS:
+		assert_true(CAPTIONS.TEXTS.has(name), name)

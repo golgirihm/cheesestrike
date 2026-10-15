@@ -1,5 +1,6 @@
 """The settings screen, through the real menus."""
 
+import re
 import unittest
 
 from harness import GameTestCase
@@ -108,10 +109,13 @@ class CaptionsTest(GameTestCase):
         joiner = self.open_game()
         joiner.join(host.state()["code"])
         host.wait_for("s.players.length === 2")
+        walker = joiner.own_player()["name"]
         joiner.page.keyboard.down("w")
-        state = host.wait_for("s.combat.captions.some((c) => c.startsWith('Footsteps, '))")
+        state = host.wait_for("s.combat.captions.some((c) => c.startsWith('Footsteps'))")
         joiner.page.keyboard.up("w")
-        self.assertRegex(next(c for c in state["combat"]["captions"] if c.startswith("Footsteps")), r"^Footsteps, (ahead|behind|left|right)$")
+        # Who is walking, which way, and perhaps how near or far.
+        caption = next(c for c in state["combat"]["captions"] if c.startswith("Footsteps"))
+        self.assertRegex(caption, rf"^Footsteps \({re.escape(walker)}\), (ahead|behind|left|right)(, (near|far))?$")
 
 
 if __name__ == "__main__":
