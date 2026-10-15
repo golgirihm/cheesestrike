@@ -61,17 +61,27 @@ func test_the_menu_says_when_the_session_list_cant_be_had_and_stops_once_it_can(
 	assert_eq(_list_lines(), [main.UNREACHABLE_LIST])
 
 
-func test_no_answer_or_a_wrong_one_from_the_session_server_is_said() -> void:
+func test_no_answer_or_a_wrong_one_from_the_session_server_twice_running_is_said() -> void:
 	watch_signals(Net)
-	Net._on_sessions_listed(HTTPRequest.RESULT_CANT_CONNECT, 0, PackedStringArray(), PackedByteArray())
-	assert_signal_emit_count(Net, "sessions_unreachable", 1, "no answer")
-	Net._on_sessions_listed(HTTPRequest.RESULT_SUCCESS, 502, PackedStringArray(), "Bad gateway".to_utf8_buffer())
-	assert_signal_emit_count(Net, "sessions_unreachable", 2, "an error")
-	Net._on_sessions_listed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), "<html>".to_utf8_buffer())
-	assert_signal_emit_count(Net, "sessions_unreachable", 3, "something that isn't a list")
-	Net._on_sessions_listed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), JSON.stringify({"sessions": []}).to_utf8_buffer())
-	assert_signal_emit_count(Net, "sessions_unreachable", 3)
+	var good := JSON.stringify({"sessions": []}).to_utf8_buffer()
+	var bad := [[HTTPRequest.RESULT_CANT_CONNECT, 0, PackedByteArray()], [HTTPRequest.RESULT_SUCCESS, 502, "Bad gateway".to_utf8_buffer()],
+		[HTTPRequest.RESULT_SUCCESS, 200, "<html>".to_utf8_buffer()], [HTTPRequest.RESULT_TIMEOUT, 0, PackedByteArray()]]
+	var said := 0
+	for answer: Array in bad:
+		# Once is asked again, without a word.
+		Net._on_sessions_listed(answer[0], answer[1], PackedStringArray(), answer[2])
+		assert_signal_emit_count(Net, "sessions_unreachable", said, "once: %s" % [answer])
+		# Twice running is said.
+		Net._on_sessions_listed(answer[0], answer[1], PackedStringArray(), answer[2])
+		said += 1
+		assert_signal_emit_count(Net, "sessions_unreachable", said, "twice: %s" % [answer])
+	# A list in between starts the count again.
+	Net._on_sessions_listed(HTTPRequest.RESULT_TIMEOUT, 0, PackedStringArray(), PackedByteArray())
+	Net._on_sessions_listed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), good)
+	Net._on_sessions_listed(HTTPRequest.RESULT_TIMEOUT, 0, PackedStringArray(), PackedByteArray())
+	assert_signal_emit_count(Net, "sessions_unreachable", said)
 	assert_signal_emitted_with_parameters(Net, "sessions_listed", [[]])
+	Net._on_sessions_listed(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), good)
 
 
 func test_the_buttons_say_what_is_chosen() -> void:
