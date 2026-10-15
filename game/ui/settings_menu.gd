@@ -28,6 +28,7 @@ const SLIDERS := [
 	["interface_volume", "Hits and announcements", 0.0, 1.0, 0.05, "%d%%"],
 	["touch_size", "Touch buttons", 0.7, 1.5, 0.05, "%.2f×"],
 	["hud_scale", "Text size", 0.75, 1.5, 0.05, "%.2f×"],
+	["menu_text", "Text size in menus", 1.0, 1.25, 0.05, "%.2f×"],
 	["screen_shake", "Screen shake", 0.0, 1.0, 0.05, "%d%%"],
 	["camera_motion", "Camera motion", 0.0, 1.0, 0.05, "%d%%"],
 	["crosshair_size", "Crosshair: length", 2.0, 24.0, 1.0, "%d px"],
@@ -37,6 +38,7 @@ const SLIDERS := [
 ## The settings that are on or off, with what each says.
 const TOGGLES := [
 	["invert_look", "Invert looking up and down"],
+	["high_contrast", "High contrast"],
 	["less_motion", "Less motion: no shake, bob or sway, and softer flashes"],
 	["aim_assist", "Gamepad: slow the view over an opponent"],
 	["rumble", "Gamepad: rumble"],

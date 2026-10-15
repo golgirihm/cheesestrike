@@ -29,9 +29,9 @@ layout_mode = 2
 [node name="Margin" type="MarginContainer" parent="UI/Menu/Panel"]
 layout_mode = 2
 theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 20
+theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 20
+theme_override_constants/margin_bottom = 16
 
 [node name="Rows" type="VBoxContainer" parent="UI/Menu/Panel/Margin"]
 layout_mode = 2

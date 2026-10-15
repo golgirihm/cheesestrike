@@ -141,8 +141,8 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* extend `test_preferences.gd`.
 2. **An enemy colour.** A colour of one's own for opponents outside teams, as in free-for-all. (Sets for the common kinds of colour blindness, and free choice of each team's colour and of the hit mark's, are done.)
    *Tests:* extend `test_accessibility.gd`.
-3. **Seeing.** A high-contrast mode, larger text everywhere including menus, and menus read aloud by a screen reader.
-   *Tests:* GUT tests that every control has a name to read.
+3. **A screen reader.** Menus read aloud by a screen reader, once the engine can do it in the browser. (High contrast, larger text in menus, and a test that every button shown has a name to read are done.)
+   *Tests:* GUT tests that every control has a name to read, extended to its role.
 4. **One-handed layouts.** Sets of keys for playing with one hand, chosen in one go. (Pressing once in place of holding, for everything that is held, and holding to keep firing a weapon that fires once a press, are done.)
    *Tests:* GUT tests of the presets.
 5. **Other languages.** Move every word on screen into translation files, lay the interface out for longer words and right-to-left scripts, and translate into the first few languages.
