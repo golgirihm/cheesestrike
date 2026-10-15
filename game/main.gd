@@ -238,6 +238,7 @@ func _ready() -> void:
 	Controls.apply(Settings.get_value("bindings"))
 	WebPage.set_fullscreen_on_touch(Settings.get_value("touch_fullscreen"))
 	Settings.changed.connect(_apply_page_setting)
+	FramePace.apply()
 	name_edit.text = Settings.get_value("name")
 	name_edit.text_submitted.connect(func(_text: String) -> void: _remember_name())
 	name_edit.focus_exited.connect(_remember_name)
@@ -431,6 +432,8 @@ func _cycle(button: Button, key: String, choices: Array, describe: Callable) -> 
 
 
 func _apply_page_setting(key: String) -> void:
+	if key in [FramePace.CAP, FramePace.BATTERY_SAVER]:
+		FramePace.apply()
 	if key == "touch_fullscreen":
 		WebPage.set_fullscreen_on_touch(Settings.get_value("touch_fullscreen"))
 
