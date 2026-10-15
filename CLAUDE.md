@@ -13,6 +13,14 @@ Say what you concluded in the pull request description, including when the answe
 
 Before pushing, run the tests for what you changed: the GUT files it touches, or a suite by name, such as `python tools/run_tests.py game`. CI runs every suite on the pull request, browser tests included, and a pull request is merged only once all of its checks have passed. Run everything locally (`python tools/run_tests.py`) only when a failure in CI needs reproducing.
 
+## Phones are deprecated
+
+The game is played in a desktop browser, with keyboard and mouse or a gamepad. Nobody is expected to play it on a phone, so the phone experience (touch controls, gyro aim, the installable web app, full screen and sideways on a tap) stays as it is, with its tests, but gets no further work:
+
+- Don't add features, fixes or settings only for phones, and don't extend the touch layout to cover new actions.
+- Don't hold anything back for phones: not the picture, the frame budget, the build size, the interface's layout, nor what a host can simulate. The browser and its Compatibility renderer are the limits, not a phone.
+- If a change breaks something that only matters on a phone and fixing it isn't easy, let it break and delete the tests and manual-test rows that cover it.
+
 ## Working in this repo
 
 - **Pull requests only.** `main` is protected: changes arrive through a pull request, merged by rebase, with the "Game tests" and "Signaling tests" checks passing on an up-to-date branch. Keep each commit on a branch meaningful, since every one lands on `main`.

@@ -1,8 +1,8 @@
 class_name ParticleBudget
 ## How many specks of dust, sparks, smoke, crumbs and fire may be in the air
 ## at once, by graphics quality. Each speck is a little mesh drawn on its
-## own, so a phone can't have as many as a desktop, and a busy fight mustn't
-## be what slows the game down.
+## own, so a weaker graphics card can't have as many as a strong one, and a
+## busy fight mustn't be what slows the game down.
 ##
 ## Effects are of two sorts. Lesser ones dress up what is already plain to
 ## see, such as the dust a shot knocks off a wall: low graphics has none,

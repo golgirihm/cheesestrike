@@ -40,11 +40,21 @@ func test_buttons_do_not_overlap_or_leave_the_screen() -> void:
 
 
 func test_nothing_is_a_button_until_the_screen_is_touched() -> void:
-	controls.shown = false
 	var fire: Vector2 = TOUCH.layout_for(controls.size).fire.centre
 	assert_eq(controls.button_at(fire), "")
 	controls.notice_touch()
 	assert_eq(controls.button_at(fire), "fire")
+
+
+# A laptop that reports a touch screen is still played with the mouse until
+# someone touches it, as is whatever runs the tests.
+func test_any_touch_in_the_game_shows_the_buttons() -> void:
+	assert_false(controls.shown)
+	var touch := InputEventScreenTouch.new()
+	touch.pressed = true
+	Input.parse_input_event(touch)
+	await wait_frames(1)
+	assert_true(controls.shown)
 
 
 func test_each_button_is_found_where_it_is_drawn() -> void:
