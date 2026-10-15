@@ -40,6 +40,7 @@ const TOGGLES := [
 	["less_motion", "Less motion: no shake, bob or sway, and softer flashes"],
 	["aim_assist", "Gamepad: slow the view over an opponent"],
 	["rumble", "Gamepad: rumble"],
+	["haptics", "Phone: buzz when hurt"],
 	["gyro_aim", "Aim by turning the phone"],
 	["touch_left_handed", "Touch buttons on the left"],
 	["touch_fullscreen", "Full screen when touched"],

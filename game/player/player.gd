@@ -328,6 +328,9 @@ func _on_hurt(_attacker: int, _from: Vector3, dealt: int) -> void:
 	if Settings.get_value(StickAim.RUMBLE) and not Input.get_connected_joypads().is_empty():
 		var rumble := StickAim.hurt_rumble(dealt)
 		Input.start_joy_vibration(Input.get_connected_joypads()[0], rumble.x * 0.6, rumble.x, rumble.y)
+	# A phone buzzes, for a player who wants it.
+	if Settings.get_value(StickAim.HAPTICS) and DisplayServer.is_touchscreen_available():
+		Input.vibrate_handheld(StickAim.buzz_ms(dealt))
 	_flinch_left = Movement.FLINCH_TIME
 
 

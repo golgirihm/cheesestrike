@@ -58,3 +58,9 @@ func test_rumble_grows_with_the_hurt_and_stays_short() -> void:
 	assert_gt(StickAim.hurt_rumble(80).x, StickAim.hurt_rumble(10).x)
 	assert_lte(StickAim.hurt_rumble(500).x, 1.0)
 	assert_lte(StickAim.hurt_rumble(500).y, 0.33)
+
+
+func test_a_phone_buzzes_longer_for_a_bigger_hit_and_always_briefly() -> void:
+	assert_gt(StickAim.buzz_ms(50), StickAim.buzz_ms(5))
+	assert_lte(StickAim.buzz_ms(1000), 150)
+	assert_gte(StickAim.buzz_ms(0), 30)
