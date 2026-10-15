@@ -11,11 +11,7 @@ Every change follows both of these, in the same pull request as the change:
 
 Say what you concluded in the pull request description, including when the answer is that no test or no manual-test change was needed.
 
-Run every suite before pushing:
-
-```
-python tools/run_tests.py
-```
+Before pushing, run the tests for what you changed: the GUT files it touches, or a suite by name, such as `python tools/run_tests.py game`. CI runs every suite on the pull request, browser tests included, and a pull request is merged only once all of its checks have passed. Run everything locally (`python tools/run_tests.py`) only when a failure in CI needs reproducing.
 
 ## Working in this repo
 
