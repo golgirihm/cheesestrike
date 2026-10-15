@@ -54,3 +54,22 @@ func test_with_it_on_the_view_is_still_while_running() -> void:
 	add_child_autofree(player)
 	await wait_physics_frames(2)
 	assert_eq(player.camera.position, Vector3.ZERO)
+
+
+func test_the_title_screen_warns_of_flashing_until_it_is_put_away() -> void:
+	Settings.set_value(FrontEnd.FLASH_SEEN, false)
+	var front := FrontEnd.new()
+	add_child_autofree(front)
+	assert_true(front.flash_warning.visible)
+	assert_string_contains(front.flash_warning.find_child("FlashWarningText", true, false).text, "Less motion")
+	await wait_process_frames(3)
+	var warned := front.flash_warning.get_global_rect()
+	assert_true(get_viewport().get_visible_rect().encloses(warned), "on screen")
+	for choice: Array in FrontEnd.CHOICES:
+		assert_false(warned.intersects(front.button(choice[0]).get_global_rect()), "clear of %s" % choice[0])
+	(front.flash_warning.find_child("FlashWarningOk", true, false) as Button).pressed.emit()
+	assert_false(front.flash_warning.visible)
+	var again := FrontEnd.new()
+	add_child_autofree(again)
+	assert_false(again.flash_warning.visible, "and stays away")
+	Settings.set_value(FrontEnd.FLASH_SEEN, false)

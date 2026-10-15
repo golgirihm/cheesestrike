@@ -49,6 +49,42 @@ func _init() -> void:
 	credits = _credits()
 	credits.visible = false
 	add_child(credits)
+	flash_warning = _flash_warning()
+	add_child(flash_warning)
+
+
+## A word, until it is put away, that the game flashes, and what calms it.
+var flash_warning: Control
+const FLASH_WARNING := "This game has flashing lights and a moving view. Less motion, in the settings, calms them."
+const FLASH_SEEN := "flash_warning_seen"
+
+
+func _flash_warning() -> Control:
+	var panel := PanelContainer.new()
+	panel.name = "FlashWarning"
+	panel.visible = not Settings.get_value(FLASH_SEEN)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	panel.add_child(row)
+	var words := Label.new()
+	words.name = "FlashWarningText"
+	words.text = FLASH_WARNING
+	words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	words.custom_minimum_size = Vector2(420, 0)
+	words.add_theme_font_size_override("font_size", 14)
+	row.add_child(words)
+	var done := Button.new()
+	done.name = "FlashWarningOk"
+	done.text = "Got it"
+	done.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	done.pressed.connect(func() -> void:
+		Settings.set_value(FLASH_SEEN, true)
+		panel.hide())
+	row.add_child(done)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 8)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	return panel
 
 
 ## The button for the way in called `what`.
