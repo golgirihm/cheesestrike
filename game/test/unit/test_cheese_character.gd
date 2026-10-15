@@ -132,8 +132,24 @@ func test_legs_do_not_swing_when_standing_still() -> void:
 
 func test_legs_swing_more_at_speed() -> void:
 	assert_lt(absf(CHARACTER.leg_swing(PI / 2.0, 2.0)), absf(CHARACTER.leg_swing(PI / 2.0, 6.0)))
-	assert_almost_eq(CHARACTER.leg_swing(PI / 2.0, 6.0), CHARACTER.STRIDE, 0.0001)
+	assert_almost_eq(CHARACTER.leg_swing(PI / 2.0, CHARACTER.FULL_STRIDE_SPEED), CHARACTER.STRIDE, 0.0001)
 	assert_almost_eq(CHARACTER.leg_swing(PI / 2.0, 20.0), CHARACTER.STRIDE, 0.0001, "no more than a stride")
+
+
+func test_the_feet_keep_pace_with_the_ground() -> void:
+	var leg := BodyShape.HIP_HEIGHT * BodyShape.SIZE
+	for speed: float in [4.0, Movement.WALK_SPEED, Movement.WALK_SPEED * Movement.RUN_FACTOR]:
+		# A foot planted on the ground sweeps from one end of its swing to the
+		# other in a step, and there are two steps to a cycle.
+		var step := 2.0 * leg * sin(CHARACTER.leg_swing(PI / 2.0, speed))
+		assert_almost_eq(CHARACTER.cycle_length(speed), 2.0 * step, 0.001, "at %s m/s" % speed)
+	assert_gt(CHARACTER.cycle_length(Movement.WALK_SPEED * Movement.RUN_FACTOR), CHARACTER.cycle_length(Movement.WALK_SPEED), "longer strides at a run")
+	assert_gt(CHARACTER.cycle_length(0.2), 1.0, "and a shuffle doesn't patter")
+	# So a walk goes through as many cycles as the ground it covers allows.
+	character.set_motion(Movement.WALK_SPEED, false)
+	character._phase = 0.0
+	character._process(0.1)
+	assert_almost_eq(character._phase, Movement.WALK_SPEED * 0.1 / CHARACTER.cycle_length(Movement.WALK_SPEED) * TAU, 0.001)
 
 
 func test_walking_swings_the_legs_opposite_ways() -> void:

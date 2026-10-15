@@ -1,8 +1,8 @@
 class_name WeaponSway
 ## How the weapon in a player's own view moves with them, so that it feels
 ## held rather than fixed to the screen: it lags a little behind a turn of
-## the view, tilts into a sidestep, dips on landing, and drops to one side at
-## a run. Each is small, and all but the dip nearly vanish when aiming.
+## the view, tilts into a sidestep, dips on landing, drops to one side at
+## a run and lower still in a slide. Each is small, and all but the dip nearly vanish when aiming.
 ##
 ## Offsets are in metres and radians in the head's own directions: X to the
 ## right, Y up, Z toward the player.
@@ -20,6 +20,16 @@ const HARD_LANDING := 14.0
 ## Where it goes at a full run: down, across and turned in.
 const RUN_OFFSET := Vector3(-0.05, -0.06, 0.02)
 const RUN_TURN := Vector3(-0.25, 0.45, 0.2)
+## Where it goes in a slide, on top of a run: further down and turned further.
+const SLIDE_OFFSET := Vector3(-0.03, -0.1, 0.03)
+const SLIDE_TURN := Vector3(-0.3, 0.25, 0.25)
+
+
+## Where the weapon is carried, as an offset and a turn, at a `running` share
+## of a full run and a `sliding` share of a slide (each 0 to 1): lowered at a
+## run and lower still in a slide.
+static func carried(running: float, sliding: float) -> Array[Vector3]:
+	return [RUN_OFFSET * running + SLIDE_OFFSET * sliding, RUN_TURN * running + SLIDE_TURN * sliding]
 
 
 ## Where the weapon trails to as the view turns at `rate` (to the right,

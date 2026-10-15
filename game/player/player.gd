@@ -214,7 +214,13 @@ var _looked := Vector2.ZERO
 var _turn_rate := Vector2.ZERO
 var _landing := 0.0
 var _running := 0.0
+var _sliding := 0.0
 var _was_on_floor := true
+# Whether the player is in the air from a jump pad's throw, and so lands
+# unhurt.
+var _pad_thrown := false
+# Whether this player is drawn as a ghost, while they can't be hurt.
+var _ghost := false
 ## After being put back by the host, how far the view still is from where
 ## the player now is, the most that can be, and how fast it closes.
 var _view_carry := Vector3.ZERO
@@ -263,7 +269,8 @@ func _is_own() -> bool:
 
 ## Where the weapon sits in this player's own view, and how big: smaller and
 ## further out than in their hand as others see it, so it doesn't fill the screen.
-const VIEW_GUN_POSITION := Vector3(0.2, -0.19, -0.55)
+## Held close, so little of the arms behind it shows.
+const VIEW_GUN_POSITION := Vector3(0.19, -0.18, -0.44)
 ## Where others see a player hold a weapon they are aiming: up at the eye, in
 ## the character's measurements from the head.
 const SEEN_AIM_GUN_POSITION := Vector3(0.14, -0.05, -0.5)
@@ -431,6 +438,8 @@ func _show_weapon(id: String) -> void:
 	# Only its holder sees both hands and the arms behind them.
 	WeaponModels.show_own_view(model, _is_own())
 	gun.add_child(model)
+	if _ghost:
+		_look_ghostly()
 	muzzle = model.get_node("Muzzle")
 	_glint = model.get_node_or_null("Glint")
 	_magazine = model.get_node_or_null("Magazine")
@@ -598,6 +607,8 @@ func _show_team(team: int) -> void:
 	_team = team
 	_base_colour = TeamColors.of(team) if team != MatchState.NO_TEAM else colour_for(name.to_int())
 	body.set_colour(_base_colour)
+	if _ghost:
+		_look_ghostly()
 	name_tag.modulate = TeamColors.of(team)
 	if _badge != null:
 		_badge.queue_free()
@@ -770,9 +781,11 @@ func _animate(delta: float) -> void:
 		_landing = maxf(_landing - delta * 5.0, 0.0)
 		var at_a_run := is_on_floor() and across > Movement.WALK_SPEED * 1.2 and _aim <= 0.0
 		_running = move_toward(_running, 1.0 if at_a_run else 0.0, delta * 6.0)
+		_sliding = move_toward(_sliding, 1.0 if is_sliding() else 0.0, delta * 6.0)
 		var sideways := (global_basis.inverse() * velocity).x / Movement.WALK_SPEED
-		bob += WeaponSway.turning(_turn_rate) * steady + WeaponSway.landing(_landing) + WeaponSway.RUN_OFFSET * _running
-		sway_turn = WeaponSway.RUN_TURN * _running + Vector3(0, 0, WeaponSway.strafing(sideways) * steady)
+		var carried := WeaponSway.carried(_running, smoothstep(0.0, 1.0, _sliding))
+		bob += WeaponSway.turning(_turn_rate) * steady + WeaponSway.landing(_landing) + carried[0]
+		sway_turn = carried[1] + Vector3(0, 0, WeaponSway.strafing(sideways) * steady)
 		var progress := 1.0 - weapon.reload_left / weapon.stats.reload_time if weapon.is_reloading() else 0.0
 		reloading = WeaponSway.reload_lowering(progress)
 		magazine_out = WeaponSway.magazine_out(progress)
@@ -819,13 +832,21 @@ func _animate(delta: float) -> void:
 	var lowered := switch_lowering(_switch_left, draw_time(_shown_weapon))
 	# The owner sees through a scope rather than the weapon it is on; others
 	# see its lens catch the light.
-	gun.visible = not (_mine and (is_scoped() or _from_outside))
+	# Nor is it seen at all out of play: it goes with the one who held it.
+	gun.visible = alive and not (_mine and (is_scoped() or _from_outside))
 	if _glint != null:
 		_glint.visible = not _mine and alive and _aim >= 0.9
 	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + (Vector3(0.0, -0.5, 0.1) * lowered + Vector3(0.03, -0.16, 0.04) * reloading) * gun.scale.x
 	gun.rotation = Vector3(0.18 * _kick - 1.1 * lowered + 0.4 * reloading, 0.0, 0.5 * lowered + 0.7 * reloading) + sway_turn
 	if _magazine != null:
 		_magazine.position = _magazine_rest + Vector3.DOWN * 0.18 * magazine_out
+	if not _mine and muzzle != null:
+		# Their arms follow the weapon: one hand on its grip, the other
+		# steadying it.
+		var model := muzzle.get_parent() as Node3D
+		body.reach_for(body.to_local(model.to_global(WeaponModels.GRIP)))
+		var off_hand := model.get_node_or_null("OffHand") as Node3D
+		body.steady_with(body.to_local(off_hand.global_position) if off_hand != null else Vector3.INF)
 
 
 ## Where the weapon in hand sits in this player's own view when they aim: its
@@ -835,9 +856,27 @@ func aim_gun_position() -> Vector3:
 	var sight: Node3D = muzzle.get_parent().get_node_or_null("Sight") if muzzle != null else null
 	var at := sight.position if sight != null else Vector3.ZERO
 	return Vector3(0, 0, -AIM_EYE_RELIEF) - at * VIEW_GUN_SCALE
-	if not _mine and muzzle != null:
-		# Their weapon arm follows the hand on the weapon.
-		body.reach_for(body.to_local(muzzle.get_parent().to_global(WeaponModels.GRIP)))
+
+
+## Whether this player is drawn as a ghost: just come back, and not to be
+## hurt for a moment yet.
+func is_ghost() -> bool:
+	return _ghost
+
+
+func _show_protection() -> void:
+	var own := record() if match_ != null and match_.has_state() else null
+	var ghost := own != null and own.alive and own.is_protected()
+	if ghost != _ghost:
+		_ghost = ghost
+		_look_ghostly()
+
+
+# Everything drawn of this player, and the weapon they hold, a ghost or
+# solid as they are or aren't (see Ghost).
+func _look_ghostly() -> void:
+	Ghost.apply(body, _ghost)
+	Ghost.apply(gun, _ghost)
 
 
 ## Whether this player has a blob for a shadow just now: on graphics without
@@ -1081,6 +1120,7 @@ func _process(delta: float) -> void:
 	if not _mine and not driven:
 		_show_smoothed()
 	_animate(delta)
+	_show_protection()
 	if _mine:
 		var tip := shake.tick(delta, Settings.motion("screen_shake"))
 		# The view climbs with the weapon's kick, and settles once the run of
@@ -1170,6 +1210,12 @@ static func view_carry_after(carry: Vector3, delta: float) -> Vector3:
 ## Whether the keyboard is being typed on, in a box that takes text.
 func typing() -> bool:
 	return is_inside_tree() and get_viewport().gui_get_focus_owner() is LineEdit
+
+
+## Whether the match holds this player still: before it begins, and once it
+## is over. They can still look about.
+func held_still() -> bool:
+	return match_ != null and match_.has_state() and not match_.state.is_live()
 
 
 func _menu_open() -> bool:
@@ -1278,7 +1324,9 @@ func _physics_process(delta: float) -> void:
 	if Net.host_silent or (world != null and not world.ready_to_play()):
 		return
 	weapon.tick(delta)
-	if _menu_open():
+	# Nobody moves or fires while the menu is open, while a match counts down
+	# to its beginning, or once it is over.
+	if _menu_open() or held_still():
 		_release_controls()
 		_jump_pressed = false
 		_touch_jump = false
@@ -1336,6 +1384,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = _thrown.x
 		velocity.z = _thrown.y
 		_fall_speed = 0.0
+		_pad_thrown = true
 		move_and_slide()
 		_was_on_floor = false
 		_publish()
@@ -1396,6 +1445,11 @@ func _physics_process(delta: float) -> void:
 			Sounds.play(Footsteps.cue(Footsteps.surface_under(world.map if world != null else null, global_position)), lerpf(-14.0, -5.0, _landing), 0.75)
 		if _landing >= Movement.HARD_LANDING:
 			_flinch_left = maxf(_flinch_left, Movement.FLINCH_TIME * Movement.LANDING_WIND)
+		# A long drop hurts; the host decides how it stands after it.
+		var hurt := Movement.fall_damage(_fall_speed)
+		if hurt > 0.0 and not _pad_thrown and match_ != null:
+			match_.fall(hurt)
+		_pad_thrown = false
 	_was_on_floor = is_on_floor()
 	_publish()
 
@@ -1439,7 +1493,12 @@ func _step_up(delta: float) -> void:
 	if not is_on_floor() or across.length() < 0.001:
 		return
 	var from := global_transform
-	if not test_move(from, across):
+	var blocked := KinematicCollision3D.new()
+	if not test_move(from, across, blocked):
+		return
+	# A slope that can be walked up is walked up, at the speed of walking:
+	# stepping onto it would carry the player up it faster.
+	if blocked.get_normal().angle_to(Vector3.UP) <= floor_max_angle:
 		return
 	var rise := Vector3.UP * Movement.STEP_HEIGHT
 	if test_move(from, rise):

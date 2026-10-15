@@ -228,6 +228,29 @@ func is_host() -> bool:
 	return multiplayer.multiplayer_peer != null and multiplayer.is_server()
 
 
+## This machine's own player has landed from a fall that hurts them by
+## `amount` (see Movement.fall_damage).
+func fall(amount: float) -> void:
+	if is_host():
+		_fall(multiplayer.get_unique_id(), amount)
+	else:
+		_request_fall.rpc_id(1, amount)
+
+
+func _fall(id: int, amount: float) -> void:
+	var node: Node3D = world.player_node(id) if world != null else null
+	if node == null or amount <= 0.0 or not is_finite(amount):
+		return
+	# No more than enough to knock anyone out.
+	_harm(id, id, minf(amount, PlayerRecord.MAX_HEALTH * 2.0), node.global_position, Movement.FALL, false)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_fall(amount: Variant) -> void:
+	if is_host() and (amount is float or amount is int):
+		_fall(multiplayer.get_remote_sender_id(), float(amount))
+
+
 ## Seconds the host keeps a departed player's score, for if they come back.
 const REJOIN_WINDOW := 120.0
 const MAX_KEY_LENGTH := 64
