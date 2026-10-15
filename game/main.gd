@@ -67,6 +67,10 @@ var join_screen: JoinScreen
 var profile_screen: ProfileScreen
 # The sessions last listed, to know a session's arena before joining it.
 var _listed: Array = []
+# Why the session list couldn't be had last time it was asked for, or "".
+var _list_problem := ""
+## What the session list says while the session server can't be reached.
+const UNREACHABLE_LIST := "Can't reach the session server, so there are no sessions to show."
 ## The button that joins the best session listed, or hosts one, and those
 ## that sort and filter the list.
 var play_now_button: Button
@@ -126,6 +130,7 @@ func _ready() -> void:
 	Net.session_failed.connect(_on_session_failed)
 	Net.session_ended.connect(_on_session_ended)
 	Net.sessions_listed.connect(_show_sessions)
+	Net.sessions_unreachable.connect(_show_sessions_unreachable)
 	Net.host_silent_changed.connect(_on_host_silent_changed)
 	leave_button.pressed.connect(Net.leave)
 	disconnected_button.pressed.connect(_dismiss_disconnected)
@@ -819,6 +824,20 @@ static func session_line(session: Dictionary) -> String:
 
 func _show_sessions(list: Array) -> void:
 	_listed = list
+	if not _list_problem.is_empty() and status.text == _list_problem:
+		status.text = ""
+	_list_problem = ""
+	_draw_sessions()
+
+
+## What the menu shows when the session list couldn't be had: no sessions,
+## and why there are none, under the buttons, unless something else is said
+## there already.
+func _show_sessions_unreachable(reason: String) -> void:
+	_listed = []
+	if status.text.is_empty() or status.text == _list_problem:
+		status.text = reason
+	_list_problem = reason
 	_draw_sessions()
 
 
@@ -832,7 +851,10 @@ func _draw_sessions() -> void:
 	var shown := SessionList.arranged(_listed, _list_sort, _list_mode, _list_arena, hide_full_button.button_pressed)
 	if shown.is_empty():
 		var none := Label.new()
-		none.text = "None yet. Host one!" if _listed.is_empty() else "None like that. Host one!"
+		if not _list_problem.is_empty():
+			none.text = UNREACHABLE_LIST
+		else:
+			none.text = "None yet. Host one!" if _listed.is_empty() else "None like that. Host one!"
 		sessions.add_child(none)
 	for session: Dictionary in shown:
 		var button := Button.new()

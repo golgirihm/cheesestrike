@@ -8,6 +8,7 @@ import unittest
 from harness import GameTestCase
 
 NO_SESSIONS = "None yet. Host one!"
+UNREACHABLE = "Can't reach the session server, so there are no sessions to show."
 
 
 def distance(a, b):
@@ -30,8 +31,14 @@ class HostingTest(GameTestCase):
         state = game.wait_for("s.status.startsWith(\"Can't reach\")")
         self.assertEqual(state["screen"], "menu")
         self.assertIn(f"ws://localhost:{self.signaling.port}", state["status"])
+        self.assertIn("Hosting and joining need it", state["status"], "what it is for")
+        self.assertIn("python signaling/server.py", state["status"], "and, in a development build, how to start it")
+        # The list says why there is nothing in it, rather than that nobody is playing.
+        state = game.wait_for(f"s.sessions.length === 1 && s.sessions[0].text === {UNREACHABLE!r}")
 
         self.signaling.start()
+        game.click("RefreshButton")
+        game.wait_for(f"s.sessions.length === 1 && s.sessions[0].text === {NO_SESSIONS!r}")
         game.host()
 
 
