@@ -53,6 +53,9 @@ const DEFAULTS := {
 	"toggle_talk": false,
 	"toggle_scoreboard": false,
 	"hold_to_fire": false,
+	# How many frames a second are drawn at most (see FramePace).
+	"frame_cap": "",
+	"battery_saver": false,
 	"colour_cheddar": "",
 	"colour_brie": "",
 	"colour_hit": "",
@@ -207,6 +210,7 @@ const CHOICES := {
 	"crosshair_colour": ["white", "green", "yellow", "cyan", "magenta", "red"],
 	"hit_sound": ["tick", "pop", "bell", "off"],
 	"stick_curve": ["linear", "classic", "precise"],
+	"frame_cap": ["", "30", "60", "90", "120", "144"],
 	"colour_preset": ["standard", "protanopia", "deuteranopia", "tritanopia"],
 	"colour_cheddar": ["", "red", "orange", "yellow", "green", "teal", "blue", "sky", "purple", "pink", "white"],
 	"colour_brie": ["", "red", "orange", "yellow", "green", "teal", "blue", "sky", "purple", "pink", "white"],
