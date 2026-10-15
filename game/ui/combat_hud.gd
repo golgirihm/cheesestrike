@@ -37,6 +37,10 @@ var hurts_shown := 0
 ## The kind of the latest hit mark.
 var hit_kind := ""
 var captions: VBoxContainer
+## The setting that has the scoreboard key show and hide it, in place of
+## being held, and whether it is shown that way.
+const TOGGLE_SCORES := "toggle_scoreboard"
+var _scores_on := false
 var sound_ring: SoundRing
 
 var _hit_left := 0.0
@@ -448,7 +452,8 @@ func _process(delta: float) -> void:
 		_result_tally.text = "\n".join(lines)
 		_result_tally.visible = not lines.is_empty()
 		_result_summary.text = "\n".join(MatchSummary.lines(state, multiplayer.get_unique_id() if multiplayer.multiplayer_peer != null else 0, world.match_.stats, medals) + world.match_keeper.lines())
-	var wants_scores := Input.is_action_pressed("scoreboard") or _touch_held("scores") or _result.visible
+	var scores_key := _scores_on if Settings.get_value(TOGGLE_SCORES) else Input.is_action_pressed("scoreboard")
+	var wants_scores := scores_key or _touch_held("scores") or _result.visible
 	if wants_scores != scoreboard.visible:
 		scoreboard.visible = wants_scores
 		_refresh_scoreboard()
@@ -567,6 +572,8 @@ func _on_weapon_wheel_chosen(index: int) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("scoreboard") and not event.is_echo() and Settings.get_value(TOGGLE_SCORES):
+		_scores_on = not _scores_on
 	if world == null or not is_visible_in_tree() or weapon_wheel == null:
 		return
 	if weapon_wheel.visible:

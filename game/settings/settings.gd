@@ -47,6 +47,12 @@ const DEFAULTS := {
 	"flash_warning_seen": false,
 	# Whether a ring round the crosshair shows where sounds come from.
 	"sound_ring": false,
+	# Holding or pressing once, for the rest of what can be held (see the
+	# toggles for running, crouching and aiming).
+	"toggle_lean": false,
+	"toggle_talk": false,
+	"toggle_scoreboard": false,
+	"hold_to_fire": false,
 	"colour_cheddar": "",
 	"colour_brie": "",
 	"colour_hit": "",

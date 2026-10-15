@@ -126,6 +126,18 @@ func speak(frames: PackedVector2Array, rate: float) -> void:
 			sent += 1
 
 
+## The setting that has the talk key turn talking on and off, in place of
+## being held, and whether it has been turned on.
+const TOGGLE := "toggle_talk"
+var _talk_on := false
+
+
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(ACTION) and not event.is_echo() and Settings.get_value(TOGGLE) \
+			and not get_viewport().gui_get_focus_owner() is LineEdit:
+		_talk_on = not _talk_on
+
+
 ## Whether the player may talk just now: talking is wanted, and they are in
 ## a session with someone else to hear.
 func can_talk() -> bool:
@@ -139,7 +151,10 @@ func _process(delta: float) -> void:
 		if _clock - _last_heard.get(id, -INF) > 5.0:
 			_drop_speaker(id)
 	# Not while something is being typed, where the key is a letter.
-	var wanted := can_talk() and Input.is_action_pressed(ACTION) and not get_viewport().gui_get_focus_owner() is LineEdit
+	var pressed := _talk_on if Settings.get_value(TOGGLE) else Input.is_action_pressed(ACTION)
+	var wanted := can_talk() and pressed and not get_viewport().gui_get_focus_owner() is LineEdit
+	if not can_talk():
+		_talk_on = false
 	if not wanted:
 		if _mic != null and _mic.playing:
 			_mic.stop()
