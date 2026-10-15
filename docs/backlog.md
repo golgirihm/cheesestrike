@@ -131,7 +131,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
 5. **Gamepads in the menus.** Button pictures that match the controller, and every menu usable without a mouse. (Aim assist that only slows the view, response curves, a dead zone and rumble are done.)
    *Tests:* GUT tests of menu focus on every screen.
 6. **A smaller, faster download.** Shrink and compress the web build, load arenas and sounds when needed, and keep a copy for the next visit.
-   *Tests:* a size budget in CI.
+   *Tests:* `browser_tests/test_build_size.py` holds the build to a budget; lower it as the build shrinks.
 7. **Threads.** Decide whether the web build should use threads, for a smoother frame rate on a busy host, against the hosting it then needs.
    *Tests:* the benchmark and soak tests either way.
 
