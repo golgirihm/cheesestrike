@@ -93,10 +93,9 @@ func test_keys_read_by_name() -> void:
 	assert_eq(Controls.key_name(KEY_SPACE), "Space")
 
 
-func test_quality_starts_low_on_a_touch_screen_and_high_otherwise() -> void:
-	assert_eq(GraphicsQuality.level("", true), GraphicsQuality.LOW)
-	assert_eq(GraphicsQuality.level("", false), GraphicsQuality.HIGH)
-	assert_eq(GraphicsQuality.level("medium", true), GraphicsQuality.MEDIUM)
+func test_quality_starts_high_on_every_device() -> void:
+	assert_eq(GraphicsQuality.level(""), GraphicsQuality.HIGH)
+	assert_eq(GraphicsQuality.level("medium"), GraphicsQuality.MEDIUM)
 
 
 func test_quality_sets_the_resolution_and_shadows() -> void:

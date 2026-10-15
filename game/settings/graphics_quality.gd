@@ -1,6 +1,6 @@
 class_name GraphicsQuality
-## How much the game asks of the graphics hardware. A phone may not keep up
-## with shadows and full resolution, so it starts lower.
+## How much the game asks of the graphics hardware. It starts on High, and a
+## player whose machine can't keep up turns it down.
 ##
 ## There are three levels, Low, Medium and High, and each sets every part of
 ## the picture at once. Under them, each part can be chosen on its own:
@@ -60,14 +60,13 @@ const DYNAMIC_FLOOR := 0.6
 const DYNAMIC_STEP := 0.05
 
 
-## The level to start at when none has been chosen: low on touch screens.
-static func default_for(touch_screen: bool) -> String:
-	return LOW if touch_screen else HIGH
+## The level to start at when none has been chosen.
+const DEFAULT := HIGH
 
 
 ## The level in effect for the setting `chosen` ("" if never chosen).
-static func level(chosen: String, touch_screen := DisplayServer.is_touchscreen_available()) -> String:
-	return chosen if LEVELS.has(chosen) else default_for(touch_screen)
+static func level(chosen: String) -> String:
+	return chosen if LEVELS.has(chosen) else DEFAULT
 
 
 ## What `part` is at on `level` when the player has `chosen` for it: their

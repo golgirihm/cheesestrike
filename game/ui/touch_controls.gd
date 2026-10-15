@@ -5,9 +5,10 @@ extends Control
 ## Moving, looking and jumping are gestures on the screen itself (see the
 ## player). Aim stays on until it is pressed again.
 ##
-## The buttons show once the screen has been touched, or from the start on a
-## device that reports a touch screen. The player asks button_at() whether a
-## touch landed on one; this node only draws them.
+## The buttons show once the screen has been touched, anywhere in the game.
+## A device that only reports a touch screen, such as a laptop, is played with
+## the keyboard and mouse until it is touched. The player asks button_at()
+## whether a touch landed on one; this node only draws them.
 
 ## Each button's centre, as a point on the screen (`anchor`, 0 to 1 across and
 ## down) moved by `offset`, and its radius, in the interface's pixels.
@@ -39,9 +40,13 @@ var held: Array = []:
 func _ready() -> void:
 	add_to_group("touch_controls")
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	shown = DisplayServer.is_touchscreen_available()
 	resized.connect(queue_redraw)
 	Settings.changed.connect(func(_key: String) -> void: queue_redraw())
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		notice_touch()
 
 
 ## A touch has been seen, so this is a touch screen whatever it reported.

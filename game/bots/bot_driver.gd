@@ -6,7 +6,7 @@ extends Node
 ##
 ## A child of the bot's player node. Cheap on purpose: a few rays a frame and
 ## no pathfinding beyond a large map's few dozen street corners (see
-## Routes), as the host may be a phone.
+## Routes), as the host is a single-threaded browser tab.
 
 const WORLD_MASK := 1
 ## How high off the ground it looks for things in its way.
