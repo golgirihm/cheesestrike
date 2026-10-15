@@ -91,14 +91,18 @@ class MatchTest(GameTestCase):
         # Standing on the street, not fallen through it.
         joiner.page.wait_for_timeout(1000)
         self.assertGreater(joiner.own_player()["position"][1], -0.5)
-        # The two start facing each other across the crossroads.
+        # The city is large: the first two start at either end of it.
+        start = host.own_player()["position"]
+        far = joiner.own_player()["position"]
+        self.assertGreater(abs(start[0] - far[0]), 500, "a long way apart")
+        self.assertNotEqual(joiner_id, host.own_player()["id"])
+        # Running straight ahead, toward the middle, the host covers ground
+        # and is never put back for it.
         host.capture_mouse()
-        host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && (p.health < 100 || p.deaths > 0))")
-        # Running straight ahead, the host reaches the launcher in the middle.
         host.page.keyboard.down("Shift")
         host.page.keyboard.down("w")
         try:
-            host.wait_for("s.players.some((p) => p.mine && p.carrying.includes('launcher'))")
+            host.wait_for(f"s.players.some((p) => p.mine && Math.abs(p.position[0]) < {abs(start[0]) - 20})")
         finally:
             host.page.keyboard.up("w")
             host.page.keyboard.up("Shift")

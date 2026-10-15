@@ -47,6 +47,11 @@ func build(id: String, geometry: Node) -> void:
 	_fill.light_energy = FILL_ENERGY
 	_fill.shadow_enabled = false
 	add_child(_fill)
+	# A large map's buildings are each darkened round as one, not wall by wall.
+	var footprints: Array = geometry.get_parent().get_meta("footprints", []) if geometry.get_parent() != null else []
+	var places: Array[Transform3D] = []
+	for ground: Rect2 in footprints:
+		places.append(_contact_shade(Vector3(ground.get_center().x, 0.03, ground.get_center().y), ground.size))
 	for body: Node in geometry.get_children():
 		var shape := body.get_node_or_null("CollisionShape3D") as CollisionShape3D
 		if shape == null or not shape.shape is BoxShape3D or String(body.name).begins_with("Wall") or body.name == "Floor":
@@ -56,8 +61,27 @@ func build(id: String, geometry: Node) -> void:
 		# Only what stands on the ground darkens it.
 		if at.y - size.y / 2.0 > 0.3 or absf((body as Node3D).rotation.x) > 0.01 or absf((body as Node3D).rotation.z) > 0.01:
 			continue
-		add_child(_contact_shade(Vector3(at.x, 0.03, at.z), Vector2(size.x, size.z)))
-		_shades += 1
+		if footprints.any(func(ground: Rect2) -> bool: return ground.grow(0.1).has_point(Vector2(at.x, at.z))):
+			continue
+		places.append(_contact_shade(Vector3(at.x, 0.03, at.z), Vector2(size.x, size.z)))
+	# All drawn at once, as an arena may have a hundred.
+	_shades = places.size()
+	var copies := MultiMesh.new()
+	copies.transform_format = MultiMesh.TRANSFORM_3D
+	var plane := PlaneMesh.new()
+	plane.size = Vector2.ONE
+	plane.material = _dark_material()
+	copies.mesh = plane
+	copies.instance_count = places.size()
+	for index in places.size():
+		copies.set_instance_transform(index, places[index])
+	var shades := MultiMeshInstance3D.new()
+	shades.name = "Shades"
+	shades.multimesh = copies
+	shades.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Kept where they can be read back, as Scenery keeps its own.
+	shades.set_meta("places", places)
+	add_child(shades)
 	for at: Vector3 in LAMPS.get(id, []):
 		_lamps.append(_lamp(at))
 
@@ -84,22 +108,21 @@ func counts() -> Dictionary:
 		"glowing": _lamps.filter(func(lamp: Dictionary) -> bool: return lamp.glow.emission_energy_multiplier > 0.0).size()}
 
 
-# A soft dark edge on the ground round something `footprint` across.
-func _contact_shade(at: Vector3, footprint: Vector2) -> MeshInstance3D:
+# Where a soft dark edge on the ground round something `footprint` across
+# lies: a square of shade stretched to reach a little way past it.
+static func _contact_shade(at: Vector3, footprint: Vector2) -> Transform3D:
 	var reach := 1.6
-	var plane := PlaneMesh.new()
-	plane.size = footprint + Vector2.ONE * reach * 2.0
+	var size := footprint + Vector2.ONE * reach * 2.0
+	return Transform3D(Basis.from_scale(Vector3(size.x, 1.0, size.y)), at)
+
+
+func _dark_material() -> StandardMaterial3D:
 	var dark := StandardMaterial3D.new()
 	dark.albedo_color = Color(0, 0, 0.04, 0.34)
 	dark.albedo_texture = _shade()
 	dark.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	dark.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	plane.material = dark
-	var shade := MeshInstance3D.new()
-	shade.mesh = plane
-	shade.position = at
-	shade.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return shade
+	return dark
 
 
 # A picture that is dark in the middle and fades to nothing at its edge.

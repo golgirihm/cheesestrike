@@ -169,6 +169,8 @@ var _keys := {}
 var _departed := {}
 var _dirty := false
 var _since_sync := 0.0
+# The cheese as it was last sent.
+var _blocks_sent := PackedByteArray()
 # Whether this machine has the host's decisions yet: at once on the host, and
 # with the first state that arrives elsewhere.
 var _has_state := false
@@ -996,12 +998,18 @@ func _process(delta: float) -> void:
 		if state.match_due():
 			_new_match()
 	_since_sync += delta
-	if _since_sync >= RESYNC_INTERVAL:
+	var resync := _since_sync >= RESYNC_INTERVAL
+	if resync:
 		_dirty = true
 	if _dirty and _since_sync >= SYNC_INTERVAL and is_host():
 		_dirty = false
 		_since_sync = 0.0
-		_receive_state.rpc(state.to_dict())
+		# The cheese only when it has changed, and with every resync for
+		# anyone who has just come.
+		var cheese := state.blocks.to_array()
+		var with_blocks := resync or cheese != _blocks_sent
+		_blocks_sent = cheese
+		_receive_state.rpc(state.to_dict(with_blocks))
 
 
 func _changed() -> void:
@@ -1347,7 +1355,9 @@ func _burst_blocks(at: Vector3, weapon: WeaponStats) -> void:
 	for index in boxes.size():
 		var box: AABB = boxes[index]
 		var nearest := at.clamp(box.position, box.end)
-		_hurt_block(index, Splash.damage_at(at.distance_to(nearest), weapon.splash_damage, weapon.splash_radius))
+		var distance := at.distance_to(nearest)
+		if distance <= weapon.splash_radius:
+			_hurt_block(index, Splash.damage_at(distance, weapon.splash_damage, weapon.splash_radius))
 
 
 # Host only: block `index` loses `amount`. One that is finished goes, and
@@ -1356,7 +1366,7 @@ func _hurt_block(index: int, amount: float) -> void:
 	if not state.blocks.standing(index) or amount <= 0.0:
 		return
 	if state.blocks.hurt(index, amount):
-		for above: int in BlockRules.resting_on(world.block_boxes(), index):
+		for above: int in world.blocks_above(index):
 			state.blocks.remove(above)
 	_changed()
 
@@ -1716,8 +1726,22 @@ func _respawn(id: int) -> void:
 	var eye := Vector3.UP * BodyShape.HEAD_HEIGHT * BodyShape.SIZE
 	var sees := func(from: Vector3, to: Vector3) -> bool:
 		return space.intersect_ray(PhysicsRayQueryParameters3D.create(from + eye, to + eye, WORLD_MASK)).is_empty()
-	var spots: Array[Vector3] = world.spawn_positions()
+	var spots: Array[Vector3] = own_side(id, world.spawn_positions())
 	_bring_back(id, spots[SpawnChooser.best(spots, enemies, allies, fights, sees)])
+
+
+## Of `spots`, those player `id` may start at: on a large map, a player on a
+## team comes back at their own end of it, never at the other side's; and
+## anyone may start anywhere on an arena small enough to cross at a glance.
+func own_side(id: int, spots: Array[Vector3]) -> Array[Vector3]:
+	var record := state.player(id)
+	var bases: Array = world.objective_spots().bases
+	if not world.is_large() or record == null or record.team < 0 or bases.size() != 2:
+		return spots
+	var sides: Array = SpawnChooser.by_side(spots, bases)
+	var own: Array[Vector3] = []
+	own.assign(sides[record.team])
+	return own if not own.is_empty() else spots
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -1741,9 +1765,11 @@ func _new_match() -> void:
 	_fights.clear()
 	var spots: Array[Vector3] = world.spawn_positions()
 	spots.shuffle()
-	# In a mode with bases, each team starts on its own side of the arena.
+	# In a mode with bases, and on a large map in any with teams, each team
+	# starts on its own side.
 	var bases: Array = world.objective_spots().bases
-	var sides: Array = SpawnChooser.by_side(spots, bases) if state.capture != null and bases.size() == 2 else []
+	var by_side: bool = state.capture != null or (world.is_large() and state.settings.is_teams())
+	var sides: Array = SpawnChooser.by_side(spots, bases) if by_side and bases.size() == 2 else []
 	var taken := [0, 0]
 	var index := 0
 	for id: int in state.players:
@@ -1842,6 +1868,10 @@ func _introduce(wanted: Variant, key: Variant = "") -> void:
 @rpc("authority", "call_remote", "reliable")
 func _receive_state(data: Variant) -> void:
 	if data is Dictionary:
+		var cheese := state.blocks
 		state = MatchState.from_dict(data)
+		# Sent without the cheese, which hasn't changed since it last was.
+		if not data.has("blocks") and _has_state:
+			state.blocks = cheese
 		_has_state = true
 		state_changed.emit()

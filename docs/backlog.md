@@ -27,6 +27,21 @@ Things about how it works that shape the plan:
 - **There is no server that keeps anything.** Names and settings live in each browser. Anything a player earns and keeps (Milestone 11) needs either that, which can't be trusted, or a service and a database, which have to be run and paid for.
 - **Almost everything is made in code**: meshes, sounds, arenas' dressing. That has kept the build small and the look consistent, and it has a ceiling. Recorded sound, textures and animation (Milestones 4, 7 and 9) mean taking on assets, their licences and their size.
 
+## First: large maps, and the mice that eat them
+
+What makes the game its own: maps worth crossing, built mostly of cheese, and giant mice that come out partway through a match and eat it away, so that there is less and less to hide behind. This comes before everything below.
+
+Curd City is the first large map (`game/world/maps/curd_city.gd`, built by `game/world/big_map.gd`): a town about 640 by 400 metres, a minute's run from one team's yard to the other's, with houses of cheese that can be walked into, ramps between their floors, ladders to their roofs, and routes bots find their way by (`game/bots/routes.gd`). Cracker Duel, the practice range and arenas laid out in the editor stay small.
+
+1. **Giant mice.** About a minute into a match, with a red countdown on the HUD beforehand ("Mice invade in 0:42"), giant mice come out and eat the cheese: each makes for a building or a block, eats it bite by bite until it is gone, and moves on, with more of them as the match goes on. A mouse that is shot runs off for a while, which gives away whoever shot it; they don't hurt players. They replace the small mice that now gnaw a block every twenty seconds (`BlockRules`), and the host decides where each goes, as it decides everything else.
+   *Tests:* the mice's rules in a plain class like `BlockRules`, with GUT tests of when they come, where they go, what they eat and running off when shot; a browser test that both windows see the same mouse and the same cheese go. Manual: how they look and sound, and how a match feels as cover goes.
+2. **A minimap.** A small map in a corner of the HUD: teammates always shown as dots, and an enemy only for a few seconds after they fire a gun (not the knife), at the spot they fired from, not followed after.
+   *Tests:* who is shown and for how long in a plain class; GUT tests of the HUD.
+3. **The other arenas, large.** Rebuild Cheddar Canyon, Brie Box, Double Cream Dairy, Crumb Kitchen, Rind Market and Gruyère Grotto as large maps with `BigMap`, one or two a pull request, each keeping its own look: the canyon's mesas, the dairy's tanks, the kitchen's giant counters. `BigMap` will want more kinds of building as it goes.
+   *Tests:* `test_big_maps.gd` and `test_interiors.gd` run over every large map. Some browser tests rely on Cheddar Canyon being small and should move to Cracker Duel when it is rebuilt.
+4. **Bots that climb.** Bots go in and out of houses by the doors, but never up a ramp or a ladder. Add the floors and roofs to the routes.
+   *Tests:* `test_big_maps.gd`.
+
 ## Milestone 1: Playable from anywhere
 
 Before there is much more game, make it possible for people on different networks to reach it, so every later milestone can be playtested with real players.

@@ -5,7 +5,8 @@ extends Node
 ## everyone else where it is the way a real player's machine would.
 ##
 ## A child of the bot's player node. Cheap on purpose: a few rays a frame and
-## no pathfinding, as the host may be a phone.
+## no pathfinding beyond a large map's few dozen street corners (see
+## Routes), as the host may be a phone.
 
 const WORLD_MASK := 1
 ## How high off the ground it looks for things in its way.
@@ -64,6 +65,7 @@ func _physics_process(delta: float) -> void:
 	var blocked := func(from: Vector3, to: Vector3) -> bool:
 		var lift := Vector3.UP * KNEE
 		return not space.intersect_ray(PhysicsRayQueryParameters3D.create(from + lift, to + lift, WORLD_MASK)).is_empty()
+	brain.routes = world.routes
 	var orders := brain.think(delta, me, enemies, _places(match_, world, record), blocked)
 
 	# Turn toward what it aims at, or the way it walks, no faster than it can.
@@ -162,6 +164,10 @@ func _places(match_: Match, world: Node3D, record: PlayerRecord) -> Dictionary:
 		roam.append(pads[index].position)
 		if pads[index].kind == Pickups.HEALTH:
 			health.append(pads[index].position)
+	# On a large map, where the fighting is, too: its crossings, which the
+	# hills are at, or a bot could wander a long while and meet nobody.
+	if world.is_large():
+		roam.append_array(world.objective_spots().hills)
 	return {"health": health, "roam": roam, "objective": objective_for(state, record, world.objective_spots())}
 
 

@@ -55,6 +55,8 @@ var just_started := false
 var just_overtime := false
 ## Which of the arena's doors are open (see MovingParts), in its own order.
 var doors: Array = []
+## The most doors an arena may have: a large map has two for each house.
+const MAX_DOORS := 64
 ## Seconds the session has run, which its lifts go by. It never stops or
 ## starts again, so that a lift never jumps.
 var uptime := 0.0
@@ -751,7 +753,11 @@ func _leaders() -> Array[int]:
 	return leaders
 
 
-func to_dict() -> Dictionary:
+## Everything everyone needs to know, as it is sent. Without `with_blocks`,
+## the cheese is left out, for a receiver to keep what it was last sent:
+## on a large map there is a lot of it, and it changes far less often than
+## the rest.
+func to_dict(with_blocks := true) -> Dictionary:
 	var listed := []
 	for record: PlayerRecord in players.values():
 		listed.append(record.to_packed())
@@ -775,7 +781,7 @@ func to_dict() -> Dictionary:
 		data["objective"] = capture.to_array() if capture != null else zones.to_array()
 	if settings.mode == MatchSettings.ROUNDS:
 		data["round_break"] = round_break
-	if not blocks.health.is_empty():
+	if not blocks.health.is_empty() and with_blocks:
 		data["blocks"] = blocks.to_array()
 	if ballot != null:
 		data["ballot"] = ballot.to_array()
@@ -826,7 +832,7 @@ static func from_dict(data: Dictionary) -> MatchState:
 	state.ballot = Ballot.from_array(data.get("ballot"))
 	var open: Variant = data.get("doors")
 	if open is Array:
-		for door: Variant in open.slice(0, 32):
+		for door: Variant in open.slice(0, MAX_DOORS):
 			state.doors.append(door == true)
 	var run: Variant = data.get("uptime")
 	if (run is float or run is int) and is_finite(float(run)):

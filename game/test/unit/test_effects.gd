@@ -230,7 +230,7 @@ func test_what_a_shot_knocks_off_depends_on_what_it_hits() -> void:
 	assert_false(Surfaces.sparks(geometry.get_node("Block1")))
 	assert_true(Scenery.is_yellow(Surfaces.dust(geometry.get_node("Block1"))), "yellow crumbs off cheese")
 	assert_false(Scenery.is_yellow(Surfaces.dust(geometry.get_node("Floor"))))
-	assert_eq(Surfaces.dust(geometry.get_node("BuildingNorthEast")), Surfaces.DUST, "plain dust off a wall of windows")
+	assert_eq(Surfaces.dust(geometry.get_node("Building1")), Surfaces.DUST, "plain dust off a wall of windows")
 	assert_eq(Surfaces.dust(null), Surfaces.DUST)
 	assert_eq(Surfaces.kind(null), Surfaces.STONE)
 

@@ -153,7 +153,8 @@ func test_yellow_is_kept_for_cheese_blocks_and_health() -> void:
 		for entry: Array in _colours(map):
 			var drawn: Node = entry[1]
 			var path := str(map.get_path_to(drawn))
-			var cheese := path.begins_with("Geometry/Block")
+			# A block of cheese, or a building of them drawn as one.
+			var cheese: bool = path.begins_with("Geometry/Block") or path.begins_with("Clusters/") and drawn.material_override.get_meta("surface", "") == Textures.CHEESE
 			var pad: Node = drawn.get_parent().get_parent() if drawn.get_parent().name == "Item" else null
 			var health := pad != null and String(pad.get_meta("kind", "")) == Pickups.HEALTH
 			if Scenery.is_yellow(entry[0]):

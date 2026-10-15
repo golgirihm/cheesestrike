@@ -70,10 +70,15 @@ func test_what_stands_on_the_ground_darkens_it_and_what_hangs_over_it_does_not()
 			standing += 1
 	assert_gt(standing, 5)
 	assert_eq(world.lighting.counts().shades, standing, "one for each: not for the roof, the gantry or a block on a block")
-	for shade: MeshInstance3D in world.lighting.find_children("*", "MeshInstance3D", false, false):
-		if shade.mesh is PlaneMesh:
-			assert_between(shade.position.y, 0.0, 0.1, "flat on the ground")
-			assert_false(shade.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+	# All drawn at once, each flat on the ground and a little bigger than
+	# what stands there.
+	var shades: MultiMeshInstance3D = world.lighting.get_node("Shades")
+	assert_eq(shades.multimesh.instance_count, standing)
+	assert_true(shades.multimesh.mesh is PlaneMesh)
+	assert_false(shades.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+	for place: Transform3D in shades.get_meta("places"):
+		assert_between(place.origin.y, 0.0, 0.1, "flat on the ground")
+		assert_gt(place.basis.get_scale().x, 3.2, "reaching past its edge")
 
 
 func test_lamps_come_on_when_the_sky_is_dark() -> void:

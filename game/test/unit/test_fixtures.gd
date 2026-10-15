@@ -92,7 +92,13 @@ func test_every_fixture_is_drawn() -> void:
 			if holder == null:
 				continue
 			for fixture: Node3D in holder.get_children():
-				assert_gt(fixture.find_children("*", "MeshInstance3D", true, false).size(), 2, "%s: %s" % [id, fixture.name])
+				var drawn := fixture.find_children("*", "MeshInstance3D", true, false)
+				assert_gt(drawn.size(), 0, "%s: %s" % [id, fixture.name])
+				# A pad's rings and arrows, or a ladder's rails and rungs.
+				var faces := 0
+				for part: MeshInstance3D in drawn:
+					faces += part.mesh.get_faces().size() / 3
+				assert_gt(faces, 200, "%s: %s is more than a box" % [id, fixture.name])
 
 
 func test_stepping_on_a_pad_throws_the_owner_onto_the_mesa() -> void:
@@ -132,23 +138,22 @@ func test_the_host_allows_for_every_arenas_pads() -> void:
 			assert_eq(refused, 0, "%s: the flight from a pad is allowed" % id)
 
 
-func test_the_owner_climbs_the_ladder_onto_the_bus() -> void:
+func test_the_owner_climbs_a_ladder_onto_a_roof() -> void:
 	await _load("city")
 	var ladder: Dictionary = world.fixtures.ladders[0]
-	# Standing at its foot, as close to the bus as a player gets, facing it.
-	var own := _own(ladder.position + Vector3(0, 0.05, 0.4))
+	var facing: Vector3 = ladder.facing
+	# Standing at its foot, as close to the house as a player gets, facing it.
+	var own := _own(ladder.position - facing * 0.4 + Vector3(0, 0.05, 0), atan2(-facing.x, -facing.z))
 	await wait_physics_frames(5)
 	assert_almost_eq(own.global_position.y, 0.0, 0.1, "holding on doesn't lift them")
 	Input.action_press("move_forward")
-	var top := 0.0
-	for frame in 240:
+	for frame in 480:
 		await wait_physics_frames(1)
-		top = maxf(top, own.global_position.y)
-		if own.global_position.y > 4.1 and own.is_on_floor():
+		if own.global_position.y > ladder.height - 0.3 and own.is_on_floor():
 			break
 	Input.action_release("move_forward")
 	assert_almost_eq(own.global_position.y, ladder.height, 0.3, "up on the roof")
-	assert_lt(own.global_position.z, ladder.position.z - 0.5, "and walked onto it")
+	assert_gt((own.global_position - ladder.position).dot(facing), 1.0, "and walked onto it")
 	# A ladder is slower than a jump, so the host's limit on rising covers it.
 	assert_lt(Fixtures.LADDER_SPEED, MovementCheck.MAX_RISE_SPEED)
 
@@ -156,7 +161,8 @@ func test_the_owner_climbs_the_ladder_onto_the_bus() -> void:
 func test_letting_go_of_the_keys_holds_on_to_a_ladder() -> void:
 	await _load("city")
 	var ladder: Dictionary = world.fixtures.ladders[0]
-	var own := _own(ladder.position + Vector3(0, 2.0, 0.4))
+	var facing: Vector3 = ladder.facing
+	var own := _own(ladder.position - facing * 0.4 + Vector3(0, 2.0, 0), atan2(-facing.x, -facing.z))
 	await wait_seconds(0.5)
 	assert_almost_eq(own.global_position.y, 2.0, 0.1, "neither climbing nor falling")
 	Input.action_press("move_back")

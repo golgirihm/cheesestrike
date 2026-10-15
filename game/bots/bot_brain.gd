@@ -43,6 +43,8 @@ const LOOK_AHEAD := 3.0
 const WAYS_ROUND := [PI / 4.0, -PI / 4.0, PI / 2.0, -PI / 2.0, PI * 0.75, -PI * 0.75]
 ## Seconds without getting anywhere after which it is stuck.
 const STUCK_AFTER := 1.2
+## Seconds after which it works out its way across a large map again.
+const REWAY_EVERY := 3.0
 
 var skill := NORMAL
 ## Who it is fighting (0 for nobody) and for how long it has had them in sight.
@@ -50,6 +52,11 @@ var target := 0
 var seen_for := 0.0
 ## Where it is heading when it has nothing better to do.
 var goal: Variant = null
+## The ways across the map it is on, if it is a large one (see Routes).
+var routes: Routes = null
+var _way: Array[Vector3] = []
+var _way_to := Vector3.INF
+var _way_age := 0.0
 var _rng := RandomNumberGenerator.new()
 var _burst_left := 0
 var _rest_left := 0.0
@@ -112,6 +119,8 @@ func think(delta: float, me: Dictionary, enemies: Array, places: Dictionary, blo
 			orders.fire = _trigger(level)
 		if heading == null:
 			orders.move = _fight_step(delta, at, enemy.at, distance, me.range)
+	if heading != null and routes != null and not routes.is_empty():
+		heading = _by_way(delta, at, heading)
 	if heading != null:
 		var way: Vector3 = heading - at
 		way.y = 0.0
@@ -206,6 +215,28 @@ func _roam(at: Vector3, spots: Array) -> Variant:
 	if goal == null and not spots.is_empty():
 		goal = spots[_rng.randi_range(0, spots.size() - 1)]
 	return goal
+
+
+# Where to walk next to get to `wanted`, far off across a large map: the
+# next point on the way there (see Routes), or `wanted` itself once near.
+# The way is worked out again when what is wanted moves, and now and then
+# in case it has been knocked off it.
+func _by_way(delta: float, at: Vector3, wanted: Vector3) -> Vector3:
+	_way_age += delta
+	if _way_to.distance_to(wanted) > Routes.REACHED or _way_age > REWAY_EVERY:
+		_way = routes.way(at, wanted)
+		_way_to = wanted
+		_way_age = 0.0
+	while not _way.is_empty() and Vector2(_way[0].x - at.x, _way[0].z - at.z).length() <= Routes.REACHED:
+		_way.pop_front()
+	if _way.is_empty() or Vector2(wanted.x - at.x, wanted.z - at.z).length() <= Routes.NEAR:
+		return wanted
+	return _way[0]
+
+
+## The points it is walking through to get where it wants, for tests.
+func way() -> Array[Vector3]:
+	return _way
 
 
 static func _nearest(at: Vector3, spots: Array) -> Vector3:

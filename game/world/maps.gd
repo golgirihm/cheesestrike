@@ -5,6 +5,11 @@ class_name Maps
 ## each other with a clear view between them, and a Gouda Launcher lies in
 ## the middle, which the browser tests rely on.
 ##
+## The large maps are built in code rather than laid out in a scene (see
+## BigMap), and need not have the first two spots in sight of each other,
+## the launcher straight ahead of the first, or anything else that only
+## suits an arena crossed in a few seconds.
+##
 ## A scene lays its Geometry out as plain boxes; Scenery draws them as they
 ## are seen, and adds the fence at the edge and the land beyond. The four
 ## Wall bodies are the edge: solid, far taller than anyone can be thrown,
@@ -33,7 +38,6 @@ const NAMES := {"canyon": "Cheddar Canyon", "box": "Brie Box", "city": "Curd Cit
 const _SCENES := {
 	"canyon": preload("res://world/maps/cheddar_canyon.tscn"),
 	"box": preload("res://world/maps/brie_box.tscn"),
-	"city": preload("res://world/maps/curd_city.tscn"),
 	"dairy": preload("res://world/maps/dairy.tscn"),
 	"kitchen": preload("res://world/maps/kitchen.tscn"),
 	"market": preload("res://world/maps/market.tscn"),
@@ -41,11 +45,29 @@ const _SCENES := {
 	"duel": preload("res://world/maps/duel.tscn"),
 	RANGE: preload("res://world/maps/practice_range.tscn"),
 }
+## The large maps, built in code (see BigMap): each a script whose build()
+## gives the map.
+const _BUILT := {
+	"city": preload("res://world/maps/curd_city.gd"),
+}
 
 
 static func scene(id: String) -> PackedScene:
 	return _SCENES.get(id, _SCENES[DEFAULT])
 
 
+## A new copy of map `id`, or of the default for one there isn't.
+static func build(id: String) -> Node3D:
+	if _BUILT.has(id):
+		return _BUILT[id].build()
+	return scene(id).instantiate()
+
+
+## Whether map `id` is one of the large ones, where the two sides start far
+## apart and getting across takes a minute or more.
+static func is_large(id: String) -> bool:
+	return _BUILT.has(id)
+
+
 static func exists(id: Variant) -> bool:
-	return id is String and (_SCENES.has(id) or id == CUSTOM)
+	return id is String and (_SCENES.has(id) or _BUILT.has(id) or id == CUSTOM)

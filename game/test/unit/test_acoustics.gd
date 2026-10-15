@@ -46,18 +46,27 @@ func test_the_middle_of_an_open_arena_is_the_open() -> void:
 	assert_ne(Acoustics.survey(space, edge), INDOORS)
 
 
-func test_the_citys_tower_is_indoors_and_its_streets_are_not() -> void:
+# A spot in a back corner of the ground floor of the city's hotel, a house
+# of three floors facing south onto the Avenue (see the city's plan).
+func _in_the_hotel() -> Vector3:
+	var hotel: Dictionary = world.places().filter(func(place: Dictionary) -> bool: return place.name == "Cheddar Hotel")[0]
+	return hotel.at + Vector3(12, 0, -6)
+
+
+func test_the_citys_houses_are_indoors_and_its_streets_are_not() -> void:
 	var space: PhysicsDirectSpaceState3D = await _arena("city")
-	assert_eq(Acoustics.survey(space, Vector3(22, 0, -20)), INDOORS, "the lobby")
-	assert_eq(Acoustics.survey(space, Vector3(22, 6.4, -20)), INDOORS, "and the floor above")
+	var lobby := _in_the_hotel()
+	assert_eq(Acoustics.survey(space, lobby), INDOORS, "the hotel's ground floor")
+	assert_eq(Acoustics.survey(space, lobby + Vector3.UP * BigMap.STOREY), INDOORS, "and the floor above")
 	assert_ne(Acoustics.survey(space, Vector3(0, 0, 0)), INDOORS, "the crossroads")
-	# Somewhere on the city's streets there are walls on both sides.
+	# Somewhere in the city there are walls on both sides.
 	var places := {}
-	for x in range(-30, 31, 5):
-		for z in range(-30, 31, 5):
+	for x in range(-300, 301, 6):
+		for z in range(-190, 191, 6):
 			places[Acoustics.survey(space, Vector3(x, 0, z))] = true
 	assert_has(places, ALLEY)
 	assert_has(places, INDOORS)
+	assert_has(places, OPEN)
 
 
 func test_every_arena_is_some_kind_of_place_wherever_a_player_starts() -> void:
@@ -70,7 +79,7 @@ func test_every_arena_is_some_kind_of_place_wherever_a_player_starts() -> void:
 
 func test_a_place_is_worked_out_once_for_each_square_and_again_for_a_new_arena() -> void:
 	await _arena("city")
-	var lobby := Vector3(22, 0, -20)
+	var lobby := _in_the_hotel()
 	assert_eq(Acoustics.place_at(world.map, lobby), INDOORS)
 	assert_eq(Acoustics._known.size(), 1)
 	Acoustics.place_at(world.map, lobby + Vector3(0.2, 0, 0.2))
@@ -135,28 +144,29 @@ func test_each_kind_of_place_has_a_bus_that_gives_it_its_sound() -> void:
 	assert_eq(AudioServer.bus_count, count, "made once")
 
 
-func test_a_shot_in_the_tower_is_played_as_one_indoors_and_muffled_from_the_street() -> void:
+func test_a_shot_in_a_house_is_played_as_one_indoors_and_muffled_from_the_street() -> void:
 	await _arena("city")
+	var lobby := _in_the_hotel()
 	var camera := Camera3D.new()
 	world.add_child(camera)
 	camera.make_current()
-	# Heard from across the lobby.
-	camera.global_position = Vector3(25, 2, -19)
-	Sounds.play_at("blaster", Vector3(19, 2, -21), world)
+	# Heard from across the room.
+	camera.global_position = lobby + Vector3(-3, 2, 1)
+	Sounds.play_at("blaster", lobby + Vector3(2, 2, -1), world)
 	assert_eq(Sounds.last_treatment.bus, "WeaponsIndoors")
 	assert_eq(Sounds.last_treatment.volume_db, 0.0)
 	assert_eq(Sounds.last_treatment.cutoff, Acoustics.CLEAR_CUTOFF)
 	var voice: AudioStreamPlayer3D = world.find_children("*", "AudioStreamPlayer3D", false, false)[-1]
 	assert_eq(String(voice.bus), "WeaponsIndoors")
-	# Heard from the street, through the tower's wall.
-	camera.global_position = Vector3(8, 2, -21)
-	Sounds.play_at("blaster", Vector3(22, 2, -22), world)
+	# Heard from the yard beside it, through its wall.
+	camera.global_position = lobby + Vector3(14, 2, 0)
+	Sounds.play_at("blaster", lobby + Vector3(0, 2, 0), world)
 	assert_eq(Sounds.last_treatment.cutoff, Acoustics.MUFFLED_CUTOFF)
 	assert_eq(Sounds.last_treatment.volume_db, Acoustics.MUFFLED_DB)
 	# A step there is treated too, and a pickup's chime is not.
-	Sounds.play_at("step", Vector3(22, 0, -20), world)
+	Sounds.play_at("step", lobby, world)
 	assert_eq(Sounds.last_treatment.bus, "StepsIndoors")
-	Sounds.play_at("pickup", Vector3(22, 0, -20), world)
+	Sounds.play_at("pickup", lobby, world)
 	assert_eq(Sounds.last_treatment.bus, Mix.WORLD)
 
 

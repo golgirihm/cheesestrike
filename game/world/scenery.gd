@@ -140,11 +140,23 @@ static func _size(body: Node3D) -> Vector3:
 	return (body.get_node("CollisionShape3D").shape as BoxShape3D).size
 
 
+## The sizes of block of cheese that have holes on their faces: a block a
+## player can hide behind. Walls and floors, and blocks as big as a house,
+## show them only in what they are made of, as a large map has hundreds.
+const HOLES_FROM := 1.5
+const HOLES_TO := 4.5
+
+
 # A block of cheese: yellow, with holes on every side that shows.
 static func _cheese(body: Node3D) -> void:
 	var drawn: MeshInstance3D = body.get_node("MeshInstance3D")
 	drawn.material_override = Textures.material(CHEESE, Textures.CHEESE)
-	var half := _size(body) / 2.0
+	var extent := _size(body)
+	var least := minf(extent.x, minf(extent.y, extent.z))
+	var most := maxf(extent.x, maxf(extent.y, extent.z))
+	if least < HOLES_FROM or most > HOLES_TO:
+		return
+	var half := extent / 2.0
 	var hole := _material(CHEESE.darkened(0.28))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(body.position)
@@ -346,10 +358,22 @@ static func _fixtures(map: Node3D) -> void:
 			var height := float(ladder.get_meta("height", 4.0))
 			# Against what it climbs, which is just ahead of where the climber stands.
 			var back := -0.95
-			for side in [-1.0, 1.0]:
-				ladder.add_child(Rounded.instance(Rounded.box(Vector3(0.12, height + 0.9, 0.12), 0.04), steel, Vector3(0.6 * side, (height + 0.9) / 2.0, back)))
-			for rung in int(height / 0.6):
-				ladder.add_child(Rounded.instance(Rounded.box(Vector3(1.2, 0.09, 0.09), 0.03), steel, Vector3(0, 0.5 + rung * 0.6, back)))
+			# As one, as a tall ladder has dozens of rungs.
+			ladder.add_child(Rounded.instance(_ladder(height), steel, Vector3(0, 0, back)))
+
+
+# A ladder `height` tall in one mesh: its two rails, and a rung every 0.6 m.
+static func _ladder(height: float) -> ArrayMesh:
+	var key := ["ladder", height]
+	if not _materials.has(key):
+		var tool := SurfaceTool.new()
+		tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for side in [-1.0, 1.0]:
+			tool.append_from(Rounded.box(Vector3(0.12, height + 0.9, 0.12), 0.04), 0, Transform3D(Basis.IDENTITY, Vector3(0.6 * side, (height + 0.9) / 2.0, 0)))
+		for rung in int(height / 0.6):
+			tool.append_from(Rounded.box(Vector3(1.2, 0.09, 0.09), 0.03), 0, Transform3D(Basis.IDENTITY, Vector3(0, 0.5 + rung * 0.6, 0)))
+		_materials[key] = tool.commit()
+	return _materials[key]
 
 
 # A wheel at `at`, its axle across the vehicle.
