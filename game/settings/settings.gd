@@ -37,6 +37,7 @@ const DEFAULTS := {
 	"stick_curve": "linear",
 	"aim_assist": true,
 	"rumble": true,
+	"haptics": true,
 	# Aiming by turning the device (see GyroAim).
 	"gyro_aim": false,
 	# One switch that calms everything that moves the view or flashes.

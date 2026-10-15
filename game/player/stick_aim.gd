@@ -8,6 +8,7 @@ const DEAD_ZONE := "stick_dead_zone"
 const CURVE := "stick_curve"
 const ASSIST := "aim_assist"
 const RUMBLE := "rumble"
+const HAPTICS := "haptics"
 ## The curves, and how each is called: how far the stick is pushed (past
 ## the dead zone, from 0 to 1) is raised to this power.
 const CURVES := {"linear": 1.0, "classic": 2.0, "precise": 3.0}
@@ -59,6 +60,12 @@ static func slowdown_among(eye: Vector3, forward: Vector3, targets: Array) -> fl
 			continue
 		slowest = minf(slowest, slowdown(forward.angle_to(target - eye), size_at(distance)))
 	return slowest
+
+
+## How long, in milliseconds, a phone buzzes when its player takes `dealt`
+## damage: longer for a bigger hit, and always short.
+static func buzz_ms(dealt: int) -> int:
+	return clampi(30 + dealt * 2, 30, 150)
 
 
 ## How strongly, from 0 to 1, and for how long a gamepad rumbles when its

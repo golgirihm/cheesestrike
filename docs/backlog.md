@@ -126,7 +126,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
    *Tests:* the benchmark scene on both.
 3. **A storefront.** Steam: a page, achievements, friends and invites through it, cloud saves, and the Steam Deck checked.
    *Tests:* manual rows.
-4. **Phones, properly.** Android and iOS builds, or the installed web app made good enough: a touch layout that can be rearranged, and haptics. (A frame-rate cap and a battery saver are done.)
+4. **Phones, properly.** Android and iOS builds, or the installed web app made good enough: and a touch layout that can be rearranged. (A frame-rate cap, a battery saver, and a buzz when hurt are done.)
    *Tests:* extend `test_touch_controls.gd`. Manual rows on real phones.
 5. **Gamepads in the menus.** Button pictures that match the controller, and every menu usable without a mouse. (Aim assist that only slows the view, response curves, a dead zone and rumble are done.)
    *Tests:* GUT tests of menu focus on every screen.
