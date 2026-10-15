@@ -43,6 +43,9 @@ const SERVER_WAIT := 8.0
 ## What a developer runs to start the session server, said in development
 ## builds when it can't be reached.
 const START_SERVER := "python signaling/server.py"
+## How many times in a row the session list is asked for before a player is
+## told the session server can't be reached.
+const LIST_TRIES := 2
 
 var use_webrtc := OS.has_feature("web")
 var in_session := false
@@ -73,6 +76,8 @@ var _joining := JoiningPeers.new()
 var _ws: WebSocketPeer
 # Seconds the connection to the session server has been opening.
 var _ws_opening := 0.0
+# How many times running the session list hasn't come.
+var _list_failures := 0
 var _outbox: Array[String] = []
 var _rtc: WebRTCMultiplayerPeer
 var _connecting := false
@@ -375,9 +380,18 @@ func _on_sessions_listed(result: int, response_code: int, _headers: PackedString
 	if result == HTTPRequest.RESULT_SUCCESS and response_code == 200 and json.parse(body.get_string_from_utf8()) == OK:
 		answer = json.data
 	if answer is Dictionary and answer.get("sessions") is Array:
+		_list_failures = 0
 		sessions_listed.emit(answer.sessions)
-	else:
-		sessions_unreachable.emit(unreachable(_http_url))
+		return
+	# Once may be nothing: the page still starting up and too busy to hear
+	# back in time, or a moment without a connection. It is asked again at
+	# once, and only if that fails too is the player told.
+	_list_failures += 1
+	if _list_failures < LIST_TRIES:
+		request_sessions.call_deferred()
+		return
+	_list_failures = 0
+	sessions_unreachable.emit(unreachable(_http_url))
 
 
 func _on_session_reported(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
