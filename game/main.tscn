@@ -242,12 +242,6 @@ custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Resume"
 
-[node name="CopyLinkButton" type="Button" parent="UI/PauseMenu/Panel/Margin/Rows"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
-layout_mode = 2
-text = "Copy invite link"
-
 [node name="HelpButton" type="Button" parent="UI/PauseMenu/Panel/Margin/Rows"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)

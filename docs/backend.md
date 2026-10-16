@@ -88,7 +88,7 @@ So everything is developed and tested without AWS. The game finds its server thr
 | Limit | Value | Where |
 |---|---|---|
 | Players in a session | 16 | `signaling/core.py` |
-| Sessions in the list | 50, newest first | `signaling/core.py`. Any session can still be joined by its code or an invite link. |
+| Sessions in the list | 50, newest first | `signaling/core.py`. Any session can still be joined by its code. |
 | Connections from one address | 32 | `signaling/core.py` |
 | Sessions hosted from one address | 8 | `signaling/core.py` |
 | Messages a second, over everyone | 200, in bursts of 400 | the WebSocket stage in `infra/template.yaml` |

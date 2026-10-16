@@ -194,8 +194,8 @@ func test_a_built_arena_has_what_the_modes_and_the_names_need() -> void:
 func test_a_link_carries_the_arena_and_reads_back() -> void:
 	var code: String = SAMPLE.code()
 	assert_eq(ArenaCode.link("https://example.com/cheese/", code), "https://example.com/cheese/?arena=" + code)
-	# Other parameters are kept, but not an older arena or a session to join.
-	var link := ArenaCode.link("http://localhost:8060/?signal=ws://pc:9080&join=ABCD&arena=old#top", code)
+	# Other parameters are kept, but not an older arena.
+	var link := ArenaCode.link("http://localhost:8060/?signal=ws://pc:9080&arena=old#top", code)
 	assert_eq(link, "http://localhost:8060/?signal=ws://pc:9080&arena=" + code)
 	assert_eq(ArenaCode.code_in(link.get_slice("?", 1)), code)
 	assert_eq(ArenaCode.code_in("?test&arena=" + code), code)

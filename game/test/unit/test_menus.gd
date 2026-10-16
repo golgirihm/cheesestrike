@@ -104,12 +104,12 @@ func test_hosting_uses_the_chosen_settings() -> void:
 	Settings.set_value("host_bot_skill", "normal")
 
 
-func test_the_private_button_switches_between_listed_and_invite_only() -> void:
+func test_the_private_button_switches_between_listed_and_by_code_only() -> void:
 	Settings.set_value("host_private", false)
 	assert_eq(main.private_button.text, "Listed for everyone")
 	main.private_button.pressed.emit()
 	assert_true(Settings.get_value("host_private"))
-	assert_eq(main.private_button.text, "Private: invite only")
+	assert_eq(main.private_button.text, "Private: join by code only")
 	main.private_button.pressed.emit()
 	assert_false(Settings.get_value("host_private"))
 

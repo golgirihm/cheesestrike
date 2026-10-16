@@ -205,7 +205,6 @@ func test_the_menu_starts_a_session_alone_on_the_range() -> void:
 	assert_true(main.combat_hud.visible)
 	main._process(0.0)
 	assert_eq(main.hud.text, "Practice range")
-	assert_false(main.copy_link_button.visible, "nobody to invite")
 	# Leaving goes back to the menu, and the next session is an ordinary one.
 	Net.leave()
 	assert_false(Net.alone)
