@@ -311,6 +311,9 @@ func _build_reach() -> void:
 	_spine.hand = _right_hand_bone
 	_spine.in_hand = _in_hand
 	_skeleton.add_child(_spine)
+	var twist: SkeletonModifier3D = preload("res://player/forearm_twist.gd").new()
+	twist.name = "ForearmTwist"
+	_skeleton.add_child(twist)
 
 
 func weapon_scale() -> float:

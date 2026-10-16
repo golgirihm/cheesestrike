@@ -251,3 +251,37 @@ func test_others_dont_see_the_arms_cut_for_its_players_own_view() -> void:
 		return
 	for name: String in SOLDIER.FIRST_PERSON:
 		assert_false(soldier._model.find_child(name).visible, name)
+
+
+func test_the_roll_about_the_forearm_is_picked_out_of_a_turn() -> void:
+	var twist := preload("res://player/forearm_twist.gd")
+	var along := Vector3(0.3, 0.2, -0.9).normalized()
+	var swing := Quaternion(along.cross(Vector3.UP).normalized(), 0.4)
+	var picked: Quaternion = twist.roll(swing * Quaternion(along, 1.2), along)
+	assert_almost_eq(picked.get_angle(), 1.2, 0.2, "most of the roll")
+	assert_almost_eq(absf(picked.get_axis().dot(along)), 1.0, 0.0001, "and only about the forearm")
+	assert_almost_eq(twist.roll(swing, along).get_angle(), 0.0, 0.01, "none from a turn that only swings")
+
+
+func test_a_hands_roll_turns_the_forearms_twist_bones_part_of_the_way() -> void:
+	# A forearm along +Y, with its two twist bones, and a hand at its end
+	# rolled about it, as an animation would leave it.
+	var skeleton := Skeleton3D.new()
+	add_child_autofree(skeleton)
+	for bone: Array in [["LeftLowerArm", -1, 0.0], ["CC_Base_L_ForearmTwist01", 0, 0.1], ["CC_Base_L_ForearmTwist02", 1, 0.1], ["LeftHand", 0, 0.3]]:
+		var index := skeleton.add_bone(bone[0])
+		skeleton.set_bone_parent(index, bone[1])
+		skeleton.set_bone_rest(index, Transform3D(Basis(), Vector3(0, bone[2], 0)))
+	skeleton.reset_bone_poses()
+	skeleton.set_bone_pose_rotation(skeleton.find_bone("LeftHand"), Quaternion(Vector3.UP, 1.5))
+	skeleton.add_child(preload("res://player/forearm_twist.gd").new())
+	var rolled := {}
+	var note := func() -> void:
+		for name in ["CC_Base_L_ForearmTwist01", "CC_Base_L_ForearmTwist02", "LeftHand"]:
+			rolled[name] = skeleton.get_bone_global_pose(skeleton.find_bone(name)).basis.get_rotation_quaternion().get_angle()
+	skeleton.skeleton_updated.connect(note)
+	await wait_process_frames(3)
+	skeleton.skeleton_updated.disconnect(note)
+	assert_almost_eq(rolled.LeftHand, 1.5, 0.001, "the hand as the animation has it")
+	assert_almost_eq(rolled.CC_Base_L_ForearmTwist02, 1.0, 0.001, "two thirds of its roll near the wrist")
+	assert_almost_eq(rolled.CC_Base_L_ForearmTwist01, 0.5, 0.001, "a third near the elbow")
