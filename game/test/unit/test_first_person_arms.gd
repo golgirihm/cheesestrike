@@ -75,7 +75,8 @@ func test_the_weapon_in_view_is_held_as_others_see_the_soldiers_aimed_or_not() -
 		# The left hand where the aim has it against the right.
 		var arms: Node3D = seen.arms
 		var weapon: Transform3D = arms._skeleton.global_transform.affine_inverse() * seen.gun.global_transform
-		var left: Vector3 = arms._skeleton.global_transform * (weapon * SOLDIER._in_hand.affine_inverse() * SOLDIER._left_from_right).origin
+		var hold: Dictionary = SOLDIER.hold("rifle")
+		var left: Vector3 = arms._skeleton.global_transform * (weapon * (hold.in_hand as Transform3D).affine_inverse() * (hold.left as Transform3D)).origin
 		assert_lt(left.distance_to(seen.LeftHand.origin), 0.005, "the left as the aim holds a rifle, held at %s" % at)
 
 
@@ -91,3 +92,25 @@ func test_where_the_arms_are_cut_from_the_body_is_out_of_view_aimed_or_not() -> 
 		for side in ["Left", "Right"]:
 			var collar: Vector3 = seen[side + "Collar"]
 			assert_gt(rad_to_deg(atan2(-collar.y, -collar.z)), widest / 2.0, "%s collarbone below the view, held at %s" % [side, at])
+
+
+func test_a_pistol_in_view_is_held_as_the_pistol_aim_holds_it() -> void:
+	if not SOLDIER.available():
+		pending("The licensed assets aren't checked out.")
+		return
+	var head := Node3D.new()
+	add_child_autofree(head)
+	var gun := Node3D.new()
+	gun.position = VIEW_GUN_POSITION
+	gun.scale = Vector3.ONE * VIEW_GUN_SCALE
+	head.add_child(gun)
+	var model := WeaponModels.build("pistol")
+	gun.add_child(model)
+	var arms: Node3D = ARMS.new(VIEW_GUN_SCALE)
+	head.add_child(arms)
+	arms.hold(gun)
+	var fist := {}
+	arms._skeleton.skeleton_updated.connect(func() -> void: fist.at = arms._skeleton.global_transform * arms._fist_now())
+	await wait_process_frames(10)
+	assert_eq(arms._player.current_animation, SOLDIER.GRIPS.pistol)
+	assert_lt((fist.at as Vector3).distance_to(model.to_global(WeaponModels.GRIP)), 0.015, "the grip in the right fist")

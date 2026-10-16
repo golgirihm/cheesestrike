@@ -7,9 +7,9 @@ extends Node3D
 ## The body stands where the player's own would, its eyes at theirs, so that
 ## where the arms are cut from it stays out of view however the weapon moves,
 ## aimed down the sights or not. The arms reach for the weapon: the right hand
-## holds it as the soldier's does (SOLDIER._in_hand), and the left where the
-## aim has it against the right, so both hands hold it as the animation holds
-## a rifle. The forearms' twist bones (forearm_twist.gd) keep the wrists from
+## holds it as the soldier's does (SOLDIER.hold), and the left where the aim
+## has it against the right, so both hands hold it as the animation holds
+## that kind of weapon, a rifle or a pistol. The forearms' twist bones (forearm_twist.gd) keep the wrists from
 ## pinching. The weapons are to be made to fit the hands, not the hands the
 ## weapons.
 
@@ -36,6 +36,9 @@ var _gun: Node3D
 var _scale := 1.0
 # Each hand's IK target (where its wrist goes) and the modifier turning it.
 var _hands := {}
+var _player: AnimationPlayer
+# How the hands hold the weapon in view (see SOLDIER.GRIPS).
+var _grip := "rifle"
 
 
 ## Arms for a weapon in view drawn `view_scale` times the size the drawn
@@ -58,7 +61,8 @@ func _init(view_scale: float) -> void:
 	while node != _model:
 		chain = (node as Node3D).transform * chain
 		node = node.get_parent()
-	var skeleton_scale := view_scale / SOLDIER._in_hand.basis.get_scale().x * LARGER
+	var rifle: Transform3D = SOLDIER.hold("rifle").in_hand
+	var skeleton_scale := view_scale / rifle.basis.get_scale().x * LARGER
 	_scale = skeleton_scale / chain.basis.get_scale().x
 	# Facing ahead, its eyes at this node's origin, then ahead and down.
 	_model.rotation.y = PI
@@ -67,10 +71,10 @@ func _init(view_scale: float) -> void:
 	var sleeves: MeshInstance3D = _model.find_child("FirstPersonSleeves")
 	_sleeves = (sleeves.get_active_material(0) as StandardMaterial3D).duplicate() as StandardMaterial3D
 	sleeves.material_override = _sleeves
-	var player := AnimationPlayer.new()
-	_model.add_child(player)
-	player.add_animation_library("", SOLDIER.library())
-	player.play("aim")
+	_player = AnimationPlayer.new()
+	_model.add_child(_player)
+	_player.add_animation_library("", SOLDIER.library())
+	_player.play(SOLDIER.GRIPS[_grip])
 	for side: String in ["Right", "Left"]:
 		_hands[side] = _arm(side)
 	var twist: SkeletonModifier3D = preload("res://player/forearm_twist.gd").new()
@@ -135,9 +139,16 @@ func _process(_delta: float) -> void:
 	# Where the hands go, in the skeleton's space: the right holding the
 	# weapon as the soldier's does, the left where the aim has it against the
 	# right.
+	# The newest model: one changed from waits to be freed beside it.
+	var model := _gun.get_child(-1) as Node3D if _gun.get_child_count() > 0 else null
+	var grip := SOLDIER.grip_of(model.get_meta("weapon", "") if model != null else "")
+	if grip != _grip:
+		_grip = grip
+		_player.play(SOLDIER.GRIPS[grip])
+	var hold: Dictionary = SOLDIER.hold(grip)
 	var weapon := _skeleton.global_transform.affine_inverse() * _gun.global_transform
-	var right := weapon * SOLDIER._in_hand.affine_inverse()
-	var left := right * SOLDIER._left_from_right
+	var right := weapon * (hold.in_hand as Transform3D).affine_inverse()
+	var left := right * (hold.left as Transform3D)
 	for side: String in _hands:
 		var hand: Transform3D = right if side == "Right" else left
 		(_hands[side].wrist as Node3D).global_position = _skeleton.global_transform * hand.origin
