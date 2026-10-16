@@ -53,7 +53,7 @@ python tools/run_tests.py
 
   The game draws to a canvas, which a test can't read, so when the page is opened with `?test` the game publishes what is on screen for the tests to check (`game/test_hook.gd`).
 
-  They take a while, so CI splits them between four machines: `python tools/run_tests.py browser --shard 2/4` runs the second machine's share, as for reproducing a failure there.
+  They take a while, so CI splits them between eight machines: `python tools/run_tests.py browser --shard 2/8` runs the second machine's share, as for reproducing a failure there. Each machine's output ends with how long each of its tests took, slowest first.
 
 The plan for the rest of the game is in [docs/backlog.md](docs/backlog.md).
 

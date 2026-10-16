@@ -104,13 +104,13 @@ jobs:
   # are limited by processor time, so they are split between several
   # machines, each exporting the build for itself and running its share.
   browser-shard:
-    name: Browser tests ${{ matrix.shard }} of 4
+    name: Browser tests ${{ matrix.shard }} of 8
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -139,7 +139,7 @@ jobs:
       # The Playwright version pins the browser build it downloads.
       - name: Install the browser
         run: python -m playwright install --only-shell chromium
-      - run: python tools/run_tests.py browser --shard ${{ matrix.shard }}/4
+      - run: python tools/run_tests.py browser --shard ${{ matrix.shard }}/8
 
   # The one check that stands for all the shards, under the name the buildci
   # command and the branch rules know.
