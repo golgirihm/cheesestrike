@@ -21,12 +21,14 @@ func _frames(count: int, delta := 1.0 / 30.0) -> void:
 		soldier._tree.advance(delta)
 
 
-func test_its_legs_blend_from_standing_through_walking_to_running() -> void:
+func test_its_legs_blend_from_standing_through_walking_and_running_to_sprinting() -> void:
 	assert_eq(SOLDIER.stride(0.0), Vector2(0.0, 1.0), "standing still")
-	var walk_speed := SOLDIER.WALK_PACE * BodyShape.SIZE * SOLDIER.model_scale()
-	var run_speed := SOLDIER.RUN_PACE * BodyShape.SIZE * SOLDIER.model_scale()
-	assert_almost_eq(SOLDIER.stride(walk_speed).x, 1.0, 0.001, "walking at the walk's own pace")
-	assert_almost_eq(SOLDIER.stride(run_speed).x, 2.0, 0.001, "running at the run's own pace")
+	var arena := BodyShape.SIZE * SOLDIER.model_scale()
+	assert_almost_eq(SOLDIER.stride(SOLDIER.WALK_PACE * arena).x, 1.0, 0.001, "walking at the walk's own pace")
+	assert_almost_eq(SOLDIER.stride(SOLDIER.RUN_PACE * arena).x, 2.0, 0.001, "running at the run's own pace")
+	assert_almost_eq(SOLDIER.stride(SOLDIER.SPRINT_PACE * arena).x, 3.0, 0.001, "sprinting at the sprint's own pace")
+	assert_between(SOLDIER.stride(Movement.WALK_SPEED).x, 1.0, 2.0, "a player walks between its walk and its run")
+	assert_between(SOLDIER.stride(Movement.WALK_SPEED * Movement.RUN_FACTOR).x, 2.0, 3.0, "and runs between its run and its sprint")
 	var last := -1.0
 	for speed in range(0, 20):
 		var gait: Vector2 = SOLDIER.stride(speed * 0.5)
@@ -34,10 +36,20 @@ func test_its_legs_blend_from_standing_through_walking_to_running() -> void:
 		last = gait.x
 
 
-func test_faster_than_its_run_it_runs_faster_so_its_feet_keep_pace() -> void:
-	var run_speed := SOLDIER.RUN_PACE * BodyShape.SIZE * SOLDIER.model_scale()
-	assert_almost_eq(SOLDIER.stride(Movement.WALK_SPEED * Movement.RUN_FACTOR).y, Movement.WALK_SPEED * Movement.RUN_FACTOR / run_speed, 0.001)
-	assert_eq(SOLDIER.stride(run_speed * 0.5).y, 1.0, "and no faster below it")
+func test_faster_than_its_sprint_it_sprints_faster_so_its_feet_keep_pace() -> void:
+	var sprint_speed := SOLDIER.SPRINT_PACE * BodyShape.SIZE * SOLDIER.model_scale()
+	assert_almost_eq(SOLDIER.stride(sprint_speed * 1.5).y, 1.5, 0.001)
+	assert_eq(SOLDIER.stride(sprint_speed * 0.5).y, 1.0, "and no faster below it")
+	var crouch_speed := SOLDIER.CROUCH_PACE * BodyShape.SIZE * SOLDIER.model_scale()
+	assert_eq(SOLDIER.crouched_stride(crouch_speed * 0.5), Vector2(0.5, 1.0), "crouched, halfway to its walk")
+	assert_eq(SOLDIER.crouched_stride(crouch_speed * 2.0), Vector2(1.0, 2.0), "and twice as fast past it")
+
+
+func test_every_gait_goes_round_and_round_and_a_jump_once() -> void:
+	for name in ["walk", "run_back_left", "sprint_ahead_right", "crouch_walk_left", "idle", "jump_loop"]:
+		assert_true(SOLDIER.loops(name), name)
+	for name in ["jump_up", "jump_down", "reload", "knocked_out"]:
+		assert_false(SOLDIER.loops(name), name)
 
 
 func test_an_animation_put_in_place_keeps_its_bob_but_not_its_travel() -> void:
@@ -72,13 +84,20 @@ func test_its_legs_play_what_the_player_is_doing() -> void:
 	soldier.set_motion(Movement.WALK_SPEED * Movement.RUN_FACTOR, false)
 	_frames(10)
 	assert_eq(soldier._tree.get("parameters/legs/current_state"), "ground")
-	assert_almost_eq((soldier._tree.get("parameters/ground/blend_position") as Vector2).y, 2.0, 0.001, "running ahead")
+	var running := SOLDIER.stride(Movement.WALK_SPEED * Movement.RUN_FACTOR).x
+	assert_almost_eq((soldier._tree.get("parameters/ground/blend_position") as Vector2).y, running, 0.001, "running ahead")
 	soldier.set_heading(Vector2.LEFT)
 	_frames(1)
-	assert_almost_eq((soldier._tree.get("parameters/ground/blend_position") as Vector2).x, -2.0, 0.001, "and to the left")
+	assert_almost_eq((soldier._tree.get("parameters/ground/blend_position") as Vector2).x, -running, 0.001, "and to the left")
 	soldier.set_motion(0.0, true, 5.0)
-	_frames(10)
-	assert_eq(soldier._tree.get("parameters/legs/current_state"), "jump", "and in the air")
+	_frames(3)
+	assert_eq(soldier._tree.get("parameters/legs/current_state"), "jump", "leaving the ground")
+	soldier.set_motion(0.0, true, -5.0)
+	_frames(3)
+	assert_eq(soldier._tree.get("parameters/legs/current_state"), "air", "then in the air")
+	soldier.set_motion(0.0, false)
+	_frames(1)
+	assert_eq(soldier._tree.get("parameters/legs/current_state"), "land", "and landing")
 	soldier.set_motion(Movement.WALK_SPEED * Movement.CROUCH_FACTOR, false)
 	soldier.set_crouch(1.0)
 	_frames(10)
@@ -91,8 +110,18 @@ func test_its_upper_body_acts_out_what_the_arms_do() -> void:
 		pending("The licensed assets aren't checked out.")
 		return
 	_frames(10)
-	assert_eq(soldier._tree.get("parameters/acts/current_state"), "aim", "with nothing else to do, the weapon up ready")
-	assert_almost_eq(soldier._tree.get("parameters/upper/blend_amount"), 1.0, 0.001)
+	assert_almost_eq(soldier._tree.get("parameters/upper/blend_amount"), 0.0, 0.001, "with nothing else to do, carrying the weapon as the legs do")
+	assert_almost_eq(soldier._spine.influence, 0.0, 0.001, "not aimed")
+	soldier.set_holding(true, false)
+	_frames(10)
+	assert_eq(soldier._tree.get("parameters/acts/current_state"), "aim", "aiming, up at the shoulder")
+	assert_almost_eq(soldier._spine.influence, 1.0, 0.001, "and pointed where it looks")
+	soldier.set_holding(false, false)
+	soldier.act(CharacterMotion.FIRE)
+	_frames(10)
+	assert_eq(soldier._tree.get("parameters/acts/current_state"), "aim", "still up a moment after firing")
+	_frames(int(SOLDIER.RAISED_AFTER_FIRING * 30.0) + 5)
+	assert_almost_eq(soldier._tree.get("parameters/upper/blend_amount"), 0.0, 0.001, "then carried again")
 	soldier.set_holding(false, true)
 	_frames(10)
 	assert_eq(soldier._tree.get("parameters/acts/current_state"), "reload")
@@ -197,6 +226,7 @@ func test_the_weapon_is_aimed_no_steeper_than_a_rifle_can_be_shouldered() -> voi
 # `gaze`.
 func _hold(gun: Node3D, model: Node3D, frames: int, gaze := 0.0) -> void:
 	soldier.set_gaze(gaze)
+	soldier.set_holding(true, false)
 	for frame in frames:
 		gun.position = Vector3(1, 2, 3)
 		soldier.hold_weapon(gun)

@@ -4,29 +4,43 @@ extends Node3D
 ## tools/convert_soldier.py, holding the weapon in view as others see the
 ## soldier hold its own.
 ##
-## The arms keep the aim's own pose; nothing bends them to fit the weapon.
-## They go wherever the weapon in view is, its grip in the right hand just as
-## in the soldier's, and at the same size against it, so the left hand is
-## where the aim holds a rifle's fore-end. The weapons are to be made to fit
-## the hands, not the hands the weapons.
+## The body stands where the player's own would, its eyes at theirs, so that
+## where the arms are cut from it stays out of view however the weapon moves,
+## aimed down the sights or not. The arms reach for the weapon: the right hand
+## holds it as the soldier's does (SOLDIER._in_hand), and the left where the
+## aim has it against the right, so both hands hold it as the animation holds
+## a rifle. The forearms' twist bones (forearm_twist.gd) keep the wrists from
+## pinching. The weapons are to be made to fit the hands, not the hands the
+## weapons.
 
 const SOLDIER := preload("res://player/soldier_character.gd")
-## How much nearer and lower the weapon in view is held, in metres, with
-## these arms: they go where it is, and held where the drawn soldier's is,
-## their shoulders would be just in front of the eye, at the bottom of the
-## view, where the arms are cut from the body.
-const VIEW_SHIFT := Vector3(0.0, -0.05, 0.07)
+const HAND_POSE := preload("res://player/hand_pose.gd")
+## How far the body stands ahead of and below the eye, in the model's own
+## metres: a little ahead, so that the hands reach the weapon, which is held
+## further out than arms in proportion could, and low enough that its
+## collarbones, where the arms are cut, stay below the view.
+const BODY_AHEAD := 0.16
+const BODY_DOWN := 0.16
+## How much bigger than the weapon in view's size calls for the arms are
+## drawn: a little, again so that the hands reach.
+const LARGER := 1.15
+## Where each elbow points, from the eyes, in the model's own metres: down
+## and out to its side.
+const ELBOWS := {"Right": Vector3(0.5, -0.6, 0.2), "Left": Vector3(-0.5, -0.6, 0.0)}
 
 var _model: Node3D
 var _skeleton: Skeleton3D
 var _sleeves: StandardMaterial3D
 var _gun: Node3D
-var _right_hand := -1
-# From the model to its skeleton.
-var _to_skeleton := Transform3D()
+# The model's size, its node's against this one's.
+var _scale := 1.0
+# Each hand's IK target (where its wrist goes) and the modifier turning it.
+var _hands := {}
 
 
-func _init() -> void:
+## Arms for a weapon in view drawn `view_scale` times the size the drawn
+## soldier's is.
+func _init(view_scale: float) -> void:
 	name = "FirstPersonArms"
 	SOLDIER.find_hold_once()
 	_model = load(SOLDIER.MODEL).instantiate()
@@ -37,11 +51,19 @@ func _init() -> void:
 		# Close to the eye, it is never in shadow's way.
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_skeleton = _model.find_children("*", "Skeleton3D")[0]
-	_right_hand = _skeleton.find_bone("RightHand")
+	# As big against the weapon in view as the soldier is against the one
+	# others see, and LARGER.
+	var chain := Transform3D()
 	var node: Node = _skeleton
 	while node != _model:
-		_to_skeleton = (node as Node3D).transform * _to_skeleton
+		chain = (node as Node3D).transform * chain
 		node = node.get_parent()
+	var skeleton_scale := view_scale / SOLDIER._in_hand.basis.get_scale().x * LARGER
+	_scale = skeleton_scale / chain.basis.get_scale().x
+	# Facing ahead, its eyes at this node's origin, then ahead and down.
+	_model.rotation.y = PI
+	_model.scale = Vector3.ONE * _scale
+	_model.position = Vector3(0.0, -SOLDIER.MODEL_EYE_HEIGHT - BODY_DOWN, -BODY_AHEAD) * _scale
 	var sleeves: MeshInstance3D = _model.find_child("FirstPersonSleeves")
 	_sleeves = (sleeves.get_active_material(0) as StandardMaterial3D).duplicate() as StandardMaterial3D
 	sleeves.material_override = _sleeves
@@ -49,10 +71,36 @@ func _init() -> void:
 	_model.add_child(player)
 	player.add_animation_library("", SOLDIER.library())
 	player.play("aim")
+	for side: String in ["Right", "Left"]:
+		_hands[side] = _arm(side)
 	var twist: SkeletonModifier3D = preload("res://player/forearm_twist.gd").new()
 	twist.name = "ForearmTwist"
 	_skeleton.add_child(twist)
-	_skeleton.skeleton_updated.connect(_follow_weapon)
+
+
+# Reaches `side`'s arm for where its wrist is to go, and turns its hand.
+func _arm(side: String) -> Dictionary:
+	var wrist := Node3D.new()
+	wrist.name = side + "Wrist"
+	add_child(wrist)
+	var elbow := Node3D.new()
+	elbow.name = side + "Elbow"
+	elbow.position = ELBOWS[side] * _scale
+	add_child(elbow)
+	var ik := TwoBoneIK3D.new()
+	ik.name = side + "ArmReach"
+	_skeleton.add_child(ik)
+	ik.set_setting_count(1)
+	ik.set_root_bone_name(0, side + "UpperArm")
+	ik.set_middle_bone_name(0, side + "LowerArm")
+	ik.set_end_bone_name(0, side + "Hand")
+	ik.set_target_node(0, ik.get_path_to(wrist))
+	ik.set_pole_node(0, ik.get_path_to(elbow))
+	var turn: SkeletonModifier3D = HAND_POSE.new()
+	turn.name = side + "HandPose"
+	turn.bone = _skeleton.find_bone(side + "Hand")
+	_skeleton.add_child(turn)
+	return {"wrist": wrist, "turn": turn}
 
 
 ## Tints the sleeves' camouflage for a player of `colour`, as others see it.
@@ -81,11 +129,16 @@ func _fist_now() -> Vector3:
 	return (base + tip) / 2.0
 
 
-# Puts the arms where the weapon in view is, its grip in the right hand as
-# the skeleton now stands: the weapon in the hand is where the soldier holds
-# it (SOLDIER._in_hand), so the skeleton is where that puts it.
-func _follow_weapon() -> void:
+func _process(_delta: float) -> void:
 	if _gun == null or not is_instance_valid(_gun) or not _gun.is_inside_tree():
 		return
-	var held := _skeleton.get_bone_global_pose(_right_hand) * SOLDIER._in_hand
-	_model.global_transform = _gun.global_transform * held.affine_inverse() * _to_skeleton.affine_inverse()
+	# Where the hands go, in the skeleton's space: the right holding the
+	# weapon as the soldier's does, the left where the aim has it against the
+	# right.
+	var weapon := _skeleton.global_transform.affine_inverse() * _gun.global_transform
+	var right := weapon * SOLDIER._in_hand.affine_inverse()
+	var left := right * SOLDIER._left_from_right
+	for side: String in _hands:
+		var hand: Transform3D = right if side == "Right" else left
+		(_hands[side].wrist as Node3D).global_position = _skeleton.global_transform * hand.origin
+		_hands[side].turn.facing = hand.basis
