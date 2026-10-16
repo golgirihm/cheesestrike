@@ -25,8 +25,6 @@ const BUTTONS := {
 	"swap": {"anchor": Vector2(1, 1), "offset": Vector2(-214.0, -172.0), "radius": 30.0, "label": "Swap", "font_size": 14},
 	"scores": {"anchor": Vector2(0.5, 0), "offset": Vector2(0.0, 44.0), "radius": 30.0, "label": "Scores", "font_size": 13},
 	"menu": {"anchor": Vector2(0.5, 0), "offset": Vector2(-84.0, 44.0), "radius": 30.0, "label": "MENU", "font_size": 12},
-	# Only while there is a door to open or close.
-	"door": {"anchor": Vector2(1, 1), "offset": Vector2(-350.0, -46.0), "radius": 32.0, "label": "DOOR", "font_size": 13, "only_when_offered": true},
 }
 ## The menu button was pressed: there is no Esc key on a touch screen.
 signal menu_pressed
@@ -41,13 +39,6 @@ var held: Array = []:
 	set(value):
 		held = value
 		queue_redraw()
-## Names of the buttons shown only now and then, such as the door's, that
-## are on offer just now.
-var offered: Array = []:
-	set(value):
-		if value != offered:
-			offered = value
-			queue_redraw()
 
 
 func _ready() -> void:
@@ -71,13 +62,10 @@ func notice_touch() -> void:
 
 ## Where each button is on a screen of `screen` size: name -> {centre, radius}.
 ## `size` scales the buttons, and how far they sit from the edge; left-handed,
-## they sit on the left instead. Those shown only now and then are there
-## only if `offering` names them.
-static func layout_for(screen: Vector2, size := 1.0, left_handed := false, offering: Array = []) -> Dictionary:
+## they sit on the left instead.
+static func layout_for(screen: Vector2, size := 1.0, left_handed := false) -> Dictionary:
 	var placed := {}
 	for name: String in BUTTONS:
-		if BUTTONS[name].get("only_when_offered", false) and not offering.has(name):
-			continue
 		var anchor: Vector2 = BUTTONS[name].anchor
 		var offset: Vector2 = BUTTONS[name].offset * size
 		if left_handed:
@@ -89,7 +77,7 @@ static func layout_for(screen: Vector2, size := 1.0, left_handed := false, offer
 
 ## The layout as the player has set it.
 func layout() -> Dictionary:
-	return layout_for(size, Settings.get_value("touch_size"), Settings.get_value("touch_left_handed"), offered)
+	return layout_for(size, Settings.get_value("touch_size"), Settings.get_value("touch_left_handed"))
 
 
 ## Whether a touch at `point` is on the side of the screen that moves the

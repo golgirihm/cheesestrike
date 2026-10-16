@@ -1136,9 +1136,6 @@ func _process(delta: float) -> void:
 	_animate(delta)
 	_show_protection()
 	if _mine:
-		var controls := _touch_controls()
-		if controls != null:
-			controls.offered = ["door"] if door_in_reach() else []
 		var tip := shake.tick(delta, Settings.motion("screen_shake"))
 		# The view climbs with the weapon's kick, and settles once the run of
 		# fire is over.
@@ -1838,8 +1835,6 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 				world.watch_camera.toggle_free()
 		if button == "reload":
 			_reload_pressed = true
-		elif button == "door":
-			use_door()
 		elif button == "swap":
 			_switch_step += 1
 		elif button == "aim":
