@@ -320,3 +320,26 @@ func test_a_hands_roll_turns_the_forearms_twist_bones_part_of_the_way() -> void:
 	assert_almost_eq(rolled.LeftHand, 1.5, 0.001, "the hand as the animation has it")
 	assert_almost_eq(rolled.CC_Base_L_ForearmTwist02, 1.0, 0.001, "two thirds of its roll near the wrist")
 	assert_almost_eq(rolled.CC_Base_L_ForearmTwist01, 0.5, 0.001, "a third near the elbow")
+
+
+func test_what_can_be_hit_is_where_it_is_drawn_standing_and_kneeling() -> void:
+	if soldier == null:
+		pending("The licensed assets aren't checked out.")
+		return
+	for crouch in [0.0, 1.0]:
+		soldier.set_crouch(crouch)
+		await wait_process_frames(20)
+		var skeleton: Skeleton3D = soldier._skeleton
+		var at := func(bone: String) -> Vector3:
+			return soldier.to_local(skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(bone)).origin)
+		var eyes: Vector3 = (at.call("LeftEye") + at.call("RightEye")) / 2.0
+		assert_almost_eq(eyes.y, BodyShape.head_height(crouch), 0.03, "its eyes where its player sees from, crouched %s" % crouch)
+		var parts := BodyShape.parts(crouch)
+		var head: AABB = parts[0][0]
+		var torso: AABB = parts[1][0]
+		assert_true(head.grow(0.02).has_point(at.call("Head")), "its head in the head, crouched %s" % crouch)
+		assert_true(torso.grow(0.02).has_point(at.call("Chest")), "its chest in the torso, crouched %s" % crouch)
+		if crouch == 0.0:
+			for side in ["Left", "Right"]:
+				var leg: AABB = (parts[2][0] as AABB).merge(parts[3][0])
+				assert_true(leg.grow(0.05).has_point(at.call(side + "LowerLeg")), "%s knee in the legs" % side)

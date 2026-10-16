@@ -147,7 +147,8 @@ func test_a_shot_is_checked_against_how_its_target_faced_then() -> void:
 	# The torso is wider than it is deep. A shot that clips its edge
 	# face-on passes by a player who was side-on when it was fired, though
 	# they face the shooter now.
-	var edge := BodyShape.TORSO_SIZE.z / 2.0 * BodyShape.SIZE + 0.1
+	# Midway between how far the torso reaches to the side and to the front.
+	var edge := (BodyShape.TORSO_SIZE.x + BodyShape.TORSO_SIZE.z) / 4.0 * BodyShape.SIZE
 	var shooter := _add(1, Vector3(edge, 0, 10))
 	var target := _add(2, Vector3(0, 0, -5))
 	target.rotation.y = PI
