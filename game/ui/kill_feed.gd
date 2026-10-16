@@ -3,6 +3,9 @@ extends VBoxContainer
 
 const MAX_ENTRIES := 5
 const ENTRY_LIFE := 6.0
+## How wide an entry's words run before they wrap, so the feed stays clear of
+## the middle of the top of the screen.
+const WIDE := 320.0
 
 ## Knock-outs announced since the session began, and the latest, for the
 ## browser tests.
@@ -76,11 +79,21 @@ func _rebuild() -> void:
 	for child in get_children():
 		child.queue_free()
 	for entry in _entries:
+		# Each in a box of its own, against the right edge.
+		var box := PanelContainer.new()
+		box.add_theme_stylebox_override("panel", Look.hud_box())
+		box.size_flags_horizontal = Control.SIZE_SHRINK_END
+		box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(box)
 		var label := Label.new()
 		label.text = entry.text
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		var font_size := CombatHud.text_size(15)
+		if label.get_theme_font("font").get_string_size(entry.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > WIDE:
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			label.custom_minimum_size = Vector2(WIDE, 0)
 		label.add_theme_font_size_override("font_size", CombatHud.text_size(15))
 		label.add_theme_color_override("font_outline_color", Color.BLACK)
 		label.add_theme_constant_override("outline_size", 5)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(label)
+		box.add_child(label)

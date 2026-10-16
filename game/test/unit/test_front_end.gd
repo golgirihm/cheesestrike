@@ -320,3 +320,21 @@ func test_a_screen_too_short_for_a_panel_scrolls_it_instead_of_cutting_it_off() 
 	assert_false(scroll.scrolls(), "a short list doesn't")
 	Settings.set_value(Look.MENU_TEXT, saved)
 	Look.refresh()
+
+
+func test_nothing_in_a_box_touches_its_edge() -> void:
+	var theme := Look.theme()
+	for kind: Array in [["panel", "PanelContainer"], ["panel", "PopupMenu"], ["panel", "TooltipPanel"], ["normal", "LineEdit"], ["normal", "Button"]]:
+		var box: StyleBox = theme.get_stylebox(kind[0], kind[1])
+		for side in [SIDE_LEFT, SIDE_RIGHT]:
+			assert_gte(box.get_content_margin(side), 8.0, "%s %s" % kind)
+		for side in [SIDE_TOP, SIDE_BOTTOM]:
+			assert_gte(box.get_content_margin(side), 4.0, "%s %s" % kind)
+	# Nor what is written over the game: each line of the kill feed and the
+	# chat are boxed too.
+	var feed: VBoxContainer = preload("res://ui/kill_feed.gd").new()
+	add_child_autofree(feed)
+	feed.add("Brie", "Edam", "blaster", false)
+	var entry: Node = feed.get_child(feed.get_child_count() - 1)
+	assert_true(entry is PanelContainer)
+	assert_gte((entry as PanelContainer).get_theme_stylebox("panel").get_content_margin(SIDE_LEFT), 8.0)

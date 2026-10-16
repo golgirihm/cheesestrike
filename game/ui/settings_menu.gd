@@ -393,7 +393,7 @@ func _build() -> void:
 	add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 20)
+		margin.add_theme_constant_override("margin_" + side, 8)
 	panel.add_child(margin)
 	var outer := VBoxContainer.new()
 	outer.add_theme_constant_override("separation", 10)
