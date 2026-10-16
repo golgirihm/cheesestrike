@@ -25,7 +25,7 @@ func test_only_its_arms_show_and_take_the_players_colour() -> void:
 	if not SOLDIER.available():
 		pending("The licensed assets aren't checked out.")
 		return
-	var arms: Node3D = ARMS.new(VIEW_GUN_SCALE)
+	var arms: Node3D = ARMS.new()
 	add_child_autofree(arms)
 	for mesh: MeshInstance3D in arms.find_children("*", "MeshInstance3D", true, false):
 		assert_eq(mesh.visible, SOLDIER.FIRST_PERSON.has(String(mesh.name)), String(mesh.name))
@@ -33,7 +33,7 @@ func test_only_its_arms_show_and_take_the_players_colour() -> void:
 	assert_eq(arms._sleeves.albedo_color, SOLDIER.shirt_colour(Color(0.2, 0.4, 0.9)))
 
 
-func test_both_hands_are_on_the_weapon_in_view() -> void:
+func test_the_weapon_in_view_is_in_its_right_hand_as_others_see_the_soldiers() -> void:
 	if not SOLDIER.available():
 		pending("The licensed assets aren't checked out.")
 		return
@@ -45,18 +45,38 @@ func test_both_hands_are_on_the_weapon_in_view() -> void:
 	head.add_child(gun)
 	var model := WeaponModels.build("blaster")
 	gun.add_child(model)
-	var arms: Node3D = ARMS.new(VIEW_GUN_SCALE)
+	var arms: Node3D = ARMS.new()
 	head.add_child(arms)
 	arms.hold(gun)
-	var skeleton: Skeleton3D = arms._skeleton
-	var fists := {}
-	var note := func() -> void:
-		fists.Right = skeleton.global_transform * (skeleton.get_bone_global_pose(skeleton.find_bone("RightHand")) * SOLDIER._right_hold)
-		fists.Left = skeleton.global_transform * (skeleton.get_bone_global_pose(skeleton.find_bone("LeftHand")) * SOLDIER.LEFT_HOLD)
-	skeleton.skeleton_updated.connect(note)
 	await wait_process_frames(10)
-	skeleton.skeleton_updated.disconnect(note)
-	var reach := VIEW_GUN_SCALE * 0.02
-	assert_lt(fists.Right.distance_to(model.to_global(WeaponModels.GRIP)), reach, "the right fist round the grip")
-	var fore_end := (model.get_node("OffHand") as Node3D).to_global(Vector3.UP * SOLDIER.FORE_END_LIFT)
-	assert_lt(fists.Left.distance_to(fore_end), reach, "the left round the fore-end")
+	var skeleton: Skeleton3D = arms._skeleton
+	var fist: Vector3 = skeleton.global_transform * arms._fist_now()
+	assert_lt(fist.distance_to(model.to_global(WeaponModels.GRIP)), 0.01, "the grip in the right fist")
+	# As big against the weapon as the soldier others see is against theirs.
+	var arms_to_weapon := skeleton.global_basis.get_scale().x / gun.global_basis.get_scale().x
+	var soldier_to_weapon := 1.0 / SOLDIER._in_hand.basis.get_scale().x
+	assert_almost_eq(arms_to_weapon, soldier_to_weapon, 0.001)
+
+
+func test_where_the_arms_are_cut_from_the_body_is_out_of_view() -> void:
+	if not SOLDIER.available():
+		pending("The licensed assets aren't checked out.")
+		return
+	var head := Node3D.new()
+	add_child_autofree(head)
+	var gun := Node3D.new()
+	gun.position = VIEW_GUN_POSITION + ARMS.VIEW_SHIFT
+	gun.scale = Vector3.ONE * VIEW_GUN_SCALE
+	head.add_child(gun)
+	gun.add_child(WeaponModels.build("blaster"))
+	var arms: Node3D = ARMS.new()
+	head.add_child(arms)
+	arms.hold(gun)
+	await wait_process_frames(10)
+	var skeleton: Skeleton3D = arms._skeleton
+	# The arms are cut where they meet the chest, past the collarbones: those
+	# are below the bottom of the widest view a player can choose.
+	var widest: float = Settings.RANGES["fov"][1]
+	for side in ["Left", "Right"]:
+		var at := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(side + "Shoulder")).origin
+		assert_gt(rad_to_deg(atan2(-at.y, -at.z)), widest / 2.0, "%s collarbone below the view" % side)

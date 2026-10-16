@@ -199,7 +199,7 @@ func _hold(gun: Node3D, model: Node3D, frames: int, gaze := 0.0) -> void:
 		await wait_process_frames(1)
 
 
-func test_it_holds_its_weapon_in_both_hands_pointing_where_it_looks() -> void:
+func test_it_holds_its_weapon_in_its_right_fist_pointing_where_it_looks() -> void:
 	if soldier == null:
 		pending("The licensed assets aren't checked out.")
 		return
@@ -212,7 +212,6 @@ func test_it_holds_its_weapon_in_both_hands_pointing_where_it_looks() -> void:
 	var fists := {}
 	var note := func() -> void:
 		fists.Right = soldier.to_local(skeleton.global_transform * soldier._fist("Right"))
-		fists.Left = soldier.to_local(skeleton.global_transform * (skeleton.get_bone_global_pose(skeleton.find_bone("LeftHand")) * SOLDIER.LEFT_HOLD))
 	skeleton.skeleton_updated.connect(note)
 	for gaze in [0.0, 0.6, 1.4]:
 		await _hold(gun, model, 15, gaze)
@@ -221,13 +220,8 @@ func test_it_holds_its_weapon_in_both_hands_pointing_where_it_looks() -> void:
 		assert_almost_eq(ahead.distance_to(Vector3(0.0, sin(pitch), -cos(pitch))), 0.0, 0.01, "pointing where it looks, %s up" % gaze)
 		var grip := soldier.to_local(model.to_global(WeaponModels.GRIP))
 		assert_lt(grip.distance_to(fists.Right), 0.01, "the grip in the right fist")
-		var fore := soldier.to_local((model.get_node("OffHand") as Node3D).to_global(Vector3.UP * SOLDIER.FORE_END_LIFT))
-		assert_lt(fore.distance_to(fists.Left), 0.02, "the fore-end in the left")
 	skeleton.skeleton_updated.disconnect(note)
 	assert_false((model.get_node("Hand") as Node3D).visible, "its own hand on the grip, not the drawn soldier's mitten")
-	soldier.act(CharacterMotion.THROW)
-	await wait_seconds(CharacterMotion.ACTION_TIME[CharacterMotion.THROW] * 0.6)
-	assert_almost_eq(soldier._left_arm.influence, 0.0, 0.001, "the left hand off it to throw")
 
 
 func test_a_new_weapon_shows_no_mitten_and_an_emote_puts_the_weapon_away() -> void:

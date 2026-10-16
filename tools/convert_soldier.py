@@ -49,10 +49,13 @@ FACE = {
 }
 
 # The arms cut from the skin and the shirt, and the bones a vertex has to
-# hang mostly from to be part of them: from the upper arm down, either side.
+# hang at least ARM_SHARE from to be part of them: from the collarbone down,
+# either side, so that the cut, and the open end of the sleeve, is at the
+# chest, out of the player's view, rather than at the upper arm.
 FIRST_PERSON_SKIN = "FirstPersonArms"
 FIRST_PERSON_SLEEVES = "FirstPersonSleeves"
-ARM_BONES = ("Upperarm", "Forearm", "Elbow", "Hand", "Thumb", "Index", "Mid", "Ring", "Pinky")
+ARM_BONES = ("Clavicle", "Upperarm", "Forearm", "Elbow", "Hand", "Thumb", "Index", "Mid", "Ring", "Pinky")
+ARM_SHARE = 0.3
 
 TEXTURE_SIZE = 2048
 SMALL_TEXTURE_SIZE = 512
@@ -121,7 +124,7 @@ def cut_arms(obj, name: str) -> None:
         weights = vertex[deform]
         total = sum(weights.values())
         arm = sum(weight for group, weight in weights.items() if group in arm_groups)
-        if total <= 0.0 or arm / total < 0.5:
+        if total <= 0.0 or arm / total < ARM_SHARE:
             gone.append(vertex)
     bmesh.ops.delete(mesh, geom=gone, context="VERTS")
     mesh.to_mesh(copy.data)

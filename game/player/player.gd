@@ -307,7 +307,9 @@ func _ready() -> void:
 	# Seeing themselves, a realistic soldier sees its own arms on the weapon,
 	# not the drawn soldier's.
 	if _mine and body.get_script() == Characters.REALISTIC:
-		_arms = FIRST_PERSON_ARMS.new(VIEW_GUN_SCALE)
+		_arms = FIRST_PERSON_ARMS.new()
+		_gun_rest += FIRST_PERSON_ARMS.VIEW_SHIFT
+		gun.position = _gun_rest
 		head.add_child(_arms)
 		_arms.hold(gun)
 		_arms.set_colour(body.colour())
