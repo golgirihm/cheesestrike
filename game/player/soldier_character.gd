@@ -19,6 +19,9 @@ extends "res://player/cheese_character.gd"
 ## the web, players are the drawn soldier.
 
 const MODEL := "res://licensed/soldier/soldier.glb"
+## The meshes of the model's arms alone, which its player sees of
+## themselves (see first_person_arms.gd).
+const FIRST_PERSON := ["FirstPersonArms", "FirstPersonSleeves"]
 const ANIMATIONS := "res://licensed/animations"
 ## How high the model's eyes are, in its own metres. It is scaled to put them
 ## where the player sees from (BodyShape.HEAD_HEIGHT), so that what can be hit
@@ -152,6 +155,9 @@ func _build() -> void:
 	_left_hand_bone = _skeleton.find_bone("LeftHand")
 	_right_hand_bone = _skeleton.find_bone("RightHand")
 	_cap_mesh = _model.find_child("Hat_LP2")
+	# The arms cut from it for its player's own view aren't for others.
+	for name in FIRST_PERSON:
+		_model.find_child(name).visible = false
 	_face_mesh = _model.find_child("CC_Base_Body")
 	for name: String in _face_shape_names():
 		_shapes[name] = _face_mesh.find_blend_shape_by_name(name)
@@ -369,7 +375,8 @@ func reach_for(_hand: Vector3) -> void:
 func hold_weapon(gun: Node3D) -> bool:
 	# A new weapon, or a different model of one: its own hand is on the grip,
 	# not the drawn soldier's mitten, and its left hand goes on the fore-end.
-	var model := gun.get_child(0) as Node3D if gun.get_child_count() > 0 else null
+	# The newest: one changed from waits to be freed beside it for a frame.
+	var model := gun.get_child(-1) as Node3D if gun.get_child_count() > 0 else null
 	if _held_gun != gun or _held_model != model:
 		_held_gun = gun
 		_held_model = model
@@ -391,9 +398,19 @@ func hold_weapon(gun: Node3D) -> bool:
 ## pointing straight ahead with its grip in the palm. The same for every
 ## soldier, so it is worked out once.
 static var _in_hand: Transform3D
+## Where the right hand's fist closes round the grip, from its wrist.
+static var _right_hold: Vector3
 static var _found_hold := false
 ## Turns this node's directions into its skeleton's.
 static var _body_to_skeleton: Basis
+
+
+## Works out how the hands hold a weapon (_in_hand and _right_hold), if no
+## soldier has yet: they are worked out from one.
+static func find_hold_once() -> void:
+	if not _found_hold:
+		var soldier: Node3D = load("res://player/soldier_character.gd").new()
+		soldier.free()
 
 
 # Works out _in_hand, posing the skeleton as at the start of the aim to do
@@ -425,6 +442,7 @@ func _find_hold() -> void:
 	# a rifle's fore-end.
 	held.origin = _fist("Right") - held.basis * WeaponModels.GRIP
 	_in_hand = hand.affine_inverse() * held
+	_right_hold = hand.affine_inverse() * _fist("Right")
 	_found_hold = true
 	_skeleton.reset_bone_poses()
 
@@ -465,8 +483,13 @@ func set_colour(colour: Color) -> void:
 	if _shirt != null:
 		# The camouflage takes on the player's colour, and the cap a darker
 		# shade of it.
-		_shirt.albedo_color = colour.lerp(Color.WHITE, 0.25)
+		_shirt.albedo_color = shirt_colour(colour)
 		_cap.albedo_color = colour.darkened(0.3)
+
+
+## The colour the camouflage is tinted for a player of `colour`.
+static func shirt_colour(colour: Color) -> Color:
+	return colour.lerp(Color.WHITE, 0.25)
 
 
 func _light() -> void:

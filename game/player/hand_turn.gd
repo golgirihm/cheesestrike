@@ -14,6 +14,9 @@ var facing := Basis()
 var curl := 0.0
 ## "Left" or "Right": whose fingers.
 var side := "Left"
+## Whether to curl the fingers at all, or leave them as its animations have
+## them.
+var bends_fingers := true
 
 
 func _process_modification() -> void:
@@ -23,6 +26,8 @@ func _process_modification() -> void:
 	var pose := skeleton.get_bone_global_pose(bone)
 	pose.basis = Basis(facing.get_rotation_quaternion()).scaled(pose.basis.get_scale())
 	skeleton.set_bone_global_pose(bone, pose)
+	if not bends_fingers:
+		return
 	# A finger runs along its bones' Y and bends about their X, toward the
 	# palm.
 	for finger: String in FINGERS:

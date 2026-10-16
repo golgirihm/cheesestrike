@@ -116,6 +116,9 @@ var _heading := Vector2(0.0, 1.0)
 # Recoil, from 1 just after a shot to 0 at rest, and where the weapon rests.
 var _kick := 0.0
 var _gun_rest := Vector3.ZERO
+# The realistic soldier's own arms, in its player's view, if it is one.
+const FIRST_PERSON_ARMS := preload("res://player/first_person_arms.gd")
+var _arms: Node3D
 var _bob_phase := 0.0
 ## Metres walked since the last footstep sound.
 const STEP_LENGTH := 1.7
@@ -301,6 +304,15 @@ func _ready() -> void:
 	set_process_unhandled_input(_mine)
 	body.shown = not _mine
 	name_tag.visible = not _mine
+	# Seeing themselves, a realistic soldier sees its own arms on the weapon,
+	# not the drawn soldier's.
+	if _mine and body.get_script() == Characters.REALISTIC:
+		_arms = FIRST_PERSON_ARMS.new(VIEW_GUN_SCALE)
+		head.add_child(_arms)
+		_arms.hold(gun)
+		_arms.set_colour(body.colour())
+		for model in gun.get_children():
+			FIRST_PERSON_ARMS.hide_drawn_arms(model)
 	_rank_tag = Label3D.new()
 	_rank_tag.name = "RankTag"
 	_rank_tag.billboard = name_tag.billboard
@@ -440,6 +452,8 @@ func _show_weapon(id: String) -> void:
 	Unlocks.paint(model, _shown_finish)
 	# Only its holder sees both hands and the arms behind them.
 	WeaponModels.show_own_view(model, _is_own())
+	if _arms != null:
+		FIRST_PERSON_ARMS.hide_drawn_arms(model)
 	gun.add_child(model)
 	if _ghost:
 		_look_ghostly()
@@ -577,6 +591,8 @@ func _show_overload(own: PlayerRecord) -> void:
 	var melted := own != null and own.melted_for > 0.0
 	body.set_glow(glowing)
 	body.set_colour(_base_colour.darkened(0.35) if melted else _base_colour)
+	if _arms != null:
+		_arms.set_colour(body.colour())
 	body.set_dizzy(melted)
 
 
@@ -610,6 +626,8 @@ func _show_team(team: int) -> void:
 	_team = team
 	_base_colour = TeamColors.of(team) if team != MatchState.NO_TEAM else colour_for(name.to_int())
 	body.set_colour(_base_colour)
+	if _arms != null:
+		_arms.set_colour(body.colour())
 	if _ghost:
 		_look_ghostly()
 	name_tag.modulate = TeamColors.of(team)
@@ -847,6 +865,8 @@ func _animate(delta: float) -> void:
 	# see its lens catch the light.
 	# Nor is it seen at all out of play: it goes with the one who held it.
 	gun.visible = alive and not (_mine and (is_scoped() or _from_outside))
+	if _arms != null:
+		_arms.visible = gun.visible
 	if _glint != null:
 		_glint.visible = not _mine and alive and _aim >= 0.9
 	gun.position = rest + bob + Vector3(0.0, 0.01, 0.07) * _kick + (Vector3(0.0, -0.5, 0.1) * lowered + Vector3(0.03, -0.16, 0.04) * reloading) * gun.scale.x
