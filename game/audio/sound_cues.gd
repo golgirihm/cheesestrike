@@ -25,6 +25,8 @@ func _ready() -> void:
 		Sounds.play_at(burst_sound(weapon), at, world))
 	match_.hit_confirmed.connect(func(_victim: int, _dealt: int, knocked_out: bool, head: bool) -> void:
 		Sounds.play(hit_sound(knocked_out, head, Settings.get_value(HIT_SETTING)), -4.0))
+	match_.mouse_hit.connect(func(_dealt: int, _scared: bool) -> void:
+		Sounds.play(hit_sound(false, false, Settings.get_value(HIT_SETTING)), -4.0))
 	match_.hurt.connect(func(_attacker: int, _from: Vector3, _dealt: int) -> void:
 		Sounds.play("hurt"))
 	match_.picked_up.connect(func(id: int, _kind: String) -> void:

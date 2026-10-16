@@ -1,6 +1,7 @@
 extends GutTest
-## The giant mice: they come a minute into a match, more follow, and they eat
-## the cheese, low and near first; a shot or a burst sends one running.
+## The giant mice: they all come a minute into a match and eat the cheese,
+## low and near first, going round what isn't cheese; shooting one enough
+## sends it running.
 
 const WORLD := preload("res://world/world.tscn")
 const HUD := preload("res://ui/combat_hud.gd")
@@ -17,6 +18,11 @@ func _cheese(places: Array) -> Dictionary:
 	for at: Vector3 in places:
 		boxes.append(AABB(at - Vector3(1, 0, 1), Vector3(2, 2, 2)))
 	return {"blocks": BlockRules.new(boxes.size()), "boxes": boxes}
+
+
+# A mouse at `at`, as the host has one.
+func _mouse(at: Vector3, mode := MouseRules.WALKING) -> Dictionary:
+	return MouseRules._mouse(at, 0.0, mode)
 
 
 # Mice that have just come, with nothing yet chosen.
@@ -38,7 +44,7 @@ func test_they_come_a_minute_in_from_the_edge_facing_in() -> void:
 	assert_eq(rules.mice.size(), 0)
 	rules.invade_in = 0.0
 	done = rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE)
-	assert_eq(done.came, MouseRules.FIRST)
+	assert_eq(done.came, MouseRules.FIRST, "all of them, for so little cheese a pair")
 	assert_true(rules.arrived)
 	for mouse: Dictionary in rules.mice:
 		var at := Vector2(mouse.at.x, mouse.at.z)
@@ -75,7 +81,7 @@ func test_the_countdown_runs_only_in_a_match_under_way() -> void:
 	assert_eq(bare.mice.invade_in, MouseRules.INVADE_AFTER, "nor where there is no cheese")
 
 
-func test_more_follow_up_to_as_many_as_the_cheese_is_worth() -> void:
+func test_as_many_as_the_cheese_is_worth_come_at_once_from_all_round() -> void:
 	assert_eq(MouseRules.most_for(13), MouseRules.FIRST, "a pair on a small arena")
 	assert_eq(MouseRules.most_for(600), MouseRules.MOST, "a pack on a large map")
 	var places := []
@@ -83,19 +89,27 @@ func test_more_follow_up_to_as_many_as_the_cheese_is_worth() -> void:
 		places.append(Vector3((index % 20) * 4.0 - 40.0, 0, (index / 20) * 4.0 - 40.0))
 	var cheese := _cheese(places)
 	var rules := _arrived()
+	var done := rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE)
+	assert_eq(done.came, MouseRules.most_for(400), "all together")
+	assert_eq(rules.mice.size(), MouseRules.most_for(400))
+	for minute in 3:
+		done = rules.tick(60.0, cheese.blocks, cheese.boxes, EDGE)
+		assert_eq(done.came, 0, "and no more after")
+	assert_eq(rules.mice.size(), MouseRules.most_for(400))
+	# Each from a different way round, not bunched on one side.
+	var sides := {}
+	rules = _arrived(3)
 	rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE)
-	var counts := [rules.mice.size()]
-	for wave in 10:
-		rules.tick(MouseRules.MORE_EVERY, cheese.blocks, cheese.boxes, EDGE)
-		counts.append(rules.mice.size())
-	assert_eq(counts[1], MouseRules.FIRST + 1, "one more each time")
-	assert_eq(counts[-1], MouseRules.most_for(400), "and no more than that")
+	for mouse: Dictionary in rules.mice:
+		var at := Vector2(mouse.at.x, mouse.at.z)
+		sides[Vector2(signf(at.x) if absf(at.x) > absf(at.y) else 0.0, signf(at.y) if absf(at.y) >= absf(at.x) else 0.0)] = true
+	assert_eq(sides.size(), 4, "from every side")
 
 
 func test_a_mouse_goes_to_the_nearest_cheese_and_eats_it_then_the_next() -> void:
 	var cheese := _cheese([Vector3(30, 0, 0), Vector3(-30, 0, 0)])
 	var rules := _arrived()
-	rules.mice.append({"at": Vector3(45, 0, 0), "heading": 0.0, "mode": MouseRules.WALKING, "target": -1, "flee": 0.0, "bite": MouseRules.BITE_EVERY})
+	rules.mice.append(_mouse(Vector3(45, 0, 0)))
 	rules.arrived = true
 	var eaten := 0
 	var seconds := 0.0
@@ -123,7 +137,7 @@ func test_low_cheese_comes_first_and_two_mice_share_none_while_there_is_more() -
 	var cheese := _cheese([Vector3(0, 14, 0), Vector3(15, 0, 0), Vector3(-15, 0, 0)])
 	var rules := _arrived()
 	for x: float in [2.0, -2.0]:
-		rules.mice.append({"at": Vector3(x, 0, 0), "heading": 0.0, "mode": MouseRules.WALKING, "target": -1, "flee": 0.0, "bite": MouseRules.BITE_EVERY})
+		rules.mice.append(_mouse(Vector3(x, 0, 0)))
 	rules.arrived = true
 	rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE)
 	assert_eq([rules.mice[0].target, rules.mice[1].target], [1, 2], "each its own, low down")
@@ -136,10 +150,86 @@ func test_low_cheese_comes_first_and_two_mice_share_none_while_there_is_more() -
 	assert_almost_eq(rules.mice[0].at.y, 14.0, 0.01, "climbing to it")
 
 
+func test_a_mouse_at_the_very_edge_of_its_reach_eats() -> void:
+	# Where rounding once left mice creeping at their cheese for ever.
+	var cheese := _cheese([Vector3(-62, 0, -178)])
+	cheese.boxes[0] = AABB(Vector3(-72, 0, -184), Vector3(20, 8, 12))
+	var rules := _arrived()
+	rules.mice.append(_mouse(Vector3(-40, 0, -195)))
+	rules.arrived = true
+	var bites := 0
+	for step in 50:
+		bites += rules.tick(0.1, cheese.blocks, cheese.boxes, Rect2(-320, -200, 640, 400)).bites.size()
+	assert_eq(rules.mice[0].mode, MouseRules.EATING)
+	assert_gt(bites, 0)
+
+
+func test_a_mouse_goes_round_what_is_tall_and_over_what_is_low() -> void:
+	var cheese := _cheese([Vector3(0, 0, -40)])
+	var rock := AABB(Vector3(-8, 0, -24), Vector3(16, 20, 4))
+	var rules := _arrived()
+	rules.mice.append(_mouse(Vector3(0, 0, 0)))
+	rules.arrived = true
+	var bites := 0
+	for step in 150:
+		bites += rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE, [rock]).bites.size()
+		assert_false(MouseRules._body(rules.mice[0].at).intersects(rock), "never through the rock")
+	assert_gt(bites, 0, "round it to the cheese")
+	# A car it can step up onto is in its way, so it walks over it.
+	cheese = _cheese([Vector3(0, 0, -40)])
+	var car := AABB(Vector3(-8, 0, -24), Vector3(16, 2.5, 4))
+	rules = _arrived()
+	rules.mice.append(_mouse(Vector3(0, 0, 0)))
+	rules.arrived = true
+	var highest := 0.0
+	for step in 40:
+		rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE, [car])
+		highest = maxf(highest, rules.mice[0].at.y)
+		assert_almost_eq(rules.mice[0].at.x, 0.0, 0.01, "straight on")
+	assert_gt(highest, 1.0, "up onto it")
+
+
+func test_a_mouse_that_cannot_get_to_its_cheese_tries_other_cheese() -> void:
+	# The nearer block is shut in on all sides; the further one isn't.
+	var cheese := _cheese([Vector3(0, 0, -30), Vector3(40, 0, 0)])
+	var walls := [AABB(Vector3(-14, 0, -46), Vector3(28, 20, 2)), AABB(Vector3(-14, 0, -16), Vector3(28, 20, 2)),
+			AABB(Vector3(-14, 0, -46), Vector3(2, 20, 32)), AABB(Vector3(12, 0, -46), Vector3(2, 20, 32))]
+	var rules := _arrived()
+	rules.mice.append(_mouse(Vector3(0, 0, 0)))
+	rules.arrived = true
+	rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE, walls)
+	assert_eq(rules.mice[0].target, 0, "the nearer first")
+	var bites := []
+	for step in 200:
+		for bite: Dictionary in rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE, walls).bites:
+			bites.append(bite.index)
+	assert_true(bites.has(1), "gives up on it for the other")
+	assert_false(bites.has(0))
+
+
+func test_a_mouse_runs_only_once_it_has_been_hurt_enough() -> void:
+	var rules := _arrived()
+	rules.mice.append(_mouse(Vector3(0, 0, -20), MouseRules.EATING))
+	assert_false(rules.hurt(0, MouseRules.BRAVERY / 2.0, Vector3.ZERO), "brave at first")
+	assert_eq(rules.mice[0].mode, MouseRules.EATING)
+	assert_false(rules.hurt(5, 1000.0, Vector3.ZERO), "no such mouse")
+	assert_false(rules.hurt(0, NAN, Vector3.ZERO))
+	# What it has taken wears off, a while later.
+	var cheese := _cheese([Vector3(0, 0, -26)])
+	rules.arrived = true
+	for step in 100:
+		rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE)
+	assert_eq(rules.mice[0].fear, 0.0, "calm again")
+	assert_false(rules.hurt(0, MouseRules.BRAVERY - 1.0, Vector3.ZERO))
+	assert_true(rules.hurt(0, 1.0, Vector3.ZERO), "and runs once it has had enough")
+	assert_eq(rules.mice[0].mode, MouseRules.FLEEING)
+	assert_false(rules.hurt(0, MouseRules.BRAVERY, Vector3.ZERO), "running already")
+
+
 func test_a_shot_through_a_mouse_hits_it_and_one_past_it_does_not() -> void:
 	var rules := _arrived()
-	rules.mice.append({"at": Vector3(0, 0, -20), "heading": 0.0, "mode": MouseRules.EATING, "target": -1, "flee": 0.0, "bite": 0.5})
-	rules.mice.append({"at": Vector3(0, 0, -40), "heading": 0.0, "mode": MouseRules.EATING, "target": -1, "flee": 0.0, "bite": 0.5})
+	rules.mice.append(_mouse(Vector3(0, 0, -20), MouseRules.EATING))
+	rules.mice.append(_mouse(Vector3(0, 0, -40), MouseRules.EATING))
 	var eye := Vector3(0, 3, 0)
 	assert_eq(rules.hit(eye, Vector3.FORWARD, 100.0), 0, "the nearer of two in line")
 	assert_eq(rules.hit(eye, Vector3.FORWARD, 10.0), -1, "out of the shot's reach")
@@ -152,7 +242,7 @@ func test_a_shot_through_a_mouse_hits_it_and_one_past_it_does_not() -> void:
 func test_a_scared_mouse_runs_away_from_whoever_scared_it_and_then_eats_again() -> void:
 	var cheese := _cheese([Vector3(0, 0, -20)])
 	var rules := _arrived()
-	rules.mice.append({"at": Vector3(0, 0, -14), "heading": 0.0, "mode": MouseRules.WALKING, "target": -1, "flee": 0.0, "bite": MouseRules.BITE_EVERY})
+	rules.mice.append(_mouse(Vector3(0, 0, -14)))
 	rules.arrived = true
 	rules.tick(0.1, cheese.blocks, cheese.boxes, EDGE)
 	assert_eq(rules.mice[0].mode, MouseRules.EATING)
@@ -177,7 +267,8 @@ func test_the_mice_survive_the_trip_and_nonsense_is_none() -> void:
 	state.blocks = BlockRules.new(3)
 	state.mice = _arrived()
 	state.mice.arrived = true
-	state.mice.mice.append({"at": Vector3(4, 1, -2), "heading": 1.5, "mode": MouseRules.FLEEING, "target": 2, "flee": 3.0, "bite": 0.5})
+	state.mice.mice.append(_mouse(Vector3(4, 1, -2), MouseRules.FLEEING))
+	state.mice.mice[0].heading = 1.5
 	var copy := MatchState.from_dict(bytes_to_var(var_to_bytes(state.to_dict(false))))
 	assert_true(copy.mice.arrived)
 	assert_eq(copy.mice.mice.size(), 1)
@@ -253,7 +344,7 @@ func test_they_are_seen_and_nothing_bumps_into_them() -> void:
 	assert_eq(world.mice_view.shown(), 0, "gone in a new match")
 
 
-func test_a_shot_at_a_mouse_scares_it_off_and_is_heard() -> void:
+func test_shots_at_a_mouse_hurt_it_until_it_runs_off_and_is_heard() -> void:
 	await _start()
 	# A bot, whose aim the host takes on trust, as it is the host's own.
 	var id := Bots.id_for(0)
@@ -271,6 +362,12 @@ func test_a_shot_at_a_mouse_scares_it_off_and_is_heard() -> void:
 	var origin: Vector3 = shooter.head.global_position
 	var middle: Vector3 = mouse.at + Vector3.UP * MouseRules.HEIGHT / 2.0
 	match_._shot(id, origin, (middle - origin).normalized(), 1, match_.state.player(id).weapon, WeaponStats.AIMED)
+	assert_signal_not_emitted(match_, "mouse_scared", "not at one shot")
+	var hurt := match_.state.mice.mice.map(func(each: Dictionary) -> float: return each.fear)
+	var struck: int = hurt.find(hurt.max())
+	assert_gt(hurt[struck], 0.0, "but hurt")
+	# Shot enough, it runs.
+	match_._hurt_mice(id, {struck: MouseRules.BRAVERY - hurt[struck]}, origin)
 	# That one, or the other if it was nearer in the line of fire.
 	assert_signal_emitted(match_, "mouse_scared")
 	var scared: int = get_signal_parameters(match_, "mouse_scared")[0]
@@ -279,13 +376,29 @@ func test_a_shot_at_a_mouse_scares_it_off_and_is_heard() -> void:
 	assert_gt(Sounds.counts.get("squeak", 0), 0)
 
 
-func test_a_burst_by_a_mouse_scares_it_too() -> void:
+func test_bursts_by_a_mouse_hurt_it_too() -> void:
 	await _start()
 	match_.state.mice.invade_in = 0.0
 	match_._run_mice(0.1)
 	var at: Vector3 = match_.state.mice.mice[1].at + Vector3(0, 1, 3)
-	match_._scare_mice_near(at, Weapons.find("launcher").splash_radius)
-	assert_eq(match_.state.mice.mice[1].mode, MouseRules.FLEEING)
+	var launcher := Weapons.find("launcher")
+	for burst in 2:
+		match_._burst(Projectile.new(burst, Bots.id_for(0), launcher, at, Vector3.FORWARD), at)
+	assert_eq(match_.state.mice.mice[1].mode, MouseRules.FLEEING, "two rockets see one off")
+
+
+func test_the_one_who_hit_a_mouse_is_shown_the_hit() -> void:
+	await _start()
+	match_.state.mice.invade_in = 0.0
+	match_._run_mice(0.1)
+	watch_signals(match_)
+	var own := multiplayer.get_unique_id()
+	match_._hurt_mice(own, {0: 20.0, 1: 15.0}, Vector3.ZERO)
+	assert_signal_emitted_with_parameters(match_, "mouse_hit", [35, false])
+	match_._hurt_mice(own, {0: MouseRules.BRAVERY}, Vector3.ZERO)
+	assert_signal_emitted_with_parameters(match_, "mouse_hit", [roundi(MouseRules.BRAVERY), true], 1)
+	match_._hurt_mice(Bots.id_for(0), {1: 20.0}, Vector3.ZERO)
+	assert_signal_emit_count(match_, "mouse_hit", 2, "not for a bot's shot")
 
 
 func test_the_countdown_is_said_only_when_there_is_one() -> void:

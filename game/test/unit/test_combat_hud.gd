@@ -97,6 +97,10 @@ func test_the_hud_counts_hits_and_hurts_and_shows_the_notice() -> void:
 	match_.hit_confirmed.emit(2, 20, false, false)
 	match_.hurt.emit(2, Vector3(5, 1, 5), 20)
 	assert_eq(hud.hits_shown, 1)
+	match_.mouse_hit.emit(30, false)
+	assert_eq(hud.hits_shown, 2, "a giant mouse shows as hit too")
+	assert_eq(hud.hit_kind, HUD.HIT)
+	hud.hits_shown = 1
 	assert_eq(hud.hurts_shown, 1)
 	assert_eq(hud.indicators_showing(), 1)
 	await wait_seconds(HUD.DAMAGE_INDICATOR_LIFE + 0.1)
