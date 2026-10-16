@@ -13,6 +13,10 @@ extends Node3D
 ## walks, runs, crouches, slides, jumps, falls and lands, steadies its weapon
 ## to aim, flinches when hurt, melts when knocked out and pops back on
 ## returning.
+##
+## What it is doing is worked out here for any body; how that is drawn is in
+## _build, _draw_arm and _draw_face, which the realistic soldier
+## (soldier_character.gd) does its own way.
 
 const INK := Color(0.1, 0.09, 0.09)
 ## The blotches of camouflage each kind of cheese wears (see Looks): a blue's
@@ -65,6 +69,8 @@ const BLINK_GAP := Vector2(2.0, 5.5)
 const GLANCE_SHIFT := 0.008
 ## Seconds the whole body flashes pale when hit.
 const FLASH_TIME := 0.09
+## Going straight ahead, as set_heading has it.
+const AHEAD := Vector2(0.0, 1.0)
 ## How far above the surface each layer of what is drawn on it sits, so that
 ## none flickers through another.
 const LAYER := 0.003
@@ -106,6 +112,7 @@ var _phase := 0.0
 var _swing := 0.0
 var _speed := 0.0
 var _airborne := false
+var _heading := AHEAD
 # How fast the player is rising, whether they are sliding, and how long
 # since they last touched down.
 var _rising := 0.0
@@ -201,6 +208,13 @@ func set_motion(speed: float, airborne: bool, rising := 0.0, sliding := false) -
 	_airborne = airborne
 	_rising = rising
 	_sliding = sliding
+
+
+## Which way the player is going, as the body faces: x to its right and y
+## ahead of it. The drawn soldier walks the same way whichever it is; the
+## realistic one steps backward and sideways.
+func set_heading(direction: Vector2) -> void:
+	_heading = direction
 
 
 ## Whether the player is aiming, or reloading: the free arm steadies the
@@ -587,23 +601,18 @@ func _process(delta: float) -> void:
 	_action = now
 	var rest := Vector3(-swing * 0.6 * _blend.pump, 0.0, Emotes.ARM_REST - _blend.lift)
 	_arm = _arm.lerp(CharacterMotion.arm(_action, _action_for, rest), nearer)
-	# With nothing else to do, the free hand steadies the weapon.
-	if _action == CharacterMotion.NONE and _emote < 0 and not _melting and _steady.is_finite():
-		_point_arm(0, _steady)
-	else:
-		_free_arm()
-		_arms[0].rotation = _arm
 	var sway := 0.0
 	var hop := 0.0
+	var emote_pose := {}
 	if _emote >= 0:
 		_emote_for += delta
 		if _emote_for >= Emotes.TIME or _melting:
 			_emote = -1
 		else:
-			var pose := Emotes.pose(_emote, _emote_for)
-			_arms[0].rotation = Vector3(0.0, 0.0, pose.arm)
-			sway = pose.sway
-			hop = pose.hop
+			emote_pose = Emotes.pose(_emote, _emote_for)
+			sway = emote_pose.sway
+			hop = emote_pose.hop
+	_draw_arm(is_steadying(), emote_pose)
 	if not _melting:
 		# Tipped on its feet by a lean or a dance, and lifted by a hop.
 		rotation = BodyShape.lean_basis(_lean).get_euler() + Vector3(0.0, 0.0, sway)
@@ -615,8 +624,6 @@ func _process(delta: float) -> void:
 	_cheer_left = maxf(_cheer_left - delta, 0.0)
 	_set_left = maxf(_set_left - delta, 0.0)
 	var face := expression()
-	for kind: String in _faces:
-		_faces[kind].visible = kind == face
 	# Blinking, now and then, when nothing else is going on with the eyes.
 	_blink_left = maxf(_blink_left - delta, 0.0)
 	_blink_in -= delta
@@ -624,6 +631,58 @@ func _process(delta: float) -> void:
 		_blink_in = randf_range(BLINK_GAP.x, BLINK_GAP.y)
 		if face == CALM or face == SET:
 			_blink_left = BLINK_TIME
+	_draw_face(face, delta)
+	if _melting:
+		_melt = minf(_melt + delta / _melt_time(), 1.0)
+		_draw_melt(delta)
+	_pop = minf(_pop + delta / POP_TIME, 1.0)
+	# Popping back grows the body from the floor.
+	scale = _melt_scale() * _ease_out(_pop) * BodyShape.SIZE
+	visible = shown and not is_melted()
+
+
+# Seconds from being knocked out to gone.
+func _melt_time() -> float:
+	return MELT_TIME
+
+
+# How far through going the body is, 0 to 1, as it is knocked out: thrown
+# back, tipping over, and slowing to a stop as it melts.
+func _draw_melt(delta: float) -> void:
+	position += _thrown * delta * BodyShape.SIZE
+	_thrown *= exp(-5.0 * delta)
+	if _thrown != Vector3.ZERO:
+		rotation = Vector3(0, 0, 0)
+		rotate(_thrown.normalized().cross(Vector3.DOWN).normalized(), THROW_TIP * _melt)
+
+
+# How melting stretches the body: it sags and spreads.
+func _melt_scale() -> Vector3:
+	return Vector3(1.0 + 0.6 * _melt, 1.0 - 0.85 * _melt, 1.0 + 0.6 * _melt)
+
+
+## Whether the free hand is steadying the weapon: it does whenever it has
+## nothing else to do.
+func is_steadying() -> bool:
+	return _action == CharacterMotion.NONE and _emote < 0 and not _melting and _steady.is_finite()
+
+
+# Puts the free arm where it goes: on the weapon if `steadying`, otherwise
+# acting out the action, or the emote if `emote_pose` (see Emotes.pose) has
+# one.
+func _draw_arm(steadying: bool, emote_pose: Dictionary) -> void:
+	if steadying:
+		_point_arm(0, _steady)
+	else:
+		_free_arm()
+		_arms[0].rotation = Vector3(0.0, 0.0, emote_pose.arm) if emote_pose.has("arm") else _arm
+
+
+# Shows `face` (see expression), with the eyes blinking, glancing and
+# following the gaze.
+func _draw_face(face: String, delta: float) -> void:
+	for kind: String in _faces:
+		_faces[kind].visible = kind == face
 	_stars.visible = face == DIZZY
 	_stars.rotate_y(delta * 5.0)
 	for index in _eyes.size():
@@ -639,20 +698,6 @@ func _process(delta: float) -> void:
 		elif face == CHEER:
 			open = 1.25
 		eye.scale.z = open
-	if _melting:
-		_melt = minf(_melt + delta / MELT_TIME, 1.0)
-		# Thrown back, tipping over, and slowing to a stop as it melts.
-		position += _thrown * delta * BodyShape.SIZE
-		_thrown *= exp(-5.0 * delta)
-		if _thrown != Vector3.ZERO:
-			rotation = Vector3(0, 0, 0)
-			rotate(_thrown.normalized().cross(Vector3.DOWN).normalized(), THROW_TIP * _melt)
-	_pop = minf(_pop + delta / POP_TIME, 1.0)
-	# Melting sags and spreads the body; popping back grows it from the floor.
-	var sag := 1.0 - 0.85 * _melt
-	var spread := 1.0 + 0.6 * _melt
-	scale = Vector3(spread, sag, spread) * _ease_out(_pop) * BodyShape.SIZE
-	visible = shown and not is_melted()
 
 
 static func _ease_out(t: float) -> float:

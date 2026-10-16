@@ -111,6 +111,8 @@ var _base_colour := Color.WHITE
 # have been moving across the ground, smoothed.
 var _last_position := Vector3.ZERO
 var _ground_speed := 0.0
+# Which way they are going, as their body faces (see body.set_heading).
+var _heading := Vector2(0.0, 1.0)
 # Recoil, from 1 just after a shot to 0 at rest, and where the weapon rests.
 var _kick := 0.0
 var _gun_rest := Vector3.ZERO
@@ -282,6 +284,7 @@ const BADGE_HEIGHT := 2.5
 
 
 func _ready() -> void:
+	body = Characters.swap(body)
 	_grow()
 	if _is_own():
 		gun.position = VIEW_GUN_POSITION
@@ -813,6 +816,13 @@ func _animate(delta: float) -> void:
 			_ground_speed = lerpf(_ground_speed, minf(speed, 12.0), minf(delta * 10.0, 1.0))
 			var airborne := absf(moved.y) / delta > 0.5
 			body.set_motion(_ground_speed, airborne, moved.y / delta, _pose & POSE_SLIDING != 0)
+			# Which way they are going, as the body faces: x to its right and
+			# y ahead of it, for the legs to walk that way.
+			var across := body.global_basis.inverse() * Vector3(moved.x, 0.0, moved.z)
+			var heading := Vector2(across.x, -across.z)
+			if heading.length() > 0.0001:
+				_heading = _heading.lerp(heading.normalized(), minf(delta * 10.0, 1.0))
+			body.set_heading(_heading)
 			body.set_holding(_pose & POSE_AIMING != 0, _pose & POSE_RELOADING != 0)
 			# Heard leaving the ground, and beginning to reload.
 			if alive and airborne and not _seen_airborne and moved.y > 0.0:
