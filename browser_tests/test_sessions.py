@@ -253,7 +253,7 @@ class LosingTheHostTest(GameTestCase):
         host_name = host.own_player()["name"]
 
         host.press("Escape")
-        host.click("MenuButton")
+        host.open_menu()
         host.click("MenuLeaveButton")
         state = joiner.wait_for("s.screen === 'disconnected'")
         self.assertEqual(state["notice"], "The host ended the session.")

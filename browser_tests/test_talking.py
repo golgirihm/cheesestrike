@@ -36,7 +36,7 @@ class TalkingTest(GameTestCase):
         self.assertEqual(talker.state()["voice"]["heard"], 0)
 
         # Muted, nothing more of theirs is heard.
-        host.click("MenuButton")
+        host.open_menu()
         host.click("MuteButton")
         host.wait_for(f"s.voice.muted.includes({talker_id})")
         host.click("ResumeButton")
@@ -59,7 +59,7 @@ class TalkingTest(GameTestCase):
         other.join(code)
         first_id = other.own_player()["id"]
         host.wait_for("s.players.length === 2")
-        host.click("MenuButton")
+        host.open_menu()
         # Mute, then the same button again to block them for good.
         host.click("MuteButton")
         host.wait_for(f"s.voice.muted.includes({first_id})")

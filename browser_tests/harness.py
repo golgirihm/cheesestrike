@@ -200,6 +200,11 @@ class Game:
     def press(self, key):
         self.page.keyboard.press(key)
 
+    def open_menu(self):
+        """Opens the in-game menu with Esc, as a player does."""
+        self.press("Escape")
+        return self.wait_for("s.screen === 'paused'")
+
     def host(self):
         """Hosts a session and returns its code."""
         self.click("HostButton")

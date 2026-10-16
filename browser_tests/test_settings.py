@@ -59,7 +59,7 @@ class SettingsTest(GameTestCase):
         self.assertEqual(host.player(1)["look"], {"cheese": "swiss", "hat": "none", "held": "none", "title": "none", "level": 1, "finish": "plain"}, "the host's own is as it was")
         self.assertIsNotNone(look)
         # Changed again in the middle of a session: it shows at once.
-        joiner.click("MenuButton")
+        joiner.open_menu()
         joiner.click("PauseSettingsButton")
         joiner.wait_for("s.screen === 'settings'")
         joiner.scroll_to("Setting_look_held")
@@ -87,7 +87,7 @@ class SettingsTest(GameTestCase):
     def test_settings_open_from_the_in_game_menu_and_go_back_to_it(self):
         game = self.open_game()
         game.host()
-        game.click("MenuButton")
+        game.open_menu()
         game.click("PauseSettingsButton")
         game.wait_for("s.screen === 'settings'")
         game.click("SettingsDone")
@@ -98,7 +98,7 @@ class CaptionsTest(GameTestCase):
     def test_turned_on_captions_say_where_another_player_is_walking(self):
         host = self.open_game()
         host.host()
-        host.click("MenuButton")
+        host.open_menu()
         host.click("PauseSettingsButton")
         host.scroll_to("Setting_captions")
         host.click("Setting_captions")

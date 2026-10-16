@@ -50,7 +50,7 @@ class VotingTest(GameTestCase):
         unwanted_name = unwanted.own_player()["name"]
 
         # The only one the asker can name: not themselves, and not the host.
-        asker.click("MenuButton")
+        asker.open_menu()
         state = asker.wait_for("'RemoveVoteButton' in s.controls")
         asker.click("RemoveVoteButton")
         for game in (host, unwanted):

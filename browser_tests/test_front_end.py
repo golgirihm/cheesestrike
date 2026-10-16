@@ -49,7 +49,7 @@ class FrontEndTest(GameTestCase):
         game = self.open_at_title()
         game._click("PracticeButton")
         game.wait_for("s.screen === 'game' && s.map === 'range'")
-        game.click("MenuButton")
+        game.open_menu()
         game.click("MenuLeaveButton")
         game.wait_for("s.screen === 'menu'")
         game._click("BackButton")
