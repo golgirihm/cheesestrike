@@ -19,6 +19,7 @@ var wheel: Wheel
 # Each line said: {"text", "left", "colour"}.
 var _said: Array[Dictionary] = []
 var _lines: Label
+var _said_box: PanelContainer
 var _row: HBoxContainer
 var _to: Label
 var _box: LineEdit
@@ -41,7 +42,14 @@ func _init(of: Node3D = null) -> void:
 	_lines.add_theme_color_override("font_outline_color", Color.BLACK)
 	_lines.add_theme_font_size_override("font_size", 14)
 	_lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_lines)
+	# In a box, to read against whatever is behind it.
+	_said_box = PanelContainer.new()
+	_said_box.name = "Said"
+	_said_box.add_theme_stylebox_override("panel", Look.hud_box())
+	_said_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_said_box.visible = false
+	_said_box.add_child(_lines)
+	add_child(_said_box)
 	_row = HBoxContainer.new()
 	_row.name = "Typing"
 	_row.visible = false
@@ -147,6 +155,7 @@ func _on_wheel_chosen(index: int) -> void:
 func _show() -> void:
 	_lines.text = "\n".join(lines())
 	_lines.visible = not _said.is_empty()
+	_said_box.visible = _lines.visible
 
 
 func _process(delta: float) -> void:

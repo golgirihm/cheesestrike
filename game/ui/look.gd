@@ -15,6 +15,9 @@ const WAX := Color(0.83, 0.2, 0.17)
 const FADED := Color(0.98, 0.95, 0.86, 0.55)
 ## How round the corners of panels and of buttons are, in pixels.
 const PANEL_CORNER := 14
+## How far in from a box's edge what is in it starts, and from a list's.
+const PANEL_PADDING := 12
+const LIST_PADDING := 8
 const BUTTON_CORNER := 9
 ## Seconds a screen takes to arrive.
 const ARRIVE_TIME := 0.16
@@ -60,8 +63,25 @@ static func _dress(made: Theme) -> void:
 	# With high contrast: solid black behind everything, and plain white
 	# edges where there were faint ones.
 	var panel := _box(Color.BLACK if stark else Color(RIND, 0.9), PANEL_CORNER, Color.WHITE if stark else Color(CHEDDAR, 0.35), 2)
+	# Nothing in a box ever touches its edge.
+	panel.set_content_margin_all(PANEL_PADDING)
 	made.set_stylebox("panel", "PanelContainer", panel)
 	made.set_stylebox("panel", "Panel", panel)
+	# The list a choice is picked from, and a tooltip, are boxes like the rest.
+	var popup := _box(Color.BLACK if stark else Color(RIND, 0.97), BUTTON_CORNER, Color.WHITE if stark else Color(CHEDDAR, 0.35), 2)
+	popup.set_content_margin_all(LIST_PADDING)
+	made.set_stylebox("panel", "PopupMenu", popup)
+	made.set_stylebox("hover", "PopupMenu", _box(Color(CHEDDAR, 0.25), BUTTON_CORNER - 3))
+	made.set_color("font_color", "PopupMenu", CREAM)
+	made.set_color("font_hover_color", "PopupMenu", Color.WHITE)
+	made.set_color("font_disabled_color", "PopupMenu", Color(CREAM, 0.75) if stark else FADED)
+	made.set_constant("v_separation", "PopupMenu", 10)
+	made.set_constant("item_start_padding", "PopupMenu", 10)
+	made.set_constant("item_end_padding", "PopupMenu", 10)
+	var tip := _box(Color(RIND, 0.95), BUTTON_CORNER, Color(CHEDDAR, 0.35), 1)
+	tip.set_content_margin_all(LIST_PADDING)
+	made.set_stylebox("panel", "TooltipPanel", tip)
+	made.set_color("font_color", "TooltipLabel", CREAM)
 	for kind: String in ["Button", "CheckButton", "OptionButton"]:
 		made.set_stylebox("normal", kind, _box(Color.BLACK if stark else Color(RIND_LIGHT, 0.95), BUTTON_CORNER, Color.WHITE if stark else Color(CREAM, 0.12), 2 if stark else 1, 10))
 		made.set_stylebox("hover", kind, _box(RIND_LIGHT.lightened(0.12), BUTTON_CORNER, Color(CHEDDAR, 0.8), 2, 10))
@@ -110,6 +130,18 @@ static func emphasise(button: Button) -> void:
 	button.add_theme_stylebox_override("normal", _box(WAX.darkened(0.1), BUTTON_CORNER, Color(CREAM, 0.25), 1, 10))
 	button.add_theme_stylebox_override("hover", _box(WAX.lightened(0.1), BUTTON_CORNER, CHEDDAR, 2, 10))
 	button.add_theme_font_override("font", heading_font())
+
+
+## A faint dark box for writing over the game, such as a line of the kill
+## feed or the chat, so it is read easily against anything behind it and
+## never touches its own edge.
+static func hud_box() -> StyleBoxFlat:
+	var box := _box(Color(0, 0, 0, 0.42), BUTTON_CORNER - 2)
+	box.content_margin_left = 10
+	box.content_margin_right = 10
+	box.content_margin_top = 4
+	box.content_margin_bottom = 4
+	return box
 
 
 ## Makes the list `choices` open with what is chosen picked out, so that the
