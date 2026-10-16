@@ -46,6 +46,8 @@ const START_SERVER := "python signaling/server.py"
 ## How many times in a row the session list is asked for before a player is
 ## told the session server can't be reached.
 const LIST_TRIES := 2
+const HOST_LOST := "The connection to the host was lost."
+const HOST_CLOSED := "The host closed the session."
 
 var use_webrtc := OS.has_feature("web")
 var in_session := false
@@ -90,7 +92,7 @@ var _visibility_callback: JavaScriptObject
 func _ready() -> void:
 	multiplayer.connected_to_server.connect(_start)
 	multiplayer.connection_failed.connect(_fail.bind("Couldn't connect to the host."))
-	multiplayer.server_disconnected.connect(leave.bind("The connection to the host was lost."))
+	multiplayer.server_disconnected.connect(_on_host_dropped)
 	multiplayer.peer_connected.connect(_send_player_count.unbind(1))
 	multiplayer.peer_disconnected.connect(_send_player_count.unbind(1))
 	_list_request = HTTPRequest.new()
@@ -184,7 +186,10 @@ func _process(delta: float) -> void:
 		else:
 			_host_watch.tick(delta)
 			if _host_watch.is_gone():
-				leave("The host closed the session.")
+				leave(HOST_CLOSED)
+				return
+			if _host_watch.is_lost():
+				leave(HOST_LOST)
 				return
 			if use_webrtc:
 				_ask_about_silent_host(delta)
@@ -276,6 +281,17 @@ func _reset() -> void:
 ## A hidden page may keep simulating (see WebPage), but drawing it is wasted work.
 func _on_visibility_changed(_args: Array) -> void:
 	RenderingServer.render_loop_enabled = not JavaScriptBridge.eval("document.hidden")
+
+
+## The connection to the host has dropped. Over WebRTC that may be the host
+## closing its page or leaving, and on a busy machine the drop can arrive before
+## anything else says so, so the session server is asked which before the
+## player is told; see HostWatch.
+func _on_host_dropped() -> void:
+	if use_webrtc and in_session:
+		_host_watch.connection_dropped()
+	else:
+		leave(HOST_LOST)
 
 
 @rpc("authority", "call_remote", "unreliable")
@@ -438,7 +454,7 @@ func _handle_signal(msg: Dictionary) -> void:
 		"closed":
 			# Only players still joining are connected to hear this.
 			if _connecting:
-				_fail("The host closed the session.")
+				_fail(HOST_CLOSED)
 		"error":
 			if in_session:
 				# The match carries on; only the session server is unhappy. A
