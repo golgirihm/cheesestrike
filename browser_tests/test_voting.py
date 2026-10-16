@@ -78,8 +78,11 @@ class VotingTest(GameTestCase):
         unwanted.type(code)
         unwanted.press("Enter")
         unwanted.wait_for("s.notice === 'You were removed from the session by a vote.'")
+        # The host has them for a moment, until it knows who they are.
+        host.wait_for("s.players.length === 2")
         host.page.wait_for_timeout(500)
         self.assertEqual(len(host.state()["players"]), 2)
+        self.assertEqual(unwanted.state()["screen"], "disconnected")
 
 
 if __name__ == "__main__":

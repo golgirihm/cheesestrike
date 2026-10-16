@@ -109,7 +109,9 @@ class CaptionsTest(GameTestCase):
         joiner = self.open_game()
         joiner.join(host.state()["code"])
         host.wait_for("s.players.length === 2")
-        walker = joiner.own_player()["name"]
+        # A player is in the session a moment before the host has their name.
+        state = joiner.wait_for("s.players.some((p) => p.mine && p.name !== 'Player')")
+        walker = next(p for p in state["players"] if p["mine"])["name"]
         joiner.page.keyboard.down("w")
         state = host.wait_for("s.combat.captions.some((c) => c.startsWith('Footsteps'))")
         joiner.page.keyboard.up("w")
