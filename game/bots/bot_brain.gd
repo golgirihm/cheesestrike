@@ -164,7 +164,7 @@ func _aim_point(delta: float, feet: Vector3, distance: float, level: Dictionary)
 		_wander = Vector2(_rng.randf_range(-1.0, 1.0), _rng.randf_range(-0.6, 0.6))
 	var off := aim_error(skill, seen_for)
 	var reach := distance * tan(deg_to_rad(off))
-	var middle := feet + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+	var middle := feet + Vector3.UP * BodyShape.CHEST.y * BodyShape.SIZE
 	return middle + Vector3(_wander.x, _wander.y, _wander.x * 0.5) * reach
 
 

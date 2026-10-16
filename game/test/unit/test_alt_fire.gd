@@ -3,7 +3,7 @@ extends GutTest
 ## shotgun's barrels, a launcher wheel that bounces, a charged blaster shot.
 
 const WORLD := preload("res://world/world.tscn")
-const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
+const CHEST := BodyShape.CHEST.y * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match

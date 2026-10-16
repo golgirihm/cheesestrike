@@ -1,7 +1,8 @@
 class_name Looks
-## What a player has chosen their character to look like: which kind of
-## cheese it is, the hat on its tip and what it holds in its free hand. None
-## of it changes what can be hit, how the character moves or how it fights.
+## What a player has chosen their soldier to look like: which kind of
+## cheese it fights for, worn as the camouflage on its uniform, the hat on
+## its helmet and what it holds in its free hand. None of it changes what can
+## be hit, how the character moves or how it fights.
 ##
 ## A look travels as one whole number, each choice a few bits of it. With it
 ## go the title the player has chosen and their level, which are shown by

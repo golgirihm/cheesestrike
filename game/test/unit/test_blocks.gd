@@ -2,7 +2,7 @@ extends GutTest
 ## The cheese blocks get eaten: by mice, through a match, and by shots.
 
 const WORLD := preload("res://world/world.tscn")
-const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
+const CHEST := BodyShape.CHEST.y * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match

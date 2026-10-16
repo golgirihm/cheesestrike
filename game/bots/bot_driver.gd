@@ -58,7 +58,7 @@ func _physics_process(delta: float) -> void:
 		var theirs := match_.state.player(other.name.to_int())
 		if other == player or theirs == null or not theirs.alive or other.is_queued_for_deletion() or match_.state.are_allies(id, theirs.id):
 			continue
-		var middle: Vector3 = other.global_position + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+		var middle: Vector3 = other.global_position + Vector3.UP * BodyShape.CHEST.y * BodyShape.SIZE
 		var seen := space.intersect_ray(PhysicsRayQueryParameters3D.create(eye, middle, WORLD_MASK)).is_empty()
 		enemies.append({"id": theirs.id, "at": other.global_position, "visible": seen})
 	var me := {"at": at, "health": record.health, "ammo": weapon.ammo, "magazine": weapon.stats.magazine, "reloading": weapon.is_reloading(),
