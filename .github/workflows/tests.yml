@@ -100,11 +100,17 @@ jobs:
       # The infra tests are quick and need the same packages, so they share this job.
       - run: python tools/run_tests.py signaling infra
 
-  # Exports the web build and plays it in headless browser windows.
-  browser:
-    name: Browser tests
+  # Exports the web build and plays it in headless browser windows. The tests
+  # are limited by processor time, so they are split between several
+  # machines, each exporting the build for itself and running its share.
+  browser-shard:
+    name: Browser tests ${{ matrix.shard }} of 4
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -133,4 +139,20 @@ jobs:
       # The Playwright version pins the browser build it downloads.
       - name: Install the browser
         run: python -m playwright install --only-shell chromium
-      - run: python tools/run_tests.py browser
+      - run: python tools/run_tests.py browser --shard ${{ matrix.shard }}/4
+
+  # The one check that stands for all the shards, under the name the buildci
+  # command and the branch rules know.
+  browser:
+    name: Browser tests
+    needs: browser-shard
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Pass only if every shard passed
+        env:
+          RESULT: ${{ needs.browser-shard.result }}
+        run: |
+          echo "The shards' result: $RESULT"
+          [ "$RESULT" = success ]
