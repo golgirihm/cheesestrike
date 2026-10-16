@@ -56,10 +56,11 @@ jobs:
             exit 0
           fi
           key="$RUNNER_TEMP/assets_deploy_key"
-          printf '%s
-' "$ASSETS_DEPLOY_KEY" > "$key"
+          printf '%s\n' "$ASSETS_DEPLOY_KEY" > "$key"
           chmod 600 "$key"
-          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"             git -c url.git@github.com:.insteadOf=https://github.com/             submodule update --init --depth 1 game/licensed
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            git -c url.git@github.com:.insteadOf=https://github.com/ \
+            submodule update --init --depth 1 game/licensed
           rm "$key"
       - name: Load pinned versions
         run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
@@ -148,10 +149,11 @@ jobs:
             exit 0
           fi
           key="$RUNNER_TEMP/assets_deploy_key"
-          printf '%s
-' "$ASSETS_DEPLOY_KEY" > "$key"
+          printf '%s\n' "$ASSETS_DEPLOY_KEY" > "$key"
           chmod 600 "$key"
-          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"             git -c url.git@github.com:.insteadOf=https://github.com/             submodule update --init --depth 1 game/licensed
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            git -c url.git@github.com:.insteadOf=https://github.com/ \
+            submodule update --init --depth 1 game/licensed
           rm "$key"
       - name: Load pinned versions
         run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
