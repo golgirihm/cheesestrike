@@ -3,7 +3,7 @@ class_name HitScan
 ## the physics engine, so that the host can test a shot against where players
 ## are (or, later, where they were) and so it can be tested on its own.
 ##
-## A player's body is the wedge of their cheese character (body_shape.gd),
+## A player's body is the head, torso and legs of their soldier (body_shape.gd),
 ## standing on their position and facing where they face.
 
 
@@ -41,7 +41,7 @@ static func ray_capsule(origin: Vector3, direction: Vector3, feet: Vector3, radi
 
 ## A player standing at `feet`, turned by `yaw` and looking up or down by
 ## `pitch`, as `targets` in first_hit() hold them. Looking up or down doesn't
-## move the wedge, so only where they stand, how they are turned and how
+## move what can be hit, so only where they stand, how they are turned and how
 ## far they `crouch` (0 standing to 1 crouched) and `lean` (-1 left to 1
 ## right) decide what hits.
 static func pose(feet: Vector3, yaw := 0.0, pitch := 0.0, crouch := 0.0, lean := 0.0) -> Dictionary:

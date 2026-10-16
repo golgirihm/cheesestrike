@@ -1,10 +1,11 @@
 extends Node3D
-## How a player looks to everyone else: an upright wedge of cheese with a
-## face and holes drawn flat on its surface, standing on two stick legs with
-## two stick arms, one of them holding the weapon. It is built from simple
-## shapes and animated in code. Its measurements are BodyShape's, which shots
-## are tested against too, so the wedge is hit where it is seen. It stands
-## on the player's feet and fits inside their collision capsule.
+## How a player looks to everyone else: a soldier in a uniform of the
+## player's colour, with a helmet, boots and a chest rig, and a face that
+## shows how things are going. One arm holds the weapon. It is built from
+## simple shapes and animated in code. Its measurements are BodyShape's,
+## which shots are tested against too, so the soldier is hit where it is
+## seen. It stands on the player's feet and fits inside their collision
+## capsule.
 ##
 ## The player sets its colour and tells it how it is moving, where it is
 ## looking and where its weapon is. From that it works out what it is doing
@@ -14,10 +15,16 @@ extends Node3D
 ## returning.
 
 const INK := Color(0.1, 0.09, 0.09)
-## The veins of a blue cheese, and the pale rind of a brie.
+## The blotches of camouflage each kind of cheese wears (see Looks): a blue's
+## are the blue of its veins and a brie's the white of its rind, as in the
+## snow; a cheddar's are a darker shade of the uniform, and a Swiss goes
+## plain.
 const VEIN := Color(0.16, 0.42, 0.55)
 const BLOOM := Color(0.96, 0.95, 0.92)
-const BLUSH := Color(0.96, 0.5, 0.5)
+const SKIN := Color(0.86, 0.66, 0.52)
+const GEAR := Color(0.22, 0.23, 0.18)
+const BOOTS := Color(0.15, 0.12, 0.1)
+const BLUSH := Color(0.93, 0.48, 0.45)
 const TEETH := Color(0.97, 0.97, 0.95)
 ## How far the legs swing, in radians, at full running speed.
 const STRIDE := 0.7
@@ -50,38 +57,48 @@ const SET_TIME := 0.5
 const BLINK_TIME := 0.12
 const BLINK_GAP := Vector2(2.0, 5.5)
 ## How far the eyes slide toward someone nearby.
-const GLANCE_SHIFT := 0.012
+const GLANCE_SHIFT := 0.008
 ## Seconds the whole body flashes pale when hit.
 const FLASH_TIME := 0.09
 ## How far above the surface each layer of what is drawn on it sits, so that
 ## none flickers through another.
 const LAYER := 0.003
 ## How far the eyes shift up or down as the player looks up or down.
-const GAZE_SHIFT := 0.012
+const GAZE_SHIFT := 0.008
+## The faces of the torso that camouflage is drawn on.
+enum { FRONT, BACK }
+## Blotches of camouflage, as [face, across, up, radius], `across` and `up`
+## from the middle of that face.
+const CAMO := [
+	[FRONT, -0.12, 0.1, 0.035], [FRONT, 0.12, -0.02, 0.04], [FRONT, -0.125, -0.07, 0.03], [FRONT, 0.125, 0.11, 0.025],
+	[BACK, 0.0, 0.08, 0.045], [BACK, -0.11, -0.05, 0.04], [BACK, 0.12, -0.08, 0.03], [BACK, 0.11, 0.1, 0.03],
+]
 
 ## Whether to draw it at all: not for the player's own machine, which sees
 ## from inside it.
 var shown := true
 
 var _material := StandardMaterial3D.new()
-var _hole_material := StandardMaterial3D.new()
-var _rind_material := StandardMaterial3D.new()
-# The look being worn (see Looks), and the parts that show it: the holes of
-# a Swiss, the veins of a blue, a rind, a hat and something held.
+var _helmet_material := StandardMaterial3D.new()
+var _camo_material := _flat(VEIN)
+var _skin := _solid(SKIN)
+var _gear := _solid(GEAR)
+var _boot := _solid(BOOTS)
+# The look being worn (see Looks), and the parts that show it: camouflage,
+# a hat and something held.
 var _look := -1
-var _holes: Array[Node3D] = []
-var _veins: Array[Node3D] = []
-var _rind: MeshInstance3D
+var _camo: Array[Node3D] = []
 var _hat: Node3D
 var _held: Node3D
 var _ink := _flat(INK)
-var _wedge: MeshInstance3D
+var _torso: MeshInstance3D
 var _legs: Array[Node3D] = []
 var _arms: Array[Node3D] = []
 var _eyes: Array[Node3D] = []
 var _calm: Node3D
 var _wince: Node3D
 var _phase := 0.0
+var _swing := 0.0
 var _speed := 0.0
 var _airborne := false
 # How fast the player is rising, whether they are sliding, and how long
@@ -133,19 +150,19 @@ var _thrown := Vector3.ZERO
 
 
 func _init() -> void:
-	_material.roughness = 0.7
-	_hole_material.roughness = 0.9
+	_material.roughness = 0.85
+	_helmet_material.roughness = 0.6
 	_build()
 	scale = Vector3.ONE * BodyShape.SIZE
 	# Until told otherwise, the weapon is where the player's scene holds it.
 	reach_for(Vector3(0.36, BodyShape.HEAD_HEIGHT - 0.29, -0.34))
 
 
-## The body's colour. Its holes are a darker shade of the same.
+## The uniform's colour. The helmet is a darker shade of the same.
 func set_colour(colour: Color) -> void:
 	_material.albedo_color = colour
-	_hole_material.albedo_color = colour.darkened(0.3)
-	_show_rind()
+	_helmet_material.albedo_color = colour.darkened(0.45)
+	_show_camo()
 
 
 func colour() -> Color:
@@ -201,18 +218,15 @@ func action() -> String:
 	return _action
 
 
-## Wears `look` (see Looks): the kind of cheese, a hat and something in the
-## free hand. None of it changes the shape that can be hit.
+## Wears `look` (see Looks): the camouflage of the kind of cheese, a hat on
+## the helmet and something in the free hand. None of it changes the shape
+## that can be hit.
 func wear(look: int) -> void:
 	if look == _look:
 		return
 	_look = look
 	var choices := Looks.unpack(look)
-	for hole in _holes:
-		hole.visible = choices.cheese == "swiss"
-	for vein in _veins:
-		vein.visible = choices.cheese == "blue"
-	_show_rind()
+	_show_camo()
 	for old: Node3D in [_hat, _held]:
 		if old != null:
 			_upper.erase(old)
@@ -232,23 +246,28 @@ func worn() -> Dictionary:
 	return Looks.unpack(maxi(_look, 0))
 
 
-# A cheddar has a rind a shade darker than itself, and a brie a pale one.
-func _show_rind() -> void:
-	if _rind == null:
-		return
+# Camouflage in the colours of the kind of cheese worn, or none for a Swiss.
+func _show_camo() -> void:
 	var cheese: String = worn().cheese
-	_rind.visible = cheese == "cheddar" or cheese == "brie"
-	_rind_material.albedo_color = BLOOM if cheese == "brie" else _material.albedo_color.darkened(0.35)
+	for blotch in _camo:
+		blotch.visible = cheese != "swiss"
+	match cheese:
+		"blue":
+			_camo_material.albedo_color = VEIN
+		"brie":
+			_camo_material.albedo_color = BLOOM
+		_:
+			_camo_material.albedo_color = _material.albedo_color.darkened(0.4)
 
 
-# A hat of `kind` for the tip of the wedge, or null for none.
+# A hat of `kind` for the top of the helmet, or null for none.
 func _build_hat(kind: String) -> Node3D:
 	if kind == "none":
 		return null
 	var hat := Node3D.new()
 	hat.name = "Hat"
-	# Sitting a little down over the tip.
-	hat.position = Vector3(0, BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y / 2.0 - 0.1, 0)
+	# Sitting a little down over the top of the helmet.
+	hat.position = Vector3(0, BodyShape.HEAD_CENTRE.y + BodyShape.HEAD_SIZE.y / 2.0 - 0.03, 0)
 	match kind:
 		"party":
 			var cone := CylinderMesh.new()
@@ -290,8 +309,8 @@ func _build_held(kind: String) -> Node3D:
 	var held := Node3D.new()
 	held.name = "Held"
 	var arm: Array = BodyShape.ARMS[0]
-	# Where the mitten is, at rest.
-	held.position = (arm[0] as Vector3) + Vector3(-sin(0.35), -cos(0.35), 0) * arm[1]
+	# Where the glove is, at rest.
+	held.position = (arm[0] as Vector3) + Vector3(sin(Emotes.ARM_REST), -cos(Emotes.ARM_REST), 0) * arm[1]
 	var stick := CylinderMesh.new()
 	stick.top_radius = 0.006
 	stick.bottom_radius = 0.006
@@ -330,7 +349,7 @@ static func _dab(radius: float, colour: Color, at: Vector3) -> MeshInstance3D:
 	return Rounded.instance(sphere, _flat(colour), at)
 
 
-## How far the player is crouched, from 0 (standing) to 1: the legs fold
+## How far the player is crouched, from 0 (standing) to 1: the knees bend
 ## and the rest comes down.
 func set_crouch(amount: float) -> void:
 	_crouch = clampf(amount, 0.0, 1.0)
@@ -338,13 +357,8 @@ func set_crouch(amount: float) -> void:
 	for part: Node3D in _upper:
 		part.position = _upper[part] + drop
 	for index in _legs.size():
-		var hip: Vector3 = BodyShape.LEGS[index][0]
-		_legs[index].position = hip + drop
-		# The legs shorten to keep the feet on the ground, and the shoes keep
-		# their shape.
-		var fold := (hip.y - BodyShape.CROUCH_DROP * _crouch) / hip.y
-		_legs[index].scale.y = fold
-		_legs[index].get_child(1).scale.y = 0.6 / fold
+		_legs[index].position = (BodyShape.LEGS[index][0] as Vector3) + drop
+	_bend_legs()
 
 
 ## How far the player leans: -1 to their left, 1 to their right.
@@ -439,7 +453,7 @@ func reach_for(hand: Vector3) -> void:
 	var length := reach.length()
 	if length < 0.001:
 		return
-	# The stick hangs down its own Y axis, so point that at the hand.
+	# The sleeve hangs down its own Y axis, so point that at the hand.
 	arm.quaternion = Quaternion(Vector3.DOWN, reach / length)
 	arm.get_child(0).scale.y = length / BodyShape.ARMS[1][1]
 
@@ -484,6 +498,23 @@ func set_in_play(in_play: bool) -> void:
 			_melt = 1.0
 
 
+# Turns each leg at the hip and the knee: swinging with the stride, drawn up
+# in the air, thrown forward in a slide, spread when crouched or landing, and
+# bent at the knee to keep the feet on the ground in a crouch. The boots stay
+# level with the ground.
+func _bend_legs() -> void:
+	var crouched: float = BodyShape.knee_bend(_crouch) * (1.0 - _blend.reach)
+	for index in _legs.size():
+		var side := 1.0 if index == 0 else -1.0
+		var out := -1.0 if (BodyShape.LEGS[index][0] as Vector3).x < 0.0 else 1.0
+		var thigh: float = lerpf(_swing * side * _blend.stride, 0.6, _blend.tuck) + 1.15 * _blend.reach + crouched
+		var knee: float = -2.0 * crouched - 1.3 * _blend.tuck - maxf(-_swing * side * _blend.stride, 0.0) * 0.8
+		_legs[index].rotation = Vector3(thigh, 0.0, _blend.splay * out)
+		var lower: Node3D = _legs[index].get_node("Knee")
+		lower.rotation.x = knee
+		lower.get_node("Boot").rotation.x = -(thigh + knee)
+
+
 ## How far a leg swings forward at walk phase `phase` (radians) when moving at
 ## `speed`: a sine wave, larger at speed, nothing standing still.
 static func leg_swing(phase: float, speed: float) -> float:
@@ -504,12 +535,8 @@ func _process(delta: float) -> void:
 	var nearer := CharacterMotion.blend(delta)
 	for key: String in _blend:
 		_blend[key] = lerpf(_blend[key], heading[key], nearer)
-	for index in _legs.size():
-		var side := 1.0 if index == 0 else -1.0
-		# Swinging with the stride, drawn up in the air, thrown forward in a
-		# slide, and spread when crouched or landing.
-		var out := -1.0 if (BodyShape.LEGS[index][0] as Vector3).x < 0.0 else 1.0
-		_legs[index].rotation = Vector3(lerpf(swing * side * _blend.stride, -0.6, _blend.tuck) - 1.15 * _blend.reach, 0.0, _blend.splay * out)
+	_swing = swing
+	_bend_legs()
 	# What the free arm is doing on top of that; the other holds the weapon.
 	var doing := _holding.duplicate()
 	for kind: String in _acting.keys():
@@ -590,33 +617,34 @@ static func _ease_out(t: float) -> float:
 
 
 func _build() -> void:
-	_wedge = Rounded.instance(Rounded.wedge(BodyShape.WEDGE_SIZE, BodyShape.WEDGE_ROUNDING), _material, BodyShape.WEDGE_CENTRE)
-	_wedge.name = "Wedge"
-	add_child(_wedge)
+	# The torso, in the uniform's colour, with a belt and a chest rig over it.
+	_torso = Rounded.instance(Rounded.box(BodyShape.TORSO_SIZE, BodyShape.ROUNDING), _material, BodyShape.TORSO_CENTRE)
+	_torso.name = "Torso"
+	add_child(_torso)
+	var half := BodyShape.TORSO_SIZE / 2.0
+	_torso.add_child(Rounded.instance(Rounded.box(Vector3(half.x * 2.0 + 0.008, 0.045, half.z * 2.0 + 0.008), 0.01), _gear, Vector3(0, -half.y + 0.04, 0)))
+	_torso.add_child(Rounded.instance(Rounded.box(Vector3(0.04, 0.035, 0.008), 0.003), _flat(Color(0.62, 0.58, 0.45)), Vector3(0, -half.y + 0.04, -half.z - 0.006)))
+	for side in [-1.0, 1.0]:
+		# Pouches on the belt, and straps over the shoulders, front and back.
+		_torso.add_child(Rounded.instance(Rounded.box(Vector3(0.07, 0.065, 0.012), 0.005), _gear, Vector3(0.12 * side, -half.y + 0.075, -half.z - 0.004)))
+		for face in [-1.0, 1.0]:
+			_torso.add_child(Rounded.instance(Rounded.box(Vector3(0.045, half.y * 2.0 - 0.06, 0.008), 0.003), _gear, Vector3(0.09 * side, 0.03, (half.z + 0.002) * face)))
+		_torso.add_child(Rounded.instance(Rounded.box(Vector3(0.05, 0.006, half.z * 2.0 + 0.004), 0.002), _gear, Vector3(0.09 * side, half.y, 0)))
+	# Magazine pouches across the chest.
+	for across in [-0.035, 0.035]:
+		_torso.add_child(Rounded.instance(Rounded.box(Vector3(0.055, 0.08, 0.012), 0.005), _gear, Vector3(across, 0.02, -half.z - 0.004)))
 
-	for hole: Array in BodyShape.HOLES:
-		var place := BodyShape.hole_place(hole)
-		var spot := Rounded.spot(place.radius, _hole_material, place.centre, place.normal, LAYER)
-		spot.name = "Hole%d" % get_child_count()
-		add_child(spot)
-		_holes.append(spot)
-		# A blue cheese has veins where a Swiss has holes: two small marks each.
-		for offset: Vector3 in [Vector3.ZERO, Vector3(0.6, 0.5, 0.6)]:
-			var across: Vector3 = (place.normal as Vector3).cross(Vector3.UP if absf(place.normal.y) < 0.9 else Vector3.RIGHT).normalized()
-			var shifted: Vector3 = place.centre + (across * offset.x + (place.normal as Vector3).cross(across) * offset.y) * place.radius
-			var vein := Rounded.spot(place.radius * 0.42, _flat(VEIN), shifted, place.normal, LAYER)
-			vein.name = "Vein%d" % (_veins.size() + 1)
-			vein.visible = false
-			add_child(vein)
-			_veins.append(vein)
+	for place: Array in CAMO:
+		var normal := Vector3.FORWARD if place[0] == FRONT else Vector3.BACK
+		var at := BodyShape.TORSO_CENTRE + Vector3(place[1], place[2], normal.z * half.z)
+		var blotch := Rounded.spot(place[3], _camo_material, at, normal, LAYER)
+		blotch.name = "Camo%d" % (_camo.size() + 1)
+		blotch.scale = Vector3(1.4, 1.0, 1.0)
+		blotch.visible = false
+		add_child(blotch)
+		_camo.append(blotch)
 
-	# A rind over the back of the wedge, a hair proud of it.
-	_rind_material.roughness = 0.9
-	_rind = Rounded.instance(Rounded.wedge(BodyShape.WEDGE_SIZE * Vector3(1.02, 1.02, 0.08), 0.02), _rind_material, BodyShape.WEDGE_CENTRE + Vector3(0, 0, BodyShape.WEDGE_SIZE.z / 2.0 - 0.018))
-	_rind.name = "Rind"
-	_rind.visible = false
-	add_child(_rind)
-
+	_build_head()
 	_build_face()
 
 	for leg: Array in BodyShape.LEGS:
@@ -624,38 +652,74 @@ func _build() -> void:
 		hip.name = "Leg%d" % (_legs.size() + 1)
 		hip.position = leg[0]
 		add_child(hip)
-		hip.add_child(_stick(leg[1]))
-		# A shoe, toe forward, resting on the ground.
-		var shoe := _ball(0.05, Vector3(0, -leg[1] + 0.03, -0.03))
-		shoe.scale = Vector3(1.0, 0.6, 1.6)
-		hip.add_child(shoe)
+		# The thigh, down to the knee, and the shin and boot below it, which
+		# bends at the knee.
+		var trousers := Vector3(BodyShape.LEG_WIDTH, BodyShape.THIGH + 0.03, BodyShape.LEG_DEPTH)
+		hip.add_child(Rounded.instance(Rounded.box(trousers, 0.02), _material, Vector3(0, -BodyShape.THIGH / 2.0, 0)))
+		var knee := Node3D.new()
+		knee.name = "Knee"
+		knee.position = Vector3(0, -BodyShape.THIGH, 0)
+		hip.add_child(knee)
+		knee.add_child(Rounded.instance(Rounded.box(trousers, 0.02), _material, Vector3(0, -BodyShape.THIGH / 2.0 + 0.02, 0)))
+		var boot := Node3D.new()
+		boot.name = "Boot"
+		boot.position = Vector3(0, -BodyShape.THIGH, 0)
+		knee.add_child(boot)
+		boot.add_child(Rounded.instance(Rounded.box(Vector3(BodyShape.LEG_WIDTH, 0.075, BodyShape.LEG_DEPTH), 0.025), _boot, Vector3(0, 0.0375, 0)))
+		boot.add_child(Rounded.instance(Rounded.box(Vector3(BodyShape.LEG_WIDTH - 0.004, 0.02, BodyShape.LEG_DEPTH - 0.004), 0.008), _ink, Vector3(0, 0.01, 0)))
 		_legs.append(hip)
 	for arm: Array in BodyShape.ARMS:
 		var shoulder := Node3D.new()
 		shoulder.name = "Arm%d" % (_arms.size() + 1)
 		shoulder.position = arm[0]
 		add_child(shoulder)
-		shoulder.add_child(_stick(arm[1]))
+		shoulder.add_child(_sleeve(arm[1]))
 		_arms.append(shoulder)
-	# The free arm hangs out from the side, with a mitten on the end. The
+	# The free arm hangs out from the side, with a glove on the end. The
 	# weapon arm's hand is part of the weapon it holds.
-	_arms[0].rotation.z = -0.35
+	_arms[0].rotation.z = Emotes.ARM_REST
 	_arms[0].add_child(_ball(0.042, Vector3(0, -BodyShape.ARMS[0][1], 0)))
 	for part in get_children():
 		if not _legs.has(part):
 			_upper[part] = part.position
 
 
-# The face, drawn on the front of the wedge: two dot eyes, and either a
+# The head: a face under a helmet in a darker shade of the uniform, with its
+# rim and a strap under the chin. All of it fills the box that is hit as the
+# head.
+func _build_head() -> void:
+	var size := BodyShape.HEAD_SIZE
+	var bottom := BodyShape.HEAD_FROM
+	var head := Node3D.new()
+	head.name = "Head"
+	add_child(head)
+	var face := Vector3(size.x, BodyShape.HEAD_HEIGHT + 0.05 - bottom, size.z)
+	head.add_child(Rounded.instance(Rounded.box(face, 0.02), _skin, Vector3(0, bottom + face.y / 2.0, 0)))
+	var top := bottom + size.y
+	var shell := Vector3(size.x, top - (BodyShape.HEAD_HEIGHT + 0.035), size.z)
+	head.add_child(Rounded.instance(Rounded.box(shell, BodyShape.ROUNDING), _helmet_material, Vector3(0, top - shell.y / 2.0, 0)))
+	# The rim, a hair proud all round, and the shell coming down over the
+	# ears and the back of the neck.
+	var rim := top - shell.y + 0.006
+	head.add_child(Rounded.instance(Rounded.box(Vector3(size.x + 0.006, 0.016, size.z + 0.006), 0.005), _helmet_material, Vector3(0, rim, 0)))
+	var guard := Vector3(size.x + 0.006, 0.075, size.z * 0.62)
+	head.add_child(Rounded.instance(Rounded.box(guard, 0.012), _helmet_material, Vector3(0, rim - guard.y / 2.0 + 0.008, size.z / 2.0 - guard.z / 2.0 + 0.003)))
+	for side in [-1.0, 1.0]:
+		var strap := Rounded.instance(Rounded.box(Vector3(0.006, 0.09, 0.014), 0.002), _gear, Vector3((face.x / 2.0 + 0.003) * side, bottom + 0.045, -0.03))
+		head.add_child(strap)
+	head.add_child(Rounded.instance(Rounded.box(Vector3(0.11, 0.008, 0.014), 0.002), _gear, Vector3(0, bottom + 0.003, -0.05)))
+
+
+# The face, drawn on the front of the head: two dot eyes, and either a
 # smile between rosy cheeks or, when wincing, gritted teeth under a frown.
 func _build_face() -> void:
-	var front := -BodyShape.WEDGE_SIZE.z / 2.0
+	var front := -BodyShape.HEAD_SIZE.z / 2.0
 	var eye_level := BodyShape.HEAD_HEIGHT
 	for centre in BodyShape.eye_centres():
 		var eye := Rounded.spot(BodyShape.EYE_RADIUS, _ink, centre, Vector3.FORWARD, LAYER * 2.0)
 		eye.name = "Eye%d" % (_eyes.size() + 1)
 		# A glint, so the eyes look alive.
-		eye.add_child(Rounded.spot(BodyShape.EYE_RADIUS * 0.32, _flat(Color.WHITE), Vector3(0.008, 0.0, 0.009), Vector3.UP, LAYER))
+		eye.add_child(Rounded.spot(BodyShape.EYE_RADIUS * 0.32, _flat(Color.WHITE), Vector3(0.006, 0.0, 0.006), Vector3.UP, LAYER))
 		add_child(eye)
 		_eyes.append(eye)
 
@@ -663,10 +727,8 @@ func _build_face() -> void:
 	_calm.name = "Calm"
 	add_child(_calm)
 	var blush := _flat(BLUSH)
-	for side in [-1.0, 1.0]:
-		_calm.add_child(Rounded.spot(0.034, blush, Vector3(0.15 * side, eye_level - 0.055, front), Vector3.FORWARD, LAYER))
 	var smile := MeshInstance3D.new()
-	smile.mesh = _arc(0.05, 0.011, deg_to_rad(205.0), deg_to_rad(335.0))
+	smile.mesh = _arc(0.03, 0.008, deg_to_rad(205.0), deg_to_rad(335.0))
 	smile.material_override = _ink
 	smile.position = Vector3(0, eye_level - 0.03, front - LAYER * 2.0)
 	_calm.add_child(smile)
@@ -675,15 +737,15 @@ func _build_face() -> void:
 	_wince.name = "Wince"
 	_wince.visible = false
 	add_child(_wince)
-	var mouth := Vector3(0, eye_level - 0.085, front)
-	_wince.add_child(_patch(Vector2(0.15, 0.062), _ink, mouth, 1))
-	_wince.add_child(_patch(Vector2(0.132, 0.044), _flat(TEETH), mouth, 2))
-	_wince.add_child(_patch(Vector2(0.132, 0.007), _ink, mouth, 3))
-	for gap in [-0.033, 0.0, 0.033]:
-		_wince.add_child(_patch(Vector2(0.007, 0.044), _ink, mouth + Vector3(gap, 0, 0), 3))
+	var mouth := Vector3(0, eye_level - 0.065, front)
+	_wince.add_child(_patch(Vector2(0.08, 0.034), _ink, mouth, 1))
+	_wince.add_child(_patch(Vector2(0.07, 0.024), _flat(TEETH), mouth, 2))
+	_wince.add_child(_patch(Vector2(0.07, 0.005), _ink, mouth, 3))
+	for gap in [-0.018, 0.0, 0.018]:
+		_wince.add_child(_patch(Vector2(0.005, 0.024), _ink, mouth + Vector3(gap, 0, 0), 3))
 	# Brows drawn down toward the middle.
 	for side in [-1.0, 1.0]:
-		var brow := _patch(Vector2(0.07, 0.014), _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.045, front), 2)
+		var brow := _patch(Vector2(0.042, 0.01), _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.02, front), 2)
 		brow.rotation.z = 0.4 * side
 		_wince.add_child(brow)
 
@@ -691,9 +753,9 @@ func _build_face() -> void:
 	var set_face := Node3D.new()
 	set_face.name = "Set"
 	add_child(set_face)
-	set_face.add_child(_patch(Vector2(0.075, 0.012), _ink, Vector3(0, eye_level - 0.075, front), 2))
+	set_face.add_child(_patch(Vector2(0.045, 0.008), _ink, Vector3(0, eye_level - 0.06, front), 2))
 	for side in [-1.0, 1.0]:
-		var brow := _patch(Vector2(0.065, 0.013), _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.04, front), 2)
+		var brow := _patch(Vector2(0.04, 0.009), _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.026, front), 2)
 		brow.rotation.z = 0.15 * side
 		set_face.add_child(brow)
 
@@ -702,32 +764,32 @@ func _build_face() -> void:
 	cheer_face.name = "Cheer"
 	add_child(cheer_face)
 	for side in [-1.0, 1.0]:
-		cheer_face.add_child(Rounded.spot(0.036, blush, Vector3(0.155 * side, eye_level - 0.05, front), Vector3.FORWARD, LAYER))
+		cheer_face.add_child(Rounded.spot(0.015, blush, Vector3(0.057 * side, eye_level - 0.038, front), Vector3.FORWARD, LAYER))
 	var grin := MeshInstance3D.new()
-	grin.mesh = _arc(0.03, 0.06, deg_to_rad(180.0), deg_to_rad(360.0))
+	grin.mesh = _arc(0.018, 0.036, deg_to_rad(180.0), deg_to_rad(360.0))
 	grin.material_override = _ink
-	grin.position = Vector3(0, eye_level - 0.045, front - LAYER * 2.0)
+	grin.position = Vector3(0, eye_level - 0.04, front - LAYER * 2.0)
 	cheer_face.add_child(grin)
 	var tongue := MeshInstance3D.new()
-	tongue.mesh = _arc(0.018, 0.03, deg_to_rad(200.0), deg_to_rad(340.0))
+	tongue.mesh = _arc(0.011, 0.018, deg_to_rad(200.0), deg_to_rad(340.0))
 	tongue.material_override = _flat(BLUSH.darkened(0.15))
-	tongue.position = Vector3(0, eye_level - 0.06, front - LAYER * 3.0)
+	tongue.position = Vector3(0, eye_level - 0.049, front - LAYER * 3.0)
 	cheer_face.add_child(tongue)
 
-	# Melted by an Overload: a wavering mouth, and stars going round the tip.
+	# Melted by an Overload: a wavering mouth, and stars going round the head.
 	var dizzy_face := Node3D.new()
 	dizzy_face.name = "Dizzy"
 	add_child(dizzy_face)
 	for step in 4:
 		var wave := MeshInstance3D.new()
 		var up := step % 2 == 0
-		wave.mesh = _arc(0.018, 0.01, deg_to_rad(0.0 if up else 180.0), deg_to_rad(180.0 if up else 360.0))
+		wave.mesh = _arc(0.011, 0.007, deg_to_rad(0.0 if up else 180.0), deg_to_rad(180.0 if up else 360.0))
 		wave.material_override = _ink
-		wave.position = Vector3(-0.054 + step * 0.036, eye_level - 0.075, front - LAYER * 2.0)
+		wave.position = Vector3(-0.033 + step * 0.022, eye_level - 0.06, front - LAYER * 2.0)
 		dizzy_face.add_child(wave)
 	_stars = Node3D.new()
 	_stars.name = "Stars"
-	_stars.position = Vector3(0, BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y / 2.0 + 0.06, 0)
+	_stars.position = Vector3(0, BodyShape.HEAD_CENTRE.y + BodyShape.HEAD_SIZE.y / 2.0 + 0.06, 0)
 	_stars.visible = false
 	add_child(_stars)
 	var star := _flat(Color(0.95, 0.95, 1.0))
@@ -747,6 +809,14 @@ func _build_face() -> void:
 	_faces = {WINCE: _wince, DIZZY: dizzy_face, CHEER: cheer_face, SET: set_face, CALM: _calm}
 
 
+# A plain surface of `colour`, as of cloth, skin or rubber.
+static func _solid(colour: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colour
+	material.roughness = 0.9
+	return material
+
+
 static func _flat(colour: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = colour
@@ -756,7 +826,7 @@ static func _flat(colour: Color) -> StandardMaterial3D:
 	return material
 
 
-# A flat rectangle of `size` on the front of the wedge, centred on `at`.
+# A flat rectangle of `size` on the front of the head, centred on `at`.
 static func _patch(size: Vector2, material: Material, at: Vector3, layer: int) -> MeshInstance3D:
 	var box := BoxMesh.new()
 	box.size = Vector3(size.x, size.y, 0.001)
@@ -795,24 +865,25 @@ static func _arc(radius: float, width: float, from: float, to: float) -> ArrayMe
 	return mesh
 
 
-# A stick `length` long hanging down from its joint.
-func _stick(length: float) -> Node3D:
+# A sleeve of the uniform `length` long hanging down from its shoulder.
+func _sleeve(length: float) -> Node3D:
 	var capsule := CapsuleMesh.new()
 	capsule.radius = BodyShape.LIMB_RADIUS
 	capsule.height = length
-	capsule.radial_segments = 8
-	capsule.rings = 2
+	capsule.radial_segments = 10
+	capsule.rings = 3
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = capsule
-	mesh.material_override = _ink
+	mesh.material_override = _material
 	mesh.position = Vector3(0, -length / 2.0, 0)
 	# Held by a node of its own, so that stretching it stretches it from the
-	# joint.
+	# shoulder.
 	var holder := Node3D.new()
 	holder.add_child(mesh)
 	return holder
 
 
+# A gloved hand.
 func _ball(radius: float, at: Vector3) -> MeshInstance3D:
 	var sphere := SphereMesh.new()
 	sphere.radius = radius
@@ -821,6 +892,6 @@ func _ball(radius: float, at: Vector3) -> MeshInstance3D:
 	sphere.rings = 6
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = sphere
-	mesh.material_override = _ink
+	mesh.material_override = _gear
 	mesh.position = at
 	return mesh

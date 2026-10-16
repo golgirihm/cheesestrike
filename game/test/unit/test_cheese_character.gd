@@ -15,11 +15,12 @@ func _named(prefix: String) -> Array:
 	return character.get_children().filter(func(child: Node) -> bool: return child.name.begins_with(prefix))
 
 
-func test_it_has_a_body_two_legs_and_two_arms() -> void:
-	assert_not_null(character.get_node_or_null("Wedge"))
+func test_it_has_a_torso_a_head_two_legs_and_two_arms() -> void:
+	assert_not_null(character.get_node_or_null("Torso"))
+	assert_not_null(character.get_node_or_null("Head"))
 	assert_eq(_named("Leg").size(), 2)
 	assert_eq(_named("Arm").size(), 2)
-	assert_eq(_named("Hole").size(), BodyShape.HOLES.size(), "it's Swiss enough to have holes")
+	assert_eq(_named("Camo").size(), CHARACTER.CAMO.size())
 	assert_eq(_named("Eye").size(), 2)
 
 
@@ -34,19 +35,18 @@ func _thickness(mesh: MeshInstance3D, normal: Vector3) -> float:
 	return high - low
 
 
-func test_the_holes_are_flat_marks_on_the_surface_not_lumps() -> void:
-	var holes := _named("Hole")
-	for index in holes.size():
-		var place := BodyShape.hole_place(BodyShape.HOLES[index])
-		var hole: MeshInstance3D = holes[index]
-		assert_lt(_thickness(hole, place.normal), 0.002, hole.name)
-		var off: float = (hole.position - place.centre).dot(place.normal)
-		assert_between(off, 0.0, 0.01, "%s sits on the wedge's face" % hole.name)
-		assert_almost_eq(hole.get_aabb().size.x, place.radius * 2.0, 0.001)
+func test_camouflage_is_flat_marks_on_the_torso_not_lumps() -> void:
+	var half := BodyShape.TORSO_SIZE / 2.0
+	for blotch: MeshInstance3D in _named("Camo"):
+		var normal := Vector3.FORWARD if blotch.position.z < 0.0 else Vector3.BACK
+		assert_lt(_thickness(blotch, normal), 0.002, blotch.name)
+		assert_between(blotch.position.z * normal.z - half.z, 0.0, 0.01, "%s sits on the torso" % blotch.name)
+		var bounds: AABB = blotch.transform * blotch.get_aabb()
+		assert_lte(maxf(absf(bounds.position.x), absf(bounds.end.x)), half.x, "%s is on the torso, not off its side" % blotch.name)
 
 
-func test_the_eyes_are_drawn_on_the_front_of_the_wedge() -> void:
-	var front := -BodyShape.WEDGE_SIZE.z / 2.0
+func test_the_eyes_are_drawn_on_the_front_of_the_head() -> void:
+	var front := -BodyShape.HEAD_SIZE.z / 2.0
 	for eye: MeshInstance3D in _named("Eye"):
 		assert_lt(_thickness(eye, Vector3.FORWARD), 0.002, "flat, not a ball")
 		assert_between(front - eye.position.z, 0.0, 0.01, "on the surface")
@@ -81,10 +81,10 @@ func test_a_hurt_player_winces_for_a_moment() -> void:
 	assert_eq(_named("Eye")[0].scale.z, 1.0)
 
 
-func test_the_limbs_are_thin_sticks() -> void:
-	for limb: Node3D in _named("Leg") + _named("Arm"):
-		var stick: MeshInstance3D = limb.find_children("*", "MeshInstance3D", true, false)[0]
-		assert_lte((stick.mesh as CapsuleMesh).radius, 0.03, limb.name)
+func test_the_arms_are_slim_enough_to_pass_by() -> void:
+	for limb: Node3D in _named("Arm"):
+		var sleeve: MeshInstance3D = limb.find_children("*", "MeshInstance3D", true, false)[0]
+		assert_lte((sleeve.mesh as CapsuleMesh).radius, BodyShape.LIMB_RADIUS + 0.0001, limb.name)
 
 
 func test_the_weapon_arm_reaches_to_the_hand_on_the_weapon() -> void:
@@ -92,7 +92,7 @@ func test_the_weapon_arm_reaches_to_the_hand_on_the_weapon() -> void:
 	for hand: Vector3 in [Vector3(0.36, 0.6, -0.34), Vector3(0.3, 0.95, -0.5), Vector3(0.5, 0.5, 0.1)]:
 		character.reach_for(hand)
 		var length: float = BodyShape.ARMS[1][1] * arm.get_child(0).scale.y
-		# The stick runs down the arm's own Y axis from the shoulder.
+		# The sleeve runs down the arm's own Y axis from the shoulder.
 		var end := arm.position + arm.basis * Vector3(0, -length, 0)
 		assert_almost_eq(end.distance_to(hand), 0.0, 0.001, str(hand))
 
@@ -100,7 +100,10 @@ func test_the_weapon_arm_reaches_to_the_hand_on_the_weapon() -> void:
 func test_it_fits_inside_the_players_collision_capsule() -> void:
 	var bounds := AABB()
 	var first := true
+	character._process(0.016)
 	for mesh: MeshInstance3D in character.find_children("*", "MeshInstance3D", true, false):
+		if not mesh.is_visible_in_tree():
+			continue
 		var box: AABB = mesh.global_transform * mesh.get_aabb()
 		bounds = box if first else bounds.merge(box)
 		first = false
@@ -108,8 +111,8 @@ func test_it_fits_inside_the_players_collision_capsule() -> void:
 	assert_lte(bounds.end.y, BodyShape.HEIGHT, "not above the head")
 	assert_lte(maxf(absf(bounds.position.x), absf(bounds.end.x)), BodyShape.RADIUS + 0.05)
 	assert_lte(maxf(absf(bounds.position.z), absf(bounds.end.z)), BodyShape.RADIUS + 0.05)
-	# Big enough to see and to match what can be hit.
-	assert_gte(bounds.end.y, BodyShape.HEIGHT * 0.75, "fills most of the capsule's height")
+	# As tall as what can be hit, which leaves the eyes where they always were.
+	assert_almost_eq(bounds.end.y, (BodyShape.HEAD_CENTRE.y + BodyShape.HEAD_SIZE.y / 2.0) * BodyShape.SIZE, 0.05, "up to the top of the helmet")
 
 
 func test_the_players_capsule_head_and_eyes_match_the_body_shots_are_tested_against() -> void:
@@ -148,7 +151,8 @@ func test_in_the_air_the_legs_tuck() -> void:
 	character.set_motion(0.0, true)
 	character._process(0.016)
 	for leg in _named("Leg"):
-		assert_lt(leg.rotation.x, 0.0)
+		assert_gt(leg.rotation.x, 0.0, "knees up")
+		assert_lt(leg.get_node("Knee").rotation.x, 0.0, "and bent")
 
 
 func test_knocked_out_it_melts_then_disappears() -> void:
@@ -231,25 +235,33 @@ func test_a_flash_gives_way_to_an_overloads_glow() -> void:
 	assert_ne(character._material.emission, Color.WHITE)
 
 
-func test_crouching_folds_the_legs_and_brings_everything_else_down() -> void:
-	var wedge: Node3D = character.get_node("Wedge")
+func test_crouching_bends_the_knees_and_brings_everything_else_down() -> void:
+	var torso: Node3D = character.get_node("Torso")
+	var head: Node3D = character.get_node("Head")
 	var eye: Node3D = _named("Eye")[0]
-	var stood := wedge.position.y
+	var stood := torso.position.y
+	var camo: Node3D = _named("Camo")[0]
+	var camo_stood := camo.position.y
 	character.set_crouch(1.0)
 	character._process(0.016)
-	assert_almost_eq(wedge.position.y, stood - BodyShape.CROUCH_DROP, 0.0001)
+	assert_almost_eq(torso.position.y, stood - BodyShape.CROUCH_DROP, 0.0001)
+	assert_almost_eq(head.position.y, -BodyShape.CROUCH_DROP, 0.0001)
+	assert_almost_eq(camo.position.y, camo_stood - BodyShape.CROUCH_DROP, 0.0001, "the camouflage comes with the torso")
 	assert_almost_eq(eye.position.y, BodyShape.head_height(1.0), 0.0001)
 	for leg: Node3D in _named("Leg"):
-		assert_lt(leg.scale.y, 1.0, "shorter")
-		# Still from the bottom of the wedge to the ground.
+		# Still from the bottom of the torso to the ground.
 		assert_almost_eq(leg.position.y, BodyShape.HIP_HEIGHT - BodyShape.CROUCH_DROP, 0.0001)
-		assert_almost_eq(leg.position.y - BodyShape.LEGS[0][1] * leg.scale.y, 0.0, 0.0001)
-	for hole: Node3D in _named("Hole"):
-		assert_lt(hole.position.y, BodyShape.WEDGE_CENTRE.y + 0.5, "the holes come with the wedge")
+		var knee: Node3D = leg.get_node("Knee")
+		var boot: Node3D = knee.get_node("Boot")
+		assert_lt(knee.global_position.z, leg.global_position.z - 0.3, "the knee out in front")
+		assert_almost_eq(boot.global_position.y, 0.0, 0.001, "the foot on the ground")
+		assert_almost_eq(boot.global_position.z, leg.global_position.z, 0.001, "under the hip")
+		assert_almost_eq(boot.global_basis.y.normalized().z, 0.0, 0.02, "the boot not tipped forward or back")
 	character.set_crouch(0.0)
 	character._process(0.016)
-	assert_almost_eq(wedge.position.y, stood, 0.0001)
-	assert_almost_eq(_named("Leg")[0].scale.y, 1.0, 0.0001)
+	assert_almost_eq(torso.position.y, stood, 0.0001)
+	assert_almost_eq(_named("Leg")[0].rotation.x, 0.0, 0.0001)
+	assert_almost_eq(_named("Leg")[0].get_node("Knee").rotation.x, 0.0, 0.0001)
 
 
 func test_the_face_shows_what_matters_most() -> void:
@@ -288,14 +300,15 @@ func test_only_the_face_being_made_is_drawn() -> void:
 		assert_eq(character.get_node("Stars").visible, face == CHARACTER.DIZZY, "stars only when dizzy")
 
 
-func test_every_face_is_drawn_flat_on_the_front_of_the_wedge() -> void:
-	var front := -BodyShape.WEDGE_SIZE.z / 2.0
+func test_every_face_is_drawn_flat_on_the_front_of_the_head_under_the_helmet() -> void:
+	var front := -BodyShape.HEAD_SIZE.z / 2.0
 	for face: String in ["Calm", "Set", "Cheer", "Dizzy", "Wince"]:
 		for mark: MeshInstance3D in character.get_node(face).find_children("*", "MeshInstance3D", true, false):
 			assert_between(front - mark.position.z, 0.0, 0.015, "%s: %s is on the surface" % [face, mark.name])
-			# Inside the triangle of the front, at its height.
-			var half_width := BodyShape.WEDGE_SIZE.x / 2.0 * (0.5 - (mark.position.y - BodyShape.WEDGE_CENTRE.y) / BodyShape.WEDGE_SIZE.y)
-			assert_lt(absf(mark.position.x), half_width, "%s: %s is on the wedge" % [face, mark.name])
+			var bounds: AABB = mark.transform * mark.get_aabb()
+			assert_lt(maxf(absf(bounds.position.x), absf(bounds.end.x)), BodyShape.HEAD_SIZE.x / 2.0 - 0.02, "%s: %s is on the face" % [face, mark.name])
+			assert_between(bounds.position.y, BodyShape.HEAD_FROM, BodyShape.HEAD_HEIGHT + 0.035, "%s: %s is under the helmet" % [face, mark.name])
+			assert_between(bounds.end.y, BodyShape.HEAD_FROM, BodyShape.HEAD_HEIGHT + 0.035, "%s: %s is under the helmet" % [face, mark.name])
 
 
 func test_the_eyes_blink_now_and_then() -> void:

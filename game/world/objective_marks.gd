@@ -119,7 +119,7 @@ func _place_wheels() -> void:
 		var carrier: Node3D = world.player_node(wheel.carrier) if wheel.status == CaptureRules.CARRIED else null
 		if carrier != null:
 			# On their back.
-			_wheels[team].global_position = carrier.global_position + carrier.global_basis.z * (BodyShape.RADIUS + 0.3) + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+			_wheels[team].global_position = carrier.global_position + carrier.global_basis.z * (BodyShape.RADIUS + 0.3) + Vector3.UP * BodyShape.CHEST.y * BodyShape.SIZE
 			_wheels[team].rotation.y = carrier.rotation.y + PI / 2.0
 		else:
 			_wheels[team].global_position = wheel.at + Vector3.UP * WHEEL_HEIGHT
