@@ -807,7 +807,7 @@ func _animate(delta: float) -> void:
 		body.set_lean(_lean)
 		# Others bring their weapon up to the eye when they aim.
 		_aim = move_toward(_aim, 1.0 if _pose & POSE_AIMING and alive else 0.0, delta / AIM_TIME)
-		rest = body.weapon_rest(_gun_rest).lerp(body.weapon_aim(SEEN_AIM_GUN_POSITION * BodyShape.SIZE), smoothstep(0.0, 1.0, _aim))
+		rest = _gun_rest.lerp(SEEN_AIM_GUN_POSITION * BodyShape.SIZE, smoothstep(0.0, 1.0, _aim))
 		var moved := global_position - _last_position
 		_last_position = global_position
 		if delta > 0.0:
@@ -855,7 +855,9 @@ func _animate(delta: float) -> void:
 		_magazine.position = _magazine_rest + Vector3.DOWN * 0.18 * magazine_out
 	if not _mine and muzzle != null:
 		# Their arms follow the weapon: one hand on its grip, the other
-		# steadying it.
+		# steadying it. A body that holds the weapon in its own hand puts it
+		# there instead, and only steadies it.
+		body.hold_weapon(gun)
 		var model := muzzle.get_parent() as Node3D
 		body.reach_for(body.to_local(model.to_global(WeaponModels.GRIP)))
 		var off_hand := model.get_node_or_null("OffHand") as Node3D

@@ -467,16 +467,11 @@ func is_grimacing() -> bool:
 	return _grimace_left > 0.0
 
 
-## Where others see this body hold its weapon at rest, given where the
-## player's scene puts it, `rest`: from the eyes, in the arena's metres. The
-## drawn soldier's arms stretch to wherever that is.
-func weapon_rest(rest: Vector3) -> Vector3:
-	return rest
-
-
-## The same, aimed.
-func weapon_aim(aim: Vector3) -> Vector3:
-	return aim
+## Holds `gun`, the weapon its player holds, if this body holds it in its
+## own hand, and says whether it does. The drawn soldier doesn't: the
+## weapon stays where the player's scene holds it, and its arms reach for it.
+func hold_weapon(_gun: Node3D) -> bool:
+	return false
 
 
 ## How big others see this body's weapon, against the size it is made at
