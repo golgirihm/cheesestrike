@@ -86,23 +86,25 @@ func test_the_button_goes_through_every_choice_and_back_to_the_levels() -> void:
 	assert_eq(GraphicsQuality.next_choice(GraphicsQuality.SHADOWS, "nonsense"), "off")
 
 
-func test_the_settings_screen_has_a_button_for_each_part() -> void:
+func test_the_settings_screen_has_a_list_for_each_part() -> void:
 	Settings.set_value("quality", MEDIUM)
 	var menu: Control = SETTINGS_MENU.new()
 	add_child_autofree(menu)
 	for part: String in GraphicsQuality.ORDER:
 		var setting: String = GraphicsQuality.PARTS[part].setting
-		var button: Button = menu.find_child("Setting_" + setting, true, false)
-		assert_not_null(button, part)
-		assert_eq(button.text, GraphicsQuality.part_text(part, MEDIUM, ""))
-		button.pressed.emit()
-		var first: String = GraphicsQuality.PARTS[part].choices.keys()[0]
+		var known: Dictionary = GraphicsQuality.PARTS[part]
+		var list: OptionButton = menu.find_child("Setting_" + setting, true, false)
+		assert_not_null(list, part)
+		assert_eq(menu.choices_of("Setting_" + setting), [""] + known.choices.keys(), "as the level has it, then each choice")
+		assert_eq(list.text, "As Medium: %s" % known.choices[GraphicsQuality.resolve(part, MEDIUM, "")])
+		var first: String = known.choices.keys()[0]
+		menu.choose("Setting_" + setting, first)
 		assert_eq(Settings.get_value(setting), first)
-		assert_eq(button.text, GraphicsQuality.part_text(part, MEDIUM, first), "and says so at once")
+		assert_eq(list.text, known.choices[first], "and says so at once")
 	# Changing the level changes what the parts left alone say.
 	Settings.set_value("gfx_shadows", "")
 	Settings.set_value("quality", LOW)
-	assert_eq((menu.find_child("Setting_gfx_shadows", true, false) as Button).text, "Shadows: Off (as Low)")
+	assert_eq((menu.find_child("Setting_gfx_shadows", true, false) as Button).text, "As Low: Off")
 	assert_not_null(menu.find_child("Setting_" + GraphicsQuality.DYNAMIC, true, false))
 
 

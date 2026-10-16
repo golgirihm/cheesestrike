@@ -247,16 +247,14 @@ func test_a_hit_plays_what_was_chosen_or_nothing() -> void:
 func test_the_settings_screen_has_the_sound_choices() -> void:
 	var menu: Control = SETTINGS_MENU.new()
 	add_child_autofree(menu)
-	var range_button: Button = menu.find_child("Setting_" + Mix.RANGE_SETTING, true, false)
-	assert_eq(range_button.text, "Sound for: Headphones")
-	range_button.pressed.emit()
+	var range_list: OptionButton = menu.find_child("Setting_" + Mix.RANGE_SETTING, true, false)
+	assert_eq(range_list.text, "Headphones")
+	menu.choose("Setting_" + Mix.RANGE_SETTING, "speakers")
 	assert_eq(Settings.get_value(Mix.RANGE_SETTING), "speakers")
-	assert_eq(range_button.text, "Sound for: Speakers")
-	var hit_button: Button = menu.find_child("Setting_" + SoundCues.HIT_SETTING, true, false)
-	assert_eq(hit_button.text, "Hit sound: Tick")
-	for press in SoundCues.HIT_SOUNDS.size():
-		hit_button.pressed.emit()
-	assert_eq(Settings.get_value(SoundCues.HIT_SETTING), "tick", "round and back")
+	assert_eq(range_list.text, "Speakers")
+	var hit_list: OptionButton = menu.find_child("Setting_" + SoundCues.HIT_SETTING, true, false)
+	assert_eq(hit_list.text, "Tick")
+	assert_eq(menu.choices_of("Setting_" + SoundCues.HIT_SETTING), SoundCues.HIT_SOUNDS.keys(), "every hit sound")
 	assert_not_null(menu.find_child("Setting_" + Mix.MONO_SETTING, true, false))
 	for choice: Array in SETTINGS_MENU.SOUND_CHOICES:
 		assert_eq(choice[2].keys(), Settings.CHOICES[choice[0]], "%s: a name for every choice" % choice[0])

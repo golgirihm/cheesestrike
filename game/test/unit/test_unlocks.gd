@@ -116,14 +116,17 @@ func test_a_button_steps_only_through_what_has_been_earned() -> void:
 	# In the settings.
 	var menu: Control = preload("res://ui/settings_menu.gd").new()
 	add_child_autofree(menu)
-	var button: Button = menu.find_child("Setting_look_hat", true, false)
-	for press in 3:
-		button.pressed.emit()
-	assert_eq(Settings.get_value("look_hat"), "none", "round the three a new player has")
+	var list: OptionButton = menu.find_child("Setting_look_hat", true, false)
+	assert_eq(menu.choices_of("Setting_look_hat"), Looks.HATS, "every hat is listed")
+	menu.choose("Setting_look_hat", "cowboy")
+	assert_eq(Settings.get_value("look_hat"), "none", "but one not yet earned can't be chosen")
+	assert_true(list.is_item_disabled(Looks.HATS.find("cowboy")))
+	assert_string_contains(list.get_item_text(Looks.HATS.find("cowboy")), "Level", "and says what it takes")
 	Progress.xp = Levels.needed(20)
-	for press in 5:
-		button.pressed.emit()
-	assert_eq(Settings.get_value("look_hat"), "cowboy", "and round all six at level twenty")
+	menu.refresh()
+	menu.choose("Setting_look_hat", "cowboy")
+	assert_eq(Settings.get_value("look_hat"), "cowboy", "once it has been earned it can")
+	assert_eq(list.get_item_text(Looks.HATS.find("cowboy")), Looks.HAT_NAMES["cowboy"])
 	assert_not_null(menu.find_child("Setting_" + Unlocks.FINISH_SETTING, true, false))
 
 
