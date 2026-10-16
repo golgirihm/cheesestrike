@@ -10,7 +10,6 @@ class_name Warmup
 const FRAMES := 4
 ## How far in front of the view they are put, in metres.
 const AHEAD := 9.0
-const CHARACTER := preload("res://player/cheese_character.gd")
 
 
 ## One of every model a fight shows, in a row: a character, each weapon and
@@ -19,7 +18,7 @@ static func props() -> Node3D:
 	var holder := Node3D.new()
 	holder.name = "Warmup"
 	var models: Array[Node3D] = []
-	var character: Node3D = CHARACTER.new()
+	var character: Node3D = Characters.make()
 	character.name = "Character"
 	models.append(character)
 	for weapon: String in Weapons.ids():
