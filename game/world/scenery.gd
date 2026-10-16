@@ -344,38 +344,42 @@ static func door_slab(size: Vector3) -> Vector3:
 	return Vector3(size.x, size.y, DOOR_THICKNESS) if size.x >= size.z else Vector3(DOOR_THICKNESS, size.y, size.z)
 
 
-# Draws a door filling `size` round `body`'s middle: a wooden slab, a raised
-# panel above and below on each face, and a brass knob on a short neck on
-# each face at the end away from the hinges (see MovingParts.door_transform).
+# Draws a door filling `size` round `body`'s middle: a wooden slab with a
+# raised panel above and below on each face, and a dark iron knob on a short
+# neck on each face at the end away from the hinges (see
+# MovingParts.door_transform). The wood is one mesh and the knobs another, as
+# an arena has many doors.
 static func _door(body: Node3D, size: Vector3) -> void:
 	var along := Vector3.RIGHT if size.x >= size.z else Vector3.BACK
 	var across := Vector3.BACK if along == Vector3.RIGHT else Vector3.RIGHT
 	var width := size.dot(along)
-	body.add_child(Rounded.instance(Rounded.box(door_slab(size), 0.05), _material(Color(0.5, 0.32, 0.2))))
-	var panel_wood := _material(Color(0.44, 0.27, 0.16))
+	var wood := SurfaceTool.new()
+	wood.append_from(Rounded.box(door_slab(size), 0.05), 0, Transform3D.IDENTITY)
 	var panel_height := (size.y - DOOR_PANEL_INSET * 3.0) / 2.0
-	var brass := StandardMaterial3D.new()
-	brass.albedo_color = Color(0.85, 0.66, 0.28)
-	brass.metallic = 0.8
-	brass.roughness = 0.35
+	var iron := SurfaceTool.new()
 	var neck_size := Vector3.ONE * KNOB_RADIUS * 0.6
+	var ball := SphereMesh.new()
+	ball.radius = KNOB_RADIUS
+	ball.height = KNOB_RADIUS * 2.0
 	for side: float in [-1.0, 1.0]:
 		var face := across * side * (DOOR_THICKNESS / 2.0)
 		for row: float in [-1.0, 1.0]:
 			var panel := along * (width - DOOR_PANEL_INSET * 2.0) + Vector3.UP * panel_height + across * 0.06
 			var middle := Vector3.UP * row * (panel_height + DOOR_PANEL_INSET) / 2.0
-			body.add_child(Rounded.instance(Rounded.box(panel, 0.03), panel_wood, middle + face))
+			wood.append_from(Rounded.box(panel, 0.03), 0, Transform3D(Basis(), middle + face))
 		var knob_at := face + along * (width / 2.0 - DOOR_PANEL_INSET * 0.9) + Vector3.UP * (size.y * (KNOB_HEIGHT - 0.5))
-		body.add_child(Rounded.instance(Rounded.box(neck_size, 0.02), brass, knob_at + across * side * KNOB_RADIUS * 0.3))
-		var knob := MeshInstance3D.new()
-		knob.name = "Knob%d" % (2 if side > 0.0 else 1)
-		var ball := SphereMesh.new()
-		ball.radius = KNOB_RADIUS
-		ball.height = KNOB_RADIUS * 2.0
-		knob.mesh = ball
-		knob.material_override = brass
-		knob.position = knob_at + across * side * KNOB_RADIUS * 1.4
-		body.add_child(knob)
+		iron.append_from(Rounded.box(neck_size, 0.02), 0, Transform3D(Basis(), knob_at + across * side * KNOB_RADIUS * 0.3))
+		iron.append_from(ball, 0, Transform3D(Basis(), knob_at + across * side * KNOB_RADIUS * 1.4))
+	var slab := Rounded.instance(wood.commit(), _material(Color(0.5, 0.32, 0.2)))
+	slab.name = "Door"
+	body.add_child(slab)
+	var metal := StandardMaterial3D.new()
+	metal.albedo_color = Color(0.24, 0.24, 0.26)
+	metal.metallic = 0.7
+	metal.roughness = 0.35
+	var knobs := Rounded.instance(iron.commit(), metal)
+	knobs.name = "Knobs"
+	body.add_child(knobs)
 
 
 static func _fixtures(map: Node3D) -> void:

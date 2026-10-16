@@ -71,6 +71,11 @@ func _flash_warning() -> Control:
 	var panel := PanelContainer.new()
 	panel.name = "FlashWarning"
 	panel.visible = not Settings.get_value(FLASH_SEEN)
+	# Kept low, under the ways in: room at the sides, less above and below.
+	var box: StyleBoxFlat = Look.theme().get_stylebox("panel", "PanelContainer").duplicate()
+	box.content_margin_top = 6
+	box.content_margin_bottom = 6
+	panel.add_theme_stylebox_override("panel", box)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	panel.add_child(row)
@@ -89,7 +94,7 @@ func _flash_warning() -> Control:
 		Settings.set_value(FLASH_SEEN, true)
 		panel.hide())
 	row.add_child(done)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 8)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 4)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	return panel
