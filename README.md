@@ -14,6 +14,12 @@ The game is a [Godot 4.7](https://godotengine.org) project in `game/`. Web build
 
 You need Godot 4.7 with the Web export templates installed, and Python 3.14 with `pip install -r signaling/requirements.txt`.
 
+Bought and downloaded models, textures and animations are in `game/licensed/`, a submodule from the private repository [cheesestrike-assets](https://github.com/golgirihm/cheesestrike-assets). Their licenses allow them in the released game but forbid sharing their files, so they stay out of this public repository. If you have access, fetch them after cloning:
+
+```
+git submodule update --init
+```
+
 On Windows, use `godot_console` in place of `godot` in the commands below. Plain `godot` is a windowed program there and prints nothing to the terminal.
 
 Run natively, where host and join use a direct connection on port 7777 and need no signaling server:

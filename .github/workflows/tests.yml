@@ -42,6 +42,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
+      # The licensed assets in game/licensed are in a private repository
+      # (README.md explains why), which the deploy key in the
+      # ASSETS_DEPLOY_KEY secret can read. A run without the secret, as for a
+      # fork's pull request or the buildci command, tests the game without
+      # them.
+      - name: Fetch the licensed assets
+        env:
+          ASSETS_DEPLOY_KEY: ${{ secrets.ASSETS_DEPLOY_KEY }}
+        run: |
+          if [ -z "$ASSETS_DEPLOY_KEY" ]; then
+            echo "::notice::No ASSETS_DEPLOY_KEY secret; testing without the licensed assets."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/assets_deploy_key"
+          printf '%s
+' "$ASSETS_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"             git -c url.git@github.com:.insteadOf=https://github.com/             submodule update --init --depth 1 game/licensed
+          rm "$key"
       - name: Load pinned versions
         run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
       # The pinned Python is rarely the release the runner image ships, and
@@ -115,6 +134,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
+      # The licensed assets in game/licensed are in a private repository
+      # (README.md explains why), which the deploy key in the
+      # ASSETS_DEPLOY_KEY secret can read. A run without the secret, as for a
+      # fork's pull request or the buildci command, tests the game without
+      # them.
+      - name: Fetch the licensed assets
+        env:
+          ASSETS_DEPLOY_KEY: ${{ secrets.ASSETS_DEPLOY_KEY }}
+        run: |
+          if [ -z "$ASSETS_DEPLOY_KEY" ]; then
+            echo "::notice::No ASSETS_DEPLOY_KEY secret; testing without the licensed assets."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/assets_deploy_key"
+          printf '%s
+' "$ASSETS_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"             git -c url.git@github.com:.insteadOf=https://github.com/             submodule update --init --depth 1 game/licensed
+          rm "$key"
       - name: Load pinned versions
         run: grep -Ev '^(#|$)' tools/versions.env >> "$GITHUB_ENV"
       - name: Restore cached Python
