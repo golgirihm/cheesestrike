@@ -156,7 +156,6 @@ func snapshot() -> Dictionary:
 		_main.leave_button,
 		_main.disconnected_button,
 		_main.rejoin_button,
-		_main.menu_button,
 		_main.resume_button,
 		_main.menu_leave_button,
 		_main.settings_button,

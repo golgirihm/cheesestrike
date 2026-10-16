@@ -134,7 +134,7 @@ func test_the_in_game_menu_opens_and_closes() -> void:
 	main.world.stop()
 
 
-func test_esc_opens_and_closes_the_menu_once_the_mouse_is_free() -> void:
+func test_esc_opens_and_closes_the_menu() -> void:
 	main._on_session_started()
 	await wait_process_frames(1)
 	var esc := InputEventAction.new()
@@ -147,12 +147,71 @@ func test_esc_opens_and_closes_the_menu_once_the_mouse_is_free() -> void:
 	main.world.stop()
 
 
-func test_esc_does_nothing_on_the_main_menu() -> void:
+func test_esc_goes_back_a_step_from_each_screen() -> void:
+	var esc := InputEventAction.new()
+	esc.action = "ui_cancel"
+	esc.pressed = true
+	main._on_way_in_chosen("play")
+	assert_true(main.menu.visible)
+	main._input(esc)
+	assert_false(main.is_pause_menu_open())
+	assert_false(main.menu.visible, "from hosting and joining")
+	assert_true(main.front_end.visible, "to the title")
+	main._input(esc)
+	assert_true(main.front_end.visible, "and no further")
+	for way: String in ["settings", "customise"]:
+		main._on_way_in_chosen(way)
+		assert_true(main.settings_menu.visible)
+		main._input(esc)
+		assert_false(main.settings_menu.visible, way)
+		assert_true(main.front_end.visible)
+	main._on_way_in_chosen("profile")
+	main._input(esc)
+	assert_false(main.profile_screen.visible)
+	main._on_way_in_chosen("credits")
+	assert_true(main.front_end.credits.visible)
+	main._input(esc)
+	assert_false(main.front_end.credits.visible)
+	assert_true(main.front_end.ways.visible)
+
+
+func test_esc_in_the_settings_from_the_game_goes_back_to_the_menu() -> void:
+	main._on_session_started()
 	var esc := InputEventAction.new()
 	esc.action = "ui_cancel"
 	esc.pressed = true
 	main._input(esc)
+	main.pause_settings_button.pressed.emit()
+	assert_true(main.settings_menu.visible)
+	main._input(esc)
+	assert_false(main.settings_menu.visible)
+	assert_true(main.is_pause_menu_open())
+	main._input(esc)
+	assert_false(main.is_pause_menu_open(), "and on into the game")
+	main.world.stop()
+
+
+func test_the_mouse_coming_free_in_play_opens_the_menu() -> void:
+	# In a browser, Esc frees the mouse without the game hearing the key.
+	main._on_session_started()
+	main.controls_help.hide()
+	await wait_process_frames(1)
+	main._was_captured = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	main._process(0.0)
+	assert_true(main.is_pause_menu_open())
+	# Not when the mouse was freed to type, or for a menu already open.
+	main.close_pause_menu()
+	main.combat_hud.chat_box.open(false)
+	main._was_captured = true
+	main._process(0.0)
 	assert_false(main.is_pause_menu_open())
+	main.combat_hud.chat_box.close()
+	main.world.stop()
+
+
+func test_there_is_no_menu_button_on_the_screen() -> void:
+	assert_null(main.find_child("MenuButton", true, false), "Esc, Start or the touch MENU button open it")
 
 
 func test_the_menu_closes_when_the_session_ends() -> void:
@@ -261,8 +320,6 @@ func test_touches_on_the_menu_are_not_moves() -> void:
 	main._on_session_started()
 	await wait_process_frames(1)
 	var controls: Control = main.touch_controls
-	var button_middle: Vector2 = main.menu_button.get_global_rect().get_center()
-	assert_true(controls.blocked_at(button_middle))
 	assert_false(controls.blocked_at(Vector2(400, 400)))
 	main.open_pause_menu()
 	await wait_process_frames(1)

@@ -190,16 +190,6 @@ offset_bottom = 40.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 6
 
-[node name="MenuButton" type="Button" parent="UI" groups=["touch_blockers"]]
-unique_name_in_owner = true
-visible = false
-offset_left = 16.0
-offset_top = 44.0
-offset_right = 96.0
-offset_bottom = 84.0
-focus_mode = 0
-text = "Menu"
-
 [node name="PauseMenu" type="CenterContainer" parent="UI" groups=["touch_blockers", "pause_menu"]]
 unique_name_in_owner = true
 visible = false

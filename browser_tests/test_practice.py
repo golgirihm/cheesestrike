@@ -26,7 +26,7 @@ class PracticeTest(GameTestCase):
         game = self.open_game()
         game.click("PracticeButton")
         game.wait_for("s.screen === 'game' && s.map === 'range'")
-        game.click("MenuButton")
+        game.open_menu()
         game.click("MenuLeaveButton")
         game.wait_for("s.screen === 'menu'")
         # And an ordinary session can be hosted after it.

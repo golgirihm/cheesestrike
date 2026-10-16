@@ -30,7 +30,6 @@ extends Node
 @onready var disconnected_button: Button = %DisconnectedButton
 @onready var rejoin_button: Button = %RejoinButton
 @onready var final_standings: Label = %FinalStandings
-@onready var menu_button: Button = %MenuButton
 @onready var pause_menu: Control = %PauseMenu
 @onready var resume_button: Button = %ResumeButton
 @onready var menu_leave_button: Button = %MenuLeaveButton
@@ -92,8 +91,9 @@ var _list_mode := SessionList.ANY
 var _list_arena := SessionList.ANY
 # Who the pause menu's vote-to-remove button names.
 var _remove_target := 0
-# Whether the mouse was captured as of the last frame. Esc while it is captured
-# only frees the mouse; the press after that opens the menu.
+# Whether the mouse was captured as of the last frame. In a browser, Esc while
+# it is captured is the browser's: it frees the mouse and the game never sees
+# the key, so the mouse coming free in play opens the menu as Esc would.
 var _was_captured := false
 
 ## How often the menu asks for the session list again, in seconds. The list is
@@ -237,7 +237,6 @@ func _ready() -> void:
 		touch_controls.visible = showing)
 	_setup_match_buttons()
 	Settings.changed.connect(_show_match_setting)
-	menu_button.pressed.connect(open_pause_menu)
 	touch_controls.menu_pressed.connect(open_pause_menu)
 	resume_button.pressed.connect(close_pause_menu)
 	menu_leave_button.pressed.connect(_leave)
@@ -354,22 +353,64 @@ func _process(_delta: float) -> void:
 			mute_toggle.text = "Muted  ·  block for good" if not tag.is_empty() else "Unmute them"
 		else:
 			mute_toggle.text = "Mute them"
-	_was_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
-	menu_button.visible = hud.visible and not _was_captured and not pause_menu.visible
+	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	if _was_captured and not captured and _playing_freely():
+		open_pause_menu()
+	_was_captured = captured
 
 
+# Whether the player is in play with nothing open over the game: no menu,
+# no box being typed in, no picture being taken.
+func _playing_freely() -> bool:
+	return hud.visible and not pause_menu.visible and not settings_menu.visible and not controls_help.visible \
+		and not waiting_notice.visible and not world.photo_mode.on and not combat_hud.chat_box.is_typing()
+
+
+# Esc goes back a step from wherever the player is, and in play opens the
+# in-game menu. Whatever is open over the rest that handles Esc itself, such
+# as the controls help or a box being typed in, has had it first.
 func _input(event: InputEvent) -> void:
-	if not hud.visible or waiting_notice.visible or settings_menu.visible or controls_help.visible:
+	if event.is_action_pressed("pause_menu"):
+		if hud.visible and not waiting_notice.visible and not settings_menu.visible:
+			get_viewport().set_input_as_handled()
+			if pause_menu.visible:
+				close_pause_menu()
+			else:
+				open_pause_menu()
 		return
-	var toggle := event.is_action_pressed("pause_menu")
-	if event.is_action_pressed("ui_cancel"):
-		toggle = toggle or (not _was_captured and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED)
-	if toggle:
+	if event.is_action_pressed("ui_cancel") and go_back():
 		get_viewport().set_input_as_handled()
-		if pause_menu.visible:
-			close_pause_menu()
-		else:
-			open_pause_menu()
+
+
+## Goes back a step from what is showing, as Esc does. Returns whether there
+## was anywhere to go.
+func go_back() -> bool:
+	if settings_menu.visible:
+		if settings_menu.is_waiting_for_key():
+			return false
+		settings_menu.close()
+	elif profile_screen.visible:
+		profile_screen.close()
+	elif arena_editor.visible:
+		# Esc while editing frees the mouse first, as in play.
+		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			return false
+		arena_editor.close()
+	elif front_end.visible and front_end.credits.visible:
+		front_end.show_credits(false)
+	elif disconnected_notice.visible:
+		_dismiss_disconnected()
+	elif waiting_notice.visible or join_screen.visible:
+		return false
+	elif pause_menu.visible:
+		close_pause_menu()
+	elif hud.visible:
+		open_pause_menu()
+	elif menu.visible:
+		show_title()
+	else:
+		return false
+	return true
 
 
 ## Opens the in-game menu. The game carries on, but this player's character

@@ -22,7 +22,7 @@ class WatchingTest(GameTestCase):
         self.assertTrue(host.state()["combat"]["match"].startswith("Warm-up"), "one to play and one to watch is no match")
 
         # They change their mind, from the menu: in they come, and it begins.
-        watcher.click("MenuButton")
+        watcher.open_menu()
         watcher.click("WatchToggleButton")
         for game in (host, watcher):
             game.wait_for(f"s.players.some((p) => p.id === {watcher_id} && !p.watching && p.alive) && !s.combat.match.startsWith('Warm-up')")
