@@ -76,3 +76,18 @@ func test_every_animation_moves_only_bones_the_soldier_has() -> void:
 			var target := animation.track_get_path(track)
 			assert_eq(str(target.get_concatenated_names()), "%GeneralSkeleton", "%s moves the soldier's skeleton" % name)
 			assert_gt(skeleton.find_bone(target.get_concatenated_subnames()), -1, "%s: %s" % [name, target])
+
+
+func test_it_rests_in_a_level_t_pose_as_the_animations_do() -> void:
+	# Animations are carried across from rest to rest, so a soldier resting
+	# with its arms sloping would hold them wrong in every one.
+	if model == null:
+		pending("The licensed assets aren't checked out.")
+		return
+	var skeleton: Skeleton3D = model.find_children("*", "Skeleton3D")[0]
+	for side in ["Left", "Right"]:
+		var elbow := skeleton.get_bone_global_rest(skeleton.find_bone(side + "LowerArm")).origin
+		var wrist := skeleton.get_bone_global_rest(skeleton.find_bone(side + "Hand")).origin
+		var shoulder := skeleton.get_bone_global_rest(skeleton.find_bone(side + "UpperArm")).origin
+		assert_almost_eq((elbow - shoulder).normalized().y, 0.0, 0.05, "%s upper arm level" % side)
+		assert_almost_eq((wrist - elbow).normalized().y, 0.0, 0.05, "%s forearm level" % side)
