@@ -82,6 +82,10 @@ func _set_up(path: String, node: String, side: int, library: bool) -> void:
 	var nodes: Dictionary = subresources.get("nodes", {})
 	var skeleton: Dictionary = nodes.get(node, {})
 	skeleton["retarget/bone_map"] = _bone_map(side)
+	# The soldier rests with its arms sloping 30 degrees down, Mixamo's in a
+	# level T-pose, and an animation's turns are carried across from rest to
+	# rest, so both are straightened to the humanoid's own T-pose first.
+	skeleton["retarget/rest_fixer/fix_silhouette/enable"] = true
 	if library:
 		# Mixamo's fingertips and the top of its head have nothing to map to.
 		skeleton["retarget/remove_tracks/unmapped_bones"] = true
