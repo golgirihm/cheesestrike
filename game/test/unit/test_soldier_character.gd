@@ -177,6 +177,17 @@ func test_the_spine_turns_the_weapon_round_to_where_it_is_aimed() -> void:
 			assert_almost_eq(turned.distance_to(at.normalized()), 0.0, 0.0001, "%s round to %s" % [now, at])
 
 
+func test_the_weapon_is_aimed_no_steeper_than_a_rifle_can_be_shouldered() -> void:
+	var aim := preload("res://player/spine_aim.gd")
+	var sky: Vector3 = aim.pitched_at_most(Vector3(0.0, 0.99, 0.1), aim.AIM_DOWN, aim.AIM_UP)
+	assert_almost_eq(asin(sky.y), aim.AIM_UP, 0.0001, "looking at the sky, as high as it goes")
+	assert_gt(sky.z, 0.0, "still facing the same way")
+	var feet: Vector3 = aim.pitched_at_most(Vector3(0.1, -0.99, 0.0), aim.AIM_DOWN, aim.AIM_UP)
+	assert_almost_eq(asin(feet.y), -aim.AIM_DOWN, 0.0001, "and at the feet, as low")
+	var level: Vector3 = aim.pitched_at_most(Vector3(0.0, 0.3, -1.0).normalized(), aim.AIM_DOWN, aim.AIM_UP)
+	assert_almost_eq(level.distance_to(Vector3(0.0, 0.3, -1.0).normalized()), 0.0, 0.0001, "anywhere between, just where it looks")
+
+
 # Holds a weapon as the player does, for `frames` frames, looking up by
 # `gaze`.
 func _hold(gun: Node3D, model: Node3D, frames: int, gaze := 0.0) -> void:
@@ -198,21 +209,43 @@ func test_it_holds_its_weapon_in_both_hands_pointing_where_it_looks() -> void:
 	var model := WeaponModels.build("blaster")
 	gun.add_child(model)
 	var skeleton: Skeleton3D = soldier._skeleton
-	var hands := {}
+	var fists := {}
 	var note := func() -> void:
-		for side in ["Left", "Right"]:
-			hands[side] = soldier.to_local(skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(side + "Hand")).origin)
+		fists.Right = soldier.to_local(skeleton.global_transform * soldier._fist("Right"))
+		fists.Left = soldier.to_local(skeleton.global_transform * (skeleton.get_bone_global_pose(skeleton.find_bone("LeftHand")) * SOLDIER.LEFT_HOLD))
 	skeleton.skeleton_updated.connect(note)
-	for gaze in [0.0, 0.6]:
+	for gaze in [0.0, 0.6, 1.4]:
 		await _hold(gun, model, 15, gaze)
 		var ahead := (soldier.global_basis.inverse() * -gun.global_basis.z).normalized()
-		assert_almost_eq(ahead.distance_to(Vector3(0.0, sin(gaze), -cos(gaze))), 0.0, 0.01, "pointing where it looks, %s up" % gaze)
+		var pitch := minf(gaze, preload("res://player/spine_aim.gd").AIM_UP)
+		assert_almost_eq(ahead.distance_to(Vector3(0.0, sin(pitch), -cos(pitch))), 0.0, 0.01, "pointing where it looks, %s up" % gaze)
 		var grip := soldier.to_local(model.to_global(WeaponModels.GRIP))
-		assert_lt(grip.distance_to(hands.Right), 0.08, "the grip in the right hand")
-		var fore := soldier.to_local((model.get_node("OffHand") as Node3D).global_position)
-		assert_lt(fore.distance_to(hands.Left), 0.02, "the left hand under the fore-end")
+		assert_lt(grip.distance_to(fists.Right), 0.01, "the grip in the right fist")
+		var fore := soldier.to_local((model.get_node("OffHand") as Node3D).to_global(Vector3.UP * SOLDIER.FORE_END_LIFT))
+		assert_lt(fore.distance_to(fists.Left), 0.02, "the fore-end in the left")
+	skeleton.skeleton_updated.disconnect(note)
 	assert_false((model.get_node("Hand") as Node3D).visible, "its own hand on the grip, not the drawn soldier's mitten")
 	soldier.act(CharacterMotion.THROW)
 	await wait_seconds(CharacterMotion.ACTION_TIME[CharacterMotion.THROW] * 0.6)
 	assert_almost_eq(soldier._left_arm.influence, 0.0, 0.001, "the left hand off it to throw")
-	skeleton.skeleton_updated.disconnect(note)
+
+
+func test_a_new_weapon_shows_no_mitten_and_an_emote_puts_the_weapon_away() -> void:
+	if soldier == null:
+		pending("The licensed assets aren't checked out.")
+		return
+	var gun := Node3D.new()
+	add_child_autofree(gun)
+	var first := WeaponModels.build("blaster")
+	gun.add_child(first)
+	await _hold(gun, first, 2)
+	gun.remove_child(first)
+	first.free()
+	var second := WeaponModels.build("shotgun")
+	gun.add_child(second)
+	await _hold(gun, second, 2)
+	assert_false((second.get_node("Hand") as Node3D).visible, "no mitten on the new one either")
+	soldier.emote(Emotes.CHEER)
+	gun.visible = true
+	soldier.hold_weapon(gun)
+	assert_false(gun.visible, "put away for the cheer")
