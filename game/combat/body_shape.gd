@@ -9,25 +9,30 @@ class_name BodyShape
 ## gear and the face are drawn within a hair of the boxes they lie on.
 ##
 ## Measurements are in the character's own units and grow by SIZE in the
-## arena. The body faces -Z and turns with the player.
+## arena. The body faces -Z and turns with the player. They are the realistic
+## soldier's (player/soldier_character.gd), measured round its mesh posed
+## standing and kneeling, with its eyes at HEAD_HEIGHT; the drawn soldier is
+## built to the same.
 
 ## How many times bigger than its measurements a character stands.
 const SIZE := 3.0
 
-const HIP_HEIGHT := 0.47
+const HIP_HEIGHT := 0.43
 ## Each leg hangs straight down from its hip, as [hip, length]. It bends at
 ## the knee halfway down: the thigh and the shin are each half its length.
-const LEGS := [[Vector3(-0.095, HIP_HEIGHT, 0), HIP_HEIGHT], [Vector3(0.095, HIP_HEIGHT, 0), HIP_HEIGHT]]
+const LEGS := [[Vector3(-0.08, HIP_HEIGHT, 0), HIP_HEIGHT], [Vector3(0.08, HIP_HEIGHT, 0), HIP_HEIGHT]]
 const THIGH := HIP_HEIGHT / 2.0
-## How wide and deep a leg is, boot and all.
-const LEG_WIDTH := 0.14
-const LEG_DEPTH := 0.16
+## How wide and deep a leg is, boot and all: deep enough to hold the legs
+## of a soldier standing with one foot ahead of the other.
+const LEG_WIDTH := 0.13
+const LEG_DEPTH := 0.28
 
-const TORSO_SIZE := Vector3(0.38, 0.32, 0.23)
+## From the hips to the neck, across the shoulders and the vest.
+const TORSO_SIZE := Vector3(0.24, 0.37, 0.21)
 const TORSO_CENTRE := Vector3(0, HIP_HEIGHT + TORSO_SIZE.y / 2.0, 0)
-## The head, from the chin to the top of the helmet.
-const HEAD_SIZE := Vector3(0.2, 0.23, 0.22)
-const HEAD_CENTRE := Vector3(0, 0.905, 0)
+## The head, from the chin to the top of the cap.
+const HEAD_SIZE := Vector3(0.15, 0.18, 0.18)
+const HEAD_CENTRE := Vector3(0, 0.89, 0)
 ## The middle of the chest: where to aim at a player, or put something on them.
 const CHEST := TORSO_CENTRE
 ## How far the edges of each part are rounded off where it is drawn. Shots
@@ -38,22 +43,23 @@ const ROUNDING := 0.025
 const LIMB_RADIUS := 0.035
 ## Each arm hangs from a shoulder, as [shoulder, length]: the left hangs
 ## free, and the right reaches to the weapon.
-const SHOULDER_HEIGHT := HIP_HEIGHT + 0.29
-const ARMS := [[Vector3(-0.226, SHOULDER_HEIGHT, 0), 0.34], [Vector3(0.226, SHOULDER_HEIGHT, 0), 0.34]]
+const SHOULDER_HEIGHT := HIP_HEIGHT + 0.33
+const ARMS := [[Vector3(-0.145, SHOULDER_HEIGHT, 0), 0.3], [Vector3(0.145, SHOULDER_HEIGHT, 0), 0.3]]
 
 ## Where the player sees from, above their feet: level with the eyes drawn
 ## on the front of the head, so that a shot fired straight ahead at a player
 ## standing level with the shooter meets their face.
 const HEAD_HEIGHT := 0.9
 ## The eyes: dots drawn this far either side of the middle of the face.
-const EYE_APART := 0.04
-const EYE_RADIUS := 0.02
+const EYE_APART := 0.03
+const EYE_RADIUS := 0.015
 ## Hits on the head, from the chin up, are headshots.
 const HEAD_FROM := HEAD_CENTRE.y - HEAD_SIZE.y / 2.0
 
 ## How far a player who crouches drops: their knees bend, and everything
-## above the legs, with the eyes they see from, comes down by this much.
-const CROUCH_DROP := 0.25
+## above the legs, with the eyes they see from, comes down by this much, as
+## far as the realistic soldier's eyes come down when it kneels.
+const CROUCH_DROP := 0.27
 
 ## How far a player who leans tips to one side, pivoting on their feet, in
 ## radians: enough to put their eyes most of a metre out past a corner.

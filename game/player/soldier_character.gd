@@ -26,7 +26,7 @@ const ANIMATIONS := "res://licensed/animations"
 ## How high the model's eyes are, in its own metres. It is scaled to put them
 ## where the player sees from (BodyShape.HEAD_HEIGHT), so that what can be hit
 ## (BodyShape's boxes) is where it is drawn.
-const MODEL_EYE_HEIGHT := 1.69
+const MODEL_EYE_HEIGHT := 1.62
 ## How fast the model's walk, run, sprint and crouched walk go across the
 ## ground, in its own metres a second, played at their own pace, each the
 ## same whichever way it goes.

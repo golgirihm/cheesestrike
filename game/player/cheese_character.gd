@@ -81,9 +81,11 @@ enum { FRONT, BACK }
 ## Blotches of camouflage, as [face, across, up, radius], `across` and `up`
 ## from the middle of that face.
 const CAMO := [
-	[FRONT, -0.12, 0.1, 0.035], [FRONT, 0.12, -0.02, 0.04], [FRONT, -0.125, -0.07, 0.03], [FRONT, 0.125, 0.11, 0.025],
-	[BACK, 0.0, 0.08, 0.045], [BACK, -0.11, -0.05, 0.04], [BACK, 0.12, -0.08, 0.03], [BACK, 0.11, 0.1, 0.03],
+	[FRONT, -0.07, 0.1, 0.025], [FRONT, 0.07, -0.02, 0.028], [FRONT, -0.072, -0.08, 0.022], [FRONT, 0.072, 0.12, 0.02],
+	[BACK, 0.0, 0.08, 0.032], [BACK, -0.065, -0.05, 0.028], [BACK, 0.07, -0.09, 0.022], [BACK, 0.065, 0.11, 0.022],
 ]
+## How big the face's marks are drawn, against a head 0.2 across.
+const FACE := 0.75
 
 ## Whether to draw it at all: not for the player's own machine, which sees
 ## from inside it.
@@ -829,24 +831,24 @@ func _build_face() -> void:
 	add_child(_calm)
 	var blush := _flat(BLUSH)
 	var smile := MeshInstance3D.new()
-	smile.mesh = _arc(0.03, 0.008, deg_to_rad(205.0), deg_to_rad(335.0))
+	smile.mesh = _arc(0.03 * FACE, 0.008 * FACE, deg_to_rad(205.0), deg_to_rad(335.0))
 	smile.material_override = _ink
-	smile.position = Vector3(0, eye_level - 0.03, front - LAYER * 2.0)
+	smile.position = Vector3(0, eye_level - 0.03 * FACE, front - LAYER * 2.0)
 	_calm.add_child(smile)
 
 	_wince = Node3D.new()
 	_wince.name = "Wince"
 	_wince.visible = false
 	add_child(_wince)
-	var mouth := Vector3(0, eye_level - 0.065, front)
-	_wince.add_child(_patch(Vector2(0.08, 0.034), _ink, mouth, 1))
-	_wince.add_child(_patch(Vector2(0.07, 0.024), _flat(TEETH), mouth, 2))
-	_wince.add_child(_patch(Vector2(0.07, 0.005), _ink, mouth, 3))
+	var mouth := Vector3(0, eye_level - 0.065 * FACE, front)
+	_wince.add_child(_patch(Vector2(0.08, 0.034) * FACE, _ink, mouth, 1))
+	_wince.add_child(_patch(Vector2(0.07, 0.024) * FACE, _flat(TEETH), mouth, 2))
+	_wince.add_child(_patch(Vector2(0.07, 0.005) * FACE, _ink, mouth, 3))
 	for gap in [-0.018, 0.0, 0.018]:
-		_wince.add_child(_patch(Vector2(0.005, 0.024), _ink, mouth + Vector3(gap, 0, 0), 3))
+		_wince.add_child(_patch(Vector2(0.005, 0.024) * FACE, _ink, mouth + Vector3(gap * FACE, 0, 0), 3))
 	# Brows drawn down toward the middle.
 	for side in [-1.0, 1.0]:
-		var brow := _patch(Vector2(0.042, 0.01), _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.02, front), 2)
+		var brow := _patch(Vector2(0.042, 0.01) * FACE, _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.02 * FACE, front), 2)
 		brow.rotation.z = 0.4 * side
 		_wince.add_child(brow)
 
@@ -854,9 +856,9 @@ func _build_face() -> void:
 	var set_face := Node3D.new()
 	set_face.name = "Set"
 	add_child(set_face)
-	set_face.add_child(_patch(Vector2(0.045, 0.008), _ink, Vector3(0, eye_level - 0.06, front), 2))
+	set_face.add_child(_patch(Vector2(0.045, 0.008) * FACE, _ink, Vector3(0, eye_level - 0.06 * FACE, front), 2))
 	for side in [-1.0, 1.0]:
-		var brow := _patch(Vector2(0.04, 0.009), _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.026, front), 2)
+		var brow := _patch(Vector2(0.04, 0.009) * FACE, _ink, Vector3(BodyShape.EYE_APART * side, eye_level + 0.026 * FACE, front), 2)
 		brow.rotation.z = 0.15 * side
 		set_face.add_child(brow)
 
@@ -865,16 +867,16 @@ func _build_face() -> void:
 	cheer_face.name = "Cheer"
 	add_child(cheer_face)
 	for side in [-1.0, 1.0]:
-		cheer_face.add_child(Rounded.spot(0.015, blush, Vector3(0.057 * side, eye_level - 0.038, front), Vector3.FORWARD, LAYER))
+		cheer_face.add_child(Rounded.spot(0.015 * FACE, blush, Vector3(0.057 * FACE * side, eye_level - 0.038 * FACE, front), Vector3.FORWARD, LAYER))
 	var grin := MeshInstance3D.new()
-	grin.mesh = _arc(0.018, 0.036, deg_to_rad(180.0), deg_to_rad(360.0))
+	grin.mesh = _arc(0.018 * FACE, 0.036 * FACE, deg_to_rad(180.0), deg_to_rad(360.0))
 	grin.material_override = _ink
-	grin.position = Vector3(0, eye_level - 0.04, front - LAYER * 2.0)
+	grin.position = Vector3(0, eye_level - 0.04 * FACE, front - LAYER * 2.0)
 	cheer_face.add_child(grin)
 	var tongue := MeshInstance3D.new()
-	tongue.mesh = _arc(0.011, 0.018, deg_to_rad(200.0), deg_to_rad(340.0))
+	tongue.mesh = _arc(0.011 * FACE, 0.018 * FACE, deg_to_rad(200.0), deg_to_rad(340.0))
 	tongue.material_override = _flat(BLUSH.darkened(0.15))
-	tongue.position = Vector3(0, eye_level - 0.049, front - LAYER * 3.0)
+	tongue.position = Vector3(0, eye_level - 0.049 * FACE, front - LAYER * 3.0)
 	cheer_face.add_child(tongue)
 
 	# Melted by an Overload: a wavering mouth, and stars going round the head.
@@ -884,9 +886,9 @@ func _build_face() -> void:
 	for step in 4:
 		var wave := MeshInstance3D.new()
 		var up := step % 2 == 0
-		wave.mesh = _arc(0.011, 0.007, deg_to_rad(0.0 if up else 180.0), deg_to_rad(180.0 if up else 360.0))
+		wave.mesh = _arc(0.011 * FACE, 0.007 * FACE, deg_to_rad(0.0 if up else 180.0), deg_to_rad(180.0 if up else 360.0))
 		wave.material_override = _ink
-		wave.position = Vector3(-0.033 + step * 0.022, eye_level - 0.06, front - LAYER * 2.0)
+		wave.position = Vector3((-0.033 + step * 0.022) * FACE, eye_level - 0.06 * FACE, front - LAYER * 2.0)
 		dizzy_face.add_child(wave)
 	_stars = Node3D.new()
 	_stars.name = "Stars"

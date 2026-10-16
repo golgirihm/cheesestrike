@@ -142,7 +142,8 @@ func test_a_shot_beside_the_head_misses() -> void:
 func test_how_a_player_faces_changes_what_is_hit() -> void:
 	# The torso is wider than it is deep: side-on, a shot that would clip its
 	# edge from the front passes by.
-	var edge := Vector3(FRONT + 0.1, (BodyShape.HIP_HEIGHT + 0.1) * BodyShape.SIZE, 0)
+	# Midway between how far the torso reaches to the side and to the front.
+	var edge := Vector3((BodyShape.TORSO_SIZE.x + BodyShape.TORSO_SIZE.z) / 4.0 * BodyShape.SIZE, (BodyShape.HIP_HEIGHT + 0.1) * BodyShape.SIZE, 0)
 	assert_false(HitScan.first_hit(edge, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, FACING_US)}).is_empty())
 	assert_true(HitScan.first_hit(edge, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, PI / 2.0)}).is_empty())
 
