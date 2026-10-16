@@ -179,3 +179,27 @@ func test_armour_shows_beside_health_only_while_worn() -> void:
 	record.armour = 35
 	assert_eq(HUD.armour_text(record), "+ 35 rind")
 	assert_eq(HUD.armour_text(null), "")
+
+
+func test_the_lines_across_the_top_never_run_over_one_another_or_the_compass() -> void:
+	var main: Node = MAIN.instantiate()
+	add_child_autofree(main)
+	main.world.start()
+	main.combat_hud.show()
+	await wait_process_frames(2)
+	var hud: Control = main.combat_hud
+	# Everything that can be up there at once, with its tallest words.
+	var lines: Array[Control] = [hud._match_label, hud._objective_label, hud.compass, hud._announce_label, hud._replay_label, hud._tutorial_label]
+	hud._match_label.text = "Cheddar 10  –  12 Brie   ·   7:31"
+	hud._objective_label.text = "Cheddar wheel home · Brie wheel with Someone"
+	hud._announce_label.text = "Team gained the lead"
+	hud._replay_label.text = "How you were knocked out"
+	hud._tutorial_label.text = "Walk to the flag"
+	for line in lines:
+		line.visible = true
+	await wait_process_frames(2)
+	for index in range(1, lines.size()):
+		var above := lines[index - 1].get_global_rect()
+		var below := lines[index].get_global_rect()
+		assert_lte(above.end.y, below.position.y, "%s is clear of %s" % [lines[index].name, lines[index - 1].name])
+	main.world.stop()

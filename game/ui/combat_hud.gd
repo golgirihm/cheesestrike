@@ -140,6 +140,18 @@ func _ready() -> void:
 	Settings.changed.connect(_on_setting_changed)
 
 
+## How far down from the top of the screen each line across its middle
+## starts, one under another so that none runs over the next: the score and
+## time, what the mode has to say, the compass, what is announced, the
+## title of a replay, and the tutorial's step.
+const SCORE_TOP := 10.0
+const OBJECTIVE_TOP := 40.0
+const COMPASS_TOP := 66.0
+const ANNOUNCE_TOP := 106.0
+const REPLAY_TOP := 148.0
+const TUTORIAL_TOP := 190.0
+
+
 ## Shows the fight of the world `of`.
 func bind(of: Node3D) -> void:
 	world = of
@@ -147,7 +159,7 @@ func bind(of: Node3D) -> void:
 	# Across the top, which way everything is; at the left, what is said.
 	compass = Compass.new(world)
 	compass.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	compass.position = Vector2(-Compass.WIDE / 2.0, 92.0)
+	compass.position = Vector2(-Compass.WIDE / 2.0, COMPASS_TOP)
 	add_child(compass)
 	chat_box = ChatBox.new(world)
 	chat_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
@@ -811,7 +823,7 @@ func _build() -> void:
 	_announce_label = _outlined_label(26)
 	_announce_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 0)
 	_announce_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_announce_label.offset_top = 96.0
+	_announce_label.offset_top = ANNOUNCE_TOP
 	_announce_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_announce_label.visible = false
 	add_child(_announce_label)
@@ -846,7 +858,7 @@ func _build() -> void:
 	_replay_label = _outlined_label(24)
 	_replay_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
 	_replay_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_replay_label.offset_top = 64.0
+	_replay_label.offset_top = REPLAY_TOP
 	_replay_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_replay_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.75))
 	_replay_label.visible = false
@@ -862,7 +874,7 @@ func _build() -> void:
 	_tutorial_label = _outlined_label(22)
 	_tutorial_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
 	_tutorial_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_tutorial_label.offset_top = 132.0
+	_tutorial_label.offset_top = TUTORIAL_TOP
 	_tutorial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tutorial_label.custom_minimum_size = Vector2(520, 0)
@@ -927,14 +939,14 @@ func _build() -> void:
 	rows.add_child(_knocked_out_detail)
 
 	_match_label = _outlined_label(18)
-	_match_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
+	_match_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(SCORE_TOP))
 	_match_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_match_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_match_label)
 	_objective_label = _outlined_label(14)
 	_objective_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
 	_objective_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_objective_label.offset_top = 40.0
+	_objective_label.offset_top = OBJECTIVE_TOP
 	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_objective_label)
 
