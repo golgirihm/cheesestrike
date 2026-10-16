@@ -7,12 +7,15 @@ extends Node
 @onready var world: Node3D = $World
 @onready var menu: Control = $UI/Menu
 @onready var name_edit: LineEdit = %NameEdit
-@onready var mode_button: Button = %ModeButton
-@onready var max_players_button: Button = %MaxPlayersButton
-@onready var kill_limit_button: Button = %KillLimitButton
-@onready var minutes_button: Button = %MinutesButton
-@onready var map_button: Button = %MapButton
-@onready var private_button: Button = %PrivateButton
+@onready var match_grid: GridContainer = %MatchGrid
+## The match settings, each a list to choose from beside what it is called
+## (see _setup_match_buttons).
+var mode_button: OptionButton
+var max_players_button: OptionButton
+var kill_limit_button: OptionButton
+var minutes_button: OptionButton
+var map_button: OptionButton
+var private_button: OptionButton
 @onready var host_button: Button = %HostButton
 @onready var target_edit: LineEdit = %TargetEdit
 @onready var join_button: Button = %JoinButton
@@ -137,6 +140,9 @@ func _ready() -> void:
 	rejoin_button.pressed.connect(_rejoin)
 	host_button.pressed.connect(_host)
 	_add_session_controls()
+	# Panels taller than a short screen scroll rather than being cut off.
+	for rows: Control in [menu.get_node("Panel/Margin/Rows"), pause_menu.get_node("Panel/Margin/Rows"), disconnected_notice.get_node("Panel/Margin/Rows")]:
+		FitScroll.wrap(rows)
 	# The whole interface has one look (see Look).
 	for screen in menu.get_parent().get_children():
 		if screen is Control:
@@ -255,6 +261,7 @@ func _ready() -> void:
 	# and links only in a browser.
 	sessions_panel.visible = Net.use_webrtc
 	private_button.visible = Net.use_webrtc
+	_match_buttons["host_private"].label.visible = Net.use_webrtc
 	if not Net.use_webrtc:
 		target_edit.placeholder_text = "Host address (blank for this PC)"
 	Net.request_sessions()
@@ -353,6 +360,8 @@ func _process(_delta: float) -> void:
 			mute_toggle.text = "Muted  ·  block for good" if not tag.is_empty() else "Unmute them"
 		else:
 			mute_toggle.text = "Mute them"
+	# Nothing to say leaves no gap where it would be said.
+	status.visible = not status.text.is_empty()
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if _was_captured and not captured and _playing_freely():
 		open_pause_menu()
@@ -438,39 +447,45 @@ func _remember_name() -> void:
 	name_edit.text = Settings.get_value("name")
 
 
-# Each match setting is a button that steps through its choices when pressed,
-# which suits a phone as well as a mouse.
+# Each match setting is what it is called beside a list of its choices, two
+# to a row, which keeps the screen short enough for a phone held sideways.
 func _setup_match_buttons() -> void:
 	var player_counts := range(MatchSettings.MIN_PLAYERS, MatchSettings.MAX_PLAYERS + 1)
-	_cycle(mode_button, "host_mode", MatchSettings.MODES, func(mode: String) -> String: return MatchSettings.MODE_NAMES[mode])
-	_cycle(max_players_button, "host_max_players", player_counts, func(count: int) -> String: return "Up to %d players" % count)
-	_cycle(kill_limit_button, "host_kill_limit", MatchSettings.KILL_LIMITS, func(limit: int) -> String: return "First to %d" % limit)
-	_cycle(minutes_button, "host_minutes", MatchSettings.MINUTES, func(minutes: int) -> String: return "%d minutes" % minutes)
-	_cycle(map_button, "host_map", Maps.ORDER + [Maps.CUSTOM], func(map: String) -> String:
+	mode_button = _choice("ModeButton", "Mode", "host_mode", MatchSettings.MODES, func(mode: String) -> String: return MatchSettings.MODE_NAMES[mode])
+	max_players_button = _choice("MaxPlayersButton", "Players", "host_max_players", player_counts, func(count: int) -> String: return "Up to %d" % count)
+	kill_limit_button = _choice("KillLimitButton", "Win at", "host_kill_limit", MatchSettings.KILL_LIMITS, func(limit: int) -> String: return "First to %d" % limit)
+	minutes_button = _choice("MinutesButton", "Time", "host_minutes", MatchSettings.MINUTES, func(minutes: int) -> String: return "%d minutes" % minutes)
+	map_button = _choice("MapButton", "Arena", "host_map", Maps.ORDER + [Maps.CUSTOM], func(map: String) -> String:
 		var none: bool = map == Maps.CUSTOM and ArenaCode.decode(Settings.get_value("custom_arena")).is_empty()
-		return "Map: %s%s" % [Maps.NAMES[map], " (none made yet)" if none else ""])
+		return "%s%s" % [Maps.NAMES[map], " (none made yet)" if none else ""])
+	_choice("SkyButton", "Sky", "host_sky", Atmosphere.ORDER + [Atmosphere.RANDOM], func(sky: String) -> String: return Atmosphere.NAMES[sky])
 	# Computer players, to fill a session or to practise against.
-	var bots_button := Button.new()
-	bots_button.name = "BotsButton"
-	var skill_button := Button.new()
-	skill_button.name = "BotSkillButton"
-	# Each goes straight after the map's button, so the last added comes first.
-	for added: Button in [skill_button, bots_button]:
-		added.custom_minimum_size = map_button.custom_minimum_size
-		map_button.add_sibling(added)
-	_cycle(bots_button, "host_bots", Bots.COUNTS, func(count: int) -> String: return "No bots" if count == 0 else ("1 bot" if count == 1 else "%d bots" % count))
-	_cycle(skill_button, "host_bot_skill", BotBrain.SKILLS, func(skill: String) -> String: return "Bots: %s" % BotBrain.SKILL_NAMES[skill])
-	var rules_button := Button.new()
-	rules_button.name = "RulesButton"
-	rules_button.custom_minimum_size = map_button.custom_minimum_size
-	skill_button.add_sibling(rules_button)
-	_cycle(rules_button, "host_rules", MatchSettings.RULES, func(rules: String) -> String: return "Rules: %s" % MatchSettings.RULE_NAMES[rules])
-	var sky_button := Button.new()
-	sky_button.name = "SkyButton"
-	sky_button.custom_minimum_size = map_button.custom_minimum_size
-	map_button.add_sibling(sky_button)
-	_cycle(sky_button, "host_sky", Atmosphere.ORDER + [Atmosphere.RANDOM], func(sky: String) -> String: return "Sky: %s" % Atmosphere.NAMES[sky])
-	_cycle(private_button, "host_private", [false, true], func(hidden: bool) -> String: return "Private: join by code only" if hidden else "Listed for everyone")
+	_choice("BotsButton", "Bots", "host_bots", Bots.COUNTS, func(count: int) -> String: return "None" if count == 0 else ("1 bot" if count == 1 else "%d bots" % count))
+	_choice("BotSkillButton", "Bot skill", "host_bot_skill", BotBrain.SKILLS, func(skill: String) -> String: return BotBrain.SKILL_NAMES[skill])
+	_choice("RulesButton", "Rules", "host_rules", MatchSettings.RULES, func(rules: String) -> String: return MatchSettings.RULE_NAMES[rules])
+	private_button = _choice("PrivateButton", "Joined", "host_private", [false, true], func(hidden: bool) -> String: return "By code only" if hidden else "From the list")
+
+
+# A match setting: what it is called, and beside it a list of its choices,
+# each as `describe` puts it.
+func _choice(id: String, called: String, key: String, choices: Array, describe: Callable) -> OptionButton:
+	var label := Label.new()
+	label.name = id.trim_suffix("Button") + "Label"
+	label.text = called
+	match_grid.add_child(label)
+	var list := OptionButton.new()
+	list.name = id
+	list.custom_minimum_size = Vector2(176, 40)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.fit_to_longest_item = false
+	list.clip_text = true
+	list.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	match_grid.add_child(list)
+	_match_buttons[key] = {"button": list, "choices": choices, "describe": describe, "label": label}
+	_show_match_setting(key)
+	list.item_selected.connect(func(index: int) -> void: Settings.set_value(key, choices[index]))
+	Look.list_opens_at_choice(list)
+	return list
 
 
 func _cycle(button: Button, key: String, choices: Array, describe: Callable) -> void:
@@ -495,7 +510,16 @@ func _show_match_setting(key: String) -> void:
 	var cycle: Dictionary = _match_buttons[key]
 	if not cycle.choices.has(Settings.get_value(key)):
 		Settings.set_value(key, Settings.DEFAULTS[key])
-	cycle.button.text = cycle.describe.call(Settings.get_value(key))
+	if cycle.button is OptionButton:
+		# Every choice afresh, as how one reads can change, as the custom
+		# arena's does once one is made.
+		var list: OptionButton = cycle.button
+		list.clear()
+		for choice: Variant in cycle.choices:
+			list.add_item(cycle.describe.call(choice))
+		list.select(cycle.choices.find(Settings.get_value(key)))
+	else:
+		cycle.button.text = cycle.describe.call(Settings.get_value(key))
 
 
 ## The match settings chosen on the menu.

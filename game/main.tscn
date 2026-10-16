@@ -58,45 +58,12 @@ size_flags_horizontal = 3
 max_length = 16
 select_all_on_focus = true
 
-[node name="MatchRow1" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
-layout_mode = 2
-
-[node name="ModeButton" type="Button" parent="UI/Menu/Panel/Margin/Rows/MatchRow1"]
+[node name="MatchGrid" type="GridContainer" parent="UI/Menu/Panel/Margin/Rows"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="MaxPlayersButton" type="Button" parent="UI/Menu/Panel/Margin/Rows/MatchRow1"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="MatchRow2" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
-layout_mode = 2
-
-[node name="KillLimitButton" type="Button" parent="UI/Menu/Panel/Margin/Rows/MatchRow2"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="MinutesButton" type="Button" parent="UI/Menu/Panel/Margin/Rows/MatchRow2"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="MapButton" type="Button" parent="UI/Menu/Panel/Margin/Rows"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-
-[node name="PrivateButton" type="Button" parent="UI/Menu/Panel/Margin/Rows"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 8
+columns = 4
 
 [node name="HostRow" type="HBoxContainer" parent="UI/Menu/Panel/Margin/Rows"]
 layout_mode = 2

@@ -213,7 +213,7 @@ class JoiningTest(GameTestCase):
 class PrivateSessionTest(GameTestCase):
     def test_a_private_session_is_not_listed_but_its_code_works(self):
         host = self.open_game()
-        host.choose("PrivateButton", "Private: join by code only")
+        host.choose("PrivateButton", "By code only")
         code = host.host()
 
         other = self.open_game()

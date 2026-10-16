@@ -68,7 +68,7 @@ class FrontEndTest(GameTestCase):
 
     def test_joining_shows_the_arena_and_a_tip_until_the_arena_is_there(self):
         host = self.open_game()
-        host.choose("MapButton", "Map: Brie Box")
+        host.choose("MapButton", "Brie Box")
         code = host.host()
         joiner = self.open_game()
         joiner.click("TargetEdit")

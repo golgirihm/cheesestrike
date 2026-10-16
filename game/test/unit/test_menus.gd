@@ -22,14 +22,23 @@ func after_each() -> void:
 	Controls.apply(Settings.get_value("bindings"))
 
 
-func test_each_match_button_steps_through_its_choices_and_comes_round() -> void:
+func test_each_match_setting_is_a_list_of_its_choices_beside_its_name() -> void:
+	assert_eq(main.kill_limit_button.item_count, MatchSettings.KILL_LIMITS.size())
+	for index in MatchSettings.KILL_LIMITS.size():
+		main.kill_limit_button.select(index)
+		main.kill_limit_button.item_selected.emit(index)
+		assert_eq(Settings.get_value("host_kill_limit"), MatchSettings.KILL_LIMITS[index])
+	assert_eq((main.match_grid.get_child(main.kill_limit_button.get_index() - 1) as Label).text, "Win at", "named beside it")
 	Settings.set_value("host_kill_limit", MatchSettings.KILL_LIMITS[0])
-	var seen := []
-	for i in MatchSettings.KILL_LIMITS.size():
-		seen.append(Settings.get_value("host_kill_limit"))
-		main.kill_limit_button.pressed.emit()
-	assert_eq(seen, MatchSettings.KILL_LIMITS)
-	assert_eq(Settings.get_value("host_kill_limit"), MatchSettings.KILL_LIMITS[0])
+	assert_eq(main.kill_limit_button.text, "First to %d" % MatchSettings.KILL_LIMITS[0], "and it follows the setting")
+	# Opened, the list picks out what is chosen, for the keys to step on from.
+	main.kill_limit_button.select(2)
+	main.kill_limit_button.get_popup().about_to_popup.emit()
+	assert_eq(main.kill_limit_button.get_popup().get_focused_item(), 2)
+	# Every setting, two to a row.
+	assert_eq(main.match_grid.columns, 4)
+	for id: String in ["ModeButton", "MaxPlayersButton", "KillLimitButton", "MinutesButton", "MapButton", "SkyButton", "BotsButton", "BotSkillButton", "RulesButton", "PrivateButton"]:
+		assert_true(main.match_grid.get_node(id) is OptionButton, id)
 
 
 # What the session list shows, line by line.
@@ -106,11 +115,11 @@ func test_hosting_uses_the_chosen_settings() -> void:
 
 func test_the_private_button_switches_between_listed_and_by_code_only() -> void:
 	Settings.set_value("host_private", false)
-	assert_eq(main.private_button.text, "Listed for everyone")
-	main.private_button.pressed.emit()
+	assert_eq(main.private_button.text, "From the list")
+	main.private_button.item_selected.emit(1)
 	assert_true(Settings.get_value("host_private"))
-	assert_eq(main.private_button.text, "Private: join by code only")
-	main.private_button.pressed.emit()
+	assert_eq(main.private_button.text, "By code only")
+	main.private_button.item_selected.emit(0)
 	assert_false(Settings.get_value("host_private"))
 
 

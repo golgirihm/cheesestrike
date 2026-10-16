@@ -291,8 +291,9 @@ class Game:
         return ((own[0] - other[0]) ** 2 + (own[2] - other[2]) ** 2) ** 0.5
 
     def choose(self, control, text):
-        """Presses one of the menu's match settings buttons, such as
-        "KillLimitButton", until it reads `text`."""
+        """Chooses `text` from one of the menu's lists of match settings,
+        such as "KillLimitButton": opens the list and steps down it with the
+        keys, a choice at a time, until the setting reads `text`."""
         if self.state()["screen"] == "title":
             self._click("PlayButton")
         for _ in range(20):
@@ -301,6 +302,9 @@ class Game:
             if buttons[control] == text:
                 return
             self.click(control)
+            self.page.wait_for_timeout(150)
+            self.press("ArrowDown")
+            self.press("Enter")
             self.wait_for(f"s.match_buttons.join('|') !== {'|'.join(state['match_buttons'])!r}")
         raise AssertionError(f"{control} never read {text!r}")
 

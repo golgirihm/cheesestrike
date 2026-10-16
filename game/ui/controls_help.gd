@@ -160,6 +160,8 @@ func _build() -> void:
 	_grid.add_theme_constant_override("h_separation", 18)
 	_grid.add_theme_constant_override("v_separation", 4)
 	rows.add_child(_grid)
+	# The list scrolls on a screen too short for all of it.
+	FitScroll.wrap(_grid)
 	_done = Button.new()
 	_done.name = "HelpDone"
 	_done.text = "Got it"

@@ -9,12 +9,12 @@ FIRST_TO_5 = "First to 5"
 
 
 class MatchTest(GameTestCase):
-    def host_with(self, mode="Free-for-all", kills="First to 20", players="Up to 16 players", map="Cheddar Canyon"):
+    def host_with(self, mode="Free-for-all", kills="First to 20", players="Up to 16", map="Cheddar Canyon"):
         host = self.open_game()
         host.choose("ModeButton", mode)
         host.choose("KillLimitButton", kills)
         host.choose("MaxPlayersButton", players)
-        host.choose("MapButton", f"Map: {map}")
+        host.choose("MapButton", f"{map}")
         return host, host.host()
 
     def test_everyone_plays_on_the_map_the_host_chose(self):
@@ -28,20 +28,23 @@ class MatchTest(GameTestCase):
         joiner.page.wait_for_timeout(1000)
         self.assertGreater(joiner.own_player()["position"][1], -0.5)
 
-    def test_a_match_waits_for_a_second_player_and_then_begins(self):
-        host, code = self.host_with()
-        self.assertEqual(host.state()["combat"]["match"], "Warm-up   ·   waiting for players")
-        host.page.wait_for_timeout(1500)
-        joiner = self.open_game()
-        joiner.join(code)
-        for game in (host, joiner):
-            # The clock has only now started to run.
-            game.wait_for("s.combat.match.startsWith('First to 20   ·   7:5')")
+    def test_a_match_counts_down_while_nobody_moves_and_then_begins(self):
+        host = self.open_game("&countdown")
+        host.host()
+        state = host.wait_for("s.combat.match.startsWith('The match begins in')")
+        start = host.own_player()["position"]
+        host.page.keyboard.down("w")
+        host.page.wait_for_timeout(1000)
+        self.assertAlmostEqual(host.own_player()["position"][2], start[2], delta=0.05, msg="held still")
+        # Then the clock starts from the full time, and everyone can move.
+        host.wait_for("s.combat.match.startsWith('First to 20   ·   ')")
         host.wait_for("s.combat.announcement === 'The match begins'")
+        host.wait_for(f"Math.hypot(s.players.find((p) => p.mine).position[0] - ({start[0]}), s.players.find((p) => p.mine).position[2] - ({start[2]})) > 1")
+        host.page.keyboard.up("w")
 
     def test_everyone_plays_by_the_hosts_rules(self):
         host = self.open_game()
-        host.choose("RulesButton", "Rules: Instant knock-out")
+        host.choose("RulesButton", "Instant knock-out")
         code = host.host()
         joiner = self.open_game()
         joiner.join(code)
@@ -168,7 +171,7 @@ class MatchTest(GameTestCase):
             game.wait_for("s.combat.result === '' && s.combat.match.startsWith('First to 5') && s.players.every((p) => p.kills === 0 && p.deaths === 0)")
 
     def test_the_session_list_shows_the_hosts_settings_and_its_limit_holds(self):
-        host, code = self.host_with(mode="Cheddar vs Brie", players="Up to 2 players")
+        host, code = self.host_with(mode="Cheddar vs Brie", players="Up to 2")
         watcher = self.open_game()
         watcher.click("RefreshButton")
         watcher.wait_for(f"s.sessions.some((line) => line.text === '{code}  ·  1/2  ·  Cheddar vs Brie  ·  Cheddar Canyon')")

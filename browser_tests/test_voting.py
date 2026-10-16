@@ -10,9 +10,9 @@ class VotingTest(GameTestCase):
         # A short match: one hit knocks out, and on the small arena whoever
         # is knocked out comes back straight ahead of the host.
         host = self.open_game()
-        host.choose("RulesButton", "Rules: Instant knock-out")
+        host.choose("RulesButton", "Instant knock-out")
         host.choose("KillLimitButton", "First to 5")
-        host.choose("MapButton", "Map: Brie Box")
+        host.choose("MapButton", "Brie Box")
         code = host.host()
         joiner = self.open_game()
         joiner.join(code)

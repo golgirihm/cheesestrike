@@ -112,6 +112,13 @@ static func emphasise(button: Button) -> void:
 	button.add_theme_font_override("font", heading_font())
 
 
+## Makes the list `choices` open with what is chosen picked out, so that the
+## arrow keys or a gamepad step on from there.
+static func list_opens_at_choice(choices: OptionButton) -> void:
+	var popup := choices.get_popup()
+	popup.about_to_popup.connect(func() -> void: popup.set_focused_item(choices.selected))
+
+
 ## Whether screens move as they change: not for someone who has turned the
 ## camera's motion right down.
 static func moves() -> bool:
