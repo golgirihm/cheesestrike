@@ -64,28 +64,16 @@ const FACES := {
 const FACE_TIME := 0.08
 ## Seconds a knocked-out soldier takes to fall back before it is gone.
 const FALL_TIME := 1.6
-## Seconds the hands take to go onto the weapon, or off it.
+## Seconds the spine takes to turn to aim the weapon, or let it go.
 const GRIP_TIME := 0.12
 ## How big its weapon is drawn, against the drawn soldier's, which is made
 ## for chunkier hands.
 const WEAPON_SCALE := 0.55
-## How the left hand holds a weapon's fore-end, against the weapon (which
-## points down its -Z, with +Y up): its palm up under it, its fingers
-## across to the right, curled up round it, and its thumb along the left,
-## pointing ahead. Its fingers bend GRIP_CURL at each joint, and the
-## fore-end is HOLD from its wrist, in its own metres.
-const LEFT_TURN := Basis(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0))
-const GRIP_CURL := 1.1
-const LEFT_HOLD := Vector3(0.0, 0.065, 0.055)
-## How far above the drawn soldier's mitten the fore-end is held.
-const FORE_END_LIFT := 0.05
 
 var _model: Node3D
 var _skeleton: Skeleton3D
 var _tree: AnimationTree
 var _spine: SkeletonModifier3D
-var _left_arm: TwoBoneIK3D
-var _off_hand: Node3D
 var _face_mesh: MeshInstance3D
 var _shirt: StandardMaterial3D
 var _cap: StandardMaterial3D
@@ -98,13 +86,8 @@ var _right_hand_bone := -1
 # The weapon its player holds, which it puts in its right hand.
 var _held_gun: Node3D
 var _held_model: Node3D
-# Where on the weapon the left hand goes, and the modifier turning it to
-# hold it there.
-var _fore_end: Node3D
-var _left_facing: SkeletonModifier3D
 # Where the weapon in its hand last was, in this node's measurements.
 var _weapon_here := Transform3D()
-var _steadying := false
 
 
 ## Whether the realistic soldier can be shown here: its licensed model is
@@ -323,41 +306,11 @@ static func _gaits(animations: AnimationLibrary, prefix: String) -> AnimationNod
 
 
 func _build_reach() -> void:
-	_off_hand = Node3D.new()
-	_off_hand.name = "OffHand"
-	add_child(_off_hand)
 	_spine = preload("res://player/spine_aim.gd").new()
 	_spine.name = "SpineAim"
 	_spine.hand = _right_hand_bone
 	_spine.in_hand = _in_hand
 	_skeleton.add_child(_spine)
-	_left_arm = _reach_ik("Left", _off_hand, Vector3(-0.45, 0.35, 0.1))
-	_left_arm.influence = 0.0
-	_left_facing = preload("res://player/hand_turn.gd").new()
-	_left_facing.name = "LeftHandTurn"
-	_left_facing.bone = _left_hand_bone
-	_left_facing.curl = GRIP_CURL
-	_left_facing.influence = 0.0
-	_skeleton.add_child(_left_facing)
-
-
-# Pulls the `side` hand onto `target`, its elbow toward `elbow` in this node's
-# measurements.
-func _reach_ik(side: String, target: Node3D, elbow: Vector3) -> TwoBoneIK3D:
-	var ik := TwoBoneIK3D.new()
-	ik.name = side + "ArmReach"
-	_skeleton.add_child(ik)
-	var pole := Node3D.new()
-	pole.name = side + "Elbow"
-	pole.position = elbow
-	add_child(pole)
-	ik.set_setting_count(1)
-	ik.set_root_bone_name(0, side + "UpperArm")
-	ik.set_middle_bone_name(0, side + "LowerArm")
-	ik.set_end_bone_name(0, side + "Hand")
-	ik.set_target_node(0, ik.get_path_to(target))
-	ik.set_pole_node(0, ik.get_path_to(pole))
-	return ik
 
 
 func weapon_scale() -> float:
@@ -374,7 +327,7 @@ func reach_for(_hand: Vector3) -> void:
 ## The drawn soldier's mitten on the grip goes: its own hand is there.
 func hold_weapon(gun: Node3D) -> bool:
 	# A new weapon, or a different model of one: its own hand is on the grip,
-	# not the drawn soldier's mitten, and its left hand goes on the fore-end.
+	# not the drawn soldier's mitten.
 	# The newest: one changed from waits to be freed beside it for a frame.
 	var model := gun.get_child(-1) as Node3D if gun.get_child_count() > 0 else null
 	if _held_gun != gun or _held_model != model:
@@ -382,7 +335,6 @@ func hold_weapon(gun: Node3D) -> bool:
 		_held_model = model
 		for mitten: Node in gun.find_children("Hand", "", true, false):
 			(mitten as Node3D).visible = false
-		_fore_end = gun.find_child("OffHand", true, false) as Node3D
 	# Making an emote, it puts the weapon away.
 	if _emote >= 0:
 		gun.visible = false
@@ -398,14 +350,12 @@ func hold_weapon(gun: Node3D) -> bool:
 ## pointing straight ahead with its grip in the palm. The same for every
 ## soldier, so it is worked out once.
 static var _in_hand: Transform3D
-## Where the right hand's fist closes round the grip, from its wrist.
-static var _right_hold: Vector3
 static var _found_hold := false
 ## Turns this node's directions into its skeleton's.
 static var _body_to_skeleton: Basis
 
 
-## Works out how the hands hold a weapon (_in_hand and _right_hold), if no
+## Works out how the right hand holds a weapon (_in_hand), if no
 ## soldier has yet: they are worked out from one.
 static func find_hold_once() -> void:
 	if not _found_hold:
@@ -442,7 +392,6 @@ func _find_hold() -> void:
 	# a rifle's fore-end.
 	held.origin = _fist("Right") - held.basis * WeaponModels.GRIP
 	_in_hand = hand.affine_inverse() * held
-	_right_hold = hand.affine_inverse() * _fist("Right")
 	_found_hold = true
 	_skeleton.reset_bone_poses()
 
@@ -456,26 +405,15 @@ func _fist(side: String) -> Vector3:
 
 
 # Puts the weapon held in the right hand as the skeleton now stands, its
-# animations and the turn of its spine and all, and notes where that is. Sets
-# where the left hand goes next, onto the weapon's fore-end, and which way
-# it faces to hold it.
+# animations and the turn of its spine and all, and notes where that is. The
+# left hand stays where its animations have it: the weapons are to fit the
+# hands, not the hands the weapons.
 func _place_weapon() -> void:
 	var weapon := _skeleton.get_bone_global_pose(_right_hand_bone) * _in_hand
 	_weapon_here = global_transform.affine_inverse() * _skeleton.global_transform * weapon
-	var facing := weapon.basis.orthonormalized() * LEFT_TURN
-	_left_facing.facing = facing
 	if _held_gun == null or not is_instance_valid(_held_gun) or not _held_gun.is_inside_tree():
 		return
 	_held_gun.global_transform = global_transform * _weapon_here
-	if _fore_end != null and is_instance_valid(_fore_end):
-		var fore_end := _skeleton.global_transform.affine_inverse() * _fore_end.to_global(Vector3.UP * FORE_END_LIFT)
-		_off_hand.position = to_local(_skeleton.global_transform * (fore_end - facing * LEFT_HOLD))
-
-
-# Whether there is somewhere to steady the weapon is what counts: where the
-# left hand goes on it is worked out from the weapon in hand.
-func steady_with(hand: Vector3) -> void:
-	super(hand)
 
 
 func set_colour(colour: Color) -> void:
@@ -535,10 +473,9 @@ func _melt_scale() -> Vector3:
 	return Vector3.ONE
 
 
-# The arms are moved by the animations and the reach, set each frame in
-# _process; this only notes whether the free hand is on the weapon.
-func _draw_arm(steadying: bool, _emote_pose: Dictionary) -> void:
-	_steadying = steadying
+# The arms are moved by the animations alone.
+func _draw_arm(_steadying: bool, _emote_pose: Dictionary) -> void:
+	pass
 
 
 func _draw_face(face: String, delta: float) -> void:
@@ -601,8 +538,6 @@ func _process(delta: float) -> void:
 	var looking := Vector3(0.0, sin(_gaze), -cos(_gaze))
 	_spine.aim = _body_to_skeleton * looking
 	_spine.influence = move_toward(_spine.influence, 1.0 if holding and _emote < 0 else 0.0, delta / GRIP_TIME)
-	_left_arm.influence = move_toward(_left_arm.influence, 1.0 if _steadying and holding else 0.0, delta / GRIP_TIME)
-	_left_facing.influence = _left_arm.influence
 	# What is held in the free hand goes with it.
 	if _held != null:
 		_held.position = _bone_here(_left_hand_bone)
