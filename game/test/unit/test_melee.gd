@@ -82,8 +82,8 @@ func test_a_strike_out_of_reach_does_nothing() -> void:
 
 func test_a_strike_reaches_a_little_to_each_side() -> void:
 	var striker := _add(1, Vector3(0, 0, 5))
-	_add(2, Vector3(1.6, 0, 2), PI)
-	# Straight ahead passes them by.
+	_add(2, Vector3(0.75, 0, 2), PI)
+	# Straight ahead passes by their head.
 	assert_true(HitScan.first_hit(striker.head.global_position, Vector3.FORWARD, Melee.REACH, match_._targets_except(1)).is_empty())
 	_strike(striker)
 	assert_lt(match_.state.player(2).health, 100)
