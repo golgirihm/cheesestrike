@@ -9,7 +9,9 @@ extends "res://player/cheese_character.gd"
 ## - its upper body aims, fires, reloads, throws, strikes, flinches and makes
 ##   the emotes, and its spine bends to look up and down;
 ## - its hands are pulled onto the weapon wherever the player holds it;
-## - its face blinks, winces, cheers and sets, with the model's face shapes;
+## - its face blinks, winces, cheers and sets, with the model's face shapes,
+##   behind its sunglasses;
+## - it wears its own cap and sunglasses rather than a chosen hat;
 ## - knocked out, it falls back rather than melting.
 ##
 ## The model and its animations are licensed and kept private, so this is
@@ -22,9 +24,6 @@ const ANIMATIONS := "res://licensed/animations"
 ## where the player sees from (BodyShape.HEAD_HEIGHT), so that what can be hit
 ## (BodyShape's boxes) is where it is drawn.
 const MODEL_EYE_HEIGHT := 1.69
-## How high the top of the model's head is, bare, in its own metres: where a
-## hat sits.
-const MODEL_TOP := 1.79
 ## How fast the model's walk and run go across the ground, in its own metres a
 ## second, played at their own pace.
 const WALK_PACE := 1.26
@@ -88,9 +87,7 @@ var _cap_mesh: MeshInstance3D
 var _overlay := StandardMaterial3D.new()
 var _shapes := {}
 var _crouches := false
-var _head_bone := -1
 var _left_hand_bone := -1
-var _head_to_top := 0.0
 var _steadying := false
 
 
@@ -139,11 +136,7 @@ func _build() -> void:
 	_model.scale = Vector3.ONE * model_scale()
 	add_child(_model)
 	_skeleton = _model.find_children("*", "Skeleton3D")[0]
-	_head_bone = _skeleton.find_bone("Head")
 	_left_hand_bone = _skeleton.find_bone("LeftHand")
-	_head_to_top = MODEL_TOP - _skeleton.get_bone_global_rest(_head_bone).origin.y
-	# Sunglasses would hide the eyes, which the faces need.
-	_model.find_child("Glass_LP1").visible = false
 	_cap_mesh = _model.find_child("Hat_LP2")
 	_face_mesh = _model.find_child("CC_Base_Body")
 	for name: String in _face_shape_names():
@@ -390,10 +383,11 @@ func _light() -> void:
 		mesh.material_overlay = _overlay if lit else null
 
 
+# It always wears its own cap and sunglasses, whatever hat is chosen.
 func wear(look: int) -> void:
 	super(look)
-	if _cap_mesh != null:
-		_cap_mesh.visible = _hat == null
+	if _hat != null:
+		_hat.visible = false
 
 
 func set_in_play(in_play: bool) -> void:
@@ -487,9 +481,7 @@ func _process(delta: float) -> void:
 	var holding := not _melting
 	_right_arm.influence = move_toward(_right_arm.influence, 1.0 if holding else 0.0, delta / GRIP_TIME)
 	_left_arm.influence = move_toward(_left_arm.influence, 1.0 if _steadying and holding else 0.0, delta / GRIP_TIME)
-	# A hat on the head and what is held in the free hand go with them.
-	if _hat != null:
-		_hat.position = _bone_here(_head_bone) + Vector3.UP * _head_to_top * model_scale()
+	# What is held in the free hand goes with it.
 	if _held != null:
 		_held.position = _bone_here(_left_hand_bone)
 

@@ -138,16 +138,17 @@ func test_knocked_out_it_falls_back_whole_then_goes() -> void:
 	assert_false(soldier.visible, "then gone")
 
 
-func test_a_hat_takes_the_place_of_its_cap() -> void:
+func test_it_keeps_its_cap_and_sunglasses_whatever_hat_is_chosen() -> void:
 	if soldier == null:
 		pending("The licensed assets aren't checked out.")
 		return
-	soldier.wear(Looks.pack("swiss", "crown", "none"))
-	_frames(2)
-	assert_false(soldier._cap_mesh.visible)
-	assert_gt(soldier._hat.position.y, BodyShape.HEAD_HEIGHT, "on top of the head")
-	soldier.wear(Looks.pack("swiss", "none", "none"))
-	assert_true(soldier._cap_mesh.visible)
+	for hat: String in Looks.HATS:
+		soldier.wear(Looks.pack("swiss", hat, "none"))
+		_frames(2)
+		assert_true(soldier._cap_mesh.visible, "its cap, with a %s hat chosen" % hat)
+		assert_true(soldier._model.find_child("Glass_LP1").visible, "and its sunglasses")
+		if soldier._hat != null:
+			assert_false(soldier._hat.visible, "and no %s hat" % hat)
 
 
 func test_players_are_the_realistic_soldier_wherever_it_can_be_shown() -> void:
