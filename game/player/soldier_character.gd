@@ -64,6 +64,14 @@ const FACE_TIME := 0.08
 const FALL_TIME := 1.6
 ## Seconds the hands take to go onto the weapon, or off it.
 const GRIP_TIME := 0.12
+## Where its hand holds the weapon's grip, from the eyes in its own
+## measurements (BodyShape's), at rest and aimed: within reach of real arms,
+## in front of the right shoulder, and up near the eye to aim.
+const HELD_GRIP := Vector3(0.085, -0.19, -0.19)
+const AIMED_GRIP := Vector3(0.07, -0.1, -0.17)
+## How big its weapon is drawn, against the drawn soldier's, which is made
+## for chunkier hands.
+const WEAPON_SCALE := 0.55
 
 var _model: Node3D
 var _skeleton: Skeleton3D
@@ -332,6 +340,24 @@ func _reach_ik(side: String, target: Node3D, elbow: Vector3) -> TwoBoneIK3D:
 	ik.set_target_node(0, ik.get_path_to(target))
 	ik.set_pole_node(0, ik.get_path_to(pole))
 	return ik
+
+
+# Where the weapon is held for its grip to be at `grip`, from the eyes in the
+# arena's metres, at the size others see it.
+static func _holding_at(grip: Vector3) -> Vector3:
+	return grip * BodyShape.SIZE - WeaponModels.GRIP * BodyShape.SIZE * WEAPON_SCALE
+
+
+func weapon_scale() -> float:
+	return WEAPON_SCALE
+
+
+func weapon_rest(_rest: Vector3) -> Vector3:
+	return _holding_at(HELD_GRIP)
+
+
+func weapon_aim(_aim: Vector3) -> Vector3:
+	return _holding_at(AIMED_GRIP)
 
 
 func reach_for(hand: Vector3) -> void:

@@ -162,3 +162,39 @@ func test_players_are_the_realistic_soldier_wherever_it_can_be_shown() -> void:
 	var drawn := Characters.make()
 	add_child_autofree(drawn)
 	assert_eq(drawn.get_script(), Characters.DRAWN, "unless it is turned off, as for the tests")
+
+
+func test_a_player_built_drawn_is_given_the_realistic_body_and_nothing_of_the_drawn_one() -> void:
+	if not SOLDIER.available():
+		pending("The licensed assets aren't checked out.")
+		return
+	var player := Node3D.new()
+	add_child_autofree(player)
+	var drawn: Node3D = Characters.DRAWN.new()
+	drawn.name = "Body"
+	player.add_child(drawn)
+	player.add_child(Node3D.new())
+	Characters.realistic = true
+	var body := Characters.swap(drawn)
+	Characters.realistic = false
+	assert_eq(body.get_script(), SOLDIER)
+	assert_eq(player.get_node("Body"), body, "under the same name")
+	assert_eq(body.get_index(), 0, "and in the same place")
+	assert_null(body.find_child("Torso", false), "without the drawn soldier's torso")
+
+
+func test_it_holds_its_weapon_within_reach_of_its_arms() -> void:
+	if soldier == null:
+		pending("The licensed assets aren't checked out.")
+		return
+	var skeleton: Skeleton3D = soldier._skeleton
+	var at := func(bone: String) -> Vector3:
+		return soldier.to_local(skeleton.global_transform * skeleton.get_bone_global_rest(skeleton.find_bone(bone)).origin)
+	var shoulder: Vector3 = at.call("RightUpperArm")
+	var reach: float = (at.call("RightLowerArm") - shoulder).length() + (at.call("RightHand") - at.call("RightLowerArm")).length()
+	var eyes := Vector3(0, BodyShape.HEAD_HEIGHT, 0)
+	for grip: Vector3 in [SOLDIER.HELD_GRIP, SOLDIER.AIMED_GRIP]:
+		assert_lt((eyes + grip - shoulder).length(), reach * 0.95, "the grip at %s" % grip)
+		# And the player's scene puts the weapon so its grip is there.
+		var held: Vector3 = soldier.weapon_rest(Vector3.ZERO) if grip == SOLDIER.HELD_GRIP else soldier.weapon_aim(Vector3.ZERO)
+		assert_almost_eq((held + WeaponModels.GRIP * BodyShape.SIZE * soldier.weapon_scale()).distance_to(grip * BodyShape.SIZE), 0.0, 0.0001)

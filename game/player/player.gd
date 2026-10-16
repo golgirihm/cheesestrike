@@ -591,7 +591,7 @@ func _grow() -> void:
 	collider.position = Vector3(0, BodyShape.HEIGHT / 2.0, 0)
 	head.position = Vector3(0, BodyShape.HEAD_HEIGHT * BodyShape.SIZE, 0)
 	gun.position *= BodyShape.SIZE
-	gun.scale = Vector3.ONE * BodyShape.SIZE
+	gun.scale = Vector3.ONE * BodyShape.SIZE * body.weapon_scale()
 	name_tag.position *= BodyShape.SIZE
 
 
@@ -807,7 +807,7 @@ func _animate(delta: float) -> void:
 		body.set_lean(_lean)
 		# Others bring their weapon up to the eye when they aim.
 		_aim = move_toward(_aim, 1.0 if _pose & POSE_AIMING and alive else 0.0, delta / AIM_TIME)
-		rest = _gun_rest.lerp(SEEN_AIM_GUN_POSITION * BodyShape.SIZE, smoothstep(0.0, 1.0, _aim))
+		rest = body.weapon_rest(_gun_rest).lerp(body.weapon_aim(SEEN_AIM_GUN_POSITION * BodyShape.SIZE), smoothstep(0.0, 1.0, _aim))
 		var moved := global_position - _last_position
 		_last_position = global_position
 		if delta > 0.0:
