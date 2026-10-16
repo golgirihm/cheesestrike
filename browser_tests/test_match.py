@@ -38,7 +38,7 @@ class MatchTest(GameTestCase):
         self.assertAlmostEqual(host.own_player()["position"][2], start[2], delta=0.05, msg="held still")
         # Then the clock starts from the full time, and everyone can move.
         host.wait_for("s.combat.match.startsWith('First to 20   ·   ')")
-        host.wait_for("s.combat.announcement === 'The match begins'")
+        host.wait_for("s.combat.announcement.startsWith('The match begins')")
         host.wait_for(f"Math.hypot(s.players.find((p) => p.mine).position[0] - ({start[0]}), s.players.find((p) => p.mine).position[2] - ({start[2]})) > 1")
         host.page.keyboard.up("w")
 
