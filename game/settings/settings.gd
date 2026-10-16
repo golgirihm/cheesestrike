@@ -158,7 +158,7 @@ const DEFAULTS := {
 	"gfx_filtering": "",
 	## Whether the render scale drops to hold the frame rate.
 	"dynamic_resolution": false,
-	## Whether teammates and pickups close by are outlined (see Outlines).
+	## Whether teammates are outlined and pickups glow (see Outlines).
 	"outlines": true,
 	"bloom": true,
 	"colour_grade": true,

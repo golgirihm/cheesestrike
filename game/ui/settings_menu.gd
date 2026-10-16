@@ -68,7 +68,7 @@ const TOGGLES := [
 	["announcer", "The announcer's voice"],
 	["voice_chat", "Talk with teammates (hold the Talk key)"],
 	["text_chat", "Text chat"],
-	["outlines", "Outline teammates and nearby pickups"],
+	["outlines", "Outline teammates, and make pickups glow"],
 	["dynamic_resolution", "Lower the render scale to hold the frame rate"],
 	["bloom", "Glow on bright things"],
 	["colour_grade", "A cast of colour for each arena"],

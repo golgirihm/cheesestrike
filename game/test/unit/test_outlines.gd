@@ -73,11 +73,32 @@ func test_an_enemy_never_gets_one_whoever_is_looking_and_however_they_stand() ->
 						assert_false(Outlines.shows(_record(viewer_team), _record(other_team, alive), teams), "%s: %d sees %d" % [mode, viewer_team, other_team])
 
 
-func test_a_pickup_is_outlined_only_when_near_and_there_to_take() -> void:
-	assert_true(Outlines.pickup_shows(3.0, true))
-	assert_true(Outlines.pickup_shows(Outlines.PICKUP_REACH, true))
-	assert_false(Outlines.pickup_shows(Outlines.PICKUP_REACH + 0.1, true))
-	assert_false(Outlines.pickup_shows(3.0, false), "one that has been taken")
+func test_a_pickup_glows_whenever_it_is_there_to_take() -> void:
+	assert_true(Outlines.pickup_shows(true))
+	assert_false(Outlines.pickup_shows(false), "one that has been taken")
+
+
+func test_a_glow_fades_out_from_the_thing_and_widens_with_distance() -> void:
+	var thing := MeshInstance3D.new()
+	thing.mesh = BoxMesh.new()
+	add_child_autofree(thing)
+	Outlines.glow(thing, Color.WHITE)
+	assert_eq(Outlines.colour_on(thing), Color.WHITE)
+	assert_true(Outlines.is_glow(thing))
+	assert_false(Outlines.through_walls(thing), "what is behind cover stays hidden")
+	var glow: ShaderMaterial = thing.material_overlay
+	assert_string_contains(glow.shader.code, "blend_add", "added to what is behind it")
+	assert_false(glow.shader.code.contains("depth_test_disabled"))
+	assert_eq(glow.get_shader_parameter("reach"), Outlines.GLOW_REACH)
+	assert_eq(glow.get_shader_parameter("spread"), Outlines.GLOW_SPREAD)
+	# As plain far off as close by: wider in the world the further it is seen
+	# from, enough to stay a pixel or two wide across the arena.
+	assert_gt(Outlines.glow_reach(100.0), Outlines.glow_reach(5.0))
+	assert_gt(Outlines.glow_reach(100.0), 100.0 * 0.003)
+	Outlines.put(thing, Color.WHITE)
+	assert_false(Outlines.is_glow(thing), "an outline is not a glow")
+	Outlines.take(thing)
+	assert_null(thing.material_overlay)
 
 
 func test_an_outline_goes_on_every_mesh_and_comes_off_again() -> void:
@@ -159,25 +180,22 @@ func test_in_a_free_for_all_nobody_is_outlined() -> void:
 	assert_null(Outlines.colour_on(other.body))
 
 
-func test_pickups_near_the_player_are_outlined_and_far_or_taken_ones_are_not() -> void:
+func test_pickups_glow_however_far_off_unless_taken() -> void:
 	await _start(MatchSettings.FREE_FOR_ALL)
 	var own: Node3D = world.player_node(1)
 	var pads: Array = world.map.get_node("Pickups").get_children()
 	own.global_position = pads[0].global_position + Vector3(2, 0, 0)
 	world.show_outlines()
 	assert_eq(Outlines.colour_on(pads[0].get_node("Item")), Outlines.PICKUP_COLOUR)
+	assert_true(Outlines.is_glow(pads[0].get_node("Item")))
 	assert_false(Outlines.through_walls(pads[0].get_node("Item")), "what is behind cover stays hidden")
-	for pad: Node3D in pads:
-		var near: bool = own.global_position.distance_to(pad.global_position) <= Outlines.PICKUP_REACH
-		assert_eq(Outlines.colour_on(pad.get_node("Item")) != null, near and pad.get_node("Item").visible, pad.name)
-	pads[0].get_node("Item").visible = false
-	world.show_outlines()
-	assert_null(Outlines.colour_on(pads[0].get_node("Item")))
-	pads[0].get_node("Item").visible = true
 	own.global_position = pads[0].global_position + Vector3(0, 200, 0)
 	world.show_outlines()
 	for pad: Node3D in pads:
-		assert_null(Outlines.colour_on(pad.get_node("Item")), pad.name)
+		assert_eq(Outlines.colour_on(pad.get_node("Item")) != null, pad.get_node("Item").visible, "%s, from far off" % pad.name)
+	pads[0].get_node("Item").visible = false
+	world.show_outlines()
+	assert_null(Outlines.colour_on(pads[0].get_node("Item")))
 
 
 func test_the_setting_turns_every_outline_off() -> void:

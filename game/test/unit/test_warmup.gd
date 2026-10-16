@@ -63,7 +63,7 @@ func test_the_arena_draws_it_all_for_a_few_frames_and_clears_it_away() -> void:
 	var props: Node3D = world.get_node("Warmup")
 	assert_not_null(Outlines.colour_on(props.get_child(0)), "the outlines too")
 	assert_true(Outlines.through_walls(props.get_child(0)))
-	assert_false(Outlines.through_walls(props.get_child(1)), "both kinds")
+	assert_true(Outlines.is_glow(props.get_child(1)), "and the glow")
 	assert_gt(world.effects.get_child_count(), 5)
 	assert_true(world.hurt_view.get_node("Red").visible, "and what being hurt looks like")
 	assert_true(world.hurt_view.get_node("Blur").visible)
