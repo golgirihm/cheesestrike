@@ -69,9 +69,10 @@ static func keys_for(action: String) -> Array:
 ## The name of the key with physical code `code`, as the keyboard labels it.
 static func key_name(code: int) -> String:
 	# The physical code names the key by its place on a US keyboard; where the
-	# keyboard can say what this one's key is labelled, that's better.
+	# keyboard can say what this one's key is labelled, that's better. A
+	# browser can't say, and asking it logs an error each time.
 	var shown := code
-	if code != 0 and DisplayServer.get_name() != "headless":
+	if code != 0 and DisplayServer.get_name() != "headless" and not OS.has_feature("web"):
 		var labelled := DisplayServer.keyboard_get_label_from_physical(code)
 		if labelled != KEY_NONE:
 			shown = labelled
