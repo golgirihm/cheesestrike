@@ -343,3 +343,27 @@ func test_what_can_be_hit_is_where_it_is_drawn_standing_and_kneeling() -> void:
 			for side in ["Left", "Right"]:
 				var leg: AABB = (parts[2][0] as AABB).merge(parts[3][0])
 				assert_true(leg.grow(0.05).has_point(at.call(side + "LowerLeg")), "%s knee in the legs" % side)
+
+
+func test_a_pistol_is_held_out_in_both_hands_and_a_rifle_carried() -> void:
+	assert_eq(SOLDIER.grip_of("pistol"), "pistol")
+	assert_eq(SOLDIER.grip_of("blaster"), "rifle", "anything else as a rifle")
+	assert_eq(WeaponModels.build("pistol").get_meta("weapon"), "pistol", "a weapon's model says which it is")
+	if soldier == null:
+		pending("The licensed assets aren't checked out.")
+		return
+	var gun := Node3D.new()
+	add_child_autofree(gun)
+	var rifle := WeaponModels.build("blaster")
+	gun.add_child(rifle)
+	soldier.hold_weapon(gun)
+	_frames(10)
+	assert_almost_eq(soldier._tree.get("parameters/upper/blend_amount"), 0.0, 0.001, "a rifle carried")
+	gun.remove_child(rifle)
+	rifle.free()
+	gun.add_child(WeaponModels.build("pistol"))
+	soldier.hold_weapon(gun)
+	_frames(10)
+	assert_eq(soldier._tree.get("parameters/acts/current_state"), "pistol_aim", "a pistol held out")
+	assert_almost_eq(soldier._tree.get("parameters/upper/blend_amount"), 1.0, 0.001)
+	assert_eq(soldier._spine.in_hand, SOLDIER.hold("pistol").in_hand, "in the pistol's grip")

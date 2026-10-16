@@ -69,6 +69,8 @@ static var _materials := {}
 static func build(id: String) -> Node3D:
 	var model := Node3D.new()
 	model.name = "Model"
+	# Which weapon it is, for a body holding it to know how.
+	model.set_meta("weapon", id)
 	var muzzle_z := -0.47
 	match id:
 		"pistol":
