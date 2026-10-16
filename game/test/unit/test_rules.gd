@@ -282,12 +282,11 @@ func test_the_owner_carries_what_the_rules_give() -> void:
 func test_the_menu_chooses_the_rules() -> void:
 	var main: Node = preload("res://main.tscn").instantiate()
 	add_child_autofree(main)
-	var button: Button = main.find_child("RulesButton", true, false)
-	assert_eq(button.text, "Rules: Standard")
-	button.pressed.emit()
-	assert_eq(button.text, "Rules: %s" % MatchSettings.RULE_NAMES[MatchSettings.RULES[1]])
+	var button: OptionButton = main.find_child("RulesButton", true, false)
+	assert_eq(button.text, "Standard")
+	button.item_selected.emit(1)
+	assert_eq(button.text, MatchSettings.RULE_NAMES[MatchSettings.RULES[1]])
 	assert_eq(main.host_settings().rules, MatchSettings.RULES[1])
 	assert_eq(main.host_settings().health, 1)
-	for press in MatchSettings.RULES.size() - 1:
-		button.pressed.emit()
-	assert_eq(main.host_settings().rules, MatchSettings.STANDARD, "and round again")
+	button.item_selected.emit(0)
+	assert_eq(main.host_settings().rules, MatchSettings.STANDARD)

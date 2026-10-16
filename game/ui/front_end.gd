@@ -165,6 +165,9 @@ func _ways() -> Control:
 		column.add_child(way)
 		_buttons[choice[0]] = way
 	Look.emphasise(_buttons.play)
+	# On a short screen, or with big text, the list scrolls rather than
+	# being cut off.
+	FitScroll.wrap(column)
 	return centre
 
 
@@ -212,4 +215,5 @@ func _credits() -> Control:
 	back.custom_minimum_size = Vector2(0, 44)
 	back.pressed.connect(show_credits.bind(false))
 	rows.add_child(back)
+	FitScroll.wrap(rows)
 	return centre

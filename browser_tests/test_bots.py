@@ -10,10 +10,9 @@ class BotsTest(GameTestCase):
     def test_a_bot_joins_the_hosts_session_and_everyone_sees_it_move(self):
         host = self.open_game()
         host.choose("BotsButton", "1 bot")
-        host.choose("BotSkillButton", "Bots: Easy")
+        host.choose("BotSkillButton", "Easy")
         code = host.host()
-        # Someone to play against, so the match begins at once.
-        state = host.wait_for("s.players.length === 2 && !s.combat.match.startsWith('Warm-up')")
+        state = host.wait_for("s.players.length === 2")
         bot = next(player for player in state["players"] if not player["mine"])
         self.assertLess(bot["id"], 0)
         self.assertTrue(bot["name"].startswith("[bot] "))
@@ -31,7 +30,7 @@ class BotsTest(GameTestCase):
     def test_a_bot_makes_way_when_the_session_is_full(self):
         host = self.open_game()
         host.choose("BotsButton", "1 bot")
-        host.choose("MaxPlayersButton", "Up to 2 players")
+        host.choose("MaxPlayersButton", "Up to 2")
         code = host.host()
         host.wait_for("s.players.length === 2 && s.players.some((p) => p.id < 0)")
         joiner = self.open_game()

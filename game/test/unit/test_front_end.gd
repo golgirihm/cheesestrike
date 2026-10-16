@@ -289,3 +289,30 @@ func test_hosting_shows_the_arena_until_it_is_there_and_then_goes() -> void:
 	main._on_session_failed("No such session")
 	assert_false(main.join_screen.visible)
 	assert_true(main.menu.visible)
+
+
+func test_a_screen_too_short_for_a_panel_scrolls_it_instead_of_cutting_it_off() -> void:
+	var saved: float = Settings.get_value(Look.MENU_TEXT)
+	Settings.set_value(Look.MENU_TEXT, Look.MOST_TEXT)
+	Look.refresh()
+	main._on_way_in_chosen("play")
+	main.sessions_panel.show()
+	# A long session list, more than any screen holds.
+	var listed := []
+	for index in 30:
+		listed.append({"code": "AB%02d" % index, "players": 1, "settings": {}})
+	main._show_sessions(listed)
+	await wait_process_frames(3)
+	var screen: Rect2 = main.menu.get_viewport_rect()
+	var panel: Control = main.menu.get_node("Panel")
+	var scroll: FitScroll = panel.find_children("*", "FitScroll", true, false)[0]
+	assert_true(scroll.scrolls(), "the list scrolls")
+	assert_lte(panel.size.y, screen.size.y, "and the panel fits on the screen")
+	assert_true(screen.encloses(panel.get_global_rect()), "with nothing cut off at the top or bottom")
+	Settings.set_value(Look.MENU_TEXT, 1.0)
+	Look.refresh()
+	main._show_sessions([])
+	await wait_process_frames(3)
+	assert_false(scroll.scrolls(), "a short list doesn't")
+	Settings.set_value(Look.MENU_TEXT, saved)
+	Look.refresh()

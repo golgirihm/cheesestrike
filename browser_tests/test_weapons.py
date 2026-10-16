@@ -111,7 +111,7 @@ class OverloadTest(GameTestCase):
         host = self.open_game()
         # On the small arena, whoever is knocked out comes back straight ahead
         # of the host, the spot farthest from it.
-        host.choose("MapButton", "Map: Brie Box")
+        host.choose("MapButton", "Brie Box")
         joiner = self.open_game()
         joiner.join(host.host())
         host.wait_for("s.players.length === 2")

@@ -16,7 +16,7 @@ class ModesTest(GameTestCase):
     def start(self, mode, map="Brie Box"):
         host = self.open_game()
         host.choose("ModeButton", mode)
-        host.choose("MapButton", f"Map: {map}")
+        host.choose("MapButton", f"{map}")
         code = host.host()
         joiner = self.open_game()
         joiner.join(code)

@@ -33,7 +33,7 @@ class ArenaEditorTest(GameTestCase):
     def test_an_arena_made_in_the_editor_is_hosted_for_whoever_joins(self):
         host = self.open_game(fresh=True)
         _, arena = self.make_arena(host)
-        host.choose("MapButton", "Map: Custom arena")
+        host.choose("MapButton", "Custom arena")
         code = host.host()
         state = host.wait_for("s.screen === 'game' && s.map === 'custom' && s.players.length === 1")
         self.assertEqual(state["arena_shown"], arena)
@@ -51,7 +51,7 @@ class ArenaEditorTest(GameTestCase):
         other = self.open_link(link)
         state = other.wait_for("s.screen === 'menu' && s.custom_arena")
         self.assertEqual(state["custom_arena"], arena)
-        self.assertEqual(state["match_buttons"][4], "Map: Custom arena")
+        self.assertEqual(state["match_buttons"][4], "Custom arena")
         self.assertIn("arena from the link", state["status"])
         self.assertNotIn("arena=", state["address"], "taken off the address once read")
         # It opens in their editor as it was made.
@@ -61,7 +61,7 @@ class ArenaEditorTest(GameTestCase):
 
     def test_with_no_arena_made_the_usual_one_is_hosted(self):
         game = self.open_game(fresh=True)
-        game.choose("MapButton", "Map: Custom arena (none made yet)")
+        game.choose("MapButton", "Custom arena (none made yet)")
         game.host()
         state = game.wait_for("s.screen === 'game' && s.players.length === 1")
         self.assertEqual(state["map"], "canyon")
