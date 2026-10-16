@@ -282,6 +282,20 @@ func test_a_player_opens_and_shuts_the_door_beside_them_and_everyone_sees_it_tur
 	assert_eq(world.doors_shown(), [0.0])
 
 
+func test_a_door_keeps_turning_open_while_the_host_sends_its_state() -> void:
+	# A player who isn't the host is sent the state many times a second, and
+	# each one names the arena already loaded: the door goes on turning.
+	await _start("dairy")
+	var door: Dictionary = world.moving_parts.doors[0]
+	var own: Node3D = world.player_node(1)
+	own.global_position = door.position + Vector3(3, -door.size.y / 2.0, 0)
+	own.use_door()
+	for step in 60:
+		match_.state_changed.emit()
+		await wait_physics_frames(1)
+	assert_eq(world.doors_shown(), [1.0], "swung right open")
+
+
 func test_a_door_is_drawn_as_a_door_with_a_knob_each_side() -> void:
 	await _start("dairy")
 	var body: Node3D = world.map.get_children().filter(func(part: Node) -> bool: return part.is_in_group("doors"))[0]
