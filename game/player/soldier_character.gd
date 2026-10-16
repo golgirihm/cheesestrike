@@ -32,7 +32,7 @@ const MODEL_EYE_HEIGHT := 1.69
 const WALK_PACE := 1.26
 const RUN_PACE := 3.03
 ## The animations that go round and round rather than playing once.
-const LOOPED := ["idle", "aim", "walk", "walk_back", "walk_left", "walk_right", "run", "run_back", "run_left", "run_right", "fire", "crouch", "crouch_aim", "crouch_walk", "crouch_walk_back", "crouch_walk_left", "crouch_walk_right", "emote_dance"]
+const LOOPED := ["idle", "aim", "walk", "walk_back", "walk_left", "walk_right", "run", "run_back", "run_left", "run_right", "fire", "crouch", "crouch_aim", "crouch_walk", "crouch_walk_back", "crouch_walk_left", "crouch_walk_right", "emote_dance", "emote_wave"]
 ## What the upper body plays for each of CharacterMotion's actions, and each
 ## emote (see Emotes). Nothing for an emote with no animation.
 const ACTIONS := {

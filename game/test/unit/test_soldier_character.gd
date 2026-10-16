@@ -79,6 +79,11 @@ func test_its_legs_play_what_the_player_is_doing() -> void:
 	soldier.set_motion(0.0, true, 5.0)
 	_frames(10)
 	assert_eq(soldier._tree.get("parameters/legs/current_state"), "jump", "and in the air")
+	soldier.set_motion(Movement.WALK_SPEED * Movement.CROUCH_FACTOR, false)
+	soldier.set_crouch(1.0)
+	_frames(10)
+	assert_eq(soldier._tree.get("parameters/legs/current_state"), "crouch", "and crouched")
+	assert_gt((soldier._tree.get("parameters/crouched/blend_position") as Vector2).length(), 0.5, "walking crouched")
 
 
 func test_its_upper_body_acts_out_what_the_arms_do() -> void:
