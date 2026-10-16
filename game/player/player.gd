@@ -725,6 +725,9 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		_mouse_fire_held = false
+	elif event.is_action_pressed("interact") and door_in_reach():
+		# On a gamepad the same button reloads, away from a door.
+		use_door()
 	elif event.is_action_pressed("reload"):
 		_reload_pressed = true
 	elif event.is_action_pressed("overload"):
@@ -856,6 +859,17 @@ func aim_gun_position() -> Vector3:
 	var sight: Node3D = muzzle.get_parent().get_node_or_null("Sight") if muzzle != null else null
 	var at := sight.position if sight != null else Vector3.ZERO
 	return Vector3(0, 0, -AIM_EYE_RELIEF) - at * VIEW_GUN_SCALE
+
+
+## Whether there is a door this player could open or close just now.
+func door_in_reach() -> bool:
+	return alive and world != null and world.get("moving_parts") != null and MovingParts.door_near(world.moving_parts.doors, global_position) != -1
+
+
+## Opens the door beside this player, or shuts it if it is open.
+func use_door() -> void:
+	if match_ != null and door_in_reach() and not _menu_open():
+		match_.use_door()
 
 
 ## Whether this player is drawn as a ghost: just come back, and not to be
@@ -1122,6 +1136,9 @@ func _process(delta: float) -> void:
 	_animate(delta)
 	_show_protection()
 	if _mine:
+		var controls := _touch_controls()
+		if controls != null:
+			controls.offered = ["door"] if door_in_reach() else []
 		var tip := shake.tick(delta, Settings.motion("screen_shake"))
 		# The view climbs with the weapon's kick, and settles once the run of
 		# fire is over.
@@ -1808,6 +1825,9 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 		return
 	if event.pressed:
 		var button: String = controls.button_at(event.position) if controls != null else ""
+		if button == "menu":
+			controls.menu_pressed.emit()
+			return
 		if not alive and world != null and world.get("watch_camera") != null:
 			# Out of play, the buttons choose who to watch.
 			if button == "fire":
@@ -1818,6 +1838,8 @@ func _handle_touch(event: InputEventScreenTouch) -> void:
 				world.watch_camera.toggle_free()
 		if button == "reload":
 			_reload_pressed = true
+		elif button == "door":
+			use_door()
 		elif button == "swap":
 			_switch_step += 1
 		elif button == "aim":

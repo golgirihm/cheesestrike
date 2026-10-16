@@ -183,14 +183,13 @@ func jump_pad(at: Vector3, launch: Vector3) -> void:
 	map.get_node("JumpPads").add_child(marker)
 
 
-## A door of `extent` filling a doorway centred at `at`, which slides down
-## out of the way when anyone comes near (see MovingParts).
+## A door of `extent` filling a doorway centred at `at`, which players open
+## and close (see MovingParts).
 func door(at: Vector3, extent: Vector3) -> void:
 	var marker := Marker3D.new()
 	marker.name = _next("Door")
 	marker.position = at
 	marker.set_meta("size", extent)
-	marker.set_meta("slide", Vector3.DOWN * (extent.y + 0.05))
 	map.get_node("Doors").add_child(marker)
 
 

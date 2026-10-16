@@ -284,7 +284,8 @@ static func _windows(colour: Color) -> StandardMaterial3D:
 # Draws the arena's jump pads and ladders where its scene marks them.
 # What hurts and what moves (see MovingParts): the grater's teeth and the
 # vat of fondue are only drawn, and are felt through the host; doors and
-# lifts are solid things the world moves.
+# lifts are solid things the world moves. A door is a panelled wooden one
+# with a knob on each side, at the end away from its hinges.
 static func _moving_parts(map: Node3D) -> void:
 	var hazards := map.get_node_or_null("Hazards")
 	if hazards != null:
@@ -316,18 +317,65 @@ static func _moving_parts(map: Node3D) -> void:
 			body.add_to_group("doors" if kind == "Doors" else "lifts")
 			var shape := CollisionShape3D.new()
 			var box := BoxShape3D.new()
-			box.size = size
+			box.size = size if kind != "Doors" else door_slab(size)
 			shape.shape = box
 			body.add_child(shape)
-			var colour := Color(0.5, 0.32, 0.2) if kind == "Doors" else Color(0.6, 0.63, 0.68)
-			body.add_child(Rounded.instance(Rounded.box(size, 0.08), _material(colour)))
 			if kind == "Doors":
-				# A band across it, to tell it from a wall.
-				body.add_child(Rounded.instance(Rounded.box(Vector3(size.x + 0.04, 0.35, size.z + 0.04), 0.04), _material(INK.lightened(0.2)), Vector3(0, 0, 0)))
+				_door(body, size)
 			else:
+				body.add_child(Rounded.instance(Rounded.box(size, 0.08), _material(Color(0.6, 0.63, 0.68))))
 				body.add_child(Rounded.instance(Rounded.box(Vector3(size.x - 0.6, size.y + 0.04, size.z - 0.6), 0.04), _material(Color(0.2, 0.75, 0.8))))
 			map.add_child(body)
 			body.position = marker.position
+
+
+## How thick a door is, whatever the doorway it fills; how far in from its
+## edges its panels are; and the radius of its knobs and how far up it, as a
+## share of its height, they are.
+const DOOR_THICKNESS := 0.3
+const DOOR_PANEL_INSET := 0.45
+const KNOB_RADIUS := 0.17
+const KNOB_HEIGHT := 0.45
+
+
+## The slab of a door that fills a doorway of `size`: as wide and tall, and
+## DOOR_THICKNESS thick.
+static func door_slab(size: Vector3) -> Vector3:
+	return Vector3(size.x, size.y, DOOR_THICKNESS) if size.x >= size.z else Vector3(DOOR_THICKNESS, size.y, size.z)
+
+
+# Draws a door filling `size` round `body`'s middle: a wooden slab, a raised
+# panel above and below on each face, and a brass knob on a short neck on
+# each face at the end away from the hinges (see MovingParts.door_transform).
+static func _door(body: Node3D, size: Vector3) -> void:
+	var along := Vector3.RIGHT if size.x >= size.z else Vector3.BACK
+	var across := Vector3.BACK if along == Vector3.RIGHT else Vector3.RIGHT
+	var width := size.dot(along)
+	body.add_child(Rounded.instance(Rounded.box(door_slab(size), 0.05), _material(Color(0.5, 0.32, 0.2))))
+	var panel_wood := _material(Color(0.44, 0.27, 0.16))
+	var panel_height := (size.y - DOOR_PANEL_INSET * 3.0) / 2.0
+	var brass := StandardMaterial3D.new()
+	brass.albedo_color = Color(0.85, 0.66, 0.28)
+	brass.metallic = 0.8
+	brass.roughness = 0.35
+	var neck_size := Vector3.ONE * KNOB_RADIUS * 0.6
+	for side: float in [-1.0, 1.0]:
+		var face := across * side * (DOOR_THICKNESS / 2.0)
+		for row: float in [-1.0, 1.0]:
+			var panel := along * (width - DOOR_PANEL_INSET * 2.0) + Vector3.UP * panel_height + across * 0.06
+			var middle := Vector3.UP * row * (panel_height + DOOR_PANEL_INSET) / 2.0
+			body.add_child(Rounded.instance(Rounded.box(panel, 0.03), panel_wood, middle + face))
+		var knob_at := face + along * (width / 2.0 - DOOR_PANEL_INSET * 0.9) + Vector3.UP * (size.y * (KNOB_HEIGHT - 0.5))
+		body.add_child(Rounded.instance(Rounded.box(neck_size, 0.02), brass, knob_at + across * side * KNOB_RADIUS * 0.3))
+		var knob := MeshInstance3D.new()
+		knob.name = "Knob%d" % (2 if side > 0.0 else 1)
+		var ball := SphereMesh.new()
+		ball.radius = KNOB_RADIUS
+		ball.height = KNOB_RADIUS * 2.0
+		knob.mesh = ball
+		knob.material_override = brass
+		knob.position = knob_at + across * side * KNOB_RADIUS * 1.4
+		body.add_child(knob)
 
 
 static func _fixtures(map: Node3D) -> void:

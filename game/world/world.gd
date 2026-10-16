@@ -64,6 +64,8 @@ var match_keeper: MatchKeeper
 var _built_code := ""
 ## The loaded arena's hazards, doors and lifts, as MovingParts.of gives them.
 var moving_parts := {"hazards": [], "doors": [], "lifts": []}
+# How far each door has turned on its hinges, in radians.
+var _door_angles: Array[float] = []
 var menu_camera: Camera3D
 
 # The loaded arena's cheese (see cheese_blocks), each block's index by its
@@ -232,6 +234,7 @@ func load_map(id: String) -> void:
 	var arena := ArenaCode.decode(custom_code) if id == Maps.CUSTOM else {}
 	if id == Maps.CUSTOM and arena.is_empty():
 		return
+	_door_angles.clear()
 	if id == map_id and (id != Maps.CUSTOM or custom_code == _built_code):
 		return
 	var was_menu_view := menu_camera != null and menu_camera.current
@@ -646,18 +649,19 @@ func pickup_pads() -> Array:
 	return pads
 
 
-# Each door slides toward open or shut, as the host has it, and each lift
+# Each door turns toward open or shut, as the host has it, and each lift
 # is where the session's clock puts it: the same on every machine, moved in
 # step with the physics so that players are carried and stopped by them.
 func _physics_process(delta: float) -> void:
 	if map == null:
 		return
 	var doors := _parts_in("doors")
+	_door_angles.resize(doors.size())
 	for index in mini(doors.size(), moving_parts.doors.size()):
 		var door: Dictionary = moving_parts.doors[index]
-		var open: bool = match_.has_state() and index < match_.state.doors.size() and match_.state.doors[index]
-		var wanted: Vector3 = door.position + (door.slide if open else Vector3.ZERO)
-		doors[index].global_position = doors[index].global_position.move_toward(wanted, MovingParts.DOOR_SPEED * delta)
+		var way: int = match_.state.doors[index] if match_.has_state() and index < match_.state.doors.size() else 0
+		_door_angles[index] = move_toward(_door_angles[index], way * MovingParts.DOOR_OPEN_ANGLE, MovingParts.DOOR_TURN_SPEED * delta)
+		doors[index].global_transform = MovingParts.door_transform(door, _door_angles[index])
 	var lifts := _parts_in("lifts")
 	var time: float = match_.state.uptime if match_.has_state() else 0.0
 	for index in mini(lifts.size(), moving_parts.lifts.size()):
@@ -670,13 +674,11 @@ func _parts_in(group: String) -> Array:
 	return map.get_children().filter(func(part: Node) -> bool: return part.is_in_group(group)) if map != null else []
 
 
-## How far each door has slid toward open, from 0 to 1, for tests.
+## How far each door has turned toward open, from 0 to 1, for tests.
 func doors_shown() -> Array:
 	var shown := []
-	var doors := _parts_in("doors")
-	for index in mini(doors.size(), moving_parts.doors.size()):
-		var door: Dictionary = moving_parts.doors[index]
-		shown.append(snappedf(doors[index].global_position.distance_to(door.position) / maxf(door.slide.length(), 0.01), 0.01))
+	for index in mini(_door_angles.size(), moving_parts.doors.size()):
+		shown.append(snappedf(absf(_door_angles[index]) / MovingParts.DOOR_OPEN_ANGLE, 0.01))
 	return shown
 
 

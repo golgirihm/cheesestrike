@@ -100,7 +100,6 @@ func test_the_doorways_are_ways_in_and_each_has_a_door() -> void:
 	for door: Dictionary in doors:
 		assert_gt(door.size.y, BodyShape.HEIGHT, "tall enough to walk through")
 		assert_gt(maxf(door.size.x, door.size.z), BodyShape.RADIUS * 2.0 + 1.0, "and wide enough")
-		assert_almost_eq(door.slide.y, -(door.size.y + 0.05), 0.01, "it goes down out of the way")
 		# With no door drawn, as before the scenery dresses it, the doorway is clear.
 		var doorway := Vector3(door.position.x, 0.05, door.position.z)
 		assert_true(_fits(doorway), "a player fits through at %s" % doorway)
@@ -211,10 +210,11 @@ func test_in_the_city_a_door_opens_for_whoever_comes_and_shuts_after() -> void:
 	# Just outside it, on whichever side is open ground.
 	var out := Vector3(door.size.z, 0, door.size.x).normalized() * 4.0
 	var outside := doorway + out if _fits(doorway + out * 1.5) else doorway - out
-	for step in 120:
+	world.player_node(1).global_position = outside
+	world.player_node(1).use_door()
+	for step in 90:
 		world.player_node(1).global_position = outside
-		world.match_._physics_process(1.0 / 60.0)
 		await wait_physics_frames(1)
-	assert_true(world.match_.state.doors[0], "it opens")
-	assert_eq(world.match_.state.doors.count(true), 1, "and only that one")
+	assert_ne(world.match_.state.doors[0], 0, "it opens")
+	assert_eq(world.match_.state.doors.count(0), world.match_.state.doors.size() - 1, "and only that one")
 	assert_true(_fits(doorway), "through the open doorway")

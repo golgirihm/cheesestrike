@@ -1,13 +1,13 @@
 class_name MovingParts
 extends RefCounted
 ## The parts of an arena that hurt or move, all decided by the host: hazards
-## that hurt whoever stands in them, doors that open for anyone who comes
-## near, and lifts that go up and down by the clock.
+## that hurt whoever stands in them, doors that players open and close, and
+## lifts that go up and down by the clock.
 ##
 ## An arena lists its own as Marker3Ds: under "Hazards", each with a `kind`
 ## and a `size` (how far it reaches across, as a Vector3 of which x and z
-## count); under "Doors", each with the `size` of the door and the `slide`
-## that takes it out of the way when open; under "Lifts", each at the low
+## count); under "Doors", each with the `size` of the door, which turns on
+## hinges at one end of its width; under "Lifts", each at the low
 ## end of its travel with the `size` of its platform and how far it goes up
 ## as its `rise`. Scenery draws them and makes the doors and platforms
 ## solid; the world moves them.
@@ -25,24 +25,25 @@ const DAMAGE := {GRATER: 30.0, FONDUE: 45.0}
 const SLOW := {GRATER: 1.0, FONDUE: 0.8}
 ## Seconds between one hurt from a hazard and the next.
 const HURT_EVERY := 0.5
-## How near a door's middle a player must come for it to open, and seconds
-## it stays open after the last has gone.
-const DOOR_REACH := 6.0
-const DOOR_HOLD := 1.5
-## How fast a door slides, and a lift moves, in metres a second; and seconds
-## a lift waits at each end.
-const DOOR_SPEED := 8.0
+## How near a door's middle a player must be to open or close it, and a bot
+## for a shut door to be opened for it, which it can't do itself.
+const DOOR_REACH := 4.5
+const BOT_DOOR_REACH := 4.0
+## How far a door turns on its hinges to be open, either way, and how fast,
+## in radians a second.
+const DOOR_OPEN_ANGLE := 1.66
+const DOOR_TURN_SPEED := 3.5
+## How fast a lift moves, in metres a second, and seconds it waits at each
+## end.
 const LIFT_SPEED := 2.5
 const LIFT_WAIT := 3.0
 
 # Player id -> seconds they have stood in a hazard since it last hurt them.
 var _in_hazard := {}
-# For each door, seconds since anyone was near it.
-var _door_empty: Array[float] = []
 
 
 ## What an arena has, read from its scene: {"hazards": [{position, size,
-## kind}], "doors": [{position, size, slide}], "lifts": [{position, size,
+## kind}], "doors": [{position, size}], "lifts": [{position, size,
 ## rise}]}.
 static func of(map: Node) -> Dictionary:
 	var found := {"hazards": [], "doors": [], "lifts": []}
@@ -54,9 +55,7 @@ static func of(map: Node) -> Dictionary:
 			var part := {"position": marker.global_position if marker.is_inside_tree() else marker.position, "size": marker.get_meta("size", Vector3(4, 1, 4))}
 			if kind == "Hazards":
 				part["kind"] = String(marker.get_meta("kind", GRATER))
-			elif kind == "Doors":
-				part["slide"] = marker.get_meta("slide", Vector3.DOWN * 5.0)
-			else:
+			elif kind == "Lifts":
 				part["rise"] = float(marker.get_meta("rise", 3.0))
 			found[kind.to_lower()].append(part)
 	return found
@@ -101,21 +100,56 @@ func hurt(delta: float, hazards: Array, standing: Dictionary) -> Array[Dictionar
 	return hurts
 
 
-## Which of `doors` are open, after `delta` more seconds: open while any
-## player in play is near, and for a moment after. `open` is how they were,
-## and is returned changed where they have.
-func doors_open(delta: float, doors: Array, standing: Dictionary, open: Array) -> Array:
-	var now := []
-	_door_empty.resize(doors.size())
+## The one of `doors` nearest a player whose feet are at `feet`, within
+## `reach` of its middle across and not a floor away, or -1.
+static func door_near(doors: Array, feet: Vector3, reach := DOOR_REACH) -> int:
+	var best := -1
+	var nearest := INF
 	for index in doors.size():
-		var door: Dictionary = doors[index]
-		var near := false
-		for player: Dictionary in standing.values():
-			var off: Vector3 = player.at - door.position
-			near = near or (player.alive and Vector2(off.x, off.z).length() <= DOOR_REACH and absf(off.y) <= 6.0)
-		_door_empty[index] = 0.0 if near else _door_empty[index] + delta
-		var was: bool = index < open.size() and open[index]
-		now.append(near or (was and _door_empty[index] < DOOR_HOLD))
+		var off: Vector3 = feet - doors[index].position
+		var across := Vector2(off.x, off.z).length()
+		if across <= reach and absf(off.y + doors[index].size.y / 2.0) <= 2.5 and across < nearest:
+			best = index
+			nearest = across
+	return best
+
+
+## Which way across its width `door` lies: along X or along Z.
+static func door_width_axis(door: Dictionary) -> Vector3:
+	return Vector3.RIGHT if door.size.x >= door.size.z else Vector3.BACK
+
+
+## Which way `door` opens for someone at `from`, 1 or -1 (see door_transform):
+## away from them, so it doesn't swing into them.
+static func door_swing(door: Dictionary, from: Vector3) -> int:
+	# Where its free end goes as it turns the 1 way.
+	var goes := Basis(Vector3.UP, 0.5) * door_width_axis(door) - door_width_axis(door)
+	return 1 if (from - door.position).dot(goes) < 0.0 else -1
+
+
+## Where `door` is when turned `angle` radians on its hinges, which are at the
+## end of its width toward -X or -Z: as a transform for the door, from its
+## middle.
+static func door_transform(door: Dictionary, angle: float) -> Transform3D:
+	var half: Vector3 = door_width_axis(door) * door.size.dot(door_width_axis(door)) / 2.0
+	var turned := Basis(Vector3.UP, angle)
+	return Transform3D(turned, door.position - half + turned * half)
+
+
+## Which of `doors` are open, and which way (see door_swing), once every shut
+## one a bot in `bots` is near has been opened for it: bots can't open doors,
+## and would stop at them. `bots` maps each bot's id to {"at": its feet,
+## "alive"}; `open` is how the doors were.
+static func open_for_bots(doors: Array, bots: Dictionary, open: Array) -> Array:
+	var now := open.duplicate()
+	now.resize(doors.size())
+	for index in doors.size():
+		if now[index] == null:
+			now[index] = 0
+	for bot: Dictionary in bots.values():
+		var index := door_near(doors, bot.at, BOT_DOOR_REACH) if bot.alive else -1
+		if index != -1 and now[index] == 0:
+			now[index] = door_swing(doors[index], bot.at)
 	return now
 
 

@@ -52,7 +52,8 @@ var team_kills := [0, 0]
 var countdown := 0.0
 ## Set as the countdown ends, for the host to tell everyone.
 var just_started := false
-## Which of the arena's doors are open (see MovingParts), in its own order.
+## How each of the arena's doors stands (see MovingParts), in its own order:
+## 0 shut, or open one way (1) or the other (-1).
 var doors: Array = []
 ## The most doors an arena may have: a large map has two for each house.
 const MAX_DOORS := 64
@@ -803,7 +804,7 @@ static func from_dict(data: Dictionary) -> MatchState:
 	var open: Variant = data.get("doors")
 	if open is Array:
 		for door: Variant in open.slice(0, MAX_DOORS):
-			state.doors.append(door == true)
+			state.doors.append(clampi(int(door), -1, 1) if door is int or door is float else 0)
 	var run: Variant = data.get("uptime")
 	if (run is float or run is int) and is_finite(float(run)):
 		state.uptime = maxf(float(run), 0.0)

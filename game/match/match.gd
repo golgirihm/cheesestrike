@@ -228,6 +228,38 @@ func is_host() -> bool:
 	return multiplayer.multiplayer_peer != null and multiplayer.is_server()
 
 
+## This machine's own player opens the door nearest them, or shuts it if it
+## is open (see MovingParts.door_near).
+func use_door() -> void:
+	if is_host():
+		_use_door(multiplayer.get_unique_id())
+	else:
+		_request_door.rpc_id(1)
+
+
+func _use_door(id: int) -> void:
+	var node: Node3D = world.player_node(id) if world != null else null
+	var record := state.player(id)
+	if node == null or record == null or not record.alive or world.map_id != state.settings.map:
+		return
+	var doors: Array = world.moving_parts.doors
+	var index := MovingParts.door_near(doors, node.global_position)
+	if index == -1:
+		return
+	state.doors.resize(doors.size())
+	for door in state.doors.size():
+		if state.doors[door] == null:
+			state.doors[door] = 0
+	state.doors[index] = 0 if state.doors[index] != 0 else MovingParts.door_swing(doors[index], node.global_position)
+	_changed()
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_door() -> void:
+	if is_host():
+		_use_door(multiplayer.get_remote_sender_id())
+
+
 ## This machine's own player has landed from a fall that hurts them by
 ## `amount` (see Movement.fall_damage).
 func fall(amount: float) -> void:
@@ -1420,8 +1452,8 @@ func _replay(clip: Variant, about: Variant, title: Variant) -> void:
 		replay_shown.emit(clip, about, title.left(120))
 
 
-# The host hurts whoever stands in a hazard, and opens doors for whoever
-# comes near.
+# The host hurts whoever stands in a hazard, and opens the doors bots come
+# to, which they can't do themselves.
 func _run_moving_parts(delta: float) -> void:
 	# Only in the arena the match is being played on.
 	if world.map_id != state.settings.map:
@@ -1431,14 +1463,17 @@ func _run_moving_parts(delta: float) -> void:
 	if parts.hazards.is_empty() and parts.doors.is_empty():
 		return
 	var standing := {}
+	var bots := {}
 	for node: Node3D in world.players.get_children():
 		var record := state.player(node.name.to_int())
 		if record != null and not node.is_queued_for_deletion():
 			standing[record.id] = {"at": node.global_position, "alive": record.alive and _is_where_shown(record.id, node)}
+			if Bots.is_bot(record.id) and not Bots.is_target(record.id):
+				bots[record.id] = standing[record.id]
 	if state.is_playing():
 		for hurt: Dictionary in _moving.hurt(delta, parts.hazards, standing):
 			_harm(hurt.id, hurt.id, hurt.amount, hurt.at, hurt.kind, false)
-	var open := _moving.doors_open(delta, parts.doors, standing, state.doors)
+	var open := MovingParts.open_for_bots(parts.doors, bots, state.doors)
 	if open != state.doors:
 		state.doors = open
 		_changed()
