@@ -238,6 +238,7 @@ func _ready() -> void:
 	_setup_match_buttons()
 	Settings.changed.connect(_show_match_setting)
 	menu_button.pressed.connect(open_pause_menu)
+	touch_controls.menu_pressed.connect(open_pause_menu)
 	resume_button.pressed.connect(close_pause_menu)
 	menu_leave_button.pressed.connect(_leave)
 	help_button.pressed.connect(_show_help_from_menu)

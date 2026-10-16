@@ -106,30 +106,41 @@ func test_the_feed_names_a_hazard() -> void:
 
 # --- Doors ------------------------------------------------------------------
 
-func test_a_door_opens_for_anyone_near_and_shuts_a_moment_after_they_go() -> void:
-	var doors := [{"position": Vector3(0, 3, 0), "size": Vector3(1, 6, 4), "slide": Vector3.DOWN * 6.0}]
-	var open := parts.doors_open(0.1, doors, {}, [])
-	assert_eq(open, [false])
-	open = parts.doors_open(0.1, doors, {1: _at(Vector3(MovingParts.DOOR_REACH + 1.0, 0, 0))}, open)
-	assert_eq(open, [false], "not near enough")
-	open = parts.doors_open(0.1, doors, {1: _at(Vector3(MovingParts.DOOR_REACH - 0.5, 0, 0))}, open)
-	assert_eq(open, [true])
-	open = parts.doors_open(MovingParts.DOOR_HOLD * 0.5, doors, {}, open)
-	assert_eq(open, [true], "held a moment")
-	open = parts.doors_open(MovingParts.DOOR_HOLD * 0.6, doors, {}, open)
-	assert_eq(open, [false])
+func test_the_door_to_use_is_the_nearest_within_reach_on_the_same_floor() -> void:
+	var doors := [{"position": Vector3(0, 3, 0), "size": Vector3(1, 6, 4)}, {"position": Vector3(6, 3, 0), "size": Vector3(1, 6, 4)}]
+	assert_eq(MovingParts.door_near(doors, Vector3(1, 0, 0)), 0)
+	assert_eq(MovingParts.door_near(doors, Vector3(4, 0, 0)), 1, "the nearer")
+	assert_eq(MovingParts.door_near(doors, Vector3(-MovingParts.DOOR_REACH - 0.5, 0, 0)), -1, "not near enough")
+	assert_eq(MovingParts.door_near(doors, Vector3(1, 10, 0)), -1, "on another floor")
+	assert_eq(MovingParts.door_near([], Vector3.ZERO), -1)
 
 
-func test_a_door_does_not_open_for_the_knocked_out_or_for_someone_on_another_floor() -> void:
-	var doors := [{"position": Vector3(0, 3, 0), "size": Vector3(1, 6, 4), "slide": Vector3.DOWN * 6.0}]
-	assert_eq(parts.doors_open(0.1, doors, {1: _at(Vector3(1, 0, 0), false)}, []), [false])
-	assert_eq(parts.doors_open(0.1, doors, {1: _at(Vector3(1, 14, 0))}, []), [false])
-	assert_eq(parts.doors_open(0.1, [], {1: _at(Vector3.ZERO)}, []), [])
+func test_a_door_turns_on_hinges_at_one_end_and_away_from_who_opens_it() -> void:
+	# Across X: its hinges are at its -X end, and its far end swings.
+	var door := {"position": Vector3(0, 3, 0), "size": Vector3(4, 6, 0.5)}
+	var hinge := Vector3(-2, 3, 0)
+	for angle: float in [0.0, 0.5, MovingParts.DOOR_OPEN_ANGLE, -MovingParts.DOOR_OPEN_ANGLE]:
+		var placed := MovingParts.door_transform(door, angle)
+		assert_almost_eq((placed * Vector3(-2, 0, 0)).distance_to(hinge), 0.0, 0.001, "the hinged end stays put at %s" % angle)
+	assert_eq(MovingParts.door_transform(door, 0.0), Transform3D(Basis(), door.position), "shut, it fills the doorway")
+	for from: Vector3 in [Vector3(0, 0, 3), Vector3(0, 0, -3)]:
+		var way := MovingParts.door_swing(door, from)
+		var free_end := MovingParts.door_transform(door, way * MovingParts.DOOR_OPEN_ANGLE) * Vector3(2, 0, 0)
+		assert_eq(signf(free_end.z), -signf(from.z), "swung to the far side from %s" % from)
+	# Across Z, the same.
+	var other := {"position": Vector3(0, 3, 0), "size": Vector3(0.5, 6, 4)}
+	var swung := MovingParts.door_transform(other, MovingParts.door_swing(other, Vector3(3, 0, 0)) * MovingParts.DOOR_OPEN_ANGLE) * Vector3(0, 0, 2)
+	assert_lt(swung.x, 0.0)
 
 
-func test_each_door_is_its_own() -> void:
-	var doors := [{"position": Vector3(0, 3, 0), "size": Vector3.ONE, "slide": Vector3.DOWN}, {"position": Vector3(40, 3, 0), "size": Vector3.ONE, "slide": Vector3.DOWN}]
-	assert_eq(parts.doors_open(0.1, doors, {1: _at(Vector3(39, 0, 0))}, []), [false, true])
+func test_a_shut_door_is_opened_for_a_bot_that_comes_to_it_and_left_as_it_is() -> void:
+	var doors := [{"position": Vector3(0, 3, 0), "size": Vector3(0.5, 6, 4)}, {"position": Vector3(40, 3, 0), "size": Vector3(0.5, 6, 4)}]
+	assert_eq(MovingParts.open_for_bots(doors, {}, []), [0, 0])
+	var open := MovingParts.open_for_bots(doors, {-1: _at(Vector3(38, 0, 0))}, [0, 0])
+	assert_eq(open, [0, MovingParts.door_swing(doors[1], Vector3(38, 0, 0))])
+	assert_eq(MovingParts.open_for_bots(doors, {}, open), open, "it stays open after")
+	assert_eq(MovingParts.open_for_bots(doors, {-1: _at(Vector3(1, 0, 0), false)}, [0, 0]), [0, 0], "not for one knocked out")
+	assert_eq(MovingParts.open_for_bots(doors, {-1: _at(Vector3(38, 0, 0))}, [0, -1]), [0, -1], "nor turned round")
 
 
 # --- Lifts ------------------------------------------------------------------
@@ -164,7 +175,6 @@ func test_an_arena_lists_its_parts_and_most_have_none() -> void:
 	assert_eq(found.hazards.map(func(hazard: Dictionary) -> String: return hazard.kind), [MovingParts.FONDUE, MovingParts.GRATER])
 	assert_eq(found.doors.size(), 1)
 	assert_eq(found.lifts.size(), 1)
-	assert_gt(found.doors[0].slide.length(), found.doors[0].size.y * 0.9, "the door goes right out of the way")
 	world.load_map("box")
 	assert_eq(world.moving_parts, {"hazards": [], "doors": [], "lifts": []})
 	world.load_map("canyon")
@@ -221,39 +231,73 @@ func test_wading_through_fondue_is_slow_for_the_player_themselves() -> void:
 	assert_gt(speed, 1.0, "but not stuck")
 
 
-func test_the_host_opens_the_door_for_whoever_comes_near_and_everyone_sees_it_slide() -> void:
+func test_a_player_opens_and_shuts_the_door_beside_them_and_everyone_sees_it_turn() -> void:
 	await _start("dairy")
 	var door: Dictionary = world.moving_parts.doors[0]
 	var own: Node3D = world.player_node(1)
 	own.global_position = Vector3(10, 0, 12)
 	match_._physics_process(1.0 / 60.0)
-	assert_eq(match_.state.doors, [false])
+	await wait_physics_frames(1)
+	assert_eq(match_.state.doors, [0])
+	assert_eq(world.doors_shown(), [0.0])
+	assert_false(own.door_in_reach())
+	match_.use_door()
+	assert_eq(match_.state.doors, [0], "nothing to open from over there")
+	# Coming near does nothing by itself.
+	var beside: Vector3 = door.position + Vector3(3, -door.size.y / 2.0, 0)
+	own.global_position = beside
+	for step in 30:
+		match_._physics_process(1.0 / 60.0)
+		await wait_physics_frames(1)
 	assert_eq(world.doors_shown(), [0.0])
 	# It stops a shot and a player while it is shut.
 	var cast := Match.wall_caster(world.get_world_3d().direct_space_state)
 	var through_from: Vector3 = door.position + Vector3(4, 0, 0)
 	var through_to: Vector3 = door.position + Vector3(-3, 0, 0)
 	assert_lt(cast.call(through_from, through_to), 7.0)
+	assert_true(own.door_in_reach())
+	assert_eq(preload("res://ui/combat_hud.gd").door_prompt(own, world), "E  ·  open the door", "and is told how")
 	watch_signals(match_)
-	own.global_position = Vector3(door.position.x + 3.0, 0, door.position.z)
-	match_._physics_process(1.0 / 60.0)
-	assert_eq(match_.state.doors, [true])
+	own.use_door()
+	assert_eq(match_.state.doors, [MovingParts.door_swing(door, beside)])
 	assert_signal_emitted(match_, "state_changed")
-	for step in 90:
-		own.global_position = Vector3(door.position.x + 3.0, 0, door.position.z)
-		match_._physics_process(1.0 / 60.0)
+	for step in 60:
 		await wait_physics_frames(1)
-	assert_eq(world.doors_shown(), [1.0], "right out of the way")
+	assert_eq(world.doors_shown(), [1.0], "swung right open")
+	assert_eq(preload("res://ui/combat_hud.gd").door_prompt(own, world), "E  ·  close the door")
 	assert_eq(cast.call(through_from, through_to), INF, "and nothing in the doorway")
-	# And shuts behind them.
+	var copy := MatchState.from_dict(match_.state.to_dict())
+	assert_eq(copy.doors, match_.state.doors, "which every machine is told")
+	# It stays open until shut.
 	own.global_position = Vector3(10, 0, 12)
-	for step in 200:
+	for step in 120:
 		match_._physics_process(1.0 / 60.0)
 		await wait_physics_frames(1)
-	assert_eq(match_.state.doors, [false])
+	assert_eq(world.doors_shown(), [1.0])
+	own.global_position = beside
+	own.use_door()
+	assert_eq(match_.state.doors, [0])
+	for step in 60:
+		await wait_physics_frames(1)
 	assert_eq(world.doors_shown(), [0.0])
-	var copy := MatchState.from_dict(match_.state.to_dict())
-	assert_eq(copy.doors, [false], "which every machine is told")
+
+
+func test_a_door_is_drawn_as_a_door_with_a_knob_each_side() -> void:
+	await _start("dairy")
+	var body: Node3D = world.map.get_children().filter(func(part: Node) -> bool: return part.is_in_group("doors"))[0]
+	var knobs: Array = body.find_children("Knob*", "MeshInstance3D", false, false)
+	assert_eq(knobs.size(), 2)
+	var door: Dictionary = world.moving_parts.doors[0]
+	# Away from the hinges, on opposite faces.
+	for knob: Node3D in knobs:
+		assert_gt(knob.position.dot(MovingParts.door_width_axis(door)), 0.0, "at the free end")
+	assert_lt(knobs[0].position.x * knobs[1].position.x, 0.0, "one on each face")
+
+
+func test_the_keys_open_the_door_and_say_so() -> void:
+	assert_true(InputMap.has_action("interact"))
+	assert_eq(Controls.keys_text("interact"), "E")
+	assert_true(Controls.REBINDABLE.has("interact"))
 
 
 func test_a_player_fits_through_the_open_doorway() -> void:

@@ -120,6 +120,8 @@ var _vote_label: Label
 var _vote_buttons: Array[Button] = []
 # What the clip being shown again is.
 var _replay_label: Label
+# What to press to open or close the door beside the player.
+var _door_label: Label
 # Who a player out of play is watching, and how to change it.
 var _watch_label: Label
 # What the tutorial asks the player to do next.
@@ -261,6 +263,17 @@ static func damage_direction(at: Vector3, yaw: float, from: Vector3) -> float:
 static func crosshair_gap(spread: float, fov: float, height: float) -> float:
 	var reach := tan(deg_to_rad(spread) / 2.0) / tan(deg_to_rad(fov) / 2.0) * height / 2.0
 	return clampf(reach, CROSSHAIR_GAP, height * 0.4)
+
+
+## What the player `own` is told to press to open or close the door beside
+## them in `of`, or "" with none there. A touch screen has a button for it.
+static func door_prompt(own: Node3D, of: Node3D) -> String:
+	if own == null or not own.door_in_reach() or own._touch_controls() != null and own._touch_controls().shown:
+		return ""
+	var index := MovingParts.door_near(of.moving_parts.doors, own.global_position)
+	var open: bool = index < of.match_.state.doors.size() and of.match_.state.doors[index] != 0
+	var key := "X / Square" if not Input.get_connected_joypads().is_empty() else Controls.keys_text("interact")
+	return "%s  ·  %s the door" % [key, "close" if open else "open"]
 
 
 ## Seconds as minutes and seconds, such as "7:05".
@@ -415,6 +428,8 @@ func _process(delta: float) -> void:
 
 	var own: Node3D = world.player_node(multiplayer.get_unique_id()) if multiplayer.multiplayer_peer != null else null
 	var record: PlayerRecord = world.match_.own_record()
+	_door_label.text = door_prompt(own, world)
+	_door_label.visible = not _door_label.text.is_empty()
 	var health := record.health if record != null else PlayerRecord.MAX_HEALTH
 	_health_bar.max_value = world.match_.state.settings.health
 	_health_bar.value = health
@@ -871,6 +886,15 @@ func _build() -> void:
 	_watch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_watch_label.visible = false
 	add_child(_watch_label)
+	_door_label = _outlined_label(18)
+	_door_label.name = "DoorPrompt"
+	_door_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 10)
+	_door_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_door_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_door_label.offset_bottom = -140.0
+	_door_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_door_label.visible = false
+	add_child(_door_label)
 	_tutorial_label = _outlined_label(22)
 	_tutorial_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 10)
 	_tutorial_label.grow_horizontal = Control.GROW_DIRECTION_BOTH

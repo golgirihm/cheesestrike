@@ -26,7 +26,8 @@ func test_the_scores_button_sits_at_the_top_middle() -> void:
 
 func test_buttons_do_not_overlap_or_leave_the_screen() -> void:
 	for screen in [Vector2(1000, 600), Vector2(648, 648), Vector2(1152, 648)]:
-		var placed := TOUCH.layout_for(screen)
+		# With the door's button too, which is there only beside a door.
+		var placed := TOUCH.layout_for(screen, 1.0, false, ["door"])
 		var rect := Rect2(Vector2.ZERO, screen)
 		for name: String in placed:
 			var reach: Vector2 = Vector2.ONE * placed[name].radius
@@ -92,7 +93,7 @@ func test_buttons_fit_at_every_size_and_on_either_side() -> void:
 	for touch_size in [0.7, 1.0, 1.5]:
 		for left_handed in [false, true]:
 			for screen in [Vector2(1000, 600), Vector2(1152, 648)]:
-				var placed := TOUCH.layout_for(screen, touch_size, left_handed)
+				var placed := TOUCH.layout_for(screen, touch_size, left_handed, ["door"])
 				var rect := Rect2(Vector2.ZERO, screen)
 				for name: String in placed:
 					var reach: Vector2 = Vector2.ONE * placed[name].radius
@@ -118,3 +119,17 @@ func test_movement_is_on_the_side_away_from_the_buttons() -> void:
 	assert_false(TOUCH.is_movement_side(Vector2(900, 300), screen, false))
 	assert_false(TOUCH.is_movement_side(Vector2(100, 300), screen, true))
 	assert_true(TOUCH.is_movement_side(Vector2(900, 300), screen, true))
+
+
+func test_the_door_button_is_there_only_beside_a_door_and_the_menu_always() -> void:
+	assert_false(TOUCH.layout_for(Vector2(1000, 600)).has("door"))
+	assert_true(TOUCH.layout_for(Vector2(1000, 600), 1.0, false, ["door"]).has("door"))
+	assert_true(TOUCH.layout_for(Vector2(1000, 600)).has("menu"), "there is no Esc key on a phone")
+	var controls: Control = TOUCH.new()
+	controls.size = Vector2(1000, 600)
+	add_child_autofree(controls)
+	controls.notice_touch()
+	var door: Vector2 = TOUCH.layout_for(controls.size, Settings.get_value("touch_size"), Settings.get_value("touch_left_handed"), ["door"]).door.centre
+	assert_eq(controls.button_at(door), "")
+	controls.offered = ["door"]
+	assert_eq(controls.button_at(door), "door")
