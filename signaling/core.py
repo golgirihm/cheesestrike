@@ -72,7 +72,7 @@ Names never pass through here: players exchange them with the host directly,
 and the game cleans them (game/match/player_name.gd).
 
 A private session is left out of the list; players join it by its code, given
-to them by the host, usually in an invite link.
+to them by the host.
 """
 
 import json

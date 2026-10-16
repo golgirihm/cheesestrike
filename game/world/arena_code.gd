@@ -151,7 +151,7 @@ static func link(page_url: String, code: String) -> String:
 	var kept: Array[String] = []
 	if address.contains("?"):
 		for part in address.get_slice("?", 1).split("&", false):
-			if part.get_slice("=", 0) != PARAM and part.get_slice("=", 0) != Invite.PARAM:
+			if part.get_slice("=", 0) != PARAM:
 				kept.append(part)
 	kept.append("%s=%s" % [PARAM, code])
 	return "%s?%s" % [address.get_slice("?", 0), "&".join(kept)]

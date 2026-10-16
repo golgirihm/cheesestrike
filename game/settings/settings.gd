@@ -25,7 +25,7 @@ const DEFAULTS := {
 	"host_max_players": MatchSettings.MAX_PLAYERS,
 	"host_map": Maps.DEFAULT,
 	# Whether a hosted session is left out of the session list, for joining
-	# only by its code or an invite link.
+	# only by its code.
 	"host_private": false,
 	## Whether to join a session to watch it rather than to play.
 	"join_watching": false,

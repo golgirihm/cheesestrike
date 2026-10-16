@@ -392,7 +392,7 @@ class GameTestCase(unittest.TestCase):
         return game
 
     def open_link(self, url):
-        """Opens the game at `url`, such as an invite link, in a new window,
+        """Opens the game at `url`, such as a link to an arena, in a new window,
         and waits for it to start, without waiting for the menu."""
         game = Game(self._context.new_page(), url, ready="s.screen && s.screen !== 'loading'")
         self._games.append(game)

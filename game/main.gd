@@ -34,7 +34,6 @@ extends Node
 @onready var pause_menu: Control = %PauseMenu
 @onready var resume_button: Button = %ResumeButton
 @onready var menu_leave_button: Button = %MenuLeaveButton
-@onready var copy_link_button: Button = %CopyLinkButton
 @onready var help_button: Button = %HelpButton
 @onready var controls_help: Control = %ControlsHelp
 @onready var settings_button: Button = %SettingsButton
@@ -96,8 +95,6 @@ var _remove_target := 0
 # Whether the mouse was captured as of the last frame. Esc while it is captured
 # only frees the mouse; the press after that opens the menu.
 var _was_captured := false
-## The invite link last copied, for the browser tests.
-var copied_link := ""
 
 ## How often the menu asks for the session list again, in seconds. The list is
 ## fetched, not pushed, so this is how stale it can get without Refresh.
@@ -243,7 +240,6 @@ func _ready() -> void:
 	menu_button.pressed.connect(open_pause_menu)
 	resume_button.pressed.connect(close_pause_menu)
 	menu_leave_button.pressed.connect(_leave)
-	copy_link_button.pressed.connect(_copy_link)
 	help_button.pressed.connect(_show_help_from_menu)
 	settings_button.pressed.connect(settings_menu.open)
 	pause_settings_button.pressed.connect(settings_menu.open)
@@ -259,7 +255,6 @@ func _ready() -> void:
 	# and links only in a browser.
 	sessions_panel.visible = Net.use_webrtc
 	private_button.visible = Net.use_webrtc
-	copy_link_button.visible = Net.use_webrtc and OS.has_feature("web")
 	if not Net.use_webrtc:
 		target_edit.placeholder_text = "Host address (blank for this PC)"
 	Net.request_sessions()
@@ -279,14 +274,9 @@ func _ready() -> void:
 		Settings.set_value("host_map", Maps.CUSTOM)
 		status.text = "The arena from the link is ready: host it, or change it in the editor."
 
-	var invited := WebPage.take_invite_code()
-	if not invited.is_empty():
-		target_edit.text = invited
-		_join(invited)
-
-	# Someone who came by a link to an arena or a session is taken straight
-	# to it; anyone else starts at the title screen.
-	if arena.is_empty() and invited.is_empty():
+	# Someone who came by a link to an arena is taken straight to hosting it;
+	# anyone else starts at the title screen.
+	if arena.is_empty():
 		show_title()
 	else:
 		front_end.hide()
@@ -438,7 +428,7 @@ func _setup_match_buttons() -> void:
 	sky_button.custom_minimum_size = map_button.custom_minimum_size
 	map_button.add_sibling(sky_button)
 	_cycle(sky_button, "host_sky", Atmosphere.ORDER + [Atmosphere.RANDOM], func(sky: String) -> String: return "Sky: %s" % Atmosphere.NAMES[sky])
-	_cycle(private_button, "host_private", [false, true], func(hidden: bool) -> String: return "Private: invite only" if hidden else "Listed for everyone")
+	_cycle(private_button, "host_private", [false, true], func(hidden: bool) -> String: return "Private: join by code only" if hidden else "Listed for everyone")
 
 
 func _cycle(button: Button, key: String, choices: Array, describe: Callable) -> void:
@@ -619,15 +609,6 @@ func _join(target: String) -> void:
 	Net.join(target)
 
 
-## Puts a link to the session on the clipboard, and says so on the button.
-func _copy_link() -> void:
-	copied_link = Invite.link(WebPage.address(), Net.room_code)
-	DisplayServer.clipboard_set(copied_link)
-	copy_link_button.text = "Link copied!"
-	await get_tree().create_timer(2.0).timeout
-	copy_link_button.text = "Copy invite link"
-
-
 ## How full the bar on the cover is, from 0 to 1, when `sounds` is the share
 ## of the sounds that have been made and one of everything has been drawn
 ## or not (`drawn`): the sounds are most of the wait.
@@ -656,7 +637,6 @@ func _on_session_started() -> void:
 	if _alone_settings == null and not world.match_.is_host() and Settings.get_value("join_watching"):
 		world.match_.watch(true)
 	_alone_settings = null
-	copy_link_button.visible = Net.use_webrtc and OS.has_feature("web") and not Net.alone
 	if not Settings.get_value("seen_help") and tutorial == null:
 		Settings.set_value("seen_help", true)
 		show_help()

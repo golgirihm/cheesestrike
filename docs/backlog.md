@@ -6,7 +6,7 @@ The plan for taking CheeseStrike from where it is now to a game that people can 
 
 ## Where the game is now
 
-Players can host a session in the browser, find it in the session list or by code or an invite link, and join it over WebRTC, or connect directly in a native build. Up to 16 play free-for-all or in two teams, to a kill limit or a time limit, on three arenas (Cheddar Canyon, Brie Box and Curd City), each fenced at its edge with scenery beyond and a sky with clouds.
+Players can host a session in the browser, find it in the session list or by code, and join it over WebRTC, or connect directly in a native build. Up to 16 play free-for-all or in two teams, to a kill limit or a time limit, on three arenas (Cheddar Canyon, Brie Box and Curd City), each fenced at its edge with scenery beyond and a sky with clouds.
 
 Players are wedges of cheese with drawn-on faces and stick limbs, who walk, run and jump with keyboard and mouse or gamepad (touch works too, but phones are deprecated: see [CLAUDE.md](../CLAUDE.md#phones-are-deprecated)). They start with a sidearm and pick up four more weapons, one of them a launcher whose wheels burst, and cheese wedges for health. Weapons can be fired from the hip or aimed down their sights. Dealing damage fills a Gouda Overload meter. The host decides every hit (`game/match/match.gd`) and keeps everyone's health and score in a `MatchState` it sends to all. Others' movement is smoothed, shots are checked against where their targets were when fired, impossible movement is put right, and a dropped player can rejoin with their score.
 

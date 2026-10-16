@@ -266,18 +266,3 @@ static func take_arena_code() -> String:
 		var rest := ArenaCode.without_code(query)
 		JavaScriptBridge.eval("history.replaceState(null, '', location.pathname + %s + location.hash)" % JSON.stringify(rest), true)
 	return code
-
-
-## The session code the page was opened with (see Invite), or "". The code is
-## taken off the address as it is read, so a reload doesn't join again.
-static func take_invite_code() -> String:
-	if not OS.has_feature("web"):
-		return ""
-	var query: Variant = JavaScriptBridge.eval("location.search", true)
-	if not query is String:
-		return ""
-	var code := Invite.code_in(query)
-	if not code.is_empty():
-		var rest := Invite.without_code(query)
-		JavaScriptBridge.eval("history.replaceState(null, '', location.pathname + %s + location.hash)" % JSON.stringify(rest), true)
-	return code

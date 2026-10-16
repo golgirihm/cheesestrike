@@ -210,45 +210,19 @@ class JoiningTest(GameTestCase):
         host.wait_for("s.players.length === 1 && s.hud.includes('1 playing')")
 
 
-class InviteTest(GameTestCase):
-    def copy_link(self, game):
-        game.click("MenuButton")
-        game.click("CopyLinkButton")
-        return game.wait_for("s.copied_link !== ''")["copied_link"]
-
-    def test_opening_an_invite_link_joins_the_session(self):
+class PrivateSessionTest(GameTestCase):
+    def test_a_private_session_is_not_listed_but_its_code_works(self):
         host = self.open_game()
+        host.choose("PrivateButton", "Private: join by code only")
         code = host.host()
-        link = self.copy_link(host)
-        self.assertTrue(link.endswith(f"&join={code}"), link)
-        self.assertIn(f"signal=ws://localhost:{self.signaling.port}", link)
-
-        joiner = self.open_link(link)
-        for game in (host, joiner):
-            state = game.wait_for("s.screen !== 'menu' && s.players.length === 2")
-        self.assertEqual(state["code"], code)
-        # Read once, the code leaves the address, so a reload doesn't join again.
-        self.assertNotIn("join=", joiner.state()["address"])
-
-    def test_a_private_session_is_not_listed_but_its_link_works(self):
-        host = self.open_game()
-        host.choose("PrivateButton", "Private: invite only")
-        code = host.host()
-        link = self.copy_link(host)
 
         other = self.open_game()
         other.click("RefreshButton")
         state = other.wait_for("s.sessions.length === 1")
         self.assertEqual(state["sessions"][0]["text"], NO_SESSIONS)
 
-        joiner = self.open_link(link)
-        joiner.wait_for(f"s.screen === 'game' && s.code === '{code}' && s.players.length === 2")
-
-    def test_a_link_to_a_session_that_has_ended_says_so(self):
-        game = self.open_link(f"http://localhost:{self._web.server_address[1]}/?test&signal=ws://localhost:{self.signaling.port}&join=GONE")
-        state = game.wait_for("s.status === 'No session with that code.'")
-        self.assertEqual(state["screen"], "menu")
-
+        other.join(code)
+        other.wait_for(f"s.screen === 'game' && s.code === '{code}' && s.players.length === 2")
 
 class LosingTheHostTest(GameTestCase):
     def test_every_joiner_is_told_when_the_host_closes_the_page(self):
