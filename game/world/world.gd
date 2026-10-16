@@ -177,7 +177,7 @@ func warm_up() -> void:
 	add_child(props)
 	props.global_position = at
 	Outlines.put(props.get_child(0), Color.WHITE, true)
-	Outlines.put(props.get_child(1), Color.WHITE, false)
+	Outlines.glow(props.get_child(1), Color.WHITE)
 	Warmup.fire(effects, at)
 	hurt_view.warm(true)
 	_warm_frames = Warmup.FRAMES
@@ -586,8 +586,8 @@ func _hold_frame_rate(delta: float) -> void:
 	_frames_took = 0.0
 
 
-## Outlines this machine's player's teammates, through walls, and the
-## pickups near them, and nobody and nothing else (see Outlines).
+## Outlines this machine's player's teammates, through walls, and makes the
+## pickups lying ready glow, and nobody and nothing else (see Outlines).
 func show_outlines() -> void:
 	var wanted: bool = Settings.get_value(Outlines.SETTING) and match_.has_state() and multiplayer.multiplayer_peer != null
 	var own: PlayerRecord = match_.own_record() if wanted else null
@@ -602,8 +602,8 @@ func show_outlines() -> void:
 	var pads := map.get_node("Pickups").get_children()
 	for index in pads.size():
 		var item: Node3D = pads[index].get_node("Item")
-		if viewer != null and own != null and own.alive and Outlines.pickup_shows(viewer.global_position.distance_to(pads[index].global_position), item.visible):
-			Outlines.put(item, Outlines.PICKUP_COLOUR)
+		if viewer != null and own != null and own.alive and Outlines.pickup_shows(item.visible):
+			Outlines.glow(item, Outlines.PICKUP_COLOUR)
 		else:
 			Outlines.take(item)
 
