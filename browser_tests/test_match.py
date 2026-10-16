@@ -46,11 +46,11 @@ class MatchTest(GameTestCase):
         host = self.open_game()
         host.choose("RulesButton", "Instant knock-out")
         code = host.host()
+        # Said as the match begins, and only for a few seconds: looked for
+        # first, before anything that can take a slow machine a while.
+        host.wait_for("s.combat.announcement === 'The match begins  ·  Instant knock-out'")
         joiner = self.open_game()
         joiner.join(code)
-        # Said as the second player arrives, and only for a few seconds: looked
-        # for first, before anything that can take a slow machine a while.
-        host.wait_for("s.combat.announcement === 'The match begins  ·  Instant knock-out'")
         joiner_id = joiner.own_player()["id"]
         for game in (host, joiner):
             game.wait_for("s.players.length === 2 && s.combat.health === '1'")
@@ -78,11 +78,13 @@ class MatchTest(GameTestCase):
         # Out through the doorway; it stays open behind them until shut.
         inside.page.keyboard.down("w")
         try:
-            inside.wait_for("s.players.some((p) => p.mine && p.position[0] > -10)")
+            inside.wait_for("s.players.some((p) => p.mine && p.position[0] > -12)")
         finally:
             inside.page.keyboard.up("w")
         inside.page.wait_for_timeout(1000)
         self.assertNotEqual(host.state()["doors"], [0], "left open")
+        # Still beside it, to shut it.
+        self.assertLess(inside.own_player()["position"][0], -14 + 4)
         inside.press("e")
         for game in (host, joiner, inside):
             game.wait_for("s.doors[0] === 0 && s.doors_shown[0] === 0")
