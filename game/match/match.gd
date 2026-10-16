@@ -181,6 +181,9 @@ func start(settings := MatchSettings.new()) -> void:
 	# A player other than the host keeps whatever the host has already sent.
 	if is_host():
 		state = MatchState.new(settings)
+		# One with no countdown begins at once, and is told as one that has
+		# counted down is.
+		state.just_started = state.countdown == 0.0 and not settings.is_practice()
 		_has_state = true
 		state.set_pickup_count(world.pickup_pads().size() if world != null else 0)
 		state.blocks = BlockRules.new(world.cheese_blocks().size() if world != null else 0, randi())
