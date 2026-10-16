@@ -49,6 +49,9 @@ func _init() -> void:
 	_model.add_child(player)
 	player.add_animation_library("", SOLDIER.library())
 	player.play("aim")
+	var twist: SkeletonModifier3D = preload("res://player/forearm_twist.gd").new()
+	twist.name = "ForearmTwist"
+	_skeleton.add_child(twist)
 	_skeleton.skeleton_updated.connect(_follow_weapon)
 
 
