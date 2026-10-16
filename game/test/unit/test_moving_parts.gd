@@ -285,13 +285,16 @@ func test_a_player_opens_and_shuts_the_door_beside_them_and_everyone_sees_it_tur
 func test_a_door_is_drawn_as_a_door_with_a_knob_each_side() -> void:
 	await _start("dairy")
 	var body: Node3D = world.map.get_children().filter(func(part: Node) -> bool: return part.is_in_group("doors"))[0]
-	var knobs: Array = body.find_children("Knob*", "MeshInstance3D", false, false)
-	assert_eq(knobs.size(), 2)
+	var knobs: MeshInstance3D = body.get_node("Knobs")
 	var door: Dictionary = world.moving_parts.doors[0]
-	# Away from the hinges, on opposite faces.
-	for knob: Node3D in knobs:
-		assert_gt(knob.position.dot(MovingParts.door_width_axis(door)), 0.0, "at the free end")
-	assert_lt(knobs[0].position.x * knobs[1].position.x, 0.0, "one on each face")
+	var bounds := knobs.get_aabb()
+	# Away from the hinges, and out from both faces.
+	var width_axis := MovingParts.door_width_axis(door)
+	assert_gt(bounds.position.dot(width_axis), 0.0, "at the free end")
+	var thickness_axis := Vector3.RIGHT if width_axis == Vector3.BACK else Vector3.BACK
+	assert_lt(bounds.position.dot(thickness_axis), -Scenery.DOOR_THICKNESS / 2.0, "on one face")
+	assert_gt(bounds.end.dot(thickness_axis), Scenery.DOOR_THICKNESS / 2.0, "and the other")
+	assert_lt(body.get_children().filter(func(part: Node) -> bool: return part is MeshInstance3D).size(), 3, "drawn in as few parts as a plain slab")
 
 
 func test_the_keys_open_the_door_and_say_so() -> void:
