@@ -249,3 +249,11 @@ func test_a_new_weapon_shows_no_mitten_and_an_emote_puts_the_weapon_away() -> vo
 	gun.visible = true
 	soldier.hold_weapon(gun)
 	assert_false(gun.visible, "put away for the cheer")
+
+
+func test_others_dont_see_the_arms_cut_for_its_players_own_view() -> void:
+	if soldier == null:
+		pending("The licensed assets aren't checked out.")
+		return
+	for name: String in SOLDIER.FIRST_PERSON:
+		assert_false(soldier._model.find_child(name).visible, name)

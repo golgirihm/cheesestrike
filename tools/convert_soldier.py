@@ -11,6 +11,8 @@ size it can carry, and writes it as one glTF file:
 - Every material gets its colour, normal, roughness and metallic maps from the
   zip, scaled down to TEXTURE_SIZE (SMALL_TEXTURE_SIZE for the small parts).
 - The skeleton and the skinning stay as they are, for the animations to drive.
+- Copies of the skin and the shirt cut down to the arms, FIRST_PERSON_SKIN
+  and FIRST_PERSON_SLEEVES, are what a player sees of their own arms.
 
 Run it with Blender, which writes game/licensed/soldier/soldier.glb:
 
@@ -19,6 +21,8 @@ Run it with Blender, which writes game/licensed/soldier/soldier.glb:
 
 import pathlib
 import sys
+
+import bmesh
 import tempfile
 import zipfile
 
@@ -44,6 +48,12 @@ FACE = {
     "Eye_L_Look_Up", "Eye_R_Look_Up", "Eye_L_Look_Down", "Eye_R_Look_Down",
 }
 
+# The arms cut from the skin and the shirt, and the bones a vertex has to
+# hang mostly from to be part of them: from the upper arm down, either side.
+FIRST_PERSON_SKIN = "FirstPersonArms"
+FIRST_PERSON_SLEEVES = "FirstPersonSleeves"
+ARM_BONES = ("Upperarm", "Forearm", "Elbow", "Hand", "Thumb", "Index", "Mid", "Ring", "Pinky")
+
 TEXTURE_SIZE = 2048
 SMALL_TEXTURE_SIZE = 512
 # Materials whose parts are small enough on screen for SMALL_TEXTURE_SIZE.
@@ -60,6 +70,9 @@ def main(fbx: pathlib.Path, maps_zip: pathlib.Path) -> None:
     for obj in bpy.data.objects:
         if obj.type == "MESH" and obj.data.shape_keys:
             keep_face_shapes(obj)
+
+    cut_arms(bpy.data.objects["CC_Base_Body"], FIRST_PERSON_SKIN)
+    cut_arms(bpy.data.objects["Shirt_02_LP2"], FIRST_PERSON_SLEEVES)
 
     with tempfile.TemporaryDirectory() as tmp:
         maps = extract_maps(maps_zip, pathlib.Path(tmp))
@@ -80,6 +93,40 @@ def main(fbx: pathlib.Path, maps_zip: pathlib.Path) -> None:
             export_extras=False,
         )
     print(f"Wrote {OUT} ({OUT.stat().st_size / 1e6:.1f} MB)")
+
+
+def is_arm_bone(name: str) -> bool:
+    for side in ("_L_", "_R_"):
+        if side in name:
+            return name.split(side, 1)[1].startswith(ARM_BONES)
+    return False
+
+
+def cut_arms(obj, name: str) -> None:
+    """A copy of `obj` named `name` with nothing but what hangs mostly from
+    the arms' bones, and without its face shapes."""
+    copy = obj.copy()
+    copy.data = obj.data.copy()
+    copy.name = name
+    copy.data.name = name
+    for collection in obj.users_collection:
+        collection.objects.link(copy)
+    copy.shape_key_clear()
+    arm_groups = {group.index for group in copy.vertex_groups if is_arm_bone(group.name)}
+    mesh = bmesh.new()
+    mesh.from_mesh(copy.data)
+    deform = mesh.verts.layers.deform.active
+    gone = []
+    for vertex in mesh.verts:
+        weights = vertex[deform]
+        total = sum(weights.values())
+        arm = sum(weight for group, weight in weights.items() if group in arm_groups)
+        if total <= 0.0 or arm / total < 0.5:
+            gone.append(vertex)
+    bmesh.ops.delete(mesh, geom=gone, context="VERTS")
+    mesh.to_mesh(copy.data)
+    mesh.free()
+    print(f"{name}: {len(copy.data.vertices)} vertices")
 
 
 def keep_face_shapes(obj) -> None:
