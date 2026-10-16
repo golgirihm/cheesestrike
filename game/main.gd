@@ -86,6 +86,9 @@ var _auto_rejoins := 0
 var _reason_shown := ""
 const RECONNECT_WAIT := 3.0
 const AUTO_REJOINS := 1
+## How long a host leaving waits for its players to hear that the session is
+## over, in milliseconds.
+const END_WAIT_MS := 3000
 var _list_mode := SessionList.ANY
 var _list_arena := SessionList.ANY
 # Who the pause menu's vote-to-remove button names.
@@ -702,11 +705,15 @@ static func standings(state: MatchState) -> String:
 
 
 ## Leaves the session. A host first tells everyone the session is over, so
-## they see why, and gives that a moment to arrive.
+## they see why, and waits for them to hang up on hearing it: closing the
+## connections sooner can lose the message, and players would see only the
+## connection drop. One who never answers isn't waited on for long.
 func _leave() -> void:
 	if world.match_.is_host() and not multiplayer.get_peers().is_empty():
 		world.match_.end_session()
-		await get_tree().create_timer(0.3).timeout
+		var give_up := Time.get_ticks_msec() + END_WAIT_MS
+		while Net.in_session and not multiplayer.get_peers().is_empty() and Time.get_ticks_msec() < give_up:
+			await get_tree().process_frame
 	Net.leave()
 
 

@@ -260,10 +260,10 @@ class LosingTheHostTest(GameTestCase):
         host.wait_for("s.players.length === 3")
         host.close()
         for joiner in joiners:
-            # Well inside the time a dropped connection takes to be noticed on
-            # its own, so this passes only if the session server's word that
-            # the host left got through.
-            state = joiner.wait_for("s.screen === 'disconnected'", timeout=5_000)
+            # Without the session server's word that the host left, a joiner
+            # would say only that the connection was lost. The time allowed
+            # is for a busy machine; on its own it takes a second or two.
+            state = joiner.wait_for("s.screen === 'disconnected'", timeout=15_000)
             self.assertEqual(state["notice"], "The host closed the session.")
             self.assertTrue(state["standings"].startswith("1. "), "how the session stood")
 

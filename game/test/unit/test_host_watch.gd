@@ -105,6 +105,53 @@ func test_gone_when_signaling_closes_after_heartbeats_stopped() -> void:
 	assert_true(watch.is_gone())
 
 
+
+func test_a_dropped_connection_is_silence_at_once() -> void:
+	watch.connection_dropped()
+	assert_true(watch.is_silent())
+	assert_false(watch.is_lost(), "not before the session server has had its say")
+
+
+func test_a_dropped_connection_with_the_session_closed_is_the_host_gone() -> void:
+	watch.connection_dropped()
+	_report_closed()
+	assert_true(watch.is_gone())
+	assert_false(watch.is_lost())
+
+
+func test_a_dropped_connection_with_the_session_open_is_lost() -> void:
+	watch.connection_dropped()
+	watch.session_reported(true)
+	assert_false(watch.is_lost(), "once could be the session server not yet seeing the host go")
+	watch.session_reported(true)
+	assert_true(watch.is_lost())
+	assert_false(watch.is_gone())
+
+
+func test_a_dropped_connection_with_no_word_is_lost_in_the_end() -> void:
+	watch.connection_dropped()
+	_advance(HostWatch.DROP_WAIT - 0.1)
+	assert_false(watch.is_lost())
+	_advance(0.2)
+	assert_true(watch.is_lost())
+
+
+func test_the_host_gone_is_never_also_lost() -> void:
+	watch.connection_dropped()
+	_advance(HostWatch.DROP_WAIT + 1.0)
+	_report_closed()
+	assert_true(watch.is_gone())
+	assert_false(watch.is_lost())
+
+
+func test_open_reports_before_the_drop_do_not_count() -> void:
+	_advance(HostWatch.HEARTBEAT_TIMEOUT + 0.1)
+	watch.session_reported(true)
+	watch.connection_dropped()
+	watch.session_reported(true)
+	assert_false(watch.is_lost())
+
+
 func _report_closed() -> void:
 	for report in HostWatch.CLOSED_REPORTS:
 		watch.session_reported(false)
