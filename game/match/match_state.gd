@@ -326,6 +326,11 @@ func _begin() -> void:
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
 	team_points = [0, 0]
+	# The hill's clock and the points taken run in the warm-up too.
+	if capture != null:
+		capture = CaptureRules.new()
+	if zones != null:
+		zones = ZoneRules.new()
 	blocks.reset(blocks.health.size())
 	for record: PlayerRecord in players.values():
 		record.kills = 0
