@@ -7,6 +7,11 @@ const WORLD := preload("res://world/world.tscn")
 const BUDGET := 3 * 1024 * 1024
 ## The most any one picture or sound file in the project may be.
 const BIGGEST_ASSET := 256 * 1024
+## The bought and downloaded models in game/licensed (see README.md there),
+## which BUDGET leaves out: a realistic character is far bigger than anything
+## made in code, and the game is headed for Steam, where a download of tens of
+## megabytes is nothing. This is what they may come to all together.
+const LICENSED_BUDGET := 48 * 1024 * 1024
 
 
 func test_every_kind_has_a_picture_that_darkens_gently_and_repeats() -> void:
@@ -119,8 +124,9 @@ func test_the_game_is_small_enough_to_download() -> void:
 		if dir == null:
 			continue
 		for sub in dir.get_directories():
-			# Not what only tests and the editor use.
-			if not sub.begins_with(".") and not ["addons", "test"].has(sub):
+			# Not what only tests and the editor use, nor the licensed
+			# models, which have a budget of their own.
+			if not sub.begins_with(".") and not ["addons", "test", "licensed"].has(sub):
 				folders.append(folder.path_join(sub))
 		for file in dir.get_files():
 			var path := folder.path_join(file)
@@ -133,3 +139,20 @@ func test_the_game_is_small_enough_to_download() -> void:
 	assert_gt(total, 100 * 1024, "the count found the game")
 	assert_lt(total, BUDGET)
 	assert_lt(biggest, BIGGEST_ASSET, biggest_name)
+
+
+func test_the_licensed_models_keep_to_their_own_budget() -> void:
+	var total := 0
+	var folders := ["res://licensed"]
+	while not folders.is_empty():
+		var folder: String = folders.pop_back()
+		var dir := DirAccess.open(folder)
+		if dir == null:
+			continue
+		for sub in dir.get_directories():
+			if not sub.begins_with("."):
+				folders.append(folder.path_join(sub))
+		for file in dir.get_files():
+			total += FileAccess.get_file_as_bytes(folder.path_join(file)).size()
+	gut.p("the licensed models come to %d KB" % (total / 1024))
+	assert_lt(total, LICENSED_BUDGET)
