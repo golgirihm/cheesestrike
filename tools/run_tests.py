@@ -227,7 +227,9 @@ def run_browser_tests(shard):
     print(f"running {len(tests)} tests in {workers} groups", flush=True)
     processes = [
         subprocess.Popen(
-            [sys.executable, "-m", "unittest", "-v", *group],
+            # --durations 0 ends the output with every test's time, slowest
+            # first, which shows which tests hold a shard up.
+            [sys.executable, "-m", "unittest", "-v", "--durations", "0", *group],
             cwd=BROWSER_TESTS,
             # So that the game's text, such as "…", survives the pipe.
             env={**os.environ, "PYTHONIOENCODING": "utf-8"},
