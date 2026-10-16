@@ -175,11 +175,25 @@ class Game:
         `control` is in view, as for something far down a scrolling list. The
         game only reports controls in a list's visible part. On the settings
         screen, each of its tabs is tried in turn until one has it."""
+        # A screen just opened may not have reported its controls yet.
+        try:
+            self.wait_for(f"{control!r} in s.controls || Object.keys(s.controls).some((name) => name.startsWith('SettingsTab_'))", timeout=3000)
+        except AssertionError:
+            pass
         tabs = [None] + sorted(name for name in self.state()["controls"] if name.startswith("SettingsTab_"))
         for tab in tabs:
             if tab is not None:
-                self._click(tab)
-                self.page.wait_for_timeout(150)
+                # Each tab changes the screen's size: wait for it to be shown
+                # and laid out before looking for the control on it.
+                group = tab.removeprefix("SettingsTab_")
+                for _ in range(5):
+                    self._click(tab)
+                    try:
+                        self.wait_for(f"s.settings_group === {group!r}", timeout=2000)
+                        break
+                    except AssertionError:
+                        pass
+                self.page.wait_for_timeout(300)
             for _ in range(30):
                 state = self.state()
                 if control in state["controls"]:

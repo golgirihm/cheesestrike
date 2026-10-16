@@ -170,6 +170,8 @@ func snapshot() -> Dictionary:
 
 	return {
 		"screen": _screen(),
+		# The group of settings whose tab is chosen, on the settings screen.
+		"settings_group": _main.settings_menu.group if _main.settings_menu.visible else "",
 		"status": _main.status.text,
 		"frame": Engine.get_process_frames(),
 		"name_box": _main.name_edit.text,

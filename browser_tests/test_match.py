@@ -1,6 +1,7 @@
 """Matches: the host's settings, the end of a match, teams, joining part way
 through and the session's player limit."""
 
+import math
 import unittest
 
 from harness import GameTestCase
@@ -69,7 +70,7 @@ class MatchTest(GameTestCase):
         inside = self.open_game()
         inside.join(code)
         for game in (host, joiner, inside):
-            state = game.wait_for("s.players.length === 3 && s.map === 'dairy' && s.doors.length === 1")
+            state = game.wait_for("s.players.length === 3 && s.map === 'dairy' && s.doors.length === 1 && s.doors_shown.length === 1")
             self.assertEqual(state["doors"], [0], "shut, though someone is beside it")
             self.assertEqual(state["doors_shown"], [0])
         inside.press("e")
@@ -78,13 +79,23 @@ class MatchTest(GameTestCase):
         # Out through the doorway; it stays open behind them until shut.
         inside.page.keyboard.down("w")
         try:
-            inside.wait_for("s.players.some((p) => p.mine && p.position[0] > -12)")
+            inside.wait_for("s.players.some((p) => p.mine && p.position[0] > -13)")
         finally:
             inside.page.keyboard.up("w")
-        inside.page.wait_for_timeout(1000)
+        inside.page.wait_for_timeout(1500)
+        self.assertGreater(inside.own_player()["position"][0], -14, "out")
         self.assertNotEqual(host.state()["doors"], [0], "left open")
-        # Still beside it, to shut it.
-        self.assertLess(inside.own_player()["position"][0], -14 + 4)
+        # Back beside it, with short steps after however far they coasted, to
+        # shut it.
+        for _ in range(20):
+            position = inside.own_player()["position"]
+            if math.hypot(position[0] + 14, position[2]) < 3.5:
+                break
+            inside.page.keyboard.down("s")
+            inside.page.wait_for_timeout(100)
+            inside.page.keyboard.up("s")
+            inside.page.wait_for_timeout(400)
+        host.wait_for(f"s.players.some((p) => p.id === {inside.own_player()['id']} && Math.hypot(p.position[0] + 14, p.position[2]) < 4)")
         inside.press("e")
         for game in (host, joiner, inside):
             game.wait_for("s.doors[0] === 0 && s.doors_shown[0] === 0")
@@ -233,7 +244,11 @@ class MatchTest(GameTestCase):
         self.assertEqual(own["kills"], 0)
         self.assertEqual(own["health"], 100)
         self.assertEqual(next(p for p in state["players"] if p["id"] == 1)["kills"], deaths)
-        late.wait_for("s.combat.match.startsWith('First to 20   ·   7:') || s.combat.match.startsWith('First to 20   ·   8:')")
+        # The clock has run since the match was hosted: the late player sees
+        # the host's time, not a fresh one.
+        minutes, seconds = host.state()["combat"]["match"].removeprefix("First to 20   ·   ").split(":")
+        left = int(minutes) * 60 + int(seconds)
+        late.wait_for(f"(([m, s]) => Math.abs(m * 60 + +s - {left}) <= 5)(s.combat.match.replace('First to 20   ·   ', '').split(':'))")
 
 
 if __name__ == "__main__":
