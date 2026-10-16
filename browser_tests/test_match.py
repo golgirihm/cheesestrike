@@ -1,7 +1,6 @@
 """Matches: the host's settings, the end of a match, teams, joining part way
 through and the session's player limit."""
 
-import math
 import unittest
 
 from harness import GameTestCase
@@ -76,26 +75,27 @@ class MatchTest(GameTestCase):
         inside.press("e")
         for game in (host, joiner, inside):
             game.wait_for("s.doors[0] !== 0 && s.doors_shown[0] === 1")
-        # Out through the doorway; it stays open behind them until shut.
+        # Back from it, out of reach: it stays open until shut. (Back into the
+        # cold store, where nothing is in the way, rather than out past the
+        # open door.)
+        inside_id = inside.own_player()["id"]
+        reach = "s.players.some((p) => p.id === %d && Math.hypot(p.position[0] + 14, p.position[2]) %s)"
+        inside.page.keyboard.down("s")
+        try:
+            inside.wait_for(reach % (inside_id, "> 5.5"))
+        finally:
+            inside.page.keyboard.up("s")
+        host.wait_for(reach % (inside_id, "> 5"))
+        inside.page.wait_for_timeout(1000)
+        self.assertNotEqual(host.state()["doors"], [0], "left open")
+        # Up to it again, to shut it.
         inside.page.keyboard.down("w")
         try:
-            inside.wait_for("s.players.some((p) => p.mine && p.position[0] > -13)")
+            inside.wait_for(reach % (inside_id, "< 2.5"))
         finally:
             inside.page.keyboard.up("w")
         inside.page.wait_for_timeout(1500)
-        self.assertGreater(inside.own_player()["position"][0], -14, "out")
-        self.assertNotEqual(host.state()["doors"], [0], "left open")
-        # Back beside it, with short steps after however far they coasted, to
-        # shut it.
-        for _ in range(20):
-            position = inside.own_player()["position"]
-            if math.hypot(position[0] + 14, position[2]) < 3.5:
-                break
-            inside.page.keyboard.down("s")
-            inside.page.wait_for_timeout(100)
-            inside.page.keyboard.up("s")
-            inside.page.wait_for_timeout(400)
-        host.wait_for(f"s.players.some((p) => p.id === {inside.own_player()['id']} && Math.hypot(p.position[0] + 14, p.position[2]) < 4)")
+        host.wait_for(reach % (inside_id, "< 4"))
         inside.press("e")
         for game in (host, joiner, inside):
             game.wait_for("s.doors[0] === 0 && s.doors_shown[0] === 0")
