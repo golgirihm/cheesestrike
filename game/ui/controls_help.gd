@@ -69,7 +69,6 @@ static func lines(on_device: String) -> Array:
 				["Fire", "Hold FIRE"],
 				["Aim down sights", "AIM, and again to stop"],
 				["Reload", "R"],
-				["Open or close a door", "DOOR, beside it"],
 				["Knife", "KNIFE"],
 				["Grenade", "NADE"],
 				["Emote", "WAVE, again for the next"],
