@@ -74,6 +74,7 @@ var _blocks: Array = []
 var _block_indices := {}
 var _block_boxes: Array = []
 var _block_supports: Array[PackedInt32Array] = []
+var _solid_boxes: Array = []
 ## Ways across a large map, for bots (see Routes); empty on an arena.
 var routes := Routes.new()
 ## The loaded map's buildings, each drawn as one (see Clusters).
@@ -736,6 +737,13 @@ func block_boxes() -> Array:
 	return _block_boxes
 
 
+## The space each solid thing in the arena that isn't cheese fills, standing
+## up from the ground, as the giant mice go round or over them: not the walls
+## round the edge, the ground, or anything sloping.
+func solid_boxes() -> Array:
+	return _solid_boxes
+
+
 ## Which blocks go when block `index` does: those standing on it, and on
 ## those (see BlockRules).
 func blocks_above(index: int) -> Array[int]:
@@ -755,6 +763,19 @@ func _find_blocks() -> void:
 		# Where it is in the arena, which is where it is in the map.
 		_block_boxes.append(AABB(body.position - size / 2.0, size))
 	_block_supports = BlockRules.supports(_block_boxes)
+	_solid_boxes.clear()
+	for body: Node in map.get_node("Geometry").get_children():
+		var shape := body.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if not body is StaticBody3D or shape == null or not shape.shape is BoxShape3D:
+			continue
+		var called := String(body.name)
+		var place: Transform3D = (body as Node3D).transform * shape.transform
+		if called.begins_with("Block") or called.begins_with("Wall") or not place.basis.y.normalized().is_equal_approx(Vector3.UP):
+			continue
+		var size: Vector3 = (shape.shape as BoxShape3D).size
+		var box := place * AABB(-size / 2.0, size)
+		if box.end.y > 0.5:
+			_solid_boxes.append(box)
 
 
 # Shows each block of cheese as the match state has it: whole, bitten into,

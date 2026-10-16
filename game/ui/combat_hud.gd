@@ -192,6 +192,7 @@ func bind(of: Node3D) -> void:
 	readings.position = Vector2(20.0, 118.0)
 	add_child(readings)
 	world.match_.hit_confirmed.connect(_on_hit_confirmed)
+	world.match_.mouse_hit.connect(func(dealt: int, _scared: bool) -> void: _show_hit(dealt, HIT))
 	world.match_.hurt.connect(_on_hurt)
 	# Where a player falls is heard just before who did it and how.
 	world.match_.fell.connect(func(victim: int, _weapon: String, _from: Vector3) -> void:
@@ -719,11 +720,16 @@ func _on_hit_confirmed(_victim: int, _dealt: int, knocked_out: bool, head: bool)
 		var distance := own.global_position.distance_to(fallen.global_position) if own != null and fallen != null else 0.0
 		for medal in medals.knock_out(_victim, _medal_clock, distance, head):
 			_medals_waiting.append(medal)
+	_show_hit(_dealt, hit_kind_for(knocked_out, head))
+
+
+# The hit marker, of kind `kind`, and the damage done, if they are shown.
+func _show_hit(dealt: int, kind: String) -> void:
 	hits_shown += 1
 	_hit_left = HIT_MARKER_LIFE
-	hit_kind = hit_kind_for(knocked_out, head)
+	hit_kind = kind
 	if Settings.get_value("damage_numbers"):
-		_damage_numbers.append({"text": str(_dealt), "left": DAMAGE_NUMBER_LIFE, "kind": hit_kind})
+		_damage_numbers.append({"text": str(dealt), "left": DAMAGE_NUMBER_LIFE, "kind": hit_kind})
 		while _damage_numbers.size() > 6:
 			_damage_numbers.pop_front()
 

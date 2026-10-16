@@ -54,6 +54,9 @@ signal replay_shown(clip: Dictionary, about: int, title: String)
 ## Giant mouse `index` was scared off by a shot or a burst (on everyone's
 ## machine).
 signal mouse_scared(index: int)
+## This machine's player hit one or more giant mice, for `dealt` between
+## them, and whether that sent one running.
+signal mouse_hit(dealt: int, scared: bool)
 ## Something everyone is told, across the screen: `text`, in the colour of
 ## `team` (MatchState.NO_TEAM for nobody's).
 signal announced(text: String, team: int)
@@ -1129,13 +1132,17 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 	var targets := _targets_except(shooter, now() - rewind_for(shooter))
 	var damage_to := {}
 	var headshot := {}
+	var mouse_damage := {}
 	var ends := []
 	for pellet in HitScan.pellet_directions(direction, weapon.pellets, cone, seed):
 		# Through thin cover, at a cost; stopped by anything more.
 		var way := Penetration.path(origin, pellet, weapon.max_range, wall_caster(world.get_world_3d().direct_space_state))
 		var hit := HitScan.first_hit(origin, pellet, way.reach, targets)
-		# A mouse in the way runs off, and the shot goes on past it.
-		_scare_mice(origin, pellet, way.first)
+		# A mouse in the way is hurt, and the shot goes on past it.
+		var mouse := state.mice.hit(origin, pellet, way.first)
+		if mouse != -1:
+			var distance := origin.distance_to(state.mice.mice[mouse].at + Vector3.UP * MouseRules.HEIGHT / 2.0)
+			mouse_damage[mouse] = mouse_damage.get(mouse, 0.0) + weapon.damage_at(distance)
 		# A shot that meets a block of cheese before anyone takes some of it away.
 		if hit.is_empty() or hit.distance > way.first:
 			_shoot_block(origin, pellet, way.first, weapon.damage_at(way.first))
@@ -1146,6 +1153,7 @@ func _shot(shooter: int, origin: Vector3, direction: Vector3, seed: int, weapon_
 			var amount := weapon.damage_at(hit.distance) * (weapon.headshot_multiplier if hit.head else 1.0) * Penetration.share(way, hit.distance)
 			damage_to[hit.id] = damage_to.get(hit.id, 0.0) + amount
 			headshot[hit.id] = headshot.get(hit.id, false) or hit.head
+	_hurt_mice(shooter, mouse_damage, origin)
 	_show_shot_to_others(shooter, ends)
 	recording.shot(now(), shooter, shooter_node.muzzle.global_position, ends)
 	for victim: int in damage_to:
@@ -1389,37 +1397,44 @@ func _collect_drops() -> void:
 # Host only: the giant mice come when their countdown runs out, and go about
 # eating the cheese. Everyone is sent where they are as they go.
 func _run_mice(delta: float) -> void:
-	var done := state.mice.tick(delta, state.blocks, world.block_boxes(), world.edge())
+	var done := state.mice.tick(delta, state.blocks, world.block_boxes(), world.edge(), world.solid_boxes())
 	if done.came > 0:
-		# The first come together; the rest one at a time.
-		announce("The mice are here!" if done.came > 1 else "Another mouse!", MatchState.NO_TEAM)
+		announce("The mice are here!", MatchState.NO_TEAM)
 	for bite: Dictionary in done.bites:
 		_hurt_block(bite.index, bite.amount)
 	if not state.mice.mice.is_empty():
 		_dirty = true
 
 
-# Host only: whichever giant mice a shot from `origin` along `direction`,
-# reaching `reach`, or a burst at `at` reaching `radius`, catches run off.
-func _scare_mice(origin: Vector3, direction: Vector3, reach: float) -> void:
-	_scared(state.mice.hit(origin, direction, reach), origin)
-
-
-func _scare_mice_near(at: Vector3, radius: float) -> void:
-	for index: int in state.mice.near(at, radius):
-		_scared(index, at)
-
-
-func _scared(index: int, from: Vector3) -> void:
-	if state.mice.scare(index, from):
-		_mouse_scared.rpc(index)
-		mouse_scared.emit(index)
-		_changed()
+# Host only: `shooter` hurt giant mice, by `damage` {mouse index: amount},
+# from `from`. Any that have been hurt enough run off, and the shooter is
+# shown the hit.
+func _hurt_mice(shooter: int, damage: Dictionary, from: Vector3) -> void:
+	if damage.is_empty():
+		return
+	var dealt := 0.0
+	var scared := false
+	for index: int in damage:
+		dealt += damage[index]
+		if state.mice.hurt(index, damage[index], from):
+			scared = true
+			_mouse_scared.rpc(index)
+			mouse_scared.emit(index)
+			_changed()
+	if shooter == multiplayer.get_unique_id():
+		mouse_hit.emit(roundi(dealt), scared)
+	elif multiplayer.get_peers().has(shooter):
+		_mouse_hit.rpc_id(shooter, roundi(dealt), scared)
 
 
 @rpc("authority", "call_remote", "reliable")
 func _mouse_scared(index: int) -> void:
 	mouse_scared.emit(index)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _mouse_hit(dealt: int, scared: bool) -> void:
+	mouse_hit.emit(dealt, scared)
 
 
 # Host only: a shot from `origin` along `direction` met the arena `distance`
@@ -1663,7 +1678,10 @@ func _burst(projectile: Projectile, at: Vector3) -> void:
 	if weapon.splash_radius <= 0.0:
 		return
 	_burst_blocks(at, weapon)
-	_scare_mice_near(at, weapon.splash_radius)
+	var mouse_damage := {}
+	for index: int in state.mice.near(at, weapon.splash_radius):
+		mouse_damage[index] = weapon.splash_damage
+	_hurt_mice(projectile.shooter, mouse_damage, at)
 	var space := world.get_world_3d().direct_space_state
 	# A burst against a wall is at its face; sight lines are checked from a
 	# hand's width back along the way it came, so the wall itself counts.
