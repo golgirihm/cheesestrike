@@ -239,9 +239,11 @@ func load_map(id: String) -> void:
 	var arena := ArenaCode.decode(custom_code) if id == Maps.CUSTOM else {}
 	if id == Maps.CUSTOM and arena.is_empty():
 		return
-	_door_angles.clear()
+	# The same arena again, as every state a player is sent names it: its
+	# doors stay where they had turned to, rather than shut again.
 	if id == map_id and (id != Maps.CUSTOM or custom_code == _built_code):
 		return
+	_door_angles.clear()
 	var was_menu_view := menu_camera != null and menu_camera.current
 	if map != null:
 		remove_child(map)
