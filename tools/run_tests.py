@@ -2,6 +2,8 @@
 
     python tools/run_tests.py              every suite
     python tools/run_tests.py game         only the suites named
+    python tools/run_tests.py browser --shard 2/4
+                                           the second quarter of the browser tests
 
 Every selected suite runs even if an earlier one fails; the exit code is
 non-zero if any failed.
@@ -19,6 +21,9 @@ headless browser windows. Besides Godot's Web export template it needs:
 
     pip install -r browser_tests/requirements.txt
     python -m playwright install --only-shell chromium
+
+They take a while, so CI splits them between several machines with --shard,
+each running its share.
 
 CI pins the versions of what it tests with (tools/versions.env and the
 requirements.txt files). A local run uses whatever is installed, so this
@@ -172,7 +177,7 @@ def infra(pins):
     return run(sys.executable, "-m", "unittest", "discover", "-s", "infra")
 
 
-def browser(pins):
+def browser(pins, shard=(1, 1)):
     # The browser tests start the signaling server, so they need its package too.
     if not checked_package(pins, "websockets", "signaling/requirements.txt"):
         return False
@@ -189,12 +194,12 @@ def browser(pins):
         print("error: the web export failed. Godot's Web export template may be missing;")
         print("install the export templates from the editor, or run: python tools/fetch_export_template.py")
         return False
-    return run_browser_tests()
+    return run_browser_tests(shard)
 
 
-def run_browser_tests():
-    """Runs the browser tests several at a time, each group in a process with
-    a browser of its own."""
+def run_browser_tests(shard):
+    """Runs this shard's share of the browser tests several at a time, each
+    group in a process with a browser of its own."""
     sys.path.insert(0, str(BROWSER_TESTS))
     tests = []
 
@@ -211,6 +216,12 @@ def run_browser_tests():
         print(f"error: couldn't load the browser tests: {', '.join(broken) or 'none found'}")
         return False
 
+    # Each shard takes every nth test, which mixes the slow files and the
+    # quick ones between shards as it does between groups.
+    number, count = shard
+    tests = tests[number - 1 :: count]
+    if count > 1:
+        print(f"shard {number} of {count}", flush=True)
     workers = min(BROWSER_WORKERS, len(tests))
     groups = [tests[index::workers] for index in range(workers)]
     print(f"running {len(tests)} tests in {workers} groups", flush=True)
@@ -240,13 +251,29 @@ def run_browser_tests():
 SUITES = {"game": game, "signaling": signaling, "infra": infra, "browser": browser}
 
 
+def shard(text):
+    """Parses --shard's "2/4" into (2, 4)."""
+    number, separator, count = text.partition("/")
+    try:
+        number, count = int(number), int(count)
+    except ValueError:
+        number = count = 0
+    if not separator or not 1 <= number <= count:
+        raise argparse.ArgumentTypeError(f"expected a shard such as 2/4, not {text!r}")
+    return number, count
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the repository's test suites.")
     parser.add_argument("suites", nargs="*", metavar="suite", help=f"one of: {', '.join(SUITES)} (default: all)")
-    selected = parser.parse_args().suites or list(SUITES)
+    parser.add_argument("--shard", type=shard, metavar="N/COUNT", help="run only the Nth of COUNT equal shares of the browser tests")
+    arguments = parser.parse_args()
+    selected = arguments.suites or list(SUITES)
     unknown = [name for name in selected if name not in SUITES]
     if unknown:
         parser.error(f"unknown suite: {', '.join(unknown)}")
+    if arguments.shard and selected != ["browser"]:
+        parser.error("--shard only splits the browser suite; run it alone")
 
     # Test output can hold characters the terminal's encoding lacks.
     sys.stdout.reconfigure(errors="replace")
@@ -256,7 +283,7 @@ def main():
     results = {}
     for name in selected:
         print(f"\n=== {name} ===", flush=True)
-        results[name] = SUITES[name](pins)
+        results[name] = browser(pins, arguments.shard) if arguments.shard else SUITES[name](pins)
 
     print("\n=== summary ===")
     for name, passed in results.items():
