@@ -125,7 +125,7 @@ func test_a_code_put_in_becomes_the_players_crosshair() -> void:
 	assert_false(menu.use_crosshair_code("nonsense"))
 	assert_eq(Settings.get_value(Crosshair.SHAPE), "circle")
 	# Changing a setting changes the code shown.
-	(menu.find_child("Setting_" + Crosshair.SHAPE, true, false) as Button).pressed.emit()
+	menu.choose("Setting_" + Crosshair.SHAPE, "dot")
 	assert_eq(Settings.get_value(Crosshair.SHAPE), "dot")
 	assert_string_starts_with(box.text, "CS1-dot-cyan")
 	for key: String in Crosshair.KEYS:

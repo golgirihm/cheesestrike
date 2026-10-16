@@ -161,14 +161,15 @@ func test_the_settings_lay_the_hud_out_a_part_at_a_time() -> void:
 	var menu: Control = SETTINGS_MENU.new()
 	add_child_autofree(menu)
 	menu.open()
-	var part: Button = menu.find_child("HudPart", true, false)
-	assert_eq(part.text, "HUD part: %s" % HudLayout.PARTS.health)
+	var part: OptionButton = menu.find_child("HudPart", true, false)
+	assert_eq(part.text, HudLayout.PARTS.health)
 	(menu.find_child("Hud_scale", true, false) as HSlider).value = 1.4
 	assert_eq(Settings.get_value(HudLayout.SETTING), {"health": {"scale": 1.4}})
 	(menu.find_child("Hud_on", true, false) as CheckButton).toggled.emit(false)
 	assert_eq(Settings.get_value(HudLayout.SETTING).health.on, false)
-	part.pressed.emit()
+	menu.choose("HudPart", "weapon")
 	assert_eq(menu.hud_part, "weapon")
+	assert_eq(part.text, HudLayout.PARTS.weapon)
 	assert_eq((menu.find_child("Hud_scale", true, false) as HSlider).value, 1.0, "the controls show the part chosen")
 	assert_true((menu.find_child("Hud_on", true, false) as CheckButton).button_pressed)
 	(menu.find_child("Hud_x", true, false) as HSlider).value = -0.25
@@ -177,10 +178,7 @@ func test_the_settings_lay_the_hud_out_a_part_at_a_time() -> void:
 	assert_eq(Settings.get_value(HudLayout.SETTING), HudLayout.minimal())
 	(menu.find_child("HudStandard", true, false) as Button).pressed.emit()
 	assert_eq(Settings.get_value(HudLayout.SETTING), {})
-	# Round every part and back.
-	for press in HudLayout.PARTS.size() - 1:
-		part.pressed.emit()
-	assert_eq(menu.hud_part, "health")
+	assert_eq(menu.choices_of("HudPart"), HudLayout.PARTS.keys(), "every part can be chosen")
 
 
 func test_the_bar_shows_each_weapon_carried_with_its_key() -> void:

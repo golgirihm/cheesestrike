@@ -160,26 +160,30 @@ func test_customise_shows_the_character_and_weapons_and_settings_the_rest() -> v
 	main.front_end.button("customise").pressed.emit()
 	assert_true(settings.visible)
 	assert_eq((settings.find_child("SettingsTitle", true, false) as Label).text, "Customise")
-	for key: String in Looks.SETTINGS.keys() + settings.LOADOUT.keys():
-		assert_true((settings.find_child("Setting_" + key, true, false) as Control).visible, key)
-	for key: String in ["fov", "master_volume", "quality", "captions"]:
-		assert_false((settings.find_child("Setting_" + key, true, false) as Control).is_visible_in_tree(), key)
-	assert_false((settings.find_child("Key_reload", true, false) as Control).is_visible_in_tree())
+	var tabs := func() -> Array:
+		return settings.TABS.map(func(tab: Array) -> String: return tab[0]).filter(func(id: String) -> bool:
+			return (settings.find_child("SettingsTab_" + id, true, false) as Control).visible)
+	assert_eq(tabs.call(), ["character", "weapons"])
+	for key: String in Looks.SETTINGS.keys():
+		assert_eq(settings.group_of(key), "character", key)
+		assert_true((settings.find_child("Setting_" + key, true, false) as Control).is_visible_in_tree(), key)
+	for key: String in settings.LOADOUT.keys():
+		assert_eq(settings.group_of(key), "weapons", key)
 	settings.close()
 	assert_true(main.front_end.visible, "back at the title")
 	main.front_end.button("settings").pressed.emit()
 	assert_eq((settings.find_child("SettingsTitle", true, false) as Label).text, "Settings")
-	for key: String in Looks.SETTINGS.keys() + settings.LOADOUT.keys():
-		assert_false((settings.find_child("Setting_" + key, true, false) as Control).visible, key)
+	assert_eq(tabs.call(), ["aim", "controls", "keys", "sound", "graphics", "hud", "access"])
+	assert_true((settings.find_child("Setting_fov", true, false) as Control).is_visible_in_tree(), "the first tab's")
 	for key: String in ["fov", "master_volume", "quality", "captions"]:
-		assert_true((settings.find_child("Setting_" + key, true, false) as Control).is_visible_in_tree(), key)
+		assert_ne(settings.group_of(key), "", key)
+	(settings.find_child("SettingsTab_keys", true, false) as Button).pressed.emit()
 	assert_true((settings.find_child("Key_reload", true, false) as Control).is_visible_in_tree())
+	assert_false((settings.find_child("Setting_fov", true, false) as Control).is_visible_in_tree(), "one tab at a time")
 	settings.close()
 	# In a session, where there is one button for it, everything is there.
 	settings.open()
-	settings.open_part(settings.EVERYTHING)
-	for key: String in ["look_hat", "loadout_main", "fov"]:
-		assert_true((settings.find_child("Setting_" + key, true, false) as Control).visible, key)
+	assert_eq(tabs.call().size(), settings.TABS.size())
 
 
 func test_credits_say_what_the_game_is_made_with_and_come_back() -> void:

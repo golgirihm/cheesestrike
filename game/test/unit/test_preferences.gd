@@ -146,13 +146,17 @@ func test_the_screen_shows_what_is_set() -> void:
 	assert_eq(SETTINGS_MENU.value_text("fov", 75.0), "75°")
 
 
-func test_the_quality_button_comes_round() -> void:
+func test_the_quality_is_chosen_from_a_list_of_the_levels() -> void:
 	assert_eq(SETTINGS_MENU.next_quality("low"), "medium")
 	assert_eq(SETTINGS_MENU.next_quality("high"), "low")
 	var menu := _menu()
 	Settings.set_value("quality", "low")
-	(menu.find_child("Setting_quality", true, false) as Button).pressed.emit()
+	var list: OptionButton = menu.find_child("Setting_quality", true, false)
+	assert_eq(menu.choices_of("Setting_quality"), GraphicsQuality.LEVELS)
+	assert_eq(list.text, "Low")
+	menu.choose("Setting_quality", "medium")
 	assert_eq(Settings.get_value("quality"), "medium")
+	assert_eq(list.text, "Medium")
 
 
 func test_invert_look_toggles() -> void:

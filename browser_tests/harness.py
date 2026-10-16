@@ -173,14 +173,32 @@ class Game:
     def scroll_to(self, control):
         """Turns the mouse wheel down over the middle of the screen until
         `control` is in view, as for something far down a scrolling list. The
-        game only reports controls in a list's visible part."""
-        for _ in range(30):
-            if control in self.state()["controls"]:
-                return
-            self.page.mouse.move(VIEWPORT["width"] / 2, VIEWPORT["height"] / 2)
-            self.page.mouse.wheel(0, 120)
-            self.page.wait_for_timeout(150)
+        game only reports controls in a list's visible part. On the settings
+        screen, each of its tabs is tried in turn until one has it."""
+        tabs = [None] + sorted(name for name in self.state()["controls"] if name.startswith("SettingsTab_"))
+        for tab in tabs:
+            if tab is not None:
+                self._click(tab)
+                self.page.wait_for_timeout(150)
+            for _ in range(30):
+                state = self.state()
+                if control in state["controls"]:
+                    return
+                self.page.mouse.move(VIEWPORT["width"] / 2, VIEWPORT["height"] / 2)
+                self.page.mouse.wheel(0, 120)
+                self.page.wait_for_timeout(150)
+                if self.state()["controls"] == state["controls"]:
+                    break
         raise AssertionError(f"couldn't scroll {control} into view")
+
+    def choose_next(self, control):
+        """Opens the list of choices `control`, such as "Setting_quality",
+        and takes the choice after the one chosen, with the keys."""
+        self.click(control)
+        self.page.wait_for_timeout(150)
+        self.press("ArrowDown")
+        self.press("Enter")
+        self.page.wait_for_timeout(100)
 
     def click_at(self, canvas_point):
         """Clicks a point given in the game canvas's own pixels."""

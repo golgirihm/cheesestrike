@@ -1,10 +1,16 @@
 extends CenterContainer
 ## The settings screen: how looking feels, the field of view, loudness,
-## graphics quality and the keys. Every change is saved and takes effect at
-## once. Reached from the main menu and the in-game menu, over either.
+## graphics quality and the keys, and the character and weapons. Every change
+## is saved and takes effect at once. Reached from the main menu and the
+## in-game menu, over either.
+##
+## The settings are in groups, each under a tab across the top, and each
+## setting is a row: what it is called on the left, and on the right a
+## slider, a switch or a list of its choices.
 ##
 ## Each control is named after what it sets ("Setting_fov",
-## "Key_move_forward"), which the browser tests use to find them.
+## "Key_move_forward"), and each tab after its group ("SettingsTab_sound"),
+## which the browser tests use to find them.
 
 signal closed
 
@@ -81,21 +87,57 @@ const CUSTOMISE := "customise"
 const SETTINGS := "settings"
 const EVERYTHING := ""
 
-var _rows: VBoxContainer
+## The groups of settings, each with what its tab says, in the order of the
+## tabs: first those of "Settings", then those of "Customise".
+const TABS := [
+	["aim", "Aim"], ["controls", "Controls"], ["keys", "Keys"], ["sound", "Sound"], ["graphics", "Graphics"], ["hud", "HUD"], ["access", "Accessibility"],
+	["character", "Character"], ["weapons", "Weapons"],
+]
+const CUSTOMISE_TABS := ["character", "weapons"]
+## Which group each setting is in, by its key, in the order each group
+## lists them.
+const GROUP_OF := {
+	"mouse_sensitivity": "aim", "stick_sensitivity": "aim", "stick_dead_zone": "aim", "touch_sensitivity": "aim", "aim_sensitivity": "aim",
+	"scope_sensitivity": "aim", "look_vertical": "aim", "gyro_sensitivity": "aim", "fov": "aim", "invert_look": "aim", "aim_assist": "aim",
+	"gyro_aim": "aim", StickAim.CURVE: "aim",
+	"toggle_run": "controls", "toggle_crouch": "controls", "toggle_aim": "controls", "toggle_lean": "controls", "toggle_talk": "controls",
+	"toggle_scoreboard": "controls", "hold_to_fire": "controls", "rumble": "controls", "haptics": "controls", "touch_left_handed": "controls",
+	"touch_fullscreen": "controls", "touch_size": "controls",
+	"master_volume": "sound", "music_volume": "sound", "effects_volume": "sound", "weapons_volume": "sound", "steps_volume": "sound",
+	"voices_volume": "sound", "world_volume": "sound", "interface_volume": "sound", "mono_sound": "sound", "announcer": "sound",
+	"voice_chat": "sound", "text_chat": "sound", Mix.RANGE_SETTING: "sound", SoundCues.HIT_SETTING: "sound",
+	"battery_saver": "graphics", "dynamic_resolution": "graphics", "bloom": "graphics", "colour_grade": "graphics", "vignette": "graphics",
+	"show_fps": "graphics", "show_ping": "graphics", "show_loss": "graphics", "show_graph": "graphics", FramePace.CAP: "graphics",
+	"hud_scale": "hud", "damage_numbers": "hud", "replays": "hud", "outlines": "hud", Crosshair.SHAPE: "hud", Crosshair.COLOUR: "hud",
+	"crosshair_size": "hud", "crosshair_gap": "hud", "crosshair_thickness": "hud", "crosshair_outline": "hud", "crosshair_dot": "hud",
+	"high_contrast": "access", "less_motion": "access", "menu_text": "access", "screen_shake": "access", "camera_motion": "access",
+	"captions": "access", "sound_ring": "access", TeamColors.PRESET: "access", TeamColors.OWN_CHEDDAR: "access", TeamColors.OWN_BRIE: "access",
+	TeamColors.OWN_HIT: "access",
+}
+
 var _title: Label
 ## The part of the HUD being laid out, and the controls that do it.
 var hud_part: String = HudLayout.PARTS.keys()[0]
 const HUD_SLIDERS := [[HudLayout.X, "Across"], [HudLayout.Y, "Down"], [HudLayout.SCALE, "Size"], [HudLayout.OPACITY, "Opacity"]]
-var _hud_part_button: Button
+var _hud_part_button: OptionButton
 var _hud_sliders := {}
 var _hud_on: CheckButton
 var _crosshair_code: LineEdit
 var _crosshair_view: Control
-var _customise_rows: Array[Control] = []
 var _scroll: ScrollContainer
 var _done: Button
 var _value_labels := {}
 var _key_buttons := {}
+# Each group's rows, and its tab, by the group's id; and the group shown.
+var _groups := {}
+var _tabs := {}
+var _tab_row: HFlowContainer
+## The group of settings being shown.
+var group := "aim"
+# Each list of choices: {"list": OptionButton, "ids": [...], "name": Callable
+# (id) -> what it is called, "can": Callable (id) -> whether it can be
+# chosen, "now": Callable () -> the id chosen}, by its control's name.
+var _lists := {}
 # The action waiting for its new key, or "".
 var _waiting_for := ""
 
@@ -109,19 +151,45 @@ func _ready() -> void:
 	refresh()
 
 
+## Opens the screen with everything on it, as from the in-game menu.
 func open() -> void:
-	refresh()
-	show()
-	_done.grab_focus()
+	open_part(EVERYTHING)
 
 
 ## Opens the screen at one part of itself: CUSTOMISE for the character and
 ## weapons alone, SETTINGS for the rest, EVERYTHING for both.
 func open_part(part: String) -> void:
-	open()
+	refresh()
+	show()
+	_done.grab_focus()
 	_title.text = "Customise" if part == CUSTOMISE else "Settings"
-	for row: Control in _rows.get_children():
-		row.visible = part == EVERYTHING or (_customise_rows.has(row) == (part == CUSTOMISE))
+	var first := ""
+	for tab: Array in TABS:
+		var shown: bool = part == EVERYTHING or (CUSTOMISE_TABS.has(tab[0]) == (part == CUSTOMISE))
+		(_tabs[tab[0]] as Button).visible = shown
+		if shown and first.is_empty():
+			first = tab[0]
+	show_group(first)
+
+
+## Shows the group of settings `id` (see TABS), under its tab.
+func show_group(id: String) -> void:
+	group = id
+	for each: String in _groups:
+		(_groups[each] as Control).visible = each == id
+		(_tabs[each] as Button).set_pressed_no_signal(each == id)
+	_scroll.scroll_vertical = 0
+
+
+## The group that the setting `key` is in, or "" if it has no control here.
+func group_of(key: String) -> String:
+	var control := find_child("Setting_" + key, true, false)
+	if control == null:
+		return ""
+	for id: String in _groups:
+		if (_groups[id] as Node).is_ancestor_of(control):
+			return id
+	return ""
 
 
 func close() -> void:
@@ -139,12 +207,10 @@ func refresh() -> void:
 		_show_value(row[0])
 	for row: Array in TOGGLES:
 		(find_child("Setting_" + row[0], true, false) as CheckButton).set_pressed_no_signal(Settings.get_value(row[0]))
-	for choice: Array in SOUND_CHOICES:
-		(find_child("Setting_" + choice[0], true, false) as Button).text = sound_choice_text(choice[0])
-	(find_child("Setting_" + Sensitivity.OTHER_GAME, true, false) as Button).text = "Match the mouse of: %s" % Sensitivity.OTHER_GAMES[Settings.get_value(Sensitivity.OTHER_GAME)][0]
+	for id: String in _lists:
+		_show_list(id)
 	# The HUD's controls show the part that is chosen.
 	if _hud_part_button != null:
-		_hud_part_button.text = "HUD part: %s" % HudLayout.PARTS[hud_part]
 		var how := HudLayout.part(Settings.get_value(HudLayout.SETTING), hud_part)
 		for key: String in _hud_sliders:
 			(_hud_sliders[key] as HSlider).set_value_no_signal(how[key])
@@ -153,14 +219,6 @@ func refresh() -> void:
 	if _crosshair_code != null and not _crosshair_code.has_focus():
 		_crosshair_code.text = Crosshair.encode(Crosshair.chosen())
 		_crosshair_view.queue_redraw()
-	(find_child("Setting_quality", true, false) as Button).text = "Graphics: %s" % GraphicsQuality.NAMES[GraphicsQuality.level(Settings.get_value("quality"))]
-	for part: String in GraphicsQuality.ORDER:
-		var setting: String = GraphicsQuality.PARTS[part].setting
-		(find_child("Setting_" + setting, true, false) as Button).text = GraphicsQuality.part_text(part, GraphicsQuality.level(Settings.get_value("quality")), Settings.get_value(setting))
-	for key: String in Looks.SETTINGS:
-		(find_child("Setting_" + key, true, false) as Button).text = look_text(key)
-	for key: String in LOADOUT:
-		(find_child("Setting_" + key, true, false) as Button).text = loadout_text(key)
 	for action: String in _key_buttons:
 		_key_buttons[action].text = "Press a key…" if action == _waiting_for else Controls.keys_text(action)
 
@@ -181,6 +239,21 @@ func use_crosshair_code(code: String) -> bool:
 	return true
 
 
+## Chooses `id` in the list of choices named `name`, such as
+## "Setting_quality", as picking it from the list does.
+func choose(name: String, id: Variant) -> void:
+	var known: Dictionary = _lists[name]
+	var index: int = known.ids.find(id)
+	if index != -1 and not (known.list as OptionButton).is_item_disabled(index):
+		(known.list as OptionButton).select(index)
+		(known.list as OptionButton).item_selected.emit(index)
+
+
+## The ids of the choices in the list named `name`, in order.
+func choices_of(name: String) -> Array:
+	return _lists[name].ids
+
+
 ## A small view of the crosshair as it is chosen.
 class CrosshairView:
 	extends Control
@@ -190,7 +263,7 @@ class CrosshairView:
 		Crosshair.draw(self, size / 2.0, Crosshair.chosen(), CombatHud.CROSSHAIR_GAP)
 
 
-## The sound settings that are one of a few: the setting, what it is called,
+## The settings that are one of a few: the setting, what it is called,
 ## and its choices with what each is called.
 const SOUND_CHOICES := [
 	[Mix.RANGE_SETTING, "Sound for", {"headphones": "Headphones", "speakers": "Speakers", "night": "Night (quiet and even)"}],
@@ -206,7 +279,7 @@ const SOUND_CHOICES := [
 ]
 
 
-## What the button for one of the sound choices says, such as "Hit sound:
+## What one of the choices that are one of a few says, such as "Hit sound:
 ## Bell".
 static func sound_choice_text(key: String) -> String:
 	for choice: Array in SOUND_CHOICES:
@@ -229,17 +302,21 @@ static func value_text(key: String, value: float) -> String:
 const LOADOUT := {"loadout_main": ["Main weapon", Weapons.MAINS], "loadout_side": ["Sidearm", Weapons.SIDES], "loadout_attachment": ["Fitted to it", Attachments.IDS], "loadout_overload": ["Overload", Overload.IDS]}
 
 
-## What the button for one part of the loadout says, such as "Main weapon:
-## Swiss Shotgun".
-static func loadout_text(key: String) -> String:
+## What one part of the loadout, as `id`, is called, such as "Swiss Shotgun".
+static func loadout_choice_text(key: String, id: Variant) -> String:
 	if key == "loadout_overload":
-		return "%s: %s" % [LOADOUT[key][0], Overload.text(Overload.from_id(Settings.get_value(key)))]
+		return Overload.text(Overload.from_id(id))
 	if key == "loadout_attachment":
-		return "%s: %s" % [LOADOUT[key][0], Attachments.text(Attachments.from_id(Settings.get_value(key)))]
-	return "%s: %s" % [LOADOUT[key][0], Weapons.find(Settings.get_value(key)).display_name]
+		return Attachments.text(Attachments.from_id(id))
+	return Weapons.find(id).display_name
 
 
-## What the button for one of the character's looks says, such as "Hat: Crown".
+## What one part of the loadout says, such as "Main weapon: Swiss Shotgun".
+static func loadout_text(key: String) -> String:
+	return "%s: %s" % [LOADOUT[key][0], loadout_choice_text(key, Settings.get_value(key))]
+
+
+## What one of the character's looks says, such as "Hat: Crown".
 static func look_text(key: String) -> String:
 	var choice: Array = Looks.SETTINGS[key]
 	return "%s: %s" % [choice[2], choice[1][Settings.get_value(key)]]
@@ -296,9 +373,23 @@ func _show_value(key: String) -> void:
 		_value_labels[key].text = value_text(key, Settings.get_value(key))
 
 
+# Fills the list of choices `name` afresh, as each can read differently as
+# things change, and picks out the one chosen. Not while it is open.
+func _show_list(name: String) -> void:
+	var known: Dictionary = _lists[name]
+	var list: OptionButton = known.list
+	if list.get_popup().visible:
+		return
+	list.clear()
+	for id: Variant in known.ids:
+		list.add_item(known.name.call(id))
+		list.set_item_disabled(list.item_count - 1, not known.can.call(id))
+	list.select(known.ids.find(known.now.call()))
+
+
 func _build() -> void:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(420, 0)
+	panel.custom_minimum_size = Vector2(560, 0)
 	add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -314,48 +405,69 @@ func _build() -> void:
 	Look.heading(title)
 	outer.add_child(title)
 	_title = title
-
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(380, 400)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	outer.add_child(scroll)
-	_scroll = scroll
-	_rows = VBoxContainer.new()
-	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_rows.add_theme_constant_override("separation", 8)
-	scroll.add_child(_rows)
+	# A tab for each group, which wrap onto a second line if they must.
+	_tab_row = HFlowContainer.new()
+	_tab_row.name = "SettingsTabs"
+	_tab_row.alignment = FlowContainer.ALIGNMENT_CENTER
+	_tab_row.add_theme_constant_override("h_separation", 6)
+	_tab_row.add_theme_constant_override("v_separation", 6)
+	outer.add_child(_tab_row)
+	var tabs := ButtonGroup.new()
+	var holder := VBoxContainer.new()
+	holder.name = "Groups"
+	for tab: Array in TABS:
+		var button := Button.new()
+		button.name = "SettingsTab_" + tab[0]
+		button.text = tab[1]
+		button.toggle_mode = true
+		button.button_group = tabs
+		button.custom_minimum_size = Vector2(0, 38)
+		button.pressed.connect(show_group.bind(tab[0]))
+		_tab_row.add_child(button)
+		_tabs[tab[0]] = button
+		var rows := VBoxContainer.new()
+		rows.name = "Group_" + tab[0]
+		rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rows.add_theme_constant_override("separation", 8)
+		holder.add_child(rows)
+		_groups[tab[0]] = rows
+	outer.add_child(holder)
+	_scroll = FitScroll.wrap(holder)
 
 	for row: Array in SLIDERS:
-		_add_slider(row[0], row[1], row[2], row[3], row[4])
+		_add_slider(GROUP_OF.get(row[0], "hud"), row[0], row[1], row[2], row[3], row[4])
 	for row: Array in TOGGLES:
 		var toggle := CheckButton.new()
 		toggle.name = "Setting_" + row[0]
-		toggle.text = row[1]
 		toggle.custom_minimum_size = Vector2(0, 40)
 		toggle.toggled.connect(func(on: bool) -> void: Settings.set_value(row[0], on))
-		_rows.add_child(toggle)
-	# The sound choices that are one of a few.
+		_row(GROUP_OF.get(row[0], "access"), row[1], toggle, true)
+	# The settings that are one of a few.
 	for choice: Array in SOUND_CHOICES:
-		var button := Button.new()
-		button.name = "Setting_" + choice[0]
-		button.custom_minimum_size = Vector2(0, 40)
-		button.pressed.connect(func() -> void:
-			Settings.set_value(choice[0], next_choice(choice[2].keys(), Settings.get_value(choice[0]))))
-		_rows.add_child(button)
-	# The mouse made to turn as far as it does in another game.
+		var key: String = choice[0]
+		var names: Dictionary = choice[2]
+		_add_list(GROUP_OF.get(key, "access"), "Setting_" + key, choice[1], names.keys(),
+			func(id: Variant) -> String: return names[id],
+			func(id: Variant) -> void: Settings.set_value(key, id),
+			func() -> Variant: return Settings.get_value(key))
+	# The mouse made to turn as far as it does in another game: which game,
+	# and how sensitive it is there.
 	var match_row := HBoxContainer.new()
-	_rows.add_child(match_row)
-	var match_game := Button.new()
-	match_game.name = "Setting_" + Sensitivity.OTHER_GAME
-	match_game.custom_minimum_size = Vector2(0, 40)
+	var match_game := _add_list("aim", "Setting_" + Sensitivity.OTHER_GAME, "Match the mouse of", Sensitivity.OTHER_GAMES.keys(),
+		func(id: Variant) -> String: return Sensitivity.OTHER_GAMES[id][0],
+		func(id: Variant) -> void: Settings.set_value(Sensitivity.OTHER_GAME, id),
+		func() -> Variant: return Settings.get_value(Sensitivity.OTHER_GAME))
+	var match_line := match_game.get_parent()
+	match_line.remove_child(match_game)
+	match_line.add_child(match_row)
+	match_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	match_row.size_flags_stretch_ratio = 1.2
 	match_game.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	match_game.pressed.connect(func() -> void:
-		Settings.set_value(Sensitivity.OTHER_GAME, next_choice(Sensitivity.OTHER_GAMES.keys(), Settings.get_value(Sensitivity.OTHER_GAME))))
 	match_row.add_child(match_game)
 	var theirs := LineEdit.new()
 	theirs.name = "MatchSensitivity"
 	theirs.placeholder_text = "Its sensitivity"
-	theirs.custom_minimum_size = Vector2(130, 40)
+	theirs.custom_minimum_size = Vector2(120, 40)
 	theirs.text_submitted.connect(func(text: String) -> void:
 		var ours := Sensitivity.matching(Settings.get_value(Sensitivity.OTHER_GAME), text.to_float() if text.is_valid_float() else -1.0)
 		if ours > 0.0:
@@ -363,13 +475,14 @@ func _build() -> void:
 			theirs.clear()
 		theirs.release_focus())
 	match_row.add_child(theirs)
+
 	# The crosshair as a code, to copy for someone or to paste in from them,
 	# with the crosshair itself beside it.
 	var code_row := HBoxContainer.new()
-	_rows.add_child(code_row)
+	code_row.add_theme_constant_override("separation", 8)
 	_crosshair_view = CrosshairView.new()
 	_crosshair_view.name = "CrosshairView"
-	_crosshair_view.custom_minimum_size = Vector2(64, 64)
+	_crosshair_view.custom_minimum_size = Vector2(56, 56)
 	code_row.add_child(_crosshair_view)
 	_crosshair_code = LineEdit.new()
 	_crosshair_code.name = "CrosshairCode"
@@ -387,44 +500,33 @@ func _build() -> void:
 		if DisplayServer.has_feature(DisplayServer.FEATURE_CLIPBOARD):
 			DisplayServer.clipboard_set(Crosshair.encode(Crosshair.chosen())))
 	code_row.add_child(copy_code)
+	_row("hud", "Crosshair code", code_row)
 	# The HUD, a part at a time: which part, then where, how big, how
 	# faint, and whether it is there at all.
-	var hud_title := Label.new()
-	hud_title.text = "The HUD, a part at a time"
-	hud_title.add_theme_font_size_override("font_size", 20)
-	_rows.add_child(hud_title)
-	_hud_part_button = Button.new()
-	_hud_part_button.name = "HudPart"
-	_hud_part_button.custom_minimum_size = Vector2(0, 40)
-	_hud_part_button.pressed.connect(func() -> void:
-		hud_part = next_choice(HudLayout.PARTS.keys(), hud_part)
-		refresh())
-	_rows.add_child(_hud_part_button)
+	_heading("hud", "The HUD, a part at a time")
+	_hud_part_button = _add_list("hud", "HudPart", "Part", HudLayout.PARTS.keys(),
+		func(id: Variant) -> String: return HudLayout.PARTS[id],
+		func(id: Variant) -> void:
+			hud_part = id
+			refresh(),
+		func() -> Variant: return hud_part)
 	for row: Array in HUD_SLIDERS:
-		var line := HBoxContainer.new()
-		_rows.add_child(line)
-		var label := Label.new()
-		label.text = row[1]
-		label.custom_minimum_size = Vector2(110, 0)
-		line.add_child(label)
 		var slider := HSlider.new()
 		slider.name = "Hud_" + row[0]
 		slider.min_value = HudLayout.RANGES[row[0]][0]
 		slider.max_value = HudLayout.RANGES[row[0]][1]
 		slider.step = 0.05
-		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		slider.custom_minimum_size = Vector2(0, 32)
 		slider.value_changed.connect(func(value: float) -> void: set_hud(row[0], value))
-		line.add_child(slider)
+		_row("hud", row[1], slider)
 		_hud_sliders[row[0]] = slider
 	_hud_on = CheckButton.new()
 	_hud_on.name = "Hud_on"
-	_hud_on.text = "Show this part"
 	_hud_on.custom_minimum_size = Vector2(0, 40)
 	_hud_on.toggled.connect(func(on: bool) -> void: set_hud(HudLayout.ON, on))
-	_rows.add_child(_hud_on)
+	_row("hud", "Show this part", _hud_on, true)
 	var presets := HBoxContainer.new()
-	_rows.add_child(presets)
 	for preset: Array in [["HudMinimal", "Minimal HUD", HudLayout.minimal()], ["HudStandard", "Usual HUD", HudLayout.standard()]]:
 		var button := Button.new()
 		button.name = preset[0]
@@ -433,74 +535,69 @@ func _build() -> void:
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(func() -> void: Settings.set_value(HudLayout.SETTING, preset[2]))
 		presets.add_child(button)
-	var quality := Button.new()
-	quality.name = "Setting_quality"
-	quality.custom_minimum_size = Vector2(0, 40)
-	quality.pressed.connect(func() -> void:
-		Settings.set_value("quality", next_quality(GraphicsQuality.level(Settings.get_value("quality")))))
-	_rows.add_child(quality)
-	# Each part of the graphics on its own, under the level above.
+	(_groups["hud"] as Control).add_child(presets)
+
+	# The graphics: a level, and under it each part on its own, which is
+	# either as the level has it or chosen.
+	var quality := _add_list("graphics", "Setting_quality", "Quality", GraphicsQuality.LEVELS,
+		func(id: Variant) -> String: return GraphicsQuality.NAMES[id],
+		func(id: Variant) -> void: Settings.set_value("quality", id),
+		func() -> Variant: return GraphicsQuality.level(Settings.get_value("quality")))
+	(_groups["graphics"] as Control).move_child(quality.get_parent(), 0)
 	for part: String in GraphicsQuality.ORDER:
-		var setting: String = GraphicsQuality.PARTS[part].setting
-		var button := Button.new()
-		button.name = "Setting_" + setting
-		button.custom_minimum_size = Vector2(0, 40)
-		button.pressed.connect(func() -> void:
-			Settings.set_value(setting, GraphicsQuality.next_choice(part, Settings.get_value(setting))))
-		_rows.add_child(button)
+		var known: Dictionary = GraphicsQuality.PARTS[part]
+		var setting: String = known.setting
+		var line := _add_list("graphics", "Setting_" + setting, known.name, [""] + known.choices.keys(),
+			func(id: Variant) -> String:
+				var level := GraphicsQuality.level(Settings.get_value("quality"))
+				return "As %s: %s" % [GraphicsQuality.NAMES[level], known.choices[GraphicsQuality.resolve(part, level, "")]] if id == "" else known.choices[id],
+			func(id: Variant) -> void: Settings.set_value(setting, id),
+			func() -> Variant: return Settings.get_value(setting) if known.choices.has(Settings.get_value(setting)) else "")
+		(_groups["graphics"] as Control).move_child(line.get_parent(), GraphicsQuality.ORDER.find(part) + 1)
 
-	# From here on is what "Customise" shows on its own.
-	var first_of_customise := _rows.get_child_count()
-	var loadout_title := Label.new()
-	loadout_title.text = "Your weapons, from when you next come back"
-	loadout_title.add_theme_font_size_override("font_size", 20)
-	_rows.add_child(loadout_title)
+	# What "Customise" shows: the weapons, and the character.
+	_heading("weapons", "Your weapons, from when you next come back")
 	for key: String in LOADOUT:
-		var slot := Button.new()
-		slot.name = "Setting_" + key
-		slot.custom_minimum_size = Vector2(0, 40)
-		slot.pressed.connect(func() -> void:
-			Settings.set_value(key, next_choice(LOADOUT[key][1], Settings.get_value(key))))
-		_rows.add_child(slot)
-
-	var look_title := Label.new()
-	look_title.text = "Your character, as others see it"
-	look_title.add_theme_font_size_override("font_size", 20)
-	_rows.add_child(look_title)
+		_add_list("weapons", "Setting_" + key, LOADOUT[key][0], LOADOUT[key][1],
+			func(id: Variant) -> String: return loadout_choice_text(key, id),
+			func(id: Variant) -> void: Settings.set_value(key, id),
+			func() -> Variant: return Settings.get_value(key))
+	_heading("character", "Your character, as others see it")
 	for key: String in Looks.SETTINGS:
-		var look := Button.new()
-		look.name = "Setting_" + key
-		look.custom_minimum_size = Vector2(0, 40)
-		look.pressed.connect(func() -> void:
-			# Through what the player has earned, and no further.
-			Settings.set_value(key, Unlocks.next(Looks.KIND_OF[key], Settings.get_value(key), Progress.level(), Progress.achievements, Progress.challenges_done())))
-		_rows.add_child(look)
+		var kind: String = Looks.KIND_OF[key]
+		var names: Dictionary = Looks.SETTINGS[key][1]
+		# Everything, but only what the player has earned can be chosen;
+		# the rest says what it takes.
+		_add_list("character", "Setting_" + key, Looks.SETTINGS[key][2], Looks.SETTINGS[key][0],
+			func(id: Variant) -> String:
+				var needs := Unlocks.needs_text(kind, id)
+				return names[id] if Unlocks.mine(kind, id) or needs.is_empty() else "%s  ·  %s" % [names[id], needs],
+			func(id: Variant) -> void: Settings.set_value(key, id),
+			func() -> Variant: return Settings.get_value(key),
+			func(id: Variant) -> bool: return Unlocks.mine(kind, id))
 
-	for index in range(first_of_customise, _rows.get_child_count()):
-		_customise_rows.append(_rows.get_child(index))
-	var keys_title := Label.new()
-	keys_title.text = "Keys"
-	keys_title.add_theme_font_size_override("font_size", 20)
-	_rows.add_child(keys_title)
 	for action: String in Controls.REBINDABLE:
-		var line := HBoxContainer.new()
-		_rows.add_child(line)
-		var label := Label.new()
-		label.text = Controls.REBINDABLE[action]
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		line.add_child(label)
 		var button := Button.new()
 		button.name = "Key_" + action
 		button.custom_minimum_size = Vector2(160, 36)
 		button.pressed.connect(rebind.bind(action))
-		line.add_child(button)
+		_row("keys", Controls.REBINDABLE[action], button)
 		_key_buttons[action] = button
 	var reset := Button.new()
 	reset.name = "SettingsResetKeys"
 	reset.text = "Reset keys"
 	reset.custom_minimum_size = Vector2(0, 36)
 	reset.pressed.connect(_reset_keys)
-	_rows.add_child(reset)
+	(_groups["keys"] as Control).add_child(reset)
+
+	# Each group's settings in the order GROUP_OF has them, before anything
+	# else it holds.
+	var order := GROUP_OF.keys()
+	for id: String in _groups:
+		var keyed: Array = (_groups[id] as Node).get_children().filter(func(line: Node) -> bool: return order.has(_key_of(line)))
+		keyed.sort_custom(func(a: Node, b: Node) -> bool: return order.find(_key_of(a)) < order.find(_key_of(b)))
+		for index in keyed.size():
+			(_groups[id] as Node).move_child(keyed[index], index)
 
 	_done = Button.new()
 	_done.name = "SettingsDone"
@@ -508,15 +605,68 @@ func _build() -> void:
 	_done.custom_minimum_size = Vector2(0, 44)
 	_done.pressed.connect(close)
 	outer.add_child(_done)
+	show_group(group)
 
 
-func _add_slider(key: String, text: String, low: float, high: float, step: float) -> void:
+# The setting a row is for, or "".
+static func _key_of(line: Node) -> String:
+	for child in line.get_children():
+		if child.name.begins_with("Setting_"):
+			return child.name.trim_prefix("Setting_")
+		for inner in child.get_children():
+			if inner.name.begins_with("Setting_"):
+				return inner.name.trim_prefix("Setting_")
+	return ""
+
+
+# A row of group `id`: what it sets, `text`, on the left, and `control` on
+# the right. A switch sits at the far right.
+func _row(id: String, text: String, control: Control, switch := false) -> HBoxContainer:
 	var line := HBoxContainer.new()
-	_rows.add_child(line)
+	line.add_theme_constant_override("separation", 12)
 	var label := Label.new()
 	label.text = text
-	label.custom_minimum_size = Vector2(110, 0)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size = Vector2(170, 0)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	line.add_child(label)
+	control.size_flags_horizontal = Control.SIZE_SHRINK_END if switch else Control.SIZE_EXPAND_FILL
+	control.size_flags_stretch_ratio = 1.2
+	line.add_child(control)
+	(_groups[id] as Control).add_child(line)
+	return line
+
+
+func _heading(id: String, text: String) -> void:
+	var heading := Label.new()
+	heading.text = text
+	heading.add_theme_font_size_override("font_size", 20)
+	heading.add_theme_color_override("font_color", Look.CHEDDAR)
+	(_groups[id] as Control).add_child(heading)
+
+
+# A list of choices, as a row of group `id`: `ids` in order, each called
+# what `name` says, `pick` called with the one chosen, `now` saying which is
+# chosen, and `can` whether one may be.
+func _add_list(id: String, control_name: String, text: String, ids: Array, name: Callable, pick: Callable, now: Callable, can := Callable()) -> OptionButton:
+	var list := OptionButton.new()
+	list.name = control_name
+	list.custom_minimum_size = Vector2(0, 40)
+	list.fit_to_longest_item = false
+	list.clip_text = true
+	list.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_lists[control_name] = {"list": list, "ids": ids, "name": name, "now": now,
+		"can": can if can.is_valid() else func(_id: Variant) -> bool: return true}
+	list.item_selected.connect(func(index: int) -> void: pick.call(ids[index]))
+	Look.list_opens_at_choice(list)
+	_row(id, text, list)
+	_show_list(control_name)
+	return list
+
+
+func _add_slider(id: String, key: String, text: String, low: float, high: float, step: float) -> void:
+	var holder := HBoxContainer.new()
 	var slider := HSlider.new()
 	slider.name = "Setting_" + key
 	slider.min_value = low
@@ -526,12 +676,13 @@ func _add_slider(key: String, text: String, low: float, high: float, step: float
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	slider.custom_minimum_size = Vector2(0, 32)
 	slider.value_changed.connect(func(value: float) -> void: Settings.set_value(key, value))
-	line.add_child(slider)
+	holder.add_child(slider)
 	var shown := Label.new()
 	shown.custom_minimum_size = Vector2(60, 0)
 	shown.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	line.add_child(shown)
+	holder.add_child(shown)
 	_value_labels[key] = shown
+	_row(id, text, holder)
 
 
 ## Every control that can be pressed or dragged and is in view, scrolled

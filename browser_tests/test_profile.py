@@ -28,7 +28,7 @@ class ProfileTest(GameTestCase):
         joiner.click("CustomiseButton")
         joiner.wait_for("s.screen === 'settings'")
         joiner.scroll_to("Setting_look_title")
-        joiner.click("Setting_look_title")
+        joiner.choose_next("Setting_look_title")
         joiner.click("SettingsDone")
         # Their own page says so.
         joiner.click("ProfileButton")
