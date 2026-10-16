@@ -27,12 +27,22 @@ const ANIMATIONS := "res://licensed/animations"
 ## where the player sees from (BodyShape.HEAD_HEIGHT), so that what can be hit
 ## (BodyShape's boxes) is where it is drawn.
 const MODEL_EYE_HEIGHT := 1.69
-## How fast the model's walk and run go across the ground, in its own metres a
-## second, played at their own pace.
-const WALK_PACE := 1.26
-const RUN_PACE := 3.03
-## The animations that go round and round rather than playing once.
-const LOOPED := ["idle", "aim", "walk", "walk_back", "walk_left", "walk_right", "run", "run_back", "run_left", "run_right", "fire", "crouch", "crouch_aim", "crouch_walk", "crouch_walk_back", "crouch_walk_left", "crouch_walk_right", "emote_dance", "emote_wave"]
+## How fast the model's walk, run, sprint and crouched walk go across the
+## ground, in its own metres a second, played at their own pace, each the
+## same whichever way it goes.
+const WALK_PACE := 1.86
+const RUN_PACE := 4.64
+const SPRINT_PACE := 6.96
+const CROUCH_PACE := 1.97
+## The gaits, as far along the legs' blend as each is (see stride), and the
+## ways each goes, by the end of its animation's name, as [right, ahead].
+const GAITS := {"walk": 1.0, "run": 2.0, "sprint": 3.0}
+const WAYS := {"": Vector2(0, 1), "_back": Vector2(0, -1), "_left": Vector2(-1, 0), "_right": Vector2(1, 0), "_ahead_left": Vector2(-0.7071, 0.7071), "_ahead_right": Vector2(0.7071, 0.7071), "_back_left": Vector2(-0.7071, -0.7071), "_back_right": Vector2(0.7071, -0.7071)}
+## The animations that go round and round rather than playing once, besides
+## every gait's.
+const LOOPED := ["idle", "aim", "fire", "crouch", "crouch_aim", "jump_loop", "emote_dance", "emote_wave"]
+## Seconds the weapon stays up at the shoulder after the last shot.
+const RAISED_AFTER_FIRING := 1.0
 ## What the upper body plays for each of CharacterMotion's actions, and each
 ## emote (see Emotes). Nothing for an emote with no animation.
 const ACTIONS := {
@@ -88,6 +98,8 @@ var _held_gun: Node3D
 var _held_model: Node3D
 # Where the weapon in its hand last was, in this node's measurements.
 var _weapon_here := Transform3D()
+# Seconds since it last fired.
+var _since_fired := INF
 
 
 ## Whether the realistic soldier can be shown here: its licensed model is
@@ -102,16 +114,33 @@ static func model_scale() -> float:
 
 
 ## How the legs go for a player moving at `speed` across the arena (metres a
-## second), as [how far along from standing (0) through walking (1) to running
-## (2), how fast to play that]: the walk and the run are blended and sped up so
-## that the feet keep pace with the ground.
+## second), as [how far along from standing (0) through walking (1) and
+## running (2) to sprinting (3), how fast to play that]: the gaits are blended,
+## and sped up past the sprint, so that the feet keep pace with the ground.
 static func stride(speed: float) -> Vector2:
 	var pace := speed / (BodyShape.SIZE * model_scale())
-	if pace < WALK_PACE:
-		return Vector2(pace / WALK_PACE, 1.0)
-	if pace < RUN_PACE:
-		return Vector2(1.0 + (pace - WALK_PACE) / (RUN_PACE - WALK_PACE), 1.0)
-	return Vector2(2.0, pace / RUN_PACE)
+	var paces := [0.0, WALK_PACE, RUN_PACE, SPRINT_PACE]
+	for gait in range(1, paces.size()):
+		if pace < paces[gait]:
+			return Vector2(gait - 1 + (pace - paces[gait - 1]) / (paces[gait] - paces[gait - 1]), 1.0)
+	return Vector2(paces.size() - 1, pace / SPRINT_PACE)
+
+
+## The same crouched, which only walks: [how far from crouched still (0) to
+## walking (1), how fast to play that].
+static func crouched_stride(speed: float) -> Vector2:
+	var pace := speed / (BodyShape.SIZE * model_scale())
+	return Vector2(minf(pace / CROUCH_PACE, 1.0), maxf(pace / CROUCH_PACE, 1.0))
+
+
+## Whether animation `name` goes round and round.
+static func loops(name: String) -> bool:
+	if LOOPED.has(name) or name.begins_with("crouch_walk"):
+		return true
+	for gait: String in GAITS:
+		if name.begins_with(gait):
+			return true
+	return false
 
 
 ## Takes the travel out of `animation`, which Mixamo leaves in many: the hips
@@ -194,7 +223,7 @@ static func library() -> AnimationLibrary:
 		var animation: Animation = source.get_animation(source.get_animation_list()[0]).duplicate(true)
 		in_place(animation)
 		var name := file.get_basename()
-		animation.loop_mode = Animation.LOOP_LINEAR if LOOPED.has(name) else Animation.LOOP_NONE
+		animation.loop_mode = Animation.LOOP_LINEAR if loops(name) else Animation.LOOP_NONE
 		_library.add_animation(name, animation)
 	return _library
 
@@ -225,7 +254,7 @@ static func _blending(animations: AnimationLibrary) -> AnimationNodeBlendTree:
 	tree.connect_node("pace", 0, "ground")
 	var legs := AnimationNodeTransition.new()
 	legs.xfade_time = 0.15
-	for input in ["ground", "crouch", "jump", "slide"]:
+	for input in ["ground", "crouch", "jump", "air", "land", "slide"]:
 		legs.add_input(input)
 	tree.add_node("legs", legs, Vector2(400, 0))
 	tree.connect_node("legs", 0, "pace")
@@ -237,10 +266,13 @@ static func _blending(animations: AnimationLibrary) -> AnimationNodeBlendTree:
 	else:
 		tree.add_node("crouched", _clip("idle"), Vector2(200, 150))
 		tree.connect_node("legs", 1, "crouched")
-	tree.add_node("jump", _clip("jump"), Vector2(200, 300))
-	tree.connect_node("legs", 2, "jump")
-	tree.add_node("slide", _clip("slide"), Vector2(200, 400))
-	tree.connect_node("legs", 3, "slide")
+	# Leaving the ground, in the air, and landing.
+	for index in 3:
+		var part: Array = [["jump", "jump_up"], ["air", "jump_loop"], ["land", "jump_down"]][index]
+		tree.add_node(part[0], _clip(part[1]), Vector2(200, 300 + 60 * index))
+		tree.connect_node("legs", 2 + index, part[0])
+	tree.add_node("slide", _clip("slide"), Vector2(200, 500))
+	tree.connect_node("legs", 5, "slide")
 
 	var acts := AnimationNodeTransition.new()
 	acts.xfade_time = 0.12
@@ -286,22 +318,22 @@ static func _clip(name: String) -> AnimationNodeAnimation:
 	return node
 
 
-# The legs' blend of standing, walking and running each way, from the
-# animations named with `prefix` (none, or "crouch_" for crouched, which has
-# no run).
+# The legs' blend of standing, walking, running and sprinting each of eight
+# ways, from the animations named with `prefix` (none, or "crouch_" for
+# crouched, which only walks).
 static func _gaits(animations: AnimationLibrary, prefix: String) -> AnimationNodeBlendSpace2D:
 	var space := AnimationNodeBlendSpace2D.new()
-	space.min_space = Vector2(-2, -2)
-	space.max_space = Vector2(2, 2)
+	space.min_space = Vector2(-3, -3)
+	space.max_space = Vector2(3, 3)
 	var still := "idle" if prefix == "" else "crouch"
 	space.add_blend_point(_clip(still), Vector2.ZERO, -1, still)
-	var gaits := {"walk": 1.0, "run": 2.0} if prefix == "" else {"crouch_walk": 1.0}
+	var gaits: Dictionary = GAITS if prefix == "" else {"crouch_walk": 1.0}
 	for gait: String in gaits:
 		var reach: float = gaits[gait]
-		for way: Array in [["", Vector2(0, 1)], ["_back", Vector2(0, -1)], ["_left", Vector2(-1, 0)], ["_right", Vector2(1, 0)]]:
-			var name: String = gait + way[0]
+		for way: String in WAYS:
+			var name: String = gait + way
 			if animations.has_animation(name):
-				space.add_blend_point(_clip(name), (way[1] as Vector2) * reach, -1, name)
+				space.add_blend_point(_clip(name), (WAYS[way] as Vector2) * reach, -1, name)
 	return space
 
 
@@ -354,6 +386,9 @@ func hold_weapon(gun: Node3D) -> bool:
 ## soldier, so it is worked out once.
 static var _in_hand: Transform3D
 static var _found_hold := false
+## Where the left hand is in the aim, from the right: how the animation
+## holds a weapon in both hands.
+static var _left_from_right: Transform3D
 ## Turns this node's directions into its skeleton's.
 static var _body_to_skeleton: Basis
 
@@ -395,6 +430,7 @@ func _find_hold() -> void:
 	# a rifle's fore-end.
 	held.origin = _fist("Right") - held.basis * WeaponModels.GRIP
 	_in_hand = hand.affine_inverse() * held
+	_left_from_right = hand.affine_inverse() * _skeleton.get_bone_global_pose(_left_hand_bone)
 	_found_hold = true
 	_skeleton.reset_bone_poses()
 
@@ -511,8 +547,12 @@ func _process(delta: float) -> void:
 	match _state:
 		CharacterMotion.CROUCH, CharacterMotion.CROUCH_WALK:
 			legs = "crouch"
-		CharacterMotion.JUMP, CharacterMotion.FALL:
+		CharacterMotion.JUMP:
 			legs = "jump"
+		CharacterMotion.FALL:
+			legs = "air"
+		CharacterMotion.LAND:
+			legs = "land"
 		CharacterMotion.SLIDE:
 			legs = "slide"
 	if _tree.get("parameters/legs/current_state") != legs:
@@ -522,25 +562,30 @@ func _process(delta: float) -> void:
 	_tree.set("parameters/ground/blend_position", way * gait.x)
 	_tree.set("parameters/pace/scale", gait.y)
 	if _crouches:
-		_tree.set("parameters/crouched/blend_position", way * minf(gait.x, 1.0))
-		_tree.set("parameters/crouch_pace/scale", maxf(gait.x, 1.0) * gait.y)
-	# The upper body: an emote, or what the arms are doing, or, with nothing
-	# else, the weapon up ready.
-	var doing := "aim"
+		var crouched := crouched_stride(_speed)
+		_tree.set("parameters/crouched/blend_position", way * crouched.x)
+		_tree.set("parameters/crouch_pace/scale", crouched.y)
+	# The upper body: an emote, or what the arms are doing, or the weapon up
+	# at the shoulder just after firing; with none of these, it carries the
+	# weapon as the legs' own animation does.
+	_since_fired = 0.0 if _action == CharacterMotion.FIRE else _since_fired + delta
+	var doing := ""
 	if _emote >= 0 and EMOTES.has(_emote):
 		doing = EMOTES[_emote]
 	elif ACTIONS.has(_action):
 		doing = ACTIONS[_action]
-	if _tree.get("parameters/acts/current_state") != doing:
+	elif _since_fired < RAISED_AFTER_FIRING:
+		doing = "aim"
+	if doing != "" and _tree.get("parameters/acts/current_state") != doing:
 		_tree.set("parameters/acts/transition_request", doing)
 	var upper: float = _tree.get("parameters/upper/blend_amount")
-	_tree.set("parameters/upper/blend_amount", move_toward(upper, 0.0 if _melting else 1.0, delta / 0.12))
-	# The weapon pointed where the player looks, by turning the spine, when
-	# the upper body is holding it rather than making an emote.
-	var holding := not _melting
+	_tree.set("parameters/upper/blend_amount", move_toward(upper, 1.0 if doing != "" and not _melting else 0.0, delta / 0.15))
+	# Aiming or firing, the weapon points where the player looks, the spine
+	# turning to bring it round.
 	var looking := Vector3(0.0, sin(_gaze), -cos(_gaze))
 	_spine.aim = _body_to_skeleton * looking
-	_spine.influence = move_toward(_spine.influence, 1.0 if holding and _emote < 0 else 0.0, delta / GRIP_TIME)
+	var aimed := (doing == "aim" or doing == "fire") and not _melting
+	_spine.influence = move_toward(_spine.influence, 1.0 if aimed else 0.0, delta / GRIP_TIME)
 	# What is held in the free hand goes with it.
 	if _held != null:
 		_held.position = _bone_here(_left_hand_bone)
