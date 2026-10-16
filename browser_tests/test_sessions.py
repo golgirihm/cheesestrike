@@ -252,7 +252,6 @@ class LosingTheHostTest(GameTestCase):
         host.shoot_until(f"s.players.some((p) => p.id === {joiner_id} && p.deaths >= 1)")
         host_name = host.own_player()["name"]
 
-        host.press("Escape")
         host.open_menu()
         host.click("MenuLeaveButton")
         state = joiner.wait_for("s.screen === 'disconnected'")
