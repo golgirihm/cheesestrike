@@ -12,7 +12,7 @@ const ANIMATIONS := "res://licensed/animations"
 ## skeletons are mapped onto.
 const BONES := ["Hips", "Spine", "UpperChest", "Head", "LeftHand", "RightHand", "LeftFoot", "RightFoot"]
 ## The animations the character plays, one to a file.
-const PLAYED := ["idle", "aim", "walk", "walk_back", "walk_left", "walk_right", "run", "run_back", "run_left", "run_right", "jump", "slide", "fire", "reload", "throw", "melee", "hurt", "knocked_out", "emote_cheer", "emote_dance", "emote_shrug"]
+const PLAYED := ["idle", "aim", "walk", "walk_back", "walk_left", "walk_right", "run", "run_back", "run_left", "run_right", "jump", "slide", "fire", "reload", "throw", "melee", "hurt", "knocked_out", "emote_cheer", "emote_dance", "emote_shrug", "emote_wave", "crouch", "crouch_aim", "crouch_walk", "crouch_walk_back", "crouch_walk_left", "crouch_walk_right"]
 ## Face shapes the faces are made of: blinking, wincing, cheering and firing.
 const FACE := ["Eye_Blink_L", "Eye_Blink_R", "Eye_Squint_L", "Eye_Squint_R", "Brow_Drop_L", "Brow_Drop_R", "Mouth_Smile_L", "Mouth_Smile_R", "Mouth_Stretch_L", "Mouth_Stretch_R", "Mouth_Press_L", "Mouth_Press_R", "Jaw_Open"]
 
