@@ -31,6 +31,11 @@ static func swap(drawn: Node3D) -> Node3D:
 	var body := make()
 	body.name = drawn.name
 	body.transform = drawn.transform
-	drawn.replace_by(body)
+	# Not replace_by, which would hand it the drawn body's parts as well.
+	var parent := drawn.get_parent()
+	var index := drawn.get_index()
+	parent.remove_child(drawn)
 	drawn.free()
+	parent.add_child(body)
+	parent.move_child(body, index)
 	return body
