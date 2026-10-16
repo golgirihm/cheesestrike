@@ -103,9 +103,6 @@ func _init(with := MatchSettings.new()) -> void:
 	settings = with
 	time_left = settings.minutes * 60.0
 	countdown = _countdown_for(settings)
-	# One with no countdown begins at once, which is told as one that has
-	# counted down is.
-	just_started = countdown == 0.0 and not settings.is_practice()
 	if settings.mode == MatchSettings.CAPTURE:
 		capture = CaptureRules.new()
 	elif settings.mode == MatchSettings.HILL or settings.mode == MatchSettings.POINTS:
@@ -633,6 +630,8 @@ func start_match() -> void:
 	phase = PLAYING
 	ballot = null
 	countdown = _countdown_for(settings)
+	# One with no countdown begins at once, which is told as one that has
+	# counted down is.
 	just_started = countdown == 0.0 and not settings.is_practice()
 	time_left = settings.minutes * 60.0
 	team_kills = [0, 0]
