@@ -1,8 +1,8 @@
 extends GutTest
 
 const WORLD := preload("res://world/world.tscn")
-## Height of the middle of a player's wedge: a body shot, not between the legs.
-const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
+## Height of the middle of a player's torso: a body shot, not between the legs.
+const CHEST := BodyShape.CHEST.y * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match
@@ -144,10 +144,10 @@ func test_how_others_face_is_recorded_with_where_they_are() -> void:
 
 
 func test_a_shot_is_checked_against_how_its_target_faced_then() -> void:
-	# Low down, the wedge is wider than it is deep. A shot that clips its edge
+	# The torso is wider than it is deep. A shot that clips its edge
 	# face-on passes by a player who was side-on when it was fired, though
 	# they face the shooter now.
-	var edge := BodyShape.WEDGE_SIZE.z / 2.0 * BodyShape.SIZE + 0.1
+	var edge := BodyShape.TORSO_SIZE.z / 2.0 * BodyShape.SIZE + 0.1
 	var shooter := _add(1, Vector3(edge, 0, 10))
 	var target := _add(2, Vector3(0, 0, -5))
 	target.rotation.y = PI

@@ -5,7 +5,7 @@ extends GutTest
 const WORLD := preload("res://world/world.tscn")
 const HUD := preload("res://ui/combat_hud.gd")
 const Effects := preload("res://effects/effects.gd")
-const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
+const CHEST := BodyShape.CHEST.y * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match

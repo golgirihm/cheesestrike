@@ -64,10 +64,10 @@ func test_a_slanted_ray_hits_where_expected() -> void:
 
 ## A player at FEET facing the shooter at the origin, who looks along -Z.
 const FACING_US := PI
-## Height of the middle of the wedge, in the arena.
-const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
-## Half the wedge's depth, in the arena: how far its faces are from its middle.
-const FRONT := BodyShape.WEDGE_SIZE.z / 2.0 * BodyShape.SIZE
+## Height of the middle of the torso, in the arena.
+const CHEST := BodyShape.CHEST.y * BodyShape.SIZE
+## Half the torso's depth, in the arena: how far its faces are from its middle.
+const FRONT := BodyShape.TORSO_SIZE.z / 2.0 * BodyShape.SIZE
 
 
 func _eye(feet: Vector3, yaw: float) -> Vector3:
@@ -116,29 +116,32 @@ func test_headshots_count_on_a_player_standing_on_a_box() -> void:
 	assert_false(HitScan.first_hit(Vector3(0, 2.0 + CHEST, 0), Vector3.FORWARD, 100.0, target).head)
 
 
-func test_a_shot_between_the_legs_misses() -> void:
+func test_a_shot_between_the_legs_misses_and_one_at_a_leg_hits() -> void:
 	var knee := (BodyShape.HIP_HEIGHT / 2.0) * BodyShape.SIZE
 	assert_true(HitScan.first_hit(Vector3(0, knee, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
 	var leg: Vector3 = BodyShape.LEGS[0][0] * BodyShape.SIZE
-	assert_true(HitScan.first_hit(Vector3(leg.x, knee, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty(), "a leg is only a stick, and can't be hit")
+	var hit := HitScan.first_hit(Vector3(leg.x, knee, 0), Vector3.FORWARD, 100.0, {8: FEET})
+	assert_false(hit.is_empty())
+	assert_false(hit.head)
 
 
-func test_a_shot_at_an_arm_out_from_the_wedge_misses() -> void:
+func test_a_shot_at_an_arm_out_from_the_torso_misses() -> void:
 	var arm: Vector3 = BodyShape.ARMS[0][0] * BodyShape.SIZE
 	var beside := Vector3(arm.x - 0.3, arm.y - 0.5, 0)
 	assert_true(HitScan.first_hit(beside, Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
 
 
-func test_a_shot_beside_the_narrow_top_of_the_wedge_misses() -> void:
-	# The wedge narrows to a point, so high up a shot just off the middle passes it.
-	var high := (BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y * 0.3) * BodyShape.SIZE
-	assert_true(HitScan.first_hit(Vector3(0.6, high, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
+func test_a_shot_beside_the_head_misses() -> void:
+	# The head is narrower than the shoulders, so up there a shot just off
+	# the middle passes it.
+	var high := (BodyShape.HEAD_CENTRE.y + BodyShape.HEAD_SIZE.y * 0.3) * BodyShape.SIZE
+	assert_true(HitScan.first_hit(Vector3(0.45, high, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
 	assert_false(HitScan.first_hit(Vector3(0.1, high, 0), Vector3.FORWARD, 100.0, {8: FEET}).is_empty())
 
 
 func test_how_a_player_faces_changes_what_is_hit() -> void:
-	# Low down, the wedge is wider than it is deep: side-on, a shot that would
-	# clip its edge from the front passes by.
+	# The torso is wider than it is deep: side-on, a shot that would clip its
+	# edge from the front passes by.
 	var edge := Vector3(FRONT + 0.1, (BodyShape.HIP_HEIGHT + 0.1) * BodyShape.SIZE, 0)
 	assert_false(HitScan.first_hit(edge, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, FACING_US)}).is_empty())
 	assert_true(HitScan.first_hit(edge, Vector3.FORWARD, 100.0, {8: HitScan.pose(FEET, PI / 2.0)}).is_empty())

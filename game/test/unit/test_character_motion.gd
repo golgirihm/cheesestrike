@@ -122,7 +122,7 @@ func test_a_slide_throws_the_legs_forward() -> void:
 	character.set_motion(9.0, false, 0.0, true)
 	_settle()
 	for leg: Node3D in _named("Leg"):
-		assert_lt(leg.rotation.x, -1.0, "out in front")
+		assert_gt(leg.rotation.x, 1.0, "out in front")
 
 
 func test_landing_and_crouching_spread_the_legs() -> void:
@@ -142,14 +142,15 @@ func test_landing_and_crouching_spread_the_legs() -> void:
 	assert_lt(legs[0].rotation.z, -0.2)
 
 
-func test_the_limbs_move_and_the_wedge_does_not() -> void:
-	var wedge: MeshInstance3D = character.get_node("Wedge")
-	var rest := wedge.global_transform
+func test_the_limbs_move_and_the_head_and_torso_do_not() -> void:
+	var still: Array[Node3D] = [character.get_node("Torso"), character.get_node("Head")]
+	var rest := still.map(func(part: Node3D) -> Transform3D: return part.global_transform)
 	var run := Movement.WALK_SPEED * Movement.RUN_FACTOR
 	for motion: Array in [[run, false, 0.0, false], [run, true, 6.0, false], [run, true, -6.0, false], [0.0, false, 0.0, false]]:
 		character.set_motion(motion[0], motion[1], motion[2], motion[3])
 		_settle()
-		assert_true(wedge.global_transform.is_equal_approx(rest), "%s: what is hit stays where it is tested" % [motion])
+		for index in still.size():
+			assert_true(still[index].global_transform.is_equal_approx(rest[index]), "%s: %s stays where it is tested" % [motion, still[index].name])
 
 
 func test_the_free_arm_steadies_the_weapon_to_aim_or_reload() -> void:
@@ -160,7 +161,7 @@ func test_the_free_arm_steadies_the_weapon_to_aim_or_reload() -> void:
 	character._process(0.016)
 	assert_eq(character.action(), M.AIM)
 	_settle()
-	assert_lt(arm.rotation.x, -1.0, "brought forward to the weapon")
+	assert_gt(arm.rotation.x, 1.0, "brought forward to the weapon")
 	character.set_holding(false, true)
 	character._process(0.016)
 	assert_eq(character.action(), M.RELOAD)
@@ -186,8 +187,8 @@ func test_momentary_actions_pass() -> void:
 func test_a_throw_takes_the_arm_back_then_through() -> void:
 	var back := M.arm(M.THROW, 0.0, Vector3.ZERO)
 	var through := M.arm(M.THROW, M.ACTION_TIME[M.THROW], Vector3.ZERO)
-	assert_gt(back.x, 2.0, "wound up behind the shoulder")
-	assert_lt(through.x, -0.5, "and followed through in front")
+	assert_lt(back.x, -2.0, "wound up behind the shoulder")
+	assert_gt(through.x, 0.5, "and followed through in front")
 	var rest := Vector3(0.1, 0.0, -0.35)
 	assert_eq(M.arm(M.NONE, 0.3, rest), rest)
 

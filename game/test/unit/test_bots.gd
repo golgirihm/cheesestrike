@@ -141,7 +141,7 @@ func test_it_takes_a_moment_to_notice_and_the_better_it_is_the_shorter() -> void
 
 func test_it_aims_at_the_middle_of_its_enemy_and_steadies_as_it_tracks() -> void:
 	var feet := Vector3(0, 0, -20)
-	var middle := feet + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+	var middle := feet + Vector3.UP * BodyShape.CHEST.y * BodyShape.SIZE
 	for skill: String in BotBrain.SKILLS:
 		var brain := BotBrain.new(skill, 9)
 		var worst := 0.0
@@ -388,7 +388,7 @@ func test_a_bot_shoots_a_player_it_can_see_and_can_be_shot() -> void:
 	# And it can be hit, where the host sees it.
 	var before: int = match_.state.player(-1).health
 	var origin: Vector3 = own.head.global_position
-	var middle: Vector3 = bot.global_position + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+	var middle: Vector3 = bot.global_position + Vector3.UP * BodyShape.CHEST.y * BodyShape.SIZE
 	match_._shot(1, origin, (middle - origin).normalized(), 1, "blaster", WeaponStats.AIMED)
 	assert_lt(match_.state.player(-1).health, before)
 

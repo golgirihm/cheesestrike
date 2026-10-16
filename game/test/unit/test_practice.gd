@@ -19,7 +19,7 @@ func _start() -> void:
 
 
 func _middle_of(id: int) -> Vector3:
-	return world.player_node(id).global_position + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE
+	return world.player_node(id).global_position + Vector3.UP * BodyShape.CHEST.y * BodyShape.SIZE
 
 
 func test_the_range_is_an_arena_but_not_one_a_host_chooses() -> void:
@@ -108,7 +108,7 @@ func test_hitting_a_target_is_like_hitting_anyone_and_is_counted() -> void:
 	var origin: Vector3 = own.head.global_position
 	watch_signals(match_)
 	# Low on the body, under the face.
-	var chest: Vector3 = world.player_node(id).global_position + Vector3.UP * (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
+	var chest: Vector3 = world.player_node(id).global_position + Vector3.UP * BodyShape.CHEST.y * BodyShape.SIZE
 	match_._shot(1, origin, (chest - origin).normalized(), 1, "blaster", WeaponStats.AIMED)
 	assert_eq(match_.state.player(id).health, PlayerRecord.MAX_HEALTH - 20)
 	assert_signal_emitted(match_, "hit_confirmed")

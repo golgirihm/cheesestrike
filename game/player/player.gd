@@ -557,7 +557,7 @@ func _show_power(own: PlayerRecord) -> void:
 		through.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		through.albedo_color = Color(Powers.COLOURS[Powers.SIGHT], 0.55)
 		through.render_priority = 5
-		_seen_mark = Rounded.instance(blob, through, BodyShape.WEDGE_CENTRE * BodyShape.SIZE)
+		_seen_mark = Rounded.instance(blob, through, BodyShape.CHEST * BodyShape.SIZE)
 		_seen_mark.name = "SeenMark"
 		_seen_mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_seen_mark)
@@ -1327,7 +1327,7 @@ func fall(weapon: String, from: Vector3) -> void:
 	body.knock(weapon, away)
 	if world != null and not _mine:
 		var scattered: bool = body.ending() == body.SCATTERED
-		world.effects.crumbs(global_position + Vector3.UP * BodyShape.WEDGE_CENTRE.y * BodyShape.SIZE, body.colour(), 36 if scattered else 12, 9.0 if scattered else 4.0)
+		world.effects.crumbs(global_position + Vector3.UP * BodyShape.CHEST.y * BodyShape.SIZE, body.colour(), 36 if scattered else 12, 9.0 if scattered else 4.0)
 
 
 

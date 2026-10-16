@@ -14,7 +14,7 @@ const NAMES := {WAVE: "Wave", DANCE: "Dance", SHRUG: "Shrug", CHEER: "Cheer"}
 const TIME := 1.6
 const INTERVAL := 1.0
 ## How the free arm hangs at rest, in radians out from straight down.
-const ARM_REST := -0.35
+const ARM_REST := -0.22
 
 
 static func is_kind(kind: Variant) -> bool:

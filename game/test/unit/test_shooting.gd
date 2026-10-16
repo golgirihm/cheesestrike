@@ -4,9 +4,9 @@ extends GutTest
 ## the spawner would add them.
 
 const WORLD := preload("res://world/world.tscn")
-## A height low on a player's wedge: a body shot, under the face and not
+## A height on a player's torso: a body shot, under the face and not
 ## between the legs.
-const CHEST := (BodyShape.HIP_HEIGHT + 0.25) * BodyShape.SIZE
+const CHEST := BodyShape.CHEST.y * BodyShape.SIZE
 
 var world: Node3D
 var match_: Match
@@ -198,7 +198,7 @@ func test_the_host_is_told_when_it_is_hurt_and_sees_the_shot() -> void:
 	assert_signal_emitted(match_, "shot_shown")
 	var ends: Array = get_signal_parameters(match_, "shot_shown")[1]
 	assert_eq(ends.size(), 1)
-	assert_almost_eq(ends[0].z, -5.0 + BodyShape.WEDGE_SIZE.z / 2.0 * BodyShape.SIZE, 0.01, "the tracer stops at the player hit")
+	assert_almost_eq(ends[0].z, -5.0 + BodyShape.TORSO_SIZE.z / 2.0 * BodyShape.SIZE, 0.01, "the tracer stops at the player hit")
 
 
 func test_a_missed_shot_ends_at_the_wall() -> void:
@@ -354,7 +354,9 @@ func test_a_launcher_wheel_knocks_out_a_healthy_player_it_lands_on() -> void:
 	_add(2, Vector3(0, 0, 0))
 	_give(1, "launcher")
 	var origin: Vector3 = shooter.head.global_position
-	match_._shot(1, origin, (Vector3(0, CHEST, 0) - origin).normalized(), 1, "launcher")
+	# Aimed over the chest, as the wheel drops on its way: aimed at it, it
+	# would pass between the legs.
+	match_._shot(1, origin, (Vector3(0, CHEST + 0.6, 0) - origin).normalized(), 1, "launcher")
 	_fly(1.5)
 	assert_false(match_.state.player(2).alive)
 	assert_eq(match_.state.player(1).health, 100, "the shooter stood well back")
@@ -935,7 +937,7 @@ func test_holding_crouch_lowers_the_owner_and_slows_them() -> void:
 func test_a_shot_over_a_crouched_player_misses() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	var other := _add(2, Vector3(0, 0, -5))
-	var over := Vector3(0, (BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y * 0.45) * BodyShape.SIZE, -5)
+	var over := Vector3(0, (BodyShape.HEAD_CENTRE.y + BodyShape.HEAD_SIZE.y * 0.4) * BodyShape.SIZE, -5)
 	# Level, so that the shot is as high where it passes them as where it is aimed.
 	var origin := Vector3(0, over.y, 5)
 	shooter.global_position = origin - Vector3.UP * shooter.head.position.y
@@ -1409,7 +1411,7 @@ func test_a_shot_at_where_a_leaning_player_stood_upright_misses() -> void:
 	var shooter := _add(1, Vector3(0, 0, 5))
 	var other := _add(2, Vector3(0, 0, -5), )
 	other.rotation.y = PI
-	var tip := Vector3(0, (BodyShape.WEDGE_CENTRE.y + BodyShape.WEDGE_SIZE.y * 0.45) * BodyShape.SIZE, -5)
+	var tip := Vector3(0, (BodyShape.HEAD_CENTRE.y + BodyShape.HEAD_SIZE.y * 0.4) * BodyShape.SIZE, -5)
 	shooter.global_position = Vector3(0, tip.y - shooter.head.position.y, 5)
 	other.net_state = PackedFloat32Array([0, 0, -5, PI, 0, 0, other.POSE_LEAN_LEFT])
 	other._animate(1.0)

@@ -7,7 +7,8 @@ class_name CharacterMotion
 ##
 ## The character blends from one pose to the next rather than snapping, so
 ## each pose here is where the limbs are heading, not where they are. Only
-## the limbs move: the wedge that shots are tested against stays put.
+## the limbs move: the head and torso stay put, and shots are tested against
+## the legs as they stand, as in most games.
 
 const IDLE := "idle"
 const WALK := "walk"
@@ -93,21 +94,21 @@ static func blend(delta: float) -> float:
 
 
 ## Where the free arm is `elapsed` seconds into `action`, as its turn about
-## the shoulder: (forward and back, 0, out from the side), in radians. `rest`
-## is where it would be otherwise.
+## the shoulder: (forward, above zero, or back, 0, out from the side), in
+## radians. `rest` is where it would be otherwise.
 static func arm(kind: String, elapsed: float, rest: Vector3) -> Vector3:
 	match kind:
 		AIM, RELOAD:
 			# Across and forward, to steady the weapon.
-			return Vector3(-1.25, 0.0, 0.25)
+			return Vector3(1.25, 0.0, 0.25)
 		FIRE:
-			return rest + Vector3(0.12, 0.0, 0.0)
+			return rest + Vector3(-0.12, 0.0, 0.0)
 		HURT:
-			return Vector3(0.3, 0.0, -1.1)
+			return Vector3(-0.3, 0.0, -1.1)
 		MELEE:
-			return Vector3(0.6, 0.0, -0.6)
+			return Vector3(-0.6, 0.0, -0.6)
 		THROW:
 			# Back over the shoulder, then through and down.
 			var through := clampf(elapsed / ACTION_TIME[THROW], 0.0, 1.0)
-			return Vector3(lerpf(2.6, -1.0, smoothstep(0.2, 0.8, through)), 0.0, -0.3)
+			return Vector3(lerpf(-2.6, 1.0, smoothstep(0.2, 0.8, through)), 0.0, -0.3)
 	return rest
