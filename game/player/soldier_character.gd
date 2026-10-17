@@ -1,8 +1,7 @@
-extends "res://player/cheese_character.gd"
-## The realistic soldier: the Tactical Soldier 02 model in game/licensed,
-## moved by its Mixamo animations. It works out what it is doing just as the
-## drawn soldier does (cheese_character.gd, whose workings it shares), and
-## shows it its own way:
+extends "res://player/body.gd"
+## How a player looks to everyone else: the Tactical Soldier 02 model in
+## game/licensed, moved by its Mixamo animations, showing what its body is
+## doing (body.gd, which works that out):
 ##
 ## - its legs walk and run whichever way the player goes, at the pace they go,
 ##   and crouch, jump and slide;
@@ -14,9 +13,9 @@ extends "res://player/cheese_character.gd"
 ## - it wears its own cap and sunglasses rather than a chosen hat;
 ## - knocked out, it falls back rather than melting.
 ##
-## The model and its animations are licensed and kept private, so this is
-## only used where they are (see available); everywhere else, and always on
-## the web, players are the drawn soldier.
+## The model and its animations are licensed and kept in a private
+## repository, checked out as the game/licensed submodule, which the game
+## can't do without.
 
 const MODEL := "res://licensed/soldier/soldier.glb"
 const SPINE_AIM := preload("res://player/spine_aim.gd")
@@ -91,12 +90,10 @@ const FACES := {
 }
 ## How the face moves to the next one: most of the way in this many seconds.
 const FACE_TIME := 0.08
-## Seconds a knocked-out soldier takes to fall back before it is gone.
-const FALL_TIME := 1.6
 ## Seconds the spine takes to turn to aim the weapon, or let it go.
 const GRIP_TIME := 0.12
-## How big its weapon is drawn, against the drawn soldier's, which is made
-## for chunkier hands.
+## How big its weapon is drawn, against the size the weapon models are made
+## at, which is for the player's own view.
 const WEAPON_SCALE := 0.55
 
 var _model: Node3D
@@ -128,12 +125,6 @@ var _left_weapon: Node3D
 # into aiming them it is, 0 to 1.
 var _dual_reach := {}
 var _dual_aim := 0.0
-
-
-## Whether the realistic soldier can be shown here: its licensed model is
-## checked out, and this isn't the web build, which leaves it out.
-static func available() -> bool:
-	return not OS.has_feature("web") and ResourceLoader.exists(MODEL)
 
 
 ## How much bigger the model is drawn than it is.
@@ -474,24 +465,15 @@ func weapon_scale() -> float:
 	return WEAPON_SCALE
 
 
-# It holds the weapon in its right hand, so the hand needn't reach for it.
-func reach_for(_hand: Vector3) -> void:
-	pass
-
-
 ## Puts `gun`, the weapon its player holds, in its right hand, wherever its
 ## animations take that, rather than where the player's scene would hold it.
-## The drawn soldier's mitten on the grip goes: its own hand is there.
-func hold_weapon(gun: Node3D) -> bool:
-	# A new weapon, or a different model of one: its own hand is on the grip,
-	# not the drawn soldier's mitten.
+func hold_weapon(gun: Node3D) -> void:
+	# A new weapon, or a different model of one: how its hands hold it.
 	# The newest: one changed from waits to be freed beside it for a frame.
 	var model := gun.get_child(-1) as Node3D if gun.get_child_count() > 0 else null
 	if _held_gun != gun or _held_model != model:
 		_held_gun = gun
 		_held_model = model
-		for mitten: Node in gun.find_children("Hand", "", true, false):
-			(mitten as Node3D).visible = false
 		_weapon = model.get_meta("weapon", "") if model != null else ""
 		_grip = grip_of(_weapon)
 		_spine.in_hand = in_hand(_weapon)
@@ -504,7 +486,6 @@ func hold_weapon(gun: Node3D) -> bool:
 	# back there in between for the player to find its other hand's place.
 	if gun.is_inside_tree() and is_inside_tree():
 		gun.global_transform = global_transform * _weapon_here
-	return true
 
 
 ## How each grip (see GRIPS) holds a weapon, as {in_hand: where the weapon
@@ -639,20 +620,12 @@ static func shirt_colour(colour: Color) -> Color:
 
 
 func _light() -> void:
-	super()
 	if _model == null:
 		return
 	var lit := _glowing or is_flashing()
 	_overlay.albedo_color = Color(1, 1, 1, 0.5) if is_flashing() else Color(1.0, 0.45, 0.1, 0.35)
 	for mesh: MeshInstance3D in _model.find_children("*", "MeshInstance3D"):
 		mesh.material_overlay = _overlay if lit else null
-
-
-# It always wears its own cap and sunglasses, whatever hat is chosen.
-func wear(look: int) -> void:
-	super(look)
-	if _hat != null:
-		_hat.visible = false
 
 
 func set_in_play(in_play: bool) -> void:
@@ -666,24 +639,11 @@ func set_in_play(in_play: bool) -> void:
 		_tree.set("parameters/knock/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
 
 
-func _melt_time() -> float:
-	return FALL_TIME
-
-
 # Knocked out, it falls back with its animation where it was thrown, rather
 # than tipping and melting.
 func _draw_melt(delta: float) -> void:
 	position += _thrown * delta * BodyShape.SIZE
 	_thrown *= exp(-5.0 * delta)
-
-
-func _melt_scale() -> Vector3:
-	return Vector3.ONE
-
-
-# The arms are moved by the animations alone.
-func _draw_arm(_steadying: bool, _emote_pose: Dictionary) -> void:
-	pass
 
 
 func _draw_face(face: String, delta: float) -> void:

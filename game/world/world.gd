@@ -547,8 +547,6 @@ func _show_drops() -> void:
 			continue
 		var model := WeaponModels.build(lying[key].weapon)
 		model.name = key
-		model.get_node("Hand").visible = false
-		WeaponModels.show_own_view(model, false)
 		model.scale = Vector3.ONE * 1.4
 		# On its side on the ground, each at its own angle.
 		model.rotation = Vector3(0.0, int(key) * 2.4, PI / 2.0)

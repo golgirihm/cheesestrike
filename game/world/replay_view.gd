@@ -50,7 +50,7 @@ func play(clip: Dictionary, about: int, heading: String) -> void:
 	played += 1
 	world.players.visible = false
 	for id: int in clip.tracks:
-		var ghost: Node3D = Characters.make()
+		var ghost: Node3D = preload("res://player/soldier_character.gd").new()
 		add_child(ghost)
 		ghost.set_colour(world.colour_of(id))
 		var record: PlayerRecord = world.match_.state.player(id) if world.match_.has_state() else null

@@ -7,12 +7,8 @@ class_name WeaponModels
 ## runs the way the weapon points. A weapon whose magazine comes out to
 ## reload has it as a part called "Magazine".
 ##
-## Two mittens hold it: "Hand" on the grip, and "OffHand" steadying it
-## further forward. In a player's own view both are shown, each on the end
-## of a stick arm coming up from below ("ViewArmRight", "ViewArmLeft").
-## Everyone else sees only the hand on the grip, which their character's own
-## arm reaches to; the rest are in the "view_only" group for the player to
-## show or hide.
+## The soldier's own hands hold it (see soldier_character.gd and
+## first_person_arms.gd): the weapons are made to fit the hands.
 ##
 ## Yellow is kept for cheese that can be eaten, so the weapons are steel,
 ## wood and wax, each with a colour of its own to tell it by.
@@ -36,13 +32,10 @@ const CRUST := Color(0.5, 0.31, 0.17)
 const LENS := Color(0.85, 0.93, 1.0)
 ## The red wax a Gouda comes wrapped in.
 const WAX := Color(0.75, 0.12, 0.1)
-## The mitten of the hand holding the weapon.
-const HAND := Color(0.1, 0.09, 0.09)
-## Where the hand holds every weapon, from the model's middle.
+## Where the hand closes round most weapons, from the model's middle.
 const GRIP := Vector3(0.0, -0.09, 0.12)
-## Where a hand that closes round it holds each weapon whose grip is
-## somewhere else, from the model's middle: a pistol's, further forward,
-## under the slide. The drawn soldier's mittens stay at GRIP.
+## Where a hand closes round each weapon whose grip is somewhere else, from
+## the model's middle: a pistol's, further forward, under the slide.
 const HELD_AT := {
 	"pistol": Vector3(0.0, -0.08, 0.05),
 	"pistols": Vector3(0.0, -0.075, 0.05),
@@ -52,26 +45,8 @@ const HELD_AT := {
 ## view: a pistol, held out in the hand, is short, and nearer still would
 ## leave it lost at the bottom of the view.
 const VIEW_NEARER := {"pistol": 0.1, "pistols": 0.08, "burratas": 0.08}
-## Where the other hand steadies each weapon, from the model's middle.
-const OFF_HAND := {
-	"pistol": Vector3(-0.035, -0.125, 0.085),
-	"blaster": Vector3(0.0, -0.085, -0.2),
-	"shotgun": Vector3(0.0, -0.1, -0.14),
-	"grater": Vector3(0.0, -0.105, -0.18),
-	"launcher": Vector3(0.0, -0.085, -0.2),
-	# The other hand has a pistol of its own.
-	"pistols": Vector3(-PAIR_GAP, -0.09, 0.12),
-	"burratas": Vector3(-PAIR_GAP, -0.09, 0.12),
-	"carbine": Vector3(0.0, -0.085, -0.17),
-	"rifle": Vector3(0.0, -0.075, -0.24),
-	"lmg": Vector3(0.0, -0.1, -0.2),
-	"bow": Vector3(0.0, -0.06, -0.2),
-}
 ## How far to the left of the first the second of a pair of pistols is held.
 const PAIR_GAP := 0.17
-## Where each arm comes from, below and behind its hand, out of view.
-const SHOULDER_RIGHT := Vector3(0.2, -0.4, 0.5)
-const SHOULDER_LEFT := Vector3(-0.34, -0.4, 0.55)
 ## How tall the sights stand.
 const SIGHT_HEIGHT := 0.022
 
@@ -217,52 +192,11 @@ static func build(id: String) -> Node3D:
 			_box(model, Vector3(0.06, 0.15, 0.09), Vector3(0.0, -0.11, -0.06), GUNMETAL).name = "Magazine"
 			_box(model, Vector3(0.03, 0.035, 0.2), Vector3(0.0, 0.075, 0.02), DARK)
 			_sights(model, 0.0925, 0.11, -0.07)
-	# The hand holding it, which also stands for the arm in first person.
-	var hand := SphereMesh.new()
-	hand.radius = 0.055
-	hand.height = 0.11
-	hand.radial_segments = 12
-	hand.rings = 6
-	var mitten := Rounded.instance(hand, _material(HAND), GRIP)
-	mitten.name = "Hand"
-	model.add_child(mitten)
-	var steadying: Vector3 = OFF_HAND.get(id, OFF_HAND["blaster"])
-	var other := Rounded.instance(hand, _material(HAND), steadying)
-	other.name = "OffHand"
-	model.add_child(other)
-	var right := _arm(GRIP, GRIP + SHOULDER_RIGHT)
-	right.name = "ViewArmRight"
-	model.add_child(right)
-	var left := _arm(steadying, steadying + SHOULDER_LEFT)
-	left.name = "ViewArmLeft"
-	model.add_child(left)
-	for part: Node in [other, right, left]:
-		part.add_to_group("view_only")
 	var muzzle := Marker3D.new()
 	muzzle.name = "Muzzle"
 	muzzle.position = Vector3(0, 0.02, muzzle_z)
 	model.add_child(muzzle)
 	return model
-
-
-## Shows the parts of `model` that only its holder sees, or hides them.
-static func show_own_view(model: Node3D, own: bool) -> void:
-	for part in model.get_children():
-		if part.is_in_group("view_only"):
-			part.visible = own
-
-
-# A stick arm from a hand at `from` to a shoulder at `to`.
-static func _arm(from: Vector3, to: Vector3) -> MeshInstance3D:
-	var stick := CapsuleMesh.new()
-	stick.radius = 0.022
-	stick.height = from.distance_to(to)
-	stick.radial_segments = 8
-	stick.rings = 2
-	var arm := Rounded.instance(stick, _material(HAND), (from + to) / 2.0)
-	# The stick runs along its own Y axis.
-	arm.quaternion = Quaternion(Vector3.UP, (to - from).normalized())
-	return arm
 
 
 static func _material(color: Color) -> StandardMaterial3D:

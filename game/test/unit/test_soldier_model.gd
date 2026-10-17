@@ -20,15 +20,11 @@ var model: Node3D
 
 
 func before_each() -> void:
-	if ResourceLoader.exists(PATH):
-		model = load(PATH).instantiate()
-		add_child_autofree(model)
+	model = load(PATH).instantiate()
+	add_child_autofree(model)
 
 
 func test_it_has_the_bones_the_game_drives() -> void:
-	if model == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var skeleton: Skeleton3D = model.find_children("*", "Skeleton3D")[0]
 	assert_eq(skeleton.name, &"GeneralSkeleton", "under the name the animations know it by")
 	for bone: String in BONES:
@@ -36,18 +32,12 @@ func test_it_has_the_bones_the_game_drives() -> void:
 
 
 func test_its_face_has_the_shapes_the_faces_are_made_of() -> void:
-	if model == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var body: MeshInstance3D = model.find_child("CC_Base_Body")
 	for shape: String in FACE:
 		assert_gt(body.find_blend_shape_by_name(shape), -1, shape)
 
 
 func test_it_stands_as_tall_as_a_person_on_the_ground() -> void:
-	if model == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var lowest := INF
 	var highest := -INF
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
@@ -59,9 +49,6 @@ func test_it_stands_as_tall_as_a_person_on_the_ground() -> void:
 
 
 func test_every_animation_moves_only_bones_the_soldier_has() -> void:
-	if model == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var skeleton: Skeleton3D = model.find_children("*", "Skeleton3D")[0]
 	for name: String in PLAYED:
 		var path := ANIMATIONS.path_join(name + ".fbx")
@@ -81,9 +68,6 @@ func test_every_animation_moves_only_bones_the_soldier_has() -> void:
 func test_it_rests_in_a_level_t_pose_as_the_animations_do() -> void:
 	# Animations are carried across from rest to rest, so a soldier resting
 	# with its arms sloping would hold them wrong in every one.
-	if model == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var skeleton: Skeleton3D = model.find_children("*", "Skeleton3D")[0]
 	for side in ["Left", "Right"]:
 		var elbow := skeleton.get_bone_global_rest(skeleton.find_bone(side + "LowerArm")).origin

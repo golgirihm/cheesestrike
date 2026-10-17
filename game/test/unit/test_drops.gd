@@ -223,7 +223,6 @@ func test_the_weapons_lying_about_are_shown_and_cleared_away() -> void:
 	assert_eq(world.drops_shown(), 2)
 	var shown: Node3D = world.get_node("Drops").get_child(0)
 	assert_almost_eq(shown.global_position.x, 2.0, 0.01)
-	assert_false(shown.get_node("Hand").visible, "nobody is holding it")
 	match_._process(Pickups.DROP_LIFE + 0.1)
 	await wait_process_frames(2)
 	assert_eq(match_.state.drops.size(), 0)

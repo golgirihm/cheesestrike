@@ -1,8 +1,6 @@
 extends GutTest
-## What a realistic soldier's player sees of their own arms
-## (player/first_person_arms.gd): the model's arms alone, both hands on the
-## weapon in view. They need the licensed model in the private game/licensed
-## submodule, so a checkout without it skips most of these.
+## What a player sees of their own arms (player/first_person_arms.gd): the
+## soldier's arms alone, both hands on the weapon in view.
 
 const ARMS := preload("res://player/first_person_arms.gd")
 const SOLDIER := preload("res://player/soldier_character.gd")
@@ -11,20 +9,24 @@ const VIEW_GUN_POSITION := Vector3(0.19, -0.18, -0.44)
 const VIEW_GUN_SCALE := 0.6
 
 
-func test_the_drawn_arms_and_mittens_on_a_weapon_in_view_are_hidden() -> void:
+func test_a_weapon_carries_no_drawn_hands_or_arms() -> void:
 	var model := WeaponModels.build("blaster")
 	autofree(model)
-	WeaponModels.show_own_view(model, true)
-	ARMS.hide_drawn_arms(model)
 	for part in ["Hand", "OffHand", "ViewArmRight", "ViewArmLeft"]:
-		assert_false((model.get_node(part) as Node3D).visible, part)
-	assert_true((model.get_node("Muzzle") as Node3D) != null, "the weapon itself is all there")
+		assert_null(model.get_node_or_null(part), "%s: the soldier's own hands hold it" % part)
+	assert_not_null(model.get_node_or_null("Muzzle"), "the weapon itself is all there")
+
+
+func test_a_players_own_view_shows_their_arms_on_the_weapon() -> void:
+	var player: CharacterBody3D = preload("res://player/player.tscn").instantiate()
+	player.name = "1"
+	add_child_autofree(player)
+	await wait_process_frames(1)
+	assert_not_null(player._arms, "their own")
+	assert_eq(player._arms.get_parent(), player.head)
 
 
 func test_only_its_arms_show_and_take_the_players_colour() -> void:
-	if not SOLDIER.available():
-		pending("The licensed assets aren't checked out.")
-		return
 	var arms: Node3D = ARMS.new(VIEW_GUN_SCALE)
 	add_child_autofree(arms)
 	for mesh: MeshInstance3D in arms.find_children("*", "MeshInstance3D", true, false):
@@ -66,9 +68,6 @@ func _arms_holding(at: Vector3) -> Dictionary:
 
 
 func test_the_weapon_in_view_is_held_as_others_see_the_soldiers_aimed_or_not() -> void:
-	if not SOLDIER.available():
-		pending("The licensed assets aren't checked out.")
-		return
 	for at: Vector3 in [VIEW_GUN_POSITION, AIMED_GUN_POSITION]:
 		var seen: Dictionary = await _arms_holding(at)
 		assert_lt(seen.fist.distance_to(seen.model.to_global(WeaponModels.GRIP)), 0.015, "the grip in the right fist, held at %s" % at)
@@ -81,9 +80,6 @@ func test_the_weapon_in_view_is_held_as_others_see_the_soldiers_aimed_or_not() -
 
 
 func test_where_the_arms_are_cut_from_the_body_is_out_of_view_aimed_or_not() -> void:
-	if not SOLDIER.available():
-		pending("The licensed assets aren't checked out.")
-		return
 	# The arms are cut where they meet the chest, past the collarbones: those
 	# are below the bottom of the widest view a player can choose.
 	var widest: float = Settings.RANGES["fov"][1]
@@ -95,9 +91,6 @@ func test_where_the_arms_are_cut_from_the_body_is_out_of_view_aimed_or_not() -> 
 
 
 func test_a_pistol_in_view_is_held_as_the_pistol_aim_holds_it() -> void:
-	if not SOLDIER.available():
-		pending("The licensed assets aren't checked out.")
-		return
 	var head := Node3D.new()
 	add_child_autofree(head)
 	var gun := Node3D.new()
@@ -124,9 +117,6 @@ func test_a_pistol_in_view_is_held_as_the_pistol_aim_holds_it() -> void:
 
 
 func test_a_pair_of_pistols_in_view_is_held_one_in_each_hand() -> void:
-	if not SOLDIER.available():
-		pending("The licensed assets aren't checked out.")
-		return
 	var head := Node3D.new()
 	add_child_autofree(head)
 	var gun := Node3D.new()
