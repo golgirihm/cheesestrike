@@ -4,7 +4,7 @@ class_name GunGame
 
 ## The weapons in the order they are worked through, the hardest to finish
 ## with last.
-const LADDER := ["blaster", "shotgun", "carbine", "grater", "lmg", "rifle", "bow", "launcher", "pistols", "pistol"]
+const LADDER := ["blaster", "shotgun", "carbine", "grater", "lmg", "rifle", "bow", "launcher", "burratas", "pistols", "pistol"]
 
 
 ## The weapon a player with `kills` knock-outs carries.

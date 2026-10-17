@@ -16,6 +16,7 @@ const SOUNDS := {
 	"grater": "_grater",
 	"launcher": "_launcher",
 	"pistols": "_pistols",
+	"burratas": "_burratas",
 	"carbine": "_carbine",
 	"rifle": "_rifle",
 	"lmg": "_lmg",
@@ -72,7 +73,7 @@ const SOUNDS := {
 
 ## How many takes there are of the sounds heard over and over, so that no
 ## two in a row need be the same. The rest have one.
-const TAKES := {"pistol": 3, "blaster": 3, "shotgun": 3, "grater": 4, "pistols": 3, "carbine": 3, "rifle": 2, "lmg": 4,
+const TAKES := {"pistol": 3, "blaster": 3, "shotgun": 3, "grater": 4, "pistols": 3, "burratas": 3, "carbine": 3, "rifle": 2, "lmg": 4,
 	"launcher": 2, "burst": 3, "step": 4, "land": 2, "hurt": 2,
 	"step_rock": 4, "step_grass": 4, "step_wood": 4, "step_metal": 4, "step_cheese": 4,
 	"voice_effort": 3, "voice_pain": 3}
@@ -300,6 +301,14 @@ static func _pistols() -> AudioStreamWAV:
 	return _gunshot(21, 0.24, {"crack": 1.3, "crack_decay": 800.0, "blast": 0.8, "blast_bright": 0.6, "blast_decay": 85.0,
 		"thump": 0.4, "thump_from": 250.0, "thump_to": 110.0, "thump_decay": 55.0, "tail": 0.6, "tail_bright": 0.14, "tail_decay": 24.0, "volume": 0.68,
 		"click": 0.2, "click_at": 0.07, "click_note": 3300.0})
+
+
+# One of the burratas' pair of shots: rounder and heavier than the twin
+# curds', a crack with a soft thud under it.
+static func _burratas() -> AudioStreamWAV:
+	return _gunshot(26, 0.3, {"crack": 1.1, "crack_decay": 650.0, "blast": 1.0, "blast_bright": 0.4, "blast_decay": 60.0,
+		"thump": 0.8, "thump_from": 200.0, "thump_to": 80.0, "thump_decay": 40.0, "tail": 0.8, "tail_bright": 0.1, "tail_decay": 20.0, "volume": 0.75,
+		"click": 0.2, "click_at": 0.08, "click_note": 2900.0})
 
 
 # The carbine: three quick cracks, so each is tight and dry.

@@ -13,7 +13,7 @@ const RADIUS := 70.0
 ## How wide a mark is, in radians.
 const WIDTH := 0.35
 ## The sounds that get a mark, and how strongly each is shown, from 0 to 1.
-const LOUDNESS := {"pistol": 0.8, "pistols": 0.8, "gnaw": 0.7, "squeak": 0.8,"crumble": 0.6, "blaster": 0.9, "shotgun": 1.0, "grater": 0.8, "launcher": 1.0,
+const LOUDNESS := {"pistol": 0.8, "pistols": 0.8, "burratas": 0.8, "gnaw": 0.7, "squeak": 0.8,"crumble": 0.6, "blaster": 0.9, "shotgun": 1.0, "grater": 0.8, "launcher": 1.0,
 	"carbine": 0.85, "rifle": 0.9, "lmg": 0.9, "bow": 0.6, "burst": 1.0, "knife": 0.5, "throw": 0.5, "slide": 0.5, "pad": 0.6, "step": 0.45,
 	"step_rock": 0.45, "step_grass": 0.4, "step_wood": 0.45, "step_metal": 0.5, "step_cheese": 0.4, "voice_pain": 0.6, "voice_out": 0.6,
 	"voice_taunt": 0.5, "voice_reload": 0.5, "pickup": 0.4}
