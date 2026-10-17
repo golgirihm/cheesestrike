@@ -1,7 +1,7 @@
 """Signaling server for CheeseStrike on AWS: the rules in signaling/core.py,
 run by one Lambda function that is called once for each thing that happens
 and remembers nothing in between. Sessions are kept in DynamoDB
-(signaling/dynamo_store.py). infra/template.yaml sets all of it up, and
+(signaling/cloud/dynamo_store.py). infra/template.yaml sets all of it up, and
 docs/backend.md describes it.
 
 The function is called from two places, told apart by the event it is given:

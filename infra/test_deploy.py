@@ -9,6 +9,8 @@ import json
 import os
 import pathlib
 import re
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -39,6 +41,30 @@ class ConfigTest(unittest.TestCase):
     def test_a_page_with_no_head_is_refused(self):
         with self.assertRaises(ValueError):
             deploy.with_config("<html><body></body></html>", SIGNAL, SESSIONS)
+
+
+class FunctionTest(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = pathlib.Path(folder.name) / "lambda"
+
+    def test_only_the_functions_own_code_is_uploaded(self):
+        names = deploy.build_function(self.folder)
+        self.assertEqual(names, ["aws_lambda.py", "core.py", "dynamo_store.py"])
+
+    def test_building_again_leaves_nothing_behind(self):
+        self.folder.mkdir()
+        (self.folder / "server.py").write_text("stale")
+        self.assertNotIn("server.py", deploy.build_function(self.folder))
+
+    def test_the_function_imports_with_nothing_but_its_own_code(self):
+        deploy.build_function(self.folder)
+        # Isolated from the repository, as on AWS; boto3 is in Lambda's runtime.
+        script = f"import sys; sys.path.insert(0, {str(self.folder)!r}); import aws_lambda; print(aws_lambda.handler.__module__)"
+        ran = subprocess.run([sys.executable, "-I", "-c", script], capture_output=True, text=True, cwd=self.folder)
+        self.assertEqual(ran.returncode, 0, ran.stderr)
+        self.assertEqual(ran.stdout.strip(), "aws_lambda")
 
 
 class UploadTest(unittest.TestCase):

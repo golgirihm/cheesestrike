@@ -8,7 +8,9 @@ game's web build to the bucket that template makes.
 It acts on whatever AWS account the AWS CLI is signed in to (`aws login`),
 in REGION, under the stack name STACK. Deploying again updates what is there.
 
-The backend needs the SAM CLI (`sam`). The game needs Godot with the Web
+The backend needs the SAM CLI (`sam`). Its function is built fresh each time,
+in build/lambda, from signaling/cloud/ and the rules they share with the
+development server, signaling/core.py, so that only those are uploaded. The game needs Godot with the Web
 export templates; it is exported fresh each time, to build/deploy.
 
 Uploading the game does three things a plain copy wouldn't:
@@ -34,6 +36,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "infra" / "template.yaml"
 BUILD = ROOT / "build" / "deploy"
+LAMBDA = ROOT / "build" / "lambda"  # the template's CodeUri
 STACK = "cheesestrike"
 REGION = "us-east-2"
 
@@ -96,8 +99,20 @@ def find(*names):
     sys.exit(f"{names[-1]} not found on the PATH.")
 
 
+def build_function(folder):
+    """Puts the function's code in `folder`: signaling/cloud/'s modules and
+    the rules, signaling/core.py. Returns their names."""
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    signaling = ROOT / "signaling"
+    for path in [*sorted((signaling / "cloud").glob("*.py")), signaling / "core.py"]:
+        shutil.copyfile(path, folder / path.name)
+    return sorted(path.name for path in folder.iterdir())
+
+
 def deploy_backend(stack, region):
     sam = find("sam")
+    build_function(LAMBDA)
     run(sam, "deploy", "--template-file", TEMPLATE, "--stack-name", stack, "--region", region, "--resolve-s3", "--capabilities", "CAPABILITY_IAM", "--no-fail-on-empty-changeset")
 
 

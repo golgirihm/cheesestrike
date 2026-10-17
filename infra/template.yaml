@@ -6,7 +6,7 @@ Description: >-
   playing. docs/backend.md describes it; infra/deploy.py deploys it.
 
 Resources:
-  # Sessions and connections. Laid out as SCHEMA in signaling/dynamo_store.py,
+  # Sessions and connections. Laid out as SCHEMA in signaling/cloud/dynamo_store.py,
   # which infra/test_template.py checks.
   Table:
     Type: AWS::DynamoDB::Table
@@ -50,11 +50,13 @@ Resources:
         Enabled: true
 
   # The signaling rules. One function, called by the WebSocket API for hosts
-  # and players joining, and through its own URL for the session list.
+  # and players joining, and through its own URL for the session list. Its
+  # code is signaling/cloud/ and signaling/core.py, which infra/deploy.py
+  # puts together in build/lambda.
   Function:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../signaling
+      CodeUri: ../build/lambda
       Handler: aws_lambda.handler
       Runtime: python3.14
       Architectures:

@@ -34,7 +34,7 @@ Build and run the web version:
 ```
 mkdir -p build/web
 godot --headless --path game --export-debug Web ../build/web/index.html
-python signaling/server.py
+python signaling/local/server.py
 python tools/serve.py
 ```
 
@@ -49,7 +49,7 @@ python tools/run_tests.py
 ```
 
 - **Game tests** use [GUT](https://github.com/bitwes/Gut), vendored in `game/addons/gut`, and live in `game/test`.
-- **Signaling tests** are in `signaling/`. `test_stores.py` tests the rules on their own, over both places they can keep sessions (memory, and DynamoDB as on AWS); `test_server.py` tests the development server over real connections; `test_aws_lambda.py` tests the function AWS runs. **Infra tests**, in `infra/`, check the AWS template and what deploying does to the game's files. Both need `pip install -r signaling/requirements-test.txt`, and use imitations of AWS that run inside the tests: nothing reaches a real account.
+- **Signaling tests** are in `signaling/`. `test_stores.py` tests the rules on their own, over both places they can keep sessions (memory, and DynamoDB as on AWS); `test_server.py` tests the development server over real connections; `test_aws_lambda.py` tests the function AWS runs. The development server is in `signaling/local/` and the function in `signaling/cloud/`, both running the rules in `signaling/core.py`. **Infra tests**, in `infra/`, check the AWS template, what is uploaded as the function, and what deploying does to the game's files. Both need `pip install -r signaling/requirements-test.txt`, and use imitations of AWS that run inside the tests: nothing reaches a real account.
 - **Browser tests** are in `browser_tests/`. They export the web build, then play it in headless browser windows that host and join sessions with each other for real, using [Playwright](https://playwright.dev/python/). They need a one-time setup:
 
   ```

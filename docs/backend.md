@@ -78,8 +78,10 @@ The rules are written once, in `signaling/core.py`, free of how messages travel 
 
 | | Carries messages | Keeps sessions |
 |---|---|---|
-| **Development and tests**: `signaling/server.py` | one Python process, WebSocket and HTTP on one port | in memory (`signaling/memory_store.py`) |
-| **AWS**: `signaling/aws_lambda.py` | API Gateway and the function's URL | DynamoDB (`signaling/dynamo_store.py`) |
+| **Development and tests**: `signaling/local/server.py` | one Python process, WebSocket and HTTP on one port | in memory (`signaling/local/memory_store.py`) |
+| **AWS**: `signaling/cloud/aws_lambda.py` | API Gateway and the function's URL | DynamoDB (`signaling/cloud/dynamo_store.py`) |
+
+Each side has a folder of its own, `signaling/local/` and `signaling/cloud/`, beside the rules they share. The function AWS runs holds only `signaling/cloud/` and `signaling/core.py`, which the deploy puts together in `build/lambda`, so its code in the Lambda console is just those three files. The tests stay in `signaling/`.
 
 So everything is developed and tested without AWS. The game finds its server through `game/net/backend_urls.gd`: a deployed page has the two AWS addresses written into it, and a page with nothing written looks on port 9080 of the machine that served it.
 

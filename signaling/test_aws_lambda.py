@@ -13,9 +13,16 @@ import unittest
 import boto3
 from moto import mock_aws
 
-import aws_lambda
-import core
-import dynamo_store
+import pathlib
+import sys
+
+# The two ways of running the rules, each in a folder of its own.
+HERE = pathlib.Path(__file__).resolve().parent
+sys.path[:0] = [str(HERE / "local"), str(HERE / "cloud")]
+
+import aws_lambda  # noqa: E402
+import core  # noqa: E402
+import dynamo_store  # noqa: E402
 
 DOMAIN = "abc123.execute-api.us-east-2.amazonaws.com"
 
