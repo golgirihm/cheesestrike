@@ -366,4 +366,87 @@ func test_a_pistol_is_held_out_in_both_hands_and_a_rifle_carried() -> void:
 	_frames(10)
 	assert_eq(soldier._tree.get("parameters/acts/current_state"), "pistol_aim", "a pistol held out")
 	assert_almost_eq(soldier._tree.get("parameters/upper/blend_amount"), 1.0, 0.001)
-	assert_eq(soldier._spine.in_hand, SOLDIER.hold("pistol").in_hand, "in the pistol's grip")
+	assert_eq(soldier._spine.in_hand, SOLDIER.in_hand("pistol"), "in the pistol's grip")
+
+
+func test_a_hand_closes_round_each_weapons_own_grip() -> void:
+	assert_eq(WeaponModels.held_at("blaster"), WeaponModels.GRIP, "most where the mittens go")
+	assert_lt(WeaponModels.held_at("pistol").z, WeaponModels.GRIP.z, "a pistol's further forward, under its slide")
+	assert_gt(WeaponModels.view_offset("pistol").z, 0.0, "and a pistol nearer the eye in its holder's view")
+	assert_eq(WeaponModels.view_offset("blaster"), Vector3.ZERO)
+	if soldier == null:
+		pending("The licensed assets aren't checked out.")
+		return
+	var skeleton: Skeleton3D = soldier._skeleton
+	var fists := {}
+	var note := func() -> void:
+		for side in ["Right", "Left"]:
+			fists[side] = soldier.to_local(skeleton.global_transform * soldier._fist(side))
+	skeleton.skeleton_updated.connect(note)
+	for weapon: String in ["pistol", "pistols"]:
+		var gun := Node3D.new()
+		add_child_autofree(gun)
+		gun.scale = Vector3.ONE * BodyShape.SIZE * soldier.weapon_scale()
+		var model := WeaponModels.build(weapon)
+		gun.add_child(model)
+		await _hold(gun, model, 15)
+		var grip := soldier.to_local(model.to_global(WeaponModels.held_at(weapon)))
+		# Near enough: the fingers move a little as the hold is worked out
+		# from the first frame.
+		assert_lt(grip.distance_to(fists.Right), 0.02, "%s's grip in the right fist" % weapon)
+		var second := model.get_node_or_null("LeftPistol") as Node3D
+		if second != null:
+			var other := soldier.to_local(second.to_global(WeaponModels.held_at(weapon)))
+			assert_lt(other.distance_to(fists.Left), 0.02, "the other's in the left")
+	skeleton.skeleton_updated.disconnect(note)
+
+
+func test_a_pair_of_pistols_is_carried_low_and_aimed_out_side_by_side() -> void:
+	assert_eq(SOLDIER.grip_of("pistols"), "dual")
+	assert_not_null(WeaponModels.build("pistols").get_node_or_null("LeftPistol"), "the second its own node, for the left hand")
+	if soldier == null:
+		pending("The licensed assets aren't checked out.")
+		return
+	var gun := Node3D.new()
+	add_child_autofree(gun)
+	gun.scale = Vector3.ONE * BodyShape.SIZE * soldier.weapon_scale()
+	var model := WeaponModels.build("pistols")
+	gun.add_child(model)
+	soldier.hold_weapon(gun)
+	_frames(10)
+	assert_eq(soldier._tree.get("parameters/acts/current_state"), "dual_carry", "carried")
+	assert_eq(soldier._dual_aim, 0.0, "not reached out")
+	var second := model.get_node("LeftPistol") as Node3D
+	for gaze in [0.0, 0.5]:
+		await _hold(gun, model, 15, gaze)
+		assert_eq(soldier._dual_aim, 1.0, "aimed, reached out")
+		assert_eq(soldier._spine.influence, 0.0, "by the arms alone")
+		for pistol: Node3D in [model, second]:
+			var ahead := (soldier.global_basis.inverse() * -pistol.global_basis.z).normalized()
+			assert_almost_eq(ahead.distance_to(Vector3(0.0, sin(gaze), -cos(gaze))), 0.0, 0.05, "%s pointing where it looks, %s up" % [pistol.name, gaze])
+		var right := soldier.to_local(model.global_position)
+		var left := soldier.to_local(second.global_position)
+		assert_gt(right.x - left.x, 0.05, "side by side, a little apart")
+		assert_almost_eq(right.z, left.z, 0.05, "neither ahead of the other")
+		assert_lt(right.z, -0.15, "out in front")
+
+
+func test_a_pair_of_pistols_is_gripped_in_both_hands_as_the_right_grips_one() -> void:
+	var from := Animation.new()
+	var turn := Quaternion(Vector3(0.2, 0.3, 0.9).normalized(), 0.7)
+	for finger: String in SOLDIER.FINGERS:
+		var track := from.add_track(Animation.TYPE_ROTATION_3D)
+		from.track_set_path(track, NodePath("%GeneralSkeleton:Right" + finger))
+		from.rotation_track_insert_key(track, 0.0, turn)
+	var carry := Animation.new()
+	var loose := carry.add_track(Animation.TYPE_ROTATION_3D)
+	carry.track_set_path(loose, NodePath("%GeneralSkeleton:LeftIndexProximal"))
+	carry.rotation_track_insert_key(loose, 0.0, Quaternion.IDENTITY)
+	carry.rotation_track_insert_key(loose, 1.0, Quaternion(Vector3.UP, 0.5))
+	SOLDIER.gripping(carry, from)
+	for finger: String in SOLDIER.FINGERS:
+		var right := carry.find_track(NodePath("%GeneralSkeleton:Right" + finger), Animation.TYPE_ROTATION_3D)
+		var left := carry.find_track(NodePath("%GeneralSkeleton:Left" + finger), Animation.TYPE_ROTATION_3D)
+		assert_eq(carry.track_get_key_count(left), 1, "%s held still" % finger)
+		assert_true(carry.rotation_track_interpolate(right, 0.5).is_equal_approx(turn), "the right as it grips")
+		assert_true(carry.rotation_track_interpolate(left, 0.5).is_equal_approx(Quaternion(turn.x, -turn.y, -turn.z, turn.w)), "the left mirroring it")

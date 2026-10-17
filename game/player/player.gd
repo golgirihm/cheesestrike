@@ -791,7 +791,7 @@ func _animate(delta: float) -> void:
 	var magazine_out := 0.0
 	if _mine:
 		var sights := smoothstep(0.0, 1.0, _aim)
-		rest = _gun_rest.lerp(aim_gun_position(), sights)
+		rest = (_gun_rest + WeaponModels.view_offset(_shown_weapon)).lerp(aim_gun_position(), sights)
 		var across := Vector2(velocity.x, velocity.z).length()
 		# Held steadier at the eye.
 		var steady := 1.0 - 0.8 * sights

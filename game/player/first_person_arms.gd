@@ -19,11 +19,11 @@ const HAND_POSE := preload("res://player/hand_pose.gd")
 ## metres: a little ahead, so that the hands reach the weapon, which is held
 ## further out than arms in proportion could, and low enough that its
 ## collarbones, where the arms are cut, stay below the view.
-const BODY_AHEAD := 0.16
-const BODY_DOWN := 0.16
+const BODY_AHEAD := 0.04
+const BODY_DOWN := 0.28
 ## How much bigger than the weapon in view's size calls for the arms are
 ## drawn: a little, again so that the hands reach.
-const LARGER := 1.15
+const LARGER := 1.35
 ## Where each elbow points, from the eyes, in the model's own metres: down
 ## and out to its side.
 const ELBOWS := {"Right": Vector3(0.5, -0.6, 0.2), "Left": Vector3(-0.5, -0.6, 0.0)}
@@ -39,6 +39,19 @@ var _hands := {}
 var _player: AnimationPlayer
 # How the hands hold the weapon in view (see SOLDIER.GRIPS).
 var _grip := "rifle"
+# Takes the left arm out of view, while active.
+var _hide_left: Shrink
+
+
+## Shrinks a bone, and all that hangs from it, to nothing: an arm the view
+## has no use for.
+class Shrink extends SkeletonModifier3D:
+	var bone := -1
+
+	func _process_modification() -> void:
+		var skeleton := get_skeleton()
+		if skeleton != null and bone >= 0:
+			skeleton.set_bone_pose_scale(bone, Vector3.ONE * 0.001)
 
 
 ## Arms for a weapon in view drawn `view_scale` times the size the drawn
@@ -71,6 +84,14 @@ func _init(view_scale: float) -> void:
 	var sleeves: MeshInstance3D = _model.find_child("FirstPersonSleeves")
 	_sleeves = (sleeves.get_active_material(0) as StandardMaterial3D).duplicate() as StandardMaterial3D
 	sleeves.material_override = _sleeves
+	# Where the arms are cut, the inside of the sleeve is drawn rather than
+	# seen through, should the cut come into view.
+	_sleeves.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var skin: MeshInstance3D = _model.find_child("FirstPersonArms")
+	for surface in skin.mesh.get_surface_count():
+		var material := skin.get_active_material(surface).duplicate() as BaseMaterial3D
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		skin.set_surface_override_material(surface, material)
 	_player = AnimationPlayer.new()
 	_model.add_child(_player)
 	_player.add_animation_library("", SOLDIER.library())
@@ -80,6 +101,11 @@ func _init(view_scale: float) -> void:
 	var twist: SkeletonModifier3D = preload("res://player/forearm_twist.gd").new()
 	twist.name = "ForearmTwist"
 	_skeleton.add_child(twist)
+	_hide_left = Shrink.new()
+	_hide_left.name = "HideLeftArm"
+	_hide_left.bone = _skeleton.find_bone("LeftShoulder")
+	_hide_left.active = false
+	_skeleton.add_child(_hide_left)
 
 
 # Reaches `side`'s arm for where its wrist is to go, and turns its hand.
@@ -104,7 +130,7 @@ func _arm(side: String) -> Dictionary:
 	turn.name = side + "HandPose"
 	turn.bone = _skeleton.find_bone(side + "Hand")
 	_skeleton.add_child(turn)
-	return {"wrist": wrist, "turn": turn}
+	return {"wrist": wrist, "elbow": elbow, "turn": turn}
 
 
 ## Tints the sleeves' camouflage for a player of `colour`, as others see it.
@@ -126,6 +152,16 @@ static func hide_drawn_arms(model: Node3D) -> void:
 			drawn.visible = false
 
 
+## `weapon` (weapon `id`, in the skeleton's space), as big as the soldier
+## holds it, round the same grip: the arms are bigger against the weapon in
+## view than the soldier is against its own (LARGER), so a hand holding it
+## is placed as the hand of one that size.
+static func as_held(weapon: Transform3D, id: String) -> Transform3D:
+	var grip := weapon * WeaponModels.held_at(id)
+	var basis := weapon.basis * (SOLDIER._weapon_size / weapon.basis.get_scale().x)
+	return Transform3D(basis, grip - basis * WeaponModels.held_at(id))
+
+
 # Where the right fist closes now, in the skeleton's space.
 func _fist_now() -> Vector3:
 	var base := _skeleton.get_bone_global_pose(_skeleton.find_bone("RightMiddleProximal")).origin
@@ -141,15 +177,28 @@ func _process(_delta: float) -> void:
 	# right.
 	# The newest model: one changed from waits to be freed beside it.
 	var model := _gun.get_child(-1) as Node3D if _gun.get_child_count() > 0 else null
-	var grip := SOLDIER.grip_of(model.get_meta("weapon", "") if model != null else "")
+	var id: String = model.get_meta("weapon", "") if model != null else ""
+	var grip := SOLDIER.grip_of(id)
 	if grip != _grip:
 		_grip = grip
 		_player.play(SOLDIER.GRIPS[grip])
 	var hold: Dictionary = SOLDIER.hold(grip)
 	var weapon := _skeleton.global_transform.affine_inverse() * _gun.global_transform
-	var right := weapon * (hold.in_hand as Transform3D).affine_inverse()
-	var left := right * (hold.left as Transform3D)
+	var right := as_held(weapon, id) * SOLDIER.in_hand(id).affine_inverse()
+	# The left against the weapon as it is, which is smaller against these
+	# arms than as held (see as_held): on its fore-end.
+	var left := weapon * SOLDIER.in_hand(id).affine_inverse() * (hold.left as Transform3D)
+	# A second weapon is in the left hand.
+	var second := model.find_child("LeftPistol", false, false) as Node3D if model != null else null
+	if grip == "dual" and second != null:
+		left = as_held(_skeleton.global_transform.affine_inverse() * second.global_transform, id) * SOLDIER.left_in_hand(id).affine_inverse()
+	# A pistol is held in the right hand alone, as far as the view goes: the
+	# left, which steadies it below, would only hang empty beside it.
+	_hide_left.active = grip == "pistol"
 	for side: String in _hands:
 		var hand: Transform3D = right if side == "Right" else left
 		(_hands[side].wrist as Node3D).global_position = _skeleton.global_transform * hand.origin
 		_hands[side].turn.facing = hand.basis
+		# Each elbow where the animation has it against the hands, so that
+		# the arm bends, and its forearm turns, as the animation's does.
+		(_hands[side].elbow as Node3D).global_position = _skeleton.global_transform * (right * (hold.elbows[side] as Vector3))
