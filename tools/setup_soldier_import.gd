@@ -61,6 +61,14 @@ const SIDED := [
 ]
 const CHARACTER_CREATOR := 1
 const MIXAMO := 2
+## The most pixels across any of the model's textures is imported at. The
+## clothes come at 4096, far more than a player ever shows of them, even up
+## close in their own view; at this they take a quarter of the download and of
+## the graphics card's memory.
+const TEXTURE_LIMIT := 2048
+## The same for the small parts, by the start of their textures' names: the
+## sunglasses, also made at 4096, and the tiny parts of the face and hands.
+const SMALL_PARTS := {"Glass_": 1024, "Std_Nails": 512, "Std_Eyelash": 512, "Std_Upper_Teeth": 512, "Std_Lower_Teeth": 512, "Std_Eye_": 512, "Std_Cornea_": 512}
 
 
 func _init() -> void:
@@ -68,7 +76,30 @@ func _init() -> void:
 	for file in DirAccess.get_files_at(ANIMATIONS):
 		if file.get_extension() == "fbx":
 			_set_up(ANIMATIONS.path_join(file), "PATH:Skeleton3D", MIXAMO, true)
+	for file in DirAccess.get_files_at(SOLDIER.get_base_dir()):
+		if file.get_extension() == "webp":
+			_compress(SOLDIER.get_base_dir().path_join(file))
 	quit()
+
+
+## Imports the texture at `path`, one the model's import took out of it, as
+## the graphics card keeps it, where the default keeps every pixel as it is,
+## and no bigger than the soldier is ever seen (TEXTURE_LIMIT).
+func _compress(path: String) -> void:
+	var settings := ConfigFile.new()
+	if settings.load(path + ".import") != OK:
+		push_error("%s.import is missing: import the project first." % path)
+		return
+	settings.set_value("params", "compress/mode", 2)
+	var limit := TEXTURE_LIMIT
+	for part: String in SMALL_PARTS:
+		if path.get_file().begins_with("soldier_" + part):
+			limit = SMALL_PARTS[part]
+	settings.set_value("params", "process/size_limit", limit)
+	if path.get_basename().ends_with("_Normal"):
+		settings.set_value("params", "compress/normal_map", 1)
+	settings.save(path + ".import")
+	print("compressed ", path)
 
 
 ## Maps the skeleton at `node` in the file at `path`, from `side`'s bone names,

@@ -14,9 +14,12 @@ name: buildci command
 # the job's name, which is also the name of the required check.
 #
 # Anyone may use it, on any pull request including one from a fork. The jobs
-# that run the pull request's code get a read-only token and no secrets, the
-# same as its automatic test runs. The jobs that can write statuses or restart
-# runs never check the code out.
+# that run the pull request's code get a read-only token, the same as its
+# automatic test runs, and the secrets only for a pull request from this
+# repository, whose author could reach them anyway: the tests need the deploy
+# key for the licensed assets, so a fork's fail without it, as its automatic
+# runs do. The jobs that can write statuses or restart runs never check the
+# code out.
 
 on:
   issue_comment:
@@ -45,6 +48,8 @@ jobs:
     outputs:
       # Set only when the tests have to run inside this workflow.
       sha: ${{ steps.command.outputs.sha }}
+      # Whether the pull request comes from a fork.
+      fork: ${{ steps.command.outputs.fork }}
     env:
       PR: ${{ github.event.issue.number }}
       COMMENT_ID: ${{ github.event.comment.id }}
@@ -100,11 +105,25 @@ jobs:
           done <<< "$CONTEXTS"
           react rocket
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "fork=$(gh pr view "$PR" --repo "$REPO" --json isCrossRepository --jq .isCrossRepository)" >> "$GITHUB_OUTPUT"
 
+  # One or the other runs, under the same name: with the secrets for a pull
+  # request from this repository, without for a fork's.
   tests:
     name: tests
     needs: prepare
-    if: needs.prepare.outputs.sha != ''
+    if: needs.prepare.outputs.sha != '' && needs.prepare.outputs.fork != 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/tests.yml
+    with:
+      ref: ${{ needs.prepare.outputs.sha }}
+    secrets: inherit
+
+  fork-tests:
+    name: tests
+    needs: prepare
+    if: needs.prepare.outputs.sha != '' && needs.prepare.outputs.fork == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/tests.yml
@@ -113,7 +132,7 @@ jobs:
 
   report:
     name: Report results
-    needs: [prepare, tests]
+    needs: [prepare, tests, fork-tests]
     if: always() && needs.prepare.outputs.sha != ''
     runs-on: ubuntu-24.04
     permissions:

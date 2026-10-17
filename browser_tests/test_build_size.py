@@ -8,9 +8,11 @@ from harness import WEB_BUILD
 MB = 1024 * 1024
 
 # The game's own data: arenas, models, sounds and scripts. Almost everything
-# is made in code, so this is small; a budget well above what it is now
-# leaves room to grow while catching something large added by mistake.
-PCK_BUDGET = 4 * MB
+# is made in code; most of it is the soldier players are seen as, its model,
+# textures and animations (game/licensed), about 80 MB. A budget well above
+# what it is now leaves room to grow while catching something large added by
+# mistake.
+PCK_BUDGET = 112 * MB
 # The page and the script that starts the engine.
 PAGE_BUDGET = 1 * MB
 # The engine itself. These tests use a debug export, which is larger than
