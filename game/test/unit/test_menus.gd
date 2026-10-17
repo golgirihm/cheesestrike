@@ -93,9 +93,7 @@ func test_the_menu_says_when_the_session_list_cant_be_had_and_stops_once_it_can(
 
 
 func test_no_answer_or_a_wrong_one_from_the_session_server_twice_running_is_said() -> void:
-	# The menu asked for the list when it opened, and with no session server
-	# here, may have been refused already: count from nothing.
-	Net._list_request.cancel_request()
+	# Count from nothing, whatever the tests before left.
 	Net._list_failures = 0
 	watch_signals(Net)
 	var good := JSON.stringify({"sessions": []}).to_utf8_buffer()

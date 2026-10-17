@@ -53,6 +53,9 @@ const HOST_LOST := "The connection to the host was lost."
 const HOST_CLOSED := "The host closed the session."
 
 var in_session := false
+## Whether to ask the session server for the session list. The game's tests
+## turn it off, so that nothing they check depends on whether one is running.
+var reach_server := true
 ## Whether the session is one of this machine alone (see play_alone).
 var alone := false
 var room_code := ""
@@ -168,7 +171,7 @@ func leave(reason := "") -> void:
 
 ## Asks for the session list, which arrives as `sessions_listed`.
 func request_sessions() -> void:
-	if _list_request.get_http_client_status() == HTTPClient.STATUS_DISCONNECTED:
+	if reach_server and _list_request.get_http_client_status() == HTTPClient.STATUS_DISCONNECTED:
 		if _list_request.request(_http_url + "/sessions") != OK:
 			sessions_unreachable.emit(unreachable(_http_url))
 
