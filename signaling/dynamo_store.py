@@ -10,7 +10,7 @@ write: DynamoDB applies it only if the condition still holds, and tells the
 loser.
 
 The table's layout is `SCHEMA`, which infra/template.yaml has to match
-(signaling/test_template.py checks). Each item has a string key, `id`:
+(infra/test_template.py checks). Each item has a string key, `id`:
 
     s#ABCD          a session
     c#<connection>  a connection
