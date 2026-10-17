@@ -1,8 +1,9 @@
 extends Node
 ## Entry scene: the arena with the host/join menu over it.
 ##
-## Native builds also take `-- --host` or `-- --join=<address>` on the command
-## line to skip the menu.
+## Native builds also take `-- --host`, `-- --join=<code>`, or `-- --join` for
+## the newest session listed (waiting for one), on the command line to skip
+## the menu.
 
 @onready var world: Node3D = $World
 @onready var menu: Control = $UI/Menu
@@ -68,6 +69,9 @@ var join_screen: JoinScreen
 var profile_screen: ProfileScreen
 # The sessions last listed, to know a session's arena before joining it.
 var _listed: Array = []
+## Set by `--join` with no code: join the newest session listed, as soon as
+## there is one.
+var _join_newest := false
 # Why the session list couldn't be had last time it was asked for, or "".
 var _list_problem := ""
 ## What the session list says while the session server can't be reached.
@@ -257,13 +261,6 @@ func _ready() -> void:
 	name_edit.text_submitted.connect(func(_text: String) -> void: _remember_name())
 	name_edit.focus_exited.connect(_remember_name)
 
-	# Session codes and the session list only exist with the signaling server,
-	# and links only in a browser.
-	sessions_panel.visible = Net.use_webrtc
-	private_button.visible = Net.use_webrtc
-	_match_buttons["host_private"].label.visible = Net.use_webrtc
-	if not Net.use_webrtc:
-		target_edit.placeholder_text = "Host address (blank for this PC)"
 	Net.request_sessions()
 	var refresh := Timer.new()
 	refresh.wait_time = LIST_REFRESH_SECONDS
@@ -293,6 +290,8 @@ func _ready() -> void:
 			_host()
 		elif arg.begins_with("--join="):
 			_join(arg.trim_prefix("--join="))
+		elif arg == "--join":
+			_wait_to_join_newest()
 
 
 func _process(_delta: float) -> void:
@@ -661,8 +660,23 @@ func _run_tutorial() -> void:
 	combat_hud.show_tutorial(tutorial.text(device, keys, Settings.get_value("touch_left_handed")))
 
 
+## Asks for the session list every second until there is a session in it to
+## join; see _join_newest.
+func _wait_to_join_newest() -> void:
+	_join_newest = true
+	var ask := Timer.new()
+	ask.wait_time = 1.0
+	ask.timeout.connect(func() -> void:
+		if _join_newest:
+			Net.request_sessions()
+		else:
+			ask.queue_free())
+	add_child(ask)
+	ask.start()
+
+
 func _join(target: String) -> void:
-	if Net.use_webrtc and target.strip_edges().is_empty():
+	if target.strip_edges().is_empty():
 		status.text = "Enter a session code."
 		return
 	_remember_name()
@@ -671,7 +685,7 @@ func _join(target: String) -> void:
 	for session: Dictionary in _listed:
 		if String(session.get("code", "")) == target.strip_edges().to_upper():
 			map = MatchSettings.from_dict(session.get("settings")).map
-	_set_busy("Joining %s…" % target.strip_edges().to_upper() if Net.use_webrtc else "Joining…", map)
+	_set_busy("Joining %s…" % target.strip_edges().to_upper(), map)
 	Net.join(target)
 
 
@@ -868,6 +882,12 @@ func _refresh_sessions_if_showing() -> void:
 		Net.request_sessions()
 
 
+## The code of the newest session in `list`, which the session server sends
+## newest first, or "" if there is none.
+static func newest_code(list: Array) -> String:
+	return String(list[0].get("code", "")) if not list.is_empty() and list[0] is Dictionary else ""
+
+
 ## How a session reads in the session list.
 static func session_line(session: Dictionary) -> String:
 	var settings := MatchSettings.from_dict(session.get("settings"))
@@ -881,6 +901,9 @@ func _show_sessions(list: Array) -> void:
 		status.text = ""
 	_list_problem = ""
 	_draw_sessions()
+	if _join_newest and not newest_code(list).is_empty():
+		_join_newest = false
+		_join(newest_code(list))
 
 
 ## What the menu shows when the session list couldn't be had: no sessions,

@@ -10,7 +10,7 @@ Copyright (c) 2026 Hamid Golgiri. All rights reserved. The source is public for 
 
 ## Development
 
-The game is a [Godot 4.7](https://godotengine.org) project in `game/`. Web builds connect players peer-to-peer over WebRTC; `signaling/` is the small server that lists sessions and brokers those connections. In development it runs as one Python process; the public one runs the same rules on AWS with nothing left running between players. [docs/backend.md](docs/backend.md) describes that, with a diagram, and how to deploy it.
+The game is a [Godot 4.7](https://godotengine.org) project in `game/`. Players connect peer-to-peer over WebRTC, in the browser and in native builds alike; `signaling/` is the small server that lists sessions and brokers those connections. In development it runs as one Python process; the public one runs the same rules on AWS with nothing left running between players. [docs/backend.md](docs/backend.md) describes that, with a diagram, and how to deploy it.
 
 You need Godot 4.7 with the Web export templates installed, and Python 3.14 with `pip install -r signaling/requirements.txt`.
 
@@ -22,12 +22,21 @@ git submodule update --init
 
 On Windows, use `godot_console` in place of `godot` in the commands below. Plain `godot` is a windowed program there and prints nothing to the terminal.
 
-Run natively, where host and join use a direct connection on port 7777 and need no signaling server:
+Run natively. Native builds connect the same way the browser does, so they need WebRTC, which Godot's desktop builds don't have of their own, and the development server. Install WebRTC once after cloning, and again when its pin in `tools/versions.env` changes:
 
 ```
-godot --path game -- --host
-godot --path game -- --join=127.0.0.1
+python tools/fetch_webrtc.py
 ```
+
+Then start the server and two instances, one hosting and one joining the newest session listed:
+
+```
+python signaling/local/server.py
+godot --path game -- --host
+godot --path game -- --join
+```
+
+`--join=<code>` joins a session by its code, and `--signal=ws://<address>` uses another session server, such as the one on AWS (its address is in `infra/deployed.json`).
 
 Build and run the web version:
 
