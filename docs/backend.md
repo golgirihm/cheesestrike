@@ -83,7 +83,7 @@ The rules are written once, in `signaling/core.py`, free of how messages travel 
 
 Each side has a folder of its own, `signaling/local/` and `signaling/cloud/`, beside the rules they share. The function AWS runs holds only `signaling/cloud/` and `signaling/core.py`, which the deploy puts together in `build/lambda`, so its code in the Lambda console is just those three files. The tests stay in `signaling/`.
 
-So everything is developed and tested without AWS. The game finds its server through `game/net/backend_urls.gd`: a deployed page has the two AWS addresses written into it, and a page with nothing written looks on port 9080 of the machine that served it.
+So everything is developed and tested without AWS. The game finds its server through `game/net/backend_urls.gd`: a deployed page has the two AWS addresses written into it, and a page with nothing written looks on port 9080 of the machine that served it. Deploying also saves the addresses in `infra/deployed.json`, and `tools/serve.py` writes them into the pages it serves, so a build played locally uses AWS too; `tools/serve.py --local` leaves them out, for the development server. `?signal=` in a page's address overrides both, which is how the browser tests use a development server of their own.
 
 ## Limits
 

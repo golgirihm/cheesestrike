@@ -67,6 +67,24 @@ class FunctionTest(unittest.TestCase):
         self.assertEqual(ran.stdout.strip(), "aws_lambda")
 
 
+class AddressesTest(unittest.TestCase):
+    OUTPUTS = {"SignalUrl": SIGNAL, "SessionsUrl": SESSIONS, "GameUrl": "https://game.example/index.html", "GameBucket": "game"}
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.path = pathlib.Path(folder.name) / "deployed.json"
+
+    def test_the_backends_addresses_are_saved_for_local_builds(self):
+        self.assertTrue(deploy.save_addresses(self.OUTPUTS, self.path))
+        saved = json.loads(self.path.read_text(encoding="utf-8"))
+        self.assertEqual(saved, {"signal": SIGNAL, "sessions": SESSIONS, "game": "https://game.example/index.html"})
+
+    def test_saving_the_same_addresses_again_changes_nothing(self):
+        deploy.save_addresses(self.OUTPUTS, self.path)
+        self.assertFalse(deploy.save_addresses(self.OUTPUTS, self.path))
+
+
 class UploadTest(unittest.TestCase):
     def setUp(self):
         # Made-up credentials, so that nothing can reach a real account even
