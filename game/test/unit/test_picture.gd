@@ -1,6 +1,7 @@
 extends GutTest
-## Glow on bright things, each arena's cast of colour and the darker corners
-## of the view, and the settings that turn each off.
+## Light brought down to the screen as film would, glow on bright things,
+## each arena's cast of colour and the darker corners of the view, and the
+## settings that turn each off.
 
 const WORLD := preload("res://world/world.tscn")
 const KEYS := [Picture.BLOOM, Picture.GRADE, Picture.VIGNETTE]
@@ -37,7 +38,7 @@ func test_each_is_a_setting_that_starts_on_and_has_a_switch() -> void:
 	assert_eq(Picture.wanted(), _all(false))
 
 
-func test_every_arena_has_a_cast_that_leaves_the_picture_readable() -> void:
+func test_every_arena_has_a_muted_cast_that_leaves_the_picture_readable() -> void:
 	for id: String in Maps.ORDER:
 		assert_has(Picture.GRADES, id)
 	for id: String in Picture.GRADES:
@@ -45,7 +46,8 @@ func test_every_arena_has_a_cast_that_leaves_the_picture_readable() -> void:
 		var cast: Dictionary = Picture.GRADES[id]
 		assert_between(cast.brightness, 0.9, 1.1, id)
 		assert_between(cast.contrast, 0.95, 1.2, id)
-		assert_between(cast.saturation, 0.8, 1.25, id)
+		# Muted, for a grounded look rather than a bright cartoon one.
+		assert_between(cast.saturation, 0.8, 1.0, id)
 		# A tint, not a colour wash: white stays nearly white.
 		for part: float in [cast.tint.r, cast.tint.g, cast.tint.b]:
 			assert_between(part, 0.85, 1.0, id)
@@ -67,8 +69,11 @@ func test_low_graphics_has_no_glow_whatever_is_asked() -> void:
 func test_the_picture_is_put_into_the_environment() -> void:
 	var environment := Environment.new()
 	Picture.apply(environment, "city", GraphicsQuality.HIGH, _all(true))
+	assert_eq(environment.tonemap_mode, Picture.TONE_MAPPER)
+	assert_ne(Picture.TONE_MAPPER, Environment.TONE_MAPPER_LINEAR, "bright things fade to white rather than clipping")
+	assert_eq(environment.tonemap_exposure, Picture.EXPOSURE)
 	assert_true(environment.glow_enabled)
-	assert_eq(environment.glow_intensity, Picture.GLOW_INTENSITY)
+	assert_almost_eq(environment.glow_intensity, Picture.GLOW_INTENSITY, 0.0001)
 	assert_true(environment.adjustment_enabled)
 	assert_almost_eq(environment.adjustment_saturation, float(Picture.GRADES.city.saturation), 0.0001)
 	assert_almost_eq(environment.adjustment_contrast, float(Picture.GRADES.city.contrast), 0.0001)
@@ -81,12 +86,14 @@ func test_the_picture_is_put_into_the_environment() -> void:
 	assert_false(environment.adjustment_enabled)
 	assert_null(environment.adjustment_color_correction)
 	assert_eq(environment.adjustment_saturation, 1.0)
+	assert_eq(environment.tonemap_mode, Picture.TONE_MAPPER, "the curve is how light is shown, not a setting")
 	# Each on its own.
 	Picture.apply(environment, "city", GraphicsQuality.HIGH, {Picture.BLOOM: true, Picture.GRADE: false})
 	assert_true(environment.glow_enabled)
 	assert_false(environment.adjustment_enabled)
 	Picture.apply(environment, "city", GraphicsQuality.LOW, _all(true))
 	assert_false(environment.glow_enabled, "no glow on low")
+	assert_eq(environment.tonemap_mode, Picture.TONE_MAPPER, "and the curve costs next to nothing")
 	assert_true(environment.adjustment_enabled, "but the cast costs nothing")
 	Picture.apply(environment, Maps.RANGE, GraphicsQuality.HIGH, _all(true))
 	assert_false(environment.adjustment_enabled, "nothing to do for a plain arena")
@@ -96,6 +103,7 @@ func test_the_arena_being_played_sets_the_cast_and_settings_change_it_at_once() 
 	var world: Node3D = WORLD.instantiate()
 	add_child_autofree(world)
 	var environment: Environment = world.get_node("WorldEnvironment").environment
+	assert_eq(environment.tonemap_mode, Picture.TONE_MAPPER)
 	assert_true(environment.glow_enabled)
 	assert_almost_eq(environment.adjustment_saturation, float(Picture.GRADES[Maps.DEFAULT].saturation), 0.0001)
 	world.load_map("cave")
