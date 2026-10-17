@@ -78,7 +78,7 @@ func test_a_gun_has_its_works_clicking_after_the_shot() -> void:
 	var without: AudioStreamWAV = SoundBank._gunshot(9, 0.4, {"tail": 0.0})
 	assert_gt(_level(with_click, 0.2, 0.22), _level(without, 0.2, 0.22) * 3.0)
 	assert_almost_eq(_level(with_click, 0.15, 0.19), _level(without, 0.15, 0.19), 0.02, "and not before")
-	for weapon: String in ["pistol", "blaster", "shotgun", "rifle", "carbine", "lmg", "grater", "pistols"]:
+	for weapon: String in ["pistol", "blaster", "shotgun", "rifle", "carbine", "lmg", "grater", "pistols", "burratas"]:
 		assert_not_null(SoundBank.get_sound(weapon), weapon)
 
 

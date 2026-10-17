@@ -300,6 +300,28 @@ func test_the_pair_of_pistols_trades_aim_for_fire() -> void:
 	model.free()
 
 
+func test_the_dual_burratas_fire_a_shot_from_each_for_each_pull() -> void:
+	var burratas := Weapons.find("burratas")
+	var curds := Weapons.find("pistols")
+	assert_eq(burratas.display_name, "Dual Burratas")
+	assert_eq(burratas.slot, Weapons.SIDE)
+	assert_has(Weapons.SIDES, "burratas", "offered as a sidearm")
+	assert_eq(Weapons.ORDER.back(), "burratas", "added at the end, so no other weapon is sent differently")
+	assert_true(burratas.unlimited())
+	assert_false(burratas.automatic, "a pull at a time")
+	assert_eq(burratas.burst, 2, "a shot from each")
+	assert_gt(burratas.damage, curds.damage, "each hitting harder than the twin curds'")
+	assert_lt(burratas.damage * burratas.burst / burratas.fire_interval, curds.damage / curds.fire_interval, "though doing less in a second than the twin curds held down")
+	assert_lt(burratas.spread(true), curds.spread(true), "aimed more closely")
+	assert_gt(burratas.damage_at(40.0), curds.damage_at(40.0), "and reaching further")
+	var model := WeaponModels.build("burratas")
+	var second := model.get_node("LeftPistol") as Node3D
+	assert_almost_eq(second.position.x, -WeaponModels.PAIR_GAP, 0.0001, "the second in the left hand")
+	assert_gt(second.get_child_count(), 0, "drawn there")
+	assert_almost_eq(model.get_node("OffHand").position.x, -WeaponModels.PAIR_GAP, 0.0001)
+	model.free()
+
+
 # --- The bow ---------------------------------------------------------------
 
 func test_a_breadstick_hurts_only_whoever_it_strikes() -> void:

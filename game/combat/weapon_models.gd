@@ -21,6 +21,9 @@ const STEEL := Color(0.58, 0.61, 0.66)
 const GUNMETAL := Color(0.2, 0.22, 0.26)
 const DARK := Color(0.1, 0.1, 0.12)
 const WOOD := Color(0.47, 0.29, 0.16)
+## A burrata's pale, soft skin, and the leek it is tied with.
+const BURRATA := Color(0.95, 0.93, 0.84)
+const LEEK := Color(0.36, 0.55, 0.24)
 const TEAL := Color(0.13, 0.5, 0.55)
 const PURPLE := Color(0.45, 0.3, 0.62)
 const GREEN := Color(0.22, 0.4, 0.26)
@@ -46,6 +49,7 @@ const OFF_HAND := {
 	"launcher": Vector3(0.0, -0.085, -0.2),
 	# The other hand has a pistol of its own.
 	"pistols": Vector3(-PAIR_GAP, -0.09, 0.12),
+	"burratas": Vector3(-PAIR_GAP, -0.09, 0.12),
 	"carbine": Vector3(0.0, -0.085, -0.17),
 	"rifle": Vector3(0.0, -0.075, -0.24),
 	"lmg": Vector3(0.0, -0.1, -0.2),
@@ -82,6 +86,23 @@ static func build(id: String) -> Node3D:
 			_box(model, Vector3(0.042, 0.05, 0.065), Vector3(0.0, -0.16, 0.05), DARK).name = "Magazine"
 			_sights(model, 0.04, 0.065, -0.15)
 			muzzle_z = -0.17
+		"burratas":
+			# A pair, each a burrata: a soft white slide ending in the round
+			# of the cheese, knotted at the grip with leek. The second is a
+			# node of its own, for a hand that holds it; the sights are the
+			# right one's.
+			var other := Node3D.new()
+			other.name = "LeftPistol"
+			other.position = Vector3(-PAIR_GAP, 0.0, 0.0)
+			model.add_child(other)
+			for pistol: Node3D in [model, other]:
+				_box(pistol, Vector3(0.07, 0.085, 0.24), Vector3(0.0, 0.0, -0.05), BURRATA, 0.03)
+				_box(pistol, Vector3(0.085, 0.09, 0.07), Vector3(0.0, 0.0, 0.08), BURRATA, 0.04)
+				_box(pistol, Vector3(0.055, 0.14, 0.08), Vector3(0.0, -0.085, 0.05), GUNMETAL)
+				_box(pistol, Vector3(0.066, 0.02, 0.09), Vector3(0.0, -0.035, 0.05), LEEK, 0.006)
+			_box(model, Vector3(0.042, 0.05, 0.065), Vector3(0.0, -0.16, 0.05), DARK).name = "Magazine"
+			_sights(model, 0.0425, 0.07, -0.15)
+			muzzle_z = -0.18
 		"carbine":
 			# Short and square, with a stock and a straight magazine.
 			_box(model, Vector3(0.085, 0.11, 0.4), Vector3(0.0, 0.0, 0.0), GREEN)

@@ -14,12 +14,12 @@ const POWER := "power"
 ## The weapons a loadout can have in each slot, in the order they are
 ## offered. Kept by hand, and checked against each weapon's own slot.
 const MAINS := ["blaster", "shotgun", "grater", "carbine", "rifle", "lmg", "bow"]
-const SIDES := ["pistol", "pistols"]
+const SIDES := ["pistol", "pistols", "burratas"]
 
 ## In the order they are stepped through, and that the number keys choose
 ## among those carried. Added to at the end only: a weapon is sent as its
 ## place here.
-const ORDER := ["pistol", "blaster", "shotgun", "grater", "launcher", "pistols", "carbine", "rifle", "lmg", "bow"]
+const ORDER := ["pistol", "blaster", "shotgun", "grater", "launcher", "pistols", "carbine", "rifle", "lmg", "bow", "burratas"]
 ## How many number keys choose weapons (the actions weapon_1 and up).
 const KEYS := 5
 
@@ -40,6 +40,7 @@ const _ALL := {
 	"rifle": preload("res://combat/weapons/rifle.tres"),
 	"lmg": preload("res://combat/weapons/lmg.tres"),
 	"bow": preload("res://combat/weapons/bow.tres"),
+	"burratas": preload("res://combat/weapons/burratas.tres"),
 	GRENADE: preload("res://combat/weapons/grenade.tres"),
 	# The other ways some weapons fire (see WeaponStats.alt).
 	"shotgun_both": preload("res://combat/weapons/shotgun_both.tres"),

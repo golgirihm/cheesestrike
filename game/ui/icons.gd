@@ -110,6 +110,10 @@ static func _shapes(name: String) -> Array:
 		"pistols":
 			return [_rect(0.08, 0.2, 0.5, 0.11), _points([0.1, 0.31, 0.24, 0.31, 0.2, 0.52, 0.08, 0.52]),
 				_rect(0.4, 0.52, 0.5, 0.11), _points([0.42, 0.63, 0.56, 0.63, 0.52, 0.86, 0.4, 0.86])]
+		"burratas":
+			# The pair, each with the round of the cheese at the back.
+			return [_rect(0.14, 0.2, 0.44, 0.11), _rect(0.06, 0.17, 0.1, 0.17), _points([0.1, 0.31, 0.24, 0.31, 0.2, 0.52, 0.08, 0.52]),
+				_rect(0.46, 0.52, 0.44, 0.11), _rect(0.38, 0.49, 0.1, 0.17), _points([0.42, 0.63, 0.56, 0.63, 0.52, 0.86, 0.4, 0.86])]
 		"blaster":
 			return _gun(0.62, 0.17, true, 0.2)
 		"carbine":

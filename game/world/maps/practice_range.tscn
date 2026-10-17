@@ -147,6 +147,10 @@ metadata/kind = "bow"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 0, 5)
 metadata/kind = "launcher"
 
+[node name="Rack11" type="Marker3D" parent="Pickups"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, 5)
+metadata/kind = "burratas"
+
 [node name="Ammo" type="Marker3D" parent="Pickups"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 0, 11)
 metadata/kind = "ammo"

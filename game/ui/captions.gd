@@ -23,6 +23,7 @@ const TEXTS := {
 	"grater": "Grater fire",
 	"launcher": "Launcher shot",
 	"pistols": "Pistol fire",
+	"burratas": "Pistol fire",
 	"carbine": "Carbine burst",
 	"rifle": "Rifle shot",
 	"lmg": "Machine gun fire",
