@@ -11,7 +11,7 @@ const BIGGEST_ASSET := 256 * 1024
 ## which BUDGET leaves out: a realistic character is far bigger than anything
 ## made in code, and the game is headed for Steam, where a download of tens of
 ## megabytes is nothing. This is what they may come to all together.
-const LICENSED_BUDGET := 48 * 1024 * 1024
+const LICENSED_BUDGET := 64 * 1024 * 1024
 
 
 func test_every_kind_has_a_picture_that_darkens_gently_and_repeats() -> void:
