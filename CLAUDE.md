@@ -1,6 +1,6 @@
 # CheeseStrike: Gouda Overload
 
-A cheese-themed multiplayer first-person shooter. The game is a Godot 4.7 project in `game/`, played mainly in the browser, where one player's browser hosts and the others connect to it over WebRTC. `signaling/` is the small Python server that lists sessions and brokers those connections: one set of rules (`signaling/core.py`), run by a single process in development and by a Lambda function on AWS, which `infra/` sets up and deploys. The README covers setup, running and building; `docs/backend.md` covers the backend.
+A cheese-themed multiplayer first-person shooter. The game is a Godot 4.7 project in `game/`, played mainly in the browser, where one player's browser hosts and the others connect to it over WebRTC. `signaling/` is the small Python server that lists sessions and brokers those connections: one set of rules (`signaling/core.py`), run by a single process in development (`signaling/local/`) and by a Lambda function on AWS (`signaling/cloud/`), which `infra/` sets up and deploys. The README covers setup, running and building; `docs/backend.md` covers the backend.
 
 ## Testing rules
 

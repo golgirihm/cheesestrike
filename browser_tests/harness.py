@@ -74,7 +74,7 @@ class SignalingServer:
 
     def _start(self):
         self._process = subprocess.Popen(
-            [sys.executable, "-u", str(ROOT / "signaling" / "server.py"), "--host", "127.0.0.1", "--port", str(self.port)],
+            [sys.executable, "-u", str(ROOT / "signaling" / "local" / "server.py"), "--host", "127.0.0.1", "--port", str(self.port)],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

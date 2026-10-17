@@ -1,5 +1,5 @@
 """Where the signaling rules keep sessions and connections when one process
-runs them: in memory. signaling/dynamo_store.py keeps the same things in
+runs them: in memory. signaling/cloud/dynamo_store.py keeps the same things in
 DynamoDB, with the same methods, and signaling/test_stores.py holds both to
 the same behavior.
 

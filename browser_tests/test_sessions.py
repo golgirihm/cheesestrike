@@ -32,7 +32,7 @@ class HostingTest(GameTestCase):
         self.assertEqual(state["screen"], "menu")
         self.assertIn(f"ws://localhost:{self.signaling.port}", state["status"])
         self.assertIn("Hosting and joining need it", state["status"], "what it is for")
-        self.assertIn("python signaling/server.py", state["status"], "and, in a development build, how to start it")
+        self.assertIn("python signaling/local/server.py", state["status"], "and, in a development build, how to start it")
         # The list says why there is nothing in it, rather than that nobody is playing.
         state = game.wait_for(f"s.sessions.length === 1 && s.sessions[0].text === {UNREACHABLE!r}")
 

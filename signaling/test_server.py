@@ -15,8 +15,15 @@ import urllib.request
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
-import core
-import server
+import pathlib
+import sys
+
+# The two ways of running the rules, each in a folder of its own.
+HERE = pathlib.Path(__file__).resolve().parent
+sys.path[:0] = [str(HERE / "local"), str(HERE / "cloud")]
+
+import core  # noqa: E402
+import server  # noqa: E402
 
 TIMEOUT = 2
 NO_SUCH_SESSION = {"type": "error", "message": "No session with that code."}

@@ -42,7 +42,7 @@ const ICE_SERVERS := [{"urls": ["stun:stun.l.google.com:19302"]}]
 const SERVER_WAIT := 8.0
 ## What a developer runs to start the session server, said in development
 ## builds when it can't be reached.
-const START_SERVER := "python signaling/server.py"
+const START_SERVER := "python signaling/local/server.py"
 ## How many times in a row the session list is asked for before a player is
 ## told the session server can't be reached.
 const LIST_TRIES := 2

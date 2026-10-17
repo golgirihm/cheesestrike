@@ -1,5 +1,5 @@
 """Signaling server for CheeseStrike, as one process: what development and the
-tests run. The public one runs the same rules on AWS (signaling/aws_lambda.py).
+tests run. The public one runs the same rules on AWS (signaling/cloud/aws_lambda.py).
 
 The rules and the protocol are in signaling/core.py. This carries the
 messages: WebSocket connections for hosts and for players joining, and on the
@@ -21,13 +21,18 @@ import argparse
 import asyncio
 import http
 import json
+import pathlib
+import sys
 import time
 
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
-import core
-from memory_store import MemoryStore
+# The rules are one folder up, shared with signaling/cloud/.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+
+import core  # noqa: E402
+from memory_store import MemoryStore  # noqa: E402
 
 MAX_SESSIONS = 1000
 MAX_MESSAGE_SIZE = 64 * 1024

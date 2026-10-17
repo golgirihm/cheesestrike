@@ -14,9 +14,16 @@ import unittest
 import boto3
 from moto import mock_aws
 
-import core
-import dynamo_store
-from memory_store import MemoryStore
+import pathlib
+import sys
+
+# The two ways of running the rules, each in a folder of its own.
+HERE = pathlib.Path(__file__).resolve().parent
+sys.path[:0] = [str(HERE / "local"), str(HERE / "cloud")]
+
+import core  # noqa: E402
+import dynamo_store  # noqa: E402
+from memory_store import MemoryStore  # noqa: E402
 
 
 class Clock:

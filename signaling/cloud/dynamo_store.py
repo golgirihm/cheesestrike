@@ -1,5 +1,5 @@
 """Where the signaling rules keep sessions and connections on AWS: one
-DynamoDB table. It has the same methods as signaling/memory_store.py, which
+DynamoDB table. It has the same methods as signaling/local/memory_store.py, which
 says what a session and a connection's record hold, and
 signaling/test_stores.py holds both to the same behavior.
 

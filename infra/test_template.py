@@ -6,6 +6,7 @@ that it is a valid template, and that it agrees with the code it sets up.
 
 import pathlib
 import sys
+import tempfile
 import unittest
 
 import cfnlint.api
@@ -13,8 +14,9 @@ from cfnlint.decode import cfn_yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "infra" / "template.yaml"
-sys.path.insert(0, str(ROOT / "signaling"))
+sys.path.insert(0, str(ROOT / "signaling" / "cloud"))
 
+import deploy  # noqa: E402
 import dynamo_store  # noqa: E402
 
 
@@ -45,9 +47,11 @@ class TemplateTest(unittest.TestCase):
     def test_the_function_runs_the_handler_that_exists(self):
         function = self.resources["Function"]["Properties"]
         module, name = function["Handler"].split(".")
-        folder = (TEMPLATE.parent / function["CodeUri"]).resolve()
-        self.assertEqual(folder, ROOT / "signaling")
-        self.assertIn(f"def {name}(event, context)", (folder / f"{module}.py").read_text(encoding="utf-8"))
+        self.assertEqual((TEMPLATE.parent / function["CodeUri"]).resolve(), deploy.LAMBDA, "where the deploy builds it")
+        with tempfile.TemporaryDirectory() as built:
+            folder = pathlib.Path(built)
+            deploy.build_function(folder)
+            self.assertIn(f"def {name}(event, context)", (folder / f"{module}.py").read_text(encoding="utf-8"))
 
     def test_every_kind_of_websocket_event_reaches_the_function(self):
         routes = {r["Properties"]["RouteKey"] for r in self.resources.values() if r["Type"] == "AWS::ApiGatewayV2::Route"}

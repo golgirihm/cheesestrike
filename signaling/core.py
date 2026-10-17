@@ -5,8 +5,8 @@ Signaling lists open sessions and relays WebRTC handshake messages between a
 session's host and the players joining it. No game traffic passes through
 here: once two browsers have connected to each other they stop needing it.
 
-Two things run these rules. signaling/server.py is one process holding
-everything in memory, for development and the tests. signaling/aws_lambda.py
+Two things run these rules. signaling/local/server.py is one process holding
+everything in memory, for development and the tests. signaling/cloud/aws_lambda.py
 runs them on AWS, where nothing stays running between messages and sessions
 are kept in DynamoDB. docs/backend.md describes the whole arrangement.
 
@@ -150,7 +150,7 @@ class Signaling:
     of None means close that connection. The caller does the sending, so the
     rules never wait on the network.
 
-    A store is signaling/memory_store.py's MemoryStore or anything with the
+    A store is signaling/local/memory_store.py's MemoryStore or anything with the
     same methods; a connection is whatever the caller uses to name one.
     """
 
