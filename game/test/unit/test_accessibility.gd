@@ -298,6 +298,25 @@ func test_every_screen_fits_with_the_largest_menu_text() -> void:
 	_seeing_back()
 
 
+func test_the_menu_fits_with_the_largest_text_whatever_the_session_list_says() -> void:
+	Settings.set_value(Look.MENU_TEXT, Look.MOST_TEXT)
+	Look.refresh()
+	var main: Node = load("res://main.tscn").instantiate()
+	add_child_autofree(main)
+	await wait_process_frames(3)
+	var base := Vector2(ProjectSettings.get_setting("display/window/size/viewport_width"), ProjectSettings.get_setting("display/window/size/viewport_height"))
+	var panel: Control = main.menu.get_node("Panel")
+	for say: Callable in [
+		func() -> void: Net.sessions_unreachable.emit(Net.unreachable("http://127.0.0.1:9080", true)),
+		func() -> void: Net.sessions_listed.emit([]),
+	]:
+		say.call()
+		await wait_process_frames(2)
+		assert_lte(panel.get_combined_minimum_size().x, base.x, "too wide")
+		assert_lte(panel.get_combined_minimum_size().y, base.y, "too tall")
+	_seeing_back()
+
+
 func test_every_button_has_a_name_to_read() -> void:
 	var main: Node = load("res://main.tscn").instantiate()
 	add_child_autofree(main)

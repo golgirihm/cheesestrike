@@ -927,6 +927,10 @@ func _draw_sessions() -> void:
 	var shown := SessionList.arranged(_listed, _list_sort, _list_mode, _list_arena, hide_full_button.button_pressed)
 	if shown.is_empty():
 		var none := Label.new()
+		# Wrapped, so that a long line never widens the menu past the screen,
+		# at the width the status line under the buttons keeps.
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		none.custom_minimum_size.x = status.custom_minimum_size.x
 		if not _list_problem.is_empty():
 			none.text = UNREACHABLE_LIST
 		else:
