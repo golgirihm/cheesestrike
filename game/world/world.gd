@@ -140,6 +140,8 @@ func _ready() -> void:
 			replay_view.play(clip, about, title))
 	vignette = Picture.vignette()
 	add_child(vignette)
+	# TEMPORARY: F8 opens a panel for trying the picture's values live.
+	add_child(preload("res://world/picture_tuner.gd").new(self))
 	hurt_view = HurtView.new(self)
 	add_child(hurt_view)
 	announcer = Announcer.new(self)
