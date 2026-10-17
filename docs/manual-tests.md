@@ -12,7 +12,7 @@ More of these could move to the browser tests in `browser_tests/`. A row is here
 
 ## Setups
 
-Each section names the setup it needs. Build and serve the web version first, as described in the [README](../README.md#development).
+Each section names the setup it needs. Build and serve the web version first, as described in the [README](../README.md#development). Served that way it uses the session server on AWS; serve with `--local` and run the development server to test a change to the server itself.
 
 | Setup | What it is |
 |---|---|
@@ -324,7 +324,7 @@ Why manual: each combination is a different real device or program.
 | DEV-10 | Install to the home screen | A phone, with the game served over HTTPS (local `http://localhost` doesn't qualify on a phone) | 1. Use the browser's "Install app" or "Add to Home screen".<br>2. Open the game from the new icon. | The icon is a cheese wedge. The game opens without the browser's address bar and plays as in the browser. |
 | DEV-12 | A session server that doesn't answer | A PC | 1. Open the game with `?signal=ws://10.255.255.1:9080` added to its address: somewhere that never answers, unlike a stopped server, which refuses at once.<br>2. Look at the session list, then press Host, then Play now, then Join with any code. | The session list says it can't reach the session server rather than that there are no sessions, and the line under the buttons says why: that hosting and joining need it, that practice and the tutorial work without it and, in a development build, how to start it. Each of Host, Play now and Join gives up within about ten seconds, with the same message, back on the menu, never left waiting. Practice still starts at once. |
 
-DEV-06 needs the deployed game (see [backend.md](backend.md)): in development the signaling server only runs on the development PC, so a device on another network can't reach it. DEV-10 needs the game on an HTTPS host, as the deployed game is; `tools/serve.py` also turns off the offline cache that installing uses, so a reload always picks up a new build.
+DEV-06 needs the deployed game (see [backend.md](backend.md)): in development the game is served only from the development PC, so a device on another network can't reach it. DEV-10 needs the game on an HTTPS host, as the deployed game is; `tools/serve.py` also turns off the offline cache that installing uses, so a reload always picks up a new build.
 
 ## Deployed game
 

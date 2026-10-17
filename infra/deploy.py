@@ -13,6 +13,11 @@ in build/lambda, from signaling/cloud/ and the rules they share with the
 development server, signaling/core.py, so that only those are uploaded. The game needs Godot with the Web
 export templates; it is exported fresh each time, to build/deploy.
 
+Deploying the backend also saves its public addresses in infra/deployed.json,
+which tools/serve.py writes into the pages it serves, so that a build played
+locally uses the real backend too. They change only if the stack is made
+anew; commit the file when they do.
+
 Uploading the game does three things a plain copy wouldn't:
 
   - It writes the backend's addresses into index.html, which is how the game
@@ -37,6 +42,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "infra" / "template.yaml"
 BUILD = ROOT / "build" / "deploy"
 LAMBDA = ROOT / "build" / "lambda"  # the template's CodeUri
+DEPLOYED = ROOT / "infra" / "deployed.json"
 STACK = "cheesestrike"
 REGION = "us-east-2"
 
@@ -87,6 +93,16 @@ def stack_outputs(cloudformation, stack):
     return {output["OutputKey"]: output["OutputValue"] for output in described.get("Outputs", [])}
 
 
+def save_addresses(outputs, path=DEPLOYED):
+    """Keeps the backend's addresses, from its stack's outputs, in `path`.
+    Returns whether they changed."""
+    text = json.dumps({"signal": outputs["SignalUrl"], "sessions": outputs["SessionsUrl"], "game": outputs["GameUrl"]}, indent=2) + "\n"
+    if path.exists() and path.read_text(encoding="utf-8") == text:
+        return False
+    path.write_bytes(text.encode("utf-8"))
+    return True
+
+
 def run(*command):
     print("+", " ".join(str(part) for part in command), flush=True)
     subprocess.run(command, cwd=ROOT, check=True)
@@ -114,6 +130,10 @@ def deploy_backend(stack, region):
     sam = find("sam")
     build_function(LAMBDA)
     run(sam, "deploy", "--template-file", TEMPLATE, "--stack-name", stack, "--region", region, "--resolve-s3", "--capabilities", "CAPABILITY_IAM", "--no-fail-on-empty-changeset")
+    import boto3
+
+    if save_addresses(stack_outputs(boto3.client("cloudformation", region_name=region), stack)):
+        print(f"the backend's addresses changed; commit {DEPLOYED.relative_to(ROOT).as_posix()}")
 
 
 def deploy_game(stack, region):

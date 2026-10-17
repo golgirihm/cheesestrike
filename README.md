@@ -34,11 +34,17 @@ Build and run the web version:
 ```
 mkdir -p build/web
 godot --headless --path game --export-debug Web ../build/web/index.html
-python signaling/local/server.py
 python tools/serve.py
 ```
 
-Then open http://localhost:8060 in two browser windows, host in one and join from the other. A host's tab keeps the session running when it is in the background. If the host stops anyway, as a phone does when its browser is put away, the other players get a "Waiting for host" notice and are frozen until it comes back or they leave. A phone on the same network can join at `http://<this PC's address>:8060`, though phones are deprecated: what works on them is kept, but nothing more is done for them (see [CLAUDE.md](CLAUDE.md#phones-are-deprecated)).
+Then open http://localhost:8060 in two browser windows, host in one and join from the other. They find each other through the session server on AWS, whose addresses deploying saves in `infra/deployed.json`. To use the development server instead, as when changing it, run it and serve with `--local`:
+
+```
+python signaling/local/server.py
+python tools/serve.py --local
+```
+
+The automated tests always start a development server of their own, and never reach AWS. A host's tab keeps the session running when it is in the background. If the host stops anyway, as a phone does when its browser is put away, the other players get a "Waiting for host" notice and are frozen until it comes back or they leave. A phone on the same network can join at `http://<this PC's address>:8060`, though phones are deprecated: what works on them is kept, but nothing more is done for them (see [CLAUDE.md](CLAUDE.md#phones-are-deprecated)).
 
 ### Tests
 
@@ -49,7 +55,7 @@ python tools/run_tests.py
 ```
 
 - **Game tests** use [GUT](https://github.com/bitwes/Gut), vendored in `game/addons/gut`, and live in `game/test`.
-- **Signaling tests** are in `signaling/`. `test_stores.py` tests the rules on their own, over both places they can keep sessions (memory, and DynamoDB as on AWS); `test_server.py` tests the development server over real connections; `test_aws_lambda.py` tests the function AWS runs. The development server is in `signaling/local/` and the function in `signaling/cloud/`, both running the rules in `signaling/core.py`. **Infra tests**, in `infra/`, check the AWS template, what is uploaded as the function, and what deploying does to the game's files. Both need `pip install -r signaling/requirements-test.txt`, and use imitations of AWS that run inside the tests: nothing reaches a real account.
+- **Signaling tests** are in `signaling/`. `test_stores.py` tests the rules on their own, over both places they can keep sessions (memory, and DynamoDB as on AWS); `test_server.py` tests the development server over real connections; `test_aws_lambda.py` tests the function AWS runs. The development server is in `signaling/local/` and the function in `signaling/cloud/`, both running the rules in `signaling/core.py`. **Infra tests**, in `infra/`, check the AWS template, what is uploaded as the function, what deploying does to the game's files, and which server `tools/serve.py` points the game at. Both need `pip install -r signaling/requirements-test.txt`, and use imitations of AWS that run inside the tests: nothing reaches a real account.
 - **Browser tests** are in `browser_tests/`. They export the web build, then play it in headless browser windows that host and join sessions with each other for real, using [Playwright](https://playwright.dev/python/). They need a one-time setup:
 
   ```
