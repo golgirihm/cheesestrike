@@ -3,11 +3,11 @@ Transform: AWS::Serverless-2016-10-31
 Description: >-
   CheeseStrike's backend: the session server (signaling) and the bucket the
   game is served from. Nothing here runs, or costs anything, while nobody is
-  playing. docs/backend.md describes it; tools/deploy.py deploys it.
+  playing. docs/backend.md describes it; infra/deploy.py deploys it.
 
 Resources:
   # Sessions and connections. Laid out as SCHEMA in signaling/dynamo_store.py,
-  # which signaling/test_template.py checks.
+  # which infra/test_template.py checks.
   Table:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Delete
@@ -148,7 +148,7 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
 
-  # The game's files, readable by anyone. tools/deploy.py uploads them.
+  # The game's files, readable by anyone. infra/deploy.py uploads them.
   GameBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
