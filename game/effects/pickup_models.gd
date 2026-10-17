@@ -56,9 +56,6 @@ static func build(kind: String) -> Node3D:
 		var model := WeaponModels.build(kind)
 		model.scale = Vector3.ONE * 1.6
 		model.rotation.y = PI / 2.0
-		# Nobody is holding it yet.
-		model.get_node("Hand").visible = false
-		WeaponModels.show_own_view(model, false)
 		holder.add_child(model)
 	return holder
 

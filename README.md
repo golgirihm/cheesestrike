@@ -14,7 +14,7 @@ The game is a [Godot 4.7](https://godotengine.org) project in `game/`. Web build
 
 You need Godot 4.7 with the Web export templates installed, and Python 3.14 with `pip install -r signaling/requirements.txt`.
 
-Bought and downloaded models, textures and animations are in `game/licensed/`, a submodule from the private repository [cheesestrike-assets](https://github.com/golgirihm/cheesestrike-assets). Their licenses allow them in the released game but forbid sharing their files, so they stay out of this public repository. If you have access, fetch them after cloning:
+Bought and downloaded models, textures and animations are in `game/licensed/`, a submodule from the private repository [cheesestrike-assets](https://github.com/golgirihm/cheesestrike-assets). Their licenses allow them in the released game but forbid sharing their files, so they stay out of this public repository. The game can't run without them, natively or on the web: players are the soldier model in there. If you have access, fetch them after cloning:
 
 ```
 git submodule update --init

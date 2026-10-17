@@ -127,13 +127,16 @@ func test_others_are_seen_to_reload() -> void:
 	var other := _other()
 	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, 0])
 	other._animate(1.0)
-	var rest: Vector3 = other.gun.position
+	other.body._process(0.016)
+	assert_eq(other.body.action(), CharacterMotion.NONE)
 	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, other.POSE_RELOADING])
 	other._animate(1.0)
-	assert_lt(other.gun.position.y, rest.y - 0.1, "their weapon is down")
+	other.body._process(0.016)
+	assert_eq(other.body.action(), CharacterMotion.RELOAD, "their soldier reloads")
 	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, 0])
 	other._animate(1.0)
-	assert_almost_eq(other.gun.position.distance_to(rest), 0.0, 0.001, "and back up when they are done")
+	other.body._process(0.016)
+	assert_eq(other.body.action(), CharacterMotion.NONE, "and is done")
 
 
 func test_landing_dips_the_owners_weapon_and_it_recovers() -> void:
@@ -188,45 +191,6 @@ func test_the_view_moves_only_as_much_as_the_player_asks() -> void:
 	Settings.set_value("camera_motion", 1.0)
 
 
-func test_every_weapon_is_held_in_two_hands_on_the_ends_of_two_arms() -> void:
-	for id: String in Weapons.ids():
-		var model := WeaponModels.build(id)
-		var hand: Node3D = model.get_node_or_null("Hand")
-		var other: Node3D = model.get_node_or_null("OffHand")
-		assert_not_null(hand, id)
-		assert_not_null(other, id)
-		assert_true(WeaponModels.OFF_HAND.has(id), "%s has a place for the other hand" % id)
-		assert_gt(hand.position.distance_to(other.position), 0.04, "%s: two hands, not one on the other" % id)
-		assert_lt(other.position.y, model.get_node("Sight").position.y - 0.05, "%s: the other hand is under the weapon, clear of the sights" % id)
-		for arm_name: String in ["ViewArmRight", "ViewArmLeft"]:
-			var arm: MeshInstance3D = model.get_node_or_null(arm_name)
-			assert_not_null(arm, "%s %s" % [id, arm_name])
-			# One end at its hand, the other below and behind it, out of view.
-			var grip: Vector3 = hand.position if arm_name == "ViewArmRight" else other.position
-			var half: Vector3 = arm.transform.basis.y * (arm.mesh as CapsuleMesh).height / 2.0
-			var ends := [arm.position + half, arm.position - half]
-			var near: Vector3 = ends[0] if ends[0].distance_to(grip) < ends[1].distance_to(grip) else ends[1]
-			var far: Vector3 = ends[1] if near == ends[0] else ends[0]
-			assert_almost_eq(near.distance_to(grip), 0.0, 0.001, "%s %s reaches its hand" % [id, arm_name])
-			assert_lt(far.y, grip.y - 0.3, "%s %s comes up from below" % [id, arm_name])
-			assert_gt(far.z, grip.z + 0.3, "%s %s comes from behind" % [id, arm_name])
-		model.free()
-
-
-func test_only_the_holder_sees_both_hands_and_the_arms() -> void:
-	var own := _own()
-	var other := _other()
-	await wait_process_frames(1)
-	for part: String in ["OffHand", "ViewArmRight", "ViewArmLeft"]:
-		assert_true(own.muzzle.get_parent().get_node(part).visible, "own %s" % part)
-		assert_false(other.muzzle.get_parent().get_node(part).visible, "another player's %s" % part)
-	assert_true(other.muzzle.get_parent().get_node("Hand").visible, "their hand on the grip is what their arm reaches to")
-	var pickup := PickupModels.build("blaster")
-	for part: String in ["Hand", "OffHand", "ViewArmRight", "ViewArmLeft"]:
-		assert_false(pickup.find_child(part, true, false).visible, "nobody holds a weapon lying on a pad")
-	pickup.free()
-
-
 func test_the_weapon_is_lowered_at_a_run_and_lower_still_in_a_slide() -> void:
 	var still := WeaponSway.carried(0.0, 0.0)
 	assert_eq(still[0], Vector3.ZERO, "where it rests, walking or standing")
@@ -238,18 +202,19 @@ func test_the_weapon_is_lowered_at_a_run_and_lower_still_in_a_slide() -> void:
 	assert_lt(sliding[1].x, running[1].x, "and tipped further down")
 
 
-func test_another_players_arms_hold_their_weapon() -> void:
+
+func test_another_player_holds_their_weapon_in_their_hand() -> void:
 	var other := _other()
 	await wait_process_frames(2)
 	var model: Node3D = other.muzzle.get_parent()
 	var body: Node3D = other.body
-	for pair: Array in [["Arm2", model.to_global(WeaponModels.GRIP)], ["Arm1", model.get_node("OffHand").global_position]]:
-		var arm: Node3D = body.get_node(pair[0])
-		var stick: Node3D = arm.get_child(0)
-		var length: float = BodyShape.ARMS[0][1] * stick.scale.y
-		var end: Vector3 = arm.global_transform * Vector3(0, -length, 0)
-		assert_almost_eq(end.distance_to(pair[1]), 0.0, 0.05, "%s reaches the weapon" % pair[0])
-
+	# Where the soldier puts it, as it does, when its skeleton is updated.
+	var seen := {}
+	body._skeleton.skeleton_updated.connect(func() -> void:
+		seen.fist = body._skeleton.global_transform * body._fist("Right")
+		seen.grip = model.to_global(WeaponModels.held_at(model.get_meta("weapon"))))
+	await wait_process_frames(2)
+	assert_almost_eq((seen.grip as Vector3).distance_to(seen.fist), 0.0, 0.05, "the grip in the right fist")
 
 func test_a_knocked_out_players_weapon_goes_with_them() -> void:
 	var other := _other()

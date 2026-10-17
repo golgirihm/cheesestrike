@@ -1,18 +1,15 @@
 class_name BodyShape
-## The shape of a player's soldier, and where a ray first touches it. The
-## character everyone sees (player/cheese_character.gd) is built from these
-## measurements, and shots are tested against the same ones (hit_scan.gd),
-## so a shot hits when it looks like it hits.
+## The shape of a player's soldier, and where a ray first touches it. Shots
+## are tested against these measurements (hit_scan.gd), which are the
+## soldier's (player/soldier_character.gd), measured round its mesh posed
+## standing and kneeling, with its eyes at HEAD_HEIGHT, so a shot hits when
+## it looks like it hits.
 ##
-## What can be hit is a few boxes: the head (helmet and all), the torso and
-## the two legs. The arms are thin enough that shots pass them by, and the
-## gear and the face are drawn within a hair of the boxes they lie on.
+## What can be hit is a few boxes: the head (cap and all), the torso and the
+## two legs. The arms are thin enough that shots pass them by.
 ##
 ## Measurements are in the character's own units and grow by SIZE in the
-## arena. The body faces -Z and turns with the player. They are the realistic
-## soldier's (player/soldier_character.gd), measured round its mesh posed
-## standing and kneeling, with its eyes at HEAD_HEIGHT; the drawn soldier is
-## built to the same.
+## arena. The body faces -Z and turns with the player.
 
 ## How many times bigger than its measurements a character stands.
 const SIZE := 3.0

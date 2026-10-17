@@ -44,16 +44,15 @@ jobs:
           ref: ${{ inputs.ref }}
       # The licensed assets in game/licensed are in a private repository
       # (README.md explains why), which the deploy key in the
-      # ASSETS_DEPLOY_KEY secret can read. A run without the secret, as for a
-      # fork's pull request or the buildci command, tests the game without
-      # them.
+      # ASSETS_DEPLOY_KEY secret can read. The game can't do without them, so
+      # a run without the secret, as for a fork's pull request, fails here.
       - name: Fetch the licensed assets
         env:
           ASSETS_DEPLOY_KEY: ${{ secrets.ASSETS_DEPLOY_KEY }}
         run: |
           if [ -z "$ASSETS_DEPLOY_KEY" ]; then
-            echo "::notice::No ASSETS_DEPLOY_KEY secret; testing without the licensed assets."
-            exit 0
+            echo "::error::No ASSETS_DEPLOY_KEY secret, so the licensed assets the game needs can't be fetched. A fork's pull request runs without it."
+            exit 1
           fi
           key="$RUNNER_TEMP/assets_deploy_key"
           printf '%s\n' "$ASSETS_DEPLOY_KEY" > "$key"
@@ -137,16 +136,15 @@ jobs:
           ref: ${{ inputs.ref }}
       # The licensed assets in game/licensed are in a private repository
       # (README.md explains why), which the deploy key in the
-      # ASSETS_DEPLOY_KEY secret can read. A run without the secret, as for a
-      # fork's pull request or the buildci command, tests the game without
-      # them.
+      # ASSETS_DEPLOY_KEY secret can read. The game can't do without them, so
+      # a run without the secret, as for a fork's pull request, fails here.
       - name: Fetch the licensed assets
         env:
           ASSETS_DEPLOY_KEY: ${{ secrets.ASSETS_DEPLOY_KEY }}
         run: |
           if [ -z "$ASSETS_DEPLOY_KEY" ]; then
-            echo "::notice::No ASSETS_DEPLOY_KEY secret; testing without the licensed assets."
-            exit 0
+            echo "::error::No ASSETS_DEPLOY_KEY secret, so the licensed assets the game needs can't be fetched. A fork's pull request runs without it."
+            exit 1
           fi
           key="$RUNNER_TEMP/assets_deploy_key"
           printf '%s\n' "$ASSETS_DEPLOY_KEY" > "$key"

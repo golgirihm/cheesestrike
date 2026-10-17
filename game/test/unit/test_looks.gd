@@ -2,7 +2,7 @@ extends GutTest
 ## What players choose their characters to look like, and that none of it
 ## changes what can be hit.
 
-const CHARACTER := preload("res://player/cheese_character.gd")
+const CHARACTER := preload("res://player/soldier_character.gd")
 const WORLD := preload("res://world/world.tscn")
 
 var character: Node3D
@@ -68,86 +68,37 @@ func test_the_chosen_look_comes_from_the_settings() -> void:
 	assert_eq(Settings.get_value("look_hat"), "chef", "a hat that doesn't exist isn't taken")
 
 
-func test_each_kind_of_cheese_wears_its_own_camouflage() -> void:
-	var camo := character.get_children().filter(func(child: Node) -> bool: return child.name.begins_with("Camo"))
-	assert_gt(camo.size(), 0)
-	character.set_colour(Color.BLUE)
-	var colours := {}
-	for cheese: String in Looks.CHEESES:
-		character.wear(Looks.pack(cheese, "none", "none"))
-		assert_eq(character.worn().cheese, cheese)
-		assert_eq(camo.all(func(blotch: Node3D) -> bool: return blotch.visible), cheese != "swiss", "%s: camouflage" % cheese)
-		assert_true(camo.all(func(blotch: Node3D) -> bool: return blotch.visible == camo[0].visible), "%s: all of it or none" % cheese)
-		colours[cheese] = character._camo_material.albedo_color
-	assert_lt(colours.cheddar.v, Color.BLUE.v, "a cheddar's is a darker shade of the uniform")
-	assert_gt(colours.brie.v, 0.9, "a brie's is pale, whatever colour the uniform")
-	assert_eq(colours.blue, CHARACTER.VEIN, "a blue's is the blue of its veins")
-
-
-func test_a_hat_sits_on_the_helmet_and_one_thing_is_held() -> void:
-	var top := BodyShape.HEAD_CENTRE.y + BodyShape.HEAD_SIZE.y / 2.0
-	for hat: String in Looks.HATS:
-		character.wear(Looks.pack("swiss", hat, "none"))
-		var worn := character.get_node_or_null("Hat")
-		if hat == "none":
-			assert_null(worn)
-			continue
-		assert_not_null(worn, hat)
-		assert_between(worn.position.y, top - 0.1, top, "%s: on the helmet" % hat)
-		assert_gt(worn.find_children("*", "MeshInstance3D", true, false).size(), 0, hat)
+func test_one_thing_is_held_at_a_time() -> void:
 	for held: String in Looks.HELD:
 		character.wear(Looks.pack("swiss", "none", held))
 		var carried := character.get_node_or_null("Held")
 		assert_eq(carried == null, held == "none", held)
 	character.wear(Looks.pack("swiss", "top", "flag"))
-	character.wear(Looks.pack("swiss", "crown", "flag"))
+	character.wear(Looks.pack("swiss", "crown", "balloon"))
 	await wait_process_frames(2)
-	assert_eq(character.get_children().filter(func(child: Node) -> bool: return child.name.begins_with("Hat")).size(), 1, "one hat at a time")
+	assert_eq(character.get_children().filter(func(child: Node) -> bool: return child.name.begins_with("Held")).size(), 1, "one at a time")
 
 
-func test_no_look_changes_what_can_be_hit_or_leaves_the_players_own_space() -> void:
-	var parts: Array = ["Torso", "Head", "Leg1", "Leg2"].map(func(part: String) -> Node3D: return character.get_node(part))
-	var before := parts.map(_drawn_bounds)
+func test_what_is_held_stays_in_the_players_own_space() -> void:
 	for look: int in _every_look():
 		character.wear(look)
-		assert_eq(parts.map(_drawn_bounds), before, "what is hit is the same")
+		var held := character.get_node_or_null("Held") as Node3D
+		if held == null:
+			continue
+		for frame in 3:
+			character._process(1.0 / 30.0)
+		await wait_process_frames(1)
 		var bounds := AABB()
-		var first := true
-		for mesh: MeshInstance3D in character.find_children("*", "MeshInstance3D", true, false):
-			if not mesh.is_visible_in_tree():
-				continue
+		var meshes: Array = held.find_children("*", "MeshInstance3D", true, false)
+		for index in meshes.size():
+			var mesh: MeshInstance3D = meshes[index]
 			var box: AABB = mesh.global_transform * mesh.get_aabb()
-			bounds = box if first else bounds.merge(box)
-			first = false
+			bounds = box if index == 0 else bounds.merge(box)
 		var named := str(Looks.unpack(look))
 		assert_gte(bounds.position.y, -0.01, named)
-		assert_lte(bounds.end.y, BodyShape.HEIGHT, "%s: within the player's height" % named)
-		assert_lte(maxf(absf(bounds.position.x), absf(bounds.end.x)), BodyShape.RADIUS + 0.05, "%s: within their width" % named)
-		assert_lte(maxf(absf(bounds.position.z), absf(bounds.end.z)), BodyShape.RADIUS + 0.05, named)
-
-
-# Where the meshes under `part` are drawn, all together.
-func _drawn_bounds(part: Node3D) -> AABB:
-	var meshes: Array = part.find_children("*", "MeshInstance3D", true, false)
-	if part is MeshInstance3D:
-		meshes.append(part)
-	var bounds := AABB()
-	for index in meshes.size():
-		var mesh: MeshInstance3D = meshes[index]
-		var box: AABB = mesh.global_transform * mesh.get_aabb()
-		bounds = box if index == 0 else bounds.merge(box)
-	return bounds
-
-
-func test_a_hat_comes_down_with_a_crouch() -> void:
-	character.wear(Looks.pack("swiss", "top", "balloon"))
-	var stood: float = character.get_node("Hat").position.y
-	var held: float = character.get_node("Held").position.y
-	character.set_crouch(1.0)
-	assert_almost_eq(character.get_node("Hat").position.y, stood - BodyShape.CROUCH_DROP, 0.0001)
-	assert_almost_eq(character.get_node("Held").position.y, held - BodyShape.CROUCH_DROP, 0.0001)
-	character.wear(Looks.pack("swiss", "crown", "none"))
-	assert_almost_eq(character.get_node("Hat").position.y, stood - BodyShape.CROUCH_DROP, 0.0001, "a hat put on while crouched is on the head, not above it")
+		assert_lte(bounds.end.y, BodyShape.HEIGHT + 1.0, "%s: about the player's height" % named)
+		assert_lte(maxf(absf(bounds.position.x), absf(bounds.end.x)), BodyShape.RADIUS + 0.5, "%s: by their side" % named)
+		assert_lte(maxf(absf(bounds.position.z), absf(bounds.end.z)), BodyShape.RADIUS + 0.5, named)
 
 
 func test_a_look_survives_the_trip_with_the_rest_of_the_record() -> void:
@@ -192,7 +143,7 @@ func test_everyone_sees_what_a_player_wears() -> void:
 	assert_eq(other.body.worn().hat, "none")
 	match_._wear(2, Looks.pack("blue", "chef", "balloon"))
 	assert_eq(other.body.worn(), {"finish": "plain", "title": "none", "level": 0, "cheese": "blue", "hat": "chef", "held": "balloon"})
-	assert_not_null(other.body.get_node_or_null("Hat"))
+	assert_not_null(other.body.get_node_or_null("Held"))
 
 
 func test_the_settings_say_what_is_chosen_and_step_through_the_choices() -> void:

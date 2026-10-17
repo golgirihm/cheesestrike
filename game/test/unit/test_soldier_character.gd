@@ -1,7 +1,7 @@
 extends GutTest
-## The realistic soldier (player/soldier_character.gd): how it paces its legs
-## and keeps its animations in place, which hold anywhere, and, where its
-## licensed model is checked out, that it shows what the player is doing.
+## The soldier everyone sees (player/soldier_character.gd): how it paces its
+## legs and keeps its animations in place, and how it shows what the player
+## is doing.
 
 const SOLDIER := preload("res://player/soldier_character.gd")
 
@@ -9,10 +9,8 @@ var soldier: Node3D
 
 
 func before_each() -> void:
-	soldier = null
-	if SOLDIER.available():
-		soldier = SOLDIER.new()
-		add_child_autofree(soldier)
+	soldier = SOLDIER.new()
+	add_child_autofree(soldier)
 
 
 func _frames(count: int, delta := 1.0 / 30.0) -> void:
@@ -66,7 +64,7 @@ func test_an_animation_put_in_place_keeps_its_bob_but_not_its_travel() -> void:
 	assert_almost_eq((animation.track_get_key_value(track, 1) as Vector3).y, 0.95, 0.0001, "bobbing as it did")
 
 
-func test_the_web_build_leaves_it_out() -> void:
+func test_the_web_build_takes_it_along() -> void:
 	var presets := ConfigFile.new()
 	assert_eq(presets.load("res://export_presets.cfg"), OK)
 	var web := ""
@@ -74,13 +72,11 @@ func test_the_web_build_leaves_it_out() -> void:
 		if presets.get_value(section, "platform", "") == "Web":
 			web = section
 	assert_ne(web, "", "there is a web build")
-	assert_has(str(presets.get_value(web, "exclude_filter", "")).split(", "), "licensed/*")
+	for filter: String in str(presets.get_value(web, "exclude_filter", "")).split(", "):
+		assert_false(filter.begins_with("licensed"), "the licensed assets go with it")
 
 
 func test_its_legs_play_what_the_player_is_doing() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	soldier.set_motion(Movement.WALK_SPEED * Movement.RUN_FACTOR, false)
 	_frames(10)
 	assert_eq(soldier._tree.get("parameters/legs/current_state"), "ground")
@@ -106,9 +102,6 @@ func test_its_legs_play_what_the_player_is_doing() -> void:
 
 
 func test_its_upper_body_acts_out_what_the_arms_do() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	_frames(10)
 	assert_almost_eq(soldier._tree.get("parameters/upper/blend_amount"), 0.0, 0.001, "with nothing else to do, carrying the weapon as the legs do")
 	assert_almost_eq(soldier._spine.influence, 0.0, 0.001, "not aimed")
@@ -129,9 +122,6 @@ func test_its_upper_body_acts_out_what_the_arms_do() -> void:
 
 
 func test_its_face_shows_how_things_are_going() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var face: MeshInstance3D = soldier._face_mesh
 	var smile := face.find_blend_shape_by_name("Mouth_Smile_L")
 	var squint := face.find_blend_shape_by_name("Eye_Squint_L")
@@ -145,62 +135,31 @@ func test_its_face_shows_how_things_are_going() -> void:
 
 
 func test_knocked_out_it_falls_back_whole_then_goes() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	soldier.knock("blaster", Vector3(0, 0, 1))
 	soldier.set_in_play(false)
 	_frames(15)
 	assert_true(soldier.visible, "still there, falling")
 	assert_almost_eq(soldier.scale.x, soldier.scale.y, 0.0001, "not melting")
-	_frames(int(SOLDIER.FALL_TIME * 30.0))
+	_frames(int(SOLDIER.MELT_TIME * 30.0))
 	assert_false(soldier.visible, "then gone")
 
 
 func test_it_keeps_its_cap_and_sunglasses_whatever_hat_is_chosen() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	for hat: String in Looks.HATS:
 		soldier.wear(Looks.pack("swiss", hat, "none"))
 		_frames(2)
 		assert_true(soldier._cap_mesh.visible, "its cap, with a %s hat chosen" % hat)
 		assert_true(soldier._model.find_child("Glass_LP1").visible, "and its sunglasses")
-		if soldier._hat != null:
-			assert_false(soldier._hat.visible, "and no %s hat" % hat)
+		assert_null(soldier.get_node_or_null("Hat"), "and no %s hat" % hat)
 
 
-func test_players_are_the_realistic_soldier_wherever_it_can_be_shown() -> void:
-	Characters.realistic = true
-	var body := Characters.make()
-	Characters.realistic = false
-	add_child_autofree(body)
-	if SOLDIER.available():
-		assert_eq(body.get_script(), SOLDIER)
-	else:
-		assert_eq(body.get_script(), Characters.DRAWN, "and the drawn one elsewhere")
-	var drawn := Characters.make()
-	add_child_autofree(drawn)
-	assert_eq(drawn.get_script(), Characters.DRAWN, "unless it is turned off, as for the tests")
-
-
-func test_a_player_built_drawn_is_given_the_realistic_body_and_nothing_of_the_drawn_one() -> void:
-	if not SOLDIER.available():
-		pending("The licensed assets aren't checked out.")
-		return
-	var player := Node3D.new()
+func test_everywhere_a_player_is_shown_it_is_the_soldier() -> void:
+	var player: Node3D = preload("res://player/player.tscn").instantiate()
 	add_child_autofree(player)
-	var drawn: Node3D = Characters.DRAWN.new()
-	drawn.name = "Body"
-	player.add_child(drawn)
-	player.add_child(Node3D.new())
-	Characters.realistic = true
-	var body := Characters.swap(drawn)
-	Characters.realistic = false
-	assert_eq(body.get_script(), SOLDIER)
-	assert_eq(player.get_node("Body"), body, "under the same name")
-	assert_eq(body.get_index(), 0, "and in the same place")
-	assert_null(body.find_child("Torso", false), "without the drawn soldier's torso")
+	assert_eq(player.body.get_script(), SOLDIER, "in a match")
+	var props: Node3D = preload("res://effects/warmup.gd").props()
+	add_child_autofree(props)
+	assert_eq(props.get_node("Character").get_script(), SOLDIER, "warming up the graphics")
 
 
 func test_the_spine_turns_the_weapon_round_to_where_it_is_aimed() -> void:
@@ -230,14 +189,10 @@ func _hold(gun: Node3D, model: Node3D, frames: int, gaze := 0.0) -> void:
 	for frame in frames:
 		gun.position = Vector3(1, 2, 3)
 		soldier.hold_weapon(gun)
-		soldier.steady_with(soldier.to_local((model.get_node("OffHand") as Node3D).global_position))
 		await wait_process_frames(1)
 
 
 func test_it_holds_its_weapon_in_its_right_fist_pointing_where_it_looks() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var gun := Node3D.new()
 	add_child_autofree(gun)
 	gun.scale = Vector3.ONE * BodyShape.SIZE * soldier.weapon_scale()
@@ -256,13 +211,9 @@ func test_it_holds_its_weapon_in_its_right_fist_pointing_where_it_looks() -> voi
 		var grip := soldier.to_local(model.to_global(WeaponModels.GRIP))
 		assert_lt(grip.distance_to(fists.Right), 0.01, "the grip in the right fist")
 	skeleton.skeleton_updated.disconnect(note)
-	assert_false((model.get_node("Hand") as Node3D).visible, "its own hand on the grip, not the drawn soldier's mitten")
 
 
-func test_a_new_weapon_shows_no_mitten_and_an_emote_puts_the_weapon_away() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
+func test_a_new_weapon_is_held_its_own_way_and_an_emote_puts_the_weapon_away() -> void:
 	var gun := Node3D.new()
 	add_child_autofree(gun)
 	var first := WeaponModels.build("blaster")
@@ -273,7 +224,7 @@ func test_a_new_weapon_shows_no_mitten_and_an_emote_puts_the_weapon_away() -> vo
 	var second := WeaponModels.build("shotgun")
 	gun.add_child(second)
 	await _hold(gun, second, 2)
-	assert_false((second.get_node("Hand") as Node3D).visible, "no mitten on the new one either")
+	assert_eq(soldier._weapon, "shotgun", "the new one in its hands")
 	soldier.emote(Emotes.CHEER)
 	gun.visible = true
 	soldier.hold_weapon(gun)
@@ -281,9 +232,6 @@ func test_a_new_weapon_shows_no_mitten_and_an_emote_puts_the_weapon_away() -> vo
 
 
 func test_others_dont_see_the_arms_cut_for_its_players_own_view() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	for name: String in SOLDIER.FIRST_PERSON:
 		assert_false(soldier._model.find_child(name).visible, name)
 
@@ -323,9 +271,6 @@ func test_a_hands_roll_turns_the_forearms_twist_bones_part_of_the_way() -> void:
 
 
 func test_what_can_be_hit_is_where_it_is_drawn_standing_and_kneeling() -> void:
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	for crouch in [0.0, 1.0]:
 		soldier.set_crouch(crouch)
 		await wait_process_frames(20)
@@ -349,9 +294,6 @@ func test_a_pistol_is_held_out_in_both_hands_and_a_rifle_carried() -> void:
 	assert_eq(SOLDIER.grip_of("pistol"), "pistol")
 	assert_eq(SOLDIER.grip_of("blaster"), "rifle", "anything else as a rifle")
 	assert_eq(WeaponModels.build("pistol").get_meta("weapon"), "pistol", "a weapon's model says which it is")
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var gun := Node3D.new()
 	add_child_autofree(gun)
 	var rifle := WeaponModels.build("blaster")
@@ -370,13 +312,10 @@ func test_a_pistol_is_held_out_in_both_hands_and_a_rifle_carried() -> void:
 
 
 func test_a_hand_closes_round_each_weapons_own_grip() -> void:
-	assert_eq(WeaponModels.held_at("blaster"), WeaponModels.GRIP, "most where the mittens go")
+	assert_eq(WeaponModels.held_at("blaster"), WeaponModels.GRIP, "most at the usual grip")
 	assert_lt(WeaponModels.held_at("pistol").z, WeaponModels.GRIP.z, "a pistol's further forward, under its slide")
 	assert_gt(WeaponModels.view_offset("pistol").z, 0.0, "and a pistol nearer the eye in its holder's view")
 	assert_eq(WeaponModels.view_offset("blaster"), Vector3.ZERO)
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var skeleton: Skeleton3D = soldier._skeleton
 	var fists := {}
 	var note := func() -> void:
@@ -405,9 +344,6 @@ func test_a_pair_of_pistols_is_carried_low_and_aimed_out_side_by_side() -> void:
 	assert_eq(SOLDIER.grip_of("pistols"), "dual")
 	assert_eq(SOLDIER.grip_of("burratas"), "dual", "the Dual Burratas too")
 	assert_not_null(WeaponModels.build("pistols").get_node_or_null("LeftPistol"), "the second its own node, for the left hand")
-	if soldier == null:
-		pending("The licensed assets aren't checked out.")
-		return
 	var gun := Node3D.new()
 	add_child_autofree(gun)
 	gun.scale = Vector3.ONE * BodyShape.SIZE * soldier.weapon_scale()

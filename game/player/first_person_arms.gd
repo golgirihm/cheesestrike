@@ -1,6 +1,6 @@
 extends Node3D
-## What a player sees of their own arms, where the realistic soldier is shown
-## (see Characters): its arms and sleeves, cut from its model by
+## What a player sees of their own arms: the soldier's arms and sleeves, cut
+## from its model by
 ## tools/convert_soldier.py, holding the weapon in view as others see the
 ## soldier hold its own.
 ##
@@ -9,8 +9,8 @@ extends Node3D
 ## aimed down the sights or not. The arms reach for the weapon: the right hand
 ## holds it as the soldier's does (SOLDIER.hold), and the left where the aim
 ## has it against the right, so both hands hold it as the animation holds
-## that kind of weapon, a rifle or a pistol. The forearms' twist bones (forearm_twist.gd) keep the wrists from
-## pinching. The weapons are to be made to fit the hands, not the hands the
+## that kind of weapon, a rifle or a pistol. The forearms' twist bones
+## (forearm_twist.gd) keep the wrists from pinching. The weapons are to be made to fit the hands, not the hands the
 ## weapons.
 
 const SOLDIER := preload("res://player/soldier_character.gd")
@@ -141,15 +141,6 @@ func set_colour(colour: Color) -> void:
 ## Holds `gun`, the node the weapon in view is in.
 func hold(gun: Node3D) -> void:
 	_gun = gun
-
-
-## Hides the drawn soldier's arms and mittens on `model`, a weapon model in
-## view: these arms hold it instead.
-static func hide_drawn_arms(model: Node3D) -> void:
-	for part: String in ["Hand", "OffHand", "ViewArmRight", "ViewArmLeft"]:
-		var drawn := model.get_node_or_null(part) as Node3D
-		if drawn != null:
-			drawn.visible = false
 
 
 ## `weapon` (weapon `id`, in the skeleton's space), as big as the soldier

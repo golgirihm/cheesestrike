@@ -276,9 +276,6 @@ func _is_own() -> bool:
 ## further out than in their hand as others see it, so it doesn't fill the screen.
 ## Held close, so little of the arms behind it shows.
 const VIEW_GUN_POSITION := Vector3(0.19, -0.18, -0.44)
-## Where others see a player hold a weapon they are aiming: up at the eye, in
-## the character's measurements from the head.
-const SEEN_AIM_GUN_POSITION := Vector3(0.14, -0.05, -0.5)
 ## How far in front of the eye the rear sight is held when aiming.
 const AIM_EYE_RELIEF := 0.32
 const VIEW_GUN_SCALE := 0.6
@@ -287,7 +284,6 @@ const BADGE_HEIGHT := 2.5
 
 
 func _ready() -> void:
-	body = Characters.swap(body)
 	_grow()
 	if _is_own():
 		gun.position = VIEW_GUN_POSITION
@@ -304,15 +300,12 @@ func _ready() -> void:
 	set_process_unhandled_input(_mine)
 	body.shown = not _mine
 	name_tag.visible = not _mine
-	# Seeing themselves, a realistic soldier sees its own arms on the weapon,
-	# not the drawn soldier's.
-	if _mine and body.get_script() == Characters.REALISTIC:
+	# Seeing themselves, a player sees their own arms on the weapon.
+	if _mine:
 		_arms = FIRST_PERSON_ARMS.new(VIEW_GUN_SCALE)
 		head.add_child(_arms)
 		_arms.hold(gun)
 		_arms.set_colour(body.colour())
-		for model in gun.get_children():
-			FIRST_PERSON_ARMS.hide_drawn_arms(model)
 	_rank_tag = Label3D.new()
 	_rank_tag.name = "RankTag"
 	_rank_tag.billboard = name_tag.billboard
@@ -450,10 +443,6 @@ func _show_weapon(id: String) -> void:
 	var holder := record()
 	_shown_finish = Looks.unpack(holder.look).finish if holder != null else Unlocks.FINISHES[0]
 	Unlocks.paint(model, _shown_finish)
-	# Only its holder sees both hands and the arms behind them.
-	WeaponModels.show_own_view(model, _is_own())
-	if _arms != null:
-		FIRST_PERSON_ARMS.hide_drawn_arms(model)
 	gun.add_child(model)
 	if _ghost:
 		_look_ghostly()
@@ -823,9 +812,8 @@ func _animate(delta: float) -> void:
 		var leaning := (1.0 if _pose & POSE_LEAN_RIGHT else 0.0) - (1.0 if _pose & POSE_LEAN_LEFT else 0.0)
 		_lean = move_toward(_lean, leaning if alive else 0.0, delta * Movement.CROUCH_RATE)
 		body.set_lean(_lean)
-		# Others bring their weapon up to the eye when they aim.
+		# Others bring their weapon up when they aim, their soldier raising it.
 		_aim = move_toward(_aim, 1.0 if _pose & POSE_AIMING and alive else 0.0, delta / AIM_TIME)
-		rest = _gun_rest.lerp(SEEN_AIM_GUN_POSITION * BodyShape.SIZE, smoothstep(0.0, 1.0, _aim))
 		var moved := global_position - _last_position
 		_last_position = global_position
 		if delta > 0.0:
@@ -874,14 +862,8 @@ func _animate(delta: float) -> void:
 	if _magazine != null:
 		_magazine.position = _magazine_rest + Vector3.DOWN * 0.18 * magazine_out
 	if not _mine and muzzle != null:
-		# Their arms follow the weapon: one hand on its grip, the other
-		# steadying it. A body that holds the weapon in its own hand puts it
-		# there instead, and only steadies it.
+		# Others see the weapon in their body's hands.
 		body.hold_weapon(gun)
-		var model := muzzle.get_parent() as Node3D
-		body.reach_for(body.to_local(model.to_global(WeaponModels.GRIP)))
-		var off_hand := model.get_node_or_null("OffHand") as Node3D
-		body.steady_with(body.to_local(off_hand.global_position) if off_hand != null else Vector3.INF)
 
 
 ## Where the weapon in hand sits in this player's own view when they aim: its

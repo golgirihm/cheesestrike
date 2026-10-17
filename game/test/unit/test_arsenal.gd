@@ -296,7 +296,7 @@ func test_the_pair_of_pistols_trades_aim_for_fire() -> void:
 	assert_gt(pair.aim_zoom, single.aim_zoom, "with no sights to bring up")
 	assert_lt(pair.damage_at(50.0), single.damage_at(50.0), "and less reach")
 	var model := WeaponModels.build("pistols")
-	assert_almost_eq(model.get_node("OffHand").position.x, -WeaponModels.PAIR_GAP, 0.0001, "the other hand has its own")
+	assert_almost_eq((model.get_node("LeftPistol") as Node3D).position.x, -WeaponModels.PAIR_GAP, 0.0001, "the other hand has its own")
 	model.free()
 
 
@@ -318,7 +318,6 @@ func test_the_dual_burratas_fire_a_shot_from_each_for_each_pull() -> void:
 	var second := model.get_node("LeftPistol") as Node3D
 	assert_almost_eq(second.position.x, -WeaponModels.PAIR_GAP, 0.0001, "the second in the left hand")
 	assert_gt(second.get_child_count(), 0, "drawn there")
-	assert_almost_eq(model.get_node("OffHand").position.x, -WeaponModels.PAIR_GAP, 0.0001)
 	model.free()
 
 

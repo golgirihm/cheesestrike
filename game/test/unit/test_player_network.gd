@@ -83,17 +83,18 @@ func test_others_are_seen_to_bring_their_weapon_up_to_aim() -> void:
 	var other := _player(2)
 	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, 0])
 	other._animate(1.0)
-	var hip: Vector3 = other.gun.position
+	other.body._process(0.016)
 	assert_false(other.is_aiming())
+	assert_eq(other.body.action(), CharacterMotion.NONE)
 	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, other.POSE_AIMING])
-	other._animate(other.AIM_TIME / 2.0)
-	assert_gt(other.gun.position.y, hip.y, "on its way up")
 	other._animate(1.0)
+	other.body._process(0.016)
 	assert_true(other.is_aiming())
-	assert_almost_eq(other.gun.position.distance_to(other.SEEN_AIM_GUN_POSITION * BodyShape.SIZE), 0.0, 0.01, "at the eye")
+	assert_eq(other.body.action(), CharacterMotion.AIM, "their soldier aims")
 	other.net_state = PackedFloat32Array([4, 0, 2, 0, 0, 0, 0])
 	other._animate(1.0)
-	assert_almost_eq(other.gun.position.distance_to(hip), 0.0, 0.01, "and back down")
+	other.body._process(0.016)
+	assert_eq(other.body.action(), CharacterMotion.NONE, "and lowers it again")
 
 
 func test_an_update_without_a_pose_is_someone_not_aiming() -> void:

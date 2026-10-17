@@ -18,7 +18,7 @@ static func props() -> Node3D:
 	var holder := Node3D.new()
 	holder.name = "Warmup"
 	var models: Array[Node3D] = []
-	var character: Node3D = Characters.make()
+	var character: Node3D = preload("res://player/soldier_character.gd").new()
 	character.name = "Character"
 	models.append(character)
 	for weapon: String in Weapons.ids():

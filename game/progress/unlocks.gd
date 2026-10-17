@@ -166,9 +166,6 @@ static func paint(model: Node, finish: String) -> void:
 		var material := mesh.material_override as StandardMaterial3D
 		if material == null:
 			continue
-		# The hand that holds it stays a hand.
-		if material.albedo_color.is_equal_approx(WeaponModels.HAND):
-			continue
 		var painted := material.duplicate() as StandardMaterial3D
 		painted.albedo_color = material.albedo_color.lerp(FINISH_COLOURS[finish], 0.6)
 		painted.metallic = 0.5 if finish == "gold" else painted.metallic

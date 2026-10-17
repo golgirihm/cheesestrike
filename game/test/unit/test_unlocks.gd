@@ -165,10 +165,9 @@ func test_a_finish_travels_with_the_look_and_paints_the_weapon() -> void:
 		return model.find_children("*", "MeshInstance3D", true, false).map(func(part: MeshInstance3D) -> Color:
 			return (part.material_override as StandardMaterial3D).albedo_color if part.material_override is StandardMaterial3D else Color.BLACK)
 	assert_ne(colours.call(painted), colours.call(plain))
-	assert_eq(colours.call(plain), colours.call(WeaponModels.build("blaster")))
-	# The hand that holds it is still a hand.
-	var hands: Array = colours.call(painted).filter(func(colour: Color) -> bool: return colour.is_equal_approx(WeaponModels.HAND))
-	assert_gt(hands.size(), 0)
+	var fresh := WeaponModels.build("blaster")
+	assert_eq(colours.call(plain), colours.call(fresh))
+	fresh.free()
 	plain.free()
 	painted.free()
 
