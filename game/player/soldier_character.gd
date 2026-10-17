@@ -49,7 +49,7 @@ const LOOPED := ["idle", "aim", "pistol_aim", "dual_carry", "fire", "crouch", "c
 ## reaching out with them (see DUAL_REACH). Weapons not named in GRIP_OF are
 ## held as rifles.
 const GRIPS := {"rifle": "aim", "pistol": "pistol_aim", "dual": "dual_carry"}
-const GRIP_OF := {"pistol": "pistol", "pistols": "dual"}
+const GRIP_OF := {"pistol": "pistol", "pistols": "dual", "burratas": "dual"}
 ## What the upper body carries a weapon with when not aiming it, by grip: a
 ## rifle as the legs' own animation does (nothing here), a pistol always out
 ## in front, and a pair of pistols low, one by each hip.

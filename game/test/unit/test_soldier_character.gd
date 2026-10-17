@@ -403,6 +403,7 @@ func test_a_hand_closes_round_each_weapons_own_grip() -> void:
 
 func test_a_pair_of_pistols_is_carried_low_and_aimed_out_side_by_side() -> void:
 	assert_eq(SOLDIER.grip_of("pistols"), "dual")
+	assert_eq(SOLDIER.grip_of("burratas"), "dual", "the Dual Burratas too")
 	assert_not_null(WeaponModels.build("pistols").get_node_or_null("LeftPistol"), "the second its own node, for the left hand")
 	if soldier == null:
 		pending("The licensed assets aren't checked out.")

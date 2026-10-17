@@ -46,11 +46,12 @@ const GRIP := Vector3(0.0, -0.09, 0.12)
 const HELD_AT := {
 	"pistol": Vector3(0.0, -0.08, 0.05),
 	"pistols": Vector3(0.0, -0.075, 0.05),
+	"burratas": Vector3(0.0, -0.075, 0.05),
 }
 ## How much nearer the eye than others each weapon sits in its holder's own
 ## view: a pistol, held out in the hand, is short, and nearer still would
 ## leave it lost at the bottom of the view.
-const VIEW_NEARER := {"pistol": 0.1, "pistols": 0.08}
+const VIEW_NEARER := {"pistol": 0.1, "pistols": 0.08, "burratas": 0.08}
 ## Where the other hand steadies each weapon, from the model's middle.
 const OFF_HAND := {
 	"pistol": Vector3(-0.035, -0.125, 0.085),
