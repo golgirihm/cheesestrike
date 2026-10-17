@@ -1,8 +1,11 @@
 class_name Picture
-## What is done to the picture after the arena is drawn: bright things glow,
-## each arena has its own cast of colour, and the corners of the view are a
-## little darker than its middle. Each can be turned off in the settings,
-## and the glow, which costs the most, is left off on low graphics.
+## What is done to the picture after the arena is drawn: light is brought
+## down to the screen as film would, so bright things fade to white rather
+## than clipping flat; bright things glow; each arena has its own cast of
+## colour, muted and contrasty, for a grounded look rather than a bright
+## cartoon one; and the corners of the view are a little darker than its
+## middle. All but the first can be turned off in the settings, and the
+## glow, which costs the most, is left off on low graphics.
 
 ## The settings that turn each on.
 const BLOOM := "bloom"
@@ -12,20 +15,25 @@ const VIGNETTE := "vignette"
 ## Each arena's cast: how bright, how contrasty and how colourful the
 ## picture is made (1 leaves it alone), and the colour white becomes.
 const GRADES := {
-	"canyon": {"brightness": 1.0, "contrast": 1.06, "saturation": 1.12, "tint": Color(1.0, 0.97, 0.9)},
-	"box": {"brightness": 1.02, "contrast": 1.04, "saturation": 1.08, "tint": Color(1.0, 0.99, 0.95)},
-	"city": {"brightness": 1.0, "contrast": 1.1, "saturation": 0.9, "tint": Color(0.94, 0.97, 1.0)},
-	"dairy": {"brightness": 1.03, "contrast": 1.03, "saturation": 1.0, "tint": Color(0.97, 0.99, 1.0)},
-	"kitchen": {"brightness": 1.0, "contrast": 1.05, "saturation": 1.1, "tint": Color(1.0, 0.96, 0.88)},
-	"market": {"brightness": 1.0, "contrast": 1.05, "saturation": 1.18, "tint": Color(1.0, 0.98, 0.93)},
-	"cave": {"brightness": 0.98, "contrast": 1.12, "saturation": 0.92, "tint": Color(0.9, 0.96, 1.0)},
-	"duel": {"brightness": 1.0, "contrast": 1.1, "saturation": 1.0, "tint": Color(1.0, 0.97, 0.94)},
+	"canyon": {"brightness": 1.0, "contrast": 1.12, "saturation": 0.86, "tint": Color(1.0, 0.96, 0.9)},
+	"box": {"brightness": 1.0, "contrast": 1.1, "saturation": 0.84, "tint": Color(0.97, 0.98, 0.97)},
+	"city": {"brightness": 0.98, "contrast": 1.15, "saturation": 0.8, "tint": Color(0.92, 0.96, 1.0)},
+	"dairy": {"brightness": 0.96, "contrast": 1.1, "saturation": 0.82, "tint": Color(0.94, 0.98, 1.0)},
+	"kitchen": {"brightness": 1.0, "contrast": 1.12, "saturation": 0.86, "tint": Color(1.0, 0.95, 0.88)},
+	"market": {"brightness": 1.0, "contrast": 1.12, "saturation": 0.88, "tint": Color(1.0, 0.97, 0.92)},
+	"cave": {"brightness": 0.96, "contrast": 1.16, "saturation": 0.8, "tint": Color(0.9, 0.95, 1.0)},
+	"duel": {"brightness": 1.0, "contrast": 1.14, "saturation": 0.84, "tint": Color(1.0, 0.97, 0.94)},
 }
 const PLAIN := {"brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "tint": Color.WHITE}
 
-## How strongly bright things glow, and how bright a thing must be to.
-const GLOW_INTENSITY := 0.5
-const GLOW_THRESHOLD := 0.92
+## How light is brought down to the screen, and how much it is brightened
+## first, as the curve darkens the middle tones a little.
+const TONE_MAPPER := Environment.TONE_MAPPER_ACES
+const EXPOSURE := 1.0
+## How strongly bright things glow, and how bright a thing must be to: only
+## what shines, a muzzle flash or a lamp, not a sunlit wall.
+const GLOW_INTENSITY := 0.3
+const GLOW_THRESHOLD := 1.0
 ## How dark the corners of the view get.
 const VIGNETTE_STRENGTH := 0.3
 
@@ -55,6 +63,8 @@ static func glows(level: String, wants: bool) -> bool:
 ## `environment`, as the settings in `wanted` ({BLOOM, GRADE, VIGNETTE:
 ## bool}) have it.
 static func apply(environment: Environment, map: String, level: String, wanted: Dictionary) -> void:
+	environment.tonemap_mode = TONE_MAPPER
+	environment.tonemap_exposure = EXPOSURE
 	environment.glow_enabled = glows(level, wanted.get(BLOOM, true))
 	environment.glow_intensity = GLOW_INTENSITY
 	environment.glow_hdr_threshold = GLOW_THRESHOLD
