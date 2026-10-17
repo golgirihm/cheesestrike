@@ -55,6 +55,28 @@ func test_a_session_server_that_cant_be_reached_is_explained() -> void:
 	assert_string_contains(Net.unreachable("ws://localhost:9080", true), Net.START_SERVER, "a developer can")
 
 
+func test_a_build_without_webrtc_says_how_to_get_it() -> void:
+	assert_true(Net.has_webrtc(true, []), "a browser has its own")
+	assert_false(Net.has_webrtc(false, []), "a native build has none of its own")
+	assert_true(Net.has_webrtc(false, [Net.WEBRTC_EXTENSION]), "until the extension is installed")
+	assert_string_contains(Net.no_webrtc(), Net.FETCH_WEBRTC)
+
+
+func test_every_build_finds_sessions_by_code_and_list() -> void:
+	assert_true(main.sessions_panel.visible, "the session list")
+	assert_true(main.private_button.visible, "private sessions")
+	assert_eq(main.target_edit.placeholder_text, "Session code")
+
+
+func test_join_on_the_command_line_with_no_code_waits_for_the_newest_session() -> void:
+	main._join_newest = true
+	Net.sessions_listed.emit([])
+	assert_true(main._join_newest, "still waiting while there are none")
+	main._join_newest = false
+	assert_eq(main.newest_code([{"code": "NEWS", "players": 1}, {"code": "OLDS", "players": 3}]), "NEWS", "first in the list")
+	assert_eq(main.newest_code([]), "")
+
+
 func test_the_menu_says_when_the_session_list_cant_be_had_and_stops_once_it_can() -> void:
 	var reason := Net.unreachable("http://localhost:9080")
 	Net.sessions_unreachable.emit(reason)
@@ -71,6 +93,8 @@ func test_the_menu_says_when_the_session_list_cant_be_had_and_stops_once_it_can(
 
 
 func test_no_answer_or_a_wrong_one_from_the_session_server_twice_running_is_said() -> void:
+	# Count from nothing, whatever the tests before left.
+	Net._list_failures = 0
 	watch_signals(Net)
 	var good := JSON.stringify({"sessions": []}).to_utf8_buffer()
 	var bad := [[HTTPRequest.RESULT_CANT_CONNECT, 0, PackedByteArray()], [HTTPRequest.RESULT_SUCCESS, 502, "Bad gateway".to_utf8_buffer()],

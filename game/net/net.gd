@@ -1,9 +1,10 @@
 extends Node
-## Session transport. Web builds connect peer-to-peer over WebRTC, with the
-## session server brokering the handshake; native builds use ENet directly,
-## which is what local development and headless testing run on.
+## Session transport: players connect peer-to-peer over WebRTC, with the
+## session server brokering the handshake. A browser has WebRTC of its own;
+## native builds get it from the webrtc-native extension, which
+## tools/fetch_webrtc.py installs.
 ##
-## Either way the result is a host (peer 1) with clients attached, exposed
+## The result is a host (peer 1) with clients attached, exposed
 ## through the regular high-level multiplayer API.
 ##
 ## The session server (signaling/core.py has its protocol) is used sparingly,
@@ -24,7 +25,6 @@ signal sessions_listed(sessions: Array)
 signal sessions_unreachable(reason: String)
 signal host_silent_changed(silent: bool)
 
-const ENET_PORT := 7777
 const MAX_PLAYERS := 16
 const SIGNALING_PORT := 9080
 const JOIN_TIMEOUT := 30.0
@@ -43,14 +43,19 @@ const SERVER_WAIT := 8.0
 ## What a developer runs to start the session server, said in development
 ## builds when it can't be reached.
 const START_SERVER := "python signaling/local/server.py"
+## What a developer runs to give a native build WebRTC, said when it has none.
+const FETCH_WEBRTC := "python tools/fetch_webrtc.py"
+const WEBRTC_EXTENSION := "res://addons/webrtc_native/webrtc_native.gdextension"
 ## How many times in a row the session list is asked for before a player is
 ## told the session server can't be reached.
 const LIST_TRIES := 2
 const HOST_LOST := "The connection to the host was lost."
 const HOST_CLOSED := "The host closed the session."
 
-var use_webrtc := OS.has_feature("web")
 var in_session := false
+## Whether to ask the session server for the session list. The game's tests
+## turn it off, so that nothing they check depends on whether one is running.
+var reach_server := true
 ## Whether the session is one of this machine alone (see play_alone).
 var alone := false
 var room_code := ""
@@ -103,10 +108,10 @@ func _ready() -> void:
 	_status_request.timeout = 5.0
 	_status_request.request_completed.connect(_on_session_reported)
 	add_child(_status_request)
+	var urls := _web_backend_urls() if OS.has_feature("web") else _native_backend_urls()
+	_signaling_url = urls.signal
+	_http_url = urls.http
 	if OS.has_feature("web"):
-		var urls := _web_backend_urls()
-		_signaling_url = urls.signal
-		_http_url = urls.http
 		WebPage.install()
 		_visibility_callback = JavaScriptBridge.create_callback(_on_visibility_changed)
 		JavaScriptBridge.get_interface("document").addEventListener("visibilitychange", _visibility_callback)
@@ -116,19 +121,13 @@ func _ready() -> void:
 ## players given its code or a link can join.
 func host(settings := MatchSettings.new(), private := false) -> void:
 	last_joined = ""
+	if not has_webrtc():
+		_fail(no_webrtc())
+		return
 	_connecting = true
-	if use_webrtc:
-		_host_settings = settings.advertised()
-		_host_private = private
-		_send({"type": "host", "settings": _host_settings, "private": private})
-		return
-	var enet := ENetMultiplayerPeer.new()
-	if enet.create_server(ENET_PORT, settings.max_players - 1) != OK:
-		_fail("Couldn't open port %d." % ENET_PORT)
-		return
-	multiplayer.multiplayer_peer = enet
-	room_code = "port %d" % ENET_PORT
-	_start()
+	_host_settings = settings.advertised()
+	_host_private = private
+	_send({"type": "host", "settings": _host_settings, "private": private})
 
 
 ## Starts a session of one, on this machine alone, with nobody told and
@@ -140,23 +139,27 @@ func play_alone() -> void:
 	_start()
 
 
-## `target` is a session code on WebRTC, or an address on ENet.
+## `target` is a session code.
 func join(target: String) -> void:
 	target = target.strip_edges()
 	last_joined = target
+	if not has_webrtc():
+		_fail(no_webrtc())
+		return
 	_connecting = true
 	_join_deadline = Time.get_unix_time_from_system() + JOIN_TIMEOUT
-	if use_webrtc:
-		_send({"type": "join", "code": target.to_upper()})
-		return
-	if target.is_empty():
-		target = "127.0.0.1"
-	var enet := ENetMultiplayerPeer.new()
-	if enet.create_client(target, ENET_PORT) != OK:
-		_fail("Couldn't connect to %s." % target)
-		return
-	multiplayer.multiplayer_peer = enet
-	room_code = target
+	_send({"type": "join", "code": target.to_upper()})
+
+
+## Whether this build can make WebRTC connections: a browser always can, and
+## a native build once the extension is installed.
+static func has_webrtc(web := OS.has_feature("web"), loaded := GDExtensionManager.get_loaded_extensions()) -> bool:
+	return web or loaded.has(WEBRTC_EXTENSION)
+
+
+## What a player is told when this build has no WebRTC.
+static func no_webrtc() -> String:
+	return "This build can't connect to other players: it has no WebRTC. Install it with: %s" % FETCH_WEBRTC
 
 
 func leave(reason := "") -> void:
@@ -168,7 +171,7 @@ func leave(reason := "") -> void:
 
 ## Asks for the session list, which arrives as `sessions_listed`.
 func request_sessions() -> void:
-	if use_webrtc and _list_request.get_http_client_status() == HTTPClient.STATUS_DISCONNECTED:
+	if reach_server and _list_request.get_http_client_status() == HTTPClient.STATUS_DISCONNECTED:
 		if _list_request.request(_http_url + "/sessions") != OK:
 			sessions_unreachable.emit(unreachable(_http_url))
 
@@ -180,9 +183,8 @@ func _process(delta: float) -> void:
 			if _heartbeat_timer >= HostWatch.HEARTBEAT_INTERVAL:
 				_heartbeat_timer = 0.0
 				_heartbeat.rpc()
-			if use_webrtc:
-				_keep_session_listed(delta)
-				_drop_players_who_never_arrived(delta)
+			_keep_session_listed(delta)
+			_drop_players_who_never_arrived(delta)
 		else:
 			_host_watch.tick(delta)
 			if _host_watch.is_gone():
@@ -191,8 +193,7 @@ func _process(delta: float) -> void:
 			if _host_watch.is_lost():
 				leave(HOST_LOST)
 				return
-			if use_webrtc:
-				_ask_about_silent_host(delta)
+			_ask_about_silent_host(delta)
 		_update_host_silent()
 	if _connecting and _join_deadline > 0.0 and Time.get_unix_time_from_system() > _join_deadline:
 		_fail("Timed out connecting to the host.")
@@ -241,7 +242,7 @@ func _start() -> void:
 	_connecting = false
 	_join_deadline = 0.0
 	in_session = true
-	if use_webrtc and not multiplayer.is_server():
+	if not multiplayer.is_server():
 		# Connected to the host, so the session server's part is over.
 		_close_signaling()
 	WebPage.set_wake_lock(true)
@@ -288,7 +289,7 @@ func _on_visibility_changed(_args: Array) -> void:
 ## anything else says so, so the session server is asked which before the
 ## player is told; see HostWatch.
 func _on_host_dropped() -> void:
-	if use_webrtc and in_session:
+	if in_session:
 		_host_watch.connection_dropped()
 	else:
 		leave(HOST_LOST)
@@ -370,7 +371,7 @@ func _drop_players_who_never_arrived(delta: float) -> void:
 ## session list shows. It can't count them itself, since players leave it once
 ## they are connected here.
 func _send_player_count() -> void:
-	if in_session and use_webrtc and multiplayer.is_server() and _ws != null:
+	if in_session and multiplayer.is_server() and _ws != null:
 		_send({"type": "update", "players": multiplayer.get_peers().size() + 1})
 
 
@@ -487,6 +488,17 @@ func _on_description_created(type: String, sdp: String, id: int) -> void:
 
 func _on_ice_candidate_created(mid: String, index: int, sdp: String, id: int) -> void:
 	_send({"type": "candidate", "to": id, "mid": mid, "index": index, "sdp": sdp})
+
+
+## Where the session server is for a native build: the development server on
+## this machine, unless the command line names another with
+## `-- --signal=ws://...`; see BackendUrls.
+func _native_backend_urls() -> Dictionary:
+	var override := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--signal="):
+			override = arg.trim_prefix("--signal=")
+	return BackendUrls.choose(override, {}, false, "127.0.0.1")
 
 
 ## Where the session server is, from what the page says; see BackendUrls.
