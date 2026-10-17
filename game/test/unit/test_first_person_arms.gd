@@ -110,7 +110,40 @@ func test_a_pistol_in_view_is_held_as_the_pistol_aim_holds_it() -> void:
 	head.add_child(arms)
 	arms.hold(gun)
 	var fist := {}
-	arms._skeleton.skeleton_updated.connect(func() -> void: fist.at = arms._skeleton.global_transform * arms._fist_now())
+	var shoulder: int = arms._skeleton.find_bone("LeftShoulder")
+	arms._skeleton.skeleton_updated.connect(func() -> void:
+		fist.at = arms._skeleton.global_transform * arms._fist_now()
+		fist.shoulder = arms._skeleton.get_bone_global_pose(shoulder).basis.get_scale().x)
 	await wait_process_frames(10)
 	assert_eq(arms._player.current_animation, SOLDIER.GRIPS.pistol)
-	assert_lt((fist.at as Vector3).distance_to(model.to_global(WeaponModels.GRIP)), 0.015, "the grip in the right fist")
+	# Near enough: the fingers move a little after the first frame, which
+	# the hold is worked out from.
+	assert_lt((fist.at as Vector3).distance_to(model.to_global(WeaponModels.held_at("pistol"))), 0.025, "the grip in the right fist")
+	assert_true(arms._hide_left.active, "the left arm, with nothing to hold, out of view")
+	assert_lt(fist.shoulder, 0.01)
+
+
+func test_a_pair_of_pistols_in_view_is_held_one_in_each_hand() -> void:
+	if not SOLDIER.available():
+		pending("The licensed assets aren't checked out.")
+		return
+	var head := Node3D.new()
+	add_child_autofree(head)
+	var gun := Node3D.new()
+	gun.position = VIEW_GUN_POSITION
+	gun.scale = Vector3.ONE * VIEW_GUN_SCALE
+	head.add_child(gun)
+	var model := WeaponModels.build("pistols")
+	gun.add_child(model)
+	var arms: Node3D = ARMS.new(VIEW_GUN_SCALE)
+	head.add_child(arms)
+	arms.hold(gun)
+	var left := {}
+	arms._skeleton.skeleton_updated.connect(func() -> void: left.hand = arms._skeleton.global_transform * arms._skeleton.get_bone_global_pose(arms._skeleton.find_bone("LeftHand")))
+	await wait_process_frames(10)
+	assert_eq(arms._player.current_animation, SOLDIER.GRIPS.dual)
+	assert_false(arms._hide_left.active, "both arms in view")
+	var second := model.get_node("LeftPistol") as Node3D
+	var held: Transform3D = ARMS.as_held(arms._skeleton.global_transform.affine_inverse() * second.global_transform, "pistols")
+	var wanted: Transform3D = arms._skeleton.global_transform * held * SOLDIER.left_in_hand("pistols").affine_inverse()
+	assert_lt((left.hand as Transform3D).origin.distance_to(wanted.origin), 0.01, "the left hand on the other pistol")

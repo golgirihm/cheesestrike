@@ -19,6 +19,7 @@ extends "res://player/cheese_character.gd"
 ## the web, players are the drawn soldier.
 
 const MODEL := "res://licensed/soldier/soldier.glb"
+const SPINE_AIM := preload("res://player/spine_aim.gd")
 ## The meshes of the model's arms alone, which its player sees of
 ## themselves (see first_person_arms.gd).
 const FIRST_PERSON := ["FirstPersonArms", "FirstPersonSleeves"]
@@ -40,12 +41,25 @@ const GAITS := {"walk": 1.0, "run": 2.0, "sprint": 3.0}
 const WAYS := {"": Vector2(0, 1), "_back": Vector2(0, -1), "_left": Vector2(-1, 0), "_right": Vector2(1, 0), "_ahead_left": Vector2(-0.7071, 0.7071), "_ahead_right": Vector2(0.7071, 0.7071), "_back_left": Vector2(-0.7071, -0.7071), "_back_right": Vector2(0.7071, -0.7071)}
 ## The animations that go round and round rather than playing once, besides
 ## every gait's.
-const LOOPED := ["idle", "aim", "pistol_aim", "fire", "crouch", "crouch_aim", "jump_loop", "emote_dance", "emote_wave"]
+const LOOPED := ["idle", "aim", "pistol_aim", "dual_carry", "fire", "crouch", "crouch_aim", "jump_loop", "emote_dance", "emote_wave"]
 ## How its hands hold each kind of weapon, by the animation of its aim that
 ## the hold is worked out from: a rifle in both hands, a pistol in two hands
-## out in front. Weapons not named in GRIP_OF are held as rifles.
-const GRIPS := {"rifle": "aim", "pistol": "pistol_aim"}
-const GRIP_OF := {"pistol": "pistol"}
+## out in front, and a pair of pistols one in each. Mixamo has no aim with a
+## pistol in each hand, so a pair are held as they are carried, and aimed by
+## reaching out with them (see DUAL_REACH). Weapons not named in GRIP_OF are
+## held as rifles.
+const GRIPS := {"rifle": "aim", "pistol": "pistol_aim", "dual": "dual_carry"}
+const GRIP_OF := {"pistol": "pistol", "pistols": "dual"}
+## What the upper body carries a weapon with when not aiming it, by grip: a
+## rifle as the legs' own animation does (nothing here), a pistol always out
+## in front, and a pair of pistols low, one by each hip.
+const CARRY := {"pistol": "pistol_aim", "dual": "dual_carry"}
+## Aiming a pair of pistols, how far the fists reach out from between the
+## shoulders along the look, as a share of an arm's length, and how far
+## apart they are, as a share of the shoulders' width: out in front, side by
+## side, a little apart.
+const DUAL_REACH := 0.85
+const DUAL_APART := 0.7
 ## Seconds the weapon stays up at the shoulder after the last shot.
 const RAISED_AFTER_FIRING := 1.0
 ## What the upper body plays for each of CharacterMotion's actions, and each
@@ -105,8 +119,15 @@ var _held_model: Node3D
 var _weapon_here := Transform3D()
 # Seconds since it last fired.
 var _since_fired := INF
-# How its hands hold the weapon in them (see GRIPS).
+# The weapon in its hands, and how they hold it (see GRIPS).
+var _weapon := ""
 var _grip := "rifle"
+# The second of a pair of weapons, which its left hand holds.
+var _left_weapon: Node3D
+# Each arm's reach for aiming a pair of pistols (see _reach_out), and how far
+# into aiming them it is, 0 to 1.
+var _dual_reach := {}
+var _dual_aim := 0.0
 
 
 ## Whether the realistic soldier can be shown here: its licensed model is
@@ -227,12 +248,40 @@ static func library() -> AnimationLibrary:
 		if file.get_extension() != "fbx" or _library.has_animation(file.get_basename()):
 			continue
 		var source: AnimationLibrary = load(ANIMATIONS.path_join(file))
-		var animation: Animation = source.get_animation(source.get_animation_list()[0]).duplicate(true)
+		# Mixamo's; a file downloaded with its character also has its bind
+		# pose, a still "Take 001".
+		var clip: StringName = &"mixamo_com" if source.has_animation(&"mixamo_com") else source.get_animation_list()[0]
+		var animation: Animation = source.get_animation(clip).duplicate(true)
 		in_place(animation)
 		var name := file.get_basename()
 		animation.loop_mode = Animation.LOOP_LINEAR if loops(name) else Animation.LOOP_NONE
 		_library.add_animation(name, animation)
+	# The pistols carried in it are held in loose hands: each closes round
+	# its grip as the right does round a pistol it aims.
+	if _library.has_animation("dual_carry") and _library.has_animation("pistol_aim"):
+		gripping(_library.get_animation("dual_carry"), _library.get_animation("pistol_aim"))
 	return _library
+
+
+## Gives both hands in `animation` the fingers of the right hand at the start
+## of `from`, the left's mirrored from the right's, held still.
+static func gripping(animation: Animation, from: Animation) -> void:
+	for finger: String in FINGERS:
+		var source := from.find_track(NodePath("%GeneralSkeleton:Right" + finger), Animation.TYPE_ROTATION_3D)
+		if source < 0:
+			continue
+		var turn := from.rotation_track_interpolate(source, 0.0)
+		# The humanoid's left bones are its right ones' mirror images, so a
+		# turn mirrors by flipping it about their length.
+		for side: Array in [["Right", turn], ["Left", Quaternion(turn.x, -turn.y, -turn.z, turn.w)]]:
+			var path := NodePath("%GeneralSkeleton:" + side[0] + finger)
+			var track := animation.find_track(path, Animation.TYPE_ROTATION_3D)
+			if track < 0:
+				track = animation.add_track(Animation.TYPE_ROTATION_3D)
+				animation.track_set_path(track, path)
+			while animation.track_get_key_count(track) > 0:
+				animation.track_remove_key(track, 0)
+			animation.rotation_track_insert_key(track, 0.0, side[1])
 
 
 func _build_animations() -> void:
@@ -283,7 +332,7 @@ static func _blending(animations: AnimationLibrary) -> AnimationNodeBlendTree:
 
 	var acts := AnimationNodeTransition.new()
 	acts.xfade_time = 0.12
-	var doing: Array = ACTIONS.values() + EMOTES.values() + ["pistol_aim"]
+	var doing: Array = ACTIONS.values() + EMOTES.values() + ["pistol_aim", "dual_carry"]
 	for index in doing.size():
 		acts.add_input(doing[index])
 		var clip: String = doing[index] if animations.has_animation(doing[index]) else "aim"
@@ -345,14 +394,80 @@ static func _gaits(animations: AnimationLibrary, prefix: String) -> AnimationNod
 
 
 func _build_reach() -> void:
-	_spine = preload("res://player/spine_aim.gd").new()
+	_spine = SPINE_AIM.new()
 	_spine.name = "SpineAim"
 	_spine.hand = _right_hand_bone
 	_spine.in_hand = hold("rifle").in_hand
 	_skeleton.add_child(_spine)
+	# Each arm reaching out with a pistol, aiming a pair.
+	for side: String in ["Right", "Left"]:
+		_dual_reach[side] = _reach_out(side)
 	var twist: SkeletonModifier3D = preload("res://player/forearm_twist.gd").new()
 	twist.name = "ForearmTwist"
 	_skeleton.add_child(twist)
+
+
+# Reaches `side`'s arm for where its wrist is to go, and turns its hand, for
+# aiming a pair of pistols; off until then.
+func _reach_out(side: String) -> Dictionary:
+	var wrist := Node3D.new()
+	wrist.name = side + "DualWrist"
+	add_child(wrist)
+	var elbow := Node3D.new()
+	elbow.name = side + "DualElbow"
+	add_child(elbow)
+	var ik := TwoBoneIK3D.new()
+	ik.name = side + "DualReach"
+	_skeleton.add_child(ik)
+	ik.set_setting_count(1)
+	ik.set_root_bone_name(0, side + "UpperArm")
+	ik.set_middle_bone_name(0, side + "LowerArm")
+	ik.set_end_bone_name(0, side + "Hand")
+	ik.set_target_node(0, ik.get_path_to(wrist))
+	ik.set_pole_node(0, ik.get_path_to(elbow))
+	var turn: SkeletonModifier3D = preload("res://player/hand_pose.gd").new()
+	turn.name = side + "DualHand"
+	turn.bone = _skeleton.find_bone(side + "Hand")
+	_skeleton.add_child(turn)
+	for modifier: SkeletonModifier3D in [ik, turn]:
+		modifier.influence = 0.0
+		modifier.active = false
+	var upper := _skeleton.find_bone(side + "UpperArm")
+	var lower := _skeleton.find_bone(side + "LowerArm")
+	var hand := _skeleton.find_bone(side + "Hand")
+	var length := _skeleton.get_bone_global_rest(upper).origin.distance_to(_skeleton.get_bone_global_rest(lower).origin) + _skeleton.get_bone_global_rest(lower).origin.distance_to(_skeleton.get_bone_global_rest(hand).origin)
+	return {"wrist": wrist, "elbow": elbow, "ik": ik, "turn": turn, "shoulder": upper, "length": length}
+
+
+# Aiming a pair of pistols, by `amount` (0 to 1): each arm reaches out along
+# `looking` (in the skeleton's space), the pistols in its hands pointing
+# that way, as each grip holds them.
+func _aim_pair(amount: float, looking: Vector3) -> void:
+	var right_shoulder := _skeleton.get_bone_global_pose(_dual_reach.Right.shoulder).origin
+	var left_shoulder := _skeleton.get_bone_global_pose(_dual_reach.Left.shoulder).origin
+	var middle := (right_shoulder + left_shoulder) / 2.0
+	# To the right across the look, whichever way the shoulders are turned.
+	var level := Vector3(looking.x, 0.0, looking.z)
+	var right := (level if not level.is_zero_approx() else Vector3.FORWARD).cross(Vector3.UP).normalized()
+	var apart := right * right_shoulder.distance_to(left_shoulder) * DUAL_APART / 2.0
+	var facing := Basis.looking_at(looking, Vector3.UP).scaled(Vector3.ONE * _weapon_size)
+	for side: String in _dual_reach:
+		var reach: Dictionary = _dual_reach[side]
+		var on := amount > 0.0
+		for modifier: SkeletonModifier3D in [reach.ik, reach.turn]:
+			modifier.active = on
+			modifier.influence = amount
+		if not on:
+			continue
+		var shoulder := right_shoulder if side == "Right" else left_shoulder
+		var outward := apart if side == "Right" else -apart
+		var fist: Vector3 = middle + looking * reach.length * DUAL_REACH + outward
+		var weapon := Transform3D(facing, fist - facing * WeaponModels.held_at(_weapon))
+		var hand := weapon * (in_hand(_weapon) if side == "Right" else left_in_hand(_weapon)).affine_inverse()
+		(reach.wrist as Node3D).global_position = _skeleton.global_transform * hand.origin
+		reach.turn.facing = hand.basis
+		# The elbow below and out to its side.
+		(reach.elbow as Node3D).global_position = _skeleton.global_transform * (shoulder + looking * reach.length * 0.4 + Vector3.DOWN * reach.length * 0.5 + outward)
 
 
 func weapon_scale() -> float:
@@ -377,8 +492,10 @@ func hold_weapon(gun: Node3D) -> bool:
 		_held_model = model
 		for mitten: Node in gun.find_children("Hand", "", true, false):
 			(mitten as Node3D).visible = false
-		_grip = grip_of(model.get_meta("weapon", "") if model != null else "")
-		_spine.in_hand = hold(_grip).in_hand
+		_weapon = model.get_meta("weapon", "") if model != null else ""
+		_grip = grip_of(_weapon)
+		_spine.in_hand = in_hand(_weapon)
+		_left_weapon = model.find_child("LeftPistol", false, false) as Node3D if model != null else null
 	# Making an emote, it puts the weapon away.
 	if _emote >= 0:
 		gun.visible = false
@@ -392,12 +509,16 @@ func hold_weapon(gun: Node3D) -> bool:
 
 ## How each grip (see GRIPS) holds a weapon, as {in_hand: where the weapon
 ## is from the right hand's bone, in its aim, pointing straight ahead with its
-## grip in the fist; left: where the left hand is in that aim, from the
-## right}. The same for every soldier, so it is worked out once.
+## grip (WeaponModels.GRIP) in the fist; left: where the left hand is in that
+## aim, from the right; left_in_hand: where a second weapon is from the left
+## hand's bone, as in_hand is from the right's; elbows: where each elbow is,
+## from the right hand}. The same for every soldier, so it is worked out once.
 static var _holds := {}
 static var _found_hold := false
 ## Turns this node's directions into its skeleton's.
 static var _body_to_skeleton: Basis
+## How big a weapon is in the skeleton's space.
+static var _weapon_size := 1.0
 
 
 ## How `grip` holds a weapon (see _holds).
@@ -408,6 +529,23 @@ static func hold(grip: String) -> Dictionary:
 ## The grip a weapon is held with, by the weapon's id.
 static func grip_of(weapon: String) -> String:
 	return GRIP_OF.get(weapon, "rifle")
+
+
+## Where weapon `weapon` is from the right hand's bone: as its grip holds
+## any weapon (see _holds), moved so that the hand closes round its own grip.
+static func in_hand(weapon: String) -> Transform3D:
+	return (hold(grip_of(weapon)).in_hand as Transform3D) * _to_grip(weapon)
+
+
+## Where the second of a pair of weapons `weapon` is from the left hand's
+## bone, as in_hand is for the first.
+static func left_in_hand(weapon: String) -> Transform3D:
+	return (hold(grip_of(weapon)).left_in_hand as Transform3D) * _to_grip(weapon)
+
+
+# From where a grip holds any weapon to where it holds `weapon`.
+static func _to_grip(weapon: String) -> Transform3D:
+	return Transform3D(Basis(), WeaponModels.GRIP - WeaponModels.held_at(weapon))
 
 
 ## Works out how the hands hold weapons (_holds), if no soldier has yet:
@@ -450,11 +588,17 @@ func _hold_in(aim: Animation) -> Dictionary:
 		node = node.get_parent()
 	to_body = to_body * chain
 	_body_to_skeleton = to_body.basis.orthonormalized().inverse()
+	_weapon_size = (to_body.affine_inverse().basis * Basis.from_scale(Vector3.ONE * WEAPON_SCALE)).get_scale().x
 	var held := to_body.affine_inverse() * Transform3D(Basis.from_scale(Vector3.ONE * WEAPON_SCALE), Vector3.ZERO)
 	# The grip in the right hand's fist, and the left hand as the aim holds
 	# a rifle's fore-end.
 	held.origin = _fist("Right") - held.basis * WeaponModels.GRIP
-	return {"in_hand": hand.affine_inverse() * held, "left": hand.affine_inverse() * _skeleton.get_bone_global_pose(_left_hand_bone)}
+	var left := _skeleton.get_bone_global_pose(_left_hand_bone)
+	var held_left := Transform3D(held.basis, _fist("Left") - held.basis * WeaponModels.GRIP)
+	var elbows := {}
+	for side: String in ["Right", "Left"]:
+		elbows[side] = hand.affine_inverse() * _skeleton.get_bone_global_pose(_skeleton.find_bone(side + "LowerArm")).origin
+	return {"in_hand": hand.affine_inverse() * held, "left": hand.affine_inverse() * left, "left_in_hand": left.affine_inverse() * held_left, "elbows": elbows}
 
 
 # Where `side`'s hand closes round what it holds, in the skeleton's space:
@@ -470,12 +614,14 @@ func _fist(side: String) -> Vector3:
 # left hand stays where its animations have it: the weapons are to fit the
 # hands, not the hands the weapons.
 func _place_weapon() -> void:
-	var in_hand: Transform3D = hold(_grip).in_hand
-	var weapon := _skeleton.get_bone_global_pose(_right_hand_bone) * in_hand
+	var weapon := _skeleton.get_bone_global_pose(_right_hand_bone) * in_hand(_weapon)
 	_weapon_here = global_transform.affine_inverse() * _skeleton.global_transform * weapon
 	if _held_gun == null or not is_instance_valid(_held_gun) or not _held_gun.is_inside_tree():
 		return
 	_held_gun.global_transform = global_transform * _weapon_here
+	# A second weapon goes in the left hand.
+	if _left_weapon != null and is_instance_valid(_left_weapon):
+		_left_weapon.global_transform = _skeleton.global_transform * _skeleton.get_bone_global_pose(_left_hand_bone) * left_in_hand(_weapon)
 
 
 func set_colour(colour: Color) -> void:
@@ -599,10 +745,13 @@ func _process(delta: float) -> void:
 		doing = ACTIONS[_action]
 	elif _since_fired < RAISED_AFTER_FIRING:
 		doing = "aim"
-	# A pistol is always held out in both hands, ready: there is nothing to
-	# carry it at the hip.
-	if _grip == "pistol" and (doing == "" or doing == "aim" or doing == "fire"):
-		doing = GRIPS.pistol
+	# Each grip aims, and carries, its own way.
+	var raised := doing == "aim" or doing == "fire"
+	if _grip != "rifle":
+		if doing == "aim" or doing == "fire":
+			doing = GRIPS[_grip]
+		elif doing == "":
+			doing = CARRY.get(_grip, "")
 	if doing != "" and _tree.get("parameters/acts/current_state") != doing:
 		_tree.set("parameters/acts/transition_request", doing)
 	var upper: float = _tree.get("parameters/upper/blend_amount")
@@ -611,8 +760,12 @@ func _process(delta: float) -> void:
 	# turning to bring it round.
 	var looking := Vector3(0.0, sin(_gaze), -cos(_gaze))
 	_spine.aim = _body_to_skeleton * looking
-	var aimed := ["aim", "fire", GRIPS.pistol].has(doing) and not _melting
-	_spine.influence = move_toward(_spine.influence, 1.0 if aimed else 0.0, delta / GRIP_TIME)
+	var aimed := (["aim", "fire"].has(doing) or GRIPS.values().has(doing)) and not _melting
+	# A pair of pistols is aimed by the arms alone, reaching out with them.
+	var pair := raised and _grip == "dual" and not _melting
+	_dual_aim = move_toward(_dual_aim, 1.0 if pair else 0.0, delta / GRIP_TIME)
+	_aim_pair(_dual_aim, SPINE_AIM.pitched_at_most(_spine.aim, SPINE_AIM.AIM_DOWN, SPINE_AIM.AIM_UP))
+	_spine.influence = move_toward(_spine.influence, 1.0 if aimed and _grip != "dual" else 0.0, delta / GRIP_TIME)
 	# What is held in the free hand goes with it.
 	if _held != null:
 		_held.position = _bone_here(_left_hand_bone)

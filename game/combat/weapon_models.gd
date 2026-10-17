@@ -40,6 +40,17 @@ const WAX := Color(0.75, 0.12, 0.1)
 const HAND := Color(0.1, 0.09, 0.09)
 ## Where the hand holds every weapon, from the model's middle.
 const GRIP := Vector3(0.0, -0.09, 0.12)
+## Where a hand that closes round it holds each weapon whose grip is
+## somewhere else, from the model's middle: a pistol's, further forward,
+## under the slide. The drawn soldier's mittens stay at GRIP.
+const HELD_AT := {
+	"pistol": Vector3(0.0, -0.08, 0.05),
+	"pistols": Vector3(0.0, -0.075, 0.05),
+}
+## How much nearer the eye than others each weapon sits in its holder's own
+## view: a pistol, held out in the hand, is short, and nearer still would
+## leave it lost at the bottom of the view.
+const VIEW_NEARER := {"pistol": 0.1, "pistols": 0.08}
 ## Where the other hand steadies each weapon, from the model's middle.
 const OFF_HAND := {
 	"pistol": Vector3(-0.035, -0.125, 0.085),
@@ -66,6 +77,17 @@ const SIGHT_HEIGHT := 0.022
 static var _materials := {}
 
 
+## Where a hand closes round weapon `id`, from the model's middle.
+static func held_at(id: String) -> Vector3:
+	return HELD_AT.get(id, GRIP)
+
+
+## How far weapon `id` sits from where the others do in its holder's own
+## view (see VIEW_NEARER).
+static func view_offset(id: String) -> Vector3:
+	return Vector3(0.0, 0.0, VIEW_NEARER.get(id, 0.0))
+
+
 static func build(id: String) -> Node3D:
 	var model := Node3D.new()
 	model.name = "Model"
@@ -81,10 +103,15 @@ static func build(id: String) -> Node3D:
 			_sights(model, 0.0425, 0.07, -0.16)
 			muzzle_z = -0.18
 		"pistols":
-			# One in each hand; the sights are the right one's.
-			for side: float in [0.0, -PAIR_GAP]:
-				_box(model, Vector3(0.065, 0.08, 0.25), Vector3(side, 0.0, -0.04), GUNMETAL)
-				_box(model, Vector3(0.055, 0.14, 0.08), Vector3(side, -0.085, 0.05), WOOD)
+			# One in each hand; the sights are the right one's. The other is a
+			# node of its own, for a hand that holds it to carry.
+			var other := Node3D.new()
+			other.name = "LeftPistol"
+			other.position = Vector3(-PAIR_GAP, 0.0, 0.0)
+			model.add_child(other)
+			for pistol: Node3D in [model, other]:
+				_box(pistol, Vector3(0.065, 0.08, 0.25), Vector3(0.0, 0.0, -0.04), GUNMETAL)
+				_box(pistol, Vector3(0.055, 0.14, 0.08), Vector3(0.0, -0.085, 0.05), WOOD)
 			_box(model, Vector3(0.042, 0.05, 0.065), Vector3(0.0, -0.16, 0.05), DARK).name = "Magazine"
 			_sights(model, 0.04, 0.065, -0.15)
 			muzzle_z = -0.17
