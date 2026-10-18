@@ -1,5 +1,0 @@
-{
-  "signal": "wss://h8ty2w66k1.execute-api.us-east-2.amazonaws.com/prod",
-  "sessions": "https://ibgdmk27ymz4ynjrpnj7f5xlre0nlvyc.lambda-url.us-east-2.on.aws/",
-  "game": "https://cheesestrike-gamebucket-knurvtoylcsd.s3.us-east-2.amazonaws.com/index.html"
-}
