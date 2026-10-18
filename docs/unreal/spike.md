@@ -1,0 +1,72 @@
+# The Unreal spike
+
+A two-week build in Unreal Engine 5 to settle, with evidence, whether CheeseStrike moves from Godot to Unreal. The decision was taken in principle in October 2026: the goal is a serious first-person shooter on Steam that stands next to other shooters, and the engine comparison is in the conversation that led here. The spike exists so that the full port starts from a working skeleton rather than a blank project, and so that the two weeks are lost rather than two months if Unreal turns out to fight the way we work.
+
+What the spike is not: the game. No modes beyond free-for-all, no bots, no progression, no mice. Those come after, in the order [design.md](design.md) gives.
+
+## What "done" looks like
+
+At the end, all of the following, in one Unreal project in its own repository:
+
+1. **Two players over Steam.** One hosts as a listen server, the other joins through the Steam friends list or a session search, on the Steam test app id (480). Both move, jump, crouch, sprint and shoot each other with client-side prediction, so the joiner feels no lag on their own movement.
+2. **One arena, grey-boxed from the Godot layout.** Cheddar Canyon's floor, mesas, blocks, ramps, pads and starting spots, at real scale (see the scale rule in the design document), with Megascans or Fab textures on the floor, rock and walls, and the sky, sun and post-processing set up for a grounded daylight look.
+3. **One weapon with the Godot numbers.** The Cheddar Blaster: hitscan, 20 damage, 1.75 head multiplier, 0.12 s between shots, 24 in the magazine, falloff from 40 to 90 player-heights, bloom over 8 shots, recoil up 0.45 and sideways 0.35 per shot, aim-down-sights at 0.6 zoom. Hits decided on the server with lag compensation. A licensed rifle model with first-person arms.
+4. **Knock-outs and respawns.** Health, death, a respawn after a few seconds at the starting spot furthest from enemies, a kill feed and a scoreboard. A match ends at a kill limit.
+5. **The workflow holds up.** The project builds from the command line, a test (Unreal Automation) runs headless and is run by a GitHub Actions workflow, and the gameplay code is C++ rather than Blueprint, so that it can be read, edited and reviewed as text.
+6. **A screenshot next to the Godot one.** The same spot in Cheddar Canyon, at the same time of day, side by side with the native Forward+ build on the `godot-final` tag.
+
+Then the go/no-go: did building this feel like the way to build the next two years of the game? If yes, the spike project becomes the real repository and the port continues in [design.md](design.md)'s order. If no, the Godot project continues from `godot-final` with the asset list from October.
+
+## Before anything can start: manual steps
+
+These need an account, a password, a credit card or a licence click, so they are yours.
+
+1. **An Epic Games account**, and the Unreal Engine EULA accepted on it. The same account signs in to the Epic Games Launcher and to Fab.
+2. **The Epic Games Launcher**, then from its Unreal Engine tab install the current 5.x release (5.6 or newer; whichever is the latest non-preview). Tick "Editor symbols for debugging" off to save 30 GB. Expect about 60 GB for the engine itself.
+3. **Visual Studio 2022** (Community is fine) with the "Game development with C++" workload, and under its optional parts: the Windows 10 or 11 SDK, "Unreal Engine installer", and ".NET desktop development". Unreal's own setup page lists the exact boxes; the launcher checks them on first project creation.
+4. **Lyra Starter Game**, from the Launcher's Samples tab (it is Epic's and free). Also from Fab, claim while signed in: Epic's free Paragon characters and any current free-for-the-month packs that have weapons, military props or environment sets. Note that most Megascans moved to paid on Fab in 2025; there is still a free tier and Epic's own free samples (City Sample, the Lyra weapons and characters), and buying a texture bundle is cheap if the free ones run out.
+5. **A new GitHub repository** for the Unreal project, with Git LFS enabled (it is on by default for GitHub; the `.gitattributes` that routes `.uasset`, `.umap`, textures and audio through LFS is part of step 1 below). Decide its name. The Godot repository stays as it is, with the `godot-final` tag.
+6. **Steam, later.** A Steamworks partner account ($100 one-time) is only needed for the real app id, store page and achievements. The spike uses Steam's public test app id 480 ("Spacewar"), which needs only the Steam client installed and running on both PCs, signed in to two different accounts (any two accounts that have ever spent money; a second account may need a cheap game bought on it).
+7. **Disk and time.** Free 150 GB before starting: engine, Lyra, the project with its derived data, and Visual Studio. First-time shader compilation of Lyra takes an hour on this PC.
+
+What I need from you once those are done: the repository name and that the Launcher shows the engine installed. Everything after that, I can do from the terminal and the editor's command line, with you in the editor for the things that are only clickable (importing a model the first time, setting up the Steam plugin's project settings page).
+
+## The plan, by day
+
+Days are working days and are a guess; the order matters more than the dates.
+
+**Day 1: the project.** A C++ project from the First Person template (not Lyra: see below), named for the game, `.gitattributes` for LFS, `.gitignore` for Unreal, the editor's source control off (git is driven from outside). A `Source/` layout with one game module. Confirm it builds from `Build.bat` on the command line and opens. First commit.
+
+**Day 2: the character.** The template's character replaced with ours: a Character Movement Component tuned to the design document's movement table (walk, sprint, crouch, jump, air steering, slide), the camera at eye height, input through Enhanced Input with the Godot key bindings. Prediction and replication come with the component. A second window joining over the local network (`?listen` and `open 127.0.0.1`) proves it.
+
+**Day 3: the arena.** Cheddar Canyon grey-boxed from `game/world/maps/cheddar_canyon.tscn`, scaled by the scale rule, as static meshes or geometry brushes: floor, four mesas, the blocks, the ramps, the pads as markers, player starts. A directional light, sky atmosphere, sky light, exponential height fog, a post-process volume with Lumen on. Nothing textured yet.
+
+**Day 4: the weapon.** A weapon actor and a weapon-data asset holding the Godot stats, the Cheddar Blaster filled in. Firing on the client, a server RPC with the shot's origin and direction, server-side line trace with Unreal's lag compensation (the `AGameMode`'s hit-validation hooks or a short rewind of capsule positions, as Lyra does), damage with the head multiplier against a head bone or a head box, falloff, recoil and bloom applied on the client. Hit markers and a crosshair that opens with spread.
+
+**Day 5: knock-outs.** Health as a replicated attribute, death, ragdoll or a fall animation, respawn at the start furthest from enemies after the design's delay, a kill feed and scoreboard widget, a kill limit ending the match and a results screen. Free-for-all only.
+
+**Day 6: Steam.** The Online Subsystem Steam plugin, app id 480, sessions created and found through the subsystem, a join through the Steam overlay's friends list. Two PCs (or one PC and a laptop) over the internet, not the LAN.
+
+**Day 7: models and arms.** A licensed rifle and first-person arms from Fab, the animation blueprint for aiming, firing and reloading. The soldier model for other players, which may be Lyra's or Paragon's for the spike.
+
+**Day 8: materials and sky.** Megascans or Fab textures on the canyon floor and rock, a desert sky, the post-process tuned for a grounded look. The side-by-side screenshot.
+
+**Day 9: tests and CI.** One Automation test of the damage calculation and one of the shot validation, run headless with `UnrealEditor-Cmd.exe -ExecCmds="Automation RunTests ..."`, and a GitHub Actions workflow on a self-hosted runner (this PC) that builds and runs them. A hosted runner can't hold the engine.
+
+**Day 10: the verdict.** Play it for an evening with a second person. Write up what was easy, what was hard, and the decision.
+
+## Why the First Person template and not Lyra
+
+Lyra is the better shooter and the worse starting point. It is Epic's complete multiplayer shooter: the Gameplay Ability System for everything a player does, a modular game-feature architecture, dedicated server builds, cosmetics, a settings screen, ranked team modes. It is also 80,000 lines of C++ and Blueprints across plugins, with a learning curve measured in weeks before a change lands where you expect. Starting the game inside it means inheriting all of it.
+
+The plan is: build the spike on the First Person template, which is a character, a gun and a room, so that every system in the project is one we wrote and understand; and read Lyra as the reference for how Epic solves each problem (its weapon data, its lag-compensated traces, its session and team setup), taking its solutions one at a time as they are needed. If after the spike the Gameplay Ability System looks like the right fit for Overloads, power-ups and the mice, it is a plugin that can be added to our project; it does not have to come with Lyra around it.
+
+## What carries over from Godot, and how
+
+Nothing carries over as code. What carries over is the design, which [design.md](design.md) writes down in full, and three things in particular:
+
+- **The numbers.** Every weapon's stats, the movement constants, the mode rules, the mice, Overload and power-up timings, and the progression tables are tuning that took play to find. They go into Unreal data assets as they are, scaled by the scale rule where they are lengths.
+- **The arenas' layouts.** The `.tscn` files are plain lists of boxes with positions and sizes; `curd_city.gd` is a plan that builds a town. A script can read either and emit a level's actors. The dressing (holes in cheese, windows, fences) does not carry: it was a stand-in for real models.
+- **The tests' intent.** `game/test/unit/` is 23,000 lines of rules written down as tests. They are the specification of what the game does. Each system ported gets its rules re-expressed as Automation tests, reading the Godot test for what to assert.
+
+The signaling server, the browser tests, the WebRTC transport and the AWS stack do not come: Unreal's sessions over Steam replace all of them, and dedicated servers, if ever wanted, are an Unreal build target rather than a Lambda.
