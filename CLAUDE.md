@@ -1,6 +1,6 @@
 # CheeseStrike: Gouda Overload
 
-A cheese-themed multiplayer first-person shooter. The game is a Godot 4.7 project in `game/`, played mainly in the browser, where one player's browser hosts and the others connect to it over WebRTC. `signaling/` is the small Python server that lists sessions and brokers those connections: one set of rules (`signaling/core.py`), run by a single process in development (`signaling/local/`) and by a Lambda function on AWS (`signaling/cloud/`), which `infra/` sets up and deploys. The README covers setup, running and building; `docs/backend.md` covers the backend.
+A cheese-themed multiplayer first-person shooter. The game is a Godot 4.7 project in `game/`, headed for Steam as a native desktop build; it also runs in the browser, which is how it is developed and tested, with one player's browser hosting and the others connecting to it over WebRTC. `signaling/` is the small Python server that lists sessions and brokers those connections: one set of rules (`signaling/core.py`), run by a single process in development (`signaling/local/`) and by a Lambda function on AWS (`signaling/cloud/`), which `infra/` sets up and deploys. The README covers setup, running and building; `docs/backend.md` covers the backend.
 
 ## Testing rules
 
@@ -18,7 +18,7 @@ Before pushing, run the tests for what you changed: the GUT files it touches, or
 The game is played in a desktop browser, with keyboard and mouse or a gamepad. Nobody is expected to play it on a phone, so the phone experience (touch controls, gyro aim, the installable web app, full screen and sideways on a tap) stays as it is, with its tests, but gets no further work:
 
 - Don't add features, fixes or settings only for phones, and don't extend the touch layout to cover new actions.
-- Don't hold anything back for phones: not the picture, the frame budget, the build size, the interface's layout, nor what a host can simulate. The browser and its Compatibility renderer are the limits, not a phone.
+- Don't hold anything back for phones: not the picture, the frame budget, the build size, the interface's layout, nor what a host can simulate. The desktop build is the one to look best; the web build, which draws with the Compatibility renderer, only has to stay playable.
 - If a change breaks something that only matters on a phone and fixing it isn't easy, let it break and delete the tests and manual-test rows that cover it.
 
 ## Working in this repo

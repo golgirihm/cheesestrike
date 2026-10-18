@@ -23,13 +23,14 @@ shader_parameter/clouds = SubResource("NoiseTexture2D_clouds")
 
 [sub_resource type="Sky" id="Sky_clouds"]
 sky_material = SubResource("ShaderMaterial_sky")
-radiance_size = 0
+radiance_size = 2
 
 [sub_resource type="Environment" id="Environment_sky"]
 background_mode = 2
 sky = SubResource("Sky_clouds")
-ambient_light_source = 2
-reflected_light_source = 1
+ambient_light_source = 3
+ambient_light_sky_contribution = 0.6
+reflected_light_source = 2
 ambient_light_color = Color(0.82, 0.88, 1, 1)
 ambient_light_energy = 0.5
 
@@ -42,6 +43,7 @@ environment = SubResource("Environment_sky")
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.8192, -0.4699, 0.329, 0, 0.5736, 0.8192, -0.5736, -0.6711, 0.4699, 0, 10, 0)
 shadow_enabled = true
+directional_shadow_max_distance = 160.0
 
 [node name="Players" type="Node3D" parent="."]
 

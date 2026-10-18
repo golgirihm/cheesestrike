@@ -47,6 +47,7 @@ func test_the_shade_is_filled_with_cool_light_from_the_other_side_of_the_sky() -
 	assert_lt(Vector2(sun_way.x, sun_way.z).dot(Vector2(fill_way.x, fill_way.z)), 0.0, "from the other side")
 	assert_lt(fill_way.y, 0.0, "and from above")
 	assert_gt(fill.light_color.b, fill.light_color.r, "cool")
+	assert_lt(fill.light_color.s, 0.3, "a hint of it: shade is dim, not blue")
 	assert_gt(sun.light_color.r, sun.light_color.b, "against a warm sun")
 	assert_lt(fill.light_energy, sun.light_energy * 0.5, "never rivalling it")
 	# It follows the sun round as the sky changes.

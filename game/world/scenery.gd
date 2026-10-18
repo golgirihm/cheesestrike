@@ -24,13 +24,20 @@ const POST_SPACING := 3.0
 const REACH := 190.0
 
 const INK := Color(0.1, 0.1, 0.12)
-const CAR_COLOURS := [Color(0.8, 0.16, 0.14), Color(0.16, 0.4, 0.78), Color(0.9, 0.9, 0.88), Color(0.14, 0.55, 0.42), Color(0.22, 0.22, 0.26), Color(0.55, 0.3, 0.65)]
-const BUILDING_COLOURS := [Color(0.5, 0.6, 0.72), Color(0.66, 0.4, 0.33), Color(0.72, 0.72, 0.7), Color(0.36, 0.42, 0.55), Color(0.58, 0.5, 0.46), Color(0.42, 0.52, 0.5)]
+## The colours cars come in, and towers: the ones seen on a real street,
+## not a toy box's.
+const CAR_COLOURS := [Color(0.9, 0.9, 0.88), Color(0.62, 0.63, 0.65), Color(0.12, 0.12, 0.13), Color(0.3, 0.31, 0.34), Color(0.14, 0.2, 0.36), Color(0.42, 0.1, 0.1)]
+const BUILDING_COLOURS := [Color(0.56, 0.58, 0.62), Color(0.5, 0.42, 0.38), Color(0.66, 0.64, 0.6), Color(0.4, 0.43, 0.48), Color(0.52, 0.48, 0.44), Color(0.45, 0.5, 0.5)]
+## How much of a box's smallest side its edges are rounded by, and the least
+## and most, in metres: a chamfer that catches the light, not a cushion.
+const EDGE_SHARE := 0.03
+const EDGE_LEAST := 0.02
+const EDGE_MOST := 0.06
 
 ## How each kind of surroundings is coloured: the ground beyond the arena,
 ## and the fence's posts and rails.
 const LOOKS := {
-	MEADOW: {"ground": Color(0.3, 0.52, 0.26), "post": Color(0.95, 0.95, 0.93), "rail": Color(0.95, 0.95, 0.93)},
+	MEADOW: {"ground": Color(0.3, 0.52, 0.26), "post": Color(0.42, 0.36, 0.28), "rail": Color(0.5, 0.42, 0.32)},
 	CANYON: {"ground": Color(0.56, 0.34, 0.28), "post": Color(0.42, 0.27, 0.17), "rail": Color(0.5, 0.33, 0.2)},
 	CITY: {"ground": Color(0.46, 0.47, 0.5), "post": Color(0.3, 0.31, 0.35), "rail": Color(0.78, 0.2, 0.16)},
 }
@@ -132,7 +139,7 @@ static func _round(body: Node3D, surface := Textures.PLASTER) -> void:
 		# Its own colour, in what it is made of.
 		var plain := box.material as StandardMaterial3D
 		drawn.material_override = Textures.material(plain.albedo_color, surface) if plain != null else box.material
-		drawn.mesh = Rounded.box(box.size, clampf(least * 0.2, 0.04, 0.3))
+		drawn.mesh = Rounded.box(box.size, clampf(least * EDGE_SHARE, EDGE_LEAST, EDGE_MOST))
 
 
 # The size of the box `body` is, from its collision shape.
@@ -269,7 +276,7 @@ static func _building(body: Node3D) -> void:
 	var colour: Color = (drawn.material_override as StandardMaterial3D).albedo_color
 	drawn.material_override = _windows(colour)
 	var size := _size(body)
-	body.add_child(Rounded.instance(Rounded.box(Vector3(size.x + 0.8, 1.0, size.z + 0.8), 0.25), _material(INK.lightened(0.15)), Vector3(0, size.y / 2.0 + 0.3, 0)))
+	body.add_child(Rounded.instance(Rounded.box(Vector3(size.x + 0.8, 1.0, size.z + 0.8), 0.06), _material(INK.lightened(0.15)), Vector3(0, size.y / 2.0 + 0.3, 0)))
 	# A doorway on each side, so it reads as a building from the street:
 	# but not on a tower that begins above floors that can be walked into.
 	if body.position.y - size.y / 2.0 > 1.0:
@@ -467,8 +474,8 @@ static func _car(body: Node3D) -> void:
 	var colour: Color = CAR_COLOURS[body.name.trim_prefix("Car").to_int() % CAR_COLOURS.size()]
 	var paint := _material(colour)
 	var glass := _material(Color(0.16, 0.22, 0.3))
-	body.add_child(Rounded.instance(Rounded.box(Vector3(3.2, 1.05, 7.0), 0.4), paint, Vector3(0, 0.875, 0)))
-	body.add_child(Rounded.instance(Rounded.box(Vector3(2.8, 1.05, 3.4), 0.4), paint, Vector3(0, 1.875, 0.3)))
+	body.add_child(Rounded.instance(Rounded.box(Vector3(3.2, 1.05, 7.0), 0.12), paint, Vector3(0, 0.875, 0)))
+	body.add_child(Rounded.instance(Rounded.box(Vector3(2.8, 1.05, 3.4), 0.12), paint, Vector3(0, 1.875, 0.3)))
 	# Windows all round the cabin.
 	body.add_child(Rounded.instance(Rounded.box(Vector3(2.86, 0.6, 2.6), 0.1), glass, Vector3(0, 1.95, 0.3)))
 	body.add_child(Rounded.instance(Rounded.box(Vector3(2.3, 0.6, 3.46), 0.1), glass, Vector3(0, 1.95, 0.3)))
@@ -483,7 +490,7 @@ static func _car(body: Node3D) -> void:
 static func _bus(body: Node3D) -> void:
 	var size := _size(body)
 	var glass := _material(Color(0.16, 0.22, 0.3))
-	body.add_child(Rounded.instance(Rounded.box(Vector3(size.x, size.y - 0.5, size.z), 0.5), _material(Color(0.78, 0.14, 0.12)), Vector3(0, size.y / 2.0 + 0.25, 0)))
+	body.add_child(Rounded.instance(Rounded.box(Vector3(size.x, size.y - 0.5, size.z), 0.12), _material(Color(0.78, 0.14, 0.12)), Vector3(0, size.y / 2.0 + 0.25, 0)))
 	body.add_child(Rounded.instance(Rounded.box(Vector3(size.x + 0.06, 1.2, size.z - 1.6), 0.15), glass, Vector3(0, size.y - 1.3, 0)))
 	body.add_child(Rounded.instance(Rounded.box(Vector3(size.x - 0.6, 1.6, size.z + 0.06), 0.15), glass, Vector3(0, size.y - 1.5, 0)))
 	for side in [-1.0, 1.0]:
@@ -608,11 +615,11 @@ static func _meadow(parent: Node3D, edge: Rect2, rng: RandomNumberGenerator) -> 
 	barn.position = Vector3(edge.end.x + 26.0, 0, edge.position.y - 8.0)
 	barn.rotation.y = 0.5
 	parent.add_child(barn)
-	barn.add_child(Rounded.instance(Rounded.box(Vector3(12, 7, 16), 0.3), _material(Color(0.68, 0.16, 0.13)), Vector3(0, 3.5, 0)))
+	barn.add_child(Rounded.instance(Rounded.box(Vector3(12, 7, 16), 0.08), _material(Color(0.68, 0.16, 0.13)), Vector3(0, 3.5, 0)))
 	var roof := PackedVector2Array([Vector2(-7, 0), Vector2(7, 0), Vector2(0, 4.5)])
-	barn.add_child(Rounded.instance(Rounded.prism(roof, 17.0, 0.3), _material(Color(0.3, 0.3, 0.34)), Vector3(0, 7, 0)))
+	barn.add_child(Rounded.instance(Rounded.prism(roof, 17.0, 0.08), _material(Color(0.3, 0.3, 0.34)), Vector3(0, 7, 0)))
 	barn.add_child(Rounded.instance(Rounded.box(Vector3(4, 5, 0.3), 0.1), _material(Color(0.93, 0.93, 0.9)), Vector3(0, 2.5, 8.05)))
-	barn.add_child(Rounded.instance(Rounded.cylinder(2.6, 13.0, 1.2, 16), _material(Color(0.8, 0.82, 0.85)), Vector3(10, 6.5, -4)))
+	barn.add_child(Rounded.instance(Rounded.cylinder(2.6, 13.0, 0.3, 16), _material(Color(0.8, 0.82, 0.85)), Vector3(10, 6.5, -4)))
 
 
 # Red rock: flat-topped buttes near and far, and cactuses between them.

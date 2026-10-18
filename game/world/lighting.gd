@@ -12,8 +12,8 @@ extends Node3D
 ## stored. It is the same few cheap things on every machine.
 
 ## The cool of shade, and how strong beside the sun.
-const FILL := Color(0.62, 0.74, 1.0)
-const FILL_ENERGY := 0.28
+const FILL := Color(0.74, 0.8, 0.94)
+const FILL_ENERGY := 0.14
 const LAMP := Color(1.0, 0.82, 0.55)
 const LAMP_ENERGY := 2.6
 const LAMP_RANGE := 18.0

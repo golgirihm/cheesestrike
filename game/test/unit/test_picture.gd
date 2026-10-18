@@ -1,6 +1,6 @@
 extends GutTest
-## Glow on bright things, each arena's cast of colour and the darker corners
-## of the view, and the settings that turn each off.
+## Shade in corners, glow on bright things, each arena's cast of colour and
+## the darker corners of the view, and the settings that turn each off.
 
 const WORLD := preload("res://world/world.tscn")
 const KEYS := [Picture.BLOOM, Picture.GRADE, Picture.VIGNETTE]
@@ -64,9 +64,25 @@ func test_low_graphics_has_no_glow_whatever_is_asked() -> void:
 		assert_false(Picture.glows(level, false), level)
 
 
+func test_corners_are_shaded_on_all_but_low_graphics() -> void:
+	assert_false(Picture.shades(GraphicsQuality.LOW))
+	assert_true(Picture.shades(GraphicsQuality.MEDIUM))
+	assert_true(Picture.shades(GraphicsQuality.HIGH))
+	# A player is three times the height of a person, so the shade reaches
+	# further than it would in a room, but not across one.
+	assert_between(Picture.SHADE_RADIUS, 1.5, 4.0)
+
+
+func test_the_desktop_draws_with_the_renderer_that_can_shade_and_the_web_with_the_one_it_can_run() -> void:
+	assert_eq(ProjectSettings.get_setting("rendering/renderer/rendering_method"), "forward_plus")
+	assert_eq(ProjectSettings.get_setting("rendering/renderer/rendering_method.web"), "gl_compatibility")
+
+
 func test_the_picture_is_put_into_the_environment() -> void:
 	var environment := Environment.new()
 	Picture.apply(environment, "city", GraphicsQuality.HIGH, _all(true))
+	assert_true(environment.ssao_enabled)
+	assert_almost_eq(environment.ssao_radius, Picture.SHADE_RADIUS, 0.0001)
 	assert_true(environment.glow_enabled)
 	assert_eq(environment.glow_intensity, Picture.GLOW_INTENSITY)
 	assert_true(environment.adjustment_enabled)
@@ -87,6 +103,7 @@ func test_the_picture_is_put_into_the_environment() -> void:
 	assert_false(environment.adjustment_enabled)
 	Picture.apply(environment, "city", GraphicsQuality.LOW, _all(true))
 	assert_false(environment.glow_enabled, "no glow on low")
+	assert_false(environment.ssao_enabled, "nor shade in corners")
 	assert_true(environment.adjustment_enabled, "but the cast costs nothing")
 	Picture.apply(environment, Maps.RANGE, GraphicsQuality.HIGH, _all(true))
 	assert_false(environment.adjustment_enabled, "nothing to do for a plain arena")

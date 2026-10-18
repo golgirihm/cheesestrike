@@ -208,7 +208,7 @@ func _build_train() -> Node3D:
 	add_child(train)
 	for carriage in 5:
 		var colour := Color(0.75, 0.2, 0.16) if carriage == 0 else Color(0.3, 0.42, 0.55)
-		train.add_child(_part(Rounded.box(Vector3(16.0, 5.0, 4.0), 0.4), colour, Vector3(-carriage * 17.5, 3.4, 0)))
+		train.add_child(_part(Rounded.box(Vector3(16.0, 5.0, 4.0), 0.1), colour, Vector3(-carriage * 17.5, 3.4, 0)))
 		train.add_child(_part(Rounded.box(Vector3(14.0, 1.4, 4.1), 0.1), INK.lightened(0.5), Vector3(-carriage * 17.5, 4.3, 0)))
 	return train
 

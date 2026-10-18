@@ -1,8 +1,11 @@
 class_name Picture
-## What is done to the picture after the arena is drawn: bright things glow,
-## each arena has its own cast of colour, and the corners of the view are a
-## little darker than its middle. Each can be turned off in the settings,
-## and the glow, which costs the most, is left off on low graphics.
+## What is done to the picture after the arena is drawn: corners and the
+## foot of things are shaded where light would struggle to reach, bright
+## things glow, each arena has its own cast of colour, and the corners of the
+## view are a little darker than its middle. The glow, the cast and the
+## corners can be turned off in the settings, and the glow and the shading,
+## which cost the most, are left off on low graphics. The shading is only
+## drawn by the desktop renderer: the web build's has no way to.
 
 ## The settings that turn each on.
 const BLOOM := "bloom"
@@ -26,6 +29,10 @@ const PLAIN := {"brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "tint": C
 ## How strongly bright things glow, and how bright a thing must be to.
 const GLOW_INTENSITY := 0.5
 const GLOW_THRESHOLD := 0.92
+## How far the shading in corners reaches, in metres (a player is 5.4 m
+## tall, so further than it would in a room), and how dark it goes.
+const SHADE_RADIUS := 2.5
+const SHADE_INTENSITY := 2.5
 ## How dark the corners of the view get.
 const VIGNETTE_STRENGTH := 0.3
 
@@ -51,10 +58,18 @@ static func glows(level: String, wants: bool) -> bool:
 	return wants and level != GraphicsQuality.LOW
 
 
+## Whether corners are shaded on graphics quality `level`: not on low.
+static func shades(level: String) -> bool:
+	return level != GraphicsQuality.LOW
+
+
 ## Puts the picture for arena `map` on graphics quality `level` into
 ## `environment`, as the settings in `wanted` ({BLOOM, GRADE, VIGNETTE:
 ## bool}) have it.
 static func apply(environment: Environment, map: String, level: String, wanted: Dictionary) -> void:
+	environment.ssao_enabled = shades(level)
+	environment.ssao_radius = SHADE_RADIUS
+	environment.ssao_intensity = SHADE_INTENSITY
 	environment.glow_enabled = glows(level, wanted.get(BLOOM, true))
 	environment.glow_intensity = GLOW_INTENSITY
 	environment.glow_hdr_threshold = GLOW_THRESHOLD
