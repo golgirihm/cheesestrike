@@ -1,5 +1,0 @@
-# What the signaling and infra tests need, on top of what the server needs.
--r requirements.txt
-boto3==1.43.112
-moto[dynamodb,s3]==5.2.4
-cfn-lint==1.57.2
