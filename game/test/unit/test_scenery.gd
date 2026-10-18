@@ -33,6 +33,20 @@ func test_no_box_in_any_arena_has_a_hard_edge() -> void:
 			assert_false(mesh.mesh is PrismMesh, "%s: %s is a plain wedge" % [id, mesh.get_path()])
 
 
+func test_edges_are_chamfers_that_catch_the_light_not_cushions() -> void:
+	assert_lte(Scenery.EDGE_MOST, 0.08, "a few centimetres on the biggest wall")
+	assert_gte(Scenery.EDGE_LEAST, 0.01, "and still never a hard edge")
+	assert_lte(Scenery.EDGE_SHARE, 0.05)
+	var map: Node3D = await _load("box")
+	for body: Node3D in map.get_node("Geometry").get_children():
+		if not body.name.begins_with("Block"):
+			continue
+		var drawn: MeshInstance3D = body.get_node("MeshInstance3D")
+		var size: Vector3 = (body.get_node("CollisionShape3D").shape as BoxShape3D).size
+		var least := minf(size.x, minf(size.y, size.z))
+		assert_same(drawn.mesh, Rounded.box(size, clampf(least * Scenery.EDGE_SHARE, Scenery.EDGE_LEAST, Scenery.EDGE_MOST)), body.name)
+
+
 func test_a_rounded_box_is_drawn_the_size_it_is_solid() -> void:
 	for id: String in Maps.ORDER:
 		var map: Node3D = await _load(id)
@@ -189,9 +203,13 @@ func test_cheese_blocks_have_holes_on_their_faces() -> void:
 		assert_lte(sideways[1] + radius, half.x, "not over the edge")
 
 
-func test_the_sky_has_clouds() -> void:
+func test_the_sky_has_clouds_lights_the_shade_and_shows_in_steel() -> void:
 	var environment: Environment = world.get_node("WorldEnvironment").environment
 	assert_eq(environment.background_mode, Environment.BG_SKY)
+	assert_eq(environment.ambient_light_source, Environment.AMBIENT_SOURCE_SKY, "shade is lit from the sky above, not a flat colour")
+	assert_between(environment.ambient_light_sky_contribution, 0.4, 0.8, "and still takes some of each sky's own cast")
+	assert_eq(environment.reflected_light_source, Environment.REFLECTION_SOURCE_SKY)
+	assert_gte(environment.sky.radiance_size, Sky.RADIANCE_SIZE_128, "finely enough for a reflection to be a sky")
 	var material := environment.sky.sky_material as ShaderMaterial
 	assert_not_null(material)
 	assert_string_contains(material.shader.code, "shader_type sky")

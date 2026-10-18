@@ -39,6 +39,27 @@ func test_every_kind_has_a_picture_that_darkens_gently_and_repeats() -> void:
 		assert_gt(total / (Textures.SIZE * Textures.SIZE), 0.78, "%s keeps a thing its colour" % kind)
 
 
+func test_every_kind_has_a_relief_cut_from_its_picture() -> void:
+	for kind: String in Textures.KINDS:
+		assert_true(Textures.RELIEF.has(kind), kind)
+		var relief := Textures.relief(kind)
+		assert_eq(relief.get_width(), Textures.SIZE, kind)
+		assert_eq(relief.get_height(), Textures.SIZE, kind)
+		assert_same(Textures.relief(kind), relief, "%s is made once" % kind)
+		var image := relief.get_image()
+		assert_true(image.has_mipmaps(), "%s doesn't shimmer far off" % kind)
+		# A normal map: mostly facing straight out (blue), tilting here and there.
+		var tilted := 0
+		for y in Textures.SIZE:
+			for x in Textures.SIZE:
+				var facing := image.get_pixel(x, y)
+				assert_gt(facing.b, 0.5, "%s: nothing faces backward" % kind)
+				if absf(facing.r - 0.5) >= 0.01 or absf(facing.g - 0.5) >= 0.01:
+					tilted += 1
+		assert_gt(tilted, 0, "%s has some relief" % kind)
+	assert_gt(Textures.RELIEF[Textures.COBBLE], Textures.RELIEF[Textures.METAL], "stones stand out, brushed steel barely")
+
+
 func test_no_two_kinds_look_the_same() -> void:
 	var seen := {}
 	for kind: String in Textures.KINDS:
@@ -56,6 +77,10 @@ func test_a_material_keeps_its_colour_and_is_made_once() -> void:
 	assert_true(red.uv1_triplanar, "laid on by where it is, not by how the shape was made")
 	assert_true(red.uv1_world_triplanar)
 	assert_almost_eq(red.uv1_scale.x, 1.0 / Textures.SPAN[Textures.WOOD], 0.0001)
+	assert_true(red.normal_enabled, "with the relief of what it is made of")
+	assert_same(red.normal_texture, Textures.relief(Textures.WOOD))
+	assert_eq(red.metallic, 0.0, "wood scatters the light")
+	assert_gt(Textures.material(Color.WHITE, Textures.METAL).metallic, 0.5, "steel mirrors the sky")
 	assert_same(Textures.material(Color(0.8, 0.2, 0.2), Textures.WOOD), red)
 	assert_ne(Textures.material(Color(0.8, 0.2, 0.2), Textures.ROCK), red)
 	assert_eq(Textures.material(Color.WHITE, "moon dust").get_meta("surface"), Textures.PLASTER, "an unknown kind is plaster")

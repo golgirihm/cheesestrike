@@ -22,7 +22,7 @@ Things about how it works that shape the plan:
 - **The web export is single-threaded** (`thread_support=false`), which lets it run on any static host without special headers. Keep it that way unless something needs threads badly enough to justify the hosting requirements.
 - **The arena editor needs a keyboard and mouse**, and makes flat arenas: a floor of one of three sizes with blocks, walls, crates and pads on a grid (`game/world/arena_code.gd`). An arena is a short code, kept in the player's settings and shared in a link; the host sends it to whoever joins.
 - **The light is not baked.** Each arena has a sun, a cool fill light, soft dark edges drawn on the ground round what stands on it, and in some a few lamps: all cheap, and all worked out as the game runs. Real baked lighting needs the editor to bake it and the baked maps to be downloaded.
-- **The renderer is Compatibility**, the one that runs in browsers. It has no ambient occlusion, volumetric light or screen-space reflections, so the look has to come from shapes, colour, baked light and particles.
+- **Desktop builds draw with Forward+, the web build with Compatibility** (`rendering_method` and `rendering_method.web` in `project.godot`). Native is the real platform and the web build is for development, so anything the picture gains on desktop (ambient occlusion in corners, soft shadows, reflections of the sky) is simply absent on the web, which has to stay playable without it: a browser window is how the tests play.
 - **The session list knows two modes and three arenas.** The server that keeps the list accepts only free-for-all and teams, and only the first three arenas, so a session in any newer mode is listed as whichever of those two is nearer, and one on a newer arena, or on one a player laid out, as Cheddar Canyon (`MatchSettings.advertised`). Nor is it told of bots, the host's rules or the sky. Players get all of it once they join. Listing it properly means teaching `signaling/` the rest.
 - **There is no server that keeps anything.** Names and settings live in each browser. Anything a player earns and keeps (Milestone 11) needs either that, which can't be trusted, or a service and a database, which have to be run and paid for.
 - **Almost everything is made in code**: meshes, sounds, arenas' dressing. That has kept the build small and the look consistent, and it has a ceiling. Recorded sound, textures and animation (Milestones 4, 7 and 9) mean taking on assets, their licences and their size.
@@ -81,7 +81,7 @@ The shooting works and is fair. This milestone is about how it feels in the hand
 
 ## Milestone 8: A picture that holds up
 
-The game uses the Compatibility renderer so it runs in a browser. Some effects common in big games (ambient occlusion, volumetric light, screen-space reflections) aren't available there. Items here stay within it; a second, richer renderer for desktop builds is in Milestone 13.
+Desktop builds draw with Forward+ and the web build with Compatibility, which has no ambient occlusion, volumetric light or screen-space reflections. An item here may use what only Forward+ has, as the shade in corners does (`game/world/picture.gd`), so long as the web build still plays without it.
 
 1. **Simpler shapes far away, and nothing drawn behind walls.** Small dressing is already left out far away (`game/world/detail.gd`). Still to do: a simpler shape for far characters and scenery in place of the full one, and leaving out what a wall hides, if occlusion culling can be had in the browser.
    *Tests:* extend `test_detail.gd` and its budgets.
@@ -136,9 +136,7 @@ Everything here needs somewhere to keep what a player has earned. Start with the
 
 1. **Desktop builds.** Windows, macOS and Linux builds with full screen, resolutions and windowed modes, published from CI.
    *Tests:* CI builds each and runs the game tests on it.
-2. **A richer picture on desktop.** Offer the Forward+ or Mobile renderer on desktop builds, for the lighting and effects the browser can't have, with the Compatibility look as the floor.
-   *Tests:* the benchmark scene on both.
-3. **A storefront.** Steam: a page, achievements, friends and invites through it, cloud saves, and the Steam Deck checked.
+2. **A storefront.** Steam: a page, achievements, friends and invites through it, cloud saves, and the Steam Deck checked.
    *Tests:* manual rows.
 4. **Gamepads in the menus.** Button pictures that match the controller, and every menu usable without a mouse. (Aim assist that only slows the view, response curves, a dead zone and rumble are done.)
    *Tests:* GUT tests of menu focus on every screen.

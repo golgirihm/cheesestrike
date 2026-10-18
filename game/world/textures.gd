@@ -27,6 +27,13 @@ const SIZE := 64
 const SPAN := {DIRT: 5.0, ROCK: 6.0, WOOD: 3.0, ASPHALT: 3.0, TILE: 4.0, COBBLE: 4.0, METAL: 4.0, PLASTER: 6.0, BREAD: 2.5, CHEESE: 4.0}
 ## How rough each is to the light.
 const ROUGH := {DIRT: 0.95, ROCK: 0.9, WOOD: 0.75, ASPHALT: 0.9, TILE: 0.45, COBBLE: 0.85, METAL: 0.35, PLASTER: 0.85, BREAD: 0.9, CHEESE: 0.6}
+## Which are metal, and so mirror the sky a little rather than only scatter
+## its light.
+const METALLIC := {METAL: 0.7}
+## How deep the light and shade of each picture is taken to lie, for the
+## relief a surface shows under raking light: a bump where the picture is
+## light, a dip where it is dark.
+const RELIEF := {DIRT: 2.0, ROCK: 4.0, WOOD: 1.5, ASPHALT: 1.0, TILE: 3.0, COBBLE: 5.0, METAL: 0.5, PLASTER: 4.0, BREAD: 2.0, CHEESE: 3.0}
 ## What the solid pieces of an arena are made of, by how their names begin;
 ## anything else is plaster. A piece can say otherwise with its own
 ## `surface`.
@@ -40,6 +47,7 @@ const BY_NAME := {
 const FLOORS := {"meadow": DIRT, "canyon": DIRT, "city": ASPHALT}
 
 static var _pictures := {}
+static var _reliefs := {}
 static var _materials := {}
 
 
@@ -70,6 +78,9 @@ static func material(colour: Color, kind: String) -> StandardMaterial3D:
 		made.uv1_world_triplanar = true
 		made.uv1_scale = Vector3.ONE / SPAN[kind]
 		made.roughness = ROUGH[kind]
+		made.metallic = METALLIC.get(kind, 0.0)
+		made.normal_enabled = true
+		made.normal_texture = relief(kind)
 		made.set_meta("surface", kind)
 		_materials[key] = made
 	return _materials[key]
@@ -87,6 +98,18 @@ static func picture(kind: String) -> ImageTexture:
 		image.generate_mipmaps()
 		_pictures[kind] = ImageTexture.create_from_image(image)
 	return _pictures[kind]
+
+
+## The relief of the picture for `kind`: which way each point of it faces,
+## taking its light and shade as high and low ground.
+static func relief(kind: String) -> ImageTexture:
+	if not _reliefs.has(kind):
+		var image := picture(kind).get_image().duplicate() as Image
+		image.clear_mipmaps()
+		image.bump_map_to_normal_map(RELIEF[kind])
+		image.generate_mipmaps()
+		_reliefs[kind] = ImageTexture.create_from_image(image)
+	return _reliefs[kind]
 
 
 ## How light the picture for `kind` is at pixel (x, y): 1 leaves the
