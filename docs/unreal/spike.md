@@ -6,7 +6,7 @@ What the spike is not: the game. No modes beyond free-for-all, no bots, no progr
 
 ## What "done" looks like
 
-At the end, all of the following, in one Unreal project in its own repository:
+At the end, all of the following, in one Unreal project on this repository's `main`, with the Godot game kept at the `godot-final` tag:
 
 1. **Two players over Steam.** One hosts as a listen server, the other joins through the Steam friends list or a session search, on the Steam test app id (480). Both move, jump, crouch, sprint and shoot each other with client-side prediction, so the joiner feels no lag on their own movement.
 2. **One arena, grey-boxed from the Godot layout.** Cheddar Canyon's floor, mesas, blocks, ramps, pads and starting spots, at real scale (see the scale rule in the design document), with Megascans or Fab textures on the floor, rock and walls, and the sky, sun and post-processing set up for a grounded daylight look.
@@ -23,19 +23,19 @@ These need an account, a password, a credit card or a licence click, so they are
 
 1. **An Epic Games account**, and the Unreal Engine EULA accepted on it. The same account signs in to the Epic Games Launcher and to Fab.
 2. **The Epic Games Launcher**, then from its Unreal Engine tab install the current 5.x release (5.6 or newer; whichever is the latest non-preview). Tick "Editor symbols for debugging" off to save 30 GB. Expect about 60 GB for the engine itself.
-3. **Visual Studio 2022** (Community is fine) with the "Game development with C++" workload, and under its optional parts: the Windows 10 or 11 SDK, "Unreal Engine installer", and ".NET desktop development". Unreal's own setup page lists the exact boxes; the launcher checks them on first project creation.
+3. **Visual Studio 2022 Community** with the "Game development with C++" workload, and under its optional parts: the Windows 10 or 11 SDK, "Unreal Engine installer", and ".NET desktop development". Unreal's own setup page lists the exact boxes; the launcher checks them on first project creation. Community is free for an individual developer whatever the game earns; its revenue clause (over $1M a year, or over 250 PCs) applies to organizations of more than five developers, and even then a Professional seat is about $45 a month, beside Epic's 5 percent. There is no way round Microsoft's toolchain for a Windows build: Clang on Windows uses the same headers, libraries and SDK, and Unreal does not cross-compile Windows from Linux.
 4. **Lyra Starter Game**, from the Launcher's Samples tab (it is Epic's and free). Also from Fab, claim while signed in: Epic's free Paragon characters and any current free-for-the-month packs that have weapons, military props or environment sets. Note that most Megascans moved to paid on Fab in 2025; there is still a free tier and Epic's own free samples (City Sample, the Lyra weapons and characters), and buying a texture bundle is cheap if the free ones run out.
-5. **A new GitHub repository** for the Unreal project, with Git LFS enabled (it is on by default for GitHub; the `.gitattributes` that routes `.uasset`, `.umap`, textures and audio through LFS is part of step 1 below). Decide its name. The Godot repository stays as it is, with the `godot-final` tag.
+5. **Make this repository private**, in its settings on GitHub, before the first Unreal commit. The Unreal project is mostly assets, and Fab and Marketplace licences forbid redistributing their files, so the project cannot be public the way the Godot source was. The Godot tree is then deleted from `main` in one commit; its history, the `godot-final` tag and the release stay as they are. Git LFS is on by default for GitHub, and the `.gitattributes` that routes `.uasset`, `.umap`, textures and audio through it is part of day 1. The free LFS allowance (1 GB stored, 1 GB a month down) is gone within a week of an Unreal project, so buy one **LFS data pack** ($5 a month for 50 GB) when GitHub starts refusing pushes; more as it grows. If the Godot source should stay public as a portfolio piece instead, start a second private repository for Unreal; tell me which.
 6. **Steam, later.** A Steamworks partner account ($100 one-time) is only needed for the real app id, store page and achievements. The spike uses Steam's public test app id 480 ("Spacewar"), which needs only the Steam client installed and running on both PCs, signed in to two different accounts (any two accounts that have ever spent money; a second account may need a cheap game bought on it).
 7. **Disk and time.** Free 150 GB before starting: engine, Lyra, the project with its derived data, and Visual Studio. First-time shader compilation of Lyra takes an hour on this PC.
 
-What I need from you once those are done: the repository name and that the Launcher shows the engine installed. Everything after that, I can do from the terminal and the editor's command line, with you in the editor for the things that are only clickable (importing a model the first time, setting up the Steam plugin's project settings page).
+What I need from you once those are done: that the repository is private (or the second repository's name) and that the Launcher shows the engine installed. Everything after that, I can do from the terminal and the editor's command line, with you in the editor for the things that are only clickable (importing a model the first time, setting up the Steam plugin's project settings page).
 
 ## The plan, by day
 
 Days are working days and are a guess; the order matters more than the dates.
 
-**Day 1: the project.** A C++ project from the First Person template (not Lyra: see below), named for the game, `.gitattributes` for LFS, `.gitignore` for Unreal, the editor's source control off (git is driven from outside). A `Source/` layout with one game module. Confirm it builds from `Build.bat` on the command line and opens. First commit.
+**Day 1: the project.** The Godot tree removed from `main` in one commit, then a C++ project from the First Person template (not Lyra: see below), named for the game, `.gitattributes` for LFS, `.gitignore` for Unreal, the editor's source control off (git is driven from outside), and CLAUDE.md, the README and the workflows rewritten for Unreal. A `Source/` layout with one game module. Confirm it builds from `Build.bat` on the command line and opens. First commit.
 
 **Day 2: the character.** The template's character replaced with ours: a Character Movement Component tuned to the design document's movement table (walk, sprint, crouch, jump, air steering, slide), the camera at eye height, input through Enhanced Input with the Godot key bindings. Prediction and replication come with the component. A second window joining over the local network (`?listen` and `open 127.0.0.1`) proves it.
 
@@ -54,6 +54,10 @@ Days are working days and are a guess; the order matters more than the dates.
 **Day 9: tests and CI.** One Automation test of the damage calculation and one of the shot validation, run headless with `UnrealEditor-Cmd.exe -ExecCmds="Automation RunTests ..."`, and a GitHub Actions workflow on a self-hosted runner (this PC) that builds and runs them. A hosted runner can't hold the engine.
 
 **Day 10: the verdict.** Play it for an evening with a second person. Write up what was easy, what was hard, and the decision.
+
+## Source control: Git with LFS now, Perforce if there are ever several of us
+
+Unreal studios use Perforce (Helix Core), and the editor integrates with it: exclusive checkout of a binary asset so two people never edit the same one, which git cannot do well. Helix Core is free for up to five users and twenty workspaces, with no storage limit, but you run the server: on this PC, or a cloud machine at $10 to $40 a month for the disk, with backups your own problem. Past five users it costs hundreds of dollars a user a year. Git with LFS keeps GitHub, pull requests, Actions and the way the work has been reviewed so far, for $5 a month per 50 GB. For one developer, and for two who talk, git wins; Perforce is the move when a second person edits binary assets every day. Azure DevOps Repos is the free middle option (five users, no published LFS cap) if the GitHub LFS bill ever matters.
 
 ## Why the First Person template and not Lyra
 
