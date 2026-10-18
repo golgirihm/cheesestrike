@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 // That the project is put together as it should be: it opens on the shooter
-// level with the shooter's rules, and the template's Blueprints, saved against
+// level with the game's own rules, and the template's Blueprints, saved against
 // the template's own C++ classes, load against ours.
 
 #include "Misc/AutomationTest.h"
@@ -12,7 +12,7 @@
 #include "UObject/CoreRedirects.h"
 #include "CheeseStrikeCharacter.h"
 #include "ShooterCharacter.h"
-#include "ShooterGameMode.h"
+#include "CheeseStrikeGameMode.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -32,7 +32,7 @@ bool FOpensOnTheShooterLevel::RunTest(const FString& Parameters)
 	const UClass* Mode = LoadClass<AGameModeBase>(nullptr, *UGameMapsSettings::GetGlobalDefaultGameMode());
 	if (TestNotNull(TEXT("the default game mode loads"), Mode))
 	{
-		TestTrue(TEXT("and plays by the shooter's rules"), Mode->IsChildOf(AShooterGameMode::StaticClass()));
+		TestEqual(TEXT("and is the game's own"), Mode, static_cast<const UClass*>(ACheeseStrikeGameMode::StaticClass()));
 	}
 	return true;
 }

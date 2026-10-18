@@ -1,76 +1,43 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+// Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #include "CheeseStrikePlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
 #include "CheeseStrikeCameraManager.h"
-#include "Blueprint/UserWidget.h"
 #include "CheeseStrike.h"
-#include "Widgets/Input/SVirtualJoystick.h"
+#include "Input/CheeseStrikeInput.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 {
-	// set the player camera manager class
 	PlayerCameraManagerClass = ACheeseStrikeCameraManager::StaticClass();
-}
-
-void ACheeseStrikePlayerController::BeginPlay()
-{
-	Super::BeginPlay();
-
-	
-	// only spawn touch controls on local player controllers
-	if (IsLocalPlayerController() && ShouldUseTouchControls())
-	{
-		// spawn the mobile controls widget
-		MobileControlsWidget = CreateWidget<UUserWidget>(this, MobileControlsWidgetClass);
-
-		if (MobileControlsWidget)
-		{
-			// add the controls to the player screen
-			MobileControlsWidget->AddToPlayerScreen(0);
-
-		} else {
-
-			UE_LOG(LogCheeseStrike, Error, TEXT("Could not spawn mobile controls widget."));
-
-		}
-
-	}
 }
 
 void ACheeseStrikePlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-
-	// only add IMCs for local player controllers
-	if (IsLocalPlayerController())
+	if (!IsLocalPlayerController())
 	{
-		// Add Input Mapping Context
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-		{
-			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
-			{
-				Subsystem->AddMappingContext(CurrentContext, 0);
-			}
-
-			// only add these IMCs if we're not using mobile touch input
-			if (!ShouldUseTouchControls())
-			{
-				for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
-				{
-					Subsystem->AddMappingContext(CurrentContext, 0);
-				}
-			}
-		}
+		return;
 	}
-	
-}
-
-bool ACheeseStrikePlayerController::ShouldUseTouchControls() const
-{
-	// are we on a mobile platform? Should we force touch?
-	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer());
+	if (Subsystem == nullptr)
+	{
+		return;
+	}
+	// The game's own bindings, made in code.
+	if (const UCheeseStrikeInputSet* Input = UCheeseStrikeInputSet::Get(this))
+	{
+		Subsystem->AddMappingContext(Input->Context, 0);
+	}
+	else
+	{
+		UE_LOG(LogCheeseStrike, Error, TEXT("'%s' has no input set to put on."), *GetNameSafe(this));
+	}
+	// And any a Blueprint of this controller adds, as the template's do.
+	for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
+	{
+		Subsystem->AddMappingContext(CurrentContext, 0);
+	}
 }

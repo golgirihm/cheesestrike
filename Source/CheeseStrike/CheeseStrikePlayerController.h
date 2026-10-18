@@ -1,4 +1,5 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+// Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #pragma once
 
@@ -7,51 +8,24 @@
 #include "CheeseStrikePlayerController.generated.h"
 
 class UInputMappingContext;
-class UUserWidget;
 
 /**
- *  Simple first person Player Controller
- *  Manages the input mapping context.
- *  Overrides the Player Camera Manager class.
+ * The player's controller: puts the game's input bindings on for a local
+ * player (see UCheeseStrikeInputSet), and limits how far the view looks up
+ * and down through its camera manager.
  */
-UCLASS(abstract, config="Game")
+UCLASS()
 class CHEESESTRIKE_API ACheeseStrikePlayerController : public APlayerController
 {
 	GENERATED_BODY()
-	
-public:
 
-	/** Constructor */
+public:
 	ACheeseStrikePlayerController();
 
 protected:
-
-	/** Input Mapping Contexts */
+	/** Mapping contexts a Blueprint of this controller adds, besides the game's own. */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
-	TArray<UInputMappingContext*> DefaultMappingContexts;
+	TArray<TObjectPtr<UInputMappingContext>> DefaultMappingContexts;
 
-	/** Input Mapping Contexts */
-	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
-	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
-
-	/** Mobile controls widget to spawn */
-	UPROPERTY(EditAnywhere, Category="Input|Touch Controls")
-	TSubclassOf<UUserWidget> MobileControlsWidgetClass;
-
-	/** Pointer to the mobile controls widget */
-	UPROPERTY()
-	TObjectPtr<UUserWidget> MobileControlsWidget;
-
-	/** If true, the player will use UMG touch controls even if not playing on mobile platforms */
-	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
-	bool bForceTouchControls = false;
-
-	/** Gameplay initialization */
-	virtual void BeginPlay() override;
-
-	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;
-
-	/** Returns true if the player should use UMG touch controls */
-	bool ShouldUseTouchControls() const;
 };
