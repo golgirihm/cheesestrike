@@ -1,9 +1,23 @@
-# Godot
-.godot/
-*.tmp
+# Made by Unreal and Visual Studio from what is in the repository.
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+.vs/
+.vsconfig
+*.sln
+*.slnx
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.VC.db
+*.opendb
 
-# Exported builds
-/build/
+# Packaged builds.
+/Build/
+/Packaged/
 
-# Python
+# Python.
 __pycache__/
