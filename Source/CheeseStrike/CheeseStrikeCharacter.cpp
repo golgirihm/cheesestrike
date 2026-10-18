@@ -1,4 +1,5 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+// Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #include "CheeseStrikeCharacter.h"
 #include "Animation/AnimInstance.h"
@@ -6,24 +7,40 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EnhancedInputComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "InputActionValue.h"
-#include "GameFramework/CharacterMovementComponent.h"
+#include "UObject/ConstructorHelpers.h"
 #include "CheeseStrike.h"
+#include "Input/CheeseStrikeInput.h"
+#include "Movement/CheeseStrikeMovement.h"
+#include "Movement/CheeseStrikeMovementComponent.h"
 
-ACheeseStrikeCharacter::ACheeseStrikeCharacter()
+ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCheeseStrikeMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
-	// Set size for collision capsule
-	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
-	
-	// Create the first person mesh that will be viewed only by this character's owner
-	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
+	using namespace CheeseStrikeMovement;
+	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
 
+	// The body everyone else sees, and the copy of it its own player sees,
+	// each moved by the template's animation: the mannequin standing on the
+	// capsule's floor, turned to face its front.
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Mannequin(TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
+	static ConstructorHelpers::FClassFinder<UAnimInstance> BodyAnimation(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"));
+	static ConstructorHelpers::FClassFinder<UAnimInstance> ArmsAnimation(TEXT("/Game/FirstPerson/Anims/ABP_FP_Copy"));
+	GetMesh()->SetSkeletalMeshAsset(Mannequin.Object);
+	GetMesh()->SetAnimInstanceClass(BodyAnimation.Class);
+	GetMesh()->SetRelativeLocationAndRotation(FVector(-10.0f, 0.0f, -CapsuleHalfHeight), FRotator(0.0f, -90.0f, 0.0f));
+	GetMesh()->SetOwnerNoSee(true);
+	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
+
+	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 	FirstPersonMesh->SetupAttachment(GetMesh());
+	FirstPersonMesh->SetSkeletalMeshAsset(Mannequin.Object);
+	FirstPersonMesh->SetAnimInstanceClass(ArmsAnimation.Class);
 	FirstPersonMesh->SetOnlyOwnerSee(true);
 	FirstPersonMesh->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
 	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
 
-	// Create the Camera Component	
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("First Person Camera"));
 	FirstPersonCameraComponent->SetupAttachment(FirstPersonMesh, FName("head"));
 	FirstPersonCameraComponent->SetRelativeLocationAndRotation(FVector(-2.8f, 5.89f, 0.0f), FRotator(0.0f, 90.0f, -90.0f));
@@ -32,66 +49,57 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter()
 	FirstPersonCameraComponent->bEnableFirstPersonScale = true;
 	FirstPersonCameraComponent->FirstPersonFieldOfView = 70.0f;
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
+}
 
-	// configure the character comps
-	GetMesh()->SetOwnerNoSee(true);
-	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
-
-	GetCapsuleComponent()->SetCapsuleSize(34.0f, 96.0f);
-
-	// Configure character movement
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
-	GetCharacterMovement()->AirControl = 0.5f;
+UCheeseStrikeMovementComponent* ACheeseStrikeCharacter::GetCheeseStrikeMovement() const
+{
+	return Cast<UCheeseStrikeMovementComponent>(GetCharacterMovement());
 }
 
 void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{	
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+{
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+	const UCheeseStrikeInputSet* Input = UCheeseStrikeInputSet::Get(this);
+	if (EnhancedInputComponent == nullptr || Input == nullptr)
 	{
-		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::DoJumpStart);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::DoJumpEnd);
-
-		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::MoveInput);
-
-		// Looking/Aiming
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::LookInput);
-		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::LookInput);
+		UE_LOG(LogCheeseStrike, Error, TEXT("'%s' has no Enhanced Input component or no input set to bind to."), *GetNameSafe(this));
+		return;
 	}
-	else
-	{
-		UE_LOG(LogCheeseStrike, Error, TEXT("'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
-	}
+	EnhancedInputComponent->BindAction(Input->Move, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::MoveInput);
+	EnhancedInputComponent->BindAction(Input->MouseLook, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::MouseLookInput);
+	EnhancedInputComponent->BindAction(Input->StickLook, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::StickLookInput);
+	EnhancedInputComponent->BindAction(Input->Jump, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::DoJumpStart);
+	EnhancedInputComponent->BindAction(Input->Jump, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::DoJumpEnd);
+	EnhancedInputComponent->BindAction(Input->Sprint, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::SprintStarted);
+	EnhancedInputComponent->BindAction(Input->Sprint, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::SprintEnded);
+	EnhancedInputComponent->BindAction(Input->Crouch, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::CrouchStarted);
+	EnhancedInputComponent->BindAction(Input->Crouch, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::CrouchEnded);
 }
-
 
 void ACheeseStrikeCharacter::MoveInput(const FInputActionValue& Value)
 {
-	// get the Vector2D move axis
-	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	// pass the axis values to the move input
-	DoMove(MovementVector.X, MovementVector.Y);
-
+	const FVector2D Axis = Value.Get<FVector2D>();
+	DoMove(Axis.X, Axis.Y);
 }
 
-void ACheeseStrikeCharacter::LookInput(const FInputActionValue& Value)
+void ACheeseStrikeCharacter::MouseLookInput(const FInputActionValue& Value)
 {
-	// get the Vector2D look axis
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
+	const FVector2D Axis = Value.Get<FVector2D>();
+	DoAim(Axis.X * CheeseStrikeInput::MouseDegreesPerCount, Axis.Y * CheeseStrikeInput::MouseDegreesPerCount);
+}
 
-	// pass the axis values to the aim input
-	DoAim(LookAxisVector.X, LookAxisVector.Y);
-
+void ACheeseStrikeCharacter::StickLookInput(const FInputActionValue& Value)
+{
+	// A stick turns at a rate, however many frames a second are drawn.
+	const FVector2D Axis = Value.Get<FVector2D>();
+	const float Seconds = GetWorld() != nullptr ? GetWorld()->GetDeltaSeconds() : 0.0f;
+	DoAim(Axis.X * CheeseStrikeInput::StickYawDegreesPerSecond * Seconds, Axis.Y * CheeseStrikeInput::StickPitchDegreesPerSecond * Seconds);
 }
 
 void ACheeseStrikeCharacter::DoAim(float Yaw, float Pitch)
 {
 	if (GetController())
 	{
-		// pass the rotation inputs
 		AddControllerYawInput(Yaw);
 		AddControllerPitchInput(Pitch);
 	}
@@ -101,7 +109,6 @@ void ACheeseStrikeCharacter::DoMove(float Right, float Forward)
 {
 	if (GetController())
 	{
-		// pass the move inputs
 		AddMovementInput(GetActorRightVector(), Right);
 		AddMovementInput(GetActorForwardVector(), Forward);
 	}
@@ -109,12 +116,50 @@ void ACheeseStrikeCharacter::DoMove(float Right, float Forward)
 
 void ACheeseStrikeCharacter::DoJumpStart()
 {
-	// pass Jump to the character
 	Jump();
 }
 
 void ACheeseStrikeCharacter::DoJumpEnd()
 {
-	// pass StopJumping to the character
 	StopJumping();
+}
+
+void ACheeseStrikeCharacter::DoSprint(bool bHeld)
+{
+	if (UCheeseStrikeMovementComponent* Movement = GetCheeseStrikeMovement())
+	{
+		Movement->SetWantsToSprint(bHeld);
+	}
+}
+
+void ACheeseStrikeCharacter::DoCrouch(bool bHeld)
+{
+	if (bHeld)
+	{
+		Crouch();
+	}
+	else
+	{
+		UnCrouch();
+	}
+}
+
+void ACheeseStrikeCharacter::SprintStarted()
+{
+	DoSprint(true);
+}
+
+void ACheeseStrikeCharacter::SprintEnded()
+{
+	DoSprint(false);
+}
+
+void ACheeseStrikeCharacter::CrouchStarted()
+{
+	DoCrouch(true);
+}
+
+void ACheeseStrikeCharacter::CrouchEnded()
+{
+	DoCrouch(false);
 }

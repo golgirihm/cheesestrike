@@ -92,7 +92,7 @@ public:
 public:
 
 	/** Constructor */
-	AShooterCharacter();
+	AShooterCharacter(const FObjectInitializer& ObjectInitializer);
 
 protected:
 

@@ -1,4 +1,5 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+// Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #pragma once
 
@@ -7,16 +8,14 @@
 #include "CheeseStrikeGameMode.generated.h"
 
 /**
- *  Simple GameMode for a first person game
+ * The game's rules, so far: every player is a CheeseStrikeCharacter driven
+ * by a CheeseStrikePlayerController. The modes and scoring come later.
  */
-UCLASS(abstract)
-class ACheeseStrikeGameMode : public AGameModeBase
+UCLASS()
+class CHEESESTRIKE_API ACheeseStrikeGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
 	ACheeseStrikeGameMode();
 };
-
-
-

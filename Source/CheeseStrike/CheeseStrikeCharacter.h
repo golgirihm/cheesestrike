@@ -1,66 +1,40 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+// Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Logging/LogMacros.h"
 #include "CheeseStrikeCharacter.generated.h"
 
-class UInputComponent;
-class USkeletalMeshComponent;
 class UCameraComponent;
-class UInputAction;
+class UCheeseStrikeMovementComponent;
+class USkeletalMeshComponent;
 struct FInputActionValue;
 
-DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
-
 /**
- *  A basic first person character
+ * The player's character, seen from its own eyes: the mannequin, with a
+ * second copy of it that only its own player sees, whose head the camera
+ * sits on. It walks, sprints, crouches, slides and jumps as
+ * CheeseStrikeMovementComponent has it, with every move predicted on its own
+ * machine and checked on the server.
+ *
+ * Input comes from the actions the game makes in code (UCheeseStrikeInputSet),
+ * not from assets.
  */
-UCLASS(abstract)
-class ACheeseStrikeCharacter : public ACharacter
+UCLASS()
+class CHEESESTRIKE_API ACheeseStrikeCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-	/** Pawn mesh: first person view (arms; seen only by self) */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	USkeletalMeshComponent* FirstPersonMesh;
-
-	/** First person camera */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FirstPersonCameraComponent;
-
-protected:
-
-	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
-	UInputAction* JumpAction;
-
-	/** Move Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
-	UInputAction* MoveAction;
-
-	/** Look Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
-	class UInputAction* LookAction;
-
-	/** Mouse Look Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
-	class UInputAction* MouseLookAction;
-	
 public:
-	ACheeseStrikeCharacter();
+	ACheeseStrikeCharacter(const FObjectInitializer& ObjectInitializer);
 
-protected:
+	UCheeseStrikeMovementComponent* GetCheeseStrikeMovement() const;
+	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
+	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
-	/** Called from Input Actions for movement input */
-	void MoveInput(const FInputActionValue& Value);
-
-	/** Called from Input Actions for looking input */
-	void LookInput(const FInputActionValue& Value);
-
-	/** Handles aim inputs from either controls or UI interfaces */
+	/** Handles aim inputs from either controls or UI interfaces: degrees to turn by. */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoAim(float Yaw, float Pitch);
 
@@ -68,27 +42,34 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
 
-	/** Handles jump start inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpStart();
 
-	/** Handles jump end inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSprint(bool bHeld);
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoCrouch(bool bHeld);
+
 protected:
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
-	/** Set up input action bindings */
-	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
-	
+	void MoveInput(const FInputActionValue& Value);
+	void MouseLookInput(const FInputActionValue& Value);
+	void StickLookInput(const FInputActionValue& Value);
+	void SprintStarted();
+	void SprintEnded();
+	void CrouchStarted();
+	void CrouchEnded();
 
-public:
+	/** Pawn mesh: first person view (seen only by self). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMeshComponent> FirstPersonMesh;
 
-	/** Returns the first person mesh **/
-	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
-
-	/** Returns first person camera component **/
-	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
-
+	/** First person camera, on the first-person mesh's head. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCameraComponent> FirstPersonCameraComponent;
 };
-
