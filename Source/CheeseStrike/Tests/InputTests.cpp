@@ -10,7 +10,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace InputTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter;
 
@@ -19,6 +19,7 @@ namespace
 		return Keys.Contains(Key);
 	}
 }
+using namespace InputTests;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheKeysAreTheGodotGames, "CheeseStrike.Input.TheKeysAreTheGodotGames", Flags)
 
@@ -112,9 +113,19 @@ bool FForwardIsForwardAndUpIsUp::RunTest(const FString& Parameters)
 		}
 		else if (Mapping.Action == Set->MouseLook || Mapping.Action == Set->StickLook)
 		{
-			// The engine's pitch is up positive, and so is the mouse's Y; the
-			// controller takes pitch with up positive after one negation.
-			TestTrue(Name + TEXT(" looks up for up"), bNegatedY && !bNegatedX);
+			// Up is up and right is right, for the mouse and the stick alike:
+			// the controller takes pitch and yaw with those positive.
+			TestTrue(Name + TEXT(" looks up for up"), !bNegatedY && !bNegatedX && !bSwizzled);
+		}
+		// A stick's middle is ignored: one at rest is never quite centred.
+		if (Mapping.Key == EKeys::Gamepad_Left2D || Mapping.Key == EKeys::Gamepad_Right2D)
+		{
+			bool bDeadZone = false;
+			for (const UInputModifier* Modifier : Mapping.Modifiers)
+			{
+				bDeadZone |= Modifier->IsA<UInputModifierDeadZone>();
+			}
+			TestTrue(Name + TEXT(" has a dead zone"), bDeadZone);
 		}
 	}
 	TestTrue(TEXT("the mouse turns a few tenths of a degree a count"), CheeseStrikeInput::MouseDegreesPerCount * 0.07f > 0.1f && CheeseStrikeInput::MouseDegreesPerCount * 0.07f < 0.3f);

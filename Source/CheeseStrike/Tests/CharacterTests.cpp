@@ -16,10 +16,11 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace CharacterTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter;
 }
+using namespace CharacterTests;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterMovesByTheRules, "CheeseStrike.Character.MovesByTheRules", Flags)
 
@@ -69,8 +70,12 @@ bool FTheCharacterIsSeenFromItsEyes::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("the first-person body is the mannequin"), Arms->GetSkeletalMeshAsset());
 	TestNotNull(TEXT("and is animated"), Arms->AnimClass.Get());
 	TestTrue(TEXT("which only its own player sees"), Arms->bOnlyOwnerSee);
-	TestTrue(TEXT("the camera sits on its head"), Camera->GetAttachSocketName() == FName("head"));
-	TestTrue(TEXT("on the first-person body"), Camera->GetAttachParent() == Arms);
+	TestTrue(TEXT("the camera is at the eyes"), Camera->GetAttachParent() == Character->GetEyes());
+	TestTrue(TEXT("which stand on the capsule"), Character->GetEyes()->GetAttachParent() == Character->GetCapsuleComponent());
+	TestEqual(TEXT("at eye height"), static_cast<float>(Character->GetEyes()->GetRelativeLocation().Z), CheeseStrikeMovement::EyeHeight);
+	TestEqual(TEXT("which the engine knows as the base eye height"), Character->BaseEyeHeight, CheeseStrikeMovement::EyeHeight);
+	TestEqual(TEXT("and lowers when crouched"), Character->CrouchedEyeHeight, CheeseStrikeMovement::CrouchedEyeHeightAboveCentre);
+	TestTrue(TEXT("by as much as the capsule drops"), CheeseStrikeMovement::CapsuleHalfHeight - CheeseStrikeMovement::CrouchedHalfHeight > 40.0f);
 	TestTrue(TEXT("and turns with the player"), Camera->bUsePawnControlRotation);
 	TestEqual(TEXT("the body stands on the capsule's floor"), static_cast<float>(Body->GetRelativeLocation().Z), -CheeseStrikeMovement::CapsuleHalfHeight);
 	return true;

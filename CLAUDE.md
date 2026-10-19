@@ -4,6 +4,10 @@ A multiplayer first-person shooter for Steam, made with Unreal Engine 5.8 in C++
 
 The project is at the repository's root: `CheeseStrike.uproject`, `Source/CheeseStrike/` (one game module), `Config/`, and `Content/`, which is the private `cheesestrike-assets` repository as a git submodule (see below). It began as Unreal's First Person template with its Shooter variant; `Config/DefaultEngine.ini` redirects the template's script package and classes to ours, and fixes two mistakes in the template's own content. The template's shooter level is the playground until the game has arenas of its own; its game mode override is cleared, so it plays with the game's own character, and its weapons, pickups and enemies are the template's and don't yet work with it.
 
+## What the port keeps
+
+The Godot game is the source of the design, not a thing to copy. Keep what Unreal and its First Person template do well (their input, movement feel, camera, scale and conventions) and port the game's ideas and tuning where they matter: the cheese that is cover and gets eaten by the mice that come partway through a match, so that a map opens up and the fight intensifies; the weapons' roles and roughly their numbers; the modes; the Overload. Don't port the Godot key bindings, speeds, scale or maps for their own sake. The Godot maps were placeholders; a placeholder map (the template's shooter level) does until there is a plan for how levels work.
+
 ## Testing rules
 
 Every change follows both of these, in the same pull request as the change:
@@ -14,6 +18,8 @@ Every change follows both of these, in the same pull request as the change:
 Say what you concluded in the pull request description, including when the answer is that no test or no manual-test change was needed.
 
 Before pushing, run the tests: `python tools/run_tests.py`, which builds the editor and runs every `CheeseStrike` test headless, or `python tools/run_tests.py CheeseStrike.<Area>` for some of them. It fails if no test ran.
+
+To see a change in the game itself, play it without a person: `powershell -ExecutionPolicy Bypass -File tools/play.ps1 -Tag <name>` starts the game windowed, drives it through the keyboard and mouse (so the person at the PC must leave both alone for about 90 seconds, and the editor must be closed), screenshots each step into `Saved/Shots/` and traces the character's state ten times a second into `Saved/Logs/<name>.log` (`-TraceState`). Read the numbers first (speed, eye height, crouched, sliding, falling), then the pictures. Edit the script's steps for what a change needs, and give the game `-StartAt=X,Y,Z,Yaw` for a spot with room.
 
 ## Working in this repo
 

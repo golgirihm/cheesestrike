@@ -44,14 +44,19 @@ namespace
 		}
 	}
 
-	/** A 2D key whose up is the engine's down: the look axes, which the controller takes with pitch up positive. */
+	/** A 2D look key: as it comes, right and up positive, which is how the controller takes yaw and pitch. */
 	void MapLook(UInputMappingContext* Context, const UInputAction* Action, const FKey& Key)
 	{
+		Map(Context, Action, Key);
+	}
+
+	/** A stick: a 2D key that is never quite still, so its middle is ignored. */
+	void MapStick(UInputMappingContext* Context, const UInputAction* Action, const FKey& Key)
+	{
 		FEnhancedActionKeyMapping& Mapping = Map(Context, Action, Key);
-		UInputModifierNegate* Negate = NewObject<UInputModifierNegate>(Context);
-		Negate->bX = false;
-		Negate->bZ = false;
-		Mapping.Modifiers.Add(Negate);
+		UInputModifierDeadZone* DeadZone = NewObject<UInputModifierDeadZone>(Context);
+		DeadZone->LowerThreshold = CheeseStrikeInput::StickDeadZone;
+		Mapping.Modifiers.Add(DeadZone);
 	}
 }
 
@@ -76,10 +81,10 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	MapRight(Context, Set->Move, EKeys::Right, 1.0f);
 	MapRight(Context, Set->Move, EKeys::A, -1.0f);
 	MapRight(Context, Set->Move, EKeys::Left, -1.0f);
-	Map(Context, Set->Move, EKeys::Gamepad_Left2D);
+	MapStick(Context, Set->Move, EKeys::Gamepad_Left2D);
 	// Looking.
 	MapLook(Context, Set->MouseLook, EKeys::Mouse2D);
-	MapLook(Context, Set->StickLook, EKeys::Gamepad_Right2D);
+	MapStick(Context, Set->StickLook, EKeys::Gamepad_Right2D);
 	// Jumping, sprinting and crouching.
 	Map(Context, Set->Jump, EKeys::SpaceBar);
 	Map(Context, Set->Jump, EKeys::Gamepad_FaceButton_Bottom);

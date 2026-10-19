@@ -8,10 +8,11 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace
+namespace MovementTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter;
 }
+using namespace MovementTests;
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSpeedsKeepTheirRatios, "CheeseStrike.Movement.SpeedsKeepTheirRatios", Flags)
 

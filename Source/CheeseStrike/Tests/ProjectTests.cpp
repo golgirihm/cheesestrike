@@ -16,12 +16,12 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-namespace CheeseStrikeTests
+namespace ProjectTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpensOnTheShooterLevel, "CheeseStrike.Project.OpensOnTheShooterLevel", CheeseStrikeTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpensOnTheShooterLevel, "CheeseStrike.Project.OpensOnTheShooterLevel", ProjectTests::Flags)
 
 bool FOpensOnTheShooterLevel::RunTest(const FString& Parameters)
 {
@@ -37,7 +37,7 @@ bool FOpensOnTheShooterLevel::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTemplateBlueprintsLoadAgainstOurClasses, "CheeseStrike.Project.TemplateBlueprintsLoadAgainstOurClasses", CheeseStrikeTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTemplateBlueprintsLoadAgainstOurClasses, "CheeseStrike.Project.TemplateBlueprintsLoadAgainstOurClasses", ProjectTests::Flags)
 
 bool FTemplateBlueprintsLoadAgainstOurClasses::RunTest(const FString& Parameters)
 {
@@ -54,7 +54,7 @@ bool FTemplateBlueprintsLoadAgainstOurClasses::RunTest(const FString& Parameters
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNothingIsMissing, "CheeseStrike.Project.NothingIsMissing", CheeseStrikeTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNothingIsMissing, "CheeseStrike.Project.NothingIsMissing", ProjectTests::Flags)
 
 bool FNothingIsMissing::RunTest(const FString& Parameters)
 {
