@@ -27,10 +27,16 @@ UCheeseStrikePlayScript* UCheeseStrikePlayScript::FromCommandLine(ACheeseStrikeP
 		UE_LOG(LogCheeseStrike, Error, TEXT("PlayScript: can't read %s"), *Path);
 		return nullptr;
 	}
+	UCheeseStrikePlayScript* Script = FromText(InController, Text);
+	UE_LOG(LogCheeseStrike, Display, TEXT("PlayScript: %d commands from %s"), Script->NumCommands(), *Path);
+	return Script;
+}
+
+UCheeseStrikePlayScript* UCheeseStrikePlayScript::FromText(ACheeseStrikePlayerController* InController, const FString& Text)
+{
 	UCheeseStrikePlayScript* Script = NewObject<UCheeseStrikePlayScript>(InController);
 	Script->Controller = InController;
-	const int32 Count = Script->Load(Text);
-	UE_LOG(LogCheeseStrike, Display, TEXT("PlayScript: %d commands from %s"), Count, *Path);
+	Script->Load(Text);
 	return Script;
 }
 
@@ -55,6 +61,15 @@ int32 UCheeseStrikePlayScript::Load(const FString& Text)
 		Commands.Add(Command);
 	}
 	return Commands.Num();
+}
+
+void UCheeseStrikePlayScript::TakeOver(const UCheeseStrikePlayScript* Previous)
+{
+	if (Previous != nullptr)
+	{
+		Held = Previous->Held;
+		Tapped = Previous->Tapped;
+	}
 }
 
 void UCheeseStrikePlayScript::Advance(float DeltaSeconds)
@@ -136,6 +151,10 @@ bool UCheeseStrikePlayScript::Run(const FCommand& Command)
 	{
 		UE_LOG(LogCheeseStrike, Display, TEXT("PlayScript says: %s"), *FString::Join(Command.Args, TEXT(" ")));
 	}
+	else if (Command.Verb == TEXT("cmd"))
+	{
+		Controller->ConsoleCommand(FString::Join(Command.Args, TEXT(" ")));
+	}
 	else if (Command.Verb == TEXT("quit"))
 	{
 		Held.Empty();
@@ -189,6 +208,7 @@ const UInputAction* UCheeseStrikePlayScript::ActionNamed(const FString& Name) co
 	if (Lower == TEXT("fire")) return Input->Fire;
 	if (Lower == TEXT("aim")) return Input->Aim;
 	if (Lower == TEXT("reload")) return Input->Reload;
+	if (Lower == TEXT("scoreboard")) return Input->Scoreboard;
 	return nullptr;
 }
 

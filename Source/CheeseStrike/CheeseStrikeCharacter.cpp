@@ -21,6 +21,10 @@
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerState.h"
+#include "CheeseStrikeGameMode.h"
+#include "CheeseStrikePlayerController.h"
+#include "Rules/CheeseStrikeRules.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 /** With this on, every character writes its state to the log four times a second, for watching a run from outside. */
@@ -82,6 +86,9 @@ void ACheeseStrikeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ACheeseStrikeCharacter, HeldWeapon);
 	DOREPLIFETIME(ACheeseStrikeCharacter, Health);
+	DOREPLIFETIME(ACheeseStrikeCharacter, KilledBy);
+	DOREPLIFETIME(ACheeseStrikeCharacter, DiedAt);
+	DOREPLIFETIME(ACheeseStrikeCharacter, ProtectedUntil);
 }
 
 UCheeseStrikeMovementComponent* ACheeseStrikeCharacter::GetCheeseStrikeMovement() const
@@ -100,6 +107,43 @@ void ACheeseStrikeCharacter::BeginPlay()
 		Parameters.Instigator = this;
 		HeldWeapon = GetWorld()->SpawnActor<ACheeseStrikeWeapon>(ACheeseStrikeWeapon::StaticClass(), GetActorTransform(), Parameters);
 	}
+	// A fresh character can't be hurt for its first seconds, unless it fires.
+	if (HasAuthority())
+	{
+		ProtectedUntil = ServerNow() + CheeseStrikeRules::SpawnProtection;
+	}
+}
+
+void ACheeseStrikeCharacter::Destroyed()
+{
+	if (HasAuthority() && HeldWeapon != nullptr)
+	{
+		HeldWeapon->Destroy();
+	}
+	Super::Destroyed();
+}
+
+float ACheeseStrikeCharacter::ServerNow() const
+{
+	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
+	return State != nullptr ? State->GetServerWorldTimeSeconds() : (GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f);
+}
+
+bool ACheeseStrikeCharacter::CanAct() const
+{
+	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
+	return IsAlive() && (State == nullptr || !State->HasMatchEnded());
+}
+
+bool ACheeseStrikeCharacter::IsProtected() const
+{
+	return IsAlive() && ServerNow() < ProtectedUntil;
+}
+
+FString ACheeseStrikeCharacter::DisplayName() const
+{
+	const APlayerState* Player = GetPlayerState();
+	return Player != nullptr ? Player->GetPlayerName() : GetName();
 }
 
 FHitHistory::FSample ACheeseStrikeCharacter::SampleNow(float Time) const
@@ -113,28 +157,100 @@ FHitHistory::FSample ACheeseStrikeCharacter::SampleNow(float Time) const
 	return Sample;
 }
 
-void ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead)
+bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead)
 {
-	if (!HasAuthority() || !IsAlive())
+	if (!HasAuthority() || !CanAct() || IsProtected())
 	{
-		return;
+		return false;
 	}
 	Health = FMath::Max(0.0f, Health - Damage);
 	if (!IsAlive())
 	{
-		UE_LOG(LogCheeseStrike, Display, TEXT("%s is killed by %s"), *GetName(), *GetNameSafe(From));
+		Die(From, bHead);
 	}
+	return true;
+}
+
+void ACheeseStrikeCharacter::Die(ACheeseStrikeCharacter* From, bool bHead)
+{
+	KilledBy = From != nullptr ? From->DisplayName() : FString();
+	DiedAt = ServerNow();
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s is killed by %s"), *DisplayName(), From != nullptr ? *From->DisplayName() : TEXT("nobody"));
+	ShowDeath();
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->Killed(From, this, bHead);
+	}
+}
+
+void ACheeseStrikeCharacter::CheeseStrikeDie()
+{
+	if (HasAuthority())
+	{
+		ServerDie_Implementation();
+	}
+	else
+	{
+		ServerDie();
+	}
+}
+
+void ACheeseStrikeCharacter::ServerDie_Implementation()
+{
+	EndProtection();
+	TakeShot(CheeseStrikeWeapons::MaxHealth, nullptr, false);
+}
+
+void ACheeseStrikeCharacter::OnRep_Health()
+{
+	if (!IsAlive())
+	{
+		ShowDeath();
+	}
+}
+
+void ACheeseStrikeCharacter::ShowDeath()
+{
+	if (bDeathShown)
+	{
+		return;
+	}
+	bDeathShown = true;
+	if (HeldWeapon != nullptr)
+	{
+		HeldWeapon->StopFiring();
+		HeldWeapon->StopAiming();
+	}
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->DisableMovement();
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// The body falls where it is, and its own player sees it fall: the view
+	// stays where the eyes were, free to look round, until a new character
+	// comes.
+	FirstPersonCameraComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	FirstPersonMesh->SetVisibility(false, true);
+	// The body is no longer the first-person view's stand-in for lighting: it is a body, seen by all.
+	GetMesh()->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::None);
+	GetMesh()->SetOwnerNoSee(false);
+	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	GetMesh()->SetSimulatePhysics(true);
 }
 
 void ACheeseStrikeCharacter::ApplyStartAt()
 {
 	// For watching a run from outside: -StartAt=X,Y,Z,Yaw puts the local
-	// player there, facing that way, instead of wherever the level starts
-	// them. Once, on the first tick it is possessed.
+	// player's first character there, facing that way, instead of wherever
+	// the level starts them: once, on the first tick it is possessed; the
+	// characters that follow a death come back where the rules say.
 	FString Spec;
-	if (!bStartAtApplied && IsLocallyControlled() && IsPlayerControlled() && GetController() != nullptr && FParse::Value(FCommandLine::Get(), TEXT("StartAt="), Spec, false))
+	ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
+	if (!bStartAtApplied && IsLocallyControlled() && Player != nullptr && FParse::Value(FCommandLine::Get(), TEXT("StartAt="), Spec, false))
 	{
 		bStartAtApplied = true;
+		if (!Player->TakeStartAt())
+		{
+			return;
+		}
 		TArray<FString> Parts;
 		Spec.ParseIntoArray(Parts, TEXT(","));
 		if (Parts.Num() >= 3)
@@ -192,13 +308,22 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	FirstPersonCameraComponent->SetFieldOfView(FMath::FInterpTo(FirstPersonCameraComponent->FieldOfView, WantedFieldOfView, DeltaSeconds, 12.0f));
 	// Traced with the console variable, or with -TraceState on the command line.
 	static const bool bTraceSwitch = FParse::Param(FCommandLine::Get(), TEXT("TraceState"));
-	if ((bTraceSwitch || CVarTraceState.GetValueOnGameThread() != 0) && GetWorld() != nullptr && IsLocallyControlled() && IsPlayerControlled())
+	if ((bTraceSwitch || CVarTraceState.GetValueOnGameThread() != 0) && GetWorld() != nullptr)
 	{
 		SinceTrace += DeltaSeconds;
 		if (SinceTrace >= 0.1f)
 		{
 			SinceTrace = 0.0f;
-			CheeseStrikeState();
+			if (IsLocallyControlled() && IsPlayerControlled())
+			{
+				CheeseStrikeState();
+			}
+			else if (!IsAlive())
+			{
+				// Another player's body, as this machine has it.
+				const FVector Pelvis = GetMesh()->GetBoneLocation(TEXT("pelvis"));
+				UE_LOG(LogCheeseStrike, Display, TEXT("Body of %s: pelvis (%.0f, %.0f, %.0f) fallen %d visible %d"), *DisplayName(), Pelvis.X, Pelvis.Y, Pelvis.Z, GetMesh()->IsSimulatingPhysics() ? 1 : 0, GetMesh()->IsVisible() ? 1 : 0);
+			}
 		}
 	}
 	// The eyes settle at their height for standing or crouched.
@@ -230,12 +355,20 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 	const UCheeseStrikeMovementComponent* Movement = GetCheeseStrikeMovement();
 	const FVector At = GetActorLocation();
 	const FVector Eye = FirstPersonCameraComponent->GetComponentLocation();
-	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d"),
-		At.X, At.Y, At.Z, GetVelocity().Size2D(), Eye.Z - (At.Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), GetControlRotation().Pitch, GetControlRotation().Yaw,
+	const FVector Body = GetMesh()->GetComponentLocation();
+	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f)"),
+		At.X, At.Y, At.Z, GetVelocity().Size2D(), Eye.Z - (At.Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), FRotator::NormalizeAxis(GetControlRotation().Pitch), FRotator::NormalizeAxis(GetControlRotation().Yaw),
 		bIsCrouched ? 1 : 0, Movement != nullptr && Movement->IsSprinting() ? 1 : 0, Movement != nullptr && Movement->IsSliding() ? 1 : 0,
 		Movement != nullptr ? Movement->GetSlideElapsed() : -1.0f, Movement != nullptr && Movement->IsFalling() ? 1 : 0, bPressedJump ? 1 : 0, JumpCurrentCount,
-		Health, HeldWeapon != nullptr ? HeldWeapon->GetMagazine() : -1, HeldWeapon != nullptr ? HeldWeapon->GetReserve() : -1, HeldWeapon != nullptr && HeldWeapon->IsAimed() ? 1 : 0,
-		FirstPersonCameraComponent->FieldOfView, HeldWeapon != nullptr ? HeldWeapon->ShotsFired : 0, HeldWeapon != nullptr ? HeldWeapon->HitsConfirmed : 0, HeldWeapon != nullptr && HeldWeapon->IsReloading() ? 1 : 0);
+		Health, IsAlive() ? 1 : 0, IsProtected() ? 1 : 0, HeldWeapon != nullptr ? HeldWeapon->GetMagazine() : -1, HeldWeapon != nullptr ? HeldWeapon->GetReserve() : -1, HeldWeapon != nullptr && HeldWeapon->IsAimed() ? 1 : 0,
+		FirstPersonCameraComponent->FieldOfView, HeldWeapon != nullptr ? HeldWeapon->ShotsFired : 0, HeldWeapon != nullptr ? HeldWeapon->HitsConfirmed : 0, HeldWeapon != nullptr && HeldWeapon->IsReloading() ? 1 : 0,
+		Body.X, Body.Y, Body.Z, GetMesh()->IsSimulatingPhysics() ? 1 : 0, Eye.X, Eye.Y, Eye.Z);
+	if (!IsAlive())
+	{
+		const FVector Pelvis = GetMesh()->GetBoneLocation(TEXT("pelvis"));
+		const FVector Head = GetMesh()->GetBoneLocation(TEXT("head"));
+		UE_LOG(LogCheeseStrike, Display, TEXT("Dead: pelvis (%.0f, %.0f, %.0f) head (%.0f, %.0f, %.0f) visible %d"), Pelvis.X, Pelvis.Y, Pelvis.Z, Head.X, Head.Y, Head.Z, GetMesh()->IsVisible() ? 1 : 0);
+	}
 }
 
 void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -294,7 +427,7 @@ void ACheeseStrikeCharacter::DoAim(float Yaw, float Pitch)
 
 void ACheeseStrikeCharacter::DoMove(float Right, float Forward)
 {
-	if (GetController())
+	if (GetController() && CanAct())
 	{
 		AddMovementInput(GetActorRightVector(), Right);
 		AddMovementInput(GetActorForwardVector(), Forward);
@@ -303,7 +436,10 @@ void ACheeseStrikeCharacter::DoMove(float Right, float Forward)
 
 void ACheeseStrikeCharacter::DoJumpStart()
 {
-	Jump();
+	if (CanAct())
+	{
+		Jump();
+	}
 }
 
 void ACheeseStrikeCharacter::DoJumpEnd()
@@ -315,13 +451,13 @@ void ACheeseStrikeCharacter::DoSprint(bool bHeld)
 {
 	if (UCheeseStrikeMovementComponent* Movement = GetCheeseStrikeMovement())
 	{
-		Movement->SetWantsToSprint(bHeld);
+		Movement->SetWantsToSprint(bHeld && CanAct());
 	}
 }
 
 void ACheeseStrikeCharacter::DoCrouch(bool bHeld)
 {
-	if (bHeld)
+	if (bHeld && CanAct())
 	{
 		Crouch();
 	}
@@ -337,7 +473,7 @@ void ACheeseStrikeCharacter::DoFire(bool bHeld)
 	{
 		return;
 	}
-	if (bHeld)
+	if (bHeld && CanAct())
 	{
 		HeldWeapon->StartFiring();
 	}
@@ -353,7 +489,7 @@ void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 	{
 		return;
 	}
-	if (bHeld)
+	if (bHeld && CanAct())
 	{
 		HeldWeapon->StartAiming();
 	}
@@ -365,7 +501,7 @@ void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 
 void ACheeseStrikeCharacter::DoReload()
 {
-	if (HeldWeapon != nullptr)
+	if (HeldWeapon != nullptr && CanAct())
 	{
 		HeldWeapon->StartReload();
 	}

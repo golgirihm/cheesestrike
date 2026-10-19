@@ -1,0 +1,69 @@
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+
+class ACheeseStrikeCharacter;
+class ACheeseStrikeGameState;
+class ACheeseStrikePlayerController;
+class FAutomationTestBase;
+class UWorld;
+
+/**
+ * Tests that play the game: in the editor, on the shooter level, alone or
+ * as a host with others joining in the same process, each driven by a
+ * play script (UCheeseStrikePlayScript) and then looked at.
+ *
+ * A test queues the steps from RunTest, in order, and they run over the
+ * frames that follow:
+ *
+ *   PlayTesting::StartPlaying({2, TEXT("?KillLimit=1")});
+ *   PlayTesting::Play(1, TEXT("hold Fire\nwait 1\nrelease Fire"));
+ *   PlayTesting::Then([this]() { TestFalse(TEXT("the host is dead"), PlayTesting::Character(0)->IsAlive()); });
+ *   PlayTesting::StopPlaying();
+ *
+ * Player 0 is the host, or the only player; 1 is the first to join. The
+ * host's world is the server's, so what its characters say is the truth;
+ * a joiner's world is what that player sees.
+ */
+namespace PlayTesting
+{
+	/** A session: how many play, and the host's options for the map's URL. */
+	struct FSession
+	{
+		int32 Players = 1;
+		FString Options;
+	};
+
+	/** Queues: start playing as `Session` says, and wait until every player is in, with a character that has its weapon. */
+	void StartPlaying(const FSession& Session);
+	/** Queues: stop playing. A test that started must queue this last. */
+	void StopPlaying();
+	/** Queues: wait until `Condition` holds, or fail the test as `What` not having happened in `Timeout` seconds. */
+	void WaitUntil(const FString& What, float Timeout, TFunction<bool()> Condition);
+	/** Queues: wait `Seconds` of play. */
+	void Wait(float Seconds);
+	/** Queues: `Do`, once. */
+	void Then(TFunction<void()> Do);
+	/** Queues: `Player` plays `Script` (see UCheeseStrikePlayScript) through to its end. */
+	void Play(int32 Player, const FString& Script, float Timeout = 30.0f);
+	/** Queues: put `Player`'s character at `At`, facing `Yaw`, as the server and the player both see it. */
+	void PutAt(int32 Player, const FVector& At, float Yaw);
+
+	/** The worlds and what is in them while playing; null before and after. */
+	UWorld* World(int32 Player);
+	ACheeseStrikePlayerController* Controller(int32 Player);
+	ACheeseStrikeCharacter* Character(int32 Player);
+	ACheeseStrikeGameState* GameState(int32 Player);
+	/** `Of`'s character as `Seen` has it in their world: the live one if there is one, else a body; null until it has arrived. */
+	ACheeseStrikeCharacter* CharacterOf(int32 Of, int32 Seen);
+	/** The server's clock as `Player` has it. */
+	float Now(int32 Player);
+	/** The test running, for its checks from inside a step. */
+	FAutomationTestBase* Test();
+}
+
+#endif

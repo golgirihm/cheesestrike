@@ -1,0 +1,30 @@
+# The joiner of a duel: faces the host 4 m ahead, waits out its own
+# protection, kills them, looks down and to the side at the body (clear of the
+# rifle) once it has settled, and looks at the kill feed, the scoreboard,
+# and the host come back.
+wait 3
+state
+shot duel_client_1_sees_host
+wait 3
+hold Fire
+wait 1.2
+release Fire
+wait 0.3
+state
+shot duel_client_2_kill
+wait 1.5
+look 45 -20
+wait 0.3
+shot duel_client_3_body
+look -45 20
+wait 0.5
+hold Scoreboard
+wait 0.3
+shot duel_client_4_scoreboard
+release Scoreboard
+wait 3
+shot duel_client_5_later
+state
+log client done
+wait 1
+quit

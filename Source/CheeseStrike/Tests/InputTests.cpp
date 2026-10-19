@@ -54,10 +54,12 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the right button aims"), InputTests::Has(Set->KeysFor(Set->Aim), EKeys::RightMouseButton));
 	TestTrue(TEXT("so does the left trigger"), InputTests::Has(Set->KeysFor(Set->Aim), EKeys::Gamepad_LeftTrigger));
 	TestTrue(TEXT("R reloads"), InputTests::Has(Set->KeysFor(Set->Reload), EKeys::R));
+	TestTrue(TEXT("tab shows the scoreboard"), InputTests::Has(Set->KeysFor(Set->Scoreboard), EKeys::Tab));
+	TestTrue(TEXT("so does the gamepad's left special button"), InputTests::Has(Set->KeysFor(Set->Scoreboard), EKeys::Gamepad_Special_Left));
 
 	// No key does two things.
 	TArray<FKey> All;
-	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get(), Set->Fire.Get(), Set->Aim.Get(), Set->Reload.Get()})
+	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get(), Set->Fire.Get(), Set->Aim.Get(), Set->Reload.Get(), Set->Scoreboard.Get()})
 	{
 		for (const FKey& Key : Set->KeysFor(Action))
 		{

@@ -6,10 +6,18 @@
 #include "GameFramework/HUD.h"
 #include "CheeseStrikeHUD.generated.h"
 
+class ACheeseStrikeCharacter;
+class ACheeseStrikeGameState;
+class ACheeseStrikePlayerController;
+class UFont;
+
 /**
- * What a player sees over the view in a fight, drawn in code: a crosshair
+ * What a player sees over the view, drawn in code. In a fight: a crosshair
  * whose gap opens with the weapon's spread, a mark when a shot hits (longer
- * ticks for the head), health, and the magazine and reserve.
+ * ticks for the head), health, and the magazine and reserve. Always: the
+ * last few kills at the top right. Dead: who did it and how long until
+ * they are back. The scoreboard while its key is held, and for good once
+ * the match is over, with the winner.
  */
 UCLASS()
 class CHEESESTRIKE_API ACheeseStrikeHUD : public AHUD
@@ -28,4 +36,12 @@ public:
 	static float PixelsForDegrees(float Degrees, float FieldOfView, float Width);
 
 	virtual void DrawHUD() override;
+
+protected:
+	void DrawFight(const ACheeseStrikeCharacter* Character, float FieldOfView);
+	void DrawDeath(const ACheeseStrikeCharacter* Character, const ACheeseStrikeGameState* Match);
+	void DrawKillFeed(const ACheeseStrikeGameState* Match);
+	void DrawScoreboard(const ACheeseStrikeGameState* Match, bool bOver);
+	/** Draws `Text` with its middle at `X`. */
+	void DrawCentred(const FString& Text, float X, float Y, UFont* Font, float Scale, const FLinearColor& Colour);
 };

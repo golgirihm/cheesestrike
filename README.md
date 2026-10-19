@@ -44,4 +44,4 @@ The tests are Unreal Automation tests in `Source/CheeseStrike/Tests/`. This buil
 python tools/run_tests.py
 ```
 
-Name some of them to run only those, such as `python tools/run_tests.py CheeseStrike.Project`. They can also be run from the editor's Session Frontend, under Automation. What can't be tested automatically is in [docs/manual-tests.md](docs/manual-tests.md).
+Name some of them to run only those, such as `python tools/run_tests.py CheeseStrike.Project`. They can also be run from the editor's Session Frontend, under Automation. The `CheeseStrike.Play` tests play the game in the editor, alone or as a host and a joiner, and take ten to twenty seconds each. What can't be tested automatically is in [docs/manual-tests.md](docs/manual-tests.md).

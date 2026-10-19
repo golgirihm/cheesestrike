@@ -1,0 +1,312 @@
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+
+// Tests that play the game in the editor (see PlayTesting.h): the character
+// moving and firing as the rules say, and two players killing, coming back
+// and ending a match over the network.
+
+#include "Misc/AutomationTest.h"
+#include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerStart.h"
+#include "GameFramework/PlayerState.h"
+#include "CheeseStrikeCharacter.h"
+#include "CheeseStrikeGameState.h"
+#include "CheeseStrikePlayerController.h"
+#include "CheeseStrikePlayerState.h"
+#include "Movement/CheeseStrikeMovement.h"
+#include "Movement/CheeseStrikeMovementComponent.h"
+#include "PlayTesting.h"
+#include "Rules/CheeseStrikeRules.h"
+#include "Weapons/CheeseStrikeShot.h"
+#include "Weapons/CheeseStrikeWeapon.h"
+
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+
+namespace PlayTests
+{
+	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
+	/** Open ground on the shooter level: a long clear run from here, this way. */
+	const FVector OpenGround(1150.0f, -1450.0f, 100.0f);
+	constexpr float OpenGroundYaw = 117.0f;
+	/** Two spots facing each other across 4 m of clear ground. */
+	const FVector HostSpot(-231.0f, -300.0f, 100.0f);
+	constexpr float HostYaw = -90.0f;
+	const FVector JoinerSpot(-231.0f, -700.0f, 100.0f);
+	constexpr float JoinerYaw = 90.0f;
+
+	bool Near(float Value, float Wanted, float Within)
+	{
+		return FMath::Abs(Value - Wanted) <= Within;
+	}
+
+	/** The character player `Player` has, or an error on the test. */
+	ACheeseStrikeCharacter* Pawn(int32 Player)
+	{
+		ACheeseStrikeCharacter* Character = PlayTesting::Character(Player);
+		if (Character == nullptr)
+		{
+			PlayTesting::Test()->AddError(FString::Printf(TEXT("player %d has no character"), Player));
+		}
+		return Character;
+	}
+
+	/** How far `At` is from the nearest player start in `World`. */
+	float FromNearestStart(UWorld* World, const FVector& At)
+	{
+		float Nearest = TNumericLimits<float>::Max();
+		for (TActorIterator<APlayerStart> It(World); It; ++It)
+		{
+			Nearest = FMath::Min(Nearest, static_cast<float>(FVector::Dist2D(It->GetActorLocation(), At)));
+		}
+		return Nearest;
+	}
+
+	/** Remembered between steps. */
+	TWeakObjectPtr<ACheeseStrikeCharacter> FirstBody;
+	int32 ShotsBefore = 0;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FItWalksSprintsAndSlides, "CheeseStrike.Play.WalksSprintsAndSlides", PlayTests::Flags)
+
+bool FItWalksSprintsAndSlides::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace CheeseStrikeMovement;
+	StartPlaying({1});
+	PutAt(0, PlayTests::OpenGround, PlayTests::OpenGroundYaw);
+	Play(0, TEXT("hold Move 0 1\nwait 0.8\nstate"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			TestTrue(FString::Printf(TEXT("walks at walking speed (%.0f)"), Character->GetVelocity().Size2D()), PlayTests::Near(Character->GetVelocity().Size2D(), WalkSpeed, WalkSpeed * 0.1f));
+			TestFalse(TEXT("standing"), Character->bIsCrouched);
+		}
+	});
+	// From the start again, so that the run that follows has the ground it needs.
+	PutAt(0, PlayTests::OpenGround, PlayTests::OpenGroundYaw);
+	Play(0, TEXT("hold Sprint\nwait 0.8\nstate"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			TestTrue(FString::Printf(TEXT("sprints at sprinting speed (%.0f)"), Character->GetVelocity().Size2D()), PlayTests::Near(Character->GetVelocity().Size2D(), WalkSpeed * SprintFactor, WalkSpeed * 0.1f));
+			TestTrue(TEXT("and knows it"), Character->GetCheeseStrikeMovement()->IsSprinting());
+		}
+	});
+	Play(0, TEXT("hold Crouch\nwait 0.25\nstate"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			TestTrue(TEXT("crouching from a sprint slides"), Character->GetCheeseStrikeMovement()->IsSliding());
+			TestTrue(FString::Printf(TEXT("faster than a walk (%.0f)"), Character->GetVelocity().Size2D()), Character->GetVelocity().Size2D() > WalkSpeed);
+		}
+	});
+	Play(0, TEXT("wait 1.5\nstate"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			TestFalse(TEXT("the slide is over"), Character->GetCheeseStrikeMovement()->IsSliding());
+			TestTrue(TEXT("leaving it crouched"), Character->bIsCrouched);
+			TestTrue(FString::Printf(TEXT("at a crouched walk (%.0f)"), Character->GetVelocity().Size2D()), PlayTests::Near(Character->GetVelocity().Size2D(), WalkSpeed * CrouchFactor, WalkSpeed * CrouchFactor * 0.15f));
+			const float EyesAboveFloor = Character->GetEyeOffset() + Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+			TestTrue(FString::Printf(TEXT("with its eyes lowered (%.0f above the floor)"), EyesAboveFloor), EyesAboveFloor < EyeHeight + CapsuleHalfHeight - 30.0f);
+		}
+	});
+	Play(0, TEXT("release Crouch\nrelease Sprint\nrelease Move\nwait 0.8\nstate"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			TestTrue(FString::Printf(TEXT("let go, it stops (%.0f)"), Character->GetVelocity().Size2D()), Character->GetVelocity().Size2D() < 30.0f);
+			TestFalse(TEXT("and stands"), Character->bIsCrouched);
+		}
+	});
+	Play(0, TEXT("tap Jump\nwait 0.2\nstate"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			TestTrue(TEXT("jumping leaves the ground"), Character->GetCheeseStrikeMovement()->IsFalling());
+			TestTrue(FString::Printf(TEXT("upwards (%.0f)"), Character->GetVelocity().Z), Character->GetVelocity().Z > 0.0f);
+		}
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FItFiresAimsAndReloads, "CheeseStrike.Play.FiresAimsAndReloads", PlayTests::Flags)
+
+bool FItFiresAimsAndReloads::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	StartPlaying({1});
+	PutAt(0, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
+	Play(0, TEXT("hold Fire\nwait 0.6\nrelease Fire\nwait 0.2"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			const ACheeseStrikeWeapon* Weapon = Character->GetWeapon();
+			PlayTests::ShotsBefore = Weapon->ShotsFired;
+			TestTrue(FString::Printf(TEXT("holding the trigger fires a burst (%d)"), Weapon->ShotsFired), Weapon->ShotsFired >= 4 && Weapon->ShotsFired <= 6);
+			TestEqual(TEXT("each from the magazine"), Weapon->GetMagazine(), Weapon->GetStats().MagazineSize - Weapon->ShotsFired);
+			TestEqual(TEXT("none from the reserve"), Weapon->GetReserve(), Weapon->GetStats().Reserve);
+		}
+	});
+	Play(0, TEXT("hold Aim\nwait 0.6"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			const float Wanted = 90.0f * Character->GetWeapon()->GetStats().AimZoom;
+			TestTrue(TEXT("aiming"), Character->GetWeapon()->IsAimed());
+			TestTrue(FString::Printf(TEXT("narrows the view (%.0f)"), Character->GetFirstPersonCameraComponent()->FieldOfView), PlayTests::Near(Character->GetFirstPersonCameraComponent()->FieldOfView, Wanted, 3.0f));
+		}
+	});
+	Play(0, TEXT("release Aim\ntap Reload\nwait 0.3"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			TestTrue(TEXT("R reloads"), Character->GetWeapon()->IsReloading());
+		}
+	});
+	Play(0, TEXT("wait 1.8"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			const ACheeseStrikeWeapon* Weapon = Character->GetWeapon();
+			TestFalse(TEXT("and is done in the reload time"), Weapon->IsReloading());
+			TestEqual(TEXT("with the magazine full"), Weapon->GetMagazine(), Weapon->GetStats().MagazineSize);
+			TestEqual(TEXT("from the reserve"), Weapon->GetReserve(), Weapon->GetStats().Reserve - PlayTests::ShotsBefore);
+		}
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAKillIsScoredAndTheKilledComeBack, "CheeseStrike.Play.AKillIsScoredAndTheKilledComeBack", PlayTests::Flags)
+
+bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	StartPlaying({2, TEXT("?RespawnDelay=2")});
+	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
+	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
+	Then([]() { PlayTests::FirstBody = Character(0); });
+	// Both have just arrived, and can't be hurt yet.
+	Wait(CheeseStrikeRules::SpawnProtection);
+	Play(1, TEXT("hold Fire\nwait 1.2\nrelease Fire"));
+	WaitUntil(TEXT("the host dying"), 5.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && !Host->IsAlive(); });
+	Then([this]()
+	{
+		ACheeseStrikeCharacter* Host = PlayTests::Pawn(0);
+		ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		const ACheeseStrikeGameState* Match = GameState(0);
+		if (Host == nullptr || !TestNotNull(TEXT("the server has the joiner"), Joiner) || !TestNotNull(TEXT("and the match"), Match))
+		{
+			return;
+		}
+		TestEqual(TEXT("the host was killed by the joiner"), Host->GetKilledBy(), Joiner->DisplayName());
+		TestTrue(TEXT("and knows when"), Host->GetDiedAt() > 0.0f);
+		TestEqual(TEXT("the kill is in the feed"), Match->GetKillFeed().Num(), 1);
+		if (Match->GetKillFeed().Num() == 1)
+		{
+			TestEqual(TEXT("as the joiner's"), Match->GetKillFeed()[0].Killer, Joiner->DisplayName());
+			TestEqual(TEXT("of the host"), Match->GetKillFeed()[0].Victim, Host->DisplayName());
+		}
+		TestEqual(TEXT("the joiner has a kill"), Joiner->GetPlayerState<ACheeseStrikePlayerState>()->GetKills(), 1);
+		TestEqual(TEXT("and no deaths"), Joiner->GetPlayerState<ACheeseStrikePlayerState>()->GetDeaths(), 0);
+		TestEqual(TEXT("the host a death"), Host->GetPlayerState<ACheeseStrikePlayerState>()->GetDeaths(), 1);
+		TestEqual(TEXT("the joiner leads"), Match->Standings()[0].Name, Joiner->DisplayName());
+		TestFalse(TEXT("and the match goes on"), Match->HasMatchEnded());
+	});
+	WaitUntil(TEXT("the kill reaching the joiner"), 5.0f, []() { const ACheeseStrikeGameState* Match = GameState(1); return Match != nullptr && Match->GetKillFeed().Num() == 1; });
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* HostAsSeen = CharacterOf(0, 1);
+		if (TestNotNull(TEXT("the joiner sees the host"), HostAsSeen))
+		{
+			TestFalse(TEXT("dead"), HostAsSeen->IsAlive());
+		}
+		if (ACheeseStrikeCharacter* Joiner = PlayTests::Pawn(1))
+		{
+			TestTrue(FString::Printf(TEXT("the joiner's hits were confirmed (%d)"), Joiner->GetWeapon()->HitsConfirmed), Joiner->GetWeapon()->HitsConfirmed >= 5);
+		}
+	});
+	WaitUntil(TEXT("the host coming back"), 2.0f + 5.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive() && Host != PlayTests::FirstBody.Get(); });
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Host = PlayTests::Pawn(0))
+		{
+			TestEqual(TEXT("the host is back with full health"), Host->GetHealth(), CheeseStrikeWeapons::MaxHealth);
+			TestTrue(TEXT("protected for the moment"), Host->IsProtected());
+			TestTrue(TEXT("holding a weapon"), Host->GetWeapon() != nullptr);
+			TestTrue(FString::Printf(TEXT("at a player start (%.0f cm from one)"), PlayTests::FromNearestStart(World(0), Host->GetActorLocation())), PlayTests::FromNearestStart(World(0), Host->GetActorLocation()) < 150.0f);
+			TestTrue(TEXT("while the match goes on"), !GameState(0)->HasMatchEnded());
+		}
+	});
+	WaitUntil(TEXT("the joiner seeing the host back"), 5.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 1); return Host != nullptr && Host->IsAlive(); });
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMatchEndsAtTheKillLimit, "CheeseStrike.Play.TheMatchEndsAtTheKillLimit", PlayTests::Flags)
+
+bool FTheMatchEndsAtTheKillLimit::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	StartPlaying({2, TEXT("?KillLimit=1?RespawnDelay=1")});
+	Then([this]()
+	{
+		if (const ACheeseStrikeGameState* Match = GameState(0))
+		{
+			TestEqual(TEXT("the host's kill limit is on"), Match->GetKillLimit(), 1);
+			TestEqual(TEXT("and respawn delay"), Match->GetRespawnDelay(), 1.0f);
+		}
+	});
+	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
+	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
+	Wait(CheeseStrikeRules::SpawnProtection);
+	Play(1, TEXT("hold Fire\nwait 1.2\nrelease Fire"));
+	WaitUntil(TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		if (TestNotNull(TEXT("the server has the joiner"), Joiner))
+		{
+			TestEqual(TEXT("the joiner wins"), GameState(0)->GetWinnerName(), Joiner->DisplayName());
+		}
+	});
+	WaitUntil(TEXT("the joiner hearing the match is over"), 5.0f, []() { const ACheeseStrikeGameState* Match = GameState(1); return Match != nullptr && Match->HasMatchEnded() && !Match->GetWinnerName().IsEmpty(); });
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Joiner = PlayTests::Pawn(1))
+		{
+			TestEqual(TEXT("and who won"), GameState(1)->GetWinnerName(), Joiner->DisplayName());
+			PlayTests::ShotsBefore = Joiner->GetWeapon()->ShotsFired;
+		}
+	});
+	// Past the respawn delay, nobody comes back; and nobody can fire.
+	Wait(2.5f);
+	Play(1, TEXT("hold Fire\nwait 0.5\nrelease Fire"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		TestTrue(TEXT("the host stays dead"), Host == nullptr || !Host->IsAlive());
+		if (ACheeseStrikeCharacter* Joiner = PlayTests::Pawn(1))
+		{
+			TestEqual(TEXT("and the joiner can't fire"), Joiner->GetWeapon()->ShotsFired, PlayTests::ShotsBefore);
+		}
+	});
+	StopPlaying();
+	return true;
+}
+
+#endif

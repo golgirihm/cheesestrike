@@ -15,14 +15,18 @@
 # With -ClientScript, a pair: this game listens for the other, which joins it
 # after -ClientDelay seconds, starts at -ClientStartAt and plays that script.
 # Both logs are summarised; the client's is Saved/Logs/<tag>_client.log.
+# The players are named -Name and -ClientName, as the kill feed and the
+# scoreboard show them.
 param(
   [Parameter(Mandatory=$true)][string]$Script,
   [string]$Tag = "play",
   [string]$StartAt = "-231,-700,100,90",
   [string]$Map = "/Game/Variant_Shooter/Lvl_Shooter",
   [string]$Extra = "",
+  [string]$Name = "Host",
   [string]$ClientScript = "",
   [string]$ClientStartAt = "-231,-1200,100,90",
+  [string]$ClientName = "Joiner",
   [int]$ClientDelay = 25,
   [switch]$Window,
   [int]$TimeoutSeconds = 180
@@ -42,15 +46,15 @@ function Launch($map, $script, $tag, $startAt, $x) {
 function Summarise($tag) {
   $log = Join-Path $root "Saved\Logs\$tag.log"
   Write-Output "log: $log"
-  Get-Content $log | Select-String "PlayScript: |Shot|killed|PlayScript says|LogNet: Join|Welcomed" | ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[ *\d+\]Log[A-Za-z]+: (Display|Warning|Error): ', '' } | Select-Object -First 80
+  Get-Content $log | Select-String "PlayScript: |Shot|killed|Kill:|Match over|Free-for-all|PlayScript says|LogNet: Join|Welcomed" | ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[ *\d+\]Log[A-Za-z]+: (Display|Warning|Error): ', '' } | Select-Object -First 80
 }
 $pair = $ClientScript -ne ""
 $serverExtra = if ($pair -and $Extra -eq "") { "?listen" } else { $Extra }
-$game = Launch "$Map$serverExtra" $Script $Tag $StartAt 0
+$game = Launch "${Map}${serverExtra}?Nick=${Name}" $Script $Tag $StartAt 0
 $client = $null
 if ($pair) {
   Start-Sleep -Seconds $ClientDelay
-  $client = Launch "127.0.0.1" $ClientScript "${Tag}_client" $ClientStartAt 970
+  $client = Launch "127.0.0.1?Nick=${ClientName}" $ClientScript "${Tag}_client" $ClientStartAt 970
 }
 if (-not $game.WaitForExit($TimeoutSeconds * 1000)) {
   Stop-Process -Id $game.Id -Force -ErrorAction SilentlyContinue

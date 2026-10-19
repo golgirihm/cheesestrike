@@ -12,8 +12,10 @@ class UInputMappingContext;
 
 /**
  * The player's controller: puts the game's input bindings on for a local
- * player (see UCheeseStrikeInputSet), and limits how far the view looks up
- * and down through its camera manager.
+ * player (see UCheeseStrikeInputSet), shows the scoreboard while its key is
+ * held, limits how far the view looks up and down through its camera
+ * manager, and plays a script in place of a person when given one
+ * (UCheeseStrikePlayScript).
  */
 UCLASS()
 class CHEESESTRIKE_API ACheeseStrikePlayerController : public APlayerController
@@ -22,6 +24,16 @@ class CHEESESTRIKE_API ACheeseStrikePlayerController : public APlayerController
 
 public:
 	ACheeseStrikePlayerController();
+
+	/** Whether the scoreboard's key is held. */
+	bool IsScoreboardShown() const { return bScoreboardHeld; }
+
+	/** Plays `Text` as a script from now on, in place of any other; see UCheeseStrikePlayScript for the commands. */
+	UCheeseStrikePlayScript* Play(const FString& Text);
+	UCheeseStrikePlayScript* GetPlayScript() const { return PlayScript; }
+
+	/** True the first time only: -StartAt is for this player's first character. */
+	bool TakeStartAt();
 
 protected:
 	/** Mapping contexts a Blueprint of this controller adds, besides the game's own. */
@@ -32,7 +44,12 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
-	/** The script playing the game in place of a person, if -PlayScript named one. */
+	void ScoreboardStarted();
+	void ScoreboardEnded();
+
+	/** The script playing the game in place of a person, if -PlayScript named one or a test gave one. */
 	UPROPERTY()
 	TObjectPtr<UCheeseStrikePlayScript> PlayScript;
+	bool bScoreboardHeld = false;
+	bool bStartAtTaken = false;
 };

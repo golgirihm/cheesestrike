@@ -1,0 +1,25 @@
+# The host of a duel: stands still to be killed by the joiner (who comes
+# about 25 s in and fires 7 s later, with the kill at about 33 s), and looks
+# at what follows: the death, its own body (it falls behind where it stood,
+# so the view turns round and down to find it), and either coming back (with
+# a kill limit above one) or the results (with -Extra "?listen?KillLimit=1").
+# Stays until the joiner has gone.
+wait 34.5
+state
+shot duel_server_1_killed
+look 180 -40
+wait 0.3
+state
+shot duel_server_2_body
+look -180 40
+wait 3
+state
+shot duel_server_3_after
+hold Scoreboard
+wait 0.3
+shot duel_server_4_scoreboard
+release Scoreboard
+wait 6
+log server done
+wait 1
+quit

@@ -2,6 +2,7 @@
 // Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #include "CheeseStrikePlayerController.h"
+#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
@@ -19,7 +20,18 @@ ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 void ACheeseStrikePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	PlayScript = UCheeseStrikePlayScript::FromCommandLine(this);
+	if (PlayScript == nullptr)
+	{
+		PlayScript = UCheeseStrikePlayScript::FromCommandLine(this);
+	}
+}
+
+UCheeseStrikePlayScript* ACheeseStrikePlayerController::Play(const FString& Text)
+{
+	UCheeseStrikePlayScript* Next = UCheeseStrikePlayScript::FromText(this, Text);
+	Next->TakeOver(PlayScript);
+	PlayScript = Next;
+	return PlayScript;
 }
 
 void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
@@ -44,9 +56,16 @@ void ACheeseStrikePlayerController::SetupInputComponent()
 		return;
 	}
 	// The game's own bindings, made in code.
-	if (const UCheeseStrikeInputSet* Input = UCheeseStrikeInputSet::Get(this))
+	const UCheeseStrikeInputSet* Input = UCheeseStrikeInputSet::Get(this);
+	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
+	if (Input != nullptr)
 	{
 		Subsystem->AddMappingContext(Input->Context, 0);
+		if (EnhancedInput != nullptr)
+		{
+			EnhancedInput->BindAction(Input->Scoreboard, ETriggerEvent::Started, this, &ACheeseStrikePlayerController::ScoreboardStarted);
+			EnhancedInput->BindAction(Input->Scoreboard, ETriggerEvent::Completed, this, &ACheeseStrikePlayerController::ScoreboardEnded);
+		}
 	}
 	else
 	{
@@ -57,4 +76,21 @@ void ACheeseStrikePlayerController::SetupInputComponent()
 	{
 		Subsystem->AddMappingContext(CurrentContext, 0);
 	}
+}
+
+bool ACheeseStrikePlayerController::TakeStartAt()
+{
+	const bool bFirst = !bStartAtTaken;
+	bStartAtTaken = true;
+	return bFirst;
+}
+
+void ACheeseStrikePlayerController::ScoreboardStarted()
+{
+	bScoreboardHeld = true;
+}
+
+void ACheeseStrikePlayerController::ScoreboardEnded()
+{
+	bScoreboardHeld = false;
 }

@@ -23,11 +23,18 @@ public class CheeseStrike : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "EngineSettings", "AssetRegistry" });
 
+		// The tests that play the game do so in the editor.
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
+
 		PublicIncludePaths.AddRange(new string[] {
 			"CheeseStrike",
 			"CheeseStrike/Dev",
 			"CheeseStrike/Input",
 			"CheeseStrike/Movement",
+			"CheeseStrike/Rules",
 			"CheeseStrike/UI",
 			"CheeseStrike/Weapons",
 			"CheeseStrike/Variant_Shooter",

@@ -19,14 +19,18 @@ class UInputAction;
  *
  * One command a line, `#` for a comment:
  *   wait <seconds>              do nothing for so long
- *   hold <action> [x [y]]       hold an input from now on: Move x y, Look x y, or Jump, Sprint, Crouch, Fire, Aim
+ *   hold <action> [x [y]]       hold an input from now on: Move x y, Look x y, or Jump, Sprint, Crouch, Fire, Aim, Reload, Scoreboard
  *   release <action>            let it go
  *   tap <action> [x [y]]        hold it for a few frames
  *   look <yaw> <pitch>          turn the view by so many degrees, at once
  *   shot <name>                 save a screenshot as Saved/Screenshots/<platform>/<name>.png
  *   state                       write the character's state to the log now
  *   log <text>                  write a line to the log
+ *   cmd <console command>       run a console command, such as CheeseStrikeDie
  *   quit                        end the game
+ *
+ * A test plays one too (ACheeseStrikePlayerController::Play), in the
+ * editor, and then looks at what it did.
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikePlayScript : public UObject
@@ -36,6 +40,8 @@ class CHEESESTRIKE_API UCheeseStrikePlayScript : public UObject
 public:
 	/** The script named on the command line, or null if there is none. */
 	static UCheeseStrikePlayScript* FromCommandLine(ACheeseStrikePlayerController* Controller);
+	/** A script from `Text`, for `Controller` to play. */
+	static UCheeseStrikePlayScript* FromText(ACheeseStrikePlayerController* Controller, const FString& Text);
 
 	/** Reads `Text` as commands; returns how many. */
 	int32 Load(const FString& Text);
@@ -43,7 +49,11 @@ public:
 	/** Runs the script on for `DeltaSeconds`: the next commands, and the inputs still held. */
 	void Advance(float DeltaSeconds);
 
-	bool IsFinished() const { return Next >= Commands.Num() && Held.Num() == 0; }
+	/** Keeps holding what `Previous` was holding, so that one script can follow another without a key going up. */
+	void TakeOver(const UCheeseStrikePlayScript* Previous);
+
+	/** Whether every command has run and no wait is left; inputs may still be held. */
+	bool IsFinished() const { return Next >= Commands.Num() && Waiting <= 0.0f; }
 	int32 NumCommands() const { return Commands.Num(); }
 
 private:

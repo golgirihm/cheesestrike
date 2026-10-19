@@ -167,7 +167,7 @@ void ACheeseStrikeWeapon::StopAiming()
 
 void ACheeseStrikeWeapon::FireOnce()
 {
-	if (Holder == nullptr || !Holder->IsLocallyControlled() || !Holder->IsAlive())
+	if (Holder == nullptr || !Holder->IsLocallyControlled() || !Holder->CanAct())
 	{
 		return;
 	}
@@ -227,7 +227,7 @@ bool ACheeseStrikeWeapon::ServerAllowsShot(float Now)
 void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, FVector_NetQuantizeNormal AimDirection, int32 Seed, int32 Index, bool bWasAimed, float ClientTime)
 {
 	UWorld* World = GetWorld();
-	if (Holder == nullptr || World == nullptr || !Holder->IsAlive())
+	if (Holder == nullptr || World == nullptr || !Holder->CanAct())
 	{
 		return;
 	}
@@ -237,6 +237,8 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		UE_LOG(LogCheeseStrike, Warning, TEXT("Shot from %s refused: rate or magazine"), *Holder->GetName());
 		return;
 	}
+	// Firing gives up the protection of a fresh spawn.
+	Holder->EndProtection();
 	// When the shooter fired, as near as can be told: never ahead of now, never further back than is kept.
 	const float When = FMath::Clamp(ClientTime, Now - FHitHistory::Kept, Now);
 	// The shot must have come from about where the shooter's eyes were.
@@ -300,9 +302,15 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 	if (Victim != nullptr)
 	{
 		const float Damage = CheeseStrikeWeapons::DamageAt(*Stats, Reach, bHead);
-		Victim->TakeShot(Damage, Holder, bHead);
-		ClientHit(Damage, bHead);
-		UE_LOG(LogCheeseStrike, Display, TEXT("Shot: %s hit %s%s at %.0f cm for %.0f (health %.0f)"), *Holder->GetName(), *Victim->GetName(), bHead ? TEXT(" on the head") : TEXT(""), Reach, Damage, Victim->GetHealth());
+		if (Victim->TakeShot(Damage, Holder, bHead))
+		{
+			ClientHit(Damage, bHead);
+			UE_LOG(LogCheeseStrike, Display, TEXT("Shot: %s hit %s%s at %.0f cm for %.0f (health %.0f)"), *Holder->GetName(), *Victim->GetName(), bHead ? TEXT(" on the head") : TEXT(""), Reach, Damage, Victim->GetHealth());
+		}
+		else
+		{
+			UE_LOG(LogCheeseStrike, Display, TEXT("Shot: %s hit %s, who is protected"), *Holder->GetName(), *Victim->GetName());
+		}
 	}
 	else if (bWallHit && Wall.GetActor() != nullptr)
 	{
