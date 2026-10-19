@@ -8,10 +8,27 @@
 #include "CheeseStrikeCameraManager.h"
 #include "CheeseStrike.h"
 #include "Input/CheeseStrikeInput.h"
+#include "Dev/CheeseStrikePlayScript.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 {
 	PlayerCameraManagerClass = ACheeseStrikeCameraManager::StaticClass();
+	PrimaryActorTick.bCanEverTick = true;
+}
+
+void ACheeseStrikePlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	PlayScript = UCheeseStrikePlayScript::FromCommandLine(this);
+}
+
+void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (PlayScript != nullptr && GetPawn() != nullptr)
+	{
+		PlayScript->Advance(DeltaSeconds);
+	}
 }
 
 void ACheeseStrikePlayerController::SetupInputComponent()

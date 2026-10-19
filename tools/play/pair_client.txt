@@ -1,0 +1,22 @@
+# The joiner of a pair: faces the host, who stands 5 m ahead, and fires at them, from the hip and then aimed.
+wait 3
+state
+shot pair_client_1_sees_host
+hold Fire
+wait 0.4
+release Fire
+shot pair_client_2_hit
+wait 0.5
+state
+hold Aim
+wait 0.5
+hold Fire
+wait 0.4
+release Fire
+shot pair_client_3_aimed_hit
+release Aim
+wait 0.5
+state
+log client done
+wait 1
+quit

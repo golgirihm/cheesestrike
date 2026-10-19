@@ -69,6 +69,9 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Set->Jump = MakeAction(Set, TEXT("IA_Jump"), EInputActionValueType::Boolean);
 	Set->Sprint = MakeAction(Set, TEXT("IA_Sprint"), EInputActionValueType::Boolean);
 	Set->Crouch = MakeAction(Set, TEXT("IA_Crouch"), EInputActionValueType::Boolean);
+	Set->Fire = MakeAction(Set, TEXT("IA_Fire"), EInputActionValueType::Boolean);
+	Set->Aim = MakeAction(Set, TEXT("IA_Aim"), EInputActionValueType::Boolean);
+	Set->Reload = MakeAction(Set, TEXT("IA_Reload"), EInputActionValueType::Boolean);
 	UInputMappingContext* Context = NewObject<UInputMappingContext>(Set, TEXT("IMC_CheeseStrike"));
 	Set->Context = Context;
 
@@ -93,6 +96,13 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->Crouch, EKeys::C);
 	Map(Context, Set->Crouch, EKeys::LeftControl);
 	Map(Context, Set->Crouch, EKeys::Gamepad_FaceButton_Right);
+	// Firing, aiming down the sights, and reloading.
+	Map(Context, Set->Fire, EKeys::LeftMouseButton);
+	Map(Context, Set->Fire, EKeys::Gamepad_RightTrigger);
+	Map(Context, Set->Aim, EKeys::RightMouseButton);
+	Map(Context, Set->Aim, EKeys::Gamepad_LeftTrigger);
+	Map(Context, Set->Reload, EKeys::R);
+	Map(Context, Set->Reload, EKeys::Gamepad_FaceButton_Left);
 	return Set;
 }
 

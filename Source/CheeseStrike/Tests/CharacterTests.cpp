@@ -11,6 +11,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikePlayerController.h"
+#include "UI/CheeseStrikeHUD.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 
@@ -20,9 +21,8 @@ namespace CharacterTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter;
 }
-using namespace CharacterTests;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterMovesByTheRules, "CheeseStrike.Character.MovesByTheRules", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterMovesByTheRules, "CheeseStrike.Character.MovesByTheRules", CharacterTests::Flags)
 
 bool FTheCharacterMovesByTheRules::RunTest(const FString& Parameters)
 {
@@ -52,7 +52,7 @@ bool FTheCharacterMovesByTheRules::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterIsSeenFromItsEyes, "CheeseStrike.Character.IsSeenFromItsEyes", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterIsSeenFromItsEyes, "CheeseStrike.Character.IsSeenFromItsEyes", CharacterTests::Flags)
 
 bool FTheCharacterIsSeenFromItsEyes::RunTest(const FString& Parameters)
 {
@@ -70,8 +70,8 @@ bool FTheCharacterIsSeenFromItsEyes::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("the first-person body is the mannequin"), Arms->GetSkeletalMeshAsset());
 	TestNotNull(TEXT("and is animated"), Arms->AnimClass.Get());
 	TestTrue(TEXT("which only its own player sees"), Arms->bOnlyOwnerSee);
-	TestTrue(TEXT("the camera is at the eyes"), Camera->GetAttachParent() == Character->GetEyes());
-	TestTrue(TEXT("which stand on the capsule"), Character->GetEyes()->GetAttachParent() == Character->GetCapsuleComponent());
+	TestTrue(TEXT("the camera sits on the first-person body's head"), Camera->GetAttachParent() == Arms && Camera->GetAttachSocketName() == FName("head"));
+	TestTrue(TEXT("the eyes stand on the capsule"), Character->GetEyes()->GetAttachParent() == Character->GetCapsuleComponent());
 	TestEqual(TEXT("at eye height"), static_cast<float>(Character->GetEyes()->GetRelativeLocation().Z), CheeseStrikeMovement::EyeHeight);
 	TestEqual(TEXT("which the engine knows as the base eye height"), Character->BaseEyeHeight, CheeseStrikeMovement::EyeHeight);
 	TestEqual(TEXT("and lowers when crouched"), Character->CrouchedEyeHeight, CheeseStrikeMovement::CrouchedEyeHeightAboveCentre);
@@ -81,13 +81,14 @@ bool FTheCharacterIsSeenFromItsEyes::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEveryPlayerGetsTheCharacter, "CheeseStrike.Character.EveryPlayerGetsTheCharacter", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEveryPlayerGetsTheCharacter, "CheeseStrike.Character.EveryPlayerGetsTheCharacter", CharacterTests::Flags)
 
 bool FEveryPlayerGetsTheCharacter::RunTest(const FString& Parameters)
 {
 	const AGameModeBase* Mode = GetDefault<ACheeseStrikeGameMode>();
 	TestEqual(TEXT("the pawn"), Mode->DefaultPawnClass.Get(), static_cast<UClass*>(ACheeseStrikeCharacter::StaticClass()));
 	TestEqual(TEXT("the controller"), Mode->PlayerControllerClass.Get(), static_cast<UClass*>(ACheeseStrikePlayerController::StaticClass()));
+	TestEqual(TEXT("the HUD"), Mode->HUDClass.Get(), static_cast<UClass*>(ACheeseStrikeHUD::StaticClass()));
 	TestFalse(TEXT("the character can be made"), ACheeseStrikeCharacter::StaticClass()->HasAnyClassFlags(CLASS_Abstract));
 	TestFalse(TEXT("so can the controller"), ACheeseStrikePlayerController::StaticClass()->HasAnyClassFlags(CLASS_Abstract));
 	TestFalse(TEXT("and the mode"), ACheeseStrikeGameMode::StaticClass()->HasAnyClassFlags(CLASS_Abstract));

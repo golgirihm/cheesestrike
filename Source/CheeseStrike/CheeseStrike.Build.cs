@@ -25,6 +25,11 @@ public class CheeseStrike : ModuleRules
 
 		PublicIncludePaths.AddRange(new string[] {
 			"CheeseStrike",
+			"CheeseStrike/Dev",
+			"CheeseStrike/Input",
+			"CheeseStrike/Movement",
+			"CheeseStrike/UI",
+			"CheeseStrike/Weapons",
 			"CheeseStrike/Variant_Shooter",
 			"CheeseStrike/Variant_Shooter/AI",
 			"CheeseStrike/Variant_Shooter/UI",

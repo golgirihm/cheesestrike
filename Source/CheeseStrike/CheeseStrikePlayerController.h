@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerController.h"
 #include "CheeseStrikePlayerController.generated.h"
 
+class UCheeseStrikePlayScript;
 class UInputMappingContext;
 
 /**
@@ -28,4 +29,10 @@ protected:
 	TArray<TObjectPtr<UInputMappingContext>> DefaultMappingContexts;
 
 	virtual void SetupInputComponent() override;
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	/** The script playing the game in place of a person, if -PlayScript named one. */
+	UPROPERTY()
+	TObjectPtr<UCheeseStrikePlayScript> PlayScript;
 };

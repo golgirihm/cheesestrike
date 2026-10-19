@@ -1,0 +1,9 @@
+# The host of a pair: stands still to be shot at, and reports.
+wait 30
+state
+shot pair_server_1
+wait 8
+state
+log server done
+wait 2
+quit
