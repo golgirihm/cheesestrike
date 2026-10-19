@@ -72,6 +72,7 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Set->Fire = MakeAction(Set, TEXT("IA_Fire"), EInputActionValueType::Boolean);
 	Set->Aim = MakeAction(Set, TEXT("IA_Aim"), EInputActionValueType::Boolean);
 	Set->Reload = MakeAction(Set, TEXT("IA_Reload"), EInputActionValueType::Boolean);
+	Set->Scoreboard = MakeAction(Set, TEXT("IA_Scoreboard"), EInputActionValueType::Boolean);
 	UInputMappingContext* Context = NewObject<UInputMappingContext>(Set, TEXT("IMC_CheeseStrike"));
 	Set->Context = Context;
 
@@ -103,6 +104,8 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->Aim, EKeys::Gamepad_LeftTrigger);
 	Map(Context, Set->Reload, EKeys::R);
 	Map(Context, Set->Reload, EKeys::Gamepad_FaceButton_Left);
+	Map(Context, Set->Scoreboard, EKeys::Tab);
+	Map(Context, Set->Scoreboard, EKeys::Gamepad_Special_Left);
 	return Set;
 }
 

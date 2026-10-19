@@ -71,6 +71,9 @@ public:
 	TObjectPtr<UInputAction> Aim;
 	UPROPERTY()
 	TObjectPtr<UInputAction> Reload;
+	/** Shows the scoreboard while held. */
+	UPROPERTY()
+	TObjectPtr<UInputAction> Scoreboard;
 	UPROPERTY()
 	TObjectPtr<UInputMappingContext> Context;
 };

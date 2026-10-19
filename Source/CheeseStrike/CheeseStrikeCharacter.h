@@ -29,6 +29,10 @@ struct FInputActionValue;
  * takes from, and keeps, on the server, where it has lately been, for shots
  * to be judged against where the shooter saw it (FHitHistory).
  *
+ * Killed, it falls where it is and its player looks on from where their
+ * eyes were until the game mode gives them a new one; a new one can't be
+ * hurt for its first seconds unless it fires (CheeseStrikeRules).
+ *
  * Input comes from the actions the game makes in code (UCheeseStrikeInputSet),
  * not from assets.
  */
@@ -49,12 +53,16 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
+	virtual void Destroyed() override;
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 
 	/** Writes where the character is and what it is doing to the log, for looking at a run from outside (with -TraceState, ten times a second for the local player). */
 	UFUNCTION(Exec)
 	void CheeseStrikeState();
+	/** Kills the character, from the console, for looking at a death without another player. */
+	UFUNCTION(Exec)
+	void CheeseStrikeDie();
 
 	/** Handles aim inputs from either controls or UI interfaces: degrees to turn by. */
 	UFUNCTION(BlueprintCallable, Category="Input")
@@ -91,8 +99,26 @@ public:
 
 	float GetHealth() const { return Health; }
 	bool IsAlive() const { return Health > 0.0f; }
-	/** Takes `Damage` off the health (server only); for the server's own records, from whom and whether on the head. */
-	void TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead);
+	/** Whether it can do anything but look: alive, in a match still on. */
+	bool CanAct() const;
+	/** Whether it has just come back and can't yet be hurt. */
+	bool IsProtected() const;
+	/** Server only: ends that, as firing does. */
+	void EndProtection() { ProtectedUntil = 0.0f; }
+	/** The player's name, as the feed and the scoreboard show it, or the actor's where there is no player. */
+	FString DisplayName() const;
+	/** Who killed it, once it is dead, and the server's time it died (-1 while alive). */
+	const FString& GetKilledBy() const { return KilledBy; }
+	float GetDiedAt() const { return DiedAt; }
+	/**
+	 * Takes `Damage` off the health (server only); for the server's own
+	 * records, from whom and whether on the head. False if it couldn't be
+	 * hurt: dead already, or protected.
+	 */
+	bool TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead);
+
+	/** Puts it at `At`, facing `Yaw` (on the server), for -StartAt and for tests. */
+	void StartAt(const FVector& At, float Yaw);
 
 	/** Where this character has lately been, kept on the server. */
 	const FHitHistory& GetHitHistory() const { return HitHistory; }
@@ -135,8 +161,18 @@ protected:
 	/** The weapon in hand: spawned by the server, which owns it, and attached on every machine. */
 	UPROPERTY(Replicated)
 	TObjectPtr<ACheeseStrikeWeapon> HeldWeapon;
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing=OnRep_Health)
 	float Health = 100.0f;
+	/** Who killed it, and when, in the server's time; set by the server as it dies. */
+	UPROPERTY(Replicated)
+	FString KilledBy;
+	UPROPERTY(Replicated)
+	float DiedAt = -1.0f;
+	/** The server's time its protection as a fresh spawn ends. */
+	UPROPERTY(Replicated)
+	float ProtectedUntil = 0.0f;
+	/** Whether its death has been shown here. */
+	bool bDeathShown = false;
 	/** Where it has lately been: the server's record. */
 	FHitHistory HitHistory;
 	/** The usual field of view, to come back to after aiming down the sights. */
@@ -146,8 +182,18 @@ protected:
 	/** Whether -StartAt has been applied. */
 	bool bStartAtApplied = false;
 
+	UFUNCTION()
+	void OnRep_Health();
+	/** Server only: it has just run out of health. */
+	void Die(ACheeseStrikeCharacter* From, bool bHead);
+	/** On every machine: the body falls, the view stays where the eyes were, and nothing more is done. */
+	void ShowDeath();
+	/** The server's clock. */
+	float ServerNow() const;
+
 	void ApplyStartAt();
-	void StartAt(const FVector& At, float Yaw);
+	UFUNCTION(Server, Reliable)
+	void ServerDie();
 	UFUNCTION(Server, Reliable)
 	void ServerStartAt(FVector_NetQuantize At, float Yaw);
 	UFUNCTION(Client, Reliable)

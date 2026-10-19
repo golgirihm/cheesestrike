@@ -4,18 +4,48 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
+#include "GameFramework/GameMode.h"
 #include "CheeseStrikeGameMode.generated.h"
 
+class ACheeseStrikeCharacter;
+class ACheeseStrikeGameState;
+
 /**
- * The game's rules, so far: every player is a CheeseStrikeCharacter driven
- * by a CheeseStrikePlayerController. The modes and scoring come later.
+ * The game's rules, applied on the server: a free-for-all. Every player is
+ * a CheeseStrikeCharacter driven by a CheeseStrikePlayerController. A kill
+ * is scored to the killer (CheeseStrikePlayerState) and shown to everyone
+ * (CheeseStrikeGameState's feed); the killed come back after the respawn
+ * delay at the start furthest from everyone else; the match ends when
+ * someone reaches the kill limit. The host sets the limit and the delay
+ * on the map's URL: `?KillLimit=10?RespawnDelay=1`.
  */
 UCLASS()
-class CHEESESTRIKE_API ACheeseStrikeGameMode : public AGameModeBase
+class CHEESESTRIKE_API ACheeseStrikeGameMode : public AGameMode
 {
 	GENERATED_BODY()
 
 public:
 	ACheeseStrikeGameMode();
+
+	int32 GetKillLimit() const { return KillLimit; }
+	float GetRespawnDelay() const { return RespawnDelay; }
+
+	/** `Victim` has been killed by `Killer` (null for nobody), on the head or not. */
+	void Killed(ACheeseStrikeCharacter* Killer, ACheeseStrikeCharacter* Victim, bool bHead);
+
+	/** Where `Player` comes back: the start furthest from every living enemy. */
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	/** Every spawn chooses afresh, rather than reusing the first. */
+	virtual bool ShouldSpawnAtStartSpot(AController* Player) override { return false; }
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	virtual void InitGameState() override;
+	/** A player may name themself with `?Nick=` on the URL they join by (for development; Steam will name them). */
+	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
+
+protected:
+	/** Gives `Who` a new character, if they and the match are still here. */
+	void Respawn(TWeakObjectPtr<AController> Who);
+
+	int32 KillLimit;
+	float RespawnDelay;
 };

@@ -1,0 +1,22 @@
+# Dies alone, by the console command, for looking at a death: the body,
+# the view, and coming back. Run with tools/play.ps1.
+wait 2
+state
+cmd CheeseStrikeDie
+wait 0.2
+state
+wait 0.5
+state
+look 0 -45
+wait 0.3
+state
+shot death_1_body
+wait 1
+state
+shot death_2_body_later
+look 0 45
+wait 1.5
+state
+shot death_3_back
+wait 1
+quit
