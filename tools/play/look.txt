@@ -1,0 +1,14 @@
+# Looks level, far down and far up, for checking the body bends with the aim.
+wait 2
+state
+look 0 -60
+wait 0.6
+state
+shot look_1_down
+look 0 120
+wait 0.6
+state
+shot look_2_up
+look 0 -60
+wait 0.3
+quit

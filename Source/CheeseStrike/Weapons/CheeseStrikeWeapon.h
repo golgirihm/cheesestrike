@@ -9,8 +9,9 @@
 
 class ACheeseStrikeCharacter;
 class UAnimInstance;
-class UAnimMontage;
+class UAnimSequence;
 class USkeletalMeshComponent;
+class USoundBase;
 
 /**
  * A weapon in a character's hands. It has two meshes, one only its owner
@@ -80,8 +81,18 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerReload();
 	void FinishReload();
-	/** Plays the firing animation on the owner's first-person body. */
+	/** Shows a shot on this machine: the body's and the rifle's firing animations, and the sound. */
 	void ShowShot();
+	/** Shows a reload on this machine: the body's and the rifle's animations, and the sounds along the way. */
+	void ShowReload();
+	/** Tells every other machine of a shot or a reload the server allowed, to show it. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastShot();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastReload();
+	/** Plays `Animation` on both of the holder's bodies, over whatever they are doing, at `PlayRate`. */
+	void PlayOnBodies(UAnimSequence* Animation, float PlayRate = 1.0f);
+	void PlaySound(USoundBase* Sound) const;
 	/** Whether the server can allow a shot now: the rate, and the magazine. */
 	bool ServerAllowsShot(float Now);
 
@@ -93,12 +104,23 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> ThirdPersonMesh;
 
+	/** The rifle's own animations, and the sounds it makes (Lyra's; Content/LICENSES.md). */
 	UPROPERTY()
-	TObjectPtr<UAnimMontage> FiringMontage;
+	TObjectPtr<UAnimSequence> RifleFire;
 	UPROPERTY()
-	TSubclassOf<UAnimInstance> FirstPersonAnimation;
+	TObjectPtr<UAnimSequence> RifleReload;
 	UPROPERTY()
-	TSubclassOf<UAnimInstance> ThirdPersonAnimation;
+	TArray<TObjectPtr<USoundBase>> FireSounds;
+	UPROPERTY()
+	TObjectPtr<USoundBase> DryFireSound;
+	UPROPERTY()
+	TObjectPtr<USoundBase> ClipOutSound;
+	UPROPERTY()
+	TObjectPtr<USoundBase> ClipInSound;
+	UPROPERTY()
+	TObjectPtr<USoundBase> BoltSound;
+	FTimerHandle ClipInTimer;
+	FTimerHandle BoltTimer;
 
 	/** Rounds in the magazine and in reserve: the server's count, sent to the owner. */
 	UPROPERTY(Replicated)

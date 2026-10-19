@@ -125,14 +125,6 @@ namespace PlayTesting
 	{
 		PlayersWanted = Session.Players;
 		PlayersTogether = Session.bApart ? 1 : Session.Players;
-		// The template's first-person weapon animation looks for a camera
-		// and a controller its own character has and ours doesn't, and says
-		// so every frame; it is the known gap until the game has arms of its
-		// own (docs/unreal/spike.md, day 7), not what these tests check.
-		if (FAutomationTestBase* Current = Test())
-		{
-			Current->AddExpectedErrorPlain(TEXT("Blueprint:  ABP_FP_Weapon"), EAutomationExpectedErrorFlags::Contains, -1);
-		}
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
 		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 		Settings->SetPlayNumberOfClients(Session.Players);
@@ -145,6 +137,23 @@ namespace PlayTesting
 		Params.GlobalMapOverride = ShooterLevel;
 		ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(Params));
 		WaitUntil(FString::Printf(TEXT("%d player(s) being in with their weapons"), Session.Players), 90.0f, &EveryoneIsIn);
+		// Nothing is drawn here, and a body that isn't drawn isn't posed; the tests look at the bones, so pose them anyway.
+		Then([]()
+		{
+			for (UWorld* Each : Worlds())
+			{
+				for (TActorIterator<ACheeseStrikeCharacter> It(Each); It; ++It)
+				{
+					for (USkeletalMeshComponent* Body : {It->GetMesh(), It->GetFirstPersonMesh()})
+					{
+						if (Body != nullptr)
+						{
+							Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+						}
+					}
+				}
+			}
+		});
 	}
 
 	void StopPlaying()

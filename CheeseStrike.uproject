@@ -38,6 +38,10 @@
 		{
 			"Name": "SocketSubsystemSteamIP",
 			"Enabled": true
+		},
+		{
+			"Name": "AudioModulation",
+			"Enabled": true
 		}
 	]
 }

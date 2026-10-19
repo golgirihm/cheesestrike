@@ -18,7 +18,8 @@ public class CheeseStrike : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			"AnimGraphRuntime"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "EngineSettings", "AssetRegistry", "OnlineBase", "OnlineSubsystem", "OnlineSubsystemUtils" });
@@ -31,6 +32,7 @@ public class CheeseStrike : ModuleRules
 
 		PublicIncludePaths.AddRange(new string[] {
 			"CheeseStrike",
+			"CheeseStrike/Animation",
 			"CheeseStrike/Dev",
 			"CheeseStrike/Input",
 			"CheeseStrike/Movement",

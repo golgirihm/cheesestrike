@@ -56,5 +56,15 @@ Setup: Play in Editor on the shooter level, with the output log open to watch fo
 |---|---|---|---|
 | MOV-02 | Jump and air steering | 1. Jump from standing, then from a sprint.<br>2. Jump and let go of every key; jump and steer sideways in the air.<br>3. Walk into a knee-high step, then into a waist-high block. | A jump is quick and about half a metre high; from a sprint it carries forward. Letting go in the air slows the character gently, not at once; steering in the air turns the landing a little, not sharply. A low step is walked up; a waist-high block stops the character. |
 | MOV-03 | Slide | 1. Sprint, slide, stand, and slide again at once.<br>2. During a slide, push sideways, and look round. | Right after a slide the next needs a moment. Pushing sideways during a slide does nothing; looking round does not change the slide's direction. The slide looks like one: a dip of the view that comes back up as it ends. |
-| MOV-05 | Hands and weapon | 1. Look level, up, down and round while standing, walking and sprinting.<br>2. Crouch and look down. | The rifle is in view at the lower right, steady as the view turns and bobbing a little with the walk. Crouched, it stays in view. (The template's arms don't yet hold it as its own character's do; that waits for the game's own arms.) |
+| MOV-05 | Hands and weapon | 1. Look level, up, down and round while standing, walking and sprinting.<br>2. Hold the right button to aim, then crouch, and look down. | The rifle is held in both hands at the lower right, pointing where the crosshair is, up, down and round, and bobbing a little with the walk. Aiming raises it to the eye with its sights near the crosshair. Crouched, the view drops and the rifle stays in the hands. |
+| MOV-06 | The other player's body | 1. As a listen server with two players (PRJ-03), have B stand still while A watches, then B: look up and down, crouch, walk and jog in each direction, jump, fire, reload. | A sees B's rifle follow B's view up and down, B's body crouch and walk crouched, B's legs walk and jog the way B moves, B leave the ground on a jump, the rifle kick on a shot, and a reload played out on B's rifle and hands over the reload time. |
+
+## Sound
+
+Setup: Play in Editor on the shooter level, alone and then as a listen server with two players. Why manual: whether sounds play at the right moment and from the right place.
+
+| ID | Test | Steps | Expected |
+|---|---|---|---|
+| SND-01 | The rifle | 1. Fire a shot, a burst, and the magazine out.<br>2. Press R with the magazine short. | Each shot has a report. On an empty magazine the trigger clicks and the reload starts. A reload sounds the magazine coming out at once, going in two thirds of the way through, and the bolt near the end. |
+| SND-02 | Another player's rifle | 1. As a listen server with two players, have B fire and reload while A listens with B to one side, then behind. | A hears B's shots and reload from where B is. |
 | MOV-04 | Nobody is corrected | 1. Play as a listen server with two players (PRJ-03). In the joining window, sprint, slide, crouch and jump about for a minute.<br>2. Watch the host's view of the joiner, and the output log. | The joiner is never snapped back or jerked, in its own window or the host's, and the log has no line about a client adjustment or a position correction. |
