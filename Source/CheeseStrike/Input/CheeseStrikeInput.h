@@ -23,6 +23,8 @@ namespace CheeseStrikeInput
 	/** Degrees a second a stick held full over turns the view. */
 	constexpr float StickYawDegreesPerSecond = 150.0f;
 	constexpr float StickPitchDegreesPerSecond = 100.0f;
+	/** How far a stick must be pushed before it counts: a stick at rest is never quite centred. */
+	constexpr float StickDeadZone = 0.2f;
 }
 
 /**

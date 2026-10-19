@@ -42,6 +42,9 @@ namespace CheeseStrikeMovement
 	constexpr float CrouchedHalfHeight = 44.0f;
 	/** Crouches and stands in about an eighth of a second. */
 	constexpr float CrouchRate = 8.0f;
+	/** The eyes, above the capsule's centre: the mannequin's head when standing, and the same above a crouched capsule, so they drop by what the capsule does. */
+	constexpr float EyeHeight = 64.0f;
+	constexpr float CrouchedEyeHeightAboveCentre = 64.0f;
 	/**
 	 * Crouching at a sprint slides: the player keeps going the way they were,
 	 * a little faster at first, easing down to a crouched walk over SlideTime
