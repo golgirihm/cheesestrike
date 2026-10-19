@@ -2,8 +2,10 @@
 
 #include "CheeseStrikeWeapon.h"
 #include "Animation/AnimInstance.h"
-#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequence.h"
 #include "Camera/CameraComponent.h"
+#include "Sound/SoundBase.h"
+#include "Animation/CheeseStrikeAnimInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -23,9 +25,9 @@ namespace
 	constexpr float OriginTolerance = 250.0f;
 	/** Shots that may arrive together after a delay on the network, over the rate. */
 	constexpr float RateBurst = 3.0f;
-	/** The socket on each hand the weapon sits in. */
-	const FName HandSocket(TEXT("HandGrip_R"));
-	const FName MuzzleSocket(TEXT("Muzzle"));
+	/** The bone on the mannequin's right hand the weapon sits in, and how the rifle turns in it to point the way the hand does. */
+	const FName HandSocket(TEXT("weapon_r"));
+	const FRotator GripRotation(0.0f, -90.0f, 0.0f);
 
 	float ServerTime(const UWorld* World)
 	{
@@ -43,13 +45,24 @@ ACheeseStrikeWeapon::ACheeseStrikeWeapon()
 
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Rifle(TEXT("/Game/Weapons/Rifle/Meshes/SKM_Rifle.SKM_Rifle"));
-	static ConstructorHelpers::FObjectFinder<UAnimMontage> Shoot(TEXT("/Game/Variant_Shooter/Anims/FP_Rifle_Shoot_Montage.FP_Rifle_Shoot_Montage"));
-	static ConstructorHelpers::FClassFinder<UAnimInstance> ArmsAnimation(TEXT("/Game/Variant_Shooter/Anims/ABP_FP_Weapon"));
-	static ConstructorHelpers::FClassFinder<UAnimInstance> BodyAnimation(TEXT("/Game/Variant_Shooter/Anims/ABP_TP_Rifle"));
-	FiringMontage = Shoot.Object;
-	FirstPersonAnimation = ArmsAnimation.Class;
-	ThirdPersonAnimation = BodyAnimation.Class;
+	// Lyra's rifle, its animations and its sounds (Content/LICENSES.md).
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Rifle(TEXT("/Game/Weapons/Rifle/Mesh/SK_Rifle.SK_Rifle"));
+	static ConstructorHelpers::FObjectFinder<UAnimSequence> Fire(TEXT("/Game/Weapons/Rifle/Animations/Weap_Rifle_Fire.Weap_Rifle_Fire"));
+	static ConstructorHelpers::FObjectFinder<UAnimSequence> Reload(TEXT("/Game/Weapons/Rifle/Animations/Weap_Rifle_Reload.Weap_Rifle_Reload"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> Shot1(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Punch-Close_01.Weapons_Rifle_Punch-Close_01"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> Shot2(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Punch-Close_02.Weapons_Rifle_Punch-Close_02"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> Shot3(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Punch-Close_03.Weapons_Rifle_Punch-Close_03"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> DryFire(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_DryFire_01.Weapons_Rifle_DryFire_01"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> ClipOut(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_ClipOut_01.Weapons_Rifle_ClipOut_01"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> ClipIn(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_ClipIn_01.Weapons_Rifle_ClipIn_01"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> Bolt(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Bolt_01.Weapons_Rifle_Bolt_01"));
+	RifleFire = Fire.Object;
+	RifleReload = Reload.Object;
+	FireSounds = {Shot1.Object, Shot2.Object, Shot3.Object};
+	DryFireSound = DryFire.Object;
+	ClipOutSound = ClipOut.Object;
+	ClipInSound = ClipIn.Object;
+	BoltSound = Bolt.Object;
 
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 	FirstPersonMesh->SetupAttachment(RootComponent);
@@ -110,9 +123,83 @@ void ACheeseStrikeWeapon::Hold(ACheeseStrikeCharacter* Character)
 	AttachToActor(Character, Snap);
 	FirstPersonMesh->AttachToComponent(Character->GetFirstPersonMesh(), Snap, HandSocket);
 	ThirdPersonMesh->AttachToComponent(Character->GetMesh(), Snap, HandSocket);
-	Character->GetFirstPersonMesh()->SetAnimInstanceClass(FirstPersonAnimation);
-	Character->GetMesh()->SetAnimInstanceClass(ThirdPersonAnimation);
+	// The rifle is modelled along its Y axis; the hand's bone points its X the way the character faces.
+	FirstPersonMesh->SetRelativeRotation(GripRotation);
+	ThirdPersonMesh->SetRelativeRotation(GripRotation);
 	Character->SetWeapon(this);
+}
+
+void ACheeseStrikeWeapon::PlayOnBodies(UAnimSequence* Animation, float PlayRate)
+{
+	if (Holder == nullptr || Animation == nullptr)
+	{
+		return;
+	}
+	for (USkeletalMeshComponent* Body : {Holder->GetFirstPersonMesh(), Holder->GetMesh()})
+	{
+		if (UAnimInstance* Instance = Body != nullptr ? Body->GetAnimInstance() : nullptr)
+		{
+			Instance->PlaySlotAnimationAsDynamicMontage(Animation, UCheeseStrikeAnimInstance::SlotName(), 0.1f, 0.15f, PlayRate);
+		}
+	}
+}
+
+void ACheeseStrikeWeapon::PlaySound(USoundBase* Sound) const
+{
+	if (Sound != nullptr)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, Sound, ThirdPersonMesh->GetComponentLocation());
+	}
+}
+
+void ACheeseStrikeWeapon::ShowShot()
+{
+	const UCheeseStrikeAnimInstance* Body = Holder != nullptr && Holder->GetMesh() != nullptr ? Cast<UCheeseStrikeAnimInstance>(Holder->GetMesh()->GetAnimInstance()) : nullptr;
+	PlayOnBodies(Body != nullptr ? Body->GetSet().Fire.Get() : nullptr);
+	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
+	{
+		Mesh->PlayAnimation(RifleFire, false);
+	}
+	if (FireSounds.Num() > 0)
+	{
+		PlaySound(FireSounds[FMath::RandHelper(FireSounds.Num())]);
+	}
+}
+
+void ACheeseStrikeWeapon::ShowReload()
+{
+	const UCheeseStrikeAnimInstance* Body = Holder != nullptr && Holder->GetMesh() != nullptr ? Cast<UCheeseStrikeAnimInstance>(Holder->GetMesh()->GetAnimInstance()) : nullptr;
+	UAnimSequence* Reload = Body != nullptr ? Body->GetSet().Reload.Get() : nullptr;
+	// The animations take the reload's time, however long they were made.
+	const float BodyRate = Reload != nullptr && Reload->GetPlayLength() > 0.0f ? Reload->GetPlayLength() / Stats->ReloadTime : 1.0f;
+	PlayOnBodies(Reload, BodyRate);
+	const float RifleRate = RifleReload != nullptr && RifleReload->GetPlayLength() > 0.0f ? RifleReload->GetPlayLength() / Stats->ReloadTime : 1.0f;
+	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
+	{
+		Mesh->SetPlayRate(RifleRate);
+		Mesh->PlayAnimation(RifleReload, false);
+	}
+	// The magazine comes out at once, goes in two thirds of the way through, and the bolt follows.
+	PlaySound(ClipOutSound);
+	GetWorldTimerManager().SetTimer(ClipInTimer, FTimerDelegate::CreateUObject(this, &ACheeseStrikeWeapon::PlaySound, ClipInSound.Get()), Stats->ReloadTime * 0.65f, false);
+	GetWorldTimerManager().SetTimer(BoltTimer, FTimerDelegate::CreateUObject(this, &ACheeseStrikeWeapon::PlaySound, BoltSound.Get()), Stats->ReloadTime * 0.85f, false);
+}
+
+void ACheeseStrikeWeapon::MulticastShot_Implementation()
+{
+	// The shooter has shown it already.
+	if (Holder != nullptr && !Holder->IsLocallyControlled())
+	{
+		ShowShot();
+	}
+}
+
+void ACheeseStrikeWeapon::MulticastReload_Implementation()
+{
+	if (Holder != nullptr && !Holder->IsLocallyControlled())
+	{
+		ShowReload();
+	}
 }
 
 bool ACheeseStrikeWeapon::IsReloading() const
@@ -178,6 +265,7 @@ void ACheeseStrikeWeapon::FireOnce()
 	}
 	if (Magazine <= 0)
 	{
+		PlaySound(DryFireSound);
 		StartReload();
 		return;
 	}
@@ -198,18 +286,6 @@ void ACheeseStrikeWeapon::FireOnce()
 	++ShotsFired;
 	ShowShot();
 	ServerFire(Origin, Aim, Seed, Index, bAimed, Now);
-}
-
-void ACheeseStrikeWeapon::ShowShot()
-{
-	if (Holder == nullptr || FiringMontage == nullptr)
-	{
-		return;
-	}
-	if (UAnimInstance* Arms = Holder->GetFirstPersonMesh()->GetAnimInstance())
-	{
-		Arms->Montage_Play(FiringMontage);
-	}
 }
 
 bool ACheeseStrikeWeapon::ServerAllowsShot(float Now)
@@ -250,6 +326,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		return;
 	}
 	--Magazine;
+	MulticastShot();
 	// Which way it went: the shooter's aim, spread as the shooter's seed had it.
 	const int32 RunIndex = FMath::Max(0, Index);
 	FRandomStream Random(Seed);
@@ -344,6 +421,7 @@ void ACheeseStrikeWeapon::StartReload()
 		return;
 	}
 	StopFiring();
+	ShowReload();
 	ServerReload();
 }
 
@@ -355,6 +433,7 @@ void ACheeseStrikeWeapon::ServerReload_Implementation()
 	}
 	ReloadEndsAt = ServerTime(GetWorld()) + Stats->ReloadTime;
 	GetWorldTimerManager().SetTimer(ReloadTimer, this, &ACheeseStrikeWeapon::FinishReload, Stats->ReloadTime, false);
+	MulticastReload();
 }
 
 void ACheeseStrikeWeapon::FinishReload()

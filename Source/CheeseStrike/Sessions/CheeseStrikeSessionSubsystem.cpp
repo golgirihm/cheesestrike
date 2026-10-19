@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeSessionSubsystem.h"
+#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -20,6 +21,19 @@ void UCheeseStrikeSessionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 		InviteHandle = Interface->AddOnSessionUserInviteAcceptedDelegate_Handle(FOnSessionUserInviteAcceptedDelegate::CreateUObject(this, &UCheeseStrikeSessionSubsystem::OnInviteAccepted));
 	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: through %s"), *ServiceName());
+	// The game's traffic goes through Steam's net driver only when Steam is
+	// the service; without it (the editor, -NOSTEAM, no Steam client) that
+	// driver can't connect even to an address, so the plain IP driver takes over.
+	if (ServiceName() != TEXT("STEAM") && GEngine != nullptr)
+	{
+		for (FNetDriverDefinition& Definition : GEngine->NetDriverDefinitions)
+		{
+			if (Definition.DefName == NAME_GameNetDriver)
+			{
+				Definition.DriverClassName = FName(TEXT("/Script/OnlineSubsystemUtils.IpNetDriver"));
+			}
+		}
+	}
 }
 
 void UCheeseStrikeSessionSubsystem::Deinitialize()

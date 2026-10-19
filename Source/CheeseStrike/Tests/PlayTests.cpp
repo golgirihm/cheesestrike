@@ -5,8 +5,10 @@
 // and ending a match over the network.
 
 #include "Misc/AutomationTest.h"
+#include "Animation/CheeseStrikeAnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
@@ -68,6 +70,19 @@ namespace PlayTests
 	/** Remembered between steps. */
 	TWeakObjectPtr<ACheeseStrikeCharacter> FirstBody;
 	int32 ShotsBefore = 0;
+	float HeadAbove = 0.0f;
+
+	/** How high `Character`'s head bone is above where it stands. */
+	float HeadHeight(const ACheeseStrikeCharacter* Character)
+	{
+		return Character->GetMesh()->GetSocketLocation(FName(TEXT("head"))).Z - Character->GetMesh()->GetComponentLocation().Z;
+	}
+
+	/** The body's animation of `Character`'s mesh seen by everyone. */
+	const UCheeseStrikeAnimInstance* BodyAnimation(const ACheeseStrikeCharacter* Character)
+	{
+		return Cast<UCheeseStrikeAnimInstance>(Character->GetMesh()->GetAnimInstance());
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FItWalksSprintsAndSlides, "CheeseStrike.Play.WalksSprintsAndSlides", PlayTests::Flags)
@@ -85,6 +100,12 @@ bool FItWalksSprintsAndSlides::RunTest(const FString& Parameters)
 		{
 			TestTrue(FString::Printf(TEXT("walks at walking speed (%.0f)"), Character->GetVelocity().Size2D()), PlayTests::Near(Character->GetVelocity().Size2D(), WalkSpeed, WalkSpeed * 0.1f));
 			TestFalse(TEXT("standing"), Character->bIsCrouched);
+			PlayTests::HeadAbove = PlayTests::HeadHeight(Character);
+			if (const UCheeseStrikeAnimInstance* Animation = PlayTests::BodyAnimation(Character))
+			{
+				TestTrue(FString::Printf(TEXT("the body knows its speed (%.0f)"), Animation->Speed), PlayTests::Near(Animation->Speed, WalkSpeed, WalkSpeed * 0.15f));
+				TestTrue(FString::Printf(TEXT("and that it goes forward (%.0f)"), Animation->Direction), FMath::Abs(Animation->Direction) < 10.0f);
+			}
 		}
 	});
 	// From the start again, so that the run that follows has the ground it needs.
@@ -117,6 +138,9 @@ bool FItWalksSprintsAndSlides::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("at a crouched walk (%.0f)"), Character->GetVelocity().Size2D()), PlayTests::Near(Character->GetVelocity().Size2D(), WalkSpeed * CrouchFactor, WalkSpeed * CrouchFactor * 0.15f));
 			const float EyesAboveFloor = Character->GetEyeOffset() + Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 			TestTrue(FString::Printf(TEXT("with its eyes lowered (%.0f above the floor)"), EyesAboveFloor), EyesAboveFloor < EyeHeight + CapsuleHalfHeight - 30.0f);
+			TestTrue(FString::Printf(TEXT("and its head down with them (%.0f, from %.0f)"), PlayTests::HeadHeight(Character), PlayTests::HeadAbove), PlayTests::HeadHeight(Character) < PlayTests::HeadAbove - 20.0f);
+			const UCheeseStrikeAnimInstance* Animation = PlayTests::BodyAnimation(Character);
+			TestTrue(TEXT("the body knows it is crouched"), Animation != nullptr && Animation->bCrouched);
 		}
 	});
 	Play(0, TEXT("release Crouch\nrelease Sprint\nrelease Move\nwait 0.8\nstate"));
@@ -170,7 +194,36 @@ bool FItFiresAimsAndReloads::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("narrows the view (%.0f)"), Character->GetFirstPersonCameraComponent()->FieldOfView), PlayTests::Near(Character->GetFirstPersonCameraComponent()->FieldOfView, Wanted, 3.0f));
 		}
 	});
-	Play(0, TEXT("release Aim\ntap Reload\nwait 0.3"));
+	Then([]()
+	{
+		if (const ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			PlayTests::HeadAbove = PlayTests::HeadHeight(Character);
+		}
+	});
+	Play(0, TEXT("release Aim\nlook 0 -50\nwait 0.5"));
+	Then([this]()
+	{
+		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			// Looking down bends the body down with the aim offset: both bodies know the pitch, and both rifles point down with it.
+			for (const USkeletalMeshComponent* Body : {Character->GetMesh(), Character->GetFirstPersonMesh()})
+			{
+				const UCheeseStrikeAnimInstance* Animation = Cast<UCheeseStrikeAnimInstance>(Body->GetAnimInstance());
+				if (TestNotNull(TEXT("the body is animated in code"), Animation))
+				{
+					TestTrue(FString::Printf(TEXT("and knows the aim pitch (%.0f)"), Animation->AimPitch), PlayTests::Near(Animation->AimPitch, -50.0f, 3.0f));
+				}
+			}
+			for (const USkeletalMeshComponent* Rifle : {Character->GetWeapon()->GetThirdPersonMesh(), Character->GetWeapon()->GetFirstPersonMesh()})
+			{
+				// The rifle is modelled along its Y axis.
+				const float BarrelPitch = FMath::RadiansToDegrees(FMath::Asin(Rifle->GetRightVector().Z));
+				TestTrue(FString::Printf(TEXT("the rifle points down with the view (%.0f)"), BarrelPitch), BarrelPitch < -25.0f && BarrelPitch > -75.0f);
+			}
+		}
+	});
+	Play(0, TEXT("look 0 50\ntap Reload\nwait 0.3"));
 	Then([this]()
 	{
 		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))

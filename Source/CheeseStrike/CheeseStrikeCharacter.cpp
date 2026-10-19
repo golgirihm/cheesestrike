@@ -15,6 +15,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "CheeseStrike.h"
+#include "Animation/CheeseStrikeAnimInstance.h"
 #include "Input/CheeseStrikeInput.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
@@ -37,13 +38,12 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
 
 	// The body everyone else sees, and the copy of it its own player sees,
-	// each moved by the template's animation: the mannequin standing on the
-	// capsule's floor, turned to face its front.
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Mannequin(TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
-	static ConstructorHelpers::FClassFinder<UAnimInstance> BodyAnimation(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"));
-	static ConstructorHelpers::FClassFinder<UAnimInstance> ArmsAnimation(TEXT("/Game/FirstPerson/Anims/ABP_FP_Copy"));
+	// each animated in code (UCheeseStrikeAnimInstance) with Lyra's rifle
+	// set: the mannequin standing on the capsule's floor, turned to face
+	// its front.
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Mannequin(TEXT("/Game/Characters/Heroes/Mannequin/Meshes/SKM_Manny.SKM_Manny"));
 	GetMesh()->SetSkeletalMeshAsset(Mannequin.Object);
-	GetMesh()->SetAnimInstanceClass(BodyAnimation.Class);
+	GetMesh()->SetAnimInstanceClass(UCheeseStrikeAnimInstance::StaticClass());
 	GetMesh()->SetRelativeLocationAndRotation(FVector(-10.0f, 0.0f, -CapsuleHalfHeight), FRotator(0.0f, -90.0f, 0.0f));
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
@@ -51,7 +51,7 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 	FirstPersonMesh->SetupAttachment(GetMesh());
 	FirstPersonMesh->SetSkeletalMeshAsset(Mannequin.Object);
-	FirstPersonMesh->SetAnimInstanceClass(ArmsAnimation.Class);
+	FirstPersonMesh->SetAnimInstanceClass(UCheeseStrikeAnimInstance::StaticClass());
 	FirstPersonMesh->SetOnlyOwnerSee(true);
 	FirstPersonMesh->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
 	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
@@ -73,8 +73,11 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	FirstPersonCameraComponent->SetupAttachment(FirstPersonMesh, FName("head"));
 	FirstPersonCameraComponent->SetRelativeLocationAndRotation(FVector(-2.8f, 5.89f, 0.0f), FRotator(0.0f, 90.0f, -90.0f));
 	FirstPersonCameraComponent->bUsePawnControlRotation = true;
+	// The first-person body is drawn at a narrower field of view than the
+	// world, which keeps a rifle this close from stretching; it isn't shrunk
+	// towards the camera, which would pull it out of the hands' line.
 	FirstPersonCameraComponent->bEnableFirstPersonFieldOfView = true;
-	FirstPersonCameraComponent->bEnableFirstPersonScale = true;
+	FirstPersonCameraComponent->bEnableFirstPersonScale = false;
 	FirstPersonCameraComponent->FirstPersonFieldOfView = 70.0f;
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
 	BaseFieldOfView = FirstPersonCameraComponent->FieldOfView;
@@ -326,15 +329,11 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 			}
 		}
 	}
-	// The eyes settle at their height for standing or crouched.
+	// The eyes settle at their height for standing or crouched; the view
+	// itself rides the first-person body's head, which the crouch animation
+	// lowers.
 	EyeOffset = FMath::FInterpTo(EyeOffset, BaseEyeHeight, DeltaSeconds, CheeseStrikeMovement::CrouchRate);
 	Eyes->SetRelativeLocation(FVector(0.0f, 0.0f, EyeOffset));
-	// The first-person body goes down with the eyes, as the body it copies
-	// has no crouch: its feet sink below the floor, which only its own
-	// player could see, by looking down.
-	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-	const float EyesAboveFloor = EyeOffset + HalfHeight;
-	FirstPersonMesh->SetRelativeLocation(FVector(0.0f, 0.0f, EyesAboveFloor - (CheeseStrikeMovement::EyeHeight + CheeseStrikeMovement::CapsuleHalfHeight)));
 }
 
 void ACheeseStrikeCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
@@ -363,6 +362,23 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 		Health, IsAlive() ? 1 : 0, IsProtected() ? 1 : 0, HeldWeapon != nullptr ? HeldWeapon->GetMagazine() : -1, HeldWeapon != nullptr ? HeldWeapon->GetReserve() : -1, HeldWeapon != nullptr && HeldWeapon->IsAimed() ? 1 : 0,
 		FirstPersonCameraComponent->FieldOfView, HeldWeapon != nullptr ? HeldWeapon->ShotsFired : 0, HeldWeapon != nullptr ? HeldWeapon->HitsConfirmed : 0, HeldWeapon != nullptr && HeldWeapon->IsReloading() ? 1 : 0,
 		Body.X, Body.Y, Body.Z, GetMesh()->IsSimulatingPhysics() ? 1 : 0, Eye.X, Eye.Y, Eye.Z);
+	if (HeldWeapon != nullptr)
+	{
+		// Where the hands and the rifle are, in each body, relative to the eyes: for checking the weapon sits in the hands.
+		const FVector FirstHand = FirstPersonMesh->GetBoneLocation(TEXT("hand_r")) - Eye;
+		const FVector FirstRifle = HeldWeapon->GetFirstPersonMesh()->GetComponentLocation() - Eye;
+		const FVector Hand = GetMesh()->GetBoneLocation(TEXT("hand_r")) - Eye;
+		const FVector Rifle = HeldWeapon->GetThirdPersonMesh()->GetComponentLocation() - Eye;
+		// The rifle is modelled along its Y axis.
+		const FVector FirstBarrel = HeldWeapon->GetFirstPersonMesh()->GetRightVector();
+		const FVector Barrel = HeldWeapon->GetThirdPersonMesh()->GetRightVector();
+		const FVector View = FirstPersonCameraComponent->GetForwardVector();
+		const FVector Head = GetMesh()->GetBoneLocation(TEXT("head")) - GetMesh()->GetComponentLocation();
+		const UCheeseStrikeAnimInstance* Animation = Cast<UCheeseStrikeAnimInstance>(GetMesh()->GetAnimInstance());
+		UE_LOG(LogCheeseStrike, Display, TEXT("Hands: first-person hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f); body hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f) head (%.0f, %.0f, %.0f) over the feet; view (%.2f, %.2f, %.2f) aim pitch %.0f"),
+			FirstHand.X, FirstHand.Y, FirstHand.Z, FirstRifle.X, FirstRifle.Y, FirstRifle.Z, FirstBarrel.X, FirstBarrel.Y, FirstBarrel.Z,
+			Hand.X, Hand.Y, Hand.Z, Rifle.X, Rifle.Y, Rifle.Z, Barrel.X, Barrel.Y, Barrel.Z, Head.X, Head.Y, Head.Z, View.X, View.Y, View.Z, Animation != nullptr ? Animation->AimPitch : 0.0f);
+	}
 	if (!IsAlive())
 	{
 		const FVector Pelvis = GetMesh()->GetBoneLocation(TEXT("pelvis"));
