@@ -19,9 +19,8 @@ namespace InputTests
 		return Keys.Contains(Key);
 	}
 }
-using namespace InputTests;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheKeysAreTheGodotGames, "CheeseStrike.Input.TheKeysAreTheGodotGames", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheKeysAreTheGodotGames, "CheeseStrike.Input.TheKeysAreTheGodotGames", InputTests::Flags)
 
 bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 {
@@ -35,25 +34,30 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	const TArray<FKey> Move = Set->KeysFor(Set->Move);
 	for (const FKey& Key : {EKeys::W, EKeys::A, EKeys::S, EKeys::D, EKeys::Up, EKeys::Down, EKeys::Left, EKeys::Right, EKeys::Gamepad_Left2D})
 	{
-		TestTrue(FString::Printf(TEXT("%s moves"), *Key.ToString()), Has(Move, Key));
+		TestTrue(FString::Printf(TEXT("%s moves"), *Key.ToString()), InputTests::Has(Move, Key));
 	}
 	TestEqual(TEXT("and nothing else"), Move.Num(), 9);
 	TestEqual(TEXT("moving is two axes"), Set->Move->ValueType, EInputActionValueType::Axis2D);
 
-	TestTrue(TEXT("the mouse looks"), Has(Set->KeysFor(Set->MouseLook), EKeys::Mouse2D));
-	TestTrue(TEXT("the right stick looks"), Has(Set->KeysFor(Set->StickLook), EKeys::Gamepad_Right2D));
-	TestTrue(TEXT("space jumps"), Has(Set->KeysFor(Set->Jump), EKeys::SpaceBar));
-	TestTrue(TEXT("so does the bottom face button"), Has(Set->KeysFor(Set->Jump), EKeys::Gamepad_FaceButton_Bottom));
-	TestTrue(TEXT("shift sprints"), Has(Set->KeysFor(Set->Sprint), EKeys::LeftShift));
-	TestTrue(TEXT("so does pressing the left stick"), Has(Set->KeysFor(Set->Sprint), EKeys::Gamepad_LeftThumbstick));
-	TestTrue(TEXT("C crouches"), Has(Set->KeysFor(Set->Crouch), EKeys::C));
-	TestTrue(TEXT("so does control"), Has(Set->KeysFor(Set->Crouch), EKeys::LeftControl));
-	TestTrue(TEXT("and the right face button"), Has(Set->KeysFor(Set->Crouch), EKeys::Gamepad_FaceButton_Right));
+	TestTrue(TEXT("the mouse looks"), InputTests::Has(Set->KeysFor(Set->MouseLook), EKeys::Mouse2D));
+	TestTrue(TEXT("the right stick looks"), InputTests::Has(Set->KeysFor(Set->StickLook), EKeys::Gamepad_Right2D));
+	TestTrue(TEXT("space jumps"), InputTests::Has(Set->KeysFor(Set->Jump), EKeys::SpaceBar));
+	TestTrue(TEXT("so does the bottom face button"), InputTests::Has(Set->KeysFor(Set->Jump), EKeys::Gamepad_FaceButton_Bottom));
+	TestTrue(TEXT("shift sprints"), InputTests::Has(Set->KeysFor(Set->Sprint), EKeys::LeftShift));
+	TestTrue(TEXT("so does pressing the left stick"), InputTests::Has(Set->KeysFor(Set->Sprint), EKeys::Gamepad_LeftThumbstick));
+	TestTrue(TEXT("C crouches"), InputTests::Has(Set->KeysFor(Set->Crouch), EKeys::C));
+	TestTrue(TEXT("so does control"), InputTests::Has(Set->KeysFor(Set->Crouch), EKeys::LeftControl));
+	TestTrue(TEXT("and the right face button"), InputTests::Has(Set->KeysFor(Set->Crouch), EKeys::Gamepad_FaceButton_Right));
 	TestEqual(TEXT("jumping is a button"), Set->Jump->ValueType, EInputActionValueType::Boolean);
+	TestTrue(TEXT("the left button fires"), InputTests::Has(Set->KeysFor(Set->Fire), EKeys::LeftMouseButton));
+	TestTrue(TEXT("so does the right trigger"), InputTests::Has(Set->KeysFor(Set->Fire), EKeys::Gamepad_RightTrigger));
+	TestTrue(TEXT("the right button aims"), InputTests::Has(Set->KeysFor(Set->Aim), EKeys::RightMouseButton));
+	TestTrue(TEXT("so does the left trigger"), InputTests::Has(Set->KeysFor(Set->Aim), EKeys::Gamepad_LeftTrigger));
+	TestTrue(TEXT("R reloads"), InputTests::Has(Set->KeysFor(Set->Reload), EKeys::R));
 
 	// No key does two things.
 	TArray<FKey> All;
-	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get()})
+	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get(), Set->Fire.Get(), Set->Aim.Get(), Set->Reload.Get()})
 	{
 		for (const FKey& Key : Set->KeysFor(Action))
 		{
@@ -64,7 +68,7 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FForwardIsForwardAndUpIsUp, "CheeseStrike.Input.ForwardIsForwardAndUpIsUp", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FForwardIsForwardAndUpIsUp, "CheeseStrike.Input.ForwardIsForwardAndUpIsUp", InputTests::Flags)
 
 bool FForwardIsForwardAndUpIsUp::RunTest(const FString& Parameters)
 {

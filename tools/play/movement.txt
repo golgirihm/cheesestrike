@@ -1,0 +1,66 @@
+# Walks, sprints, crouches, slides, looks and jumps, for checking the
+# character's movement by its trace. Run with tools/play.ps1.
+wait 2
+state
+shot movement_1_idle
+hold Move 0 1
+wait 1.5
+state
+shot movement_2_walk
+release Move
+wait 0.8
+hold Sprint
+hold Move 0 1
+wait 1.5
+state
+shot movement_3_sprint
+release Move
+release Sprint
+wait 0.8
+hold Crouch
+wait 1
+state
+shot movement_4_crouch
+hold Move 0 1
+wait 1.2
+state
+release Move
+release Crouch
+wait 0.8
+look 0 30
+wait 0.3
+state
+shot movement_5_lookup
+look 0 -60
+wait 0.3
+state
+look 0 30
+look 90 0
+wait 0.3
+state
+look -90 0
+hold Sprint
+hold Move 0 1
+wait 1.2
+hold Crouch
+wait 0.3
+state
+shot movement_6_slide
+wait 0.4
+state
+release Crouch
+release Move
+release Sprint
+wait 0.8
+tap Jump
+wait 0.3
+state
+wait 0.7
+hold Move 0 1
+wait 0.4
+tap Jump
+wait 0.3
+state
+release Move
+wait 1
+quit

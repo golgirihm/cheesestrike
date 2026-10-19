@@ -1,0 +1,14 @@
+# Looks at the weapon in hand, level and down, and fires, for checking what the player sees of their arms.
+wait 2
+shot arms_1_level
+look 0 -50
+wait 0.3
+shot arms_2_down
+look 0 50
+hold Fire
+wait 1.2
+release Fire
+state
+wait 0.3
+shot arms_3_fired
+quit

@@ -4,9 +4,11 @@
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikePlayerController.h"
+#include "UI/CheeseStrikeHUD.h"
 
 ACheeseStrikeGameMode::ACheeseStrikeGameMode()
 {
 	DefaultPawnClass = ACheeseStrikeCharacter::StaticClass();
 	PlayerControllerClass = ACheeseStrikePlayerController::StaticClass();
+	HUDClass = ACheeseStrikeHUD::StaticClass();
 }

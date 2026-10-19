@@ -66,6 +66,12 @@ public:
 	UPROPERTY()
 	TObjectPtr<UInputAction> Crouch;
 	UPROPERTY()
+	TObjectPtr<UInputAction> Fire;
+	UPROPERTY()
+	TObjectPtr<UInputAction> Aim;
+	UPROPERTY()
+	TObjectPtr<UInputAction> Reload;
+	UPROPERTY()
 	TObjectPtr<UInputMappingContext> Context;
 };
 

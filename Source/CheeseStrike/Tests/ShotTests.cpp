@@ -1,0 +1,147 @@
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+
+// What a shot does, as arithmetic: damage with distance and on the head,
+// time to kill, spread that blooms, recoil that climbs and settles, the
+// ray tests a hit is decided by, and where a player was put back to.
+
+#include "Misc/AutomationTest.h"
+#include "Weapons/CheeseStrikeShot.h"
+
+#if WITH_DEV_AUTOMATION_TESTS
+
+namespace ShotTests
+{
+	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FDamageFallsOffWithDistanceAndDoublesOnTheHead, "CheeseStrike.Shot.DamageFallsOffWithDistanceAndDoublesOnTheHead", ShotTests::Flags)
+
+bool FDamageFallsOffWithDistanceAndDoublesOnTheHead::RunTest(const FString& Parameters)
+{
+	const FWeaponStats& Weapon = CheeseStrikeWeapons::Blaster();
+	TestEqual(TEXT("close, the body takes the whole damage"), CheeseStrikeWeapons::DamageAt(Weapon, 100.0f, false), Weapon.Damage);
+	TestEqual(TEXT("up to where falloff starts"), CheeseStrikeWeapons::DamageAt(Weapon, Weapon.FalloffStart, false), Weapon.Damage);
+	TestEqual(TEXT("the floor from where it ends"), CheeseStrikeWeapons::DamageAt(Weapon, Weapon.FalloffEnd, false), Weapon.Damage * Weapon.FalloffFloor);
+	TestEqual(TEXT("and no less further out"), CheeseStrikeWeapons::DamageAt(Weapon, Weapon.MaxRange, false), Weapon.Damage * Weapon.FalloffFloor);
+	const float Halfway = (Weapon.FalloffStart + Weapon.FalloffEnd) / 2.0f;
+	TestEqual(TEXT("halfway between"), CheeseStrikeWeapons::DamageAt(Weapon, Halfway, false), Weapon.Damage * (1.0f + Weapon.FalloffFloor) / 2.0f);
+	TestEqual(TEXT("the head takes more"), CheeseStrikeWeapons::DamageAt(Weapon, 100.0f, true), Weapon.Damage * Weapon.HeadMultiplier);
+	TestTrue(TEXT("five body shots to kill, in about half a second"), CheeseStrikeWeapons::TimeToKill(Weapon) > 0.4f && CheeseStrikeWeapons::TimeToKill(Weapon) < 0.6f);
+	TestTrue(TEXT("falloff starts beyond a room and ends across a yard"), Weapon.FalloffStart > 1000.0f && Weapon.FalloffEnd < 4000.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSpreadBloomsAndRecoilClimbs, "CheeseStrike.Shot.SpreadBloomsAndRecoilClimbs", ShotTests::Flags)
+
+bool FSpreadBloomsAndRecoilClimbs::RunTest(const FString& Parameters)
+{
+	const FWeaponStats& Weapon = CheeseStrikeWeapons::Blaster();
+	TestEqual(TEXT("the first shot from the hip goes where it is aimed"), CheeseStrikeWeapons::SpreadFor(Weapon, 0, false), 0.0f);
+	TestEqual(TEXT("halfway through the bloom, half the cone"), CheeseStrikeWeapons::SpreadFor(Weapon, Weapon.BloomShots / 2, false), Weapon.HipSpreadDegrees / 2.0f);
+	TestEqual(TEXT("the whole cone after the bloom"), CheeseStrikeWeapons::SpreadFor(Weapon, Weapon.BloomShots, false), Weapon.HipSpreadDegrees);
+	TestEqual(TEXT("and no more"), CheeseStrikeWeapons::SpreadFor(Weapon, Weapon.BloomShots * 3, false), Weapon.HipSpreadDegrees);
+	TestEqual(TEXT("aimed, the tight cone"), CheeseStrikeWeapons::SpreadFor(Weapon, Weapon.BloomShots, true), Weapon.SpreadDegrees);
+	TestTrue(TEXT("which is far tighter"), Weapon.SpreadDegrees * 10.0f < Weapon.HipSpreadDegrees);
+
+	TestEqual(TEXT("the first shot has no kick"), CheeseStrikeWeapons::RecoilFor(Weapon, 0, false), FVector2D::ZeroVector);
+	const FVector2D Second = CheeseStrikeWeapons::RecoilFor(Weapon, 1, false);
+	TestTrue(TEXT("the second climbs"), Second.Y > 0.0f);
+	TestTrue(TEXT("by about one shot's worth"), Second.Y < Weapon.RecoilUp && Second.Y > Weapon.RecoilUp * 0.4f);
+	float Last = 0.0f;
+	for (int32 Index = 1; Index < 40; ++Index)
+	{
+		const float Climb = CheeseStrikeWeapons::RecoilFor(Weapon, Index, false).Y;
+		TestTrue(FString::Printf(TEXT("shot %d climbs on"), Index), Climb > Last);
+		TestTrue(FString::Printf(TEXT("shot %d stays under the cap"), Index), Climb < Weapon.RecoilUp * Weapon.RecoilCap);
+		Last = Climb;
+	}
+	TestTrue(TEXT("and settles near the cap"), Last > Weapon.RecoilUp * Weapon.RecoilCap * 0.9f);
+	TestTrue(TEXT("it wanders to the side"), FMath::Abs(CheeseStrikeWeapons::RecoilFor(Weapon, 5, false).X) > 0.0f);
+	TestTrue(TEXT("along the same pattern every time"), CheeseStrikeWeapons::RecoilFor(Weapon, 5, false) == CheeseStrikeWeapons::RecoilFor(Weapon, 5, false));
+	TestEqual(TEXT("aimed, it is steadier"), CheeseStrikeWeapons::RecoilFor(Weapon, 5, true).Y, CheeseStrikeWeapons::RecoilFor(Weapon, 5, false).Y * CheeseStrikeWeapons::AimRecoilFactor);
+
+	TestEqual(TEXT("a run begins at the first shot"), CheeseStrikeWeapons::NextInRun(Weapon, -1, 100.0f), 0);
+	TestEqual(TEXT("and goes on while shots come quickly"), CheeseStrikeWeapons::NextInRun(Weapon, 3, Weapon.FireInterval), 4);
+	TestEqual(TEXT("and starts over after a pause"), CheeseStrikeWeapons::NextInRun(Weapon, 3, Weapon.RecoilReset + 0.01f), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAShotIsTurnedAndSpread, "CheeseStrike.Shot.AShotIsTurnedAndSpread", ShotTests::Flags)
+
+bool FAShotIsTurnedAndSpread::RunTest(const FString& Parameters)
+{
+	const FVector Ahead = FVector::ForwardVector;
+	const FVector Up = CheeseStrikeWeapons::Turned(Ahead, FVector2D(0.0f, 90.0f));
+	TestTrue(TEXT("90 degrees up is up"), Up.Equals(FVector::UpVector, 0.001f));
+	const FVector Right = CheeseStrikeWeapons::Turned(Ahead, FVector2D(90.0f, 0.0f));
+	TestTrue(TEXT("90 degrees right is right"), Right.Equals(FVector::RightVector, 0.001f));
+	TestTrue(TEXT("nothing is nothing"), CheeseStrikeWeapons::Turned(Ahead, FVector2D::ZeroVector).Equals(Ahead, 0.001f));
+
+	FRandomStream Random(7);
+	TestTrue(TEXT("no cone, no spread"), CheeseStrikeWeapons::Spread(Ahead, 0.0f, Random).Equals(Ahead, 0.001f));
+	for (int32 Shot = 0; Shot < 50; ++Shot)
+	{
+		const FVector Way = CheeseStrikeWeapons::Spread(Ahead, 5.0f, Random);
+		const float Off = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(Way, Ahead)));
+		TestTrue(FString::Printf(TEXT("shot %d stays in the cone"), Shot), Off <= 5.0f + 0.01f);
+	}
+	FRandomStream A(42);
+	FRandomStream B(42);
+	TestTrue(TEXT("the same seed gives the same shot, for the shooter and the server to agree"), CheeseStrikeWeapons::Spread(Ahead, 5.0f, A).Equals(CheeseStrikeWeapons::Spread(Ahead, 5.0f, B), 0.0001f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FARayHitsACapsuleAndAHead, "CheeseStrike.Shot.ARayHitsACapsuleAndAHead", ShotTests::Flags)
+
+bool FARayHitsACapsuleAndAHead::RunTest(const FString& Parameters)
+{
+	const FVector Feet(1000.0f, 0.0f, 0.0f);
+	const float Radius = 34.0f;
+	const float Height = 192.0f;
+	// Straight at the middle of the body.
+	const float Middle = CheeseStrikeWeapons::RayHitsCapsule(FVector(0, 0, 96), FVector::ForwardVector, Feet, Radius, Height);
+	TestTrue(TEXT("hits the near side"), FMath::IsNearlyEqual(Middle, 1000.0f - Radius, 0.01f));
+	// Past the side.
+	TestEqual(TEXT("misses past the side"), CheeseStrikeWeapons::RayHitsCapsule(FVector(0, Radius + 1.0f, 96), FVector::ForwardVector, Feet, Radius, Height), -1.0f);
+	// Over the top, and under the feet.
+	TestEqual(TEXT("misses over the top"), CheeseStrikeWeapons::RayHitsCapsule(FVector(0, 0, Height + 1.0f), FVector::ForwardVector, Feet, Radius, Height), -1.0f);
+	TestEqual(TEXT("misses under the feet"), CheeseStrikeWeapons::RayHitsCapsule(FVector(0, 0, -1.0f), FVector::ForwardVector, Feet, Radius, Height), -1.0f);
+	// The rounded top: a ray at the very top's height, off centre, hits the cap.
+	const float Cap = CheeseStrikeWeapons::RayHitsCapsule(FVector(0, 0, Height - Radius), FVector::ForwardVector, Feet, Radius, Height);
+	TestTrue(TEXT("hits the top's round"), FMath::IsNearlyEqual(Cap, 1000.0f - Radius, 0.01f));
+	// Away from it, and from inside.
+	TestEqual(TEXT("misses behind"), CheeseStrikeWeapons::RayHitsCapsule(FVector(0, 0, 96), FVector::BackwardVector, Feet, Radius, Height), -1.0f);
+	TestEqual(TEXT("from inside doesn't count"), CheeseStrikeWeapons::RayHitsCapsule(Feet + FVector(0, 0, 96), FVector::ForwardVector, Feet, Radius, Height), -1.0f);
+	// A crouched capsule is shorter.
+	TestEqual(TEXT("a crouched body is missed over its head"), CheeseStrikeWeapons::RayHitsCapsule(FVector(0, 0, 100.0f), FVector::ForwardVector, Feet, Radius, 88.0f), -1.0f);
+
+	const FVector Head(1000.0f, 0.0f, 160.0f);
+	TestTrue(TEXT("a head shot"), FMath::IsNearlyEqual(CheeseStrikeWeapons::RayHitsSphere(FVector(0, 0, 160), FVector::ForwardVector, Head, CheeseStrikeWeapons::HeadRadius), 1000.0f - CheeseStrikeWeapons::HeadRadius, 0.01f));
+	TestEqual(TEXT("just over the head"), CheeseStrikeWeapons::RayHitsSphere(FVector(0, 0, 160 + CheeseStrikeWeapons::HeadRadius + 1.0f), FVector::ForwardVector, Head, CheeseStrikeWeapons::HeadRadius), -1.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAPlayerIsPutBackWhereTheyWere, "CheeseStrike.Shot.APlayerIsPutBackWhereTheyWere", ShotTests::Flags)
+
+bool FAPlayerIsPutBackWhereTheyWere::RunTest(const FString& Parameters)
+{
+	FHitHistory History;
+	TestEqual(TEXT("nothing yet"), History.At(1.0f).Feet, FVector::ZeroVector);
+	for (int32 Tick = 0; Tick <= 20; ++Tick)
+	{
+		FHitHistory::FSample Sample;
+		Sample.Time = Tick * 0.1f;
+		Sample.Feet = FVector(Tick * 100.0f, 0.0f, 0.0f);
+		Sample.Head = Sample.Feet + FVector(0, 0, 160.0f);
+		History.Add(Sample);
+	}
+	TestTrue(FString::Printf(TEXT("only the last second is kept (%d samples)"), History.Num()), History.Num() >= 10 && History.Num() <= 12);
+	TestTrue(TEXT("between two samples, between their places"), History.At(1.55f).Feet.Equals(FVector(1550.0f, 0.0f, 0.0f), 0.01f));
+	TestTrue(TEXT("the head too"), History.At(1.55f).Head.Equals(FVector(1550.0f, 0.0f, 160.0f), 0.01f));
+	TestTrue(TEXT("on a sample, that sample"), History.At(1.5f).Feet.Equals(FVector(1500.0f, 0.0f, 0.0f), 0.01f));
+	TestTrue(TEXT("past the end, the latest"), History.At(5.0f).Feet.Equals(FVector(2000.0f, 0.0f, 0.0f), 0.01f));
+	TestTrue(TEXT("before the start, the earliest kept"), History.At(0.0f).Feet.X < 1100.0f);
+	return true;
+}
+
+#endif

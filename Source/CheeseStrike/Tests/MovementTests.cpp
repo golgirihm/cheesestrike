@@ -12,9 +12,8 @@ namespace MovementTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter;
 }
-using namespace MovementTests;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSpeedsKeepTheirRatios, "CheeseStrike.Movement.SpeedsKeepTheirRatios", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSpeedsKeepTheirRatios, "CheeseStrike.Movement.SpeedsKeepTheirRatios", MovementTests::Flags)
 
 bool FSpeedsKeepTheirRatios::RunTest(const FString& Parameters)
 {
@@ -31,7 +30,7 @@ bool FSpeedsKeepTheirRatios::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FASlideBeginsAtASprintAndEasesToACrouch, "CheeseStrike.Movement.ASlideBeginsAtASprintAndEasesToACrouch", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FASlideBeginsAtASprintAndEasesToACrouch, "CheeseStrike.Movement.ASlideBeginsAtASprintAndEasesToACrouch", MovementTests::Flags)
 
 bool FASlideBeginsAtASprintAndEasesToACrouch::RunTest(const FString& Parameters)
 {
@@ -59,7 +58,7 @@ bool FASlideBeginsAtASprintAndEasesToACrouch::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAJumpIsQuickAndAboutHalfAMetre, "CheeseStrike.Movement.AJumpIsQuickAndAboutHalfAMetre", Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAJumpIsQuickAndAboutHalfAMetre, "CheeseStrike.Movement.AJumpIsQuickAndAboutHalfAMetre", MovementTests::Flags)
 
 bool FAJumpIsQuickAndAboutHalfAMetre::RunTest(const FString& Parameters)
 {

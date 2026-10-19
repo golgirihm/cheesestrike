@@ -1,0 +1,35 @@
+# Fires the Cheddar Blaster: a burst from the hip, a burst aimed, a reload,
+# and the magazine emptied. Run with tools/play.ps1.
+wait 2
+state
+shot firing_1_idle
+hold Fire
+wait 0.6
+release Fire
+state
+shot firing_2_burst
+wait 0.5
+hold Aim
+wait 0.6
+state
+shot firing_3_aimed
+hold Fire
+wait 0.35
+release Fire
+release Aim
+wait 0.2
+state
+tap Reload
+wait 0.4
+state
+wait 1.6
+state
+shot firing_4_reloaded
+look 30 0
+hold Fire
+wait 4
+release Fire
+state
+wait 2
+state
+quit
