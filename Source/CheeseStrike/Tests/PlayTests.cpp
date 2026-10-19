@@ -7,7 +7,9 @@
 #include "Misc/AutomationTest.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "Sessions/CheeseStrikeSessionSubsystem.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
@@ -304,6 +306,73 @@ bool FTheMatchEndsAtTheKillLimit::RunTest(const FString& Parameters)
 		{
 			TestEqual(TEXT("and the joiner can't fire"), Joiner->GetWeapon()->ShotsFired, PlayTests::ShotsBefore);
 		}
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAJoinerFindsAndJoinsTheHostsMatch, "CheeseStrike.Play.AJoinerFindsAndJoinsTheHostsMatch", PlayTests::Flags)
+
+bool FAJoinerFindsAndJoinsTheHostsMatch::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	// Two players apart, each alone in the level; in the editor the online service is the Null one, so over the local network.
+	StartPlaying({2, FString(), true});
+	Then([this]()
+	{
+		UCheeseStrikeSessionSubsystem* Host = World(0)->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>();
+		if (TestNotNull(TEXT("the host has the session subsystem"), Host))
+		{
+			TestFalse(TEXT("and no match yet"), Host->IsInAMatch());
+			Host->Host(TEXT("?KillLimit=3"), true);
+		}
+	});
+	WaitUntil(TEXT("the host listening on the level"), 30.0f, []()
+	{
+		UWorld* Hosts = World(0);
+		const ACheeseStrikeCharacter* Pawn = Character(0);
+		return Hosts != nullptr && Hosts->GetNetMode() == NM_ListenServer && Hosts->GetNetDriver() != nullptr && Pawn != nullptr && Pawn->IsAlive() && GameState(0) != nullptr && GameState(0)->HasMatchStarted();
+	});
+	// The host's answer to a search names the port it listens on, once it does.
+	Wait(1.0f);
+	Then([this]()
+	{
+		const UCheeseStrikeSessionSubsystem* Host = World(0)->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>();
+		TestTrue(TEXT("the host is in its match"), Host->IsInAMatch());
+		TestEqual(TEXT("with the kill limit it asked for"), GameState(0)->GetKillLimit(), 3);
+		if (UCheeseStrikeSessionSubsystem* Joiner = World(1)->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+		{
+			Joiner->Find(true);
+		}
+	});
+	WaitUntil(TEXT("the joiner finding the match"), 30.0f, []()
+	{
+		UWorld* Theirs = World(1);
+		const UCheeseStrikeSessionSubsystem* Joiner = Theirs != nullptr ? Theirs->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+		return Joiner != nullptr && !Joiner->IsBusy() && Joiner->GetFound().Num() >= 1;
+	});
+	Then([this]()
+	{
+		UCheeseStrikeSessionSubsystem* Joiner = World(1)->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>();
+		TestEqual(TEXT("one match found"), Joiner->GetFound().Num(), 1);
+		if (Joiner->GetFound().Num() == 1)
+		{
+			TestTrue(FString::Printf(TEXT("described with its rules (%s)"), *Joiner->GetFound()[0]), Joiner->GetFound()[0].Contains(TEXT("first to 3 kills")));
+		}
+		Joiner->Join(0);
+	});
+	WaitUntil(TEXT("the joiner being in the host's match"), 30.0f, []()
+	{
+		UWorld* Theirs = World(1);
+		const ACheeseStrikeCharacter* Pawn = Character(1);
+		return Theirs != nullptr && Theirs->GetNetMode() == NM_Client && Pawn != nullptr && Pawn->IsAlive() && Pawn->GetWeapon() != nullptr
+			&& GameState(1) != nullptr && GameState(1)->PlayerArray.Num() == 2 && GameState(0) != nullptr && GameState(0)->PlayerArray.Num() == 2;
+	});
+	Then([this]()
+	{
+		TestEqual(TEXT("the joiner plays by the host's rules"), GameState(1)->GetKillLimit(), 3);
+		TestTrue(TEXT("and is in the match"), World(1)->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>()->IsInAMatch());
+		TestNotNull(TEXT("the host sees the joiner"), CharacterOf(1, 0));
 	});
 	StopPlaying();
 	return true;

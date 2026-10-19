@@ -1,0 +1,20 @@
+# Starts alone, looks for matches through Steam, joins the first found and
+# plays in it a moment: the joiner's side of steam_host.txt. Run with
+# tools/play.ps1 -Steam as its -ClientScript, with -ClientAlone.
+wait 3
+state
+cmd CheeseStrikeFind
+wait 10
+state
+shot steam_client_1_found
+cmd CheeseStrikeJoin 1
+wait 15
+state
+shot steam_client_2_joined
+hold Move 0 1
+wait 1
+release Move
+state
+log steam joiner done
+wait 1
+quit

@@ -9,7 +9,9 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
+#include "Engine/GameInstance.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Sessions/CheeseStrikeSessionSubsystem.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 namespace
@@ -48,9 +50,29 @@ void ACheeseStrikeHUD::DrawHUD()
 		DrawDeath(Character, Match);
 	}
 	DrawKillFeed(Match);
+	DrawSessions();
 	if (bOver || Controller->IsScoreboardShown())
 	{
 		DrawScoreboard(Match, bOver);
+	}
+}
+
+void ACheeseStrikeHUD::DrawSessions()
+{
+	const UGameInstance* Game = GetGameInstance();
+	const UCheeseStrikeSessionSubsystem* Sessions = Game != nullptr ? Game->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+	if (Sessions == nullptr || Sessions->GetStatus().IsEmpty())
+	{
+		return;
+	}
+	UFont* Font = GEngine->GetMediumFont();
+	float Y = Margin;
+	DrawText(Sessions->GetStatus(), Dim, Margin, Y, Font, 1.0f);
+	Y += 22.0f;
+	for (const FString& Line : Sessions->GetFound())
+	{
+		DrawText(Line, White, Margin + 12.0f, Y, Font, 1.0f);
+		Y += 20.0f;
 	}
 }
 

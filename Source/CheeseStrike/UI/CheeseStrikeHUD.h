@@ -42,6 +42,8 @@ protected:
 	void DrawDeath(const ACheeseStrikeCharacter* Character, const ACheeseStrikeGameState* Match);
 	void DrawKillFeed(const ACheeseStrikeGameState* Match);
 	void DrawScoreboard(const ACheeseStrikeGameState* Match, bool bOver);
+	/** What the online service is doing, and the matches found, at the top left. */
+	void DrawSessions();
 	/** Draws `Text` with its middle at `X`. */
 	void DrawCentred(const FString& Text, float X, float Y, UFont* Font, float Scale, const FLinearColor& Colour);
 };

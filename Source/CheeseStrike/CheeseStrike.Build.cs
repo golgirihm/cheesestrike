@@ -21,7 +21,7 @@ public class CheeseStrike : ModuleRules
 			"Slate"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "EngineSettings", "AssetRegistry" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "EngineSettings", "AssetRegistry", "OnlineBase", "OnlineSubsystem", "OnlineSubsystemUtils" });
 
 		// The tests that play the game do so in the editor.
 		if (Target.bBuildEditor)
@@ -35,6 +35,7 @@ public class CheeseStrike : ModuleRules
 			"CheeseStrike/Input",
 			"CheeseStrike/Movement",
 			"CheeseStrike/Rules",
+			"CheeseStrike/Sessions",
 			"CheeseStrike/UI",
 			"CheeseStrike/Weapons",
 			"CheeseStrike/Variant_Shooter",
