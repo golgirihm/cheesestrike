@@ -122,7 +122,7 @@ void ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From
 	Health = FMath::Max(0.0f, Health - Damage);
 	if (!IsAlive())
 	{
-		UE_LOG(LogCheeseStrike, Display, TEXT("%s is knocked out by %s"), *GetName(), *GetNameSafe(From));
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s is killed by %s"), *GetName(), *GetNameSafe(From));
 	}
 }
 

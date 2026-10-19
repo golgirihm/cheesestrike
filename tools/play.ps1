@@ -42,7 +42,7 @@ function Launch($map, $script, $tag, $startAt, $x) {
 function Summarise($tag) {
   $log = Join-Path $root "Saved\Logs\$tag.log"
   Write-Output "log: $log"
-  Get-Content $log | Select-String "PlayScript: |Shot|knocked out|PlayScript says|LogNet: Join|Welcomed" | ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[ *\d+\]Log[A-Za-z]+: (Display|Warning|Error): ', '' } | Select-Object -First 80
+  Get-Content $log | Select-String "PlayScript: |Shot|killed|PlayScript says|LogNet: Join|Welcomed" | ForEach-Object { $_.Line -replace '^\[[^\]]*\]\[ *\d+\]Log[A-Za-z]+: (Display|Warning|Error): ', '' } | Select-Object -First 80
 }
 $pair = $ClientScript -ne ""
 $serverExtra = if ($pair -and $Extra -eq "") { "?listen" } else { $Extra }

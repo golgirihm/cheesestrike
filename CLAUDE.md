@@ -6,7 +6,7 @@ The project is at the repository's root: `CheeseStrike.uproject`, `Source/Cheese
 
 ## What the port keeps
 
-The Godot game is the source of the design, not a thing to copy. Keep what Unreal and its First Person template do well (their input, movement feel, camera, scale and conventions) and port the game's ideas and tuning where they matter: the cheese that is cover and gets eaten by the mice that come partway through a match, so that a map opens up and the fight intensifies; the weapons' roles and roughly their numbers; the modes; the Overload. Don't port the Godot key bindings, speeds, scale or maps for their own sake. The Godot maps were placeholders; a placeholder map (the template's shooter level) does until there is a plan for how levels work.
+The Godot game is the source of the design, not a thing to copy. Keep what Unreal and its First Person template do well (their input, movement feel, camera, scale and conventions) and port the game's ideas and tuning where they matter: the cheese that is cover and gets eaten by the mice that come partway through a match, so that a map opens up and the fight intensifies; the weapons' roles and roughly their numbers; the modes; the Overload. Don't port the Godot key bindings, speeds, scale or maps for their own sake. Words: a player is killed and scores kills, never knocked out. The Godot maps were placeholders; a placeholder map (the template's shooter level) does until there is a plan for how levels work.
 
 ## Testing rules
 

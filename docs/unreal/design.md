@@ -40,9 +40,9 @@ Where this document gives a length in metres, it is a Godot metre unless marked 
 | Lean | left and right, held or toggled |
 | Ladders | climbed at 5 m/s; jump pads throw along a set arc |
 
-**Health and armour.** 100 health, up to 50 armour from a rind pickup; armour takes half of each hit until it is gone. No regeneration: health comes from cheese wedges (50 each). Knocked out, a player waits the respawn delay (3 s; the "frantic" rules make it 1, and a host can set 0.5 to 15) and comes back at the starting spot furthest from enemies on their own side, invulnerable and translucent for 3 s or until they fire, with only the pistol. They keep half their Overload meter.
+**Health and armour.** 100 health, up to 50 armour from a rind pickup; armour takes half of each hit until it is gone. No regeneration: health comes from cheese wedges (50 each). Killed, a player waits the respawn delay (3 s; the "frantic" rules make it 1, and a host can set 0.5 to 15) and comes back at the starting spot furthest from enemies on their own side, invulnerable and translucent for 3 s or until they fire, with only the pistol. They keep half their Overload meter.
 
-**Loadout.** A sidearm (Curd Pistol, Twin Curds or Dual Burratas), a knife, two grenades, and up to four found weapons, with the launcher in a "power" slot of its own. A weapon dropped by the knocked-out lies there 20 s, at most twelve about at once. Weapons take attachments, chosen in the loadout: a sight (0.8 × zoom, 0.8 × aimed spread, 1.15 × hip spread), a grip (0.75 × recoil, 0.95 × speed), or a long magazine (1.3 × rounds, 1.2 × reload). Alternate fire on some weapons (below).
+**Loadout.** A sidearm (Curd Pistol, Twin Curds or Dual Burratas), a knife, two grenades, and up to four found weapons, with the launcher in a "power" slot of its own. A weapon dropped by the killed lies there 20 s, at most twelve about at once. Weapons take attachments, chosen in the loadout: a sight (0.8 × zoom, 0.8 × aimed spread, 1.15 × hip spread), a grip (0.75 × recoil, 0.95 × speed), or a long magazine (1.3 × rounds, 1.2 × reload). Alternate fire on some weapons (below).
 
 **Controls.** Keyboard and mouse or gamepad, rebindable: move, look, jump, sprint, crouch, lean left and right, fire, alt fire, aim, reload, melee, grenade, Overload, weapon next and previous and a weapon wheel, interact (doors), ping, chat and team chat and quick chat, push to talk, emote, scoreboard, photo mode, pause. Toggle or hold for sprint, crouch, aim, lean, talk and scoreboard. Mouse sensitivity, separate aim and scope sensitivity, vertical ratio, invert, FOV 75 by default, stick dead zone and curve, aim assist and rumble on gamepad, and a "match the feel of" setting that converts sensitivity from Source, and other common games. Gyro and touch controls are not carried over.
 
@@ -71,7 +71,7 @@ All hitscan unless a projectile is given. Damage falls off linearly from `fallof
 
 Reserves: each weapon carries two or three magazines' worth and holds at most about five; an ammunition crate refills a magazine's worth of every carried weapon. Shots penetrate up to 0.5 m of a wall for 0.6 × damage. Falloff and spread numbers are Godot metres and degrees.
 
-**What a shot does on screen:** a muzzle flash, a tracer streak to where it ended, a casing, a little smoke; a mark on the surface and a puff in its colour (sparks off metal); a hit marker on the crosshair, different in shape and colour for a hit, a head hit and a knock-out; a damage number drifting up; a red arc at the edge of the view pointing at whoever hurt you; red edges as health falls; a blur when a burst goes off close. Bursts have a flash, a shockwave ring to exactly where damage stops, debris, a scorch and lingering smoke.
+**What a shot does on screen:** a muzzle flash, a tracer streak to where it ended, a casing, a little smoke; a mark on the surface and a puff in its colour (sparks off metal); a hit marker on the crosshair, different in shape and colour for a hit, a head hit and a kill; a damage number drifting up; a red arc at the edge of the view pointing at whoever hurt you; red edges as health falls; a blur when a burst goes off close. Bursts have a flash, a shockwave ring to exactly where damage stops, debris, a scorch and lingering smoke.
 
 **Weapon finishes** (cosmetic): plain, red wax, blue vein, gold.
 
@@ -79,7 +79,7 @@ Reserves: each weapon carries two or three magazines' worth and holds at most ab
 
 The server decides every hit. A client fires at once, shows the shot, and sends the server the shot's origin and direction; the server checks the shot could have been fired (the weapon had a round, the interval had passed, the origin is within 2.5 m of where the server has the player, with 0.75 s of allowance around a reload), rewinds the targets to where they were at the shooter's time (lag compensation, kept to a short history), traces, and applies the damage, with head multiplier, falloff, armour, penetration, power-ups and Overload. Pellets are spread from a seed both sides share. Splash damage is checked for line of sight. Movement is client-predicted and server-checked; impossible movement is corrected. In Unreal: the Character Movement Component's prediction and the server-authoritative actor model do this; what has to be written is the shot validation, the rewind, and the damage rules, as Lyra's weapon and gameplay-ability code shows.
 
-Friendly fire is off unless the rules say otherwise. An assist goes to anyone else who hurt the victim in the 10 s before a knock-out.
+Friendly fire is off unless the rules say otherwise. An assist goes to anyone else who hurt the victim in the 10 s before a kill.
 
 ## Modes
 
@@ -87,18 +87,18 @@ Up to 16 players, 2 at least (bots fill in). The host picks a mode, a kill limit
 
 | Mode | Teams | Wins by | Notes |
 |---|---|---|---|
-| Free-for-all | no | knock-outs | |
-| Cheddar vs Brie | two | knock-outs | |
+| Free-for-all | no | kills | |
+| Cheddar vs Brie | two | kills | |
 | Capture the wheel | two | 3 captures | each base has a wheel of cheese; carry the enemy's to yours; a dropped wheel lies where it fell, returns after a while |
 | Hold the hill | two | 100 points | one zone that moves between five spots; a second a point while one team alone is in it |
 | Points | two | 150 points | three zones (A, B, C) held at once; each held zone scores over time |
 | Rounds | two | 4 rounds | one life a round; a round ends when a side is gone or on its timer |
-| Gun game | no | every weapon | each knock-out moves a player to the next weapon in the list; the last is the knife |
+| Gun game | no | every weapon | each kill moves a player to the next weapon in the list; the last is the knife |
 | Practice | alone | | the practice range: targets at marked distances, every weapon on a rack, a stats board for each weapon |
 
-Rules presets: standard; instant knock-out (1 health); low gravity (0.4 ×); launchers only; pistols only; fast and frantic (1.25 × speed, 1 s respawn); tough cheese (200 health); friendly fire. Skies: clear noon, dawn, dusk, night, rain, dust storm, or a surprise.
+Rules presets: standard; instant kill (1 health); low gravity (0.4 ×); launchers only; pistols only; fast and frantic (1.25 × speed, 1 s respawn); tough cheese (200 health); friendly fire. Skies: clear noon, dawn, dusk, night, rain, dust storm, or a surprise.
 
-Also: a session can be private (joined by code only); a player can join to watch, or switch to watching, following any player or flying free, and the knocked-out watch a teammate or their killer until they return; a vote can remove a player (three voters at least, 30 s); a dropped player can rejoin with their score; the host's departure ends the session (in Unreal, host migration or a dedicated server can change this).
+Also: a session can be private (joined by code only); a player can join to watch, or switch to watching, following any player or flying free, and the killed watch a teammate or their killer until they return; a vote can remove a player (three voters at least, 30 s); a dropped player can rejoin with their score; the host's departure ends the session (in Unreal, host migration or a dedicated server can change this).
 
 ## Arenas
 
@@ -109,7 +109,7 @@ Each arena has starting spots for 16 (the first two facing each other across a c
 | Cheddar Canyon | 48 × 48 | desert canyon | four mesas with lifts up to them, rock ledges, an arch, blocks of cheese |
 | Brie Box | 32 × 32 | meadow | small and tight; pillars, a stack of blocks, a jump pad across it |
 | Curd City | 640 × 400 | town | the large map: a yard at each end, three avenues and five cross streets, two- and three-storey houses of cheese to walk into with ramps between floors and ladders to roofs, warehouses, stone towers to find one's way by, traffic lights, steam from grates, a train beyond the fence |
-| Double Cream Dairy | 44 × 36 | dairy | steel tanks, a gantry with a lift, a cold store with a door, a fondue vat and a grater as hazards (hurt every half second; staying in one is a knock-out) |
+| Double Cream Dairy | 44 × 36 | dairy | steel tanks, a gantry with a lift, a cold store with a door, a fondue vat and a grater as hazards (hurt every half second; staying in one is a kill) |
 | Crumb Kitchen | 52 × 36 | giant kitchen | a worktop, a chopping board, a toaster, a kettle, a hob, a spice rack |
 | Rind Market | 56 × 56 | city square | stalls with awnings, a fountain, a clock tower, a cart, cobbles, lamps at night |
 | Gruyère Grotto | 48 × 44 | cave | always lamp-lit; pillars, a hollow, a ledge |
@@ -132,13 +132,13 @@ The tuning is a guess that play has not yet settled: cover should be plainly goi
 
 **Power-ups** go round in turn, so nobody knows what the pad holds: double damage (12 s), speed (1.3 ×, 15 s), shield (hits do 0.4 ×, 12 s), sight (everyone seen through walls, 10 s). Taking one is announced to all; the holder is tinted in its colour.
 
-**Overload.** Damage dealt charges a meter at 0.5 per point: two knock-outs fill it. Full, the player sets off the kind they chose in the loadout, after a 1 s build-up in which they glow and are heard, so that others can get clear:
+**Overload.** Damage dealt charges a meter at 0.5 per point: two kills fill it. Full, the player sets off the kind they chose in the loadout, after a 1 s build-up in which they glow and are heard, so that others can get clear:
 
 - **Melt** (8 s): 1.35 × speed, and anyone they hit is slowed to 0.6 × for 2 s.
 - **Rind** (8 s): hits on them do half.
 - **Rain of wheels** (3 s): eight Gouda wheels fall one after another in a ring 5 to 9 m out, from 14 m up, each 70 splash damage over 3.5 m, never on the player.
 
-None adds damage to the player's own guns. Knocked out, half the meter is kept.
+None adds damage to the player's own guns. Killed, half the meter is kept.
 
 ## Bots
 
@@ -162,13 +162,13 @@ Voice: push to talk to teammates (everyone in a free-for-all), mutable per playe
 
 Everything is kept in the player's own save (Steam Cloud later), unchecked.
 
-**Experience** per match: 12 a minute (up to 30 minutes), 20 a knock-out, 8 an assist, 25 a medal, 120 for a win, 50 for a draw, 30 for finishing. Level 2 at 300, each level 120 more than the last, to 99. A title and level show under a player's name.
+**Experience** per match: 12 a minute (up to 30 minutes), 20 a kill, 8 an assist, 25 a medal, 120 for a win, 50 for a draw, 30 for finishing. Level 2 at 300, each level 120 more than the last, to 99. A title and level show under a player's name.
 
-**Medals** during play: double and triple knock-out, a run of 5 and of 10, a long shot (40 m), a head shot, a comeback (after three deaths running), revenge. The announcer calls lead changes, the last minute, victory, defeat and streaks.
+**Medals** during play: double and triple kill, a run of 5 and of 10, a long shot (40 m), a head shot, a comeback (after three deaths running), revenge. The announcer calls lead changes, the last minute, victory, defeat and streaks.
 
-**Achievements** (Steam achievements later): First Crumb, Top of the Board, Mouser (100 knock-outs), Well Aged (50 matches), Untouched Rind (win 5–0), Three in a Row, Sharpshooter (60 % of 20+ shots), From the Next County, Back from the Board, No Hard Feelings, Tour of the Dairy (every arena), Every Flavour (every mode), The Whole Board (every weapon), Long Maturing (10 hours).
+**Achievements** (Steam achievements later): First Crumb, Top of the Board, Mouser (100 kills), Well Aged (50 matches), Untouched Rind (win 5–0), Three in a Row, Sharpshooter (60 % of 20+ shots), From the Next County, Back from the Board, No Hard Feelings, Tour of the Dairy (every arena), Every Flavour (every mode), The Whole Board (every weapon), Long Maturing (10 hours).
 
-**Challenges:** three a day (150 XP), two a week (500), one long (1000): knock out N, knock out N with a weapon, win N on an arena, play N of a mode, earn N medals, deal N damage, N assists.
+**Challenges:** three a day (150 XP), two a week (500), one long (1000): kill N, kill N with a weapon, win N on an arena, play N of a mode, earn N medals, deal N damage, N assists.
 
 **Unlocks** by level, achievement or challenge: camouflage patterns (cheese kinds), helmet and head gear, a thing held in the off hand, titles, weapon finishes, emotes (wave, dance, shrug, cheer). The hats, balloons and lollipops of the Godot game are replaced by serious equivalents: camo, helmet covers, patches, charms.
 
@@ -176,7 +176,7 @@ Everything is kept in the player's own save (Steam Cloud later), unchecked.
 
 ## Interface
 
-A front end (play, practice, learn, customise, edit an arena, settings, credits), a host screen with the match settings, a session list with filters and a join-by-code, a join screen with tips, a loadout screen, a settings screen in sections, an in-game pause menu, and the combat HUD: crosshair (shape, size, gap, thickness, colour, outline, dot, shareable as a code; opens with spread), health and armour, ammunition and reserve, grenades, the weapon bar, the Overload meter, the power-up timer, a compass with pings and objectives, the place name, hit markers and damage numbers, a damage direction arc, a kill feed with places, medals, captions for sounds, a sound ring (optional) showing where sounds come from, the mice countdown, an objective tracker, the scoreboard with pings and talking indicators, a results screen, a highlight replay and a knock-out replay, and a photo mode. A tutorial walks a new player through the practice range one step at a time, in the words of the device in their hands.
+A front end (play, practice, learn, customise, edit an arena, settings, credits), a host screen with the match settings, a session list with filters and a join-by-code, a join screen with tips, a loadout screen, a settings screen in sections, an in-game pause menu, and the combat HUD: crosshair (shape, size, gap, thickness, colour, outline, dot, shareable as a code; opens with spread), health and armour, ammunition and reserve, grenades, the weapon bar, the Overload meter, the power-up timer, a compass with pings and objectives, the place name, hit markers and damage numbers, a damage direction arc, a kill feed with places, medals, captions for sounds, a sound ring (optional) showing where sounds come from, the mice countdown, an objective tracker, the scoreboard with pings and talking indicators, a results screen, a highlight replay and a kill replay, and a photo mode. A tutorial walks a new player through the practice range one step at a time, in the words of the device in their hands.
 
 Accessibility: text size, high contrast, colour-blind presets for team and hit colours (Okabe-Ito), custom colours, less motion, captions, hold-or-toggle for everything held, aim assist, a flashing-lights warning.
 
