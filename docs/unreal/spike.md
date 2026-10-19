@@ -11,7 +11,7 @@ At the end, all of the following, in one Unreal project on this repository's `ma
 1. **Two players over Steam.** One hosts as a listen server, the other joins through the Steam friends list or a session search, on the Steam test app id (480). Both move, jump, crouch, sprint and shoot each other with client-side prediction, so the joiner feels no lag on their own movement.
 2. **One arena.** The template's shooter level, as the placeholder it is, with Megascans or Fab textures on its floor and walls and the sky, sun and post-processing set up for a grounded daylight look. (Changed in October 2026 from grey-boxing Cheddar Canyon: the Godot maps are not ported.)
 3. **One weapon with the Godot numbers.** The Cheddar Blaster: hitscan, 20 damage, 1.75 head multiplier, 0.12 s between shots, 24 in the magazine, falloff from 40 to 90 player-heights, bloom over 8 shots, recoil up 0.45 and sideways 0.35 per shot, aim-down-sights at 0.6 zoom. Hits decided on the server with lag compensation. A licensed rifle model with first-person arms.
-4. **Knock-outs and respawns.** Health, death, a respawn after a few seconds at the starting spot furthest from enemies, a kill feed and a scoreboard. A match ends at a kill limit.
+4. **Kills and respawns.** Health, death, a respawn after a few seconds at the starting spot furthest from enemies, a kill feed and a scoreboard. A match ends at a kill limit.
 5. **The workflow holds up.** The project builds from the command line, a test (Unreal Automation) runs headless and is run by a GitHub Actions workflow, and the gameplay code is C++ rather than Blueprint, so that it can be read, edited and reviewed as text.
 6. **A screenshot next to the Godot one.** The same spot in Cheddar Canyon, at the same time of day, side by side with the native Forward+ build on the `godot-final` tag.
 
@@ -43,7 +43,7 @@ Days are working days and are a guess; the order matters more than the dates.
 
 **Day 4: the weapon.** *Done in October 2026, with the template's rifle and its animations; the first-person arms don't yet hold it as the template's own character does, which waits for the game's own arms and weapons (day 7).* A weapon actor and a weapon-data asset holding the Godot stats, the Cheddar Blaster filled in. Firing on the client, a server RPC with the shot's origin and direction, server-side line trace with Unreal's lag compensation (the `AGameMode`'s hit-validation hooks or a short rewind of capsule positions, as Lyra does), damage with the head multiplier against a head bone or a head box, falloff, recoil and bloom applied on the client. Hit markers and a crosshair that opens with spread.
 
-**Day 5: knock-outs.** Health as a replicated attribute, death, ragdoll or a fall animation, respawn at the start furthest from enemies after the design's delay, a kill feed and scoreboard widget, a kill limit ending the match and a results screen. Free-for-all only.
+**Day 5: kills.** Health as a replicated attribute, death, ragdoll or a fall animation, respawn at the start furthest from enemies after the design's delay, a kill feed and scoreboard widget, a kill limit ending the match and a results screen. Free-for-all only.
 
 **Day 6: Steam.** The Online Subsystem Steam plugin, app id 480, sessions created and found through the subsystem, a join through the Steam overlay's friends list. Two PCs (or one PC and a laptop) over the internet, not the LAN.
 
