@@ -10,6 +10,8 @@
 #include "CheeseStrike.h"
 #include "Input/CheeseStrikeInput.h"
 #include "Dev/CheeseStrikePlayScript.h"
+#include "Engine/GameInstance.h"
+#include "Sessions/CheeseStrikeSessionSubsystem.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 {
@@ -20,17 +22,26 @@ ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 void ACheeseStrikePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	if (PlayScript == nullptr)
+	// The script under way, if any, goes on through this controller: a travel gives the player a new one.
+	if (IsLocalPlayerController() && GetGameInstance() != nullptr)
 	{
-		PlayScript = UCheeseStrikePlayScript::FromCommandLine(this);
+		if (UCheeseStrikePlayScriptSubsystem* Scripts = GetGameInstance()->GetSubsystem<UCheeseStrikePlayScriptSubsystem>())
+		{
+			PlayScript = Scripts->ScriptFor(this);
+		}
 	}
 }
 
 UCheeseStrikePlayScript* ACheeseStrikePlayerController::Play(const FString& Text)
 {
-	UCheeseStrikePlayScript* Next = UCheeseStrikePlayScript::FromText(this, Text);
+	UCheeseStrikePlayScriptSubsystem* Scripts = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikePlayScriptSubsystem>() : nullptr;
+	UCheeseStrikePlayScript* Next = UCheeseStrikePlayScript::FromText(Scripts != nullptr ? static_cast<UObject*>(Scripts) : this, this, Text);
 	Next->TakeOver(PlayScript);
 	PlayScript = Next;
+	if (Scripts != nullptr)
+	{
+		Scripts->SetScript(Next);
+	}
 	return PlayScript;
 }
 
@@ -75,6 +86,54 @@ void ACheeseStrikePlayerController::SetupInputComponent()
 	for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
 	{
 		Subsystem->AddMappingContext(CurrentContext, 0);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeHost(const FString& Options)
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->Host(Options, false);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeHostLan(const FString& Options)
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->Host(Options, true);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeFind()
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->Find(false);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeFindLan()
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->Find(true);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeJoin(int32 Number)
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->Join(Number - 1);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeLeave()
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->Leave();
 	}
 }
 

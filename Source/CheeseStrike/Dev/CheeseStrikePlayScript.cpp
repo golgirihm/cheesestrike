@@ -27,14 +27,33 @@ UCheeseStrikePlayScript* UCheeseStrikePlayScript::FromCommandLine(ACheeseStrikeP
 		UE_LOG(LogCheeseStrike, Error, TEXT("PlayScript: can't read %s"), *Path);
 		return nullptr;
 	}
-	UCheeseStrikePlayScript* Script = FromText(InController, Text);
+	UCheeseStrikePlayScript* Script = FromText(InController, InController, Text);
 	UE_LOG(LogCheeseStrike, Display, TEXT("PlayScript: %d commands from %s"), Script->NumCommands(), *Path);
 	return Script;
 }
 
-UCheeseStrikePlayScript* UCheeseStrikePlayScript::FromText(ACheeseStrikePlayerController* InController, const FString& Text)
+UCheeseStrikePlayScript* UCheeseStrikePlayScriptSubsystem::ScriptFor(ACheeseStrikePlayerController* Controller)
 {
-	UCheeseStrikePlayScript* Script = NewObject<UCheeseStrikePlayScript>(InController);
+	if (Current == nullptr && !bAskedCommandLine)
+	{
+		bAskedCommandLine = true;
+		Current = UCheeseStrikePlayScript::FromCommandLine(Controller);
+		if (Current != nullptr)
+		{
+			// Owned by the game, not by a controller that a travel will take away.
+			Current->Rename(nullptr, this);
+		}
+	}
+	if (Current != nullptr)
+	{
+		Current->Attach(Controller);
+	}
+	return Current;
+}
+
+UCheeseStrikePlayScript* UCheeseStrikePlayScript::FromText(UObject* Outer, ACheeseStrikePlayerController* InController, const FString& Text)
+{
+	UCheeseStrikePlayScript* Script = NewObject<UCheeseStrikePlayScript>(Outer);
 	Script->Controller = InController;
 	Script->Load(Text);
 	return Script;

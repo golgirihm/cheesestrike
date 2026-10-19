@@ -35,6 +35,20 @@ public:
 	/** True the first time only: -StartAt is for this player's first character. */
 	bool TakeStartAt();
 
+	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
+	UFUNCTION(Exec)
+	void CheeseStrikeHost(const FString& Options = TEXT(""));
+	UFUNCTION(Exec)
+	void CheeseStrikeHostLan(const FString& Options = TEXT(""));
+	UFUNCTION(Exec)
+	void CheeseStrikeFind();
+	UFUNCTION(Exec)
+	void CheeseStrikeFindLan();
+	UFUNCTION(Exec)
+	void CheeseStrikeJoin(int32 Number = 1);
+	UFUNCTION(Exec)
+	void CheeseStrikeLeave();
+
 protected:
 	/** Mapping contexts a Blueprint of this controller adds, besides the game's own. */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")

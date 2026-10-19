@@ -1,0 +1,18 @@
+# Hosts a match through Steam, alone, and waits for a joiner (see
+# steam_find.txt) to find it, join, and leave. Run with tools/play.ps1
+# -Steam; the Steam client must be running:
+#
+#     powershell -ExecutionPolicy Bypass -File tools/play.ps1 -Steam -Script tools/play/steam_host.txt -ClientScript tools/play/steam_find.txt -ClientAlone -Tag steam
+wait 3
+state
+cmd CheeseStrikeHost ?KillLimit=5
+wait 10
+state
+shot steam_1_hosting
+wait 45
+state
+shot steam_2_joined
+wait 10
+log steam host done
+wait 1
+quit

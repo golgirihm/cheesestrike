@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Subsystems/GameInstanceSubsystem.h"
 #include "UObject/Object.h"
 #include "CheeseStrikePlayScript.generated.h"
 
@@ -40,8 +41,8 @@ class CHEESESTRIKE_API UCheeseStrikePlayScript : public UObject
 public:
 	/** The script named on the command line, or null if there is none. */
 	static UCheeseStrikePlayScript* FromCommandLine(ACheeseStrikePlayerController* Controller);
-	/** A script from `Text`, for `Controller` to play. */
-	static UCheeseStrikePlayScript* FromText(ACheeseStrikePlayerController* Controller, const FString& Text);
+	/** A script from `Text`, owned by `Outer`, for `Controller` to play. */
+	static UCheeseStrikePlayScript* FromText(UObject* Outer, ACheeseStrikePlayerController* Controller, const FString& Text);
 
 	/** Reads `Text` as commands; returns how many. */
 	int32 Load(const FString& Text);
@@ -51,6 +52,9 @@ public:
 
 	/** Keeps holding what `Previous` was holding, so that one script can follow another without a key going up. */
 	void TakeOver(const UCheeseStrikePlayScript* Previous);
+
+	/** Goes on through `NewController`: the one a player gets after travelling to another match. */
+	void Attach(ACheeseStrikePlayerController* NewController) { Controller = NewController; }
 
 	/** Whether every command has run and no wait is left; inputs may still be held. */
 	bool IsFinished() const { return Next >= Commands.Num() && Waiting <= 0.0f; }
@@ -78,4 +82,26 @@ private:
 	TMap<FString, FVector2D> Held;
 	/** Taps still to be let go of, by action name, with frames left. */
 	TMap<FString, int32> Tapped;
+};
+
+/**
+ * Keeps the game's play script for as long as the game runs: a player
+ * gets a new controller whenever they travel to another match, and the
+ * script carries on through it rather than starting over.
+ */
+UCLASS()
+class CHEESESTRIKE_API UCheeseStrikePlayScriptSubsystem : public UGameInstanceSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	/** The script `Controller` should play from now: the one under way, or the command line's on the first ask; null if there is none. */
+	UCheeseStrikePlayScript* ScriptFor(ACheeseStrikePlayerController* Controller);
+	/** Makes `Script` the one under way. */
+	void SetScript(UCheeseStrikePlayScript* Script) { Current = Script; }
+
+private:
+	UPROPERTY()
+	TObjectPtr<UCheeseStrikePlayScript> Current;
+	bool bAskedCommandLine = false;
 };

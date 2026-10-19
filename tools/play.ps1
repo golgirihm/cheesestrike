@@ -25,12 +25,18 @@ param(
   [string]$Extra = "",
   [string]$Name = "Host",
   [string]$ClientScript = "",
+  [switch]$ClientAlone,
   [string]$ClientStartAt = "-231,-1200,100,90",
   [string]$ClientName = "Joiner",
   [int]$ClientDelay = 25,
   [switch]$Window,
+  [switch]$Steam,
   [int]$TimeoutSeconds = 180
 )
+# Without -Steam the game runs on the Null online service, so that a run on
+# this PC neither needs the Steam client nor shows up as a match on it; with
+# it, the Steam client must be running, and the scripts can host, find and
+# join through it (cmd CheeseStrikeHost, CheeseStrikeFind, CheeseStrikeJoin).
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $project = Join-Path $root "CheeseStrike.uproject"
 $version = (Get-Content $project | ConvertFrom-Json).EngineAssociation
@@ -41,6 +47,7 @@ function Launch($map, $script, $tag, $startAt, $x) {
   $arguments = @("`"$project`"", $map, "-game", "-resx=960", "-resy=540", "-WinX=$x", "-WinY=40", "-log=$tag.log", "-nosound", "-unattended",
     "-TraceState", "-StartAt=$startAt", "-PlayScript=`"$scriptPath`"")
   if (-not $Window) { $arguments += "-RenderOffscreen" } else { $arguments += "-windowed" }
+  if (-not $Steam) { $arguments += "-NOSTEAM" }
   return Start-Process -FilePath $editor -ArgumentList $arguments -PassThru
 }
 function Summarise($tag) {
@@ -54,7 +61,9 @@ $game = Launch "${Map}${serverExtra}?Nick=${Name}" $Script $Tag $StartAt 0
 $client = $null
 if ($pair) {
   Start-Sleep -Seconds $ClientDelay
-  $client = Launch "127.0.0.1?Nick=${ClientName}" $ClientScript "${Tag}_client" $ClientStartAt 970
+  # The client joins the host by address, or, with -ClientAlone, starts alone on the level and finds the host through its script.
+  $clientMap = if ($ClientAlone) { $Map } else { "127.0.0.1" }
+  $client = Launch "${clientMap}?Nick=${ClientName}" $ClientScript "${Tag}_client" $ClientStartAt 970
 }
 if (-not $game.WaitForExit($TimeoutSeconds * 1000)) {
   Stop-Process -Id $game.Id -Force -ErrorAction SilentlyContinue

@@ -28,6 +28,8 @@ namespace PlayTesting
 		/** The settings the session plays with, held until it ends. */
 		TStrongObjectPtr<ULevelEditorPlaySettings> Settings;
 		int32 PlayersWanted = 1;
+		/** Players in each world at the start: all of them in one match, or one each apart. */
+		int32 PlayersTogether = 1;
 
 		/** Waits for a condition, for a reason, up to a limit. */
 		class FWaitUntilCommand : public IAutomationLatentCommand
@@ -61,25 +63,24 @@ namespace PlayTesting
 			TFunction<bool()> Condition;
 		};
 
-		/** The worlds being played: the server's (or the only one) first, then the joiners' in the order they came. */
+		/** The worlds being played, in the order the editor made them: the host's (or the only one) first, then the joiners'. A world's place holds across a travel. */
 		TArray<UWorld*> Worlds()
 		{
-			TArray<UWorld*> Found;
+			TArray<TPair<int32, UWorld*>> Found;
 			for (const FWorldContext& Context : GEngine->GetWorldContexts())
 			{
 				if (Context.WorldType == EWorldType::PIE && Context.World() != nullptr)
 				{
-					if (Context.World()->GetNetMode() == NM_Client)
-					{
-						Found.Add(Context.World());
-					}
-					else
-					{
-						Found.Insert(Context.World(), 0);
-					}
+					Found.Emplace(Context.PIEInstance, Context.World());
 				}
 			}
-			return Found;
+			Found.Sort([](const TPair<int32, UWorld*>& A, const TPair<int32, UWorld*>& B) { return A.Key < B.Key; });
+			TArray<UWorld*> InOrder;
+			for (const TPair<int32, UWorld*>& Each : Found)
+			{
+				InOrder.Add(Each.Value);
+			}
+			return InOrder;
 		}
 
 		bool IsIn(UWorld* InWorld)
@@ -87,7 +88,7 @@ namespace PlayTesting
 			const ACheeseStrikeGameState* State = InWorld->GetGameState<ACheeseStrikeGameState>();
 			const ACheeseStrikePlayerController* Local = Cast<ACheeseStrikePlayerController>(InWorld->GetFirstPlayerController());
 			const ACheeseStrikeCharacter* Pawn = Local != nullptr ? Cast<ACheeseStrikeCharacter>(Local->GetPawn()) : nullptr;
-			return State != nullptr && State->HasMatchStarted() && State->PlayerArray.Num() == PlayersWanted
+			return State != nullptr && State->HasMatchStarted() && State->PlayerArray.Num() == PlayersTogether
 				&& Pawn != nullptr && Pawn->IsAlive() && Pawn->GetWeapon() != nullptr && Pawn->GetPlayerState() != nullptr;
 		}
 
@@ -111,7 +112,7 @@ namespace PlayTesting
 			{
 				++Characters;
 			}
-			return Characters == PlayersWanted;
+			return Characters == PlayersTogether;
 		}
 	}
 
@@ -123,6 +124,7 @@ namespace PlayTesting
 	void StartPlaying(const FSession& Session)
 	{
 		PlayersWanted = Session.Players;
+		PlayersTogether = Session.bApart ? 1 : Session.Players;
 		// The template's first-person weapon animation looks for a camera
 		// and a controller its own character has and ours doesn't, and says
 		// so every frame; it is the known gap until the game has arms of its
@@ -132,7 +134,7 @@ namespace PlayTesting
 			Current->AddExpectedErrorPlain(TEXT("Blueprint:  ABP_FP_Weapon"), EAutomationExpectedErrorFlags::Contains, -1);
 		}
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
-		Settings->SetPlayNetMode(Session.Players > 1 ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
+		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 		Settings->SetPlayNumberOfClients(Session.Players);
 		Settings->SetRunUnderOneProcess(true);
 		Settings->bLaunchSeparateServer = false;

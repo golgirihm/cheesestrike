@@ -31,11 +31,12 @@ class UWorld;
  */
 namespace PlayTesting
 {
-	/** A session: how many play, and the host's options for the map's URL. */
+	/** A session: how many play, the host's options for the map's URL, and whether they start apart (each alone, to find one another through the online service) rather than already in one match. */
 	struct FSession
 	{
 		int32 Players = 1;
 		FString Options;
+		bool bApart = false;
 	};
 
 	/** Queues: start playing as `Session` says, and wait until every player is in, with a character that has its weapon. */

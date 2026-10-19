@@ -37,6 +37,17 @@ Setup: Play in Editor as a listen server with two players (PRJ-03). Why manual: 
 | KIL-03 | The scoreboard | 1. Hold Tab in each window, during play and after a kill. | A panel in the middle names the match, "first to N kills", and lists both players with their kills and deaths, the leader first, while Tab is held, and goes when it is let go. |
 | KIL-04 | The match ends | 1. Host with `?KillLimit=2` on the map's URL (in the Play menu's options, or from the command line), and have A score two kills. | At the second kill the scoreboard stays up in both windows, headed "<A> WINS", and nobody can move, fire or come back. |
 
+## Steam
+
+Setup: two PCs, each with the Steam client running and signed in to a different account, and the two accounts friends; the game started with `-game` on each (`UnrealEditor.exe <project> -game`, or a packaged build), since the editor's own play never uses Steam. Commands are typed into the console (the ` key). Why manual: the automated test does this over the Null service in one process; Steam itself, two accounts and the overlay need two machines.
+
+| ID | Test | Steps | Expected |
+|---|---|---|---|
+| STM-01 | Hosting | 1. On PC A, type `CheeseStrikeHost ?KillLimit=5`. | The top left reads "Offering a match through STEAM", then "Hosting through STEAM", and the level reloads with A listening. Shift+Tab shows the Steam overlay. |
+| STM-02 | Finding and joining | 1. On PC B, type `CheeseStrikeFind`, then `CheeseStrikeJoin 1`. | Within a few seconds B lists "1. <A's Steam name>'s game, 1 of 16 in, first to 5 kills, <n> ms" and nothing from other projects on the test app; joining loads the level with A in it, named by A's Steam name on the scoreboard, and both move, shoot and kill each other as over the local network (PRJ-03, SHT-03, KIL-01). |
+| STM-03 | Joining from the friends list | 1. With A hosting, on PC B open the Steam overlay or the Steam friends list, and on A's entry choose Join Game. | B's game reads "Taking up an invitation", then joins A's match as in STM-02, without typing anything. |
+| STM-04 | Leaving and hosting again | 1. On B, type `CheeseStrikeLeave`.<br>2. On A, type `CheeseStrikeHost` again, and on B find and join again. | B is back on the level alone, and A's scoreboard loses B. A's second match is found and joined as the first was; A's first lobby is gone from the list. |
+
 ## Movement
 
 Setup: Play in Editor on the shooter level, with the output log open to watch for corrections. Why manual: how it feels and looks, and whether the server agrees with what the player saw.
