@@ -222,6 +222,22 @@ void FCheeseStrikeAnimProxy::CacheBones()
 	{
 		ToLocalSpace.CacheBones_AnyThread(FAnimationCacheBonesContext(this));
 	}
+	// The bones the mesh's reference pose scales (Belica's face hangs from faceAttach at 0.79), which the animations,
+	// retargeted ones especially, would put back to 1.
+	ScaledBones.Reset();
+	const FBoneContainer& Bones = GetRequiredBones();
+	if (Bones.IsValid())
+	{
+		for (int32 Each = 0; Each < Bones.GetCompactPoseNumBones(); ++Each)
+		{
+			const FCompactPoseBoneIndex Index(Each);
+			const FVector Scale = Bones.GetRefPoseTransform(Index).GetScale3D();
+			if (!Scale.Equals(FVector::OneVector, 1.0e-3))
+			{
+				ScaledBones.Add(TPair<FCompactPoseBoneIndex, FVector>(Index, Scale));
+			}
+		}
+	}
 }
 
 void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds)
@@ -297,5 +313,9 @@ bool FCheeseStrikeAnimProxy::Evaluate(FPoseContext& Output)
 		return false;
 	}
 	ToLocalSpace.Evaluate_AnyThread(Output);
+	for (const TPair<FCompactPoseBoneIndex, FVector>& Bone : ScaledBones)
+	{
+		Output.Pose[Bone.Key].SetScale3D(Bone.Value);
+	}
 	return true;
 }

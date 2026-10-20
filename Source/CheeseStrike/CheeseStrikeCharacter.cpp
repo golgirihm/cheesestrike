@@ -33,7 +33,16 @@
 /** With this on, every character writes its state to the log four times a second, for watching a run from outside. */
 static TAutoConsoleVariable<int32> CVarTraceState(TEXT("CheeseStrike.TraceState"), 0, TEXT("Log each character's state four times a second."));
 
-const FVector ACheeseStrikeCharacter::CameraAtHead(-2.8f, 5.89f, 0.0f);
+const FVector ACheeseStrikeCharacter::DefaultCameraAtHead(-2.8f, 5.89f, 0.0f);
+const FVector ACheeseStrikeCharacter::CameraFromEyes(-7.8f, -1.0f, 0.0f);
+
+namespace
+{
+	/** The body, the same for everyone and for its own player's first-person view. */
+	const TCHAR* const BodyMesh = TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Meshes/Belica.Belica");
+	/** Words in the names of a body's material slots that are its head, hidden from its own player. */
+	const TCHAR* const HeadSlotWords[] = {TEXT("head"), TEXT("hair"), TEXT("eye"), TEXT("mouth"), TEXT("lash")};
+}
 
 ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCheeseStrikeMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -41,23 +50,22 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	using namespace CheeseStrikeMovement;
 	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
 
-	// The body everyone else sees, and the copy of it its own player sees,
-	// each animated in code (UCheeseStrikeAnimInstance) with Lyra's rifle
-	// set: the mannequin standing on the capsule's floor, turned to face
-	// its front.
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Mannequin(TEXT("/Game/Characters/Heroes/Mannequin/Meshes/SKM_Manny.SKM_Manny"));
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Belica(TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Meshes/Belica.Belica"));
-	// Others see Lt. Belica; the player sees the mannequin's arms (below).
-	GetMesh()->SetSkeletalMeshAsset(Belica.Object);
-	GetMesh()->SetAnimInstanceClass(UCheeseStrikeBelicaAnimInstance::StaticClass());
+	// The body everyone else sees, and the copy of it its own player sees
+	// (the same mesh and animation, so the arms in view are the character's
+	// own), each animated in code with Lyra's rifle set retargeted to it:
+	// Lt. Belica standing on the capsule's floor, turned to face its front.
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Body(BodyMesh);
+	const TSubclassOf<UAnimInstance> BodyAnimation = UCheeseStrikeBelicaAnimInstance::StaticClass();
+	GetMesh()->SetSkeletalMeshAsset(Body.Object);
+	GetMesh()->SetAnimInstanceClass(BodyAnimation);
 	GetMesh()->SetRelativeLocationAndRotation(FVector(-10.0f, 0.0f, -CapsuleHalfHeight), FRotator(0.0f, -90.0f, 0.0f));
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
 
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 	FirstPersonMesh->SetupAttachment(GetMesh());
-	FirstPersonMesh->SetSkeletalMeshAsset(Mannequin.Object);
-	FirstPersonMesh->SetAnimInstanceClass(UCheeseStrikeAnimInstance::StaticClass());
+	FirstPersonMesh->SetSkeletalMeshAsset(Body.Object);
+	FirstPersonMesh->SetAnimInstanceClass(BodyAnimation);
 	FirstPersonMesh->SetOnlyOwnerSee(true);
 	FirstPersonMesh->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
 	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
@@ -72,9 +80,8 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	Eyes->SetupAttachment(GetCapsuleComponent());
 	Eyes->SetRelativeLocation(FVector(0.0f, 0.0f, EyeHeight));
 
-	// The camera sits on the first-person body's head, as the template's
-	// first-person rig expects (its arms are placed for a camera there);
-	// crouching lowers that body, and the camera with it.
+	// The camera sits on the first-person body's head, between its eyes
+	// (FitFirstPersonBody); crouching lowers that body, and the camera with it.
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("First Person Camera"));
 	FirstPersonCameraComponent->SetupAttachment(FirstPersonMesh, FName("head"));
 	FirstPersonCameraComponent->SetRelativeLocationAndRotation(CameraAtHead, FRotator(0.0f, 90.0f, -90.0f));
@@ -105,10 +112,73 @@ UCheeseStrikeMovementComponent* ACheeseStrikeCharacter::GetCheeseStrikeMovement(
 	return Cast<UCheeseStrikeMovementComponent>(GetCharacterMovement());
 }
 
+bool ACheeseStrikeCharacter::FindEyes(const USkeletalMesh* Body, FName& Left, FName& Right)
+{
+	if (Body == nullptr)
+	{
+		return false;
+	}
+	const TPair<const TCHAR*, const TCHAR*> Pairs[] = {{TEXT("eyeball_l"), TEXT("eyeball_r")}, {TEXT("L_eye"), TEXT("R_eye")}};
+	for (const TPair<const TCHAR*, const TCHAR*>& Pair : Pairs)
+	{
+		if (Body->GetRefSkeleton().FindBoneIndex(FName(Pair.Key)) != INDEX_NONE && Body->GetRefSkeleton().FindBoneIndex(FName(Pair.Value)) != INDEX_NONE)
+		{
+			Left = FName(Pair.Key);
+			Right = FName(Pair.Value);
+			return true;
+		}
+	}
+	return false;
+}
+
+void ACheeseStrikeCharacter::FitFirstPersonBody()
+{
+	const USkeletalMesh* Asset = FirstPersonMesh->GetSkeletalMeshAsset();
+	if (Asset == nullptr)
+	{
+		return;
+	}
+	const FName Head(TEXT("head"));
+	FName LeftEye;
+	FName RightEye;
+	if (Asset->GetRefSkeleton().FindBoneIndex(Head) != INDEX_NONE && FindEyes(Asset, LeftEye, RightEye))
+	{
+		// Just under the eyes in the reference pose, in the head bone's own space (whose X is up the head and Y forward):
+		// a shooter's view, which frames the arms and rifle and keeps the eye height of the movement's design.
+		const FVector Between = (Asset->GetComposedRefPoseMatrix(LeftEye).GetOrigin() + Asset->GetComposedRefPoseMatrix(RightEye).GetOrigin()) * 0.5;
+		CameraAtHead = Asset->GetComposedRefPoseMatrix(Head).InverseTransformPosition(Between) + CameraFromEyes;
+	}
+	else
+	{
+		CameraAtHead = DefaultCameraAtHead;
+	}
+	FirstPersonCameraComponent->SetRelativeLocation(CameraAtHead);
+	// The head, which the camera is inside, is not drawn for its own player.
+	const TArray<FSkeletalMaterial>& Slots = Asset->GetMaterials();
+	for (int32 Slot = 0; Slot < Slots.Num(); ++Slot)
+	{
+		const FString Name = Slots[Slot].MaterialSlotName.ToString();
+		bool bHead = false;
+		for (const TCHAR* Word : HeadSlotWords)
+		{
+			bHead |= Name.Contains(Word, ESearchCase::IgnoreCase);
+		}
+		if (bHead)
+		{
+			for (int32 Level = 0; Level < Asset->GetLODNum(); ++Level)
+			{
+				FirstPersonMesh->ShowMaterialSection(Slot, INDEX_NONE, false, Level);
+			}
+		}
+	}
+	ACheeseStrikeWeapon::HideBuiltInWeapons(FirstPersonMesh);
+}
+
 void ACheeseStrikeCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	ACheeseStrikeWeapon::HideBuiltInWeapons(GetMesh());
+	FitFirstPersonBody();
 	// The server gives every character its weapon; it arrives on every machine as an actor of this character's.
 	if (HasAuthority() && HeldWeapon == nullptr && GetWorld() != nullptr)
 	{
@@ -211,7 +281,7 @@ void ACheeseStrikeCharacter::CheeseStrikeDie()
 	}
 }
 
-void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw)
+void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw, float Height)
 {
 	APlayerController* Player = Cast<APlayerController>(GetController());
 	if (Player == nullptr || GetWorld() == nullptr)
@@ -238,7 +308,7 @@ void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw)
 		Player->SetViewTarget(this);
 		return;
 	}
-	const FVector Middle = GetActorLocation() + FVector(0.0f, 0.0f, 30.0f);
+	const FVector Middle = GetActorLocation() + FVector(0.0f, 0.0f, Height);
 	const FVector Way = FRotator(0.0f, GetActorRotation().Yaw + Yaw, 0.0f).Vector();
 	const FVector At = Middle + Way * Distance + FVector(0.0f, 0.0f, 20.0f);
 	FActorSpawnParameters Parameters;

@@ -66,12 +66,13 @@ public:
 	/**
 	 * For looking at the body from outside with one player (a second game
 	 * on the same PC renders poorly): puts the view `Distance` cm from the
-	 * character, `Yaw` degrees round from in front, looking at it, and
-	 * shows the body and its rifle as others see them. With no distance,
-	 * the view goes back to the eyes.
+	 * character, `Yaw` degrees round from in front, looking at the point
+	 * `Height` cm above its middle (70 is the face), and shows the body
+	 * and its rifle as others see them. With no distance, the view goes
+	 * back to the eyes.
 	 */
 	UFUNCTION(Exec)
-	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f);
+	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f, float Height = 30.0f);
 
 	/** Handles aim inputs from either controls or UI interfaces: degrees to turn by. */
 	UFUNCTION(BlueprintCallable, Category="Input")
@@ -127,6 +128,9 @@ public:
 	 * hurt: dead already, or protected.
 	 */
 	bool TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead);
+
+	/** The bones of a body's two eyes (eyeball_l and _r, or L_eye and R_eye), if it has them. */
+	static bool FindEyes(const USkeletalMesh* Body, FName& Left, FName& Right);
 
 	/** Where the first-person left hand is in the first-person rifle's own space, for the trace and the tests: it should stay put whatever the aim. */
 	FVector LeftHandOnRifle() const;
@@ -197,8 +201,13 @@ protected:
 	static constexpr float SightEyeDistance = 14.0f;
 	static constexpr float SightEyeHeight = -1.0f;
 	static constexpr float SightEyeSide = -1.5f;
-	/** The camera's place on the first-person body's head, as the template had it. */
-	static const FVector CameraAtHead;
+	/** Where the camera sits in the first-person body's head bone: just under its eyes (from the body's eye bones), or where the template had it on the mannequin. */
+	FVector CameraAtHead = DefaultCameraAtHead;
+	static const FVector DefaultCameraAtHead;
+	/** The camera from the eyes, in the head's space: 8 cm down and 1 cm back, as the template's camera sits from Belica's eyes. */
+	static const FVector CameraFromEyes;
+	/** Puts the camera just under the body's eyes, and hides the head (face, hair, eyes) in the first-person copy, which the camera sits inside. */
+	void FitFirstPersonBody();
 	/** Seconds since the state was last traced to the log. */
 	float SinceTrace = 0.0f;
 	/** Whether -StartAt has been applied. */

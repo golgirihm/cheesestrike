@@ -167,6 +167,8 @@ protected:
 	FCheeseStrikeGripIK LeftHand;
 	FAnimNode_ConvertComponentToLocalSpace ToLocalSpace;
 	bool bLinked = false;
+	/** Bones the mesh's reference pose scales, kept at that scale whatever the animations say (Belica's faceAttach). */
+	TArray<TPair<FCompactPoseBoneIndex, FVector>> ScaledBones;
 };
 
 /**

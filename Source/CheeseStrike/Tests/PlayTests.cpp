@@ -187,6 +187,24 @@ bool FItFiresAimsAndReloads::RunTest(const FString& Parameters)
 			TestEqual(TEXT("none from the reserve"), Weapon->GetReserve(), Weapon->GetStats().Reserve);
 		}
 	});
+	Then([this]()
+	{
+		if (const ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
+		{
+			// The player looks out from just under the character's own eyes, with its head not drawn for them.
+			USkeletalMeshComponent* Arms = Character->GetFirstPersonMesh();
+			FName Left;
+			FName Right;
+			TestTrue(TEXT("the body has eyes"), ACheeseStrikeCharacter::FindEyes(Arms->GetSkeletalMeshAsset(), Left, Right));
+			const FVector Eyes = (Arms->GetBoneLocation(Left) + Arms->GetBoneLocation(Right)) * 0.5;
+			const float Off = FVector::Dist(Character->GetFirstPersonCameraComponent()->GetComponentLocation(), Eyes);
+			TestTrue(FString::Printf(TEXT("the camera is just under the eyes (%.1f cm off)"), Off), Off > 4.0f && Off < 12.0f);
+			TestTrue(TEXT("below them"), Character->GetFirstPersonCameraComponent()->GetComponentLocation().Z < Eyes.Z);
+			const int32 Head = Arms->GetMaterialIndex(TEXT("M03_head"));
+			TestTrue(TEXT("the first-person body has no head"), Head != INDEX_NONE && !Arms->IsMaterialSectionShown(Head, 0));
+			TestTrue(TEXT("while the body others see has one"), Character->GetMesh()->IsMaterialSectionShown(Head, 0));
+		}
+	});
 	Play(0, TEXT("hold Aim\nwait 0.6"));
 	Then([this]()
 	{
