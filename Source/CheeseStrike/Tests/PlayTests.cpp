@@ -437,8 +437,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAMatchWaitsInTheLobbyAndComesBackToIt, "Cheese
 bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
-	// A host and a joiner in the lobby of a match to one kill.
-	StartPlaying({2, TEXT("?KillLimit=1?RespawnDelay=1"), false, true});
+	// A host and a joiner in the lobby of a match to five kills, which the host brings down to one from the lobby.
+	StartPlaying({2, TEXT("?KillLimit=5?RespawnDelay=1"), false, true});
 	Then([this]()
 	{
 		for (int32 Player = 0; Player < 2; ++Player)
@@ -465,9 +465,26 @@ bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
 		if (ACheeseStrikeGameMode* Mode = World(0)->GetAuthGameMode<ACheeseStrikeGameMode>())
 		{
 			TestTrue(TEXT("the match waits for the host"), Mode->IsWaitingToStart());
+			TestTrue(TEXT("who is named as the host"), GameState(0)->GetHostName() == GameState(0)->PlayerArray[0]->GetPlayerName());
 			Mode->AskToStart(false);
 			TestTrue(TEXT("who starts the countdown"), GameState(0)->IsCountingDown());
 			TestTrue(FString::Printf(TEXT("of the design's length (%.1f)"), GameState(0)->SecondsToStart()), GameState(0)->SecondsToStart() > CheeseStrikeRules::MatchCountdown - 1.0f);
+			Mode->CancelStart();
+			TestFalse(TEXT("and may call it off"), GameState(0)->IsCountingDown());
+			TestTrue(TEXT("back to waiting"), Mode->IsWaitingToStart());
+			// The rules are the host's to change from the lobby.
+			Controller(0)->SetRulesFromMenu(1, 1.0f);
+			TestEqual(TEXT("the host sets the kill limit"), GameState(0)->GetKillLimit(), 1);
+			TestEqual(TEXT("and the game mode has it"), Mode->GetKillLimit(), 1);
+		}
+	});
+	WaitUntil(TEXT("the joiner seeing the new rules"), 3.0f, []() { return GameState(1) != nullptr && GameState(1)->GetKillLimit() == 1 && GameState(1)->GetHostName() == GameState(0)->GetHostName() && !GameState(1)->IsCountingDown(); });
+	Then([this]()
+	{
+		if (ACheeseStrikeGameMode* Mode = World(0)->GetAuthGameMode<ACheeseStrikeGameMode>())
+		{
+			Mode->AskToStart(false);
+			TestTrue(TEXT("the host starts the countdown again"), GameState(0)->IsCountingDown());
 		}
 	});
 	WaitUntil(TEXT("the joiner seeing the countdown"), 3.0f, []() { return GameState(1) != nullptr && GameState(1)->IsCountingDown(); });
@@ -480,10 +497,22 @@ bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
 		TestFalse(TEXT("the countdown is over"), GameState(0)->IsCountingDown());
 	});
 	WaitUntil(TEXT("the menus going"), 3.0f, []() { return Controller(0) != nullptr && Controller(1) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::None && Controller(1)->GetMenuPage() == EMenuPage::None; });
-	// The joiner wins, and after the results everyone is back in the lobby of the same match.
 	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
 	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
 	Wait(CheeseStrikeRules::SpawnProtection);
+	// A paused player's input goes nowhere: the host pauses, and firing does nothing.
+	Then([this]() { Controller(0)->TogglePause(); });
+	WaitUntil(TEXT("the host's pause menu"), 2.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::Pause; });
+	Play(0, TEXT("hold Fire\nwait 0.5\nrelease Fire"));
+	Wait(1.0f);
+	Then([this]()
+	{
+		TestTrue(TEXT("paused, the host's firing does nothing"), Character(0) != nullptr && Character(0)->GetWeapon() != nullptr && Character(0)->GetWeapon()->ShotsFired == 0);
+		TestFalse(TEXT("nor takes input"), Character(0) != nullptr && Character(0)->TakesInput());
+		Controller(0)->TogglePause();
+	});
+	WaitUntil(TEXT("the host's pause menu going"), 2.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::None; });
+	// The joiner wins, and after the results everyone is back in the lobby of the same match.
 	Play(1, TEXT("hold Fire\nwait 1.2\nrelease Fire"));
 	WaitUntil(TEXT("the match ending"), 6.0f, []() { return GameState(0) != nullptr && GameState(0)->HasMatchEnded(); });
 	WaitUntil(TEXT("everyone being back in the lobby"), CheeseStrikeRules::ResultsTime + 15.0f, []()
@@ -495,7 +524,7 @@ bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
 	});
 	Then([this]()
 	{
-		TestEqual(TEXT("with the same rules"), GameState(0)->GetKillLimit(), 1);
+		TestEqual(TEXT("with the rules as the host set them, not as the match was hosted"), GameState(0)->GetKillLimit(), 1);
 		TestTrue(TEXT("and the lobby up again"), Controller(1)->GetMenuPage() == EMenuPage::Lobby);
 	});
 	StopPlaying();

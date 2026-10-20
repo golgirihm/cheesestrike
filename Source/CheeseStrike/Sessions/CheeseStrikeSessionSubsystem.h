@@ -38,6 +38,8 @@ public:
 	void Join(int32 Index);
 	/** Leaves the match hosted or joined, back to the level alone. */
 	void Leave();
+	/** The host's match, as offered, now says these URL `Options` (its rules), for those looking for one. */
+	void UpdateRules(const FString& Options);
 
 	/** The matches the last search found, described. */
 	const TArray<FString>& GetFound() const { return Found; }
