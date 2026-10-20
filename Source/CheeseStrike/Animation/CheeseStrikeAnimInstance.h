@@ -7,7 +7,9 @@
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimNode_ApplyMeshSpaceAdditive.h"
 #include "Animation/AnimNode_SequencePlayer.h"
+#include "Animation/AnimNodeSpaceConversions.h"
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
+#include "BoneControllers/AnimNode_TwoBoneIK.h"
 #include "AnimNodes/AnimNode_MultiWayBlend.h"
 #include "AnimNodes/AnimNode_Slot.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
@@ -155,7 +157,21 @@ protected:
 	FAnimNode_ApplyMeshSpaceAdditive AimedCrouched;
 	/** Firing and reloading play over everything. */
 	FAnimNode_Slot Slot;
+	/**
+	 * Then the hands are put on the rifle: the animations carry where each
+	 * hand should be as the ik_hand bones, and the arms are bent to reach
+	 * them, elbows kept the way the animation had them.
+	 */
+	FAnimNode_ConvertLocalToComponentSpace ToComponentSpace;
+	FAnimNode_TwoBoneIK LeftHand;
+	FAnimNode_TwoBoneIK RightHand;
+	FAnimNode_ConvertComponentToLocalSpace ToLocalSpace;
 	bool bLinked = false;
+
+public:
+	/** Where each elbow bends towards, in the body's space, from the game thread. */
+	FVector LeftElbowTarget = FVector::ZeroVector;
+	FVector RightElbowTarget = FVector::ZeroVector;
 };
 
 UCLASS()
@@ -183,6 +199,11 @@ public:
 	bool bFalling = false;
 	UPROPERTY(Transient, BlueprintReadOnly, Category="Animation")
 	bool bAiming = false;
+	/** Where each elbow should bend towards, in the body's space: where it was last frame, pushed out from the arm's line. */
+	UPROPERTY(Transient)
+	FVector LeftElbowTarget = FVector::ZeroVector;
+	UPROPERTY(Transient)
+	FVector RightElbowTarget = FVector::ZeroVector;
 
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
