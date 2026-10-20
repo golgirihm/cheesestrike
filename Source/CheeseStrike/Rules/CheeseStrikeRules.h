@@ -32,6 +32,32 @@ namespace CheeseStrikeRules
 	/** Whether a match with these URL `Options` begins as soon as there is a player (`?StartNow`), rather than waiting in the lobby for the host. */
 	bool StartsAtOnce(const FString& Options);
 
+	/** A map a host may pick: its name in the lobby, and its level's package. */
+	struct FMapChoice
+	{
+		const TCHAR* Name;
+		const TCHAR* Level;
+	};
+	/** The maps, the first picked to begin with when hosting from the front end. */
+	extern const FMapChoice Maps[];
+	int32 NumMaps();
+	/** Which of Maps a level's package (or its path with the object name) is, or INDEX_NONE. */
+	int32 MapIndexFor(const FString& LevelPackage);
+	/** The map a URL's `?Map=` picks, or `Otherwise` if it picks none of Maps. */
+	int32 MapFrom(const FString& Options, int32 Otherwise);
+	/**
+	 * How many players a match that the lobby started on another map waits
+	 * for before it begins (`?Players=`; 0 when it wasn't), so that bots fill
+	 * the slots of nobody still on the way; and how long it waits at most.
+	 */
+	int32 PlayersFrom(const FString& Options);
+	constexpr float WaitForPlayers = 15.0f;
+	/** The seed the bots' names were drawn with (`?BotSeed=`), so that a travel keeps the names the lobby showed; or `Otherwise`. */
+	int32 BotSeedFrom(const FString& Options, int32 Otherwise);
+
+	/** How much eating a block of cheese takes (docs/unreal/design.md, "The mice"). */
+	constexpr float CheeseBlockHealth = 400.0f;
+
 	/** One player's line on the scoreboard. */
 	struct FStanding
 	{

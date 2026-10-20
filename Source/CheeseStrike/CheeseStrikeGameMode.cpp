@@ -38,6 +38,14 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	// The match waits in the lobby for the host to start it, unless told not to.
 	bDelayedStart = !CheeseStrikeRules::StartsAtOnce(Options);
 	BotsWanted = CheeseStrikeRules::BotsFrom(Options);
+	MapIndex = CheeseStrikeRules::MapFrom(Options, CurrentMapIndex());
+	BotSeed = CheeseStrikeRules::BotSeedFrom(Options, FMath::Rand());
+	// A match the lobby started on another map begins when everyone has come over (ReadyToStartMatch).
+	PlayersExpected = CheeseStrikeRules::PlayersFrom(Options);
+	if (PlayersExpected > 0)
+	{
+		bDelayedStart = false;
+	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("Free-for-all to %d kills, back %.1f s after a death%s, %s bots"), KillLimit, RespawnDelay, bDelayedStart ? TEXT(", waiting in the lobby") : TEXT(""), BotsWanted < 0 ? TEXT("filling in with") : *FString::FromInt(BotsWanted));
 	// The template's level comes with spawners for its own enemies, who would wander about the menu's view and the match: none of them.
 	for (TActorIterator<AShooterNPCSpawner> It(GetWorld()); It; ++It)
@@ -50,15 +58,79 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	}
 }
 
-void ACheeseStrikeGameMode::SetRules(int32 InKillLimit, float InRespawnDelay)
+int32 ACheeseStrikeGameMode::CurrentMapIndex() const
+{
+	return GetWorld() != nullptr ? CheeseStrikeRules::MapIndexFor(GetWorld()->GetOutermost()->GetName()) : INDEX_NONE;
+}
+
+void ACheeseStrikeGameMode::SetRules(int32 InKillLimit, float InRespawnDelay, int32 InMapIndex)
 {
 	KillLimit = InKillLimit;
 	RespawnDelay = InRespawnDelay;
+	if (InMapIndex >= 0 && InMapIndex < CheeseStrikeRules::NumMaps())
+	{
+		MapIndex = InMapIndex;
+	}
 	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 	{
 		State->SetLimits(KillLimit, RespawnDelay);
+		State->SetMapIndex(MapIndex);
 	}
-	UE_LOG(LogCheeseStrike, Display, TEXT("Rules: to %d kills, back %.1f s after a death"), KillLimit, RespawnDelay);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Rules: to %d kills, back %.1f s after a death, on %s"), KillLimit, RespawnDelay, MapIndex >= 0 ? CheeseStrikeRules::Maps[MapIndex].Name : TEXT("this level"));
+}
+
+FString ACheeseStrikeGameMode::RulesOptions() const
+{
+	FString Options = FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?BotSeed=%d"), KillLimit, RespawnDelay, BotSeed);
+	if (MapIndex >= 0)
+	{
+		Options += FString::Printf(TEXT("?Map=%d"), MapIndex);
+	}
+	if (BotsWanted >= 0)
+	{
+		Options += FString::Printf(TEXT("?Bots=%d"), BotsWanted);
+	}
+	return Options;
+}
+
+void ACheeseStrikeGameMode::CountdownOver()
+{
+	if (MapIndex < 0 || MapIndex == CurrentMapIndex() || GetWorld() == nullptr)
+	{
+		StartMatch();
+		return;
+	}
+	// Everyone goes to the map the host picked, and the match starts there once they have all arrived. The URL is this
+	// level's with the map changed, so that the host listens where the players reconnect (the same port).
+	FURL Url = GetWorld()->URL;
+	Url.Map = CheeseStrikeRules::Maps[MapIndex].Level;
+	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("Bots"), TEXT("Players"), TEXT("StartNow")})
+	{
+		Url.RemoveOption(Option);
+	}
+	TArray<FString> Each;
+	(RulesOptions() + FString::Printf(TEXT("?Players=%d"), FMath::Max(1, GetNumPlayers()))).ParseIntoArray(Each, TEXT("?"));
+	for (const FString& Option : Each)
+	{
+		Url.AddOption(*Option);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("To %s: %s"), CheeseStrikeRules::Maps[MapIndex].Name, *Url.ToString());
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetCountdownEndsAt(0.0f);
+	}
+	GetWorld()->ServerTravel(Url.ToString(), GetTravelType());
+}
+
+bool ACheeseStrikeGameMode::ReadyToStartMatch_Implementation()
+{
+	if (PlayersExpected <= 0)
+	{
+		return Super::ReadyToStartMatch_Implementation();
+	}
+	const bool bEveryone = GetNumPlayers() >= PlayersExpected;
+	const bool bWaitedEnough = GetWorld() != nullptr && GetWorld()->GetTimeSeconds() > CheeseStrikeRules::WaitForPlayers;
+	return GetMatchState() == MatchState::WaitingToStart && GetNumPlayers() > 0 && (bEveryone || bWaitedEnough);
 }
 
 void ACheeseStrikeGameMode::RestartGame()
@@ -67,12 +139,20 @@ void ACheeseStrikeGameMode::RestartGame()
 	{
 		return;
 	}
-	// The engine's restart would travel by the URL the match was hosted with; this one carries the rules as the host left them.
+	// The engine's restart would travel by the URL the match was hosted with; this one carries the rules as the host left them,
+	// and goes back to the lobby on this map even if the match came here from another.
 	FURL Url = GetWorld()->URL;
-	Url.RemoveOption(TEXT("KillLimit"));
-	Url.RemoveOption(TEXT("RespawnDelay"));
-	Url.AddOption(*FString::Printf(TEXT("KillLimit=%d"), KillLimit));
-	Url.AddOption(*FString::Printf(TEXT("RespawnDelay=%.1f"), RespawnDelay));
+	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("Bots"), TEXT("Players")})
+	{
+		Url.RemoveOption(Option);
+	}
+	FString Rules = RulesOptions();
+	TArray<FString> Each;
+	Rules.ParseIntoArray(Each, TEXT("?"));
+	for (const FString& Option : Each)
+	{
+		Url.AddOption(*Option);
+	}
 	GetWorld()->ServerTravel(Url.ToString(), GetTravelType());
 }
 
@@ -153,12 +233,12 @@ void ACheeseStrikeGameMode::AskToStart(bool bAtOnce)
 	}
 	if (bAtOnce)
 	{
-		StartMatch();
+		CountdownOver();
 		return;
 	}
 	State->SetCountdownEndsAt(State->GetServerWorldTimeSeconds() + CheeseStrikeRules::MatchCountdown);
 	UE_LOG(LogCheeseStrike, Display, TEXT("The match starts in %.0f s"), CheeseStrikeRules::MatchCountdown);
-	GetWorldTimerManager().SetTimer(CountdownTimer, this, &AGameMode::StartMatch, CheeseStrikeRules::MatchCountdown, false);
+	GetWorldTimerManager().SetTimer(CountdownTimer, this, &ACheeseStrikeGameMode::CountdownOver, CheeseStrikeRules::MatchCountdown, false);
 }
 
 void ACheeseStrikeGameMode::CancelStart()
@@ -210,7 +290,8 @@ void ACheeseStrikeGameMode::InitGameState()
 	{
 		State->SetLimits(KillLimit, RespawnDelay);
 		// The bots' names are drawn once, so that the lobby and the match agree on them.
-		State->SetBots(CheeseStrikeRules::BotNames(FMath::Rand(), CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize), BotsWanted);
+		State->SetBots(CheeseStrikeRules::BotNames(BotSeed, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize), BotsWanted);
+		State->SetMapIndex(MapIndex);
 	}
 }
 

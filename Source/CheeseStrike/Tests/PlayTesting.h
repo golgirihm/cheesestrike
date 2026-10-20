@@ -39,6 +39,8 @@ namespace PlayTesting
 		bool bApart = false;
 		/** Whether the match waits in the lobby, as a hosted one does; otherwise it starts at once (`?StartNow`). */
 		bool bLobby = false;
+		/** The level's package, or the shooter level if empty. */
+		FString Level;
 	};
 
 	/** Queues: start playing as `Session` says, and wait until every player is in, with a character that has its weapon. */

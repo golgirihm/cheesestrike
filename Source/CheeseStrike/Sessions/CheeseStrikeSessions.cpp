@@ -41,7 +41,9 @@ namespace CheeseStrikeSessions
 		Settings.bUsesStats = false;
 		Settings.bAntiCheatProtected = false;
 		Settings.Set(GameKey, FString(GameValue), EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
-		Settings.Set(SETTING_MAPNAME, FString(Level), EOnlineDataAdvertisementType::ViaOnlineService);
+		// The map the match is to be played on, by name: the one picked in the lobby, or the level it is hosted on.
+		const int32 Map = CheeseStrikeRules::MapFrom(Normalised, CheeseStrikeRules::MapIndexFor(Level));
+		Settings.Set(SETTING_MAPNAME, Map >= 0 ? FString(CheeseStrikeRules::Maps[Map].Name) : FString(Level), EOnlineDataAdvertisementType::ViaOnlineService);
 		Settings.Set(KillLimitKey, CheeseStrikeRules::KillLimitFrom(Normalised), EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 		Settings.Set(RespawnDelayKey, CheeseStrikeRules::RespawnDelayFrom(Normalised), EOnlineDataAdvertisementType::ViaOnlineService);
 		return Settings;
@@ -78,7 +80,13 @@ namespace CheeseStrikeSessions
 		Settings.Get(KillLimitKey, KillLimit);
 		const int32 In = Settings.NumPublicConnections - Result.Session.NumOpenPublicConnections;
 		const FString Host = Result.Session.OwningUserName.IsEmpty() ? TEXT("someone") : Result.Session.OwningUserName;
+		FString MapName;
+		Settings.Get(SETTING_MAPNAME, MapName);
 		FString Line = FString::Printf(TEXT("%s's game, %d of %d in, first to %d kills"), *Host, In, Settings.NumPublicConnections, KillLimit);
+		if (!MapName.IsEmpty() && !MapName.StartsWith(TEXT("/")))
+		{
+			Line += FString::Printf(TEXT(" on %s"), *MapName);
+		}
 		if (Result.PingInMs >= 0 && Result.PingInMs < MAX_QUERY_PING)
 		{
 			Line += FString::Printf(TEXT(", %d ms"), Result.PingInMs);

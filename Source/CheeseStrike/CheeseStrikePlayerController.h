@@ -47,10 +47,10 @@ public:
 	EMenuPage GetMenuPage() const { return ShownPage; }
 	/** Picks a page of the front end (main, find). */
 	void ChooseMenu(EMenuPage Page);
-	/** Hosts a match with the usual rules, through the online service, or the local network without Steam: straight into its lobby. */
+	/** Hosts a match with the usual rules on the first map, through the online service, or the local network without Steam: straight into its lobby. */
 	void HostFromMenu();
-	/** The host sets the match's rules from the lobby; everyone in it sees them. */
-	void SetRulesFromMenu(int32 KillLimit, float RespawnDelay);
+	/** The host sets the match's rules and map from the lobby (INDEX_NONE keeps the map); everyone in it sees them. */
+	void SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map = INDEX_NONE);
 	/** Looks for matches, through the service or the local network without Steam. */
 	void FindFromMenu();
 	/** The host starts the match, after the countdown. */

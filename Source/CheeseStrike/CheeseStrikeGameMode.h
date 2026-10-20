@@ -44,10 +44,18 @@ public:
 	void AskToStart(bool bAtOnce);
 	/** Stops the countdown, back to waiting in the lobby. */
 	void CancelStart();
+	/**
+	 * The map the match is to be played on (CheeseStrikeRules::Maps): the
+	 * one it is on, or another the host picked in the lobby, which the
+	 * match travels to when it starts, everyone with it.
+	 */
+	int32 GetMapIndex() const { return MapIndex; }
+	/** The map this level is, or INDEX_NONE for one not in the list. */
+	int32 CurrentMapIndex() const;
 	/** Whether the match is waiting in the lobby for the host. */
 	bool IsWaitingToStart() const;
 	/** The host sets the rules from the lobby: on the match's state for everyone, and on the next match's URL. */
-	void SetRules(int32 InKillLimit, float InRespawnDelay);
+	void SetRules(int32 InKillLimit, float InRespawnDelay, int32 InMapIndex = INDEX_NONE);
 	/** Back to the lobby after the results, with the rules as they are now. */
 	virtual void RestartGame() override;
 
@@ -63,6 +71,8 @@ public:
 	virtual void InitGameState() override;
 	/** A newcomer joins the side with fewer; the host is named on the match's state. */
 	virtual void PostLogin(APlayerController* NewPlayer) override;
+	/** A match the lobby started on another map begins once everyone has arrived (or after a while), so that bots fill only the slots of nobody coming. */
+	virtual bool ReadyToStartMatch_Implementation() override;
 	/** How many bots fill in once the match starts: -1 for every empty slot. */
 	int32 GetBotsWanted() const { return BotsWanted; }
 	/** A player may name themself with `?Nick=` on the URL they join by (for development; Steam will name them). */
@@ -73,10 +83,18 @@ protected:
 	void Respawn(TWeakObjectPtr<AController> Who);
 	/** Fills the empty slots with bots, by the roster the lobby showed. */
 	void SpawnBots();
+	/** The countdown is over: the match starts here, or travels to the map the host picked and starts there. */
+	void CountdownOver();
+	/** The URL options that carry this match's rules to its next level. */
+	FString RulesOptions() const;
 
 	int32 KillLimit;
 	float RespawnDelay;
 	int32 BotsWanted = -1;
+	int32 MapIndex = INDEX_NONE;
+	int32 BotSeed = 0;
+	/** How many players a match started by the lobby on another map waits for; 0 for a match not started that way. */
+	int32 PlayersExpected = 0;
 	FTimerHandle CountdownTimer;
 	FTimerHandle ResultsTimer;
 };

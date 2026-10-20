@@ -74,6 +74,56 @@ namespace CheeseStrikeRules
 		return UGameplayStatics::HasOption(Options, TEXT("StartNow"));
 	}
 
+	const FMapChoice Maps[] = {
+		{TEXT("The Creamery"), TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery")},
+		{TEXT("Proving Ground"), TEXT("/Game/Variant_Shooter/Lvl_Shooter")},
+	};
+
+	int32 NumMaps()
+	{
+		return UE_ARRAY_COUNT(Maps);
+	}
+
+	int32 MapIndexFor(const FString& LevelPackage)
+	{
+		FString Package = LevelPackage;
+		Package.Split(TEXT("."), &Package, nullptr);
+		// A level played in the editor carries the editor's prefix on its name (UEDPIE_0_Lvl_Creamery).
+		FString Folder;
+		FString Name;
+		if (Package.Split(TEXT("/"), &Folder, &Name, ESearchCase::IgnoreCase, ESearchDir::FromEnd) && Name.StartsWith(TEXT("UEDPIE_")))
+		{
+			Name.Split(TEXT("_"), nullptr, &Name);
+			Name.Split(TEXT("_"), nullptr, &Name);
+			Package = Folder + TEXT("/") + Name;
+		}
+		for (int32 Index = 0; Index < NumMaps(); ++Index)
+		{
+			if (Package.Equals(Maps[Index].Level, ESearchCase::IgnoreCase))
+			{
+				return Index;
+			}
+		}
+		return INDEX_NONE;
+	}
+
+	int32 MapFrom(const FString& Options, int32 Otherwise)
+	{
+		const int32 Index = FMath::RoundToInt(Option(Options, TEXT("Map"), -1.0f));
+		return Index >= 0 && Index < NumMaps() ? Index : Otherwise;
+	}
+
+	int32 PlayersFrom(const FString& Options)
+	{
+		return FMath::Max(0, FMath::RoundToInt(Option(Options, TEXT("Players"), 0.0f)));
+	}
+
+	int32 BotSeedFrom(const FString& Options, int32 Otherwise)
+	{
+		const FString Value = UGameplayStatics::ParseOption(Options, TEXT("BotSeed"));
+		return Value.IsNumeric() ? FCString::Atoi(*Value) : Otherwise;
+	}
+
 	const TCHAR* const TeamNames[Teams] = {TEXT("The Gouda Guys"), TEXT("Mozza Radicals")};
 
 	int32 TeamToJoin(const int32 (&Counts)[Teams])
