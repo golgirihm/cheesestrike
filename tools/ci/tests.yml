@@ -1,0 +1,44 @@
+# Builds the editor and runs every CheeseStrike test on the self-hosted
+# runner (this PC, with Unreal Engine installed; see README.md). A hosted
+# runner can't hold the engine. The assets submodule is private and is
+# fetched over SSH with the runner's own key, since the workflow's token
+# only opens this repository.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: [self-hosted, windows, cheesestrike]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          lfs: false
+
+      - name: Fetch the assets
+        shell: pwsh
+        run: |
+          git config submodule.Content.url git@github.com:golgirihm/cheesestrike-assets.git
+          git submodule update --init --depth 1
+          git -C Content lfs pull
+
+      - name: Build and run the tests
+        shell: pwsh
+        run: python tools/run_tests.py
+
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run_tests.log
+          path: Saved/Logs/run_tests.log
+          if-no-files-found: ignore
