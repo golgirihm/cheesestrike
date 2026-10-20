@@ -324,6 +324,29 @@ void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw, floa
 	}
 }
 
+void ACheeseStrikeCharacter::CheeseStrikeViewFrom(float X, float Y, float Z, float Pitch, float Yaw)
+{
+	APlayerController* Player = Cast<APlayerController>(GetController());
+	if (Player == nullptr || GetWorld() == nullptr)
+	{
+		return;
+	}
+	if (OutsideCamera != nullptr)
+	{
+		OutsideCamera->Destroy();
+	}
+	FActorSpawnParameters Parameters;
+	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	OutsideCamera = GetWorld()->SpawnActor<ACameraActor>(FVector(X, Y, Z), FRotator(Pitch, Yaw, 0.0f), Parameters);
+	if (OutsideCamera != nullptr)
+	{
+		OutsideCamera->GetCameraComponent()->SetFieldOfView(70.0f);
+		const FRotator Kept = Player->GetControlRotation();
+		Player->SetViewTarget(OutsideCamera);
+		Player->SetControlRotation(Kept);
+	}
+}
+
 void ACheeseStrikeCharacter::ServerDie_Implementation()
 {
 	EndProtection();

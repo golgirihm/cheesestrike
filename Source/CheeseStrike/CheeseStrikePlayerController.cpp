@@ -209,22 +209,22 @@ void ACheeseStrikePlayerController::HostFromMenu()
 {
 	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
 	{
-		Sessions->Host(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f"), CheeseStrikeRules::KillLimit, CheeseStrikeRules::RespawnDelay), Sessions->ServiceName() != TEXT("STEAM"));
+		Sessions->Host(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?Map=0"), CheeseStrikeRules::KillLimit, CheeseStrikeRules::RespawnDelay), Sessions->ServiceName() != TEXT("STEAM"));
 	}
 }
 
-void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float RespawnDelay)
+void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map)
 {
 	ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
 	if (Mode == nullptr)
 	{
 		return;
 	}
-	Mode->SetRules(KillLimit, RespawnDelay);
+	Mode->SetRules(KillLimit, RespawnDelay, Map);
 	// The match as offered says the same, for those still looking for one.
 	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
 	{
-		Sessions->UpdateRules(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f"), KillLimit, RespawnDelay));
+		Sessions->UpdateRules(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?Map=%d"), KillLimit, RespawnDelay, Mode->GetMapIndex()));
 	}
 	if (Menu.IsValid())
 	{

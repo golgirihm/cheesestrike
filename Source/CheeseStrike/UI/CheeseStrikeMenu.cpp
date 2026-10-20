@@ -382,9 +382,16 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 			DelayChosen = Index;
 		}
 	}
+	TArray<FString> MapNames;
+	for (int32 Index = 0; Index < CheeseStrikeRules::NumMaps(); ++Index)
+	{
+		MapNames.Add(FString(CheeseStrikeRules::Maps[Index].Name).ToUpper());
+	}
+	const int32 MapChosen = Match != nullptr ? Match->GetMapIndex() : INDEX_NONE;
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOBBY")) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Free-for-all on the shooter level."), true) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Free-for-all."), true) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Map"), MapNames, MapChosen, bHost, [Player, KillLimit, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, RespawnDelay, Index); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("First to how many kills"), Limits, LimitChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeRules::KillLimitChoices[Index], RespawnDelay); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Back how long after a death"), Delays, DelayChosen, bHost, [Player, KillLimit](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, CheeseStrikeRules::RespawnDelayChoices[Index]); }) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeLine(bHost ? TEXT("Everyone here sees the rules as you set them.") : TEXT("The host sets the rules."), true) ];

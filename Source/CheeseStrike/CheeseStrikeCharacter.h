@@ -73,6 +73,9 @@ public:
 	 */
 	UFUNCTION(Exec)
 	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f, float Height = 30.0f);
+	/** For looking at a map (development): puts the view at X, Y, Z facing Pitch and Yaw, the character left where it is; CheeseStrikeOutside with no distance puts it back. */
+	UFUNCTION(Exec)
+	void CheeseStrikeViewFrom(float X, float Y, float Z, float Pitch, float Yaw);
 
 	/** Handles aim inputs from either controls or UI interfaces: degrees to turn by. */
 	UFUNCTION(BlueprintCallable, Category="Input")

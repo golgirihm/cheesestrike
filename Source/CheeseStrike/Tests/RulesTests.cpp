@@ -138,6 +138,27 @@ bool FTheSidesAreFilledWithBots::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAHostPicksAMap, "CheeseStrike.Rules.AHostPicksAMap", RulesTests::Flags)
+
+bool FAHostPicksAMap::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeRules;
+	TestTrue(TEXT("there is more than one map"), NumMaps() >= 2);
+	TestEqual(TEXT("the first is the Creamery"), FString(Maps[0].Name), FString(TEXT("The Creamery")));
+	TestEqual(TEXT("a level is known by its package"), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery")), 0);
+	TestEqual(TEXT("or by its object path"), MapIndexFor(TEXT("/Game/Variant_Shooter/Lvl_Shooter.Lvl_Shooter")), 1);
+	TestEqual(TEXT("or as it is played in the editor"), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/UEDPIE_1_Lvl_Creamery")), 0);
+	TestEqual(TEXT("and a level that isn't one of them is none"), MapIndexFor(TEXT("/Game/Elsewhere/Lvl_Other")), static_cast<int32>(INDEX_NONE));
+	TestEqual(TEXT("the URL picks a map"), MapFrom(TEXT("?Map=1"), 0), 1);
+	TestEqual(TEXT("but not one there isn't"), MapFrom(TEXT("?Map=9"), 0), 0);
+	TestEqual(TEXT("and without it, the one given"), MapFrom(TEXT("?KillLimit=5"), 1), 1);
+	TestEqual(TEXT("a travelled match waits for so many players"), PlayersFrom(TEXT("?Players=3")), 3);
+	TestEqual(TEXT("and a hosted one for none"), PlayersFrom(TEXT("")), 0);
+	TestEqual(TEXT("the bots' names travel by their seed"), BotSeedFrom(TEXT("?BotSeed=1234"), 7), 1234);
+	TestEqual(TEXT("or are drawn afresh"), BotSeedFrom(TEXT(""), 7), 7);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMenuFollowsTheMatch, "CheeseStrike.Rules.TheMenuFollowsTheMatch", RulesTests::Flags)
 
 bool FTheMenuFollowsTheMatch::RunTest(const FString& Parameters)

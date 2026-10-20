@@ -62,6 +62,10 @@ public:
 	/** The most kills anyone has. */
 	int32 MostKills() const;
 
+	/** The map the host picked in the lobby (CheeseStrikeRules::Maps), INDEX_NONE for this level as it is. */
+	int32 GetMapIndex() const { return MapIndex; }
+	void SetMapIndex(int32 Index) { MapIndex = Index; }
+
 	/** The host's name, as the lobby crowns it; empty until the host is in. */
 	const FString& GetHostName() const { return HostName; }
 	void SetHostName(const FString& Name) { HostName = Name; }
@@ -94,4 +98,6 @@ protected:
 	int32 BotsWanted = -1;
 	UPROPERTY(Replicated)
 	FString HostName;
+	UPROPERTY(Replicated)
+	int32 MapIndex = INDEX_NONE;
 };

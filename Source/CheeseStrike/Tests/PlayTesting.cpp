@@ -144,10 +144,11 @@ namespace PlayTesting
 		Settings->SetRunUnderOneProcess(true);
 		Settings->bLaunchSeparateServer = false;
 		// The host's options ride on the URL the editor plays, as a person's would from the Play menu.
-		GEditor->UserEditedPlayWorldURL = Options.IsEmpty() ? FString() : FString(ShooterLevel) + Options;
+		const FString Level = Session.Level.IsEmpty() ? FString(ShooterLevel) : Session.Level;
+		GEditor->UserEditedPlayWorldURL = Options.IsEmpty() ? FString() : Level + Options;
 		FRequestPlaySessionParams Params;
 		Params.EditorPlaySettings = Settings.Get();
-		Params.GlobalMapOverride = ShooterLevel;
+		Params.GlobalMapOverride = Level;
 		// Asked for on its own, not through the engine's command for it, which waits for the match to have started: a lobby never does.
 		ADD_LATENT_AUTOMATION_COMMAND(FFunctionLatentCommand([Params]()
 		{

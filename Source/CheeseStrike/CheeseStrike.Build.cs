@@ -36,6 +36,7 @@ public class CheeseStrike : ModuleRules
 			"CheeseStrike/Animation",
 			"CheeseStrike/Dev",
 			"CheeseStrike/Input",
+			"CheeseStrike/Map",
 			"CheeseStrike/Movement",
 			"CheeseStrike/Rules",
 			"CheeseStrike/Sessions",
