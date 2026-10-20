@@ -121,8 +121,8 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	float AimBlend = 0.0f;
 
 protected:
-	/** Puts the nodes together, once. */
-	void Link(const FCheeseStrikeAnimSet& Set);
+	/** Puts the nodes together, once: `Set`'s animations, the left hand's grip following `GripAnchor`. */
+	void Link(const FCheeseStrikeAnimSet& Set, FName GripAnchor);
 
 	FAnimNode_SequencePlayer_Standalone Idle;
 	FAnimNode_SequencePlayer_Standalone IdleAiming;
@@ -169,6 +169,11 @@ protected:
 	bool bLinked = false;
 };
 
+/**
+ * The mannequin's body, animated by Lyra's rifle set (FCheeseStrikeAnimProxy);
+ * the first-person arms are always this. Another body is a subclass that
+ * finds the same set retargeted to its skeleton.
+ */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeAnimInstance : public UAnimInstance
 {
@@ -178,6 +183,8 @@ public:
 	UCheeseStrikeAnimInstance();
 
 	const FCheeseStrikeAnimSet& GetSet() const { return Set; }
+	/** The bone the rifle rides, which the left hand's grip follows. */
+	FName GetGripAnchor() const { return GripAnchor; }
 	/** The slot firing and reloading play in. */
 	static FName SlotName() { return FName(TEXT("DefaultSlot")); }
 
@@ -201,7 +208,30 @@ protected:
 	virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;
 	virtual void DestroyAnimInstanceProxy(FAnimInstanceProxy* InProxy) override;
 
+	/**
+	 * Finds the rifle set by its Lyra names: the locomotion in the folder
+	 * `Locomotion`, the aim offsets in `AimOffsets`, firing and reloading
+	 * in `Actions` (package paths ending in '/'). Constructors only.
+	 */
+	void FindSet(const FString& Locomotion, const FString& AimOffsets, const FString& Actions);
+
 	UPROPERTY()
 	FCheeseStrikeAnimSet Set;
+	FName GripAnchor = TEXT("weapon_r");
 	FCheeseStrikeAnimProxy Proxy;
+};
+
+/**
+ * Lt. Belica's body (Paragon: Lt. Belica, Content/LICENSES.md): the same
+ * rifle set, retargeted from the mannequin to her skeleton through Lyra's
+ * UE4-mannequin IK rig. She has no weapon_r bone, so the rifle and the
+ * grip ride her right hand.
+ */
+UCLASS()
+class CHEESESTRIKE_API UCheeseStrikeBelicaAnimInstance : public UCheeseStrikeAnimInstance
+{
+	GENERATED_BODY()
+
+public:
+	UCheeseStrikeBelicaAnimInstance();
 };

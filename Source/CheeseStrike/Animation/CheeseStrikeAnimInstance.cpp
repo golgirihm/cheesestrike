@@ -73,24 +73,38 @@ namespace
 UCheeseStrikeAnimInstance::UCheeseStrikeAnimInstance()
 {
 	// Lyra's rifle set for the mannequin (Content/LICENSES.md).
-	Set.Idle = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Idle_Hipfire.MM_Rifle_Idle_Hipfire"));
-	Set.IdleAiming = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Idle_ADS.MM_Rifle_Idle_ADS"));
-	Set.WalkForward = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Walk_Fwd.MM_Rifle_Walk_Fwd"));
-	Set.WalkBackward = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Walk_Bwd.MM_Rifle_Walk_Bwd"));
-	Set.WalkLeft = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Walk_Left.MM_Rifle_Walk_Left"));
-	Set.WalkRight = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Walk_Right.MM_Rifle_Walk_Right"));
-	Set.JogForward = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Jog_Fwd.MM_Rifle_Jog_Fwd"));
-	Set.JogBackward = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Jog_Bwd.MM_Rifle_Jog_Bwd"));
-	Set.JogLeft = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Jog_Left.MM_Rifle_Jog_Left"));
-	Set.JogRight = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Jog_Right.MM_Rifle_Jog_Right"));
-	Set.CrouchIdle = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Crouch_Idle.MM_Rifle_Crouch_Idle"));
-	Set.CrouchWalk = Find<UBlendSpace>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/BS_MM_Rifle_Crouch_Walk.BS_MM_Rifle_Crouch_Walk"));
-	Set.FallLoop = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Locomotion/Rifle/MM_Rifle_Jump_Fall_Loop.MM_Rifle_Jump_Fall_Loop"));
-	Set.AimHip = Find<UBlendSpace>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/AimOffsets/AO_MM_Rifle_Idle_Hipfire.AO_MM_Rifle_Idle_Hipfire"));
-	Set.AimAiming = Find<UBlendSpace>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/AimOffsets/AO_MM_Rifle_Idle_ADS.AO_MM_Rifle_Idle_ADS"));
-	Set.AimCrouch = Find<UBlendSpace>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/AimOffsets/AO_MM_Rifle_Crouch_Idle.AO_MM_Rifle_Crouch_Idle"));
-	Set.Fire = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Actions/MM_Rifle_Fire.MM_Rifle_Fire"));
-	Set.Reload = Find<UAnimSequence>(TEXT("/Game/Characters/Heroes/Mannequin/Animations/Actions/MM_Rifle_Reload.MM_Rifle_Reload"));
+	const FString Mannequin = TEXT("/Game/Characters/Heroes/Mannequin/Animations/");
+	FindSet(Mannequin + TEXT("Locomotion/Rifle/"), Mannequin + TEXT("AimOffsets/"), Mannequin + TEXT("Actions/"));
+}
+
+UCheeseStrikeBelicaAnimInstance::UCheeseStrikeBelicaAnimInstance()
+{
+	const FString Retargeted = TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Animations/Rifle/");
+	FindSet(Retargeted, Retargeted, Retargeted);
+	GripAnchor = TEXT("hand_r");
+}
+
+void UCheeseStrikeAnimInstance::FindSet(const FString& Locomotion, const FString& AimOffsets, const FString& Actions)
+{
+	const auto Path = [](const FString& Folder, const TCHAR* Name) { return Folder + Name + TEXT(".") + Name; };
+	Set.Idle = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Idle_Hipfire")));
+	Set.IdleAiming = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Idle_ADS")));
+	Set.WalkForward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Fwd")));
+	Set.WalkBackward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Bwd")));
+	Set.WalkLeft = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Left")));
+	Set.WalkRight = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Right")));
+	Set.JogForward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Fwd")));
+	Set.JogBackward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Bwd")));
+	Set.JogLeft = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Left")));
+	Set.JogRight = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Right")));
+	Set.CrouchIdle = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Crouch_Idle")));
+	Set.CrouchWalk = Find<UBlendSpace>(*Path(Locomotion, TEXT("BS_MM_Rifle_Crouch_Walk")));
+	Set.FallLoop = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jump_Fall_Loop")));
+	Set.AimHip = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Idle_Hipfire")));
+	Set.AimAiming = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Idle_ADS")));
+	Set.AimCrouch = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Crouch_Idle")));
+	Set.Fire = Find<UAnimSequence>(*Path(Actions, TEXT("MM_Rifle_Fire")));
+	Set.Reload = Find<UAnimSequence>(*Path(Actions, TEXT("MM_Rifle_Reload")));
 }
 
 FAnimInstanceProxy* UCheeseStrikeAnimInstance::CreateAnimInstanceProxy()
@@ -114,8 +128,9 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	const FVector Velocity = Pawn->GetVelocity();
 	Speed = Velocity.Size2D();
 	Direction = CheeseStrikeAnimation::DirectionOf(Velocity, Pawn->GetActorRotation().Yaw);
-	// Where the player looks, as every machine has it: the controller's for its own, the replicated view pitch for others'.
-	AimPitch = FRotator::NormalizeAxis(Pawn->GetBaseAimRotation().Pitch);
+	// Where the player looks, as every machine has it: the controls' for its own (which the view follows in play, but not
+	// when it is moved outside the body to look at it), the replicated view pitch for others'.
+	AimPitch = FRotator::NormalizeAxis(Pawn->IsLocallyControlled() ? Pawn->GetControlRotation().Pitch : Pawn->GetBaseAimRotation().Pitch);
 	if (const ACheeseStrikeCharacter* Character = Cast<ACheeseStrikeCharacter>(Pawn))
 	{
 		bCrouched = Character->bIsCrouched;
@@ -124,7 +139,7 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 }
 
-void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set)
+void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set, FName GripAnchor)
 {
 	const auto Loop = [](FAnimNode_SequencePlayer_Standalone& Player, UAnimSequence* Sequence)
 	{
@@ -178,7 +193,7 @@ void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set)
 
 	// The left hand keeps its grip on the rifle, which rides the weapon_r bone in the right hand.
 	LeftHand.IKBone = FBoneReference(FName(TEXT("hand_l")));
-	LeftHand.AnchorBone = FBoneReference(FName(TEXT("weapon_r")));
+	LeftHand.AnchorBone = FBoneReference(GripAnchor);
 	LeftHand.bAllowStretching = false;
 	LeftHand.Alpha = 1.0f;
 	ToComponentSpace.LocalPose.SetLinkNode(&Slot);
@@ -194,7 +209,7 @@ void FCheeseStrikeAnimProxy::Initialize(UAnimInstance* InAnimInstance)
 	{
 		if (!bLinked)
 		{
-			Link(Instance->GetSet());
+			Link(Instance->GetSet(), Instance->GetGripAnchor());
 		}
 		ToLocalSpace.Initialize_AnyThread(FAnimationInitializeContext(this));
 	}

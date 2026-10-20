@@ -63,6 +63,15 @@ public:
 	/** Kills the character, from the console, for looking at a death without another player. */
 	UFUNCTION(Exec)
 	void CheeseStrikeDie();
+	/**
+	 * For looking at the body from outside with one player (a second game
+	 * on the same PC renders poorly): puts the view `Distance` cm from the
+	 * character, `Yaw` degrees round from in front, looking at it, and
+	 * shows the body and its rifle as others see them. With no distance,
+	 * the view goes back to the eyes.
+	 */
+	UFUNCTION(Exec)
+	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f);
 
 	/** Handles aim inputs from either controls or UI interfaces: degrees to turn by. */
 	UFUNCTION(BlueprintCallable, Category="Input")
@@ -211,4 +220,8 @@ protected:
 	void ServerStartAt(FVector_NetQuantize At, float Yaw);
 	UFUNCTION(Client, Reliable)
 	void ClientStartAt(FVector_NetQuantize At, float Yaw);
+
+	/** The camera of CheeseStrikeOutside, while it is in use. */
+	UPROPERTY(Transient)
+	TObjectPtr<class ACameraActor> OutsideCamera;
 };

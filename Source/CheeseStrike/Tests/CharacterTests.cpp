@@ -64,7 +64,7 @@ bool FTheCharacterIsSeenFromItsEyes::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
-	TestNotNull(TEXT("the body is the mannequin"), Body->GetSkeletalMeshAsset());
+	TestNotNull(TEXT("the body is Belica"), Body->GetSkeletalMeshAsset());
 	TestNotNull(TEXT("and is animated"), Body->AnimClass.Get());
 	TestTrue(TEXT("which its own player doesn't see"), Body->bOwnerNoSee);
 	TestNotNull(TEXT("the first-person body is the mannequin"), Arms->GetSkeletalMeshAsset());
