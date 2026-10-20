@@ -72,6 +72,8 @@ namespace PlayTests
 	TWeakObjectPtr<ACheeseStrikeCharacter> FirstBody;
 	int32 ShotsBefore = 0;
 	float HeadAbove = 0.0f;
+	/** Where the left hand was on the rifle down the sights, to check it stays there. */
+	FVector LeftHandAimed = FVector::ZeroVector;
 
 	/** How high `Character`'s head bone is above where it stands. */
 	float HeadHeight(const ACheeseStrikeCharacter* Character)
@@ -200,6 +202,7 @@ bool FItFiresAimsAndReloads::RunTest(const FString& Parameters)
 		if (const ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
 		{
 			PlayTests::HeadAbove = PlayTests::HeadHeight(Character);
+			PlayTests::LeftHandAimed = Character->LeftHandOnRifle();
 		}
 	});
 	Play(0, TEXT("release Aim\nlook 0 -50\nwait 0.5"));
@@ -207,6 +210,9 @@ bool FItFiresAimsAndReloads::RunTest(const FString& Parameters)
 	{
 		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
 		{
+			// The left hand keeps its grip on the rifle whatever the aim: where it was down the sights, it is looking down from the hip.
+			const FVector LeftHand = Character->LeftHandOnRifle();
+			TestTrue(FString::Printf(TEXT("the left hand stays on the rifle (%.1f, %.1f, %.1f against %.1f, %.1f, %.1f)"), LeftHand.X, LeftHand.Y, LeftHand.Z, PlayTests::LeftHandAimed.X, PlayTests::LeftHandAimed.Y, PlayTests::LeftHandAimed.Z), FVector::Dist(LeftHand, PlayTests::LeftHandAimed) < 3.0f);
 			// Looking down bends the body down with the aim offset: both bodies know the pitch, and both rifles point down with it.
 			for (const USkeletalMeshComponent* Body : {Character->GetMesh(), Character->GetFirstPersonMesh()})
 			{
@@ -241,6 +247,8 @@ bool FItFiresAimsAndReloads::RunTest(const FString& Parameters)
 			TestFalse(TEXT("and is done in the reload time"), Weapon->IsReloading());
 			TestEqual(TEXT("with the magazine full"), Weapon->GetMagazine(), Weapon->GetStats().MagazineSize);
 			TestEqual(TEXT("from the reserve"), Weapon->GetReserve(), Weapon->GetStats().Reserve - PlayTests::ShotsBefore);
+			const FVector LeftHand = Character->LeftHandOnRifle();
+			TestTrue(FString::Printf(TEXT("and the left hand back on the rifle, looking up (%.1f, %.1f, %.1f)"), LeftHand.X, LeftHand.Y, LeftHand.Z), FVector::Dist(LeftHand, PlayTests::LeftHandAimed) < 3.0f);
 		}
 	});
 	StopPlaying();

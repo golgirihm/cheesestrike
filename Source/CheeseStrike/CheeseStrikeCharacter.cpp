@@ -304,6 +304,16 @@ void ACheeseStrikeCharacter::ClientStartAt_Implementation(FVector_NetQuantize At
 	}
 }
 
+FVector ACheeseStrikeCharacter::LeftHandOnRifle() const
+{
+	const USkeletalMeshComponent* Rifle = HeldWeapon != nullptr ? HeldWeapon->GetFirstPersonMesh() : nullptr;
+	if (Rifle == nullptr || FirstPersonMesh == nullptr)
+	{
+		return FVector::ZeroVector;
+	}
+	return Rifle->GetComponentTransform().InverseTransformPosition(FirstPersonMesh->GetBoneLocation(TEXT("hand_l")));
+}
+
 void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -396,8 +406,10 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 		const FVector View = FirstPersonCameraComponent->GetForwardVector();
 		const FVector Head = GetMesh()->GetBoneLocation(TEXT("head")) - GetMesh()->GetComponentLocation();
 		const UCheeseStrikeAnimInstance* Animation = Cast<UCheeseStrikeAnimInstance>(GetMesh()->GetAnimInstance());
-		UE_LOG(LogCheeseStrike, Display, TEXT("Hands: first-person hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f); body hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f) head (%.0f, %.0f, %.0f) over the feet; view (%.2f, %.2f, %.2f) aim pitch %.0f"),
-			FirstHand.X, FirstHand.Y, FirstHand.Z, FirstRifle.X, FirstRifle.Y, FirstRifle.Z, FirstBarrel.X, FirstBarrel.Y, FirstBarrel.Z,
+		// And where the left hand is on the rifle, in the rifle's own space: it should stay put whatever the aim.
+		const FVector LeftOnRifle = LeftHandOnRifle();
+		UE_LOG(LogCheeseStrike, Display, TEXT("Hands: first-person hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f) left hand on the rifle at (%.1f, %.1f, %.1f); body hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f) head (%.0f, %.0f, %.0f) over the feet; view (%.2f, %.2f, %.2f) aim pitch %.0f"),
+			FirstHand.X, FirstHand.Y, FirstHand.Z, FirstRifle.X, FirstRifle.Y, FirstRifle.Z, FirstBarrel.X, FirstBarrel.Y, FirstBarrel.Z, LeftOnRifle.X, LeftOnRifle.Y, LeftOnRifle.Z,
 			Hand.X, Hand.Y, Hand.Z, Rifle.X, Rifle.Y, Rifle.Z, Barrel.X, Barrel.Y, Barrel.Z, Head.X, Head.Y, Head.Z, View.X, View.Y, View.Z, Animation != nullptr ? Animation->AimPitch : 0.0f);
 	}
 	if (!IsAlive())
