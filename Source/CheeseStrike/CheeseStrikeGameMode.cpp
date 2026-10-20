@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "CheeseStrike.h"
+#include "CheeseStrikeBotController.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
@@ -33,7 +34,63 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	RespawnDelay = CheeseStrikeRules::RespawnDelayFrom(Options);
 	// The match waits in the lobby for the host to start it, unless told not to.
 	bDelayedStart = !CheeseStrikeRules::StartsAtOnce(Options);
-	UE_LOG(LogCheeseStrike, Display, TEXT("Free-for-all to %d kills, back %.1f s after a death%s"), KillLimit, RespawnDelay, bDelayedStart ? TEXT(", waiting in the lobby") : TEXT(""));
+	BotsWanted = CheeseStrikeRules::BotsFrom(Options);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Free-for-all to %d kills, back %.1f s after a death%s, %s bots"), KillLimit, RespawnDelay, bDelayedStart ? TEXT(", waiting in the lobby") : TEXT(""), BotsWanted < 0 ? TEXT("filling in with") : *FString::FromInt(BotsWanted));
+}
+
+void ACheeseStrikeGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+	ACheeseStrikePlayerState* State = NewPlayer != nullptr ? NewPlayer->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+	const ACheeseStrikeGameState* Match = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr || Match == nullptr)
+	{
+		return;
+	}
+	int32 Counts[CheeseStrikeRules::Teams] = {};
+	for (const APlayerState* Each : Match->PlayerArray)
+	{
+		const ACheeseStrikePlayerState* Other = Cast<ACheeseStrikePlayerState>(Each);
+		if (Other != nullptr && Other != State && Other->GetTeam() >= 0 && Other->GetTeam() < CheeseStrikeRules::Teams)
+		{
+			++Counts[Other->GetTeam()];
+		}
+	}
+	State->SetTeam(CheeseStrikeRules::TeamToJoin(Counts));
+}
+
+void ACheeseStrikeGameMode::SpawnBots()
+{
+	ACheeseStrikeGameState* Match = GetGameState<ACheeseStrikeGameState>();
+	UWorld* World = GetWorld();
+	if (Match == nullptr || World == nullptr)
+	{
+		return;
+	}
+	for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
+	{
+		for (const CheeseStrikeRules::FRosterEntry& Entry : Match->TeamColumn(Team))
+		{
+			if (!Entry.bBot)
+			{
+				continue;
+			}
+			FActorSpawnParameters Parameters;
+			Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			ACheeseStrikeBotController* Bot = World->SpawnActor<ACheeseStrikeBotController>(ACheeseStrikeBotController::StaticClass(), FTransform::Identity, Parameters);
+			if (Bot == nullptr)
+			{
+				continue;
+			}
+			if (ACheeseStrikePlayerState* State = Bot->GetPlayerState<ACheeseStrikePlayerState>())
+			{
+				State->SetPlayerName(Entry.Name);
+				State->SetIsABot(true);
+				State->SetTeam(Team);
+			}
+			RestartPlayer(Bot);
+		}
+	}
 }
 
 bool ACheeseStrikeGameMode::IsWaitingToStart() const
@@ -65,6 +122,7 @@ void ACheeseStrikeGameMode::HandleMatchHasStarted()
 	{
 		State->SetCountdownEndsAt(0.0f);
 	}
+	SpawnBots();
 }
 
 void ACheeseStrikeGameMode::HandleMatchHasEnded()
@@ -93,6 +151,8 @@ void ACheeseStrikeGameMode::InitGameState()
 	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 	{
 		State->SetLimits(KillLimit, RespawnDelay);
+		// The bots' names are drawn once, so that the lobby and the match agree on them.
+		State->SetBots(CheeseStrikeRules::BotNames(FMath::Rand(), CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize), BotsWanted);
 	}
 }
 

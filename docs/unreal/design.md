@@ -83,7 +83,7 @@ Friendly fire is off unless the rules say otherwise. An assist goes to anyone el
 
 ## Modes
 
-Up to 16 players, 2 at least (bots fill in). The host picks a mode, a kill limit (5, 10, 20, 30, 50) or point limit, minutes (3, 5, 8, 10, 15), a map, bots and their skill, a sky, and a rules preset. A match has a 5 s countdown, plays to its limit or its time, shows the final standings and a highlight clip, and the lobby votes on the next map.
+Up to 16 players, 2 at least (bots fill in, with cheese names of their own: Gorgon Zola, Camem Bert and company). The two sides are The Gouda Guys and the Mozza Radicals; a newcomer joins the smaller, and the lobby shows both columns filled out with the bots that will stand in. The host picks a mode, a kill limit (5, 10, 20, 30, 50) or point limit, minutes (3, 5, 8, 10, 15), a map, bots and their skill, a sky, and a rules preset. A match has a 5 s countdown, plays to its limit or its time, shows the final standings and a highlight clip, and the lobby votes on the next map.
 
 | Mode | Teams | Wins by | Notes |
 |---|---|---|---|

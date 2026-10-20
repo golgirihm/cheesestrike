@@ -48,6 +48,15 @@ public:
 	/** Server only: when the countdown ends, in the server's time; 0 for none. */
 	void SetCountdownEndsAt(float At) { CountdownEndsAt = At; }
 
+	/** The bots' names the match drew, and how many bots fill in (-1 for every empty slot). */
+	const TArray<FString>& GetBotNames() const { return BotNames; }
+	int32 GetBotsWanted() const { return BotsWanted; }
+	void SetBots(const TArray<FString>& Names, int32 Wanted) { BotNames = Names; BotsWanted = Wanted; }
+	/** The players as roster entries: name, side, and whether a bot. */
+	TArray<CheeseStrikeRules::FRosterEntry> Roster() const;
+	/** Team `Team`'s column in the lobby: its players, then the bots that will fill in. */
+	TArray<CheeseStrikeRules::FRosterEntry> TeamColumn(int32 Team) const;
+
 	/** The scoreboard, in order. */
 	TArray<CheeseStrikeRules::FStanding> Standings() const;
 	/** The most kills anyone has. */
@@ -75,4 +84,8 @@ protected:
 	FString WinnerName;
 	UPROPERTY(Replicated)
 	float CountdownEndsAt = 0.0f;
+	UPROPERTY(Replicated)
+	TArray<FString> BotNames;
+	UPROPERTY(Replicated)
+	int32 BotsWanted = -1;
 };

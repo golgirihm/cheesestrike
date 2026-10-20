@@ -9,6 +9,7 @@
 #include "CheeseStrikePlayerController.generated.h"
 
 class ACameraActor;
+class ACheeseStrikeMenuFigure;
 class UCheeseStrikePlayScript;
 class UInputMappingContext;
 
@@ -101,9 +102,11 @@ protected:
 	/** The script playing the game in place of a person, if -PlayScript named one or a test gave one. */
 	UPROPERTY()
 	TObjectPtr<UCheeseStrikePlayScript> PlayScript;
-	/** The level seen while in the menu. */
+	/** The level seen while in the menu, and the figure in the middle of it. */
 	UPROPERTY()
 	TObjectPtr<ACameraActor> MenuCamera;
+	UPROPERTY()
+	TObjectPtr<ACheeseStrikeMenuFigure> MenuFigure;
 	TSharedPtr<SCheeseStrikeMenu> Menu;
 	EMenuPage ShownPage = EMenuPage::None;
 	EMenuPage ChosenPage = EMenuPage::Main;

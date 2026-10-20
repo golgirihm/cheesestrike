@@ -22,6 +22,7 @@
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
 #include "Sessions/CheeseStrikeSessions.h"
 #include "UI/CheeseStrikeMenu.h"
+#include "UI/CheeseStrikeMenuFigure.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 {
@@ -86,14 +87,10 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 			Menu->Refresh();
 		}
 	}
-	// And the level is watched from the menu camera until the match is on.
+	// And the level is watched from the menu camera, with the figure before it, until the match is on.
 	if (!bStarted)
 	{
 		ShowMenuCamera();
-		if (MenuCamera != nullptr)
-		{
-			MenuCamera->AddActorWorldRotation(FRotator(0.0f, 1.5f * DeltaSeconds, 0.0f));
-		}
 	}
 	else
 	{
@@ -145,19 +142,28 @@ void ACheeseStrikePlayerController::ShowMenuCamera()
 	{
 		return;
 	}
-	// Over the shooter level's open ground, looking along it; turned slowly as the menu is up.
+	// On the shooter level's open ground: the figure on its pedestal in the
+	// middle of the view, the arena behind it, the camera a few metres back
+	// at chest height looking slightly down.
 	FActorSpawnParameters Parameters;
 	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	MenuCamera = GetWorld()->SpawnActor<ACameraActor>(FVector(1150.0f, -1450.0f, 650.0f), FRotator(-28.0f, 117.0f, 0.0f), Parameters);
+	const FVector Pedestal(-231.0f, -500.0f, 2.0f + ACheeseStrikeMenuFigure::PedestalHeight / 2.0f);
+	MenuFigure = GetWorld()->SpawnActor<ACheeseStrikeMenuFigure>(ACheeseStrikeMenuFigure::StaticClass(), Pedestal, FRotator(0.0f, -90.0f, 0.0f), Parameters);
+	MenuCamera = GetWorld()->SpawnActor<ACameraActor>(Pedestal + FVector(0.0f, -470.0f, 110.0f), FRotator(-5.0f, 90.0f, 0.0f), Parameters);
 	if (MenuCamera != nullptr)
 	{
-		MenuCamera->GetCameraComponent()->SetFieldOfView(80.0f);
+		MenuCamera->GetCameraComponent()->SetFieldOfView(60.0f);
 		SetViewTargetWithBlend(MenuCamera, 0.0f);
 	}
 }
 
 void ACheeseStrikePlayerController::HideMenuCamera()
 {
+	if (MenuFigure != nullptr)
+	{
+		MenuFigure->Destroy();
+		MenuFigure = nullptr;
+	}
 	if (MenuCamera == nullptr)
 	{
 		return;
