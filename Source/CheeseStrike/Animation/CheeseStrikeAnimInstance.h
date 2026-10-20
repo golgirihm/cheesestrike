@@ -9,7 +9,7 @@
 #include "Animation/AnimNode_SequencePlayer.h"
 #include "Animation/AnimNodeSpaceConversions.h"
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
-#include "BoneControllers/AnimNode_TwoBoneIK.h"
+#include "CheeseStrikeGripIK.h"
 #include "AnimNodes/AnimNode_MultiWayBlend.h"
 #include "AnimNodes/AnimNode_Slot.h"
 #include "AnimNodes/AnimNode_TwoWayBlend.h"
@@ -91,9 +91,10 @@ struct FCheeseStrikeAnimSet
  * machine's copy of a character: standing, walking and jogging in four
  * directions, crouched still or walking, falling, aimed up and down by the
  * rifle aim offsets (hip, down the sights, crouched), with a slot on top
- * for firing and reloading. The numbers it blends by come from the
- * character each frame (UCheeseStrikeAnimInstance), and the blending runs
- * on the animation thread (FCheeseStrikeAnimProxy).
+ * for firing and reloading, and then the left hand held on the rifle
+ * (FCheeseStrikeGripIK) except while a montage moves it. The numbers it
+ * blends by come from the character each frame (UCheeseStrikeAnimInstance),
+ * and the blending runs on the animation thread (FCheeseStrikeAnimProxy).
  */
 struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 {
@@ -158,20 +159,14 @@ protected:
 	/** Firing and reloading play over everything. */
 	FAnimNode_Slot Slot;
 	/**
-	 * Then the hands are put on the rifle: the animations carry where each
-	 * hand should be as the ik_hand bones, and the arms are bent to reach
-	 * them, elbows kept the way the animation had them.
+	 * Then the left hand is held where it grips the rifle, which rides the
+	 * weapon_r bone, so that the cycles' and the aim offsets' drift never takes
+	 * it off; a montage (the reload) has the hand to itself.
 	 */
 	FAnimNode_ConvertLocalToComponentSpace ToComponentSpace;
-	FAnimNode_TwoBoneIK LeftHand;
-	FAnimNode_TwoBoneIK RightHand;
+	FCheeseStrikeGripIK LeftHand;
 	FAnimNode_ConvertComponentToLocalSpace ToLocalSpace;
 	bool bLinked = false;
-
-public:
-	/** Where each elbow bends towards, in the body's space, from the game thread. */
-	FVector LeftElbowTarget = FVector::ZeroVector;
-	FVector RightElbowTarget = FVector::ZeroVector;
 };
 
 UCLASS()
@@ -199,11 +194,6 @@ public:
 	bool bFalling = false;
 	UPROPERTY(Transient, BlueprintReadOnly, Category="Animation")
 	bool bAiming = false;
-	/** Where each elbow should bend towards, in the body's space: where it was last frame, pushed out from the arm's line. */
-	UPROPERTY(Transient)
-	FVector LeftElbowTarget = FVector::ZeroVector;
-	UPROPERTY(Transient)
-	FVector RightElbowTarget = FVector::ZeroVector;
 
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 

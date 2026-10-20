@@ -1,14 +1,36 @@
-# Looks at the weapon in hand, level and down, and fires, for checking what the player sees of their arms.
+# Looks at the weapon in hand level, down and up, down the sights level and
+# up, and through a reload, for checking what the player sees of their arms.
 wait 2
+state
 shot arms_1_level
 look 0 -50
-wait 0.3
+wait 0.4
+state
 shot arms_2_down
-look 0 50
+look 0 100
+wait 0.4
+state
+shot arms_3_up
+look 0 -50
+hold Aim
+wait 0.6
+state
+shot arms_4_aimed
+look 0 40
+wait 0.4
+shot arms_5_aimed_up
+look 0 -40
+release Aim
+wait 0.4
 hold Fire
 wait 1.2
 release Fire
-state
 wait 0.3
-shot arms_3_fired
+shot arms_6_fired
+tap Reload
+wait 0.9
+shot arms_7_reloading
+wait 1.6
+state
+shot arms_8_reloaded
 quit

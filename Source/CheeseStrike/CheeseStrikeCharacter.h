@@ -119,6 +119,9 @@ public:
 	 */
 	bool TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead);
 
+	/** Where the first-person left hand is in the first-person rifle's own space, for the trace and the tests: it should stay put whatever the aim. */
+	FVector LeftHandOnRifle() const;
+
 	/** Puts it at `At`, facing `Yaw` (on the server), for -StartAt and for tests. */
 	void StartAt(const FVector& At, float Yaw);
 

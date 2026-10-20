@@ -122,20 +122,6 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		bFalling = Character->GetCharacterMovement() != nullptr && Character->GetCharacterMovement()->IsFalling();
 		bAiming = Character->GetWeapon() != nullptr && Character->GetWeapon()->IsAimed();
 	}
-	// Each elbow bends the way the animation last had it: a point beyond the elbow, away from the line from shoulder to hand.
-	if (const USkeletalMeshComponent* Body = GetSkelMeshComponent())
-	{
-		const auto ElbowTarget = [Body](const TCHAR* Shoulder, const TCHAR* Elbow, const TCHAR* Hand)
-		{
-			const FVector S = Body->GetBoneLocation(FName(Shoulder), EBoneSpaces::ComponentSpace);
-			const FVector E = Body->GetBoneLocation(FName(Elbow), EBoneSpaces::ComponentSpace);
-			const FVector H = Body->GetBoneLocation(FName(Hand), EBoneSpaces::ComponentSpace);
-			const FVector Out = (E - (S + H) * 0.5).GetSafeNormal();
-			return E + Out * 50.0;
-		};
-		LeftElbowTarget = ElbowTarget(TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"));
-		RightElbowTarget = ElbowTarget(TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r"));
-	}
 }
 
 void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set)
@@ -190,25 +176,14 @@ void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set)
 	Slot.SlotName = UCheeseStrikeAnimInstance::SlotName();
 	Slot.Source.SetLinkNode(&AimedCrouched);
 
-	// The hands reach the ik_hand bones the animations place on the rifle, taking their turn from them too.
-	const auto Reach = [](FAnimNode_TwoBoneIK& Arm, const TCHAR* Hand, const TCHAR* Target)
-	{
-		Arm.IKBone = FBoneReference(FName(Hand));
-		Arm.EffectorLocationSpace = BCS_BoneSpace;
-		Arm.EffectorTarget.bUseSocket = false;
-		Arm.EffectorTarget.BoneReference = FBoneReference(FName(Target));
-		Arm.EffectorLocation = FVector::ZeroVector;
-		Arm.bTakeRotationFromEffectorSpace = true;
-		Arm.JointTargetLocationSpace = BCS_ComponentSpace;
-		Arm.bAllowStretching = false;
-		Arm.Alpha = 1.0f;
-	};
-	Reach(LeftHand, TEXT("hand_l"), TEXT("ik_hand_l"));
-	Reach(RightHand, TEXT("hand_r"), TEXT("ik_hand_r"));
+	// The left hand keeps its grip on the rifle, which rides the weapon_r bone in the right hand.
+	LeftHand.IKBone = FBoneReference(FName(TEXT("hand_l")));
+	LeftHand.AnchorBone = FBoneReference(FName(TEXT("weapon_r")));
+	LeftHand.bAllowStretching = false;
+	LeftHand.Alpha = 1.0f;
 	ToComponentSpace.LocalPose.SetLinkNode(&Slot);
 	LeftHand.ComponentPose.SetLinkNode(&ToComponentSpace);
-	RightHand.ComponentPose.SetLinkNode(&LeftHand);
-	ToLocalSpace.ComponentPose.SetLinkNode(&RightHand);
+	ToLocalSpace.ComponentPose.SetLinkNode(&LeftHand);
 	bLinked = true;
 }
 
@@ -245,8 +220,6 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		bCrouched = Instance->bCrouched;
 		bFalling = Instance->bFalling;
 		bAiming = Instance->bAiming;
-		LeftElbowTarget = Instance->LeftElbowTarget;
-		RightElbowTarget = Instance->RightElbowTarget;
 	}
 }
 
@@ -286,8 +259,12 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	AimedCrouched.Alpha = CrouchBlend;
 	AimedDownSights.Alpha = (1.0f - CrouchBlend) * AimBlend;
 	AimedFromHip.Alpha = (1.0f - CrouchBlend) * (1.0f - AimBlend);
-	LeftHand.JointTargetLocation = LeftElbowTarget;
-	RightHand.JointTargetLocation = RightElbowTarget;
+	// A montage in the slot (the reload) moves the left hand itself; the grip takes over as it fades.
+	float SlotWeight = 0.0f;
+	float SourceWeight = 1.0f;
+	float TotalWeight = 0.0f;
+	GetSlotWeight(UCheeseStrikeAnimInstance::SlotName(), SlotWeight, SourceWeight, TotalWeight);
+	LeftHand.Alpha = SourceWeight;
 }
 
 void FCheeseStrikeAnimProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)
