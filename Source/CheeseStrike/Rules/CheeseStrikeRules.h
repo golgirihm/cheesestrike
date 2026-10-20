@@ -22,6 +22,15 @@ namespace CheeseStrikeRules
 	/** Seconds a kill stays in the feed, and how many it shows at most. */
 	constexpr float KillFeedLife = 6.0f;
 	constexpr int32 KillFeedLength = 5;
+	/** Seconds from the host starting a match to its first shot, and seconds the results stay up before everyone is back in the lobby. */
+	constexpr float MatchCountdown = 5.0f;
+	constexpr float ResultsTime = 10.0f;
+	/** What a host may pick (docs/unreal/design.md, "Modes"), and what is picked to begin with. */
+	constexpr int32 KillLimitChoices[] = {5, 10, 20, 30, 50};
+	constexpr float RespawnDelayChoices[] = {1.0f, 3.0f, 5.0f};
+
+	/** Whether a match with these URL `Options` begins as soon as there is a player (`?StartNow`), rather than waiting in the lobby for the host. */
+	bool StartsAtOnce(const FString& Options);
 
 	/** One player's line on the scoreboard. */
 	struct FStanding

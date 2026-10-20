@@ -30,6 +30,8 @@ namespace PlayTesting
 		int32 PlayersWanted = 1;
 		/** Players in each world at the start: all of them in one match, or one each apart. */
 		int32 PlayersTogether = 1;
+		/** Whether the match waits in the lobby, with nobody spawned, rather than being on. */
+		bool bLobbyWanted = false;
 
 		/** Waits for a condition, for a reason, up to a limit. */
 		class FWaitUntilCommand : public IAutomationLatentCommand
@@ -88,8 +90,16 @@ namespace PlayTesting
 			const ACheeseStrikeGameState* State = InWorld->GetGameState<ACheeseStrikeGameState>();
 			const ACheeseStrikePlayerController* Local = Cast<ACheeseStrikePlayerController>(InWorld->GetFirstPlayerController());
 			const ACheeseStrikeCharacter* Pawn = Local != nullptr ? Cast<ACheeseStrikeCharacter>(Local->GetPawn()) : nullptr;
-			return State != nullptr && State->HasMatchStarted() && State->PlayerArray.Num() == PlayersTogether
-				&& Pawn != nullptr && Pawn->IsAlive() && Pawn->GetWeapon() != nullptr && Pawn->GetPlayerState() != nullptr;
+			if (State == nullptr || Local == nullptr || State->PlayerArray.Num() != PlayersTogether)
+			{
+				return false;
+			}
+			if (bLobbyWanted)
+			{
+				// In the lobby: the match waits, and nobody has a character.
+				return !State->HasMatchStarted() && Local->PlayerState != nullptr && Pawn == nullptr;
+			}
+			return State->HasMatchStarted() && Pawn != nullptr && Pawn->IsAlive() && Pawn->GetWeapon() != nullptr && Pawn->GetPlayerState() != nullptr;
 		}
 
 		bool EveryoneIsIn()
@@ -106,13 +116,13 @@ namespace PlayTesting
 					return false;
 				}
 			}
-			// And the server has everyone's character.
+			// And the server has everyone's character, or nobody's in the lobby.
 			int32 Characters = 0;
 			for (TActorIterator<ACheeseStrikeCharacter> It(Playing[0]); It; ++It)
 			{
 				++Characters;
 			}
-			return Characters == PlayersTogether;
+			return Characters == (bLobbyWanted ? 0 : PlayersTogether);
 		}
 	}
 
@@ -125,17 +135,26 @@ namespace PlayTesting
 	{
 		PlayersWanted = Session.Players;
 		PlayersTogether = Session.bApart ? 1 : Session.Players;
+		bLobbyWanted = Session.bLobby;
+		// A match starts at once unless the test wants the lobby.
+		const FString Options = Session.bLobby ? Session.Options : Session.Options + TEXT("?StartNow");
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
 		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 		Settings->SetPlayNumberOfClients(Session.Players);
 		Settings->SetRunUnderOneProcess(true);
 		Settings->bLaunchSeparateServer = false;
 		// The host's options ride on the URL the editor plays, as a person's would from the Play menu.
-		GEditor->UserEditedPlayWorldURL = Session.Options.IsEmpty() ? FString() : FString(ShooterLevel) + Session.Options;
+		GEditor->UserEditedPlayWorldURL = Options.IsEmpty() ? FString() : FString(ShooterLevel) + Options;
 		FRequestPlaySessionParams Params;
 		Params.EditorPlaySettings = Settings.Get();
 		Params.GlobalMapOverride = ShooterLevel;
-		ADD_LATENT_AUTOMATION_COMMAND(FStartPIEForAutomationCommand(Params));
+		// Asked for on its own, not through the engine's command for it, which waits for the match to have started: a lobby never does.
+		ADD_LATENT_AUTOMATION_COMMAND(FFunctionLatentCommand([Params]()
+		{
+			GEditor->RequestPlaySession(Params);
+			GEditor->StartQueuedPlaySessionRequest();
+			return true;
+		}));
 		WaitUntil(FString::Printf(TEXT("%d player(s) being in with their weapons"), Session.Players), 90.0f, &EveryoneIsIn);
 		// Nothing is drawn here, and a body that isn't drawn isn't posed; the tests look at the bones, so pose them anyway.
 		Then([]()

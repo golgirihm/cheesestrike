@@ -10,8 +10,18 @@
 #include "CheeseStrike.h"
 #include "Input/CheeseStrikeInput.h"
 #include "Dev/CheeseStrikePlayScript.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "Engine/GameInstance.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "CheeseStrikeGameMode.h"
+#include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
+#include "Sessions/CheeseStrikeSessions.h"
+#include "UI/CheeseStrikeMenu.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 {
@@ -48,9 +58,202 @@ UCheeseStrikePlayScript* ACheeseStrikePlayerController::Play(const FString& Text
 void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (PlayScript != nullptr && GetPawn() != nullptr)
+	if (!IsLocalPlayerController() || GetWorld() == nullptr)
+	{
+		return;
+	}
+	// The script goes on with or without a character: in the lobby it may start the match.
+	if (PlayScript != nullptr)
 	{
 		PlayScript->Advance(DeltaSeconds);
+	}
+	// The menu follows where the match is.
+	const AGameStateBase* State = GetWorld()->GetGameState();
+	const bool bStarted = State != nullptr && State->HasMatchStarted();
+	const bool bEnded = State != nullptr && State->HasMatchEnded();
+	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch(), bPaused, ChosenPage);
+	if (Wanted != ShownPage)
+	{
+		ShowMenu(Wanted);
+	}
+	else if (Menu.IsValid() && (Wanted == EMenuPage::Lobby || Wanted == EMenuPage::Find))
+	{
+		// These pages show things that change.
+		SinceMenuRefresh += DeltaSeconds;
+		if (SinceMenuRefresh >= CheeseStrikeMenu::RefreshEvery)
+		{
+			SinceMenuRefresh = 0.0f;
+			Menu->Refresh();
+		}
+	}
+	// And the level is watched from the menu camera until the match is on.
+	if (!bStarted)
+	{
+		ShowMenuCamera();
+		if (MenuCamera != nullptr)
+		{
+			MenuCamera->AddActorWorldRotation(FRotator(0.0f, 1.5f * DeltaSeconds, 0.0f));
+		}
+	}
+	else
+	{
+		HideMenuCamera();
+	}
+}
+
+bool ACheeseStrikePlayerController::IsInAMatch() const
+{
+	return GetWorld() != nullptr && GetWorld()->GetNetMode() != NM_Standalone;
+}
+
+void ACheeseStrikePlayerController::ShowMenu(EMenuPage Page)
+{
+	ShownPage = Page;
+	SinceMenuRefresh = 0.0f;
+	UGameViewportClient* Viewport = GetWorld() != nullptr && GetWorld()->GetGameViewport() != nullptr ? GetWorld()->GetGameViewport() : nullptr;
+	if (Page == EMenuPage::None)
+	{
+		if (Menu.IsValid() && Viewport != nullptr)
+		{
+			Viewport->RemoveViewportWidgetForPlayer(GetLocalPlayer(), Menu.ToSharedRef());
+		}
+		Menu.Reset();
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+		return;
+	}
+	if (!Menu.IsValid())
+	{
+		Menu = SNew(SCheeseStrikeMenu).Controller(this);
+		if (Viewport != nullptr)
+		{
+			Viewport->AddViewportWidgetForPlayer(GetLocalPlayer(), Menu.ToSharedRef(), 100);
+		}
+	}
+	Menu->Show(Page);
+	FInputModeGameAndUI Mode;
+	Mode.SetWidgetToFocus(Menu);
+	Mode.SetHideCursorDuringCapture(false);
+	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(Mode);
+	SetShowMouseCursor(true);
+}
+
+void ACheeseStrikePlayerController::ShowMenuCamera()
+{
+	if (MenuCamera != nullptr || GetWorld() == nullptr)
+	{
+		return;
+	}
+	// Over the shooter level's open ground, looking along it; turned slowly as the menu is up.
+	FActorSpawnParameters Parameters;
+	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	MenuCamera = GetWorld()->SpawnActor<ACameraActor>(FVector(1150.0f, -1450.0f, 650.0f), FRotator(-28.0f, 117.0f, 0.0f), Parameters);
+	if (MenuCamera != nullptr)
+	{
+		MenuCamera->GetCameraComponent()->SetFieldOfView(80.0f);
+		SetViewTargetWithBlend(MenuCamera, 0.0f);
+	}
+}
+
+void ACheeseStrikePlayerController::HideMenuCamera()
+{
+	if (MenuCamera == nullptr)
+	{
+		return;
+	}
+	if (GetPawn() != nullptr)
+	{
+		SetViewTargetWithBlend(GetPawn(), 0.0f);
+	}
+	MenuCamera->Destroy();
+	MenuCamera = nullptr;
+}
+
+void ACheeseStrikePlayerController::ChooseMenu(EMenuPage Page)
+{
+	ChosenPage = Page;
+	if (Page == EMenuPage::Find)
+	{
+		FindFromMenu();
+	}
+}
+
+void ACheeseStrikePlayerController::PlayAlone()
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->AskToStart(true);
+	}
+}
+
+void ACheeseStrikePlayerController::HostFromMenu(int32 KillLimit, float RespawnDelay)
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->Host(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f"), KillLimit, RespawnDelay), Sessions->ServiceName() != TEXT("STEAM"));
+	}
+}
+
+void ACheeseStrikePlayerController::FindFromMenu()
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->Find(Sessions->ServiceName() != TEXT("STEAM"));
+	}
+}
+
+void ACheeseStrikePlayerController::StartMatchFromMenu()
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->AskToStart(false);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeStart(const FString& AtOnce)
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->AskToStart(!AtOnce.IsEmpty());
+	}
+}
+
+void ACheeseStrikePlayerController::LeaveFromMenu()
+{
+	bPaused = false;
+	ChosenPage = EMenuPage::Main;
+	UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>();
+	if (Sessions != nullptr && Sessions->IsInAMatch())
+	{
+		Sessions->Leave();
+	}
+	else
+	{
+		ClientTravel(CheeseStrikeSessions::Level, TRAVEL_Absolute);
+	}
+}
+
+void ACheeseStrikePlayerController::QuitFromMenu()
+{
+	UKismetSystemLibrary::QuitGame(this, this, EQuitPreference::Quit, false);
+}
+
+void ACheeseStrikePlayerController::TogglePause()
+{
+	bPaused = !bPaused;
+}
+
+void ACheeseStrikePlayerController::MenuPressed()
+{
+	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
+	if (State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded())
+	{
+		TogglePause();
+	}
+	else if (ChosenPage != EMenuPage::Main)
+	{
+		ChosenPage = EMenuPage::Main;
 	}
 }
 
@@ -76,6 +279,7 @@ void ACheeseStrikePlayerController::SetupInputComponent()
 		{
 			EnhancedInput->BindAction(Input->Scoreboard, ETriggerEvent::Started, this, &ACheeseStrikePlayerController::ScoreboardStarted);
 			EnhancedInput->BindAction(Input->Scoreboard, ETriggerEvent::Completed, this, &ACheeseStrikePlayerController::ScoreboardEnded);
+			EnhancedInput->BindAction(Input->Menu, ETriggerEvent::Started, this, &ACheeseStrikePlayerController::MenuPressed);
 		}
 	}
 	else

@@ -31,7 +31,47 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	Super::InitGame(MapName, Options, ErrorMessage);
 	KillLimit = CheeseStrikeRules::KillLimitFrom(Options);
 	RespawnDelay = CheeseStrikeRules::RespawnDelayFrom(Options);
-	UE_LOG(LogCheeseStrike, Display, TEXT("Free-for-all to %d kills, back %.1f s after a death"), KillLimit, RespawnDelay);
+	// The match waits in the lobby for the host to start it, unless told not to.
+	bDelayedStart = !CheeseStrikeRules::StartsAtOnce(Options);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Free-for-all to %d kills, back %.1f s after a death%s"), KillLimit, RespawnDelay, bDelayedStart ? TEXT(", waiting in the lobby") : TEXT(""));
+}
+
+bool ACheeseStrikeGameMode::IsWaitingToStart() const
+{
+	return GetMatchState() == MatchState::WaitingToStart;
+}
+
+void ACheeseStrikeGameMode::AskToStart(bool bAtOnce)
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (!IsWaitingToStart() || State == nullptr || State->IsCountingDown())
+	{
+		return;
+	}
+	if (bAtOnce)
+	{
+		StartMatch();
+		return;
+	}
+	State->SetCountdownEndsAt(State->GetServerWorldTimeSeconds() + CheeseStrikeRules::MatchCountdown);
+	UE_LOG(LogCheeseStrike, Display, TEXT("The match starts in %.0f s"), CheeseStrikeRules::MatchCountdown);
+	GetWorldTimerManager().SetTimer(CountdownTimer, this, &AGameMode::StartMatch, CheeseStrikeRules::MatchCountdown, false);
+}
+
+void ACheeseStrikeGameMode::HandleMatchHasStarted()
+{
+	Super::HandleMatchHasStarted();
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetCountdownEndsAt(0.0f);
+	}
+}
+
+void ACheeseStrikeGameMode::HandleMatchHasEnded()
+{
+	Super::HandleMatchHasEnded();
+	// The results stay up a while; then the level is played again from the lobby, the session kept.
+	GetWorldTimerManager().SetTimer(ResultsTimer, this, &AGameMode::RestartGame, CheeseStrikeRules::ResultsTime, false);
 }
 
 FString ACheeseStrikeGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)

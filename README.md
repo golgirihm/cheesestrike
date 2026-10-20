@@ -36,7 +36,7 @@ Open `CheeseStrike.uproject` to build and open the editor; it asks to build the 
 
 The editor opens on the shooter level. Play it with Play in Editor. To try two players on one PC, set the number of players to 2 and the net mode to "Play As Listen Server" in the Play menu's options.
 
-To play over Steam, run the game outside the editor (`UnrealEditor.exe <path to CheeseStrike.uproject> -game`) with the Steam client running; it uses Steam's public test app until the game has its own. In the console (the ` key), `CheeseStrikeHost` offers a match (`CheeseStrikeHost ?KillLimit=10` sets its rules), `CheeseStrikeFind` lists this game's matches, `CheeseStrikeJoin 1` joins the first, and `CheeseStrikeLeave` leaves; Join Game in the Steam friends list works too. Two PCs with two Steam accounts are needed: a second game on the same account can't see the first's match.
+The game opens on the front end over the level: Play Alone, Host a Match (pick the kill limit and the respawn delay; hosting leads to a lobby where the host starts the match once everyone is in), Find a Match, Quit; Escape pauses. To play over Steam, run the game outside the editor (`UnrealEditor.exe <path to CheeseStrike.uproject> -game`) with the Steam client running; it uses Steam's public test app until the game has its own, and Join Game in the Steam friends list works too. Two PCs with two Steam accounts are needed: a second game on the same account can't see the first's match. The console (the ` key) has the same in commands: `CheeseStrikeHost ?KillLimit=10`, `CheeseStrikeFind`, `CheeseStrikeJoin 1`, `CheeseStrikeStart`, `CheeseStrikeLeave`.
 
 ## Tests
 

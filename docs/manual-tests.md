@@ -37,6 +37,18 @@ Setup: Play in Editor as a listen server with two players (PRJ-03). Why manual: 
 | KIL-03 | The scoreboard | 1. Hold Tab in each window, during play and after a kill. | A panel in the middle names the match, "first to N kills", and lists both players with their kills and deaths, the leader first, while Tab is held, and goes when it is let go. |
 | KIL-04 | The match ends | 1. Host with `?KillLimit=2` on the map's URL (in the Play menu's options, or from the command line), and have A score two kills. | At the second kill the scoreboard stays up in both windows, headed "<A> WINS", and nobody can move, fire or come back. |
 
+## Menus
+
+Setup: the game run outside the editor (`UnrealEditor.exe <project> -game`), so that it opens on the front end; Play in Editor opens on it too. Why manual: how the menus look, read and feel with the mouse, the keyboard and a gamepad.
+
+| ID | Test | Steps | Expected |
+|---|---|---|---|
+| MNU-01 | The front end | 1. Start the game and wait.<br>2. Move the mouse over the buttons; press Tab and Enter; press Escape. | The level is seen from above, turning slowly, with a dark panel on the left: the game's name, Play Alone, Host a Match, Find a Match, Quit, and a line saying whether matches go through Steam. The mouse is visible and buttons light under it; Tab moves between them and Enter presses; Escape on a sub-page goes back to this one. |
+| MNU-02 | Playing alone | 1. Press Play Alone. | The menu goes, the mouse hides, and the player is in the level at once with the rifle, as before. |
+| MNU-03 | Hosting | 1. From the front end press Host a Match, pick 5 kills and 1 s, press Host.<br>2. On a second PC press Find a Match, then the match in the list.<br>3. On the host press Start the Match. | The host page shows the kill limits (5, 10, 20, 30, 50) and respawn delays (1, 3, 5 s) with the chosen ones lit. Hosting reloads the level into the lobby: a panel naming the rules, who is here, and for the host a Start button; the joiner's lobby lists both and says it waits for the host. Start shows "Starting in 5" counting down on both, then both are in the match with the menus gone. |
+| MNU-04 | Pausing | 1. In a match press Escape; move and look; press Resume.<br>2. Press Escape, then Leave the Match. | Escape brings the pause menu over the view with the mouse; the match goes on behind it. Resume hides it. Leave puts the player back on the level alone with the front end up; on the host's scoreboard the leaver is gone. |
+| MNU-05 | After the results | 1. Host to 5 kills with a second player and play the match out.<br>2. Wait ten seconds after the winner's board. | The level reloads with both players back in the lobby of the same match, with the same rules, the host able to start again. |
+
 ## Steam
 
 Setup: two PCs, each with the Steam client running and signed in to a different account, and the two accounts friends; the game started with `-game` on each (`UnrealEditor.exe <project> -game`, or a packaged build), since the editor's own play never uses Steam. Commands are typed into the console (the ` key). Why manual: the automated test does this over the Null service in one process; Steam itself, two accounts and the overlay need two machines.

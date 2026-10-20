@@ -33,6 +33,20 @@ public:
 	/** `Victim` has been killed by `Killer` (null for nobody), on the head or not. */
 	void Killed(ACheeseStrikeCharacter* Killer, ACheeseStrikeCharacter* Victim, bool bHead);
 
+	/**
+	 * Starts the match from the lobby: at once, or after the design's
+	 * countdown so that everyone sees it coming. Nothing if the match isn't
+	 * waiting or is counting down already. A match hosted with `?StartNow`
+	 * on its URL never waits.
+	 */
+	void AskToStart(bool bAtOnce);
+	/** Whether the match is waiting in the lobby for the host. */
+	bool IsWaitingToStart() const;
+
+	virtual void HandleMatchHasStarted() override;
+	/** The results stay up a while, then everyone is back in the lobby. */
+	virtual void HandleMatchHasEnded() override;
+
 	/** Where `Player` comes back: the start furthest from every living enemy. */
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	/** Every spawn chooses afresh, rather than reusing the first. */
@@ -48,4 +62,6 @@ protected:
 
 	int32 KillLimit;
 	float RespawnDelay;
+	FTimerHandle CountdownTimer;
+	FTimerHandle ResultsTimer;
 };

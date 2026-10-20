@@ -68,4 +68,9 @@ namespace CheeseStrikeRules
 	{
 		return FMath::Clamp(Option(Options, TEXT("RespawnDelay"), RespawnDelay), 0.5f, 15.0f);
 	}
+
+	bool StartsAtOnce(const FString& Options)
+	{
+		return UGameplayStatics::HasOption(Options, TEXT("StartNow"));
+	}
 }

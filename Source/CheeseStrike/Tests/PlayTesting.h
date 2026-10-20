@@ -37,6 +37,8 @@ namespace PlayTesting
 		int32 Players = 1;
 		FString Options;
 		bool bApart = false;
+		/** Whether the match waits in the lobby, as a hosted one does; otherwise it starts at once (`?StartNow`). */
+		bool bLobby = false;
 	};
 
 	/** Queues: start playing as `Session` says, and wait until every player is in, with a character that has its weapon. */

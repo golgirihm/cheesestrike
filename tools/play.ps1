@@ -31,8 +31,12 @@ param(
   [int]$ClientDelay = 25,
   [switch]$Window,
   [switch]$Steam,
+  [switch]$Lobby,
   [int]$TimeoutSeconds = 180
 )
+# The match starts at once (?StartNow), so that a script finds a character
+# to drive; with -Lobby it waits in the lobby instead, as a hosted match
+# does, for a script to start it (cmd CheeseStrikeStart).
 # Without -Steam the game runs on the Null online service, so that a run on
 # this PC neither needs the Steam client nor shows up as a match on it; with
 # it, the Steam client must be running, and the scripts can host, find and
@@ -57,6 +61,7 @@ function Summarise($tag) {
 }
 $pair = $ClientScript -ne ""
 $serverExtra = if ($pair -and $Extra -eq "") { "?listen" } else { $Extra }
+if (-not $Lobby) { $serverExtra = "${serverExtra}?StartNow" }
 $game = Launch "${Map}${serverExtra}?Nick=${Name}" $Script $Tag $StartAt 0
 $client = $null
 if ($pair) {
