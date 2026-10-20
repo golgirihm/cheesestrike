@@ -177,6 +177,14 @@ protected:
 	FHitHistory HitHistory;
 	/** The usual field of view, to come back to after aiming down the sights. */
 	float BaseFieldOfView = 90.0f;
+	/** How far the view has come from the head to the rifle's sights, 0 to 1. */
+	float AimFraction = 0.0f;
+	/** Where the eye sits to look through the sights, from the rifle's bounds: so far forward of its back end, so far above its top (the rifle points a little under the view, so the eye sits a little under the top), so far to the left of its middle. */
+	static constexpr float SightEyeDistance = 14.0f;
+	static constexpr float SightEyeHeight = -1.0f;
+	static constexpr float SightEyeSide = -1.5f;
+	/** The camera's place on the first-person body's head, as the template had it. */
+	static const FVector CameraAtHead;
 	/** Seconds since the state was last traced to the log. */
 	float SinceTrace = 0.0f;
 	/** Whether -StartAt has been applied. */

@@ -40,7 +40,7 @@ namespace CheeseStrikeMenu
 namespace
 {
 	const FLinearColor Ink(0.92f, 0.9f, 0.86f);
-	const FLinearColor Dim(0.6f, 0.58f, 0.55f);
+	const FLinearColor Muted(0.6f, 0.58f, 0.55f);
 	const FLinearColor Cheese(0.96f, 0.72f, 0.2f);
 	const FLinearColor PanelColour(0.04f, 0.04f, 0.045f, 0.82f);
 
@@ -150,7 +150,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeTitle(const FString& Text)
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim)
 {
-	return SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(16)).ColorAndOpacity(bDim ? Dim : Ink).Margin(FMargin(0.0f, 4.0f)).AutoWrapText(true);
+	return SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(16)).ColorAndOpacity(bDim ? Muted : Ink).Margin(FMargin(0.0f, 4.0f)).AutoWrapText(true);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeButton(const FString& Text, TFunction<void()> Do, bool bChosen)
@@ -275,11 +275,11 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeTeamColumn(int32 Team)
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
-					SNew(STextBlock).Text(FText::FromString(Entry.Name)).Font(Font(17, Entry.bBot ? FName("Regular") : FName("Bold"))).ColorAndOpacity(Entry.bBot ? Dim : Ink)
+					SNew(STextBlock).Text(FText::FromString(Entry.Name)).Font(Font(17, Entry.bBot ? FName("Regular") : FName("Bold"))).ColorAndOpacity(Entry.bBot ? Muted : Ink)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
 				[
-					SNew(STextBlock).Text(FText::FromString(Entry.bBot ? TEXT("bot") : TEXT(""))).Font(Font(12)).ColorAndOpacity(Dim)
+					SNew(STextBlock).Text(FText::FromString(Entry.bBot ? TEXT("bot") : TEXT(""))).Font(Font(12)).ColorAndOpacity(Muted)
 				]
 			];
 		}

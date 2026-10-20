@@ -83,13 +83,16 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	const float Height = Canvas->SizeY;
 	const FVector2D Middle(Width / 2.0f, Height / 2.0f);
 
-	// The crosshair: four lines, as far apart as the weapon's spread, and no closer than the least gap.
+	// The crosshair: four lines, as far apart as the weapon's spread, and no closer than the least gap; down the sights, the sights are the crosshair.
 	const float Spread = Weapon != nullptr ? Weapon->CurrentSpread() : 0.0f;
 	const float Gap = CrosshairGap + PixelsForDegrees(Spread, FieldOfView, Width);
-	DrawLine(Middle.X - Gap - CrosshairLength, Middle.Y, Middle.X - Gap, Middle.Y, White, CrosshairThickness);
-	DrawLine(Middle.X + Gap, Middle.Y, Middle.X + Gap + CrosshairLength, Middle.Y, White, CrosshairThickness);
-	DrawLine(Middle.X, Middle.Y - Gap - CrosshairLength, Middle.X, Middle.Y - Gap, White, CrosshairThickness);
-	DrawLine(Middle.X, Middle.Y + Gap, Middle.X, Middle.Y + Gap + CrosshairLength, White, CrosshairThickness);
+	if (Weapon == nullptr || !Weapon->IsAimed())
+	{
+		DrawLine(Middle.X - Gap - CrosshairLength, Middle.Y, Middle.X - Gap, Middle.Y, White, CrosshairThickness);
+		DrawLine(Middle.X + Gap, Middle.Y, Middle.X + Gap + CrosshairLength, Middle.Y, White, CrosshairThickness);
+		DrawLine(Middle.X, Middle.Y - Gap - CrosshairLength, Middle.X, Middle.Y - Gap, White, CrosshairThickness);
+		DrawLine(Middle.X, Middle.Y + Gap, Middle.X, Middle.Y + Gap + CrosshairLength, White, CrosshairThickness);
+	}
 
 	// A hit: four diagonal ticks, longer and yellow for the head.
 	if (Weapon != nullptr && Weapon->SinceHit() < HitMarkLife)

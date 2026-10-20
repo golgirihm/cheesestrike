@@ -31,6 +31,8 @@
 /** With this on, every character writes its state to the log four times a second, for watching a run from outside. */
 static TAutoConsoleVariable<int32> CVarTraceState(TEXT("CheeseStrike.TraceState"), 0, TEXT("Log each character's state four times a second."));
 
+const FVector ACheeseStrikeCharacter::CameraAtHead(-2.8f, 5.89f, 0.0f);
+
 ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UCheeseStrikeMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
@@ -71,7 +73,7 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	// crouching lowers that body, and the camera with it.
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("First Person Camera"));
 	FirstPersonCameraComponent->SetupAttachment(FirstPersonMesh, FName("head"));
-	FirstPersonCameraComponent->SetRelativeLocationAndRotation(FVector(-2.8f, 5.89f, 0.0f), FRotator(0.0f, 90.0f, -90.0f));
+	FirstPersonCameraComponent->SetRelativeLocationAndRotation(CameraAtHead, FRotator(0.0f, 90.0f, -90.0f));
 	FirstPersonCameraComponent->bUsePawnControlRotation = true;
 	// The first-person body is drawn at a narrower field of view than the
 	// world, which keeps a rifle this close from stretching; it isn't shrunk
@@ -305,10 +307,23 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	{
 		HitHistory.Add(SampleNow(GetWorld()->GetGameState()->GetServerWorldTimeSeconds()));
 	}
-	// Aiming down the sights narrows the view, smoothly.
+	// Aiming down the sights narrows the view, smoothly, and brings the eye
+	// from the head to the rifle's sight line: a point behind the rifle's
+	// back end and just above its top, found in the head's own space so
+	// that the camera, which rides the head, lands there.
 	const bool bAimed = HeldWeapon != nullptr && HeldWeapon->IsAimed();
 	const float WantedFieldOfView = BaseFieldOfView * (bAimed ? CheeseStrikeWeapons::Blaster().AimZoom : 1.0f);
 	FirstPersonCameraComponent->SetFieldOfView(FMath::FInterpTo(FirstPersonCameraComponent->FieldOfView, WantedFieldOfView, DeltaSeconds, 12.0f));
+	AimFraction = FMath::FInterpTo(AimFraction, bAimed ? 1.0f : 0.0f, DeltaSeconds, 12.0f);
+	const USkeletalMeshComponent* Rifle = HeldWeapon != nullptr ? HeldWeapon->GetFirstPersonMesh() : nullptr;
+	if (IsAlive() && Rifle != nullptr && Rifle->GetSkeletalMeshAsset() != nullptr && IsLocallyControlled())
+	{
+		const FBoxSphereBounds Bounds = Rifle->GetSkeletalMeshAsset()->GetBounds();
+		const FVector SightOnRifle(Bounds.Origin.X + SightEyeSide, Bounds.Origin.Y - Bounds.BoxExtent.Y + SightEyeDistance, Bounds.Origin.Z + Bounds.BoxExtent.Z + SightEyeHeight);
+		const FVector SightInWorld = Rifle->GetComponentTransform().TransformPosition(SightOnRifle);
+		const FVector SightAtHead = FirstPersonMesh->GetSocketTransform(FName("head")).InverseTransformPosition(SightInWorld);
+		FirstPersonCameraComponent->SetRelativeLocation(FMath::Lerp(CameraAtHead, SightAtHead, AimFraction));
+	}
 	// Traced with the console variable, or with -TraceState on the command line.
 	static const bool bTraceSwitch = FParse::Param(FCommandLine::Get(), TEXT("TraceState"));
 	if ((bTraceSwitch || CVarTraceState.GetValueOnGameThread() != 0) && GetWorld() != nullptr)
