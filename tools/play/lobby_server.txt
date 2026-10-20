@@ -1,0 +1,18 @@
+# Hosts with the lobby: waits for the joiner, looks at the lobby, starts the
+# match from it, and pauses once in it. Run with tools/play.ps1 -Lobby.
+wait 32
+shot lobby_1_host
+cmd CheeseStrikeStart
+wait 2
+shot lobby_2_countdown
+wait 5
+state
+shot lobby_3_started
+tap Menu
+wait 0.5
+shot lobby_4_paused
+tap Menu
+wait 3
+log lobby host done
+wait 1
+quit

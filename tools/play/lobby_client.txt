@@ -1,0 +1,10 @@
+# Joins a hosted lobby and waits for the host to start.
+wait 3
+shot lobby_client_1_waiting
+wait 8
+shot lobby_client_2_countdown
+wait 6
+state
+shot lobby_client_3_started
+wait 2
+quit

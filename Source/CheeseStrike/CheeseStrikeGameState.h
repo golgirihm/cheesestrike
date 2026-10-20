@@ -42,6 +42,11 @@ public:
 	const TArray<FKillFeedEntry>& GetKillFeed() const { return KillFeed; }
 	/** Who won, once the match is over; empty before. */
 	const FString& GetWinnerName() const { return WinnerName; }
+	/** Whether the host has started the match and it is counting down, and how long is left. */
+	bool IsCountingDown() const { return CountdownEndsAt > 0.0f; }
+	float SecondsToStart() const { return IsCountingDown() ? FMath::Max(0.0f, CountdownEndsAt - static_cast<float>(GetServerWorldTimeSeconds())) : 0.0f; }
+	/** Server only: when the countdown ends, in the server's time; 0 for none. */
+	void SetCountdownEndsAt(float At) { CountdownEndsAt = At; }
 
 	/** The scoreboard, in order. */
 	TArray<CheeseStrikeRules::FStanding> Standings() const;
@@ -68,4 +73,6 @@ protected:
 	TArray<FKillFeedEntry> KillFeed;
 	UPROPERTY(Replicated)
 	FString WinnerName;
+	UPROPERTY(Replicated)
+	float CountdownEndsAt = 0.0f;
 };

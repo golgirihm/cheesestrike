@@ -16,6 +16,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
 #include "CheeseStrikeCharacter.h"
+#include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
@@ -377,7 +378,7 @@ bool FAJoinerFindsAndJoinsTheHostsMatch::RunTest(const FString& Parameters)
 		if (TestNotNull(TEXT("the host has the session subsystem"), Host))
 		{
 			TestFalse(TEXT("and no match yet"), Host->IsInAMatch());
-			Host->Host(TEXT("?KillLimit=3"), true);
+			Host->Host(TEXT("?KillLimit=3?StartNow"), true);
 		}
 	});
 	WaitUntil(TEXT("the host listening on the level"), 30.0f, []()
@@ -426,6 +427,60 @@ bool FAJoinerFindsAndJoinsTheHostsMatch::RunTest(const FString& Parameters)
 		TestEqual(TEXT("the joiner plays by the host's rules"), GameState(1)->GetKillLimit(), 3);
 		TestTrue(TEXT("and is in the match"), World(1)->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>()->IsInAMatch());
 		TestNotNull(TEXT("the host sees the joiner"), CharacterOf(1, 0));
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAMatchWaitsInTheLobbyAndComesBackToIt, "CheeseStrike.Play.AMatchWaitsInTheLobbyAndComesBackToIt", PlayTests::Flags)
+
+bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	// A host and a joiner in the lobby of a match to one kill.
+	StartPlaying({2, TEXT("?KillLimit=1?RespawnDelay=1"), false, true});
+	Then([this]()
+	{
+		for (int32 Player = 0; Player < 2; ++Player)
+		{
+			TestNull(TEXT("nobody has a character in the lobby"), Character(Player));
+			TestTrue(TEXT("and the menu shows the lobby"), Controller(Player) != nullptr && Controller(Player)->GetMenuPage() == EMenuPage::Lobby);
+		}
+		if (ACheeseStrikeGameMode* Mode = World(0)->GetAuthGameMode<ACheeseStrikeGameMode>())
+		{
+			TestTrue(TEXT("the match waits for the host"), Mode->IsWaitingToStart());
+			Mode->AskToStart(false);
+			TestTrue(TEXT("who starts the countdown"), GameState(0)->IsCountingDown());
+			TestTrue(FString::Printf(TEXT("of the design's length (%.1f)"), GameState(0)->SecondsToStart()), GameState(0)->SecondsToStart() > CheeseStrikeRules::MatchCountdown - 1.0f);
+		}
+	});
+	WaitUntil(TEXT("the joiner seeing the countdown"), 3.0f, []() { return GameState(1) != nullptr && GameState(1)->IsCountingDown(); });
+	WaitUntil(TEXT("the match starting with everyone in it"), CheeseStrikeRules::MatchCountdown + 10.0f, []()
+	{
+		return GameState(0) != nullptr && GameState(0)->HasMatchStarted() && Character(0) != nullptr && Character(1) != nullptr && Character(1)->GetWeapon() != nullptr;
+	});
+	Then([this]()
+	{
+		TestFalse(TEXT("the countdown is over"), GameState(0)->IsCountingDown());
+	});
+	WaitUntil(TEXT("the menus going"), 3.0f, []() { return Controller(0) != nullptr && Controller(1) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::None && Controller(1)->GetMenuPage() == EMenuPage::None; });
+	// The joiner wins, and after the results everyone is back in the lobby of the same match.
+	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
+	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
+	Wait(CheeseStrikeRules::SpawnProtection);
+	Play(1, TEXT("hold Fire\nwait 1.2\nrelease Fire"));
+	WaitUntil(TEXT("the match ending"), 6.0f, []() { return GameState(0) != nullptr && GameState(0)->HasMatchEnded(); });
+	WaitUntil(TEXT("everyone being back in the lobby"), CheeseStrikeRules::ResultsTime + 15.0f, []()
+	{
+		const ACheeseStrikeGameState* Hosts = GameState(0);
+		const ACheeseStrikeGameState* Joiners = GameState(1);
+		return Hosts != nullptr && !Hosts->HasMatchStarted() && Hosts->PlayerArray.Num() == 2 && Character(0) == nullptr
+			&& Joiners != nullptr && !Joiners->HasMatchStarted() && Joiners->PlayerArray.Num() == 2 && Character(1) == nullptr;
+	});
+	Then([this]()
+	{
+		TestEqual(TEXT("with the same rules"), GameState(0)->GetKillLimit(), 1);
+		TestTrue(TEXT("and the lobby up again"), Controller(1)->GetMenuPage() == EMenuPage::Lobby);
 	});
 	StopPlaying();
 	return true;

@@ -19,6 +19,7 @@ public class CheeseStrike : ModuleRules
 			"GameplayStateTreeModule",
 			"UMG",
 			"Slate",
+			"SlateCore",
 			"AnimGraphRuntime"
 		});
 

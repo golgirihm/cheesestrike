@@ -10,6 +10,7 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeGameState, KillLimit);
 	DOREPLIFETIME(ACheeseStrikeGameState, RespawnDelay);
 	DOREPLIFETIME(ACheeseStrikeGameState, WinnerName);
+	DOREPLIFETIME(ACheeseStrikeGameState, CountdownEndsAt);
 }
 
 TArray<CheeseStrikeRules::FStanding> ACheeseStrikeGameState::Standings() const

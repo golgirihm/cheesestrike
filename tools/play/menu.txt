@@ -1,0 +1,9 @@
+# Looks at the front end over the level, then starts the match from it: run
+# with tools/play.ps1 -Lobby.
+wait 3
+shot menu_1_main
+cmd CheeseStrikeStart now
+wait 2
+shot menu_2_playing
+state
+quit

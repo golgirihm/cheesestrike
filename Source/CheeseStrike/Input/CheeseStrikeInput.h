@@ -74,6 +74,9 @@ public:
 	/** Shows the scoreboard while held. */
 	UPROPERTY()
 	TObjectPtr<UInputAction> Scoreboard;
+	/** Opens and closes the menu: the pause menu in a match, back out of a page otherwise. */
+	UPROPERTY()
+	TObjectPtr<UInputAction> Menu;
 	UPROPERTY()
 	TObjectPtr<UInputMappingContext> Context;
 };

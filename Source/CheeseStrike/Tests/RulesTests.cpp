@@ -8,6 +8,7 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "UI/CheeseStrikeMenu.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -87,6 +88,27 @@ bool FTheHostSetsTheLimits::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the usual one without"), RespawnDelayFrom(TEXT("")), RespawnDelay);
 	TestEqual(TEXT("no shorter than the design allows"), RespawnDelayFrom(TEXT("?RespawnDelay=0")), 0.5f);
 	TestEqual(TEXT("nor longer"), RespawnDelayFrom(TEXT("?RespawnDelay=60")), 15.0f);
+	TestTrue(TEXT("a match told to start now does"), StartsAtOnce(TEXT("?listen?StartNow")));
+	TestFalse(TEXT("otherwise it waits in the lobby"), StartsAtOnce(TEXT("?listen?KillLimit=5")));
+	TestEqual(TEXT("the design's kill limits are offered"), static_cast<int32>(UE_ARRAY_COUNT(KillLimitChoices)), 5);
+	TestTrue(TEXT("with the usual one among them"), KillLimitChoices[2] == KillLimit);
+	TestTrue(TEXT("and the usual respawn delay among its choices"), RespawnDelayChoices[1] == RespawnDelay);
+	TestEqual(TEXT("the countdown"), MatchCountdown, 5.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMenuFollowsTheMatch, "CheeseStrike.Rules.TheMenuFollowsTheMatch", RulesTests::Flags)
+
+bool FTheMenuFollowsTheMatch::RunTest(const FString& Parameters)
+{
+	using CheeseStrikeMenu::PageFor;
+	TestTrue(TEXT("alone before a match, the front end"), PageFor(false, false, false, false, EMenuPage::Main) == EMenuPage::Main);
+	TestTrue(TEXT("or the page chosen in it"), PageFor(false, false, false, false, EMenuPage::Host) == EMenuPage::Host && PageFor(false, false, false, false, EMenuPage::Find) == EMenuPage::Find);
+	TestTrue(TEXT("but not a page that isn't the front end's"), PageFor(false, false, false, false, EMenuPage::Pause) == EMenuPage::Main);
+	TestTrue(TEXT("in a hosted or joined match that waits, the lobby"), PageFor(false, false, true, false, EMenuPage::Host) == EMenuPage::Lobby);
+	TestTrue(TEXT("once the match is on, nothing"), PageFor(true, false, true, false, EMenuPage::Main) == EMenuPage::None);
+	TestTrue(TEXT("unless paused"), PageFor(true, false, true, true, EMenuPage::Main) == EMenuPage::Pause);
+	TestTrue(TEXT("and once it is over, nothing, whatever else"), PageFor(true, true, true, true, EMenuPage::Main) == EMenuPage::None);
 	return true;
 }
 

@@ -154,7 +154,8 @@ bool UCheeseStrikePlayScript::Run(const FCommand& Command)
 	}
 	else if (Command.Verb == TEXT("shot"))
 	{
-		FScreenshotRequest::RequestScreenshot(Name + TEXT(".png"), false, false);
+		// With the interface in it: the menus are drawn in Slate, over the view.
+		FScreenshotRequest::RequestScreenshot(Name + TEXT(".png"), true, false);
 		// Taken at the end of this frame: nothing more this frame, or it would be in the picture.
 		Waiting = 0.05f;
 		return false;
@@ -228,6 +229,7 @@ const UInputAction* UCheeseStrikePlayScript::ActionNamed(const FString& Name) co
 	if (Lower == TEXT("aim")) return Input->Aim;
 	if (Lower == TEXT("reload")) return Input->Reload;
 	if (Lower == TEXT("scoreboard")) return Input->Scoreboard;
+	if (Lower == TEXT("menu")) return Input->Menu;
 	return nullptr;
 }
 
