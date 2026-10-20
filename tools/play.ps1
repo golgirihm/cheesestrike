@@ -26,7 +26,7 @@ param(
   [string]$Name = "Host",
   [string]$ClientScript = "",
   [switch]$ClientAlone,
-  [string]$ClientStartAt = "-231,-1200,100,90",
+  [string]$ClientStartAt = "-231,-300,100,-90",
   [string]$ClientName = "Joiner",
   [int]$ClientDelay = 25,
   [switch]$Window,
