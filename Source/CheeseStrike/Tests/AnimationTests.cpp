@@ -82,37 +82,29 @@ bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterIsBelicaWithTheMannequinsArms, "CheeseStrike.Animation.TheCharacterIsBelicaWithTheMannequinsArms", AnimationTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterIsBelicaInBothViews, "CheeseStrike.Animation.TheCharacterIsBelicaInBothViews", AnimationTests::Flags)
 
-bool FTheCharacterIsBelicaWithTheMannequinsArms::RunTest(const FString& Parameters)
+bool FTheCharacterIsBelicaInBothViews::RunTest(const FString& Parameters)
 {
 	const ACheeseStrikeCharacter* Character = GetDefault<ACheeseStrikeCharacter>();
-	struct FExpected
+	// The body others see and the one its own player sees are the same: the arms in view are the character's own.
+	for (const USkeletalMeshComponent* Body : {Character->GetMesh(), Character->GetFirstPersonMesh()})
 	{
-		const USkeletalMeshComponent* Body;
-		const TCHAR* Mesh;
-		UClass* Animation;
-		const TCHAR* RifleBone;
-	};
-	// Others see Lt. Belica; the player sees the mannequin's arms.
-	const FExpected Bodies[] = {
-		{Character->GetMesh(), TEXT("Belica"), UCheeseStrikeBelicaAnimInstance::StaticClass(), TEXT("hand_r")},
-		{Character->GetFirstPersonMesh(), TEXT("SKM_Manny"), UCheeseStrikeAnimInstance::StaticClass(), TEXT("weapon_r")},
-	};
-	for (const FExpected& Expected : Bodies)
-	{
-		if (!TestNotNull(TEXT("a body"), Expected.Body))
+		if (!TestNotNull(TEXT("a body"), Body))
 		{
 			continue;
 		}
-		TestNotNull(TEXT("has a mesh"), Expected.Body->GetSkeletalMeshAsset());
-		if (Expected.Body->GetSkeletalMeshAsset() != nullptr)
+		TestNotNull(TEXT("has a mesh"), Body->GetSkeletalMeshAsset());
+		if (Body->GetSkeletalMeshAsset() != nullptr)
 		{
-			TestEqual(TEXT("which is the one wanted"), Expected.Body->GetSkeletalMeshAsset()->GetName(), FString(Expected.Mesh));
-			TestTrue(FString::Printf(TEXT("with a bone for the rifle (%s)"), Expected.RifleBone), Expected.Body->GetSkeletalMeshAsset()->GetRefSkeleton().FindBoneIndex(FName(Expected.RifleBone)) != INDEX_NONE);
-			TestTrue(TEXT("and a physics asset to fall with"), Expected.Body->GetSkeletalMeshAsset()->GetPhysicsAsset() != nullptr);
+			TestEqual(TEXT("which is Belica"), Body->GetSkeletalMeshAsset()->GetName(), FString(TEXT("Belica")));
+			TestTrue(TEXT("with a hand for the rifle"), Body->GetSkeletalMeshAsset()->GetRefSkeleton().FindBoneIndex(FName(TEXT("hand_r"))) != INDEX_NONE);
+			FName Left;
+			FName Right;
+			TestTrue(TEXT("and eyes for the camera"), ACheeseStrikeCharacter::FindEyes(Body->GetSkeletalMeshAsset(), Left, Right));
+			TestTrue(TEXT("and a physics asset to fall with"), Body->GetSkeletalMeshAsset()->GetPhysicsAsset() != nullptr);
 		}
-		TestTrue(TEXT("animated in code, by its own set"), Expected.Body->AnimClass == Expected.Animation);
+		TestTrue(TEXT("animated in code, by her set"), Body->AnimClass == UCheeseStrikeBelicaAnimInstance::StaticClass());
 	}
 	const ACheeseStrikeWeapon* Weapon = GetDefault<ACheeseStrikeWeapon>();
 	for (const USkeletalMeshComponent* Rifle : {Weapon->GetFirstPersonMesh(), Weapon->GetThirdPersonMesh()})
