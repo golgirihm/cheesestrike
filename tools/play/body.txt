@@ -1,0 +1,36 @@
+# Looks at the body from outside (CheeseStrikeOutside), three metres off and
+# a little to its right, through standing, looking up and down, crouching,
+# aiming, firing and reloading, for checking it as others see it.
+wait 2
+cmd CheeseStrikeOutside 300 50
+wait 1
+shot body_1_standing
+look 0 40
+wait 0.6
+shot body_2_up
+look 0 -80
+wait 0.6
+shot body_3_down
+look 0 40
+hold Crouch
+wait 0.8
+shot body_4_crouched
+release Crouch
+wait 0.6
+hold Aim
+wait 0.6
+shot body_5_aimed
+release Aim
+hold Fire
+wait 0.3
+shot body_6_firing
+release Fire
+wait 0.3
+tap Reload
+wait 0.9
+shot body_7_reloading
+wait 1.6
+shot body_8_reloaded
+cmd CheeseStrikeOutside
+wait 0.3
+quit

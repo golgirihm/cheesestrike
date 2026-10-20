@@ -28,6 +28,16 @@ namespace
 	/** The bone on the mannequin's right hand the weapon sits in, and how the rifle turns in it to point the way the hand does. */
 	const FName HandSocket(TEXT("weapon_r"));
 	const FRotator GripRotation(0.0f, -90.0f, 0.0f);
+	/**
+	 * For a body without weapon_r (Belica): how the rifle sits on hand_r.
+	 * The turn was measured in the game, as the first-person rifle's turn in
+	 * her hand_r's space while both bodies play the same animation (the
+	 * trace's "Grip wanted" line); the place is the mannequin's weapon_r
+	 * offset from its hand, a couple of centimetres.
+	 */
+	const FTransform HandGrip(FRotator(-0.6f, 87.3f, 7.7f), FVector(-1.2f, 1.3f, -0.5f));
+	/** The bones Belica's own guns are skinned to. */
+	const TCHAR* const BuiltInWeaponBones[] = {TEXT("weapon"), TEXT("weapon_l"), TEXT("pistol")};
 
 	float ServerTime(const UWorld* World)
 	{
@@ -121,25 +131,60 @@ void ACheeseStrikeWeapon::Hold(ACheeseStrikeCharacter* Character)
 	Holder = Character;
 	const FAttachmentTransformRules Snap(EAttachmentRule::SnapToTarget, false);
 	AttachToActor(Character, Snap);
-	FirstPersonMesh->AttachToComponent(Character->GetFirstPersonMesh(), Snap, HandSocket);
-	ThirdPersonMesh->AttachToComponent(Character->GetMesh(), Snap, HandSocket);
-	// The rifle is modelled along its Y axis; the hand's bone points its X the way the character faces.
-	FirstPersonMesh->SetRelativeRotation(GripRotation);
-	ThirdPersonMesh->SetRelativeRotation(GripRotation);
+	PutInHand(FirstPersonMesh, Character->GetFirstPersonMesh());
+	PutInHand(ThirdPersonMesh, Character->GetMesh());
 	Character->SetWeapon(this);
 }
 
-void ACheeseStrikeWeapon::PlayOnBodies(UAnimSequence* Animation, float PlayRate)
+void ACheeseStrikeWeapon::PutInHand(USceneComponent* Rifle, USkeletalMeshComponent* Body)
 {
-	if (Holder == nullptr || Animation == nullptr)
+	if (Rifle == nullptr || Body == nullptr)
 	{
 		return;
 	}
+	const FAttachmentTransformRules Snap(EAttachmentRule::SnapToTarget, false);
+	const USkeletalMesh* Mesh = Body->GetSkeletalMeshAsset();
+	// The rifle is modelled along its Y axis; weapon_r points its X the way the character faces.
+	if (Mesh == nullptr || Mesh->GetRefSkeleton().FindBoneIndex(HandSocket) != INDEX_NONE)
+	{
+		Rifle->AttachToComponent(Body, Snap, HandSocket);
+		Rifle->SetRelativeRotation(GripRotation);
+		return;
+	}
+	Rifle->AttachToComponent(Body, Snap, FName(TEXT("hand_r")));
+	Rifle->SetRelativeTransform(HandGrip);
+}
+
+void ACheeseStrikeWeapon::HideBuiltInWeapons(USkeletalMeshComponent* Body)
+{
+	const USkeletalMesh* Mesh = Body != nullptr ? Body->GetSkeletalMeshAsset() : nullptr;
+	if (Mesh == nullptr)
+	{
+		return;
+	}
+	for (const TCHAR* Bone : BuiltInWeaponBones)
+	{
+		if (Mesh->GetRefSkeleton().FindBoneIndex(FName(Bone)) != INDEX_NONE)
+		{
+			Body->HideBoneByName(FName(Bone), PBO_None);
+		}
+	}
+}
+
+void ACheeseStrikeWeapon::PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAnimSet::* Which, TFunction<float(const UAnimSequence*)> RateFor)
+{
+	if (Holder == nullptr)
+	{
+		return;
+	}
+	// Each body plays its own skeleton's copy.
 	for (USkeletalMeshComponent* Body : {Holder->GetFirstPersonMesh(), Holder->GetMesh()})
 	{
-		if (UAnimInstance* Instance = Body != nullptr ? Body->GetAnimInstance() : nullptr)
+		UCheeseStrikeAnimInstance* Instance = Body != nullptr ? Cast<UCheeseStrikeAnimInstance>(Body->GetAnimInstance()) : nullptr;
+		UAnimSequence* Animation = Instance != nullptr ? (Instance->GetSet().*Which).Get() : nullptr;
+		if (Animation != nullptr)
 		{
-			Instance->PlaySlotAnimationAsDynamicMontage(Animation, UCheeseStrikeAnimInstance::SlotName(), 0.1f, 0.15f, PlayRate);
+			Instance->PlaySlotAnimationAsDynamicMontage(Animation, UCheeseStrikeAnimInstance::SlotName(), 0.1f, 0.15f, RateFor ? RateFor(Animation) : 1.0f);
 		}
 	}
 }
@@ -154,8 +199,7 @@ void ACheeseStrikeWeapon::PlaySound(USoundBase* Sound) const
 
 void ACheeseStrikeWeapon::ShowShot()
 {
-	const UCheeseStrikeAnimInstance* Body = Holder != nullptr && Holder->GetMesh() != nullptr ? Cast<UCheeseStrikeAnimInstance>(Holder->GetMesh()->GetAnimInstance()) : nullptr;
-	PlayOnBodies(Body != nullptr ? Body->GetSet().Fire.Get() : nullptr);
+	PlayOnBodies(&FCheeseStrikeAnimSet::Fire);
 	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
 	{
 		Mesh->PlayAnimation(RifleFire, false);
@@ -168,11 +212,9 @@ void ACheeseStrikeWeapon::ShowShot()
 
 void ACheeseStrikeWeapon::ShowReload()
 {
-	const UCheeseStrikeAnimInstance* Body = Holder != nullptr && Holder->GetMesh() != nullptr ? Cast<UCheeseStrikeAnimInstance>(Holder->GetMesh()->GetAnimInstance()) : nullptr;
-	UAnimSequence* Reload = Body != nullptr ? Body->GetSet().Reload.Get() : nullptr;
 	// The animations take the reload's time, however long they were made.
-	const float BodyRate = Reload != nullptr && Reload->GetPlayLength() > 0.0f ? Reload->GetPlayLength() / Stats->ReloadTime : 1.0f;
-	PlayOnBodies(Reload, BodyRate);
+	const float ReloadTime = Stats->ReloadTime;
+	PlayOnBodies(&FCheeseStrikeAnimSet::Reload, [ReloadTime](const UAnimSequence* Reload) { return Reload->GetPlayLength() > 0.0f ? Reload->GetPlayLength() / ReloadTime : 1.0f; });
 	const float RifleRate = RifleReload != nullptr && RifleReload->GetPlayLength() > 0.0f ? RifleReload->GetPlayLength() / Stats->ReloadTime : 1.0f;
 	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
 	{

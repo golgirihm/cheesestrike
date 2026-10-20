@@ -10,6 +10,7 @@
 class ACheeseStrikeCharacter;
 class UAnimInstance;
 class UAnimSequence;
+struct FCheeseStrikeAnimSet;
 class USkeletalMeshComponent;
 class USoundBase;
 
@@ -54,6 +55,14 @@ public:
 
 	/** Puts the weapon in `Character`'s hands, on both meshes, and gives the body its animation. */
 	void Hold(ACheeseStrikeCharacter* Character);
+	/**
+	 * Attaches a rifle mesh to `Body`'s right hand: on the mannequin's
+	 * weapon_r bone, or, for a body without one (Belica), on hand_r where
+	 * the mannequin's weapon_r would be.
+	 */
+	static void PutInHand(USceneComponent* Rifle, USkeletalMeshComponent* Body);
+	/** Hides any weapon a body's mesh was modelled holding (Belica's own guns), so only ours shows. */
+	static void HideBuiltInWeapons(USkeletalMeshComponent* Body);
 
 	void StartFiring();
 	void StopFiring();
@@ -91,7 +100,8 @@ protected:
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastReload();
 	/** Plays `Animation` on both of the holder's bodies, over whatever they are doing, at `PlayRate`. */
-	void PlayOnBodies(UAnimSequence* Animation, float PlayRate = 1.0f);
+	/** Plays each body's own copy of an animation of the set (`Which` picks it), at `PlayRate` (from `RateFor` its length, if given). */
+	void PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAnimSet::* Which, TFunction<float(const UAnimSequence*)> RateFor = nullptr);
 	void PlaySound(USoundBase* Sound) const;
 	/** Whether the server can allow a shot now: the rate, and the magazine. */
 	bool ServerAllowsShot(float Now);

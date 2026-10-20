@@ -59,37 +59,60 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheBodyHasEveryAnimation, "CheeseStrike.Animat
 
 bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 {
-	const UCheeseStrikeAnimInstance* Animation = GetDefault<UCheeseStrikeAnimInstance>();
-	const FCheeseStrikeAnimSet& Set = Animation->GetSet();
-	TestTrue(TEXT("every animation was found"), Set.IsComplete());
-	TestNotNull(TEXT("standing"), Set.Idle.Get());
-	TestNotNull(TEXT("crouched"), Set.CrouchIdle.Get());
-	TestNotNull(TEXT("crouch walking"), Set.CrouchWalk.Get());
-	TestNotNull(TEXT("aiming from the hip"), Set.AimHip.Get());
-	TestNotNull(TEXT("firing"), Set.Fire.Get());
-	TestNotNull(TEXT("reloading"), Set.Reload.Get());
+	// The mannequin's set, for the first-person arms, and Belica's, retargeted to her skeleton, for the body.
+	const UCheeseStrikeAnimInstance* Mannequin = GetDefault<UCheeseStrikeAnimInstance>();
+	const UCheeseStrikeAnimInstance* Belica = GetDefault<UCheeseStrikeBelicaAnimInstance>();
+	for (const UCheeseStrikeAnimInstance* Animation : {Mannequin, Belica})
+	{
+		const FCheeseStrikeAnimSet& Set = Animation->GetSet();
+		TestTrue(FString::Printf(TEXT("%s: every animation was found"), *Animation->GetClass()->GetName()), Set.IsComplete());
+		TestNotNull(TEXT("standing"), Set.Idle.Get());
+		TestNotNull(TEXT("crouched"), Set.CrouchIdle.Get());
+		TestNotNull(TEXT("crouch walking"), Set.CrouchWalk.Get());
+		TestNotNull(TEXT("aiming from the hip"), Set.AimHip.Get());
+		TestNotNull(TEXT("firing"), Set.Fire.Get());
+		TestNotNull(TEXT("reloading"), Set.Reload.Get());
+	}
+	if (Belica->GetSet().Idle != nullptr && Mannequin->GetSet().Idle != nullptr)
+	{
+		TestTrue(TEXT("Belica's are her skeleton's, not the mannequin's"), Belica->GetSet().Idle->GetSkeleton() != Mannequin->GetSet().Idle->GetSkeleton());
+	}
+	TestEqual(TEXT("the mannequin's grip follows weapon_r"), Mannequin->GetGripAnchor(), FName(TEXT("weapon_r")));
+	TestEqual(TEXT("Belica's, her right hand"), Belica->GetGripAnchor(), FName(TEXT("hand_r")));
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterIsLyrasMannequin, "CheeseStrike.Animation.TheCharacterIsLyrasMannequin", AnimationTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterIsBelicaWithTheMannequinsArms, "CheeseStrike.Animation.TheCharacterIsBelicaWithTheMannequinsArms", AnimationTests::Flags)
 
-bool FTheCharacterIsLyrasMannequin::RunTest(const FString& Parameters)
+bool FTheCharacterIsBelicaWithTheMannequinsArms::RunTest(const FString& Parameters)
 {
 	const ACheeseStrikeCharacter* Character = GetDefault<ACheeseStrikeCharacter>();
-	for (const USkeletalMeshComponent* Body : {Character->GetMesh(), Character->GetFirstPersonMesh()})
+	struct FExpected
 	{
-		if (!TestNotNull(TEXT("a body"), Body))
+		const USkeletalMeshComponent* Body;
+		const TCHAR* Mesh;
+		UClass* Animation;
+		const TCHAR* RifleBone;
+	};
+	// Others see Lt. Belica; the player sees the mannequin's arms.
+	const FExpected Bodies[] = {
+		{Character->GetMesh(), TEXT("Belica"), UCheeseStrikeBelicaAnimInstance::StaticClass(), TEXT("hand_r")},
+		{Character->GetFirstPersonMesh(), TEXT("SKM_Manny"), UCheeseStrikeAnimInstance::StaticClass(), TEXT("weapon_r")},
+	};
+	for (const FExpected& Expected : Bodies)
+	{
+		if (!TestNotNull(TEXT("a body"), Expected.Body))
 		{
 			continue;
 		}
-		TestNotNull(TEXT("has a mesh"), Body->GetSkeletalMeshAsset());
-		if (Body->GetSkeletalMeshAsset() != nullptr)
+		TestNotNull(TEXT("has a mesh"), Expected.Body->GetSkeletalMeshAsset());
+		if (Expected.Body->GetSkeletalMeshAsset() != nullptr)
 		{
-			TestEqual(TEXT("which is Lyra's Manny"), Body->GetSkeletalMeshAsset()->GetName(), FString(TEXT("SKM_Manny")));
-			TestTrue(TEXT("with a bone for the rifle"), Body->GetSkeletalMeshAsset()->GetRefSkeleton().FindBoneIndex(FName(TEXT("weapon_r"))) != INDEX_NONE);
-			TestTrue(TEXT("and a physics asset to fall with"), Body->GetSkeletalMeshAsset()->GetPhysicsAsset() != nullptr);
+			TestEqual(TEXT("which is the one wanted"), Expected.Body->GetSkeletalMeshAsset()->GetName(), FString(Expected.Mesh));
+			TestTrue(FString::Printf(TEXT("with a bone for the rifle (%s)"), Expected.RifleBone), Expected.Body->GetSkeletalMeshAsset()->GetRefSkeleton().FindBoneIndex(FName(Expected.RifleBone)) != INDEX_NONE);
+			TestTrue(TEXT("and a physics asset to fall with"), Expected.Body->GetSkeletalMeshAsset()->GetPhysicsAsset() != nullptr);
 		}
-		TestTrue(TEXT("animated in code"), Body->AnimClass == UCheeseStrikeAnimInstance::StaticClass());
+		TestTrue(TEXT("animated in code, by its own set"), Expected.Body->AnimClass == Expected.Animation);
 	}
 	const ACheeseStrikeWeapon* Weapon = GetDefault<ACheeseStrikeWeapon>();
 	for (const USkeletalMeshComponent* Rifle : {Weapon->GetFirstPersonMesh(), Weapon->GetThirdPersonMesh()})

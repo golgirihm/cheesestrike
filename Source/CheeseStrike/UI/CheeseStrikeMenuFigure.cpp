@@ -8,6 +8,7 @@
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
+#include "Weapons/CheeseStrikeWeapon.h"
 
 ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
 {
@@ -29,12 +30,12 @@ ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
 	Pedestal->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	// The character as players see one another, animated as in the game, holding the rifle.
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Mannequin(TEXT("/Game/Characters/Heroes/Mannequin/Meshes/SKM_Manny.SKM_Manny"));
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Belica(TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Meshes/Belica.Belica"));
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> RifleMesh(TEXT("/Game/Weapons/Rifle/Mesh/SK_Rifle.SK_Rifle"));
 	Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
 	Body->SetupAttachment(Pedestal);
-	Body->SetSkeletalMeshAsset(Mannequin.Object);
-	Body->SetAnimInstanceClass(UCheeseStrikeAnimInstance::StaticClass());
+	Body->SetSkeletalMeshAsset(Belica.Object);
+	Body->SetAnimInstanceClass(UCheeseStrikeBelicaAnimInstance::StaticClass());
 	// Undo the pedestal's scale, and stand on its top, facing the way the pedestal faces.
 	Body->SetRelativeScale3D(FVector(100.0f / PedestalWidth, 100.0f / PedestalWidth, 100.0f / PedestalHeight));
 	Body->SetRelativeLocation(FVector(0.0f, 0.0f, 50.0f));
@@ -43,11 +44,17 @@ ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
 	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 
 	Rifle = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Rifle"));
-	Rifle->SetupAttachment(Body, FName(TEXT("weapon_r")));
+	Rifle->SetupAttachment(Body);
 	Rifle->SetSkeletalMeshAsset(RifleMesh.Object);
-	// The rifle is modelled along its Y axis; the hand's bone points its X forward (CheeseStrikeWeapon).
-	Rifle->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
 	Rifle->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void ACheeseStrikeMenuFigure::BeginPlay()
+{
+	Super::BeginPlay();
+	// In the hand as the game holds it, with only our rifle showing.
+	ACheeseStrikeWeapon::PutInHand(Rifle, Body);
+	ACheeseStrikeWeapon::HideBuiltInWeapons(Body);
 }
 
 void ACheeseStrikeMenuFigure::Tick(float DeltaSeconds)

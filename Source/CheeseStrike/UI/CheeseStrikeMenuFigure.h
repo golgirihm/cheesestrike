@@ -29,6 +29,7 @@ public:
 	static constexpr float PedestalHeight = 8.0f;
 
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void BeginPlay() override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category="Components")

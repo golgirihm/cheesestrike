@@ -2,6 +2,8 @@
 // Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #include "CheeseStrikeCharacter.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Camera/CameraActor.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -44,8 +46,10 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	// set: the mannequin standing on the capsule's floor, turned to face
 	// its front.
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Mannequin(TEXT("/Game/Characters/Heroes/Mannequin/Meshes/SKM_Manny.SKM_Manny"));
-	GetMesh()->SetSkeletalMeshAsset(Mannequin.Object);
-	GetMesh()->SetAnimInstanceClass(UCheeseStrikeAnimInstance::StaticClass());
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Belica(TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Meshes/Belica.Belica"));
+	// Others see Lt. Belica; the player sees the mannequin's arms (below).
+	GetMesh()->SetSkeletalMeshAsset(Belica.Object);
+	GetMesh()->SetAnimInstanceClass(UCheeseStrikeBelicaAnimInstance::StaticClass());
 	GetMesh()->SetRelativeLocationAndRotation(FVector(-10.0f, 0.0f, -CapsuleHalfHeight), FRotator(0.0f, -90.0f, 0.0f));
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
@@ -104,6 +108,7 @@ UCheeseStrikeMovementComponent* ACheeseStrikeCharacter::GetCheeseStrikeMovement(
 void ACheeseStrikeCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	ACheeseStrikeWeapon::HideBuiltInWeapons(GetMesh());
 	// The server gives every character its weapon; it arrives on every machine as an actor of this character's.
 	if (HasAuthority() && HeldWeapon == nullptr && GetWorld() != nullptr)
 	{
@@ -203,6 +208,49 @@ void ACheeseStrikeCharacter::CheeseStrikeDie()
 	else
 	{
 		ServerDie();
+	}
+}
+
+void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw)
+{
+	APlayerController* Player = Cast<APlayerController>(GetController());
+	if (Player == nullptr || GetWorld() == nullptr)
+	{
+		return;
+	}
+	const bool bOutside = Distance > 0.0f;
+	// The body and its rifle, seen as others see them, or kept from the player as in play.
+	GetMesh()->SetOwnerNoSee(!bOutside);
+	GetMesh()->SetFirstPersonPrimitiveType(bOutside ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
+	FirstPersonMesh->SetVisibility(!bOutside, true);
+	if (HeldWeapon != nullptr)
+	{
+		HeldWeapon->GetThirdPersonMesh()->SetOwnerNoSee(!bOutside);
+		HeldWeapon->GetThirdPersonMesh()->SetFirstPersonPrimitiveType(bOutside ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
+	}
+	if (OutsideCamera != nullptr)
+	{
+		OutsideCamera->Destroy();
+		OutsideCamera = nullptr;
+	}
+	if (!bOutside)
+	{
+		Player->SetViewTarget(this);
+		return;
+	}
+	const FVector Middle = GetActorLocation() + FVector(0.0f, 0.0f, 30.0f);
+	const FVector Way = FRotator(0.0f, GetActorRotation().Yaw + Yaw, 0.0f).Vector();
+	const FVector At = Middle + Way * Distance + FVector(0.0f, 0.0f, 20.0f);
+	FActorSpawnParameters Parameters;
+	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	OutsideCamera = GetWorld()->SpawnActor<ACameraActor>(At, (Middle - At).Rotation(), Parameters);
+	if (OutsideCamera != nullptr)
+	{
+		OutsideCamera->GetCameraComponent()->SetFieldOfView(60.0f);
+		// Viewing through a camera turns the controls to face the way it does; the character keeps facing and aiming as before.
+		const FRotator Kept = Player->GetControlRotation();
+		Player->SetViewTarget(OutsideCamera);
+		Player->SetControlRotation(Kept);
 	}
 }
 
@@ -406,6 +454,19 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 		const FVector View = FirstPersonCameraComponent->GetForwardVector();
 		const FVector Head = GetMesh()->GetBoneLocation(TEXT("head")) - GetMesh()->GetComponentLocation();
 		const UCheeseStrikeAnimInstance* Animation = Cast<UCheeseStrikeAnimInstance>(GetMesh()->GetAnimInstance());
+		// What the player's view is drawn from, which should be this character's camera.
+		if (const APlayerController* Player = Cast<APlayerController>(GetController()))
+		{
+			if (Player->PlayerCameraManager != nullptr)
+			{
+				const FVector Seen = Player->PlayerCameraManager->GetCameraLocation();
+				const FRotator Facing = Player->PlayerCameraManager->GetCameraRotation();
+				UE_LOG(LogCheeseStrike, Display, TEXT("View: from (%.0f, %.0f, %.0f) facing (pitch %.0f, yaw %.0f) through %s"), Seen.X, Seen.Y, Seen.Z, Facing.Pitch, Facing.Yaw, *GetNameSafe(Player->GetViewTarget()));
+			}
+		}
+		// Where the first-person rifle is in the body's right hand's space: how a body without weapon_r should hold it.
+		const FTransform Wanted = HeldWeapon->GetFirstPersonMesh()->GetComponentTransform().GetRelativeTransform(GetMesh()->GetSocketTransform(TEXT("hand_r")));
+		UE_LOG(LogCheeseStrike, Display, TEXT("Grip wanted on the body's hand_r: at (%.1f, %.1f, %.1f) turned (pitch %.1f, yaw %.1f, roll %.1f)"), Wanted.GetLocation().X, Wanted.GetLocation().Y, Wanted.GetLocation().Z, Wanted.Rotator().Pitch, Wanted.Rotator().Yaw, Wanted.Rotator().Roll);
 		// And where the left hand is on the rifle, in the rifle's own space: it should stay put whatever the aim.
 		const FVector LeftOnRifle = LeftHandOnRifle();
 		UE_LOG(LogCheeseStrike, Display, TEXT("Hands: first-person hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f) left hand on the rifle at (%.1f, %.1f, %.1f); body hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f) head (%.0f, %.0f, %.0f) over the feet; view (%.2f, %.2f, %.2f) aim pitch %.0f"),
