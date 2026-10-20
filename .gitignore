@@ -16,7 +16,11 @@ Plugins/*/Intermediate/
 *.opendb
 
 # Packaged builds.
-/Build/
+# What builds leave in Build/, but not the icon the game is packaged with (our own drawing).
+/Build/*
+!/Build/Windows/
+/Build/Windows/*
+!/Build/Windows/Application.ico
 /Packaged/
 
 # Python.
