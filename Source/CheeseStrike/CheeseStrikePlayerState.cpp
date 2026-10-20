@@ -8,6 +8,7 @@ void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ACheeseStrikePlayerState, Kills);
 	DOREPLIFETIME(ACheeseStrikePlayerState, Deaths);
+	DOREPLIFETIME(ACheeseStrikePlayerState, Team);
 }
 
 CheeseStrikeRules::FStanding ACheeseStrikePlayerState::Standing() const

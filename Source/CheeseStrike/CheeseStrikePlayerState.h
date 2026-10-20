@@ -19,9 +19,12 @@ class CHEESESTRIKE_API ACheeseStrikePlayerState : public APlayerState
 public:
 	int32 GetKills() const { return Kills; }
 	int32 GetDeaths() const { return Deaths; }
+	/** The side this player is on (CheeseStrikeRules::TeamNames). */
+	int32 GetTeam() const { return Team; }
 	/** Server only. */
 	void AddKill() { ++Kills; }
 	void AddDeath() { ++Deaths; }
+	void SetTeam(int32 InTeam) { Team = InTeam; }
 
 	/** This player's line on the scoreboard. */
 	CheeseStrikeRules::FStanding Standing() const;
@@ -33,4 +36,6 @@ protected:
 	int32 Kills = 0;
 	UPROPERTY(Replicated)
 	int32 Deaths = 0;
+	UPROPERTY(Replicated)
+	int32 Team = 0;
 };

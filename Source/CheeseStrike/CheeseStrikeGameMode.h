@@ -53,15 +53,22 @@ public:
 	virtual bool ShouldSpawnAtStartSpot(AController* Player) override { return false; }
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void InitGameState() override;
+	/** A newcomer joins the side with fewer. */
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+	/** How many bots fill in once the match starts: -1 for every empty slot. */
+	int32 GetBotsWanted() const { return BotsWanted; }
 	/** A player may name themself with `?Nick=` on the URL they join by (for development; Steam will name them). */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
 
 protected:
 	/** Gives `Who` a new character, if they and the match are still here. */
 	void Respawn(TWeakObjectPtr<AController> Who);
+	/** Fills the empty slots with bots, by the roster the lobby showed. */
+	void SpawnBots();
 
 	int32 KillLimit;
 	float RespawnDelay;
+	int32 BotsWanted = -1;
 	FTimerHandle CountdownTimer;
 	FTimerHandle ResultsTimer;
 };

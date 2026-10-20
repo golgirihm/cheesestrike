@@ -11,6 +11,30 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeGameState, RespawnDelay);
 	DOREPLIFETIME(ACheeseStrikeGameState, WinnerName);
 	DOREPLIFETIME(ACheeseStrikeGameState, CountdownEndsAt);
+	DOREPLIFETIME(ACheeseStrikeGameState, BotNames);
+	DOREPLIFETIME(ACheeseStrikeGameState, BotsWanted);
+}
+
+TArray<CheeseStrikeRules::FRosterEntry> ACheeseStrikeGameState::Roster() const
+{
+	TArray<CheeseStrikeRules::FRosterEntry> Entries;
+	for (const APlayerState* Player : PlayerArray)
+	{
+		if (const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Player))
+		{
+			CheeseStrikeRules::FRosterEntry Entry;
+			Entry.Name = Ours->GetPlayerName();
+			Entry.Team = Ours->GetTeam();
+			Entry.bBot = Ours->IsABot();
+			Entries.Add(Entry);
+		}
+	}
+	return Entries;
+}
+
+TArray<CheeseStrikeRules::FRosterEntry> ACheeseStrikeGameState::TeamColumn(int32 Team) const
+{
+	return CheeseStrikeRules::TeamColumn(Team, Roster(), BotNames, BotsWanted);
 }
 
 TArray<CheeseStrikeRules::FStanding> ACheeseStrikeGameState::Standings() const

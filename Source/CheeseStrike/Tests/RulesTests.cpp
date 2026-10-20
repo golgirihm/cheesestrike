@@ -97,6 +97,47 @@ bool FTheHostSetsTheLimits::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSidesAreFilledWithBots, "CheeseStrike.Rules.TheSidesAreFilledWithBots", RulesTests::Flags)
+
+bool FTheSidesAreFilledWithBots::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeRules;
+	TestEqual(TEXT("two sides"), Teams, 2);
+	TestEqual(TEXT("of eight, for the design's sixteen"), TeamSize * Teams, 16);
+	TestEqual(TEXT("named"), FString(TeamNames[0]), FString(TEXT("The Gouda Guys")));
+	TestEqual(TEXT("and named"), FString(TeamNames[1]), FString(TEXT("Mozza Radicals")));
+	const int32 Even[Teams] = {2, 2};
+	const int32 Uneven[Teams] = {3, 2};
+	TestEqual(TEXT("a newcomer joins the first of equal sides"), TeamToJoin(Even), 0);
+	TestEqual(TEXT("or the smaller"), TeamToJoin(Uneven), 1);
+
+	TestTrue(TEXT("there are names for every slot"), NumBotNames() >= TeamSize * Teams);
+	const TArray<FString> Drawn = BotNames(7, 16);
+	TestEqual(TEXT("as many as asked"), Drawn.Num(), 16);
+	TSet<FString> Unique(Drawn);
+	TestEqual(TEXT("no two alike"), Unique.Num(), 16);
+	TestTrue(TEXT("the same seed draws the same"), BotNames(7, 16) == Drawn);
+	TestTrue(TEXT("another seed another order"), BotNames(8, 16) != Drawn);
+	TestEqual(TEXT("every slot without a say"), BotsFrom(TEXT("?listen")), -1);
+	TestEqual(TEXT("or as many as the URL says"), BotsFrom(TEXT("?Bots=3")), 3);
+	TestEqual(TEXT("none at all"), BotsFrom(TEXT("?Bots=0")), 0);
+
+	// Two players on the first side, one on the second; the sides fill with bots after them.
+	TArray<FRosterEntry> Players;
+	Players.Add({TEXT("Ash"), 0, false});
+	Players.Add({TEXT("Bo"), 1, false});
+	Players.Add({TEXT("Cam"), 0, false});
+	const TArray<FRosterEntry> First = TeamColumn(0, Players, Drawn, -1);
+	const TArray<FRosterEntry> Second = TeamColumn(1, Players, Drawn, -1);
+	TestEqual(TEXT("the first side is full"), First.Num(), TeamSize);
+	TestEqual(TEXT("so is the second"), Second.Num(), TeamSize);
+	TestTrue(TEXT("players first"), First[0].Name == TEXT("Ash") && First[1].Name == TEXT("Cam") && !First[1].bBot);
+	TestTrue(TEXT("then bots, from the side's share of the names"), First[2].bBot && First[2].Name == Drawn[0] && Second[1].bBot && Second[1].Name == Drawn[TeamSize]);
+	TestEqual(TEXT("asked for three bots, three in all"), TeamColumn(0, Players, Drawn, 3).Num() + TeamColumn(1, Players, Drawn, 3).Num(), Players.Num() + 3);
+	TestEqual(TEXT("asked for none, players only"), TeamColumn(1, Players, Drawn, 0).Num(), 1);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMenuFollowsTheMatch, "CheeseStrike.Rules.TheMenuFollowsTheMatch", RulesTests::Flags)
 
 bool FTheMenuFollowsTheMatch::RunTest(const FString& Parameters)

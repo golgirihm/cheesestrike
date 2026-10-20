@@ -136,8 +136,8 @@ namespace PlayTesting
 		PlayersWanted = Session.Players;
 		PlayersTogether = Session.bApart ? 1 : Session.Players;
 		bLobbyWanted = Session.bLobby;
-		// A match starts at once unless the test wants the lobby.
-		const FString Options = Session.bLobby ? Session.Options : Session.Options + TEXT("?StartNow");
+		// A match starts at once, with no bots to get in the way, unless the test wants the lobby, which has them.
+		const FString Options = Session.bLobby ? Session.Options : Session.Options + TEXT("?StartNow?Bots=0");
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
 		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 		Settings->SetPlayNumberOfClients(Session.Players);

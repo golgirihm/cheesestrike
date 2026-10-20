@@ -75,9 +75,16 @@ private:
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, bool bChosen = false);
 	/** A row of choices, the chosen one lit. */
 	TSharedRef<SWidget> MakeChoices(const FString& Label, const TArray<FString>& Choices, int32 Chosen, TFunction<void(int32)> Pick);
+	/** One team's column in the lobby: its name, then who is on it, bots dimmer. */
+	TSharedRef<SWidget> MakeTeamColumn(int32 Team);
 
 	TWeakObjectPtr<ACheeseStrikePlayerController> Controller;
+	/** The game's name over the front end, the panel on the left, and the lobby across the whole view. */
+	TSharedPtr<SWidget> Masthead;
+	TSharedPtr<SWidget> Panel;
 	TSharedPtr<SBox> Content;
+	TSharedPtr<SWidget> Lobby;
+	TSharedPtr<SBox> LobbyContent;
 	EMenuPage Page = EMenuPage::None;
 	int32 ChosenKillLimit = 0;
 	float ChosenRespawnDelay = 0.0f;

@@ -73,4 +73,98 @@ namespace CheeseStrikeRules
 	{
 		return UGameplayStatics::HasOption(Options, TEXT("StartNow"));
 	}
+
+	const TCHAR* const TeamNames[Teams] = {TEXT("The Gouda Guys"), TEXT("Mozza Radicals")};
+
+	int32 TeamToJoin(const int32 (&Counts)[Teams])
+	{
+		int32 Fewest = 0;
+		for (int32 Team = 1; Team < Teams; ++Team)
+		{
+			if (Counts[Team] < Counts[Fewest])
+			{
+				Fewest = Team;
+			}
+		}
+		return Fewest;
+	}
+
+	namespace
+	{
+		const TCHAR* const AllBotNames[] = {
+			TEXT("Gorgon Zola"), TEXT("Camem Bert"), TEXT("Mozza Rella"), TEXT("Sir Cheddar"), TEXT("Brie Ann"), TEXT("Edam Adams"),
+			TEXT("Stilton Blue"), TEXT("Parmesan Pete"), TEXT("Manchego Max"), TEXT("Swiss Miss"), TEXT("Ricotta Rick"), TEXT("Havarti Hart"),
+			TEXT("Provolone Pat"), TEXT("Monterey Jack"), TEXT("Pepper Jack"), TEXT("Limburger Lou"), TEXT("Emmental Emma"), TEXT("Gruyere Greg"),
+			TEXT("Raclette Ray"), TEXT("Burrata Bo"), TEXT("Paneer Pam"), TEXT("Halloumi Hal"), TEXT("Count Roquefort"), TEXT("Gouda Vibes"),
+		};
+	}
+
+	int32 NumBotNames()
+	{
+		return UE_ARRAY_COUNT(AllBotNames);
+	}
+
+	TArray<FString> BotNames(int32 Seed, int32 Count)
+	{
+		TArray<FString> Names;
+		for (const TCHAR* Name : AllBotNames)
+		{
+			Names.Add(Name);
+		}
+		FRandomStream Random(Seed);
+		for (int32 Index = Names.Num() - 1; Index > 0; --Index)
+		{
+			Names.Swap(Index, Random.RandRange(0, Index));
+		}
+		Names.SetNum(FMath::Clamp(Count, 0, Names.Num()));
+		return Names;
+	}
+
+	int32 BotsFrom(const FString& Options)
+	{
+		return FMath::Max(-1, FMath::RoundToInt(Option(Options, TEXT("Bots"), -1.0f)));
+	}
+
+	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted)
+	{
+		TArray<FRosterEntry> Column;
+		for (const FRosterEntry& Player : Players)
+		{
+			if (Player.Team == Team && Column.Num() < TeamSize)
+			{
+				Column.Add(Player);
+			}
+		}
+		const int32 Empty = TeamSize - Column.Num();
+		// Every empty slot, or the bots asked for shared out from the first team on.
+		int32 Filling = Empty;
+		if (BotsWanted >= 0)
+		{
+			int32 Left = BotsWanted;
+			for (int32 Earlier = 0; Earlier < Team; ++Earlier)
+			{
+				int32 Taken = 0;
+				for (const FRosterEntry& Player : Players)
+				{
+					Taken += Player.Team == Earlier ? 1 : 0;
+				}
+				Left -= FMath::Clamp(TeamSize - Taken, 0, Left);
+			}
+			Filling = FMath::Min(Empty, Left);
+		}
+		for (int32 Index = 0; Index < Filling; ++Index)
+		{
+			const int32 NameIndex = Team * TeamSize + Index;
+			if (!Bots.IsValidIndex(NameIndex))
+			{
+				break;
+			}
+			FRosterEntry Bot;
+			Bot.Name = Bots[NameIndex];
+			Bot.Team = Team;
+			Bot.bBot = true;
+			Column.Add(Bot);
+		}
+		return Column;
+	}
 }

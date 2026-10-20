@@ -63,4 +63,32 @@ namespace CheeseStrikeRules
 	/** The kill limit and respawn delay a host asked for in a map URL's `Options`, within what the design allows. */
 	int32 KillLimitFrom(const FString& Options);
 	float RespawnDelayFrom(const FString& Options);
+
+	/** The two sides, by name, and how many each holds: the match holds MaxPlayers in all. */
+	constexpr int32 Teams = 2;
+	constexpr int32 TeamSize = 8;
+	extern const TCHAR* const TeamNames[Teams];
+	/** Which side a newcomer joins: the one with fewer, the first among equals. */
+	int32 TeamToJoin(const int32 (&Counts)[Teams]);
+
+	/** The bots' names, cheese and all; there are at least enough for every slot. */
+	int32 NumBotNames();
+	/** `Count` of them, in an order drawn with `Seed`, no two alike. */
+	TArray<FString> BotNames(int32 Seed, int32 Count);
+	/** How many bots fill in: the URL's `?Bots=`, or every empty slot (-1) without it. */
+	int32 BotsFrom(const FString& Options);
+
+	/** One line of a team's column in the lobby. */
+	struct FRosterEntry
+	{
+		FString Name;
+		int32 Team = 0;
+		bool bBot = false;
+	};
+	/**
+	 * Team `Team`'s column: its players, then bots from `Bots` (the names
+	 * the match drew, the first TeamSize of them for the first team and so
+	 * on) until it is full, or fewer if `BotsWanted` (0 or more) says so.
+	 */
+	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted);
 }
