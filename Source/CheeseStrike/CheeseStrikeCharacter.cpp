@@ -140,6 +140,12 @@ bool ACheeseStrikeCharacter::CanAct() const
 	return IsAlive() && (State == nullptr || !State->HasMatchEnded());
 }
 
+bool ACheeseStrikeCharacter::TakesInput() const
+{
+	const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
+	return CanAct() && (Player == nullptr || !Player->IsPaused());
+}
+
 bool ACheeseStrikeCharacter::IsProtected() const
 {
 	return IsAlive() && ServerNow() < ProtectedUntil;
@@ -449,7 +455,8 @@ void ACheeseStrikeCharacter::StickLookInput(const FInputActionValue& Value)
 
 void ACheeseStrikeCharacter::DoAim(float Yaw, float Pitch)
 {
-	if (GetController())
+	const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
+	if (GetController() && (Player == nullptr || !Player->IsPaused()))
 	{
 		AddControllerYawInput(Yaw);
 		AddControllerPitchInput(Pitch);
@@ -458,7 +465,7 @@ void ACheeseStrikeCharacter::DoAim(float Yaw, float Pitch)
 
 void ACheeseStrikeCharacter::DoMove(float Right, float Forward)
 {
-	if (GetController() && CanAct())
+	if (GetController() && TakesInput())
 	{
 		AddMovementInput(GetActorRightVector(), Right);
 		AddMovementInput(GetActorForwardVector(), Forward);
@@ -467,7 +474,7 @@ void ACheeseStrikeCharacter::DoMove(float Right, float Forward)
 
 void ACheeseStrikeCharacter::DoJumpStart()
 {
-	if (CanAct())
+	if (TakesInput())
 	{
 		Jump();
 	}
@@ -482,13 +489,13 @@ void ACheeseStrikeCharacter::DoSprint(bool bHeld)
 {
 	if (UCheeseStrikeMovementComponent* Movement = GetCheeseStrikeMovement())
 	{
-		Movement->SetWantsToSprint(bHeld && CanAct());
+		Movement->SetWantsToSprint(bHeld && TakesInput());
 	}
 }
 
 void ACheeseStrikeCharacter::DoCrouch(bool bHeld)
 {
-	if (bHeld && CanAct())
+	if (bHeld && TakesInput())
 	{
 		Crouch();
 	}
@@ -504,7 +511,7 @@ void ACheeseStrikeCharacter::DoFire(bool bHeld)
 	{
 		return;
 	}
-	if (bHeld && CanAct())
+	if (bHeld && TakesInput())
 	{
 		HeldWeapon->StartFiring();
 	}
@@ -520,7 +527,7 @@ void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 	{
 		return;
 	}
-	if (bHeld && CanAct())
+	if (bHeld && TakesInput())
 	{
 		HeldWeapon->StartAiming();
 	}
@@ -532,7 +539,7 @@ void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 
 void ACheeseStrikeCharacter::DoReload()
 {
-	if (HeldWeapon != nullptr && CanAct())
+	if (HeldWeapon != nullptr && TakesInput())
 	{
 		HeldWeapon->StartReload();
 	}

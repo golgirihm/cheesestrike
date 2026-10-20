@@ -4,6 +4,7 @@
 #include "CheeseStrikeGameMode.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/GameSession.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
@@ -15,6 +16,8 @@
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "UI/CheeseStrikeHUD.h"
+#include "Variant_Shooter/AI/ShooterNPC.h"
+#include "Variant_Shooter/AI/ShooterNPCSpawner.h"
 
 ACheeseStrikeGameMode::ACheeseStrikeGameMode()
 {
@@ -36,6 +39,41 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	bDelayedStart = !CheeseStrikeRules::StartsAtOnce(Options);
 	BotsWanted = CheeseStrikeRules::BotsFrom(Options);
 	UE_LOG(LogCheeseStrike, Display, TEXT("Free-for-all to %d kills, back %.1f s after a death%s, %s bots"), KillLimit, RespawnDelay, bDelayedStart ? TEXT(", waiting in the lobby") : TEXT(""), BotsWanted < 0 ? TEXT("filling in with") : *FString::FromInt(BotsWanted));
+	// The template's level comes with spawners for its own enemies, who would wander about the menu's view and the match: none of them.
+	for (TActorIterator<AShooterNPCSpawner> It(GetWorld()); It; ++It)
+	{
+		It->Destroy();
+	}
+	for (TActorIterator<AShooterNPC> It(GetWorld()); It; ++It)
+	{
+		It->Destroy();
+	}
+}
+
+void ACheeseStrikeGameMode::SetRules(int32 InKillLimit, float InRespawnDelay)
+{
+	KillLimit = InKillLimit;
+	RespawnDelay = InRespawnDelay;
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetLimits(KillLimit, RespawnDelay);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Rules: to %d kills, back %.1f s after a death"), KillLimit, RespawnDelay);
+}
+
+void ACheeseStrikeGameMode::RestartGame()
+{
+	if (GameSession == nullptr || !GameSession->CanRestartGame() || GetMatchState() == MatchState::LeavingMap || GetWorld() == nullptr)
+	{
+		return;
+	}
+	// The engine's restart would travel by the URL the match was hosted with; this one carries the rules as the host left them.
+	FURL Url = GetWorld()->URL;
+	Url.RemoveOption(TEXT("KillLimit"));
+	Url.RemoveOption(TEXT("RespawnDelay"));
+	Url.AddOption(*FString::Printf(TEXT("KillLimit=%d"), KillLimit));
+	Url.AddOption(*FString::Printf(TEXT("RespawnDelay=%.1f"), RespawnDelay));
+	GetWorld()->ServerTravel(Url.ToString(), GetTravelType());
 }
 
 void ACheeseStrikeGameMode::PostLogin(APlayerController* NewPlayer)
@@ -57,6 +95,14 @@ void ACheeseStrikeGameMode::PostLogin(APlayerController* NewPlayer)
 		}
 	}
 	State->SetTeam(CheeseStrikeRules::TeamToJoin(Counts));
+	// The host is the player at the server's own keyboard; the lobby crowns them.
+	if (NewPlayer->IsLocalController())
+	{
+		if (ACheeseStrikeGameState* Ours = GetGameState<ACheeseStrikeGameState>())
+		{
+			Ours->SetHostName(State->GetPlayerName());
+		}
+	}
 }
 
 void ACheeseStrikeGameMode::SpawnBots()
@@ -113,6 +159,18 @@ void ACheeseStrikeGameMode::AskToStart(bool bAtOnce)
 	State->SetCountdownEndsAt(State->GetServerWorldTimeSeconds() + CheeseStrikeRules::MatchCountdown);
 	UE_LOG(LogCheeseStrike, Display, TEXT("The match starts in %.0f s"), CheeseStrikeRules::MatchCountdown);
 	GetWorldTimerManager().SetTimer(CountdownTimer, this, &AGameMode::StartMatch, CheeseStrikeRules::MatchCountdown, false);
+}
+
+void ACheeseStrikeGameMode::CancelStart()
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (!IsWaitingToStart() || State == nullptr || !State->IsCountingDown())
+	{
+		return;
+	}
+	GetWorldTimerManager().ClearTimer(CountdownTimer);
+	State->SetCountdownEndsAt(0.0f);
+	UE_LOG(LogCheeseStrike, Display, TEXT("The start is called off"));
 }
 
 void ACheeseStrikeGameMode::HandleMatchHasStarted()

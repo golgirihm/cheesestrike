@@ -17,7 +17,9 @@ class ACheeseStrikeGameState;
  * (CheeseStrikeGameState's feed); the killed come back after the respawn
  * delay at the start furthest from everyone else; the match ends when
  * someone reaches the kill limit. The host sets the limit and the delay
- * on the map's URL: `?KillLimit=10?RespawnDelay=1`.
+ * on the map's URL (`?KillLimit=10?RespawnDelay=1`), and may change them
+ * from the lobby; the template's own wandering enemies are kept off the
+ * level.
  */
 UCLASS()
 class CHEESESTRIKE_API ACheeseStrikeGameMode : public AGameMode
@@ -40,8 +42,14 @@ public:
 	 * on its URL never waits.
 	 */
 	void AskToStart(bool bAtOnce);
+	/** Stops the countdown, back to waiting in the lobby. */
+	void CancelStart();
 	/** Whether the match is waiting in the lobby for the host. */
 	bool IsWaitingToStart() const;
+	/** The host sets the rules from the lobby: on the match's state for everyone, and on the next match's URL. */
+	void SetRules(int32 InKillLimit, float InRespawnDelay);
+	/** Back to the lobby after the results, with the rules as they are now. */
+	virtual void RestartGame() override;
 
 	virtual void HandleMatchHasStarted() override;
 	/** The results stay up a while, then everyone is back in the lobby. */
@@ -53,7 +61,7 @@ public:
 	virtual bool ShouldSpawnAtStartSpot(AController* Player) override { return false; }
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void InitGameState() override;
-	/** A newcomer joins the side with fewer. */
+	/** A newcomer joins the side with fewer; the host is named on the match's state. */
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	/** How many bots fill in once the match starts: -1 for every empty slot. */
 	int32 GetBotsWanted() const { return BotsWanted; }

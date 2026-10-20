@@ -265,6 +265,18 @@ void UCheeseStrikeSessionSubsystem::Leave()
 	Interface->DestroySession(NAME_GameSession, FOnDestroySessionCompleteDelegate::CreateUObject(this, &UCheeseStrikeSessionSubsystem::OnDestroyedToLeave));
 }
 
+void UCheeseStrikeSessionSubsystem::UpdateRules(const FString& Options)
+{
+	IOnlineSessionPtr Interface = Sessions();
+	if (!Interface.IsValid() || Interface->GetNamedSession(NAME_GameSession) == nullptr)
+	{
+		return;
+	}
+	HostingOptions = CheeseStrikeSessions::NormalisedOptions(Options);
+	FOnlineSessionSettings Settings = CheeseStrikeSessions::HostSettings(HostingOptions, bHostingLan);
+	Interface->UpdateSession(NAME_GameSession, Settings, true);
+}
+
 void UCheeseStrikeSessionSubsystem::OnDestroyedToLeave(FName SessionName, bool bWasSuccessful)
 {
 	bBusy = false;

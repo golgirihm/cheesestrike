@@ -17,6 +17,7 @@
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
@@ -41,6 +42,14 @@ void ACheeseStrikePlayerController::BeginPlay()
 			PlayScript = Scripts->ScriptFor(this);
 		}
 	}
+}
+
+void ACheeseStrikePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// The menu and the menu camera belong to this level: a travel leaves none of them behind over the next.
+	ShowMenu(EMenuPage::None);
+	HideMenuCamera();
+	Super::EndPlay(EndPlayReason);
 }
 
 UCheeseStrikePlayScript* ACheeseStrikePlayerController::Play(const FString& Text)
@@ -107,7 +116,8 @@ void ACheeseStrikePlayerController::ShowMenu(EMenuPage Page)
 {
 	ShownPage = Page;
 	SinceMenuRefresh = 0.0f;
-	UGameViewportClient* Viewport = GetWorld() != nullptr && GetWorld()->GetGameViewport() != nullptr ? GetWorld()->GetGameViewport() : nullptr;
+	// The local player's viewport outlives the level, so a travel can take the menu off it.
+	UGameViewportClient* Viewport = GetLocalPlayer() != nullptr ? GetLocalPlayer()->ViewportClient : nullptr;
 	if (Page == EMenuPage::None)
 	{
 		if (Menu.IsValid() && Viewport != nullptr)
@@ -128,12 +138,22 @@ void ACheeseStrikePlayerController::ShowMenu(EMenuPage Page)
 		}
 	}
 	Menu->Show(Page);
-	FInputModeGameAndUI Mode;
+	// Only the menu takes input: nothing reaches the character, and Escape comes back through the menu.
+	FInputModeUIOnly Mode;
 	Mode.SetWidgetToFocus(Menu);
-	Mode.SetHideCursorDuringCapture(false);
 	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(Mode);
 	SetShowMouseCursor(true);
+	// Whatever was held when the menu came up is let go of.
+	FlushPressedKeys();
+	if (ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(GetPawn()))
+	{
+		Body->DoFire(false);
+		Body->DoAimDownSights(false);
+		Body->DoSprint(false);
+		Body->DoCrouch(false);
+		Body->DoJumpEnd();
+	}
 }
 
 void ACheeseStrikePlayerController::ShowMenuCamera()
@@ -144,12 +164,12 @@ void ACheeseStrikePlayerController::ShowMenuCamera()
 	}
 	// On the shooter level's open ground: the figure on its pedestal in the
 	// middle of the view, the arena behind it, the camera a few metres back
-	// at chest height looking slightly down.
+	// above head height looking down, so that the game's name clears the figure.
 	FActorSpawnParameters Parameters;
 	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	const FVector Pedestal(-231.0f, -500.0f, 2.0f + ACheeseStrikeMenuFigure::PedestalHeight / 2.0f);
 	MenuFigure = GetWorld()->SpawnActor<ACheeseStrikeMenuFigure>(ACheeseStrikeMenuFigure::StaticClass(), Pedestal, FRotator(0.0f, -90.0f, 0.0f), Parameters);
-	MenuCamera = GetWorld()->SpawnActor<ACameraActor>(Pedestal + FVector(0.0f, -470.0f, 110.0f), FRotator(-5.0f, 90.0f, 0.0f), Parameters);
+	MenuCamera = GetWorld()->SpawnActor<ACameraActor>(Pedestal + FVector(0.0f, -470.0f, 175.0f), FRotator(-7.0f, 90.0f, 0.0f), Parameters);
 	if (MenuCamera != nullptr)
 	{
 		MenuCamera->GetCameraComponent()->SetFieldOfView(60.0f);
@@ -185,19 +205,30 @@ void ACheeseStrikePlayerController::ChooseMenu(EMenuPage Page)
 	}
 }
 
-void ACheeseStrikePlayerController::PlayAlone()
-{
-	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
-	{
-		Mode->AskToStart(true);
-	}
-}
-
-void ACheeseStrikePlayerController::HostFromMenu(int32 KillLimit, float RespawnDelay)
+void ACheeseStrikePlayerController::HostFromMenu()
 {
 	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
 	{
-		Sessions->Host(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f"), KillLimit, RespawnDelay), Sessions->ServiceName() != TEXT("STEAM"));
+		Sessions->Host(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f"), CheeseStrikeRules::KillLimit, CheeseStrikeRules::RespawnDelay), Sessions->ServiceName() != TEXT("STEAM"));
+	}
+}
+
+void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float RespawnDelay)
+{
+	ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
+	if (Mode == nullptr)
+	{
+		return;
+	}
+	Mode->SetRules(KillLimit, RespawnDelay);
+	// The match as offered says the same, for those still looking for one.
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->UpdateRules(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f"), KillLimit, RespawnDelay));
+	}
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
 	}
 }
 
@@ -214,6 +245,18 @@ void ACheeseStrikePlayerController::StartMatchFromMenu()
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
 	{
 		Mode->AskToStart(false);
+	}
+}
+
+void ACheeseStrikePlayerController::CancelStartFromMenu()
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->CancelStart();
+	}
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
 	}
 }
 

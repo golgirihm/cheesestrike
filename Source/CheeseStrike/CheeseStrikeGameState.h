@@ -62,6 +62,10 @@ public:
 	/** The most kills anyone has. */
 	int32 MostKills() const;
 
+	/** The host's name, as the lobby crowns it; empty until the host is in. */
+	const FString& GetHostName() const { return HostName; }
+	void SetHostName(const FString& Name) { HostName = Name; }
+
 	/** Server only. */
 	void SetLimits(int32 InKillLimit, float InRespawnDelay);
 	/** Server only: tells every machine at once, so that the feed is never behind. */
@@ -88,4 +92,6 @@ protected:
 	TArray<FString> BotNames;
 	UPROPERTY(Replicated)
 	int32 BotsWanted = -1;
+	UPROPERTY(Replicated)
+	FString HostName;
 };

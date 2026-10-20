@@ -101,6 +101,8 @@ public:
 	bool IsAlive() const { return Health > 0.0f; }
 	/** Whether it can do anything but look: alive, in a match still on. */
 	bool CanAct() const;
+	/** Whether its player's input reaches it: it can act, and its player hasn't paused (a paused player looks at the menu, and the match goes on without them). */
+	bool TakesInput() const;
 	/** Whether it has just come back and can't yet be hurt. */
 	bool IsProtected() const;
 	/** Server only: ends that, as firing does. */

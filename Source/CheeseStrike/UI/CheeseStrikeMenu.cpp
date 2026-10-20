@@ -1,14 +1,21 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeMenu.h"
+#include "Brushes/SlateDynamicImageBrush.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerState.h"
+#include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
+#include "Styling/SlateTypes.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Images/SThrobber.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/Layout/SSpacer.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
@@ -33,7 +40,7 @@ namespace CheeseStrikeMenu
 		{
 			return EMenuPage::Lobby;
 		}
-		return Chosen == EMenuPage::Host || Chosen == EMenuPage::Find ? Chosen : EMenuPage::Main;
+		return Chosen == EMenuPage::Find ? Chosen : EMenuPage::Main;
 	}
 }
 
@@ -42,35 +49,85 @@ namespace
 	const FLinearColor Ink(0.92f, 0.9f, 0.86f);
 	const FLinearColor Muted(0.6f, 0.58f, 0.55f);
 	const FLinearColor Cheese(0.96f, 0.72f, 0.2f);
+	const FLinearColor Mozzarella(0.85f, 0.9f, 1.0f);
 	const FLinearColor PanelColour(0.04f, 0.04f, 0.045f, 0.82f);
 
 	FSlateFontInfo Font(int32 Size, const FName& Style = FName("Regular"))
 	{
 		return FCoreStyle::GetDefaultFontStyle(Style, Size);
 	}
+
+	/** The menu's looks, made once: rounded buttons in three kinds, chips, and the pictures from Content/UI. */
+	struct FLooks
+	{
+		FButtonStyle Plain;
+		FButtonStyle Primary;
+		FButtonStyle Danger;
+		FSlateRoundedBoxBrush PlayerChip;
+		FSlateRoundedBoxBrush BotChip;
+		TUniquePtr<FSlateDynamicImageBrush> PlayerIcon;
+		TUniquePtr<FSlateDynamicImageBrush> BotIcon;
+		TUniquePtr<FSlateDynamicImageBrush> CrownIcon;
+		TUniquePtr<FSlateDynamicImageBrush> LobbyTile;
+
+		FLooks()
+			: PlayerChip(FLinearColor(0.16f, 0.16f, 0.17f, 1.0f), 8.0f)
+			, BotChip(FLinearColor(0.1f, 0.1f, 0.11f, 1.0f), 8.0f)
+		{
+			const auto Make = [](FButtonStyle& Style, const FLinearColor& Rest, const FLinearColor& Hover, const FLinearColor& Press)
+			{
+				Style.SetNormal(FSlateRoundedBoxBrush(Rest, CheeseStrikeMenu::Rounding));
+				Style.SetHovered(FSlateRoundedBoxBrush(Hover, CheeseStrikeMenu::Rounding));
+				Style.SetPressed(FSlateRoundedBoxBrush(Press, CheeseStrikeMenu::Rounding));
+				Style.SetNormalForeground(Ink);
+				Style.SetHoveredForeground(FLinearColor::White);
+				Style.SetPressedForeground(FLinearColor::White);
+				Style.SetNormalPadding(FMargin(0.0f));
+				Style.SetPressedPadding(FMargin(0.0f, 1.0f, 0.0f, -1.0f));
+			};
+			Make(Plain, FLinearColor(0.18f, 0.18f, 0.19f), FLinearColor(0.28f, 0.28f, 0.3f), FLinearColor(0.12f, 0.12f, 0.13f));
+			Make(Primary, FLinearColor(0.1f, 0.42f, 0.9f), FLinearColor(0.2f, 0.52f, 1.0f), FLinearColor(0.08f, 0.32f, 0.72f));
+			Make(Danger, FLinearColor(0.72f, 0.16f, 0.14f), FLinearColor(0.85f, 0.24f, 0.2f), FLinearColor(0.55f, 0.1f, 0.1f));
+			const FString Folder = FPaths::ProjectContentDir() / TEXT("UI");
+			PlayerIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("player.png"))), FVector2D(22.0, 22.0));
+			BotIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("bot.png"))), FVector2D(22.0, 22.0));
+			CrownIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("crown.png"))), FVector2D(22.0, 22.0));
+			LobbyTile = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("lobby_tile.png"))), FVector2D(256.0, 256.0), FLinearColor::White, ESlateBrushTileType::Both);
+		}
+	};
+
+	FLooks& Looks()
+	{
+		static FLooks Made;
+		return Made;
+	}
 }
 
 void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 {
 	Controller = InArgs._Controller;
-	ChosenKillLimit = CheeseStrikeRules::KillLimit;
-	ChosenRespawnDelay = CheeseStrikeRules::RespawnDelay;
 	ChildSlot
 	[
 		SNew(SOverlay)
-		// The lobby covers the whole view.
+		// The lobby covers the whole view, over its tile.
 		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Fill)
 		[
-			SAssignNew(Lobby, SBorder)
-			.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
-			.BorderBackgroundColor(FLinearColor(PanelColour.R, PanelColour.G, PanelColour.B, 1.0f))
-			.Padding(FMargin(64.0f, 48.0f))
+			SAssignNew(Lobby, SOverlay)
+			+ SOverlay::Slot()
 			[
-				SAssignNew(LobbyContent, SBox).HAlign(HAlign_Center).VAlign(VAlign_Fill)
+				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(PanelColour.R, PanelColour.G, PanelColour.B, 1.0f))
+			]
+			+ SOverlay::Slot()
+			[
+				SNew(SImage).Image(Looks().LobbyTile.Get()).ColorAndOpacity(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f))
+			]
+			+ SOverlay::Slot().Padding(FMargin(56.0f, 40.0f))
+			[
+				SAssignNew(LobbyContent, SBox).HAlign(HAlign_Fill).VAlign(VAlign_Fill)
 			]
 		]
 		// The game's name over the front end, at the top in the middle.
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(FMargin(0.0f, 40.0f, 0.0f, 0.0f))
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(FMargin(0.0f, 36.0f, 0.0f, 0.0f))
 		[
 			SAssignNew(Masthead, SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
@@ -107,7 +164,7 @@ void SCheeseStrikeMenu::Show(EMenuPage InPage)
 void SCheeseStrikeMenu::Refresh()
 {
 	const bool bLobby = Page == EMenuPage::Lobby;
-	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Host || Page == EMenuPage::Find;
+	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
 	if (Lobby.IsValid())
 	{
 		Lobby->SetVisibility(bLobby ? EVisibility::Visible : EVisibility::Collapsed);
@@ -130,14 +187,35 @@ void SCheeseStrikeMenu::Refresh()
 	}
 }
 
+FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() == EKeys::Escape || InKeyEvent.GetKey() == EKeys::Gamepad_Special_Right)
+	{
+		if (Controller.IsValid())
+		{
+			Controller->MenuPressed();
+		}
+		return FReply::Handled();
+	}
+	return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
+}
+
+const FButtonStyle& SCheeseStrikeMenu::ButtonStyle(EButtonKind Kind) const
+{
+	switch (Kind)
+	{
+	case EButtonKind::Primary: return Looks().Primary;
+	case EButtonKind::Danger: return Looks().Danger;
+	default: return Looks().Plain;
+	}
+}
+
 TSharedRef<SWidget> SCheeseStrikeMenu::MakePage()
 {
 	switch (Page)
 	{
 	case EMenuPage::Main: return MakeMain();
-	case EMenuPage::Host: return MakeHost();
 	case EMenuPage::Find: return MakeFind();
-	case EMenuPage::Lobby: return MakeLobby();
 	case EMenuPage::Pause: return MakePause();
 	default: return SNullWidget::NullWidget;
 	}
@@ -153,22 +231,31 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim)
 	return SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(16)).ColorAndOpacity(bDim ? Muted : Ink).Margin(FMargin(0.0f, 4.0f)).AutoWrapText(true);
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeButton(const FString& Text, TFunction<void()> Do, bool bChosen)
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind, TSharedPtr<SWidget> Inside)
 {
+	TSharedRef<SHorizontalBox> Label = SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+		[
+			SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(18, FName("Bold")))
+		];
+	if (Inside.IsValid())
+	{
+		Label->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(12.0f, 0.0f, 0.0f, 0.0f)) [ Inside.ToSharedRef() ];
+	}
 	return SNew(SBox).Padding(FMargin(0.0f, 4.0f))
 	[
 		SNew(SButton)
-		.ButtonStyle(FCoreStyle::Get(), bChosen ? "PrimaryButton" : "Button")
+		.ButtonStyle(&ButtonStyle(Kind))
 		.ContentPadding(FMargin(18.0f, 10.0f))
 		.HAlign(HAlign_Left)
 		.OnClicked_Lambda([Do]() { Do(); return FReply::Handled(); })
 		[
-			SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(18, FName("Bold")))
+			Label
 		]
 	];
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoices(const FString& Label, const TArray<FString>& Choices, int32 Chosen, TFunction<void(int32)> Pick)
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoices(const FString& Label, const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick)
 {
 	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
 	for (int32 Index = 0; Index < Choices.Num(); ++Index)
@@ -176,7 +263,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoices(const FString& Label, const T
 		Row->AddSlot().AutoWidth().Padding(FMargin(0.0f, 0.0f, 6.0f, 0.0f))
 		[
 			SNew(SButton)
-			.ButtonStyle(FCoreStyle::Get(), Index == Chosen ? "PrimaryButton" : "Button")
+			.ButtonStyle(&ButtonStyle(Index == Chosen ? EButtonKind::Primary : EButtonKind::Plain))
+			.IsEnabled(bCanPick)
 			.ContentPadding(FMargin(12.0f, 6.0f))
 			.OnClicked_Lambda([Pick, Index]() { Pick(Index); return FReply::Handled(); })
 			[
@@ -192,48 +280,10 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoices(const FString& Label, const T
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 {
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
-	const UCheeseStrikeSessionSubsystem* Sessions = Player.IsValid() && Player->GetGameInstance() != nullptr ? Player->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
-	const FString Through = Sessions != nullptr && Sessions->ServiceName() == TEXT("STEAM") ? TEXT("Matches go through Steam.") : TEXT("Without Steam, matches are found on the local network only.");
 	return SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("PLAY ALONE"), [Player]() { if (Player.IsValid()) Player->PlayAlone(); }) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("HOST A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Host); }) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("HOST A MATCH"), [Player]() { if (Player.IsValid()) Player->HostFromMenu(); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ MakeLine(Through, true) ];
-}
-
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeHost()
-{
-	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
-	TArray<FString> Limits;
-	int32 LimitChosen = 0;
-	for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeRules::KillLimitChoices); ++Index)
-	{
-		Limits.Add(FString::FromInt(CheeseStrikeRules::KillLimitChoices[Index]));
-		if (CheeseStrikeRules::KillLimitChoices[Index] == ChosenKillLimit)
-		{
-			LimitChosen = Index;
-		}
-	}
-	TArray<FString> Delays;
-	int32 DelayChosen = 0;
-	for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeRules::RespawnDelayChoices); ++Index)
-	{
-		Delays.Add(FString::Printf(TEXT("%.0f s"), CheeseStrikeRules::RespawnDelayChoices[Index]));
-		if (CheeseStrikeRules::RespawnDelayChoices[Index] == ChosenRespawnDelay)
-		{
-			DelayChosen = Index;
-		}
-	}
-	const int32 KillLimit = ChosenKillLimit;
-	const float RespawnDelay = ChosenRespawnDelay;
-	return SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("HOST A MATCH")) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Free-for-all on the shooter level."), true) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("First to how many kills"), Limits, LimitChosen, [this](int32 Index) { ChosenKillLimit = CheeseStrikeRules::KillLimitChoices[Index]; Refresh(); }) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Back how long after a death"), Delays, DelayChosen, [this](int32 Index) { ChosenRespawnDelay = CheeseStrikeRules::RespawnDelayChoices[Index]; Refresh(); }) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("HOST"), [Player, KillLimit, RespawnDelay]() { if (Player.IsValid()) Player->HostFromMenu(KillLimit, RespawnDelay); }, true) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Main); }) ];
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
@@ -257,14 +307,40 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Main); }) ];
 }
 
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const FString& Name, bool bBot, bool bHost, int32 Team)
+{
+	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 10.0f, 0.0f))
+		[
+			SNew(SImage).Image(bBot ? Looks().BotIcon.Get() : Looks().PlayerIcon.Get()).ColorAndOpacity(bBot ? Muted : (Team == 0 ? Cheese : Mozzarella))
+		]
+		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+		[
+			SNew(STextBlock).Text(FText::FromString(Name)).Font(Font(16, bBot ? FName("Regular") : FName("Bold"))).ColorAndOpacity(bBot ? Muted : Ink)
+		];
+	if (bHost)
+	{
+		Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f)) [ SNew(SImage).Image(Looks().CrownIcon.Get()) ];
+	}
+	else if (bBot)
+	{
+		Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f)) [ SNew(STextBlock).Text(FText::FromString(TEXT("bot"))).Font(Font(11)).ColorAndOpacity(Muted) ];
+	}
+	return SNew(SBorder)
+		.BorderImage(bBot ? &Looks().BotChip : &Looks().PlayerChip)
+		.Padding(FMargin(12.0f, 8.0f))
+		[
+			Row
+		];
+}
+
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeTeamColumn(int32 Team)
 {
 	const ACheeseStrikeGameState* Match = Controller.IsValid() && Controller->GetWorld() != nullptr ? Controller->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-	const FLinearColor TeamColour = Team == 0 ? Cheese : FLinearColor(0.85f, 0.9f, 1.0f);
 	TSharedRef<SVerticalBox> Column = SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 12.0f))
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(4.0f, 0.0f, 0.0f, 12.0f))
 		[
-			SNew(STextBlock).Text(FText::FromString(FString(CheeseStrikeRules::TeamNames[Team]).ToUpper())).Font(Font(24, FName("Bold"))).ColorAndOpacity(TeamColour)
+			SNew(STextBlock).Text(FText::FromString(FString(CheeseStrikeRules::TeamNames[Team]).ToUpper())).Font(Font(22, FName("Bold"))).ColorAndOpacity(Team == 0 ? Cheese : Mozzarella)
 		];
 	if (Match != nullptr)
 	{
@@ -272,19 +348,46 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeTeamColumn(int32 Team)
 		{
 			Column->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f))
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-				[
-					SNew(STextBlock).Text(FText::FromString(Entry.Name)).Font(Font(17, Entry.bBot ? FName("Regular") : FName("Bold"))).ColorAndOpacity(Entry.bBot ? Muted : Ink)
-				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
-				[
-					SNew(STextBlock).Text(FText::FromString(Entry.bBot ? TEXT("bot") : TEXT(""))).Font(Font(12)).ColorAndOpacity(Muted)
-				]
+				MakeNameChip(Entry.Name, Entry.bBot, !Entry.bBot && Entry.Name == Match->GetHostName(), Team)
 			];
 		}
 	}
-	return SNew(SBox).WidthOverride(340.0f) [ Column ];
+	return SNew(SBox).WidthOverride(300.0f) [ Column ];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	const ACheeseStrikeGameState* Match = Player.IsValid() && Player->GetWorld() != nullptr ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const bool bHost = Player.IsValid() && Player->HasAuthority();
+	const int32 KillLimit = Match != nullptr ? Match->GetKillLimit() : CheeseStrikeRules::KillLimit;
+	const float RespawnDelay = Match != nullptr ? Match->GetRespawnDelay() : CheeseStrikeRules::RespawnDelay;
+	TArray<FString> Limits;
+	int32 LimitChosen = 0;
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeRules::KillLimitChoices); ++Index)
+	{
+		Limits.Add(FString::FromInt(CheeseStrikeRules::KillLimitChoices[Index]));
+		if (CheeseStrikeRules::KillLimitChoices[Index] == KillLimit)
+		{
+			LimitChosen = Index;
+		}
+	}
+	TArray<FString> Delays;
+	int32 DelayChosen = 0;
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeRules::RespawnDelayChoices); ++Index)
+	{
+		Delays.Add(FString::Printf(TEXT("%.0f s"), CheeseStrikeRules::RespawnDelayChoices[Index]));
+		if (FMath::IsNearlyEqual(CheeseStrikeRules::RespawnDelayChoices[Index], RespawnDelay))
+		{
+			DelayChosen = Index;
+		}
+	}
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOBBY")) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Free-for-all on the shooter level."), true) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("First to how many kills"), Limits, LimitChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeRules::KillLimitChoices[Index], RespawnDelay); }) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Back how long after a death"), Delays, DelayChosen, bHost, [Player, KillLimit](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, CheeseStrikeRules::RespawnDelayChoices[Index]); }) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeLine(bHost ? TEXT("Everyone here sees the rules as you set them.") : TEXT("The host sets the rules."), true) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
@@ -292,32 +395,54 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 	const ACheeseStrikeGameState* Match = Player.IsValid() && Player->GetWorld() != nullptr ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
 	const bool bHost = Player.IsValid() && Player->HasAuthority();
-	FString Note;
-	if (Match != nullptr && Match->IsCountingDown())
+	const bool bCounting = Match != nullptr && Match->IsCountingDown();
+	const FString Seconds = bCounting ? FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Match->SecondsToStart())) : FString();
+	TSharedRef<SWidget> Spinner = SNew(SCircularThrobber).Radius(10.0f).NumPieces(8).Period(0.8f).PieceImage(FCoreStyle::Get().GetBrush("Throbber.CircleChunk")).ColorAndOpacity(FLinearColor::White);
+
+	TSharedRef<SHorizontalBox> Bottom = SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ]
+		+ SHorizontalBox::Slot().FillWidth(1.0f) [ SNew(SSpacer) ];
+	if (bHost && bCounting)
 	{
-		Note = FString::Printf(TEXT("Starting in %.0f"), FMath::CeilToFloat(Match->SecondsToStart()));
+		TSharedRef<SHorizontalBox> Inside = SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Spinner ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f)) [ SNew(STextBlock).Text(FText::FromString(Seconds)).Font(Font(18, FName("Bold"))) ];
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("CANCEL"), [Player]() { if (Player.IsValid()) Player->CancelStartFromMenu(); }, EButtonKind::Danger, Inside) ];
+	}
+	else if (bHost)
+	{
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("START THE MATCH"), [Player]() { if (Player.IsValid()) Player->StartMatchFromMenu(); }, EButtonKind::Primary) ];
+	}
+	else if (bCounting)
+	{
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Spinner ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f)) [ MakeLine(FString::Printf(TEXT("Starting in %s"), *Seconds)) ]
+		];
 	}
 	else
 	{
-		Note = bHost ? TEXT("Start when everyone is here.") : TEXT("Waiting for the host to start.");
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeLine(TEXT("Waiting for the host to start."), true) ];
 	}
-	TSharedRef<SHorizontalBox> Buttons = SNew(SHorizontalBox);
-	if (bHost && !(Match != nullptr && Match->IsCountingDown()))
-	{
-		Buttons->AddSlot().AutoWidth().Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ MakeButton(TEXT("START THE MATCH"), [Player]() { if (Player.IsValid()) Player->StartMatchFromMenu(); }, true) ];
-	}
-	Buttons->AddSlot().AutoWidth() [ MakeButton(TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ];
+
 	return SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center) [ MakeTitle(TEXT("LOBBY")) ]
-		+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center) [ MakeLine(Match != nullptr ? FString::Printf(TEXT("First to %d kills, back %.0f s after a death."), Match->GetKillLimit(), Match->GetRespawnDelay()) : FString(), true) ]
-		+ SVerticalBox::Slot().FillHeight(1.0f).HAlign(HAlign_Center).Padding(FMargin(0.0f, 32.0f))
+		+ SVerticalBox::Slot().FillHeight(1.0f)
 		[
 			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().Padding(FMargin(0.0f, 0.0f, 48.0f, 0.0f)) [ MakeTeamColumn(0) ]
-			+ SHorizontalBox::Slot().AutoWidth() [ MakeTeamColumn(1) ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(FMargin(0.0f, 0.0f, 64.0f, 0.0f))
+			[
+				SNew(SBox).WidthOverride(400.0f) [ MakeLobbyRules() ]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).HAlign(HAlign_Right).VAlign(VAlign_Top)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().Padding(FMargin(0.0f, 0.0f, 24.0f, 0.0f)) [ MakeTeamColumn(0) ]
+				+ SHorizontalBox::Slot().AutoWidth() [ MakeTeamColumn(1) ]
+			]
 		]
-		+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, 0.0f, 0.0f, 12.0f)) [ MakeLine(Note) ]
-		+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center) [ Buttons ];
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ Bottom ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakePause()
@@ -326,7 +451,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePause()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("PAUSED")) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("The match goes on without you."), true) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("RESUME"), [Player]() { if (Player.IsValid()) Player->TogglePause(); }, true) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("RESUME"), [Player]() { if (Player.IsValid()) Player->TogglePause(); }, EButtonKind::Primary) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("LEAVE THE MATCH"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ];
 }
