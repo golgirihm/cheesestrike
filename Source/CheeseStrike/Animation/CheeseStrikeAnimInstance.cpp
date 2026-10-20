@@ -122,6 +122,20 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		bFalling = Character->GetCharacterMovement() != nullptr && Character->GetCharacterMovement()->IsFalling();
 		bAiming = Character->GetWeapon() != nullptr && Character->GetWeapon()->IsAimed();
 	}
+	// Each elbow bends the way the animation last had it: a point beyond the elbow, away from the line from shoulder to hand.
+	if (const USkeletalMeshComponent* Body = GetSkelMeshComponent())
+	{
+		const auto ElbowTarget = [Body](const TCHAR* Shoulder, const TCHAR* Elbow, const TCHAR* Hand)
+		{
+			const FVector S = Body->GetBoneLocation(FName(Shoulder), EBoneSpaces::ComponentSpace);
+			const FVector E = Body->GetBoneLocation(FName(Elbow), EBoneSpaces::ComponentSpace);
+			const FVector H = Body->GetBoneLocation(FName(Hand), EBoneSpaces::ComponentSpace);
+			const FVector Out = (E - (S + H) * 0.5).GetSafeNormal();
+			return E + Out * 50.0;
+		};
+		LeftElbowTarget = ElbowTarget(TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"));
+		RightElbowTarget = ElbowTarget(TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r"));
+	}
 }
 
 void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set)
@@ -175,6 +189,26 @@ void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set)
 	AimedCrouched.Additive.SetLinkNode(&AimCrouch);
 	Slot.SlotName = UCheeseStrikeAnimInstance::SlotName();
 	Slot.Source.SetLinkNode(&AimedCrouched);
+
+	// The hands reach the ik_hand bones the animations place on the rifle, taking their turn from them too.
+	const auto Reach = [](FAnimNode_TwoBoneIK& Arm, const TCHAR* Hand, const TCHAR* Target)
+	{
+		Arm.IKBone = FBoneReference(FName(Hand));
+		Arm.EffectorLocationSpace = BCS_BoneSpace;
+		Arm.EffectorTarget.bUseSocket = false;
+		Arm.EffectorTarget.BoneReference = FBoneReference(FName(Target));
+		Arm.EffectorLocation = FVector::ZeroVector;
+		Arm.bTakeRotationFromEffectorSpace = true;
+		Arm.JointTargetLocationSpace = BCS_ComponentSpace;
+		Arm.bAllowStretching = false;
+		Arm.Alpha = 1.0f;
+	};
+	Reach(LeftHand, TEXT("hand_l"), TEXT("ik_hand_l"));
+	Reach(RightHand, TEXT("hand_r"), TEXT("ik_hand_r"));
+	ToComponentSpace.LocalPose.SetLinkNode(&Slot);
+	LeftHand.ComponentPose.SetLinkNode(&ToComponentSpace);
+	RightHand.ComponentPose.SetLinkNode(&LeftHand);
+	ToLocalSpace.ComponentPose.SetLinkNode(&RightHand);
 	bLinked = true;
 }
 
@@ -187,7 +221,7 @@ void FCheeseStrikeAnimProxy::Initialize(UAnimInstance* InAnimInstance)
 		{
 			Link(Instance->GetSet());
 		}
-		Slot.Initialize_AnyThread(FAnimationInitializeContext(this));
+		ToLocalSpace.Initialize_AnyThread(FAnimationInitializeContext(this));
 	}
 }
 
@@ -196,7 +230,7 @@ void FCheeseStrikeAnimProxy::CacheBones()
 	FAnimInstanceProxy::CacheBones();
 	if (bLinked)
 	{
-		Slot.CacheBones_AnyThread(FAnimationCacheBonesContext(this));
+		ToLocalSpace.CacheBones_AnyThread(FAnimationCacheBonesContext(this));
 	}
 }
 
@@ -211,6 +245,8 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		bCrouched = Instance->bCrouched;
 		bFalling = Instance->bFalling;
 		bAiming = Instance->bAiming;
+		LeftElbowTarget = Instance->LeftElbowTarget;
+		RightElbowTarget = Instance->RightElbowTarget;
 	}
 }
 
@@ -250,13 +286,15 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	AimedCrouched.Alpha = CrouchBlend;
 	AimedDownSights.Alpha = (1.0f - CrouchBlend) * AimBlend;
 	AimedFromHip.Alpha = (1.0f - CrouchBlend) * (1.0f - AimBlend);
+	LeftHand.JointTargetLocation = LeftElbowTarget;
+	RightHand.JointTargetLocation = RightElbowTarget;
 }
 
 void FCheeseStrikeAnimProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)
 {
 	if (bLinked)
 	{
-		Slot.Update_AnyThread(InContext);
+		ToLocalSpace.Update_AnyThread(InContext);
 	}
 }
 
@@ -266,6 +304,6 @@ bool FCheeseStrikeAnimProxy::Evaluate(FPoseContext& Output)
 	{
 		return false;
 	}
-	Slot.Evaluate_AnyThread(Output);
+	ToLocalSpace.Evaluate_AnyThread(Output);
 	return true;
 }
