@@ -1,6 +1,12 @@
 # The Creamery
 
-The first real map: a cheese works, about 130 by 100 m at life size (390 by 300 Godot metres, between Curd City and the small arenas), for up to sixteen players. A sprint from one dock to the other takes about 20 seconds. It is built by `tools/art/build_creamery.py` into `Content/CheeseStrike/Maps/Lvl_Creamery`, from the engine's basic shapes and the project's own materials (`tools/art/build_materials.py`, `tools/art/cheese_material.py`): no downloaded art yet, so it is a well-lit block-out of a real place, not finished art.
+The first real map: a cheese works, about 130 by 100 m at life size (390 by 300 Godot metres, between Curd City and the small arenas), for up to sixteen players. A sprint from one dock to the other takes about 20 seconds. It is built by `tools/art/build_creamery.py` into `Content/CheeseStrike/Maps/Lvl_Creamery`.
+
+## The art
+
+Its walls and floors are blocks (the engine's cube and cylinder) wearing Megascans surfaces from Fab: concrete floors, an asphalt yard, shuttered concrete for the outer wall, corrugated sheets for the hall, the annexes and the cold stores, painted metal for the racks, rails, pipes and silos, and roller doors on the docks. `M_Surface` (`tools/art/build_materials.py`) draws a surface from world space on all three axes, so a block of any size shows it at its real scale, varies it over large areas so its repeat doesn't show, and repaints it in the map's colours. Its things are Fab models: shipping containers (Sousinho Games', repainted, with the shipping line's lettering painted over), Megascans tarped crates on pallets, jersey barriers, barrels, drums, plastic crates, a workbench and a cabinet in each annex, fluorescent lamps in the hall; with oil stains, cracks in the asphalt, rust leaking down the wall and a number on each dock door as decals. `tools/art/import_fab.py` imports them from the downloads (it names each file and where on Fab it came from; `Content/LICENSES.md` has the listings).
+
+A model standing for cover is scaled to fill the block the map's layout gives it (a crate on its pallet fills the old crate's block exactly, the Squeeze is two stacks of crates filling its two blocks), so the layout plays as below, and every model's collision, for movement and for shots and sight lines, is its box: cover is as big as it looks, and there are no slits between stacked crates. Clutter stands against walls and in corners, off the lanes, the ramps and the lines the tests check.
 
 ## Layout
 

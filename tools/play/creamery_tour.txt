@@ -31,4 +31,10 @@ shot creamery_9_tank_row
 cmd CheeseStrikeViewFrom -6000 -900 300 -5 10
 wait 2
 shot creamery_10_dock
+cmd CheeseStrikeViewFrom -5800 600 350 -5 180
+wait 2
+shot creamery_11_dock_door
+cmd CheeseStrikeViewFrom -2600 2650 100 -3 90
+wait 2
+shot creamery_12_container
 quit

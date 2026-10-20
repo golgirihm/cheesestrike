@@ -1,7 +1,7 @@
 import math
 import unreal, traceback
 
-# Run with the editor closed, after build_materials.py and cheese_material.py:
+# Run with the editor closed, after import_fab.py, build_materials.py and cheese_material.py:
 #   UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/build_creamery.py" -unattended -nullrhi
 # (both paths absolute: the editor runs from its own folder).
 # It writes what it built to Saved/build_creamery.txt.
@@ -13,6 +13,9 @@ import unreal, traceback
 # with the structure it belongs to. The west half is built and mirrored for
 # the east (x to -x); what straddles the middle is built once. Units are
 # centimetres, the floor is at 0, x runs west to east and y south to north.
+# Its surfaces are Megascans textures and its props Megascans models and a
+# shipping container from Fab (import_fab.py); a prop that is cover is scaled
+# to fill the block it stands for, so the map plays as its notes say.
 
 OUT = unreal.Paths.project_saved_dir() + "build_creamery.txt"
 LEVEL = "/Game/CheeseStrike/Maps/Lvl_Creamery"
@@ -23,10 +26,18 @@ eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 
 CUBE = unreal.load_asset("/Engine/BasicShapes/Cube")
 CYLINDER = unreal.load_asset("/Engine/BasicShapes/Cylinder")
-CONCRETE = unreal.load_asset(MATS + "M_Concrete")
-STEEL = unreal.load_asset(MATS + "M_Steel")
-CHEESE_THIN = unreal.load_asset(MATS + "MI_CheeseThin")
-METAL = {name: unreal.load_asset(MATS + "MI_Metal_" + name) for name in ("Cream", "Teal", "Red", "Blue", "Yellow", "Dark", "Grey")}
+COLOURS = ("Cream", "Teal", "Red", "Blue", "Yellow", "Orange", "Dark", "Grey")
+FLOOR = unreal.load_asset(MATS + "MI_ConcreteFloor")
+WALL = unreal.load_asset(MATS + "MI_ConcreteWall")
+FACADE = unreal.load_asset(MATS + "MI_ConcreteFacade")
+ASPHALT = unreal.load_asset(MATS + "MI_Asphalt")
+DOOR = unreal.load_asset(MATS + "MI_GarageDoor")
+ROOF = unreal.load_asset(MATS + "MI_Roof")
+STEEL = unreal.load_asset(MATS + "MI_Steel")
+SHEET = {name: unreal.load_asset(MATS + "MI_Corrugated_" + name) for name in COLOURS}
+PAINT = {name: unreal.load_asset(MATS + "MI_Painted_" + name) for name in COLOURS}
+PROPS = "/Game/Fab/Megascans/Props/"
+CONTAINER = unreal.load_asset("/Game/Fab/SousinhoGames/ShippingContainer/SM_Container")
 
 # Bounds of the playable ground; the canal runs west to east south of the hall.
 HALF_X = 6600
@@ -38,6 +49,7 @@ CANAL_RAMP_X = 5400   # and ramps up to the ground at either end by 5400
 HALL_X = 2400
 HALL_Y = 1800
 HALL_HEIGHT = 900
+DOCK_DOORS = (-1200, 600, 2400)  # the roller doors behind each dock, by y
 
 
 def v(x, y, z):
@@ -71,6 +83,73 @@ def box(label, folder, low, high, material):
 
 def cylinder(label, folder, centre_x, centre_y, bottom, diameter, height, material):
     return solid(label, folder, (centre_x, centre_y, bottom + height / 2.0), (diameter, diameter, height), material, CYLINDER)
+
+
+def mesh(name):
+    return unreal.load_asset(f"{PROPS}{name}/SM_{name}")
+
+
+def fill(label, folder, model, low, high, yaw=0, materials=None):
+    """A model scaled to fill the block from corner `low` to corner `high`, turned by `yaw` (a multiple of 90): cover keeps its block's size."""
+    b = model.get_bounding_box()
+    dx, dy, dz = abs(high[0] - low[0]), abs(high[1] - low[1]), abs(high[2] - low[2])
+    across, along = (dy, dx) if yaw % 180 else (dx, dy)
+    scale = (across / (b.max.x - b.min.x), along / (b.max.y - b.min.y), dz / (b.max.z - b.min.z))
+    middle = ((b.min.x + b.max.x) / 2.0 * scale[0], (b.min.y + b.max.y) / 2.0 * scale[1])
+    turn = math.radians(yaw)
+    offset = (middle[0] * math.cos(turn) - middle[1] * math.sin(turn), middle[0] * math.sin(turn) + middle[1] * math.cos(turn))
+    centre = ((low[0] + high[0]) / 2.0 - offset[0], (low[1] + high[1]) / 2.0 - offset[1], min(low[2], high[2]) - b.min.z * scale[2])
+    actor = place(unreal.StaticMeshActor, label, folder, centre, (0, yaw, 0))
+    component = actor.static_mesh_component
+    component.set_static_mesh(model)
+    for index, material in enumerate(materials or []):
+        component.set_material(index, material)
+    actor.set_actor_scale3d(v(*scale))
+    counts[folder.split("/")[0]] = counts.get(folder.split("/")[0], 0) + 1
+    return actor
+
+
+def prop(label, folder, name, x, y, z=0, yaw=0, scale=1.0):
+    """A model at its own size (times `scale`), standing on the floor at (x, y, z)."""
+    model = mesh(name)
+    b = model.get_bounding_box()
+    half = ((b.max.x - b.min.x) * scale / 2.0, (b.max.y - b.min.y) * scale / 2.0)
+    if yaw % 180:
+        half = (half[1], half[0])
+    return fill(label, folder, model, (x - half[0], y - half[1], z), (x + half[0], y + half[1], z + (b.max.z - b.min.z) * scale), yaw)
+
+
+def shipping_container(label, folder, low, high, colour):
+    """A shipping container (two stacked, for a block 5.2 m high) filling the block, long side along its longer side, painted `colour`."""
+    slots = [str(s.get_editor_property("material_slot_name")).lower() for s in CONTAINER.get_editor_property("static_materials")]
+    paint = [unreal.load_asset(MATS + "MI_Container_" + ("Frame" if "frame" in s else "Doors" if "door" in s else "Sides") + "_" + colour) for s in slots]
+    yaw = 0 if abs(high[0] - low[0]) >= abs(high[1] - low[1]) else 90
+    levels = max(1, round(abs(high[2] - low[2]) / 260.0))
+    step = abs(high[2] - low[2]) / levels
+    for level in range(levels):
+        z0 = min(low[2], high[2]) + level * step
+        fill(f"{label}_{level}", folder, CONTAINER, (low[0], low[1], z0), (high[0], high[1], z0 + step), yaw + 180 * level, paint)
+
+
+def stack(label, folder, name, low, high, nx, ny, nz):
+    """A block filled with nx by ny by nz of a model, side by side and on top of each other."""
+    model = mesh(name)
+    sx, sy, sz = (high[0] - low[0]) / nx, (high[1] - low[1]) / ny, (high[2] - low[2]) / nz
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                a = (low[0] + i * sx, low[1] + j * sy, low[2] + k * sz)
+                fill(f"{label}_{i}_{j}_{k}", folder, model, a, (a[0] + sx, a[1] + sy, a[2] + sz), 90 * ((i + j + k) % 2))
+
+
+def decal(label, folder, name, at, size, rotation):
+    """A decal of `size` (depth, width, height) at `at`, projecting along its rotation's forward axis."""
+    actor = place(unreal.DecalActor, label, folder, at, rotation)
+    component = actor.get_component_by_class(unreal.DecalComponent)
+    component.set_decal_material(unreal.load_asset(MATS + "MI_Decal_" + name))
+    component.set_editor_property("decal_size", v(*size))
+    counts["decals"] = counts.get("decals", 0) + 1
+    return actor
 
 
 def ramp(label, folder, start, end, width, material, thickness=40):
@@ -113,21 +192,23 @@ def start(label, x, y, z, yaw):
 def ground():
     f = "Ground"
     # North of the canal and south of it, deep enough that their faces are the canal's walls.
-    box("Ground_North", f, (-HALF_X, CANAL_Y[1], -400), (HALF_X, HALF_Y, 0), CONCRETE)
-    box("Ground_South", f, (-HALF_X, -HALF_Y, -400), (HALF_X, CANAL_Y[0], 0), CONCRETE)
+    # The yard is asphalt, the rest concrete.
+    box("Ground_North", f, (-HALF_X, CANAL_Y[1], -400), (HALF_X, 2600, 0), FLOOR)
+    box("Ground_Yard", f, (-HALF_X, 2600, -400), (HALF_X, HALF_Y, 0), ASPHALT)
+    box("Ground_South", f, (-HALF_X, -HALF_Y, -400), (HALF_X, CANAL_Y[0], 0), FLOOR)
     # The canal: a floor 3 m down, ramps up at either end, ground beyond them.
-    box("Canal_Floor", f, (-CANAL_RAMP_X, CANAL_Y[0], -CANAL_DEPTH - 100), (CANAL_RAMP_X, CANAL_Y[1], -CANAL_DEPTH), CONCRETE)
+    box("Canal_Floor", f, (-CANAL_RAMP_X, CANAL_Y[0], -CANAL_DEPTH - 100), (CANAL_RAMP_X, CANAL_Y[1], -CANAL_DEPTH), FLOOR)
     canal_middle = (CANAL_Y[0] + CANAL_Y[1]) / 2.0
     canal_width = CANAL_Y[1] - CANAL_Y[0]
     for s, side in ((-1, "West"), (1, "East")):
-        ramp(f"Canal_Ramp_{side}", f, (s * CANAL_FLAT_X, canal_middle, -CANAL_DEPTH), (s * CANAL_RAMP_X, canal_middle, 0), canal_width, CONCRETE)
-        box(f"Canal_End_{side}", f, (min(s * CANAL_RAMP_X, s * HALF_X), CANAL_Y[0], -400), (max(s * CANAL_RAMP_X, s * HALF_X), CANAL_Y[1], 0), CONCRETE)
+        ramp(f"Canal_Ramp_{side}", f, (s * CANAL_FLAT_X, canal_middle, -CANAL_DEPTH), (s * CANAL_RAMP_X, canal_middle, 0), canal_width, FLOOR)
+        box(f"Canal_End_{side}", f, (min(s * CANAL_RAMP_X, s * HALF_X), CANAL_Y[0], -400), (max(s * CANAL_RAMP_X, s * HALF_X), CANAL_Y[1], 0), FLOOR)
     # The yard's outer wall, all round.
     wall = "Ground/Boundary"
-    box("Boundary_North", wall, (-HALF_X - 100, HALF_Y, -400), (HALF_X + 100, HALF_Y + 100, 1000), CONCRETE)
-    box("Boundary_South", wall, (-HALF_X - 100, -HALF_Y - 100, -400), (HALF_X + 100, -HALF_Y, 1000), CONCRETE)
-    box("Boundary_West", wall, (-HALF_X - 100, -HALF_Y, -400), (-HALF_X, HALF_Y, 1000), CONCRETE)
-    box("Boundary_East", wall, (HALF_X, -HALF_Y, -400), (HALF_X + 100, HALF_Y, 1000), CONCRETE)
+    box("Boundary_North", wall, (-HALF_X - 100, HALF_Y, -400), (HALF_X + 100, HALF_Y + 100, 1000), WALL)
+    box("Boundary_South", wall, (-HALF_X - 100, -HALF_Y - 100, -400), (HALF_X + 100, -HALF_Y, 1000), WALL)
+    box("Boundary_West", wall, (-HALF_X - 100, -HALF_Y, -400), (-HALF_X, HALF_Y, 1000), WALL)
+    box("Boundary_East", wall, (HALF_X, -HALF_Y, -400), (HALF_X + 100, HALF_Y, 1000), WALL)
 
 
 # ---------------------------------------------------------------- one side's dock and plaza (west; s = -1 builds it, s = 1 mirrors it east)
@@ -137,17 +218,18 @@ def dock(s, side):
     X = lambda x: s * x  # x given for the east side, as distances from the middle
     team = "Gouda" if s < 0 else "Mozza"
     # The loading dock: a platform along the outer wall, 1.2 m up, with ramps down towards the middle.
-    box(f"{f}_Platform", f, (min(X(5900), X(HALF_X)), -2400, 0), (max(X(5900), X(HALF_X)), 4400, 120), CONCRETE)
-    box(f"{f}_PlatformEdge", f, (min(X(5880), X(5900)), -2400, 120), (max(X(5880), X(5900)), 4400, 135), METAL["Yellow"])
+    box(f"{f}_Platform", f, (min(X(5900), X(HALF_X)), -2400, 0), (max(X(5900), X(HALF_X)), 4400, 120), FLOOR)
+    box(f"{f}_PlatformEdge", f, (min(X(5880), X(5900)), -2400, 120), (max(X(5880), X(5900)), 4400, 135), PAINT["Yellow"])
     for y in (-1600, 3600):
-        ramp(f"{f}_Ramp_{y}", f, (X(5900), y, 120), (X(5300), y, 0), 400, CONCRETE)
+        ramp(f"{f}_Ramp_{y}", f, (X(5900), y, 120), (X(5300), y, 0), 400, FLOOR)
     # Roller doors in the outer wall behind the platform, for the place it is.
-    for y in (-1200, 600, 2400):
-        box(f"{f}_Door_{y}", f, (min(X(6595), X(6600)), y - 250, 120), (max(X(6595), X(6600)), y + 250, 620), METAL["Dark"])
-    # Crates on the platform and the ground, for cover leaving the dock.
+    for y in DOCK_DOORS:
+        box(f"{f}_Door_{y}", f, (min(X(6595), X(6600)), y - 250, 120), (max(X(6595), X(6600)), y + 250, 620), DOOR)
+    # Crates on pallets on the platform and the ground, for cover leaving the dock.
     for x, y, h in ((6200, 900, 140), (6300, 2900, 140), (5600, 4500, 120), (5650, -4300, 140), (5700, 2100, 120)):
         z0 = 120 if x > 5900 else 0
-        box(f"{f}_Crate_{x}_{y}", f, (X(x) - 70, y - 70, z0), (X(x) + 70, y + 70, z0 + h), METAL["Teal"])
+        fill(f"{f}_Pallet_{x}_{y}", f, mesh("Pallet"), (X(x) - 70, y - 70, z0), (X(x) + 70, y + 70, z0 + 14))
+        fill(f"{f}_Crate_{x}_{y}", f, mesh("TarpedCrate"), (X(x) - 70, y - 70, z0 + 14), (X(x) + 70, y + 70, z0 + h), 90 if x % 200 else 0)
     # The dock's cheese: low walls in front of it, two blocks high, that keep a side's way out covered until eaten.
     for y0, y1 in ((-2200, -1000), (1000, 2200)):
         for y in range(y0, y1, 100):
@@ -163,13 +245,14 @@ def dock(s, side):
     # The plaza between the dock and the lanes: open, with pallets of wheels to dash between.
     p = f"Plaza_{side}"
     for x, y in ((4300, 3600), (3800, 1200), (4300, -900), (3800, -2300), (4000, 4500)):
-        box(f"{p}_Pallet_{x}_{y}", p, (X(x) - 75, y - 75, 0), (X(x) + 75, y + 75, 15), METAL["Cream"])
+        fill(f"{p}_Pallet_{x}_{y}", p, mesh("Pallet"), (X(x) - 75, y - 75, 0), (X(x) + 75, y + 75, 15))
         for layer in (0, 1):
             for dx in (-37, 37):
                 for dy in (-37, 37):
                     wheel(f"Cheese_Pallet_{team}_{x}_{y}_{layer}_{dx}_{dy}", f"Pallets{team}", X(x) + dx, y + dy, 15 + layer * 50, 72, 50)
-    # A forklift by the hall's corner.
-    box(f"{p}_Forklift", p, (X(3000) - 120, 2050, 0), (X(3000) + 120, 2250, 220), METAL["Yellow"])
+    # A load waiting by the hall's corner: a big tarped crate on a pallet.
+    fill(f"{p}_Load_Pallet", p, mesh("Pallet"), (X(3000) - 120, 2050, 0), (X(3000) + 120, 2250, 15))
+    fill(f"{p}_Load", p, mesh("TarpedCrate"), (X(3000) - 120, 2050, 15), (X(3000) + 120, 2250, 220))
 
 
 # ---------------------------------------------------------------- the north lane: the loading yard
@@ -179,14 +262,14 @@ def yard_side(s, side):
     X = lambda x: s * x
     # Shipping containers: alone, and two stacked.
     def container(name, x0, y0, x1, y1, h, colour):
-        box(f"{f}_{name}", f, (min(X(x0), X(x1)), y0, 0), (max(X(x0), X(x1)), y1, h), METAL[colour])
+        shipping_container(f"{f}_{name}", f, (min(X(x0), X(x1)), y0, 0), (max(X(x0), X(x1)), y1, h), colour)
     container("Container_A", 2300, 3000, 2900, 3250, 260, "Blue")
     container("Container_B", 1550, 3700, 1800, 4300, 260, "Red")
     container("Container_Stack", 2400, 4300, 3000, 4550, 520, "Teal")
     # A trailer along the yard's north edge.
-    box(f"{f}_Trailer", f, (min(X(600), X(1400)), 4550, 40), (max(X(600), X(1400)), 4850, 340), METAL["Cream"])
+    box(f"{f}_Trailer", f, (min(X(600), X(1400)), 4550, 40), (max(X(600), X(1400)), 4850, 340), SHEET["Cream"])
     for wx in (700, 1300):
-        box(f"{f}_Trailer_Wheels_{wx}", f, (X(wx) - 60, 4580, 0), (X(wx) + 60, 4820, 40), METAL["Dark"])
+        box(f"{f}_Trailer_Wheels_{wx}", f, (X(wx) - 60, 4580, 0), (X(wx) + 60, 4820, 40), PAINT["Dark"])
 
 
 def yard_middle():
@@ -205,8 +288,8 @@ def yard_middle():
             y += diameter
     # The Squeeze: two crate stacks on the walkway by the hall that overlap, so the way
     # past the stack zig-zags and no line runs along the hall's north wall from end to end.
-    box("Squeeze_A", f, (-900, HALL_Y, 0), (-500, 2300, 300), METAL["Teal"])
-    box("Squeeze_B", f, (500, 2100, 0), (900, 2600, 300), METAL["Teal"])
+    stack("Squeeze_A", f, "TarpedCrate", (-900, HALL_Y, 0), (-500, 2300, 300), 3, 4, 2)
+    stack("Squeeze_B", f, "TarpedCrate", (500, 2100, 0), (900, 2600, 300), 3, 4, 2)
 
 
 # ---------------------------------------------------------------- the middle lane: the aging hall
@@ -214,7 +297,7 @@ def yard_middle():
 def hall():
     f = "Hall"
     T = 50  # wall thickness
-    metal = METAL["Grey"]
+    metal = SHEET["Grey"]
 
     def wall_x(name, x, y0, y1, z0, z1):
         box(f"Hall_{name}", f + "/Walls", (x - T / 2.0, y0, z0), (x + T / 2.0, y1, z1), metal)
@@ -244,12 +327,12 @@ def hall():
     # The roof: panels across the hall with strips of skylight between them.
     x = -HALL_X - T / 2.0
     while x < HALL_X:
-        box(f"Hall_Roof_{int(x)}", f + "/Roof", (x, -HALL_Y - T, HALL_HEIGHT), (min(x + 600, HALL_X + T / 2.0), HALL_Y + T, HALL_HEIGHT + 40), metal)
+        box(f"Hall_Roof_{int(x)}", f + "/Roof", (x, -HALL_Y - T, HALL_HEIGHT), (min(x + 600, HALL_X + T / 2.0), HALL_Y + T, HALL_HEIGHT + 40), ROOF)
         x += 800
     # The press in the middle, on the line between the main doors: hard cover where the
     # hall's long line would otherwise run from door to door.
-    cylinder("Hall_Press_Base", f + "/Press", 0, 0, 0, 520, 120, METAL["Dark"])
-    cylinder("Hall_Press_Drum", f + "/Press", 0, 0, 120, 420, 260, METAL["Red"])
+    cylinder("Hall_Press_Base", f + "/Press", 0, 0, 0, 520, 120, PAINT["Dark"])
+    cylinder("Hall_Press_Drum", f + "/Press", 0, 0, 120, 420, 260, PAINT["Red"])
     cylinder("Hall_Press_Head", f + "/Press", 0, 0, 380, 200, 220, STEEL)
     # The racks: steel shelving in rows across the hall, three shelves of wheels each.
     # North and south of the middle aisle, at three places either side of the press,
@@ -261,13 +344,13 @@ def hall():
                 rack(s * rx, y0, y0 + 1000)
     # The mezzanine along the south wall, 4 m up, with ramps at either end and a rail.
     m = f + "/Mezzanine"
-    box("Hall_Mezzanine", m, (-1950, -HALL_Y + T / 2.0, 370), (1950, -1300, 400), CONCRETE)
-    box("Hall_Mezzanine_Rail", m, (-1950, -1310, 400), (1950, -1300, 500), STEEL)
+    box("Hall_Mezzanine", m, (-1950, -HALL_Y + T / 2.0, 370), (1950, -1300, 400), FLOOR)
+    box("Hall_Mezzanine_Rail", m, (-1950, -1310, 400), (1950, -1300, 500), PAINT["Yellow"])
     for px in range(-1900, 1901, 760):
-        box(f"Hall_Mezzanine_Post_{px}", m, (px - 10, -1320, 0), (px + 10, -1300, 370), STEEL)
+        box(f"Hall_Mezzanine_Post_{px}", m, (px - 10, -1320, 0), (px + 10, -1300, 370), PAINT["Yellow"])
     for s, side in ((-1, "West"), (1, "East")):
         ramp(f"Hall_Mezzanine_Ramp_{side}", m, (s * 2150, -300, 0), (s * 2150, -1300, 400), 300, STEEL, thickness=30)
-        box(f"Hall_Mezzanine_Landing_{side}", m, (min(s * 1950, s * 2300), -HALL_Y + T / 2.0, 370), (max(s * 1950, s * 2300), -1300, 400), CONCRETE)
+        box(f"Hall_Mezzanine_Landing_{side}", m, (min(s * 1950, s * 2300), -HALL_Y + T / 2.0, 370), (max(s * 1950, s * 2300), -1300, 400), FLOOR)
     # Lamps over the aisles.
     for lx in (-1500, 0, 1500):
         for ly in (-900, 900):
@@ -279,6 +362,8 @@ def hall():
             component.set_editor_property("source_height", 60.0)
             component.set_editor_property("use_temperature", True)
             component.set_editor_property("temperature", 4200.0)
+            for dy in (-60, 60):
+                prop(f"Hall_Lamp_{lx}_{ly}_Tube_{dy}", f + "/Lamps", "FluorescentLamp", lx, ly + dy, HALL_HEIGHT - 30, 90, 3.0)
 
 
 def rack(x, y0, y1):
@@ -286,14 +371,14 @@ def rack(x, y0, y1):
     depth = 120
     for py in (y0, (y0 + y1) / 2.0, y1):
         for px in (x - depth / 2.0, x + depth / 2.0):
-            box(f"Rack_Post_{int(x)}_{int(py)}_{int(px)}", f, (px - 5, py - 5, 0), (px + 5, py + 5, 310), STEEL)
+            box(f"Rack_Post_{int(x)}_{int(py)}_{int(px)}", f, (px - 5, py - 5, 0), (px + 5, py + 5, 310), PAINT["Blue"])
     for z in (10, 110, 210):
-        box(f"Rack_Shelf_{int(x)}_{int(y0)}_{z}", f, (x - depth / 2.0, y0, z), (x + depth / 2.0, y1, z + 10), STEEL)
+        box(f"Rack_Shelf_{int(x)}_{int(y0)}_{z}", f, (x - depth / 2.0, y0, z), (x + depth / 2.0, y1, z + 10), PAINT["Orange"])
         y = y0 + 50
         while y < y1:
             wheel(f"Cheese_Rack_{int(x)}_{int(y)}_{z}", "Racks", x, y, z + 10, 98, 80)
             y += 100
-    box(f"Rack_Top_{int(x)}_{int(y0)}", f, (x - depth / 2.0, y0, 300), (x + depth / 2.0, y1, 310), STEEL)
+    box(f"Rack_Top_{int(x)}_{int(y0)}", f, (x - depth / 2.0, y0, 300), (x + depth / 2.0, y1, 310), PAINT["Orange"])
 
 
 # ---------------------------------------------------------------- the south lane: the canal and the tanks
@@ -305,20 +390,20 @@ def south():
         X = lambda x: s * x
         # A concrete bridge across the canal at either side, with low rails.
         b = f"{f}/Bridge_{side}"
-        box(f"Bridge_{side}", b, (X(2800) - 200, CANAL_Y[0], -50), (X(2800) + 200, CANAL_Y[1], 0), CONCRETE)
+        box(f"Bridge_{side}", b, (X(2800) - 200, CANAL_Y[0], -50), (X(2800) + 200, CANAL_Y[1], 0), FLOOR)
         for rx in (-190, 190):
-            box(f"Bridge_{side}_Rail_{rx}", b, (X(2800) + rx - 8, CANAL_Y[0], 0), (X(2800) + rx + 8, CANAL_Y[1], 100), STEEL)
+            box(f"Bridge_{side}_Rail_{rx}", b, (X(2800) + rx - 8, CANAL_Y[0], 0), (X(2800) + rx + 8, CANAL_Y[1], 100), PAINT["Yellow"])
         # Steps out of the canal, along its north wall.
-        ramp(f"Canal_Steps_{side}", f, (X(1300), -2950, -CANAL_DEPTH), (X(2500), -2950, 0), 300, CONCRETE)
+        ramp(f"Canal_Steps_{side}", f, (X(1300), -2950, -CANAL_DEPTH), (X(2500), -2950, 0), 300, FLOOR)
         # Tank Row, south of the canal: silos and barriers.
         for tx in (1200, 3200):
             cylinder(f"Silo_{side}_{tx}", f + "/Tanks", X(tx), -4300, 0, 400, 900, STEEL)
             cylinder(f"Silo_{side}_{tx}_Cap", f + "/Tanks", X(tx), -4300, 900, 300, 80, STEEL)
         for bx, by in ((2200, -3900), (400, -4550), (4000, -4400)):
-            box(f"Barrier_{side}_{bx}", f + "/Barriers", (X(bx) - 150, by - 30, 0), (X(bx) + 150, by + 30, 100), CONCRETE)
-        # The walkway between the hall and the canal: planters to break its line.
+            prop(f"Barrier_{side}_{bx}", f + "/Barriers", "ConcreteBarrier", X(bx), by)
+        # The walkway between the hall and the canal: barriers to break its line.
         for wx, wy in ((2000, -2300), (600, -2550)):
-            box(f"Planter_{side}_{wx}", f + "/Walkway", (X(wx) - 150, wy - 40, 0), (X(wx) + 150, wy + 40, 100), CONCRETE)
+            prop(f"Planter_{side}_{wx}", f + "/Walkway", "ConcreteBarrier", X(wx), wy)
     # The Cheese Bridge: the middle crossing over the canal, a deck of cheese. The mice
     # take it away, and the canal is then crossed only at the concrete bridges.
     for x in range(-200, 200, 100):
@@ -338,7 +423,7 @@ def pipe_y(label, folder, x, y0, y1, z, diameter, material):
 
 def lamp(label, folder, x, y, height=700):
     cylinder(label, folder, x, y, 0, 18, height, STEEL)
-    box(label + "_Head", folder, (x - 60, y - 15, height - 10), (x + 60, y + 15, height + 10), METAL["Dark"])
+    box(label + "_Head", folder, (x - 60, y - 15, height - 10), (x + 60, y + 15, height + 10), PAINT["Dark"])
 
 
 def annex(s, side):
@@ -347,7 +432,7 @@ def annex(s, side):
     X = lambda x: s * x
     x0, x1, y0, y1, h, t = 3500, 4500, -1900, -500, 400, 30
     lo, hi = min(X(x0), X(x1)), max(X(x0), X(x1))
-    wall = METAL["Grey"]
+    wall = SHEET["Cream"]
     # Walls towards the middle and towards the dock, each with a door; walls north and south, the north with a window.
     for x in (x0, x1):
         box(f"{f}_Wall_{x}_A", f, (X(x) - t / 2.0, y0, 0), (X(x) + t / 2.0, -1400, h), wall)
@@ -359,17 +444,18 @@ def annex(s, side):
     box(f"{f}_Wall_North_B", f, (wx1, y1 - t / 2.0, 0), (hi, y1 + t / 2.0, h), wall)
     box(f"{f}_Wall_North_Sill", f, (wx0, y1 - t / 2.0, 0), (wx1, y1 + t / 2.0, 120), wall)
     box(f"{f}_Wall_North_Lintel", f, (wx0, y1 - t / 2.0, 250), (wx1, y1 + t / 2.0, h), wall)
-    # A partition with a gap, and a desk.
+    # A partition with a gap, a workbench and a cabinet.
     box(f"{f}_Partition", f, (min(X(4000), X(4000) + s * 20), y0, 0), (max(X(4000), X(4000) + s * 20), -1250, 280), wall)
-    box(f"{f}_Desk", f, (X(3800) - 80, -800, 0), (X(3800) + 80, -650, 80), METAL["Dark"])
+    prop(f"{f}_Desk", f, "Workbench", X(3800), -725, 0, 90)
+    prop(f"{f}_Cabinet", f, "MetalCabinet", X(3700), -1855)
     # The roof, with a low parapet to crouch behind, reached by a ramp along the south wall.
-    box(f"{f}_Roof", f, (lo - t / 2.0, y0 - t / 2.0, h), (hi + t / 2.0, y1 + t / 2.0, h + 25), CONCRETE)
+    box(f"{f}_Roof", f, (lo - t / 2.0, y0 - t / 2.0, h), (hi + t / 2.0, y1 + t / 2.0, h + 25), FLOOR)
     parapets = (((lo - t / 2.0, y1 - 10), (hi + t / 2.0, y1 + t / 2.0)),
                 ((lo - t / 2.0, y0 - t / 2.0), (lo + 10, y1 + t / 2.0)),
                 ((hi - 10, y0 - t / 2.0), (hi + t / 2.0, y1 + t / 2.0)))
     for a, b in parapets:
-        box(f"{f}_Parapet_{int(a[0])}_{int(a[1])}", f, (a[0], a[1], h + 25), (b[0], b[1], h + 110), CONCRETE)
-    ramp(f"{f}_Ramp", f, (X(x1), y0 - 170, 0), (X(x0) + s * 100, y0 - 170, h + 25), 260, CONCRETE)
+        box(f"{f}_Parapet_{int(a[0])}_{int(a[1])}", f, (a[0], a[1], h + 25), (b[0], b[1], h + 110), WALL)
+    ramp(f"{f}_Ramp", f, (X(x1), y0 - 170, 0), (X(x0) + s * 100, y0 - 170, h + 25), 260, FLOOR)
 
 
 def details():
@@ -378,20 +464,19 @@ def details():
         X = lambda x: s * x
         annex(s, side)
         # The yard: another container, barriers and lamps.
-        box(f"Yard_{side}_Container_C", f"Yard_{side}", (min(X(850), X(1450)), 3150, 0), (max(X(850), X(1450)), 3400, 260), METAL["Yellow"])
+        shipping_container(f"Yard_{side}_Container_C", f"Yard_{side}", (min(X(850), X(1450)), 3150, 0), (max(X(850), X(1450)), 3400, 260), "Yellow")
         for bx, by, along in ((1200, 2850, True), (2000, 4050, False), (3100, 3700, True)):
-            half_x, half_y = (150, 30) if along else (30, 150)
-            box(f"Yard_{side}_Barrier_{bx}", f"Yard_{side}", (X(bx) - half_x, by - half_y, 0), (X(bx) + half_x, by + half_y, 100), CONCRETE)
+            prop(f"Yard_{side}_Barrier_{bx}", f"Yard_{side}", "ConcreteBarrier", X(bx), by, 0, 0 if along else 90)
         for lx, ly in ((2000, 2700), (3300, 4200), (1000, 4300)):
             lamp(f"Lamp_{side}_{lx}_{ly}", f + "/Lamps", X(lx), ly)
         # The hall's main doors: a canopy over each, on posts.
         c = f"Hall/Canopy_{side}"
-        box(f"Canopy_{side}", c, (min(X(2400), X(3100)), -650, 560), (max(X(2400), X(3100)), 650, 590), METAL["Dark"])
+        box(f"Canopy_{side}", c, (min(X(2400), X(3100)), -650, 560), (max(X(2400), X(3100)), 650, 590), PAINT["Dark"])
         for py in (-620, 620):
             box(f"Canopy_{side}_Post_{py}", c, (X(3070) - 10, py - 10, 0), (X(3070) + 10, py + 10, 560), STEEL)
         # A pipe bridge from the tanks over the canal to the hall's south wall.
         pipe_y(f"PipeBridge_{side}_A", f + "/Pipes", X(1900), -4100, -1800, 560, 45, STEEL)
-        pipe_y(f"PipeBridge_{side}_B", f + "/Pipes", X(2000), -4100, -1800, 560, 30, METAL["Red"])
+        pipe_y(f"PipeBridge_{side}_B", f + "/Pipes", X(2000), -4100, -1800, 560, 30, PAINT["Red"])
         for py in (-3700, -2700):
             bottom = -CANAL_DEPTH if CANAL_Y[0] < py < CANAL_Y[1] else 0
             box(f"PipeBridge_{side}_Support_{py}", f + "/Pipes", (X(1950) - 15, py - 15, bottom), (X(1950) + 15, py + 15, 530), STEEL)
@@ -400,37 +485,90 @@ def details():
         for lx in (1000, 3600):
             lamp(f"Lamp_{side}_Canal_{lx}", f + "/Lamps", X(lx), -2730)
     # The pipe rack along Tank Row, between the canal and the silos.
-    for y, z, d, m in ((-3820, 420, 45, STEEL), (-3880, 420, 30, METAL["Red"]), (-3850, 480, 35, METAL["Teal"])):
+    for y, z, d, m in ((-3820, 420, 45, STEEL), (-3880, 420, 30, PAINT["Red"]), (-3850, 480, 35, PAINT["Teal"])):
         pipe_x(f"PipeRack_{y}_{z}", f + "/Pipes", -4500, 4500, y, z, d, m)
     for px in range(-4500, 4501, 1000):
         box(f"PipeRack_Post_{px}", f + "/Pipes", (px - 12, -3862, 0), (px + 12, -3838, 400), STEEL)
         box(f"PipeRack_Arm_{px}", f + "/Pipes", (px - 12, -3920, 395), (px + 12, -3780, 405), STEEL)
     # Painted lines on the ground: the walkways along the hall.
     for y in (HALL_Y + 600, -HALL_Y - 600):
-        box(f"Line_{y}", f + "/Lines", (-HALL_X - 400, y - 6, 0), (HALL_X + 400, y + 6, 0.6), METAL["Yellow"])
+        box(f"Line_{y}", f + "/Lines", (-HALL_X - 400, y - 6, 0), (HALL_X + 400, y + 6, 0.6), PAINT["Yellow"])
     # The boundary wall: pilasters along its inside, so a long wall isn't a flat sheet.
     for x in range(-HALF_X + 800, HALF_X, 800):
         for y, d in ((HALF_Y, -1), (-HALF_Y, 1)):
-            box(f"Pilaster_{x}_{y}", "Ground/Boundary", (x - 40, min(y, y + d * 60), 0), (x + 40, max(y, y + d * 60), 1000), CONCRETE)
+            box(f"Pilaster_{x}_{y}", "Ground/Boundary", (x - 40, min(y, y + d * 60), 0), (x + 40, max(y, y + d * 60), 1000), WALL)
     for y in range(-HALF_Y + 800, HALF_Y, 800):
+        if any(abs(y - door) < 300 for door in DOCK_DOORS):
+            continue  # not in front of a dock's doors
         for x, d in ((HALF_X, -1), (-HALF_X, 1)):
             bottom = 120 if -2400 < y < 4400 else 0  # on the docks' platforms
-            box(f"Pilaster_{x}_{y}", "Ground/Boundary", (min(x, x + d * 60), y - 40, bottom), (max(x, x + d * 60), y + 40, 1000), CONCRETE)
+            box(f"Pilaster_{x}_{y}", "Ground/Boundary", (min(x, x + d * 60), y - 40, bottom), (max(x, x + d * 60), y + 40, 1000), WALL)
     # The works beyond the wall, for a skyline: cold stores, a chimney, a battery of tall silos.
     b = "Beyond"
-    box("Beyond_ColdStore_West", b, (-5200, 5700, 0), (-800, 9200, 1800), METAL["Teal"])
-    box("Beyond_ColdStore_East", b, (1400, 5900, 0), (5600, 8200, 1300), METAL["Grey"])
-    cylinder("Beyond_Chimney", b, 2600, 8800, 0, 320, 3600, CONCRETE)
+    box("Beyond_ColdStore_West", b, (-5200, 5700, 0), (-800, 9200, 1800), SHEET["Teal"])
+    box("Beyond_ColdStore_East", b, (1400, 5900, 0), (5600, 8200, 1300), SHEET["Grey"])
+    cylinder("Beyond_Chimney", b, 2600, 8800, 0, 320, 3600, WALL)
     for x in range(-5000, 5001, 1500):
         cylinder(f"Beyond_Silo_{x}", b, x, -6600, 0, 600, 2400, STEEL)
         cylinder(f"Beyond_Silo_{x}_Cap", b, x, -6600, 2400, 420, 150, STEEL)
-    box("Beyond_Office_West", b, (-9800, -3000, 0), (-7400, 2500, 1500), CONCRETE)
-    box("Beyond_Office_East", b, (7400, -1000, 0), (9600, 4000, 1100), METAL["Grey"])
+    box("Beyond_Office_West", b, (-9800, -3000, 0), (-7400, 2500, 1500), FACADE)
+    box("Beyond_Office_East", b, (7400, -1000, 0), (9600, 4000, 1100), SHEET["Grey"])
     # Ground for them, outside the wall only (under the yard it would roof the canal).
-    box("Beyond_Ground_North", b, (-12000, HALF_Y + 100, -60), (12000, 12000, -40), CONCRETE)
-    box("Beyond_Ground_South", b, (-12000, -10000, -60), (12000, -HALF_Y - 100, -40), CONCRETE)
-    box("Beyond_Ground_West", b, (-12000, -HALF_Y - 100, -60), (-HALF_X - 100, HALF_Y + 100, -40), CONCRETE)
-    box("Beyond_Ground_East", b, (HALF_X + 100, -HALF_Y - 100, -60), (12000, HALF_Y + 100, -40), CONCRETE)
+    box("Beyond_Ground_North", b, (-12000, HALF_Y + 100, -60), (12000, 12000, -40), ASPHALT)
+    box("Beyond_Ground_South", b, (-12000, -10000, -60), (12000, -HALF_Y - 100, -40), ASPHALT)
+    box("Beyond_Ground_West", b, (-12000, -HALF_Y - 100, -60), (-HALF_X - 100, HALF_Y + 100, -40), ASPHALT)
+    box("Beyond_Ground_East", b, (HALF_X + 100, -HALF_Y - 100, -60), (12000, HALF_Y + 100, -40), ASPHALT)
+
+
+# ---------------------------------------------------------------- dressing: what a working place has lying about, kept off the lanes, the ramps and the lines the tests check
+
+def dressing():
+    f = "Dressing"
+    down = (-90, 0, 0)
+    for s, side in ((-1, "West"), (1, "East")):
+        X = lambda x: s * x
+        d = f"{f}/{side}"
+        # The dock: crates, barrels, a hand truck and boxes on a pallet along the back wall, oil on the platform, and each door's number.
+        for i in range(3):
+            prop(f"{d}_DockCrates_{i}", d, "PlasticCrate", X(6450), -2250, 120 + i * 26)
+        for i, (x, y) in enumerate(((6480, 1250), (6490, 1330), (6420, 1295))):
+            prop(f"{d}_DockBarrel_{i}", d, "Barrel", X(x), y, 120, i * 40)
+        prop(f"{d}_HandTruck", d, "HandTruck", X(6500), -300, 120, 90 if s < 0 else -90)
+        prop(f"{d}_DockPallet", d, "Pallet", X(6450), 4250, 120)
+        prop(f"{d}_DockBoxes", d, "CardboardBoxes", X(6450), 4250, 134, 0, 2.5)
+        decal(f"{d}_DockOil_A", d, "OilStain", (X(6150), -900, 120), (40, 160, 160), down)
+        decal(f"{d}_DockOil_B", d, "OilStain", (X(6250), 2250, 120), (40, 120, 120), down)
+        for number, y in zip(("One", "Two", "Three"), DOCK_DOORS):
+            decal(f"{d}_DockNumber_{number}", d, "Painted" + number, (X(6597), y, 520), (30, 110, 110), (0, 0 if s > 0 else 180, 90))
+        # The yard: drums and gas bottles by the north wall, cracks in the asphalt, oil under the trailer.
+        for i, (x, y) in enumerate(((2250, 4880), (2320, 4900), (2290, 4820))):
+            prop(f"{d}_YardDrum_{i}", d, "PlasticDrum", X(x), y, 0, i * 50)
+        for i, x in enumerate((1520, 1580)):
+            prop(f"{d}_YardGas_{i}", d, "GasTank", X(x), 4935)
+        for i, (x, y) in enumerate(((1900, 2900), (3600, 4200), (600, 4000), (4800, 3300))):
+            decal(f"{d}_YardCrack_{i}", d, "AsphaltCrack", (X(x), y, 0), (40, 300, 300), (-90, i * 70, 0))
+        decal(f"{d}_YardOil", d, "OilStain", (X(1000), 4700, 0), (40, 220, 220), down)
+        # The plaza: a bin by the annex, barrels past its ramp, oil where loads stand.
+        prop(f"{d}_AnnexBin", d, "TrashCan", X(3440), -650)
+        for i, (x, y) in enumerate(((4900, -2450), (4970, -2480), (4930, -2390))):
+            prop(f"{d}_PlazaBarrel_{i}", d, "Barrel", X(x), y, 0, i * 60)
+        decal(f"{d}_PlazaOil_A", d, "OilStain", (X(3000), 1900, 0), (40, 200, 200), down)
+        decal(f"{d}_PlazaOil_B", d, "OilStain", (X(4000), 300, 0), (40, 150, 150), down)
+        # The hall: barrels and a pallet of crates in the north corners, a workbench and a cabinet under the mezzanine.
+        for i, (x, y) in enumerate(((2300, 1650), (2230, 1690), (2290, 1580))):
+            prop(f"{d}_HallBarrel_{i}", d, "Barrel", X(x), y, 0, i * 30)
+        prop(f"{d}_HallPallet", d, "Pallet", X(2250), 1250)
+        for i in range(2):
+            prop(f"{d}_HallCrates_{i}", d, "PlasticCrate", X(2250), 1250, 14 + i * 26, 90)
+        prop(f"{d}_HallBench", d, "Workbench", X(1000), -1700)
+        prop(f"{d}_HallCabinet", d, "MetalCabinet", X(600), -1720)
+        decal(f"{d}_HallOil", d, "OilStain", (X(1200), -900, 0), (40, 180, 180), down)
+        # Tank Row: barrels and a gas bottle between the silos; rust leaking down the south wall.
+        for i, (x, y) in enumerate(((2200, -4700), (2140, -4740))):
+            prop(f"{d}_TankBarrel_{i}", d, "Barrel", X(x), y, 0, i * 45)
+        prop(f"{d}_TankGas", d, "GasTank", X(2280), -4720)
+        for i, x in enumerate((1800, 4600)):
+            decal(f"{d}_WallLeak_{i}", d, "Leakage", (X(x), -4995, 600), (30, 500, 220), (0, -90, 90))
 
 
 # ---------------------------------------------------------------- light, sky and air
@@ -490,6 +628,7 @@ try:
     hall()
     south()
     details()
+    dressing()
     sky()
     lines.append("saved " + str(levels.save_current_level()))
     for name in sorted(counts):
