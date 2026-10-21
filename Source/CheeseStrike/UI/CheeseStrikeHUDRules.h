@@ -69,6 +69,21 @@ namespace CheeseStrikeHUD
 	 */
 	ELayer LayerFor(float Bottom, float Top, float Feet, bool bRamp, bool bWide = false);
 
+	/**
+	 * Where an Unmanned Aerial Cheese is in its sweeps at `Now`, for one
+	 * whose reveal ends at `Ends` after `RevealTime` seconds of sweeps every
+	 * `Period`: which sweep (INDEX_NONE when none is up), seconds since it,
+	 * and how strongly what it saw shows (full at the sweep, fading towards
+	 * the next).
+	 */
+	struct FSweep
+	{
+		int32 Index = INDEX_NONE;
+		float Since = 0.0f;
+		float Fade = 0.0f;
+	};
+	FSweep SweepAt(float Now, float Ends, float RevealTime, float Period);
+
 	// ---------------------------------------------------------------- damage
 
 	/** Seconds a damage arc shows. */

@@ -149,6 +149,20 @@ namespace CheeseStrikeHUD
 		return bWide && Top > Feet + 230.0f ? ELayer::Raised : ELayer::Wall;
 	}
 
+	FSweep SweepAt(float Now, float Ends, float RevealTime, float Period)
+	{
+		FSweep Sweep;
+		const float Since = Now - (Ends - RevealTime);
+		if (Ends <= 0.0f || Now >= Ends || Since < 0.0f || Period <= 0.0f)
+		{
+			return Sweep;
+		}
+		Sweep.Index = FMath::FloorToInt(Since / Period);
+		Sweep.Since = Since - Sweep.Index * Period;
+		Sweep.Fade = 1.0f - 0.65f * Sweep.Since / Period;
+		return Sweep;
+	}
+
 	float DamageArcAngle(float ViewYaw, const FVector2D& At, const FVector2D& From)
 	{
 		const FVector2D Way = From - At;

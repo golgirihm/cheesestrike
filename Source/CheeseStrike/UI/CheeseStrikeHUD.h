@@ -55,12 +55,15 @@ public:
 	/** The margin from the screen's edges, and the minimap's side, in design pixels (Unit). */
 	static constexpr float Margin = 28.0f;
 	static constexpr float MapSide = 250.0f;
+	/** The score summary's height, at the bottom in the middle: what the modes' HUD keeps clear of. */
+	static constexpr float ScoreHeight = 56.0f;
 
 	/** Pixels from the middle of a view `Width` pixels wide a line `Degrees` off the centre lands, at a field of view of `FieldOfView` degrees. */
 	static float PixelsForDegrees(float Degrees, float FieldOfView, float Width);
 
 	virtual void DrawHUD() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void BeginPlay() override;
 
 	/**
 	 * Who is on whose side, the one rule the minimap, the name tags and the
@@ -82,7 +85,7 @@ public:
 	/** For judging the damage arcs (development): a hit from `Degrees` clockwise from straight ahead, 10 m off. With CheeseStrike.HUD.HoldArcs 1 the arcs stay as they are. */
 	UFUNCTION(Exec)
 	void CheeseStrikeHitFrom(float Degrees);
-	/** Whether `Enemy` shows on the minimap now: seen in the last SeenLife seconds, or revealed (by the side's Unmanned Aerial Cheese, ACheeseStrikeGameState::IsRevealedTo, or RevealEnemies). */
+	/** Whether `Enemy` shows on the minimap now, where they are: seen in the last SeenLife seconds, or revealed here (RevealEnemies). The side's Unmanned Aerial Cheese shows them where its last sweep saw them (UpdateSweep). */
 	bool ShowsOnMinimap(const ACheeseStrikeCharacter* Enemy) const;
 
 	/** One hit taken: where it came from, by whom if known, and the world's time it came (this machine's). */
@@ -142,6 +145,15 @@ protected:
 	void DrawMice(const ACheeseStrikeGameState* Match);
 	/** The health the HUD shows: the character's, or CheeseStrike.HUD.Health's for judging the red edges (development). */
 	static float HealthShown(const ACheeseStrikeCharacter* Character);
+	/**
+	 * While the player's side has an Unmanned Aerial Cheese up
+	 * (ACheeseStrikeGameState::RevealEndsFor), notes where every enemy is at
+	 * each of its sweeps (ACheeseStrikePlayerState::SweepMarks), for the
+	 * minimap's red dots and the marks in the view.
+	 */
+	void UpdateSweep(const ACheeseStrikePlayerController* Controller);
+	/** Writes to the log when the GPU's memory has spilled into the system's (the engine's warning of it, with its other messages, is kept off the player's screen in the game). */
+	void NoteVideoMemory();
 	/** Notes which enemies the player can see, ten times a second, for the minimap. */
 	void LookForEnemies(const ACheeseStrikePlayerController* Controller);
 
@@ -159,4 +171,9 @@ protected:
 	float RevealedUntil = -1.0f;
 	/** When the reload under way began, for its bar (the world's time; -1 for none). */
 	float ReloadBegan = -1.0f;
+	/** The Unmanned Aerial Cheese's sweep now, for the minimap's pulse. */
+	CheeseStrikeHUD::FSweep Sweep;
+	/** How much video memory had spilled over when last written to the log (MB). */
+	float VideoMemorySpilled = 0.0f;
+	float NextVideoMemoryNote = 0.0f;
 };
