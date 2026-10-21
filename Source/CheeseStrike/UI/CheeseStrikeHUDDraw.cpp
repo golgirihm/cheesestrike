@@ -10,7 +10,7 @@
 #include "GlobalRenderResources.h"
 #include "Rendering/SlateRenderer.h"
 #include "Styling/CoreStyle.h"
-#include "UI/CheeseStrikeMenu.h"
+#include "Rules/CheeseStrikeModes.h"
 #include "TextureResource.h"
 #include "UObject/Package.h"
 
@@ -18,7 +18,12 @@ namespace CheeseStrikeHUDDraw
 {
 	FLinearColor SideColour(int32 Team)
 	{
-		return CheeseStrikeMenu::TeamColour(Team);
+		return CheeseStrikeModes::TeamColour(Team);
+	}
+
+	float Unit(const UCanvas* Canvas)
+	{
+		return Canvas != nullptr ? FMath::Max(0.5f, Canvas->SizeY / 1080.0f) : 1.0f;
 	}
 
 	FLinearColor Faded(const FLinearColor& Colour, float Alpha)

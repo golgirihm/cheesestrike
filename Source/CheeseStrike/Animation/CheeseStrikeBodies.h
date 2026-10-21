@@ -13,7 +13,7 @@
  * with a ragdoll of its own (tools/art/ragdolls.py). In a match with sides
  * each side has heroes of its own, whose palettes go together (the Gouda
  * Guys dark and warm, the Mozza Radicals pale and cool), dressed in the
- * side's colour (CheeseStrikeMenu::TeamColour) on their armour, so that the
+ * side's colour (CheeseStrikeModes::TeamColour) on their armour, so that the
  * sides are told apart at a glance and at range; without sides, each player
  * has one of the heroes in turn, in its own colours.
  * ACheeseStrikeCharacter applies what these say, on every machine, from the

@@ -94,16 +94,6 @@ namespace CheeseStrikeMenu
 		return ECountdownTone::None;
 	}
 
-	FLinearColor TeamColour(int32 Team)
-	{
-		switch (Team)
-		{
-		case 0: return FLinearColor::FromSRGBColor(FColor(230, 159, 0));
-		case 1: return FLinearColor::FromSRGBColor(FColor(86, 180, 233));
-		default: return FLinearColor(0.96f, 0.72f, 0.2f);
-		}
-	}
-
 	ELobbyStatus LobbyStatus(bool bHaveMatch, bool bTravelling, bool bCounting, float SecondsLeft, bool bHost)
 	{
 		if (bTravelling)
@@ -624,7 +614,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSeatColumns(bool bTeams)
 		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
 		{
 			const TArray<CheeseStrikeRules::FRosterEntry> Seats = CheeseStrikeRules::WithEmptySeats(Match != nullptr ? Match->TeamColumn(Team) : TArray<CheeseStrikeRules::FRosterEntry>(), CheeseStrikeRules::TeamSize, Team);
-			Columns->AddSlot().FillWidth(1.0f).Padding(FMargin(Team > 0 ? 24.0f : 0.0f, 0.0f, 0.0f, 0.0f)) [ MakeSeatColumn(CheeseStrikeRules::TeamNames[Team], CheeseStrikeMenu::TeamColour(Team), Seats) ];
+			Columns->AddSlot().FillWidth(1.0f).Padding(FMargin(Team > 0 ? 24.0f : 0.0f, 0.0f, 0.0f, 0.0f)) [ MakeSeatColumn(CheeseStrikeRules::TeamNames[Team], CheeseStrikeModes::TeamColour(Team), Seats) ];
 		}
 		return Columns;
 	}
@@ -645,7 +635,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSeatColumns(bool bTeams)
 		{
 			Part.Add(Seats[Index]);
 		}
-		Columns->AddSlot().FillWidth(1.0f).Padding(FMargin(Column > 0 ? 24.0f : 0.0f, 0.0f, 0.0f, 0.0f)) [ MakeSeatColumn(Column == 0 ? FString(TEXT("Everyone for themself")) : FString(), CheeseStrikeMenu::TeamColour(INDEX_NONE), Part) ];
+		Columns->AddSlot().FillWidth(1.0f).Padding(FMargin(Column > 0 ? 24.0f : 0.0f, 0.0f, 0.0f, 0.0f)) [ MakeSeatColumn(Column == 0 ? FString(TEXT("Everyone for themself")) : FString(), CheeseStrikeModes::TeamColour(INDEX_NONE), Part) ];
 	}
 	return Columns;
 }

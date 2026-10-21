@@ -6,6 +6,7 @@
 // lobby into a match on another map together.
 
 #include "Misc/AutomationTest.h"
+#include "Rules/CheeseStrikeModes.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
@@ -92,9 +93,9 @@ bool FTheLobbyDealsItsSeats::RunTest(const FString& Parameters)
 	TestEqual(TEXT("one column of sixteen"), WithEmptySeats(Host, SeatCount, INDEX_NONE).Num(), SeatCount);
 
 	// Each side has a colour of its own, and a free-for-all a third.
-	const FLinearColor Gouda = CheeseStrikeMenu::TeamColour(0);
-	const FLinearColor Mozza = CheeseStrikeMenu::TeamColour(1);
-	TestTrue(TEXT("the sides' colours differ"), !Gouda.Equals(Mozza, 0.1f) && !Gouda.Equals(CheeseStrikeMenu::TeamColour(INDEX_NONE), 0.05f));
+	const FLinearColor Gouda = CheeseStrikeModes::TeamColour(0);
+	const FLinearColor Mozza = CheeseStrikeModes::TeamColour(1);
+	TestTrue(TEXT("the sides' colours differ"), !Gouda.Equals(Mozza, 0.1f) && !Gouda.Equals(CheeseStrikeModes::TeamColour(INDEX_NONE), 0.05f));
 	TestTrue(TEXT("and are bright enough to read on the dark tile"), Gouda.GetLuminance() > 0.25f && Mozza.GetLuminance() > 0.25f);
 	return true;
 }
