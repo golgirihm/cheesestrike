@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeMouse.h"
 #include "Animation/AnimSequence.h"
+#include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -10,6 +11,7 @@
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
 #include "Net/UnrealNetwork.h"
+#include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
 #include "CheeseStrike.h"
 #include "Map/CheeseStrikeCheese.h"
@@ -23,7 +25,35 @@ namespace
 	constexpr float PointReached = 40.0f;
 	/** How often it looks again for cheese while going to some (seconds). */
 	constexpr float ChooseEvery = 1.0f;
-	const TCHAR* const Rat = TEXT("/Game/Fab/Nestaeric/BlackRat/");
+	/** A mouse's sounds are a rat's, pitched down by about this for its size, and heard this far (cm), at full loudness within the first. */
+	constexpr float Pitch = 0.7f;
+	constexpr float HeardWithin = 600.0f;
+	constexpr float HeardTo = 3500.0f;
+	/** Seconds between its squeaks, from and to; and between its crunches while it eats. */
+	constexpr float SqueakFrom = 4.0f;
+	constexpr float SqueakTo = 9.0f;
+	constexpr float CrunchFrom = 0.4f;
+	constexpr float CrunchTo = 0.9f;
+
+	UAudioComponent* Speaker(AActor* Mouse, USceneComponent* Body, const TCHAR* Name)
+	{
+		UAudioComponent* Audio = Mouse->CreateDefaultSubobject<UAudioComponent>(Name);
+		Audio->SetupAttachment(Body);
+		Audio->bAutoActivate = false;
+		Audio->bOverrideAttenuation = true;
+		Audio->AttenuationOverrides.bAttenuate = true;
+		Audio->AttenuationOverrides.bSpatialize = true;
+		Audio->AttenuationOverrides.AttenuationShape = EAttenuationShape::Sphere;
+		Audio->AttenuationOverrides.AttenuationShapeExtents = FVector(HeardWithin, 0.0f, 0.0f);
+		Audio->AttenuationOverrides.FalloffDistance = HeardTo - HeardWithin;
+		return Audio;
+	}
+
+	USoundBase* Find(const TCHAR* Name)
+	{
+		ConstructorHelpers::FObjectFinder<USoundBase> Sound(*FString::Printf(TEXT("/Game/OpenGameArt/Mice/SW_%s.SW_%s"), Name, Name));
+		return Sound.Object;
+	}
 }
 
 ACheeseStrikeMouse::ACheeseStrikeMouse()
@@ -43,22 +73,47 @@ ACheeseStrikeMouse::ACheeseStrikeMouse()
 	Body->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	Body->SetCanEverAffectNavigation(false);
 
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Model(TEXT("/Game/Fab/Nestaeric/BlackRat/SK_BlackRat.SK_BlackRat"));
-	static ConstructorHelpers::FObjectFinder<UAnimSequence> Walk(TEXT("/Game/Fab/Nestaeric/BlackRat/SK_BlackRat_Anim_Mammals_walk_A1.SK_BlackRat_Anim_Mammals_walk_A1"));
-	static ConstructorHelpers::FObjectFinder<UAnimSequence> Run(TEXT("/Game/Fab/Nestaeric/BlackRat/SK_BlackRat_Anim_Mammals_run_A1.SK_BlackRat_Anim_Mammals_run_A1"));
-	static ConstructorHelpers::FObjectFinder<UAnimSequence> Sniff(TEXT("/Game/Fab/Nestaeric/BlackRat/SK_BlackRat_Anim_Mammals_idle_A2.SK_BlackRat_Anim_Mammals_idle_A2"));
-	WalkAnimation = Walk.Object;
-	RunAnimation = Run.Object;
-	EatAnimation = Sniff.Object;
+	Model = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(TEXT("/Game/Fab/Nestaeric/BlackRat/SK_BlackRat.SK_BlackRat")));
+	Walk = TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/Fab/Nestaeric/BlackRat/SK_BlackRat_Anim_Mammals_walk_A1.SK_BlackRat_Anim_Mammals_walk_A1")));
+	Run = TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/Fab/Nestaeric/BlackRat/SK_BlackRat_Anim_Mammals_run_A1.SK_BlackRat_Anim_Mammals_run_A1")));
+	Sniff = TSoftObjectPtr<UAnimSequence>(FSoftObjectPath(TEXT("/Game/Fab/Nestaeric/BlackRat/SK_BlackRat_Anim_Mammals_idle_A2.SK_BlackRat_Anim_Mammals_idle_A2")));
 	Mesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
 	Mesh->SetupAttachment(Body);
-	Mesh->SetSkeletalMeshAsset(Model.Object);
 	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Mesh->SetCanEverAffectNavigation(false);
 	// The rat is modelled along its Y axis, nose forward, feet at its origin: turned to face the actor's X, standing on the ground under the body.
 	Mesh->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, -75.0f), FRotator(0.0f, -90.0f, 0.0f));
 	Mesh->SetRelativeScale3D(FVector(CheeseStrikeMice::Scale));
 	Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+
+	Gnawing = Speaker(this, Body, TEXT("Gnawing"));
+	Mouth = Speaker(this, Body, TEXT("Mouth"));
+	Voice = Speaker(this, Body, TEXT("Voice"));
+	Gnawing->SetSound(Find(TEXT("Gnawing")));
+	Squeaks = {Find(TEXT("RatSqueak")), Find(TEXT("RatSqueakPain"))};
+	Crunches = {Find(TEXT("Crunch1")), Find(TEXT("Crunch2")), Find(TEXT("Crunch3")), Find(TEXT("Crunch4"))};
+	Scream = Find(TEXT("RatScream"));
+}
+
+bool ACheeseStrikeMouse::HasBody() const
+{
+	if (Mesh->GetSkeletalMeshAsset() == nullptr || WalkAnimation == nullptr || RunAnimation == nullptr || EatAnimation == nullptr)
+	{
+		return false;
+	}
+	for (int32 Index = 0; Index < Mesh->GetNumMaterials(); ++Index)
+	{
+		if (Mesh->GetMaterial(Index) == nullptr)
+		{
+			return false;
+		}
+	}
+	return Mesh->GetNumMaterials() > 0;
+}
+
+bool ACheeseStrikeMouse::HasSounds() const
+{
+	return Gnawing->GetSound() != nullptr && Scream != nullptr && !Squeaks.Contains(nullptr) && !Crunches.Contains(nullptr);
 }
 
 void ACheeseStrikeMouse::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -70,6 +125,11 @@ void ACheeseStrikeMouse::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 void ACheeseStrikeMouse::BeginPlay()
 {
 	Super::BeginPlay();
+	Mesh->SetSkeletalMeshAsset(Model.LoadSynchronous());
+	WalkAnimation = Walk.LoadSynchronous();
+	RunAnimation = Run.LoadSynchronous();
+	EatAnimation = Sniff.LoadSynchronous();
+	NextSqueakAt = Now() + FMath::FRandRange(SqueakFrom, SqueakTo);
 	ShowDoing();
 }
 
@@ -100,8 +160,29 @@ void ACheeseStrikeMouse::ShowDoing()
 	{
 		return;
 	}
+	const bool bWasEating = bShownOnce && Shown == EMouseDoing::Eating;
+	const bool bFirst = !bShownOnce;
 	bShownOnce = true;
 	Shown = Doing;
+	if (GetNetMode() != NM_DedicatedServer && GetWorld() != nullptr && GetWorld()->IsGameWorld())
+	{
+		// Gnawing while it eats; a scream as it runs.
+		if (Doing == EMouseDoing::Eating)
+		{
+			Gnawing->SetPitchMultiplier(Pitch * FMath::FRandRange(0.95f, 1.1f));
+			Gnawing->SetVolumeMultiplier(0.6f);
+			Gnawing->Play(FMath::FRandRange(0.0f, 10.0f));
+			NextCrunchAt = Now() + FMath::FRandRange(0.0f, CrunchFrom);
+		}
+		else if (bWasEating)
+		{
+			Gnawing->FadeOut(0.3f, 0.0f);
+		}
+		if (Doing == EMouseDoing::Fleeing && !bFirst)
+		{
+			Say(Voice, Scream, 1.0f, Pitch);
+		}
+	}
 	UAnimSequence* Animation = Doing == EMouseDoing::Eating ? EatAnimation.Get() : (Doing == EMouseDoing::Walking ? WalkAnimation.Get() : RunAnimation.Get());
 	if (Animation != nullptr && Mesh != nullptr)
 	{
@@ -326,9 +407,45 @@ void ACheeseStrikeMouse::TurnToward(const FVector& Direction, float DeltaSeconds
 	SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), Wanted, DeltaSeconds, TurnRate));
 }
 
+void ACheeseStrikeMouse::Say(UAudioComponent* Speaker, USoundBase* Sound, float Volume, float Around)
+{
+	if (Speaker == nullptr || Sound == nullptr)
+	{
+		return;
+	}
+	Speaker->SetSound(Sound);
+	Speaker->SetVolumeMultiplier(Volume);
+	Speaker->SetPitchMultiplier(Around * FMath::FRandRange(0.9f, 1.15f));
+	Speaker->Play();
+}
+
+void ACheeseStrikeMouse::Sound(float DeltaSeconds)
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	const float Time = Now();
+	if (Time >= NextSqueakAt)
+	{
+		NextSqueakAt = Time + FMath::FRandRange(SqueakFrom, SqueakTo);
+		// Not over its scream.
+		if (!Voice->IsPlaying() && Squeaks.Num() > 0)
+		{
+			Say(Voice, Squeaks[FMath::RandRange(0, Squeaks.Num() - 1)], 0.8f, Pitch);
+		}
+	}
+	if (Shown == EMouseDoing::Eating && Time >= NextCrunchAt && Crunches.Num() > 0)
+	{
+		NextCrunchAt = Time + FMath::FRandRange(CrunchFrom, CrunchTo);
+		Say(Mouth, Crunches[FMath::RandRange(0, Crunches.Num() - 1)], 0.7f, Pitch + 0.1f);
+	}
+}
+
 void ACheeseStrikeMouse::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	Sound(DeltaSeconds);
 	if (!HasAuthority())
 	{
 		return;

@@ -64,6 +64,18 @@ DECALS = [
 ]
 # Nestaeric's Black Rat, for the mice: a rigged mesh with its idle, walk and run animations, and its textures.
 RAT = "blackrat_free_fbx.zip"
+# The mice's sounds, from OpenGameArt (downloaded into FAB/oga, the archives unpacked beside them):
+# (asset, file under FAB/oga, whether it loops).
+SOUNDS = [
+    ("RatSqueak", "qubodupSqueakyRat/qubodupSqueakyRat/qubodupSqueakyRatAttack.flac", False),
+    ("RatSqueakPain", "qubodupSqueakyRat/qubodupSqueakyRat/qubodupSqueakyRatPain.flac", False),
+    ("RatScream", "qubodupRat/qubodupRat/qubodupRatPain.flac", False),
+    ("Gnawing", "RabbitEating.wav", True),
+    ("Crunch1", "crunch_-_tito/crunch.1.ogg", False),
+    ("Crunch2", "crunch_-_tito/crunch.2.ogg", False),
+    ("Crunch3", "crunch_-_tito/crunch.3.ogg", False),
+    ("Crunch4", "crunch_-_tito/crunch.4.ogg", False),
+]
 # Sousinho Games' shipping container: one mesh, three materials (sides, doors, frame).
 CONTAINER = "container_orange.zip"
 CONTAINER_MESH = "source/shipping cointainer Orange.zip"
@@ -206,6 +218,20 @@ def skeletal(asset, fbx_path, destination):
         lines.append(f"  {path.split('.')[-1]}: {lib.find_asset_data(path).asset_class_path.asset_name}")
 
 
+def sound(asset, path, looping):
+    """Imports a sound wave, looping or not, into /Game/OpenGameArt/Mice."""
+    destination = "/Game/OpenGameArt/Mice"
+    if not REIMPORT and lib.does_asset_exist(f"{destination}/SW_{asset}"):
+        return
+    imported = [a for a in import_file(path, destination, "SW_" + asset) if isinstance(a, unreal.SoundWave)]
+    if not imported:
+        lines.append(f"  SW_{asset}: nothing imported from {path}")
+        return
+    imported[0].set_editor_property("looping", looping)
+    lib.save_asset(imported[0].get_path_name(), False)
+    lines.append(f"  SW_{asset}: {imported[0].get_editor_property('duration'):.1f} s")
+
+
 def white():
     """A small linear white texture: what a material uses for a map an asset hasn't got."""
     def chunk(kind, data):
@@ -233,6 +259,9 @@ try:
         z = archive(zip_name)
         fbx = [m for m in z.namelist() if m.startswith(folder) and m.lower().endswith(".fbx")]
         model(asset, extract(z, fbx[0], asset), destination)
+    # The mice's sounds.
+    for asset, path, looping in SOUNDS:
+        sound(asset, os.path.join(FAB, "oga", path), looping)
     # The rat, for the mice.
     destination = f"{ROOT}/Nestaeric/BlackRat"
     lines.append(f"BlackRat: {texture_set('BlackRat', RAT, '', destination, MAX)}")

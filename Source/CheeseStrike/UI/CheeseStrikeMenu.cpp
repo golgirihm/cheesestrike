@@ -23,6 +23,7 @@
 #include "GameFramework/GameMode.h"
 #include "CheeseStrikePlayerController.h"
 #include "Rules/CheeseStrikeBots.h"
+#include "UI/CheeseStrikeCredits.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
 
@@ -33,7 +34,7 @@ namespace CheeseStrikeMenu
 		// Going to the map the host picked, or back to the lobby after the results: the lobby, saying so.
 		if (bTravelling)
 		{
-			return bInAMatch ? EMenuPage::Lobby : (Chosen == EMenuPage::Find ? Chosen : EMenuPage::Main);
+			return bInAMatch ? EMenuPage::Lobby : (Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits ? Chosen : EMenuPage::Main);
 		}
 		if (bMatchEnded)
 		{
@@ -47,7 +48,7 @@ namespace CheeseStrikeMenu
 		{
 			return EMenuPage::Lobby;
 		}
-		return Chosen == EMenuPage::Find ? Chosen : EMenuPage::Main;
+		return Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits ? Chosen : EMenuPage::Main;
 	}
 }
 
@@ -184,6 +185,12 @@ void SCheeseStrikeMenu::Refresh()
 {
 	const bool bLobby = Page == EMenuPage::Lobby;
 	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
+	// The credits are long: a wider panel, and the game's name out of their way.
+	if (Content.IsValid())
+	{
+		Content->SetWidthOverride(Page == EMenuPage::Credits ? 640.0f : 400.0f);
+		Content->SetVAlign(Page == EMenuPage::Credits ? VAlign_Fill : VAlign_Center);
+	}
 	if (Lobby.IsValid())
 	{
 		Lobby->SetVisibility(bLobby ? EVisibility::Visible : EVisibility::Collapsed);
@@ -243,6 +250,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePage()
 	case EMenuPage::Main: return MakeMain();
 	case EMenuPage::Find: return MakeFind();
 	case EMenuPage::Pause: return MakePause();
+	case EMenuPage::Credits: return MakeCredits();
 	default: return SNullWidget::NullWidget;
 	}
 }
@@ -309,7 +317,24 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("HOST A MATCH"), [Player]() { if (Player.IsValid()) Player->HostFromMenu(); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeCredits()
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
+	for (int32 Index = 0; Index < CheeseStrikeCredits::NumCredits(); ++Index)
+	{
+		const CheeseStrikeCredits::FCredit& Credit = CheeseStrikeCredits::Credits[Index];
+		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 2.0f)) [ SNew(STextBlock).Text(FText::FromString(FString(Credit.Heading).ToUpper())).Font(Font(15, FName("Bold"))).ColorAndOpacity(Cheese) ];
+		List->AddSlot().AutoHeight() [ MakeLine(Credit.Text) ];
+	}
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("CREDITS")) ]
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ List ] ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Main); }) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()

@@ -133,6 +133,8 @@ bool FTheMiceEatTheCreamery::RunTest(const FString& Parameters)
 		for (ACheeseStrikeMouse* Mouse : All<ACheeseStrikeMouse>())
 		{
 			TestTrue(FString::Printf(TEXT("%s has come in"), *Mouse->GetName()), Mouse->GetDoing() != EMouseDoing::Entering);
+			TestTrue(FString::Printf(TEXT("%s squeaks, gnaws and crunches"), *Mouse->GetName()), Mouse->HasSounds());
+			TestTrue(FString::Printf(TEXT("%s has its body, animations and materials"), *Mouse->GetName()), Mouse->HasBody());
 			if (const ACheeseStrikeCheese* Cheese = Mouse->GetTarget())
 			{
 				++Going;

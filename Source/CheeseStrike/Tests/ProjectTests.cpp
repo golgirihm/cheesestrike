@@ -13,6 +13,9 @@
 #include "CheeseStrikeCharacter.h"
 #include "ShooterCharacter.h"
 #include "CheeseStrikeGameMode.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "UI/CheeseStrikeCredits.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -93,6 +96,51 @@ bool FNothingIsMissing::RunTest(const FString& Parameters)
 		}
 	}
 	TestEqual(TEXT("packages needed and missing"), Missing, 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCreditsNameEveryone, "CheeseStrike.Project.TheCreditsNameEveryone", ProjectTests::Flags)
+
+bool FTheCreditsNameEveryone::RunTest(const FString& Parameters)
+{
+	// Every pack or file in Content/LICENSES.md whose licence asks for credit (Creative Commons Attribution) is named in the credits.
+	FString Licenses;
+	if (!TestTrue(TEXT("Content/LICENSES.md is there"), FFileHelper::LoadFileToString(Licenses, *(FPaths::ProjectContentDir() / TEXT("LICENSES.md")))))
+	{
+		return false;
+	}
+	const FString Credits = CheeseStrikeCredits::AllText();
+	TArray<FString> Rows;
+	Licenses.ParseIntoArrayLines(Rows);
+	int32 Asked = 0;
+	for (const FString& Row : Rows)
+	{
+		if (!Row.StartsWith(TEXT("|")) || !(Row.Contains(TEXT("CC BY")) || Row.Contains(TEXT("CC-BY")) || Row.Contains(TEXT("Creative Commons Attribution"))))
+		{
+			continue;
+		}
+		// Each work the row links to, by its title, less any "(...)" after it: [Title (Free download)](https://...).
+		int32 From = 0;
+		while ((From = Row.Find(TEXT("["), ESearchCase::CaseSensitive, ESearchDir::FromStart, From)) != INDEX_NONE)
+		{
+			const int32 To = Row.Find(TEXT("]("), ESearchCase::CaseSensitive, ESearchDir::FromStart, From);
+			if (To == INDEX_NONE)
+			{
+				break;
+			}
+			FString Title = Row.Mid(From + 1, To - From - 1);
+			int32 Bracket = INDEX_NONE;
+			if (Title.FindChar(TEXT('('), Bracket))
+			{
+				Title = Title.Left(Bracket).TrimEnd();
+			}
+			++Asked;
+			TestTrue(FString::Printf(TEXT("the credits name \"%s\""), *Title), Credits.Contains(Title));
+			From = To + 2;
+		}
+	}
+	TestTrue(FString::Printf(TEXT("some works ask for credit (%d)"), Asked), Asked > 0);
+	TestTrue(TEXT("the credits name their licences"), Credits.Contains(TEXT("creativecommons.org/licenses/by/4.0")));
 	return true;
 }
 

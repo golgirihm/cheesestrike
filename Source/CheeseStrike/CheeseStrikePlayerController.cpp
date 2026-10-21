@@ -317,6 +317,11 @@ void ACheeseStrikePlayerController::CancelStartFromMenu()
 	}
 }
 
+void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page)
+{
+	ChooseMenu(Page.Equals(TEXT("Credits"), ESearchCase::IgnoreCase) ? EMenuPage::Credits : (Page.Equals(TEXT("Find"), ESearchCase::IgnoreCase) ? EMenuPage::Find : EMenuPage::Main));
+}
+
 void ACheeseStrikePlayerController::CheeseStrikeStart(const FString& AtOnce)
 {
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
