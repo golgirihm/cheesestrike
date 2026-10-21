@@ -69,12 +69,13 @@ public:
 	 * For looking at the body from outside with one player (a second game
 	 * on the same PC renders poorly): puts the view `Distance` cm from the
 	 * character, `Yaw` degrees round from in front, looking at the point
-	 * `Height` cm above its middle (70 is the face), and shows the body
-	 * and its rifle as others see them; once dead, round the head of the
-	 * body where it fell. With no distance, the view goes back to the eyes.
+	 * `Height` cm above its middle (70 is the face) from `Rise` cm above
+	 * that, and shows the body and its rifle as others see them; once
+	 * dead, round the head of the body where it fell (a large Rise looks
+	 * down on it). With no distance, the view goes back to the eyes.
 	 */
 	UFUNCTION(Exec)
-	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f, float Height = 30.0f);
+	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f, float Height = 30.0f, float Rise = 20.0f);
 	/** For looking at a map (development): puts the view at X, Y, Z facing Pitch and Yaw, the character left where it is; CheeseStrikeOutside with no distance puts it back. */
 	UFUNCTION(Exec)
 	void CheeseStrikeViewFrom(float X, float Y, float Z, float Pitch, float Yaw);

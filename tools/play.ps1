@@ -18,6 +18,9 @@
 # The players are named -Name and -ClientName, as the kill feed and the
 # scoreboard show them. -Res sets the size the game renders at (and its
 # screenshots), "960x540" unless given.
+# -FixedFps 30 steps the game by a thirtieth of a second a frame however slowly
+# it renders, so that a busy PC still sees what a person would at that time (a
+# ragdoll falling, not in slow motion).
 param(
   [Parameter(Mandatory=$true)][string]$Script,
   [string]$Tag = "play",
@@ -36,7 +39,8 @@ param(
   [switch]$Bots,
   [switch]$Mice,
   [int]$TimeoutSeconds = 180,
-  [string]$Res = "960x540"
+  [string]$Res = "960x540",
+  [int]$FixedFps = 0
 )
 # The match starts at once (?StartNow), so that a script finds a character
 # to drive; with -Lobby it waits in the lobby instead, as a hosted match
@@ -64,6 +68,7 @@ function Launch($map, $script, $tag, $startAt, $x, $more = @()) {
     "-TraceState", "-StartAt=$startAt", "-PlayScript=`"$scriptPath`"", "-BuildIdOverride=$buildId") + $more
   if (-not $Window) { $arguments += "-RenderOffscreen" } else { $arguments += "-windowed" }
   if (-not $Steam) { $arguments += "-NOSTEAM" }
+  if ($FixedFps -gt 0) { $arguments += @("-UseFixedTimeStep", "-FPS=$FixedFps") }
   return Start-Process -FilePath $editor -ArgumentList $arguments -PassThru
 }
 function Summarise($tag) {
