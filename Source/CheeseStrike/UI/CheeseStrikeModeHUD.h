@@ -9,9 +9,9 @@ class UCanvas;
 
 /**
  * What the modes and the streaks put over the view, drawn into the HUD's
- * canvas each frame (ACheeseStrikeHUD calls Draw): in a team mode, the
- * teams' scores at the top, the round and its time in Elimination, and a
- * mark over each teammate; the last few announcements (a streak called in,
+ * canvas each frame (ACheeseStrikeHUD calls Draw; the HUD itself shows a
+ * team mode's scores, round and time in its score summary, and the
+ * teammates' names over their heads): the last few announcements (a streak called in,
  * a round won), and the Overload's warning to those it falls on; the
  * streak ready to call in, and word when one is earned; while marking a
  * Cheese Strike, where its wheels will land; during an Unmanned Aerial

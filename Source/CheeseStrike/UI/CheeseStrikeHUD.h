@@ -4,20 +4,39 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "CheeseStrikeHUDRules.h"
+#include "CheeseStrikeMinimap.h"
 #include "CheeseStrikeHUD.generated.h"
 
 class ACheeseStrikeCharacter;
 class ACheeseStrikeGameState;
 class ACheeseStrikePlayerController;
-class UFont;
+class ACheeseStrikePlayerState;
+class APlayerState;
+class UCheeseStrikeAvatars;
+class UTexture2D;
+namespace CheeseStrikeHUDDraw { struct FShapes; }
+enum class EWeaponSlot : uint8;
 
 /**
- * What a player sees over the view, drawn in code. In a fight: a crosshair
- * whose gap opens with the weapon's spread, a mark when a shot hits (longer
- * ticks for the head), health, and the magazine and reserve. Always: the
- * last few kills at the top right. Dead: who did it and how long until
- * they are back. The scoreboard while its key is held, and for good once
- * the match is over, with the winner.
+ * What a player sees over the view, drawn in code in the design's look: a
+ * thin, square, white-and-grey interface with the cheese's yellow for an
+ * accent, in the engine's bold condensed Roboto (CheeseStrikeHUDDraw).
+ *
+ * In a fight: a crosshair whose gap opens with the weapon's spread, a mark
+ * when a shot hits (longer ticks for the head), health at the lower left,
+ * the weapon at the lower right (its name, the magazine and the reserve, a
+ * pip a round, the reload), red edges as health falls, and an arc at the
+ * edge of the view for each hit, pointing at whoever made it. Always: the
+ * minimap at the top left (CheeseStrikeMinimap), turned with the view, the
+ * player's side and the cheese on it; every player along the top, grouped
+ * by side, with their Steam pictures and whether they are alive, coming
+ * back or out; the last few kills at the top right; the score at the
+ * bottom; teammates' names over their heads. Killed: the screen melts,
+ * "YOU GOT CHEESED", with who did it and how long until they are back. The
+ * scoreboard while its key is held, and for good once the match is over,
+ * with the winner. The rules it draws by are CheeseStrikeHUD's, tested
+ * without a world.
  */
 UCLASS()
 class CHEESESTRIKE_API ACheeseStrikeHUD : public AHUD
@@ -31,21 +50,113 @@ public:
 	static constexpr float CrosshairGap = 5.0f;
 	/** Seconds a hit mark shows. */
 	static constexpr float HitMarkLife = 0.25f;
+	/** Seconds an enemy stays on the minimap after they were last seen. */
+	static constexpr float SeenLife = 1.5f;
+	/** The margin from the screen's edges, and the minimap's side, in design pixels (Unit). */
+	static constexpr float Margin = 28.0f;
+	static constexpr float MapSide = 250.0f;
 
 	/** Pixels from the middle of a view `Width` pixels wide a line `Degrees` off the centre lands, at a field of view of `FieldOfView` degrees. */
 	static float PixelsForDegrees(float Degrees, float FieldOfView, float Width);
 
 	virtual void DrawHUD() override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	/**
+	 * Who is on whose side, the one rule the minimap, the name tags and the
+	 * enemies' sighting follow: as the mode has it
+	 * (ACheeseStrikeGameState::AreTeammates), the same side in a team mode,
+	 * nobody but oneself in a free-for-all.
+	 */
+	static bool AreTeammates(const APlayerState* A, const APlayerState* B);
+
+	/**
+	 * Shows every enemy on the minimap for `Seconds`, seen or not, on this
+	 * machine: what the Unmanned Aerial Cheese does for its team's players.
+	 */
+	void RevealEnemies(float Seconds);
+	bool AreEnemiesRevealed() const;
+	/** For trying the reveal (development): CheeseStrikeReveal <seconds>. */
+	UFUNCTION(Exec)
+	void CheeseStrikeReveal(float Seconds = 10.0f);
+	/** For judging the damage arcs (development): a hit from `Degrees` clockwise from straight ahead, 10 m off. With CheeseStrike.HUD.HoldArcs 1 the arcs stay as they are. */
+	UFUNCTION(Exec)
+	void CheeseStrikeHitFrom(float Degrees);
+	/** Whether `Enemy` shows on the minimap now: seen in the last SeenLife seconds, or revealed (by the side's Unmanned Aerial Cheese, ACheeseStrikeGameState::IsRevealedTo, or RevealEnemies). */
+	bool ShowsOnMinimap(const ACheeseStrikeCharacter* Enemy) const;
+
+	/** One hit taken: where it came from, by whom if known, and the world's time it came (this machine's). */
+	struct FDamageArc
+	{
+		FVector From = FVector::ZeroVector;
+		TWeakObjectPtr<const AActor> By;
+		float At = 0.0f;
+	};
+	/** A hit from `From` (world), by `By` if known: an arc pointing at them (from ACheeseStrikeCharacter::ClientHurtFrom). Another hit by the same shooter renews theirs. */
+	void AddDamageFrom(const FVector& From, const AActor* By);
+	/** The arcs showing now. */
+	const TArray<FDamageArc>& GetDamageArcs() const { return DamageArcs; }
+	/** Where an arc points from now: its shooter where they are, or where they were. */
+	static FVector ArcSource(const FDamageArc& Arc);
+
+	/** What the bottom of the screen says about the score: a free-for-all's (CheeseStrikeHUD::FreeForAll), or a team mode's sides and its round (CheeseStrikeHUD::Teams). */
+	virtual CheeseStrikeHUD::FScoreSummary ScoreSummary(const ACheeseStrikeGameState* Match) const;
+
+	/** One of the character's weapons, as the list over the ammunition shows it: the key that takes it out, its name, whether it is in hand, and whether it may be taken out. */
+	struct FWeaponSlot
+	{
+		FString Key;
+		FString Name;
+		bool bHeld = false;
+		bool bCanDraw = true;
+	};
+	/** The character's weapons, for the list over the ammunition (drawn when there are two or more): the inventory's slots in order, 1 the primary, 2 the sidearm, 3 the knife. */
+	virtual TArray<FWeaponSlot> WeaponSlots(const ACheeseStrikeCharacter* Character) const;
+
+	/** The minimap's picture of the level, for the tests. */
+	const FCheeseStrikeMinimap& GetMinimap() const { return Minimap; }
+	/** `Player`'s status in the row along the top, `Body` being their character (BodyOf). */
+	static CheeseStrikeHUD::EStatus StatusOf(const ACheeseStrikePlayerState* Player, const ACheeseStrikeCharacter* Body);
+	/** The character that is `Player`'s now (the live one if there is one), or null. */
+	static ACheeseStrikeCharacter* BodyOf(const APlayerState* Player);
 
 protected:
+	/** Pixels for a design pixel at 1080 lines: the HUD is laid out for 1920 by 1080 and scales with the height. */
+	float Unit() const;
+
 	void DrawFight(const ACheeseStrikeCharacter* Character, float FieldOfView);
+	void DrawHealth(const ACheeseStrikeCharacter* Character);
+	void DrawWeapon(const ACheeseStrikeCharacter* Character);
+	/** The outline of the weapon in `Slot` (a rifle, a pistol, a knife) in the box at `At`, `Size` big, facing left. */
+	void DrawWeaponIcon(CheeseStrikeHUDDraw::FShapes& Shapes, EWeaponSlot Slot, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour) const;
+	void DrawVignette(const ACheeseStrikeCharacter* Character);
+	void DrawDamageArcs(const ACheeseStrikeCharacter* Character);
+	void DrawMinimap(const ACheeseStrikePlayerController* Controller, const ACheeseStrikeCharacter* Character, float FieldOfView);
+	void DrawPlayers(const ACheeseStrikeGameState* Match);
+	void DrawScoreSummary(const ACheeseStrikeGameState* Match);
+	void DrawNameTags(const ACheeseStrikePlayerController* Controller);
 	void DrawDeath(const ACheeseStrikeCharacter* Character, const ACheeseStrikeGameState* Match);
 	void DrawKillFeed(const ACheeseStrikeGameState* Match);
 	void DrawScoreboard(const ACheeseStrikeGameState* Match, bool bOver);
-	/** What the online service is doing, and the matches found, at the top left. */
-	void DrawSessions();
 	/** The mice's countdown, red, and word of their coming. */
 	void DrawMice(const ACheeseStrikeGameState* Match);
-	/** Draws `Text` with its middle at `X`. */
-	void DrawCentred(const FString& Text, float X, float Y, UFont* Font, float Scale, const FLinearColor& Colour);
+	/** The health the HUD shows: the character's, or CheeseStrike.HUD.Health's for judging the red edges (development). */
+	static float HealthShown(const ACheeseStrikeCharacter* Character);
+	/** Notes which enemies the player can see, ten times a second, for the minimap. */
+	void LookForEnemies(const ACheeseStrikePlayerController* Controller);
+
+	/** The red edges' picture: white, clear in the middle and solid at the edges, made in code. */
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> VignetteTexture;
+	UPROPERTY(Transient)
+	TObjectPtr<UCheeseStrikeAvatars> Avatars;
+	FCheeseStrikeMinimap Minimap;
+	TArray<FDamageArc> DamageArcs;
+	/** When each enemy was last seen (the world's time). */
+	TMap<TWeakObjectPtr<const ACheeseStrikeCharacter>, float> LastSeen;
+	float NextLook = 0.0f;
+	/** Until when every enemy shows on the minimap (the world's time). */
+	float RevealedUntil = -1.0f;
+	/** When the reload under way began, for its bar (the world's time; -1 for none). */
+	float ReloadBegan = -1.0f;
 };

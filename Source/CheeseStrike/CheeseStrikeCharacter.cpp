@@ -31,6 +31,7 @@
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "UI/CheeseStrikeHUD.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -264,6 +265,10 @@ bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From
 	Health = FMath::Max(0.0f, Health - Damage);
 	LastHurtBy = From;
 	LastHurtAt = ServerNow();
+	if (From != nullptr && IsPlayerControlled())
+	{
+		ClientHurtFrom(From->GetActorLocation(), From);
+	}
 	if (!IsAlive())
 	{
 		Die(From, bHead);
@@ -407,6 +412,15 @@ void ACheeseStrikeCharacter::ServerDie_Implementation()
 {
 	EndProtection();
 	TakeShot(CheeseStrikeWeapons::MaxHealth, nullptr, false);
+}
+
+void ACheeseStrikeCharacter::ClientHurtFrom_Implementation(FVector_NetQuantize From, ACheeseStrikeCharacter* By)
+{
+	const APlayerController* Player = Cast<APlayerController>(GetController());
+	if (ACheeseStrikeHUD* HUD = Player != nullptr ? Cast<ACheeseStrikeHUD>(Player->GetHUD()) : nullptr)
+	{
+		HUD->AddDamageFrom(From, By);
+	}
 }
 
 void ACheeseStrikeCharacter::OnRep_Health()

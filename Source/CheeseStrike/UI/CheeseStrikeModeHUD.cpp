@@ -85,34 +85,6 @@ namespace
 		return FString::Printf(TEXT("%d:%02d"), Whole / 60, Whole % 60);
 	}
 
-	void ModeHudDrawScores(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match)
-	{
-		if (!Match->HasTeams() || !Match->HasMatchStarted())
-		{
-			return;
-		}
-		UFont* Font = GEngine->GetMediumFont();
-		const float Middle = Canvas->SizeX / 2.0f;
-		const float Top = ModeHudMargin;
-		// Each team's name and score in its colour, either side of the middle.
-		const FString Left = FString::Printf(TEXT("%s  %d"), CheeseStrikeRules::TeamNames[0], Match->GetTeamScore(0)).ToUpper();
-		const FString Right = FString::Printf(TEXT("%d  %s"), Match->GetTeamScore(1), CheeseStrikeRules::TeamNames[1]).ToUpper();
-		float Width = 0.0f;
-		float Height = 0.0f;
-		Hud->GetTextSize(Left, Width, Height, Font, 1.3f);
-		Hud->DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.35f), Middle - Width - 30.0f, Top - 4.0f, 2.0f * Width + 60.0f, Height + 8.0f);
-		Hud->DrawText(Left, CheeseStrikeModes::TeamColour(0), Middle - Width - 14.0f, Top, Font, 1.3f);
-		Hud->DrawText(Right, CheeseStrikeModes::TeamColour(1), Middle + 14.0f, Top, Font, 1.3f);
-		FString Under = Match->GoalText();
-		if (Match->GetModeInfo().WinBy == CheeseStrikeModes::EWinBy::Rounds && Match->GetRound() > 0 && !Match->HasMatchEnded())
-		{
-			Under = Match->IsRoundBreak()
-				? FString::Printf(TEXT("next round in %.0f"), FMath::CeilToFloat(Match->SecondsToNextRound()))
-				: FString::Printf(TEXT("round %d  ·  %s  ·  %s"), Match->GetRound(), *ModeHudClock(Match->SecondsLeftInRound()), *Match->GoalText());
-		}
-		ModeHudCentred(Hud, Under, Middle, Top + Height + 8.0f, Font, 1.0f, ModeHudFaint);
-	}
-
 	void ModeHudDrawAnnouncements(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
 	{
 		UFont* Font = GEngine->GetMediumFont();
@@ -147,7 +119,8 @@ namespace
 	{
 		UFont* Font = GEngine->GetMediumFont();
 		const float Middle = Canvas->SizeX / 2.0f;
-		const float Bottom = Canvas->SizeY - ModeHudMargin;
+		// Over the HUD's score summary at the bottom.
+		const float Bottom = Canvas->SizeY - ModeHudMargin - 72.0f * Canvas->SizeY / 1080.0f;
 		const TArray<CheeseStrikeStreaks::EStreak> Ready = Mine->GetReadyStreaks();
 		const float SinceEarned = Match->GetServerWorldTimeSeconds() - Mine->GetLastEarnedAt();
 		if (!Mine->IsMarkingStrike() && Mine->GetLastEarned() != CheeseStrikeStreaks::EStreak::None && Mine->GetLastEarnedAt() > 0.0f && SinceEarned < ModeHudEarnedLife && Ready.Contains(Mine->GetLastEarned()))
@@ -231,33 +204,6 @@ namespace
 		Hud->DrawText(FString::Printf(TEXT("UNMANNED AERIAL CHEESE  %.0f"), FMath::CeilToFloat(Until - Now)), ModeHudYellow, ModeHudMargin, Canvas->SizeY * 0.3f, GEngine->GetMediumFont(), 1.1f);
 	}
 
-	void ModeHudDrawTeammates(AHUD* Hud, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine, const APawn* Own)
-	{
-		if (!Match->HasTeams())
-		{
-			return;
-		}
-		UFont* Font = GEngine->GetSmallFont();
-		const FLinearColor Colour = CheeseStrikeModes::TeamColour(Mine->GetTeam());
-		for (TActorIterator<ACheeseStrikeCharacter> It(Hud->GetWorld()); It; ++It)
-		{
-			const APlayerState* Theirs = It->GetPlayerState();
-			if (*It == Own || !It->IsAlive() || Theirs == nullptr || Theirs == Mine || !Match->AreTeammates(Mine, Theirs))
-			{
-				continue;
-			}
-			FVector2D At;
-			if (!ModeHudOnScreen(Hud, It->GetEyes()->GetComponentLocation() + FVector(0.0f, 0.0f, 45.0f), At))
-			{
-				continue;
-			}
-			// A small downward chevron and the name, in the team's colour.
-			Hud->DrawLine(At.X - 7.0f, At.Y - 5.0f, At.X, At.Y + 3.0f, Colour, 2.0f);
-			Hud->DrawLine(At.X, At.Y + 3.0f, At.X + 7.0f, At.Y - 5.0f, Colour, 2.0f);
-			ModeHudCentred(Hud, Theirs->GetPlayerName(), At.X, At.Y - 22.0f, Font, 1.0f, Colour);
-		}
-	}
-
 	void ModeHudDrawOut(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
 	{
 		UFont* Font = GEngine->GetMediumFont();
@@ -297,7 +243,6 @@ namespace CheeseStrikeModeHUD
 		{
 			return;
 		}
-		ModeHudDrawScores(Hud, Canvas, Match);
 		ModeHudDrawAnnouncements(Hud, Canvas, Match, Mine);
 		if (Match->HasMatchEnded())
 		{
@@ -310,7 +255,6 @@ namespace CheeseStrikeModeHUD
 		}
 		else if (Own != nullptr && Own->IsAlive())
 		{
-			ModeHudDrawTeammates(Hud, Match, Mine, Own);
 			ModeHudDrawReveal(Hud, Canvas, Match, Mine);
 			ModeHudDrawStreaks(Hud, Canvas, Match, Mine);
 		}
