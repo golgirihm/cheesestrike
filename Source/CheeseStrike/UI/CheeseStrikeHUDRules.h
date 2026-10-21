@@ -141,6 +141,8 @@ namespace CheeseStrikeHUD
 	};
 	/** A free-for-all's summary: `Me`'s kills, and the leader's (or, if `Me` leads, the next best), racing to `Limit`. `Sorted` is the scoreboard in order. */
 	FScoreSummary FreeForAll(const TArray<CheeseStrikeRules::FStanding>& Sorted, const FString& Me, int32 Limit);
+	/** Gun Game's summary: `Me`'s step up the ladder and the leader's (or the next best's), out of `Steps`; `SortedBySteps` is everyone with their step (1 the first) as their kills, in order. */
+	FScoreSummary GunGame(const TArray<CheeseStrikeRules::FStanding>& SortedBySteps, const FString& Me, int32 Steps);
 	/** A team mode's summary: each side's score in its colour, `MyTeam`'s marked, racing to `Limit`, with `Goal` (the round, or what wins) between them. */
 	FScoreSummary Teams(const int32 (&Scores)[CheeseStrikeRules::Teams], int32 MyTeam, int32 Limit, const FString& Goal);
 
