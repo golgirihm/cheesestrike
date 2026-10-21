@@ -1,0 +1,15 @@
+# The joiner of tools/play/hud_hurt_server.txt: faces the host 4 m ahead,
+# waits out its own protection, and shoots them a round every second and a
+# half, four times, then stays a while.
+wait 6
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1
+shot hurt_client_after
+wait 40
+quit

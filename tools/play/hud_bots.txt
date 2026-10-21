@@ -1,0 +1,80 @@
+# A match on The Creamery with bots, for the HUD as it plays: teammates on the
+# minimap and their names over their heads, enemies on it when seen, the row
+# of players coming and going, the score, and hits from the bots as arcs and
+# red edges. Pictures every second and a half while turning. Run with -Bots
+# -Extra "?Bots=7?BotSkill=0" -Map /Game/CheeseStrike/Maps/Lvl_Creamery
+# -StartAt "-1500,-800,100,60" -Res 1920x1080.
+wait 12
+shot bots_00
+wait 0.2
+wait 1.3
+shot bots_01
+wait 0.2
+wait 1.3
+shot bots_02
+look 40 0
+wait 1.3
+shot bots_03
+wait 0.2
+wait 1.3
+shot bots_04
+wait 0.2
+wait 1.3
+shot bots_05
+look 40 0
+wait 1.3
+shot bots_06
+wait 0.2
+wait 1.3
+shot bots_07
+wait 0.2
+wait 1.3
+shot bots_08
+look 40 0
+wait 1.3
+shot bots_09
+wait 0.2
+wait 1.3
+shot bots_10
+wait 0.2
+wait 1.3
+shot bots_11
+look 40 0
+wait 1.3
+shot bots_12
+wait 0.2
+wait 1.3
+shot bots_13
+wait 0.2
+wait 1.3
+shot bots_14
+look 40 0
+wait 1.3
+shot bots_15
+wait 0.2
+wait 1.3
+shot bots_16
+wait 0.2
+wait 1.3
+shot bots_17
+look 40 0
+wait 1.3
+shot bots_18
+wait 0.2
+wait 1.3
+shot bots_19
+wait 0.2
+wait 1.3
+shot bots_20
+look 40 0
+wait 1.3
+shot bots_21
+wait 0.2
+wait 1.3
+shot bots_22
+wait 0.2
+wait 1.3
+shot bots_23
+look 40 0
+wait 1.3
+quit
