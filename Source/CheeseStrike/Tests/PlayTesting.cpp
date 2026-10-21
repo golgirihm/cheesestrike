@@ -17,6 +17,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
+#include "CheeseStrikePlayerState.h"
 #include "Dev/CheeseStrikePlayScript.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -90,7 +91,18 @@ namespace PlayTesting
 			const ACheeseStrikeGameState* State = InWorld->GetGameState<ACheeseStrikeGameState>();
 			const ACheeseStrikePlayerController* Local = Cast<ACheeseStrikePlayerController>(InWorld->GetFirstPlayerController());
 			const ACheeseStrikeCharacter* Pawn = Local != nullptr ? Cast<ACheeseStrikeCharacter>(Local->GetPawn()) : nullptr;
-			if (State == nullptr || Local == nullptr || State->PlayerArray.Num() != PlayersTogether)
+			if (State == nullptr || Local == nullptr)
+			{
+				return false;
+			}
+			// Every player is on the scoreboard; bots aside.
+			int32 Players = 0;
+			for (const APlayerState* Each : State->PlayerArray)
+			{
+				const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Each);
+				Players += Ours != nullptr && !Ours->IsABot() ? 1 : 0;
+			}
+			if (Players != PlayersTogether)
 			{
 				return false;
 			}
@@ -116,11 +128,11 @@ namespace PlayTesting
 					return false;
 				}
 			}
-			// And the server has everyone's character, or nobody's in the lobby.
+			// And the server has every player's character, or nobody's in the lobby; bots aside.
 			int32 Characters = 0;
 			for (TActorIterator<ACheeseStrikeCharacter> It(Playing[0]); It; ++It)
 			{
-				++Characters;
+				Characters += It->IsPlayerControlled() ? 1 : 0;
 			}
 			return Characters == (bLobbyWanted ? 0 : PlayersTogether);
 		}
@@ -137,7 +149,9 @@ namespace PlayTesting
 		PlayersTogether = Session.bApart ? 1 : Session.Players;
 		bLobbyWanted = Session.bLobby;
 		// A match starts at once, with no bots to get in the way, unless the test wants the lobby, which has them.
-		const FString Options = Session.bLobby ? Session.Options : Session.Options + TEXT("?StartNow?Bots=0");
+		// No bots unless the test asks for them: the players are the only characters.
+		const FString NoBots = Session.Options.Contains(TEXT("?Bots=")) ? FString() : FString(TEXT("?Bots=0"));
+		const FString Options = Session.bLobby ? Session.Options : Session.Options + TEXT("?StartNow") + NoBots;
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
 		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 		Settings->SetPlayNumberOfClients(Session.Players);

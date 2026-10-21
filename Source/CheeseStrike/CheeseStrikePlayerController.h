@@ -51,6 +51,8 @@ public:
 	void HostFromMenu();
 	/** The host sets the match's rules and map from the lobby (INDEX_NONE keeps the map); everyone in it sees them. */
 	void SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map = INDEX_NONE);
+	/** The host sets how well the bots play, from the lobby. */
+	void SetBotSkillFromMenu(int32 Skill);
 	/** Looks for matches, through the service or the local network without Steam. */
 	void FindFromMenu();
 	/** The host starts the match, after the countdown. */

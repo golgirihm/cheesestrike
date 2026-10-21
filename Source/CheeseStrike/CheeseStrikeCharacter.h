@@ -131,6 +131,9 @@ public:
 	 * hurt: dead already, or protected.
 	 */
 	bool TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead);
+	/** Server only: who last hurt it, and the server's time they did; a bot turns to whoever shoots it. */
+	ACheeseStrikeCharacter* GetLastHurtBy() const { return LastHurtBy.Get(); }
+	float GetLastHurtAt() const { return LastHurtAt; }
 
 	/** The bones of a body's two eyes (eyeball_l and _r, or L_eye and R_eye), if it has them. */
 	static bool FindEyes(const USkeletalMesh* Body, FName& Left, FName& Right);
@@ -194,6 +197,8 @@ protected:
 	float ProtectedUntil = 0.0f;
 	/** Whether its death has been shown here. */
 	bool bDeathShown = false;
+	TWeakObjectPtr<ACheeseStrikeCharacter> LastHurtBy;
+	float LastHurtAt = -1000.0f;
 	/** Where it has lately been: the server's record. */
 	FHitHistory HitHistory;
 	/** The usual field of view, to come back to after aiming down the sights. */

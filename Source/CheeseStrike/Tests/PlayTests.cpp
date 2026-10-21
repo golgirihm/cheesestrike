@@ -15,6 +15,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
+#include "CheeseStrikeBotController.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
@@ -521,6 +522,12 @@ bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
 	Then([this]()
 	{
 		TestFalse(TEXT("the countdown is over"), GameState(0)->IsCountingDown());
+		// The bots that filled in stand still from here: what follows is the players' pausing and shooting, not a fight.
+		for (TActorIterator<ACheeseStrikeBotController> It(World(0)); It; ++It)
+		{
+			It->StopMovement();
+			It->SetActorTickEnabled(false);
+		}
 	});
 	WaitUntil(TEXT("the menus going"), 3.0f, []() { return Controller(0) != nullptr && Controller(1) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::None && Controller(1)->GetMenuPage() == EMenuPage::None; });
 	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);

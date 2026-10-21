@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
+#include "Rules/CheeseStrikeBots.h"
 #include "CheeseStrikeGameMode.generated.h"
 
 class ACheeseStrikeCharacter;
@@ -75,6 +76,9 @@ public:
 	virtual bool ReadyToStartMatch_Implementation() override;
 	/** How many bots fill in once the match starts: -1 for every empty slot. */
 	int32 GetBotsWanted() const { return BotsWanted; }
+	/** How well the bots play (CheeseStrikeBots::Skills), as the host picks it in the lobby (`?BotSkill=`). */
+	int32 GetBotSkill() const { return BotSkill; }
+	void SetBotSkill(int32 Skill);
 	/** A player may name themself with `?Nick=` on the URL they join by (for development; Steam will name them). */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
 
@@ -93,6 +97,7 @@ protected:
 	int32 BotsWanted = -1;
 	int32 MapIndex = INDEX_NONE;
 	int32 BotSeed = 0;
+	int32 BotSkill = CheeseStrikeBots::DefaultSkill;
 	/** How many players a match started by the lobby on another map waits for; 0 for a match not started that way. */
 	int32 PlayersExpected = 0;
 	FTimerHandle CountdownTimer;

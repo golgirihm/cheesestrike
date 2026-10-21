@@ -66,6 +66,10 @@ public:
 	int32 GetMapIndex() const { return MapIndex; }
 	void SetMapIndex(int32 Index) { MapIndex = Index; }
 
+	/** How well the bots play (CheeseStrikeBots::Skills), as the host picked it. */
+	int32 GetBotSkill() const { return BotSkill; }
+	void SetBotSkill(int32 Skill) { BotSkill = Skill; }
+
 	/** The host's name, as the lobby crowns it; empty until the host is in. */
 	const FString& GetHostName() const { return HostName; }
 	void SetHostName(const FString& Name) { HostName = Name; }
@@ -100,4 +104,6 @@ protected:
 	FString HostName;
 	UPROPERTY(Replicated)
 	int32 MapIndex = INDEX_NONE;
+	UPROPERTY(Replicated)
+	int32 BotSkill = 1;
 };

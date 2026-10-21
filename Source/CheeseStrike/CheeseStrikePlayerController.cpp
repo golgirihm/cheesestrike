@@ -232,6 +232,18 @@ void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float Resp
 	}
 }
 
+void ACheeseStrikePlayerController::SetBotSkillFromMenu(int32 Skill)
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->SetBotSkill(Skill);
+	}
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
+	}
+}
+
 void ACheeseStrikePlayerController::FindFromMenu()
 {
 	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())

@@ -250,6 +250,8 @@ bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From
 		return false;
 	}
 	Health = FMath::Max(0.0f, Health - Damage);
+	LastHurtBy = From;
+	LastHurtAt = ServerNow();
 	if (!IsAlive())
 	{
 		Die(From, bHead);
