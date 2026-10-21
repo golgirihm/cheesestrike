@@ -10,7 +10,13 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikePlayerState.h"
+#include "HAL/IConsoleManager.h"
+#include "Weapons/CheeseStrikeArsenal.h"
+#include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+
+/** Every bot that comes in after this is set carries this primary, rather than one picked for its skill. */
+static TAutoConsoleVariable<FString> CVarBotPrimary(TEXT("CheeseStrike.BotPrimary"), TEXT(""), TEXT("The primary every bot coming in carries (blaster, carbine, grater, munster, shotgun, roquefort), or empty for one suited to its skill."));
 
 namespace
 {
@@ -27,6 +33,8 @@ namespace
 	constexpr float SightsBeyond = 1500.0f;
 	/** Moving slower than this (cm/s) while going somewhere is no progress. */
 	constexpr float ProgressSpeed = 40.0f;
+	/** Seconds after changing weapons before it changes again. */
+	constexpr float ChangeRest = 0.6f;
 }
 
 ACheeseStrikeBotController::ACheeseStrikeBotController()
@@ -75,6 +83,22 @@ FString ACheeseStrikeBotController::Describe() const
 		Weapon != nullptr && Weapon->IsReloading() ? *(TEXT(" reloading, ") + Weapon->DescribeReload()) : TEXT(""), bTriggerHeld ? TEXT(" firing") : TEXT(""),
 		Me != nullptr ? Me->GetVelocity().Size2D() : 0.0f, Me != nullptr ? *Me->GetActorLocation().ToCompactString() : TEXT("-"),
 		Target.IsValid() ? *Target->DisplayName() : TEXT("none"), bSeesTarget ? TEXT(" (seen)") : TEXT(""));
+}
+
+void ACheeseStrikeBotController::BeginPlay()
+{
+	Super::BeginPlay();
+	// Its primary, for every character it is given, chosen for the skill it plays at.
+	UWorld* World = GetWorld();
+	UCheeseStrikeLoadouts* Loadouts = World != nullptr ? World->GetSubsystem<UCheeseStrikeLoadouts>() : nullptr;
+	const ACheeseStrikeGameMode* Mode = World != nullptr ? World->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
+	if (Loadouts != nullptr && !Loadouts->HasChosen(this))
+	{
+		// For watching one weapon in bots' hands: CheeseStrike.BotPrimary <weapon>.
+		const FWeaponStats* Forced = CheeseStrikeArsenal::Find(FName(*CVarBotPrimary.GetValueOnGameThread()));
+		FRandomStream Random(FMath::Rand());
+		Loadouts->Choose(this, Forced != nullptr && Forced->Slot == EWeaponSlot::Primary ? Forced->Id : CheeseStrikeBots::PrimaryFor(Mode != nullptr ? Mode->GetBotSkill() : SkillIndex, Random));
+	}
 }
 
 void ACheeseStrikeBotController::OnPossess(APawn* InPawn)
@@ -201,6 +225,7 @@ void ACheeseStrikeBotController::Think()
 {
 	Perceive();
 	ChooseWhereToGo();
+	ChooseWeapon();
 	ACheeseStrikeCharacter* Me = Body();
 	ACheeseStrikeWeapon* Weapon = Me != nullptr ? Me->GetWeapon() : nullptr;
 	if (Weapon == nullptr)
@@ -208,7 +233,7 @@ void ACheeseStrikeBotController::Think()
 		return;
 	}
 	// Between fights, a magazine half gone is filled.
-	if (!bSeesTarget && !Weapon->IsReloading() && Weapon->GetReserve() > 0 && Weapon->GetMagazine() < Weapon->GetStats().MagazineSize / 2)
+	if (!bSeesTarget && !Weapon->IsReloading() && Weapon->GetReserve() != 0 && Weapon->GetStats().UsesRounds() && Weapon->GetMagazine() < Weapon->GetStats().MagazineSize / 2)
 	{
 		Me->DoReload();
 	}
@@ -252,7 +277,7 @@ void ACheeseStrikeBotController::Perceive()
 		const float Distance = ToOther.Size();
 		// A shot nearby is heard, whoever fired it.
 		const ACheeseStrikeWeapon* TheirWeapon = Other->GetWeapon();
-		if (TheirWeapon != nullptr && TheirWeapon->IsFiring() && Distance < HeardAt)
+		if (TheirWeapon != nullptr && (TheirWeapon->IsFiring() || TheirWeapon->SinceShot() < 0.5f) && Distance < HeardAt)
 		{
 			Heard = Other;
 			HeardAt = Distance;
@@ -381,7 +406,7 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 		const float Distance = FVector::Dist(Here, Target->GetActorLocation());
 		// No map has wedges yet: hurt or not, it fights on; with nothing left to shoot, it keeps away.
 		const ACheeseStrikeWeapon* Weapon = Me->GetWeapon();
-		const bool bDry = Weapon != nullptr && Weapon->GetMagazine() == 0 && Weapon->GetReserve() == 0;
+		const bool bDry = Weapon != nullptr && Weapon->IsDry();
 		Move = bDry ? CheeseStrikeBots::EMove::Retreat : CheeseStrikeBots::MoveFor(Distance, Me->GetWeapon() != nullptr ? Me->GetWeapon()->GetStats().MaxRange : 5000.0f, Me->GetHealth(), false);
 		Me->DoSprint(false);
 		switch (Move)
@@ -549,8 +574,11 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 		// It fires once its reaction is over, when the aim is near enough, at what is in reach.
 		const float Off = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(GetControlRotation().Vector(), Straight.Vector()), -1.0f, 1.0f)));
 		const float Range = Weapon != nullptr ? Weapon->GetStats().MaxRange : 5000.0f;
-		const bool bHasAmmo = Weapon != nullptr && (Weapon->GetMagazine() > 0 || Weapon->GetReserve() > 0);
-		bWantsToFire = bHasAmmo && Tracking >= Skill.Reaction && Off <= Error + FireCone && CheeseStrikeBots::WouldFireAt(FVector::Dist(Eyes, Chest), Range, bShotByTarget);
+		const bool bHasAmmo = Weapon != nullptr && !Weapon->IsDry();
+		const bool bInReach = Weapon != nullptr && Weapon->GetStats().IsMelee()
+			? CheeseStrikeBots::WouldStrikeAt(FVector::Dist(Eyes, Chest), Weapon->GetStats().Reach)
+			: CheeseStrikeBots::WouldFireAt(FVector::Dist(Eyes, Chest), Range, bShotByTarget);
+		bWantsToFire = bHasAmmo && Tracking >= Skill.Reaction && Off <= Error + FireCone && bInReach;
 	}
 	else if (Target.IsValid())
 	{
@@ -573,10 +601,54 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 		bShotAtTarget = true;
 		LastReaction = Time - TrackingSince;
 	}
+	if (!Weapon->GetStats().bAutomatic)
+	{
+		// A weapon that fires a shot (or a burst, or a stroke) a pull is pulled each time it is ready.
+		if (bTriggerHeld)
+		{
+			bTriggerHeld = false;
+			Me->DoFire(false);
+		}
+		if (bHold && Weapon->IsReady())
+		{
+			Me->DoFire(true);
+			Me->DoFire(false);
+		}
+		return;
+	}
 	if (bHold != bTriggerHeld)
 	{
 		bTriggerHeld = bHold;
 		Me->DoFire(bHold);
+	}
+}
+
+void ACheeseStrikeBotController::ChooseWeapon()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	UCheeseStrikeInventory* Inventory = Me != nullptr ? Me->GetInventory() : nullptr;
+	EWeaponSlot Current;
+	if (Inventory == nullptr || !Inventory->GetHeldSlot(Current) || Now() - ChangedWeaponAt < ChangeRest)
+	{
+		return;
+	}
+	CheeseStrikeBots::FArmed Armed;
+	Armed.bPrimary = Inventory->CanDraw(EWeaponSlot::Primary);
+	Armed.bSidearm = Inventory->CanDraw(EWeaponSlot::Sidearm);
+	Armed.bKnife = Inventory->CanDraw(EWeaponSlot::Knife);
+	if (const ACheeseStrikeWeapon* Primary = Inventory->GetInSlot(EWeaponSlot::Primary))
+	{
+		Armed.PrimaryMagazine = Primary->GetMagazine();
+		Armed.bPrimaryReserve = Primary->GetReserve() != 0;
+	}
+	const bool bFighting = bSeesTarget && Target.IsValid();
+	const float Distance = bFighting ? FVector::Dist(Me->GetActorLocation(), Target->GetActorLocation()) : 0.0f;
+	const EWeaponSlot Best = CheeseStrikeBots::ChooseWeapon(Armed, bFighting, Distance, Current);
+	if (Best != Current)
+	{
+		LetGoOfTrigger();
+		Me->DoDrawWeapon(Best);
+		ChangedWeaponAt = Now();
 	}
 }
 

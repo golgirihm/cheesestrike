@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeBots.h"
 #include "Kismet/GameplayStatics.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 
 namespace CheeseStrikeBots
 {
@@ -67,12 +68,83 @@ namespace CheeseStrikeBots
 		{
 			return EMove::Retreat;
 		}
-		if (Distance < BackOff)
+		// A weapon made for close quarters isn't kept at arm's length.
+		if (Distance < FMath::Min(BackOff, WeaponRange * FightRangeShare * 0.5f))
 		{
 			return EMove::BackOff;
 		}
 		// Some give either side of the range, so that a bot doesn't flick between closing in and holding.
 		return Distance > WeaponRange * FightRangeShare * 1.25f ? EMove::Approach : EMove::Hold;
+	}
+
+	TArray<TPair<FName, float>> PrimaryWeights(int32 SkillIndex)
+	{
+		using namespace CheeseStrikeWeapons;
+		// Blaster, Carbine, Grater, Munster, Shotgun, Roquefort: an easy bot sprays, a hard one aims.
+		static const float Weights[NumSkills][6] = {
+			{3.0f, 1.0f, 3.0f, 2.0f, 2.0f, 0.0f},
+			{3.0f, 2.0f, 2.0f, 2.0f, 2.0f, 1.0f},
+			{2.0f, 3.0f, 2.0f, 1.0f, 2.0f, 2.0f},
+		};
+		const FWeaponStats* Order[] = {&Blaster(), &Carbine(), &Grater(), &Munster(), &Shotgun(), &Roquefort()};
+		const int32 Row = FMath::Clamp(SkillIndex, 0, NumSkills - 1);
+		TArray<TPair<FName, float>> Out;
+		for (int32 Index = 0; Index < 6; ++Index)
+		{
+			Out.Add({Order[Index]->Id, Weights[Row][Index]});
+		}
+		return Out;
+	}
+
+	FName PrimaryFor(int32 SkillIndex, FRandomStream& Random)
+	{
+		const TArray<TPair<FName, float>> Weights = PrimaryWeights(SkillIndex);
+		float Total = 0.0f;
+		for (const TPair<FName, float>& Each : Weights)
+		{
+			Total += Each.Value;
+		}
+		float Pick = Random.FRandRange(0.0f, Total);
+		for (const TPair<FName, float>& Each : Weights)
+		{
+			if (Each.Value > 0.0f && Pick < Each.Value)
+			{
+				return Each.Key;
+			}
+			Pick -= Each.Value;
+		}
+		return CheeseStrikeArsenal::DefaultPrimary();
+	}
+
+	EWeaponSlot ChooseWeapon(const FArmed& Armed, bool bFighting, float Distance, EWeaponSlot Current)
+	{
+		const bool bPrimaryUsable = Armed.bPrimary && (Armed.PrimaryMagazine > 0 || Armed.bPrimaryReserve);
+		if (bFighting && Armed.bKnife && (Distance < KnifeFrom || (Current == EWeaponSlot::Knife && Distance < KnifeLetGo)))
+		{
+			return EWeaponSlot::Knife;
+		}
+		if (bFighting && Armed.bSidearm && Armed.PrimaryMagazine <= 0 && (Current == EWeaponSlot::Sidearm || Distance < SidearmWithin || !bPrimaryUsable))
+		{
+			return EWeaponSlot::Sidearm;
+		}
+		if (bPrimaryUsable)
+		{
+			return EWeaponSlot::Primary;
+		}
+		if (Armed.bSidearm)
+		{
+			return EWeaponSlot::Sidearm;
+		}
+		if (Armed.bKnife)
+		{
+			return EWeaponSlot::Knife;
+		}
+		return Current;
+	}
+
+	bool WouldStrikeAt(float Distance, float Reach)
+	{
+		return Distance <= Reach * 0.95f;
 	}
 
 	bool WouldFireAt(float Distance, float WeaponRange, bool bTheyShootMe)
