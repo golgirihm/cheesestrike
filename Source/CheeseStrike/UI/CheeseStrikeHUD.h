@@ -171,6 +171,10 @@ protected:
 	float RevealedUntil = -1.0f;
 	/** When the reload under way began, for its bar (the world's time; -1 for none). */
 	float ReloadBegan = -1.0f;
+	/** Where each kill in the feed happened (the map's name for the place the body fell), by the killed and the time. */
+	TMap<FString, FString> KillPlaces;
+	/** The place of `Kill`: found once, from the body where it lies, and kept while the kill is in the feed. */
+	FString KillPlace(const struct FKillFeedEntry& Kill, float Now);
 	/** The Unmanned Aerial Cheese's sweep now, for the minimap's pulse. */
 	CheeseStrikeHUD::FSweep Sweep;
 	/** How much video memory had spilled over when last written to the log (MB). */

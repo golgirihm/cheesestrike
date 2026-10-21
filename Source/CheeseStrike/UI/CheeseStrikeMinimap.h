@@ -21,7 +21,8 @@ namespace CheeseStrikeHUDDraw { struct FShapes; }
  * player's (CheeseStrikeHUD::LayerFor): what is over their head is left
  * out, a level below is dark, floors a little lighter, cover lighter, walls
  * light. The cheese is kept apart and read as it is now: an eaten block
- * is gone, a bitten one paler, a falling one where it is.
+ * is gone, a bitten one paler, a falling one where it is. So are the
+ * doors, whose leaves slide aside as anyone comes up to them.
  */
 class CHEESESTRIKE_API FCheeseStrikeMinimap
 {
@@ -69,5 +70,7 @@ private:
 	/** The level's pieces, lowest top first, so that higher ones are drawn over lower. */
 	TArray<FPiece> Pieces;
 	TArray<FCheese> Cheese;
+	/** The doors, read as they are each frame: a door that opens shows open. */
+	TArray<TWeakObjectPtr<AActor>> Doors;
 	TWeakObjectPtr<UWorld> GatheredFor;
 };

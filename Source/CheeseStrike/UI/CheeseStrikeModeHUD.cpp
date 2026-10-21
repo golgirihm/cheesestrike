@@ -216,9 +216,9 @@ namespace
 				Shapes.Quad(At + FVector2D(0, -Size), At + FVector2D(Size, 0), At + FVector2D(0, Size), At + FVector2D(-Size, 0), HudDraw::Faded(HudDraw::Danger, Sweep.Fade));
 			}
 		}
-		// Under the minimap: its name, its seconds, and a bar running down.
+		// Under the minimap and the place's name: its name, its seconds, and a bar running down.
 		const float Left = ACheeseStrikeHUD::Margin * U;
-		const float Top = (ACheeseStrikeHUD::Margin + ACheeseStrikeHUD::MapSide + 12.0f) * U;
+		const float Top = (ACheeseStrikeHUD::Margin + ACheeseStrikeHUD::MapSide + 40.0f) * U;
 		const float Width = ACheeseStrikeHUD::MapSide * U;
 		const float Remaining = FMath::Clamp((Until - Now) / CheeseStrikeStreaks::RevealTime, 0.0f, 1.0f);
 		const FSlateFontInfo Label = HudDraw::Font(14.0f * U);

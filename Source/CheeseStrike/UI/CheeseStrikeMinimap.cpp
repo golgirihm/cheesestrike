@@ -10,6 +10,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
 #include "Map/CheeseStrikeCheese.h"
+#include "Map/CheeseStrikeDoor.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -170,6 +171,7 @@ void FCheeseStrikeMinimap::Gather(UWorld* World)
 	GatheredFor = World;
 	Pieces.Reset();
 	Cheese.Reset();
+	Doors.Reset();
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
 		AActor* Actor = *It;
@@ -180,6 +182,11 @@ void FCheeseStrikeMinimap::Gather(UWorld* World)
 		if (ACheeseStrikeCheese* Block = Cast<ACheeseStrikeCheese>(Actor))
 		{
 			Cheese.Add({Block, {}, FTransform(FVector(1e9f))});
+			continue;
+		}
+		if (Actor->IsA<ACheeseStrikeDoor>())
+		{
+			Doors.Add(Actor);
 			continue;
 		}
 		TInlineComponentArray<UStaticMeshComponent*> Components(Actor);
@@ -257,6 +264,33 @@ void FCheeseStrikeMinimap::Draw(CheeseStrikeHUDDraw::FShapes& Shapes, const FVec
 		if (Layer != ELayer::Hidden)
 		{
 			DrawPiece(Shapes, Piece, MinimapColour(Layer), Min, Max, Middle, ViewYaw, Scale);
+		}
+	}
+	// The doors' leaves where they are now.
+	for (const TWeakObjectPtr<AActor>& Door : Doors)
+	{
+		const AActor* Live = Door.Get();
+		if (Live == nullptr || FVector2D::Distance(FVector2D(Live->GetActorLocation()), Middle) > Reach + 1000.0f)
+		{
+			continue;
+		}
+		TInlineComponentArray<UStaticMeshComponent*> Leaves(Live);
+		for (const UStaticMeshComponent* Leaf : Leaves)
+		{
+			if (Leaf->GetStaticMesh() == nullptr || !Leaf->IsVisible() || Leaf->GetCollisionEnabled() == ECollisionEnabled::NoCollision)
+			{
+				continue;
+			}
+			TArray<FPiece> Found;
+			PiecesOf(Leaf->GetStaticMesh(), Leaf->GetComponentTransform(), Found);
+			for (const FPiece& Piece : Found)
+			{
+				const ELayer Layer = CheeseStrikeHUD::LayerFor(Piece.Bottom, Piece.Top, Feet, false);
+				if (Layer != ELayer::Hidden)
+				{
+					DrawPiece(Shapes, Piece, MinimapColour(Layer), Min, Max, Middle, ViewYaw, Scale);
+				}
+			}
 		}
 	}
 	for (FCheese& Block : Cheese)
