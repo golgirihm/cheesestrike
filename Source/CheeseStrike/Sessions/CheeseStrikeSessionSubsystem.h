@@ -3,10 +3,24 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "CheeseStrikeSessionSubsystem.generated.h"
+
+class UNetDriver;
+class UWorld;
+
+/** What the player has set going that ends in a level change: the front end shows it, and takes no more clicks until it is over. */
+enum class ESessionPending : uint8
+{
+	None,
+	/** Offering a match, then reloading the level into its lobby. */
+	Hosting,
+	/** Joining a match found (or an invitation), then travelling to its host. */
+	Joining,
+};
 
 /**
  * Hosts, finds, joins and leaves matches through the online service: Steam
@@ -47,6 +61,12 @@ public:
 	const FString& GetStatus() const { return Status; }
 	/** Whether something is under way that the next command would cut across. */
 	bool IsBusy() const { return bBusy; }
+	/**
+	 * Hosting or joining, from the moment it is asked for until the level
+	 * it leads to has loaded, or it fails: the menu shows a spinner, and its
+	 * buttons can't be pressed.
+	 */
+	ESessionPending GetPending() const { return Pending; }
 	/** The service in use: "Steam" or "Null". */
 	FString ServiceName() const;
 	/** Whether this game instance hosts or has joined a match. */
@@ -65,6 +85,11 @@ protected:
 	void CreateNow();
 	void JoinNow(const FOnlineSessionSearchResult& Result);
 	void Travel(const FString& Url, bool bAsHost);
+	/** Hosting or joining is over: a level of this game's has loaded, or the travel failed. */
+	void OnLevelLoaded(UWorld* World);
+	void OnTravelFailed(UWorld* World, ETravelFailure::Type Failure, const FString& Error);
+	void OnNetworkFailed(UWorld* World, UNetDriver* Driver, ENetworkFailure::Type Failure, const FString& Error);
+	void SetPending(ESessionPending Now);
 
 	/** The last search, and the matches of ours it found. */
 	TSharedPtr<FOnlineSessionSearch> Search;
@@ -72,6 +97,7 @@ protected:
 	TArray<FString> Found;
 	FString Status;
 	bool bBusy = false;
+	ESessionPending Pending = ESessionPending::None;
 	/** What the next step needs: the options of the match being hosted, or the match being joined. */
 	FString HostingOptions;
 	bool bHostingLan = false;
@@ -81,4 +107,7 @@ protected:
 	FDelegateHandle FoundHandle;
 	FDelegateHandle JoinedHandle;
 	FDelegateHandle InviteHandle;
+	FDelegateHandle LoadedHandle;
+	FDelegateHandle TravelFailedHandle;
+	FDelegateHandle NetworkFailedHandle;
 };

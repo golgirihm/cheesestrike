@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Widgets/SCompoundWidget.h"
+#include "Rules/CheeseStrikeRules.h"
 
 class ACheeseStrikePlayerController;
 class SBox;
@@ -25,22 +26,65 @@ enum class EMenuPage : uint8
 	Pause,
 	/** Who made what the game is made of (CheeseStrikeCredits). */
 	Credits,
+	/** The player's options (UCheeseStrikeSettings): from the front end, or from the pause menu during a match. */
+	Options,
+};
+
+/** The options page's tabs. */
+enum class EOptionsTab : uint8
+{
+	Controls,
+	View,
+	Sound,
+	Graphics,
 };
 
 namespace CheeseStrikeMenu
 {
 	/**
 	 * Which page shows, from where the match is: none once it is on (or the
-	 * pause menu, if the player paused), none once it is over (the scoreboard
-	 * is up), the lobby while a hosted or joined match waits, and otherwise
-	 * the page the player chose among the front end's.
+	 * pause menu, if the player paused, or the options from it), none once
+	 * it is over (the scoreboard is up), the lobby while a hosted or joined
+	 * match waits or goes to another level, and otherwise the page the
+	 * player chose among the front end's.
 	 */
 	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling = false);
+
+	/** The tones of the lobby's countdown (CheeseStrikeTones). */
+	enum class ECountdownTone : uint8
+	{
+		None,
+		/** A second has gone by: 5, 4, 3, 2, 1. */
+		Second,
+		/** The countdown is over. */
+		End,
+	};
+	/**
+	 * The tone this frame: from the countdown now (`bCounting`, `Left`
+	 * seconds left) and whether it is `bOver` on the server (the match has
+	 * begun, or is leaving for its level), and `Sounded`, kept between
+	 * frames: the last whole second sounded, 0 once the end has, INDEX_NONE
+	 * with no countdown. A tone as each second begins, each once however
+	 * this machine's clock of the server's wavers (the first only if most of
+	 * it is still to come), and the end's when the
+	 * seconds run out or the countdown is over before this clock has got
+	 * there; none when it is called off.
+	 */
+	ECountdownTone CountdownTone(int32& Sounded, bool bCounting, float Left, bool bOver);
+
+	/**
+	 * A side's colour, on its chips and over its column: The Gouda Guys'
+	 * orange and the Mozza Radicals' sky blue (Okabe and Ito's, which eyes
+	 * that see colour differently still tell apart), both clear on the
+	 * lobby's dark tile; any other team, as in a free-for-all, a cheese
+	 * yellow.
+	 */
+	FLinearColor TeamColour(int32 Team);
 
 	/** What the bottom of the lobby says, right of Leave. */
 	enum class ELobbyStatus : uint8
 	{
-		/** A joiner who hasn't got the host's match yet: "Joining the match", no seats. */
+		/** A joiner who hasn't got the host's match yet: "Joining the lobby", no seats. */
 		Joining,
 		/** Going to another level, the match's map or back to the lobby: "Going to ...". */
 		Travelling,
@@ -89,6 +133,9 @@ public:
 	/** Draws the page again if what it shows has changed; cheap otherwise, so run every frame. */
 	void Refresh();
 	EMenuPage GetPage() const { return Page; }
+	/** Shows `Tab` of the options when they show. */
+	void SetOptionsTab(EOptionsTab Tab) { OptionsTab = Tab; ShownPageKey.Reset(); }
+	EOptionsTab GetOptionsTab() const { return OptionsTab; }
 
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
@@ -103,14 +150,35 @@ private:
 	TSharedRef<SWidget> MakeLobbyRules();
 	TSharedRef<SWidget> MakePause();
 	TSharedRef<SWidget> MakeCredits();
+	/** The options: a tab for each kind (EOptionsTab), each setting on a row, applied as it changes and kept. */
+	TSharedRef<SWidget> MakeOptions();
+	TSharedRef<SWidget> MakeOptionsTab();
+	/** A row of the options: its name on the left, then what sets it. */
+	TSharedRef<SWidget> MakeOptionRow(const FString& Label, TSharedRef<SWidget> Setter);
+	/** A slider from `Min` to `Max` by `Step`, its value written beside it by `Show`; `Set` as it moves, and the settings kept when it is let go. */
+	TSharedRef<SWidget> MakeSlider(float Min, float Max, float Step, TFunction<float()> Get, TFunction<void(float)> Set, TFunction<FString(float)> Show);
+	/** A row of choices without a label of its own, for an options row. */
+	TSharedRef<SWidget> MakeChoiceButtons(const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick);
+	/** A spinner, turning once a second. */
+	TSharedRef<SWidget> MakeSpinner(float Radius = 10.0f) const;
 	TSharedRef<SWidget> MakeTitle(const FString& Text);
 	TSharedRef<SWidget> MakeLine(const FString& Text, bool bDim = false);
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain, TSharedPtr<SWidget> Inside = nullptr);
 	/** A row of choices, the chosen one lit; with `bCanPick` off, only the chosen one is shown lit and none can be pressed. */
 	TSharedRef<SWidget> MakeChoices(const FString& Label, const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick);
-	/** One team's column in the lobby: its name, then who is on it, each in a chip with an icon, the host crowned. */
-	TSharedRef<SWidget> MakeTeamColumn(int32 Team);
-	TSharedRef<SWidget> MakeNameChip(const FString& Name, bool bBot, bool bHost, int32 Team);
+	/**
+	 * A column of the lobby's seats: `Title` over them in `Colour`, then
+	 * `Seats` (players, bots, then empty seats; CheeseStrikeRules::
+	 * WithEmptySeats), each in a chip of that colour with an icon, the host
+	 * crowned, sharing the column's height. Two of these, one a side, make
+	 * the lobby of a team match (MakeSeatColumns); one with every seat, a
+	 * free-for-all's.
+	 */
+	TSharedRef<SWidget> MakeSeatColumn(const FString& Title, const FLinearColor& Colour, const TArray<CheeseStrikeRules::FRosterEntry>& Seats);
+	/** The lobby's columns: a team's column for each side when `bTeams`, or one column of every seat. */
+	TSharedRef<SWidget> MakeSeatColumns(bool bTeams);
+	/** One seat's chip: a player's (crowned if `bHost`), a bot's, or an empty seat, in `Colour`. */
+	TSharedRef<SWidget> MakeNameChip(const CheeseStrikeRules::FRosterEntry& Seat, bool bHost, const FLinearColor& Colour);
 	/** A number with a button either side to make it less or more; with `bCanPick` off, the buttons can't be pressed. */
 	TSharedRef<SWidget> MakeStepper(const FString& Label, const FString& Value, bool bCanPick, TFunction<void()> Less, TFunction<void()> More);
 	/** The picture of map `MapIndex` (CheeseStrikeRules::Maps), its name across the bottom. */
@@ -133,6 +201,7 @@ private:
 	TSharedPtr<SWidget> Lobby;
 	TSharedPtr<SBox> LobbyContent;
 	EMenuPage Page = EMenuPage::None;
+	EOptionsTab OptionsTab = EOptionsTab::Controls;
 	FString ShownLobbyKey;
 	FString ShownPageKey;
 };

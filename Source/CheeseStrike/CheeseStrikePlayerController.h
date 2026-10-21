@@ -31,6 +31,14 @@ public:
 	/** Whether the scoreboard's key is held. */
 	bool IsScoreboardShown() const { return bScoreboardHeld; }
 
+	/**
+	 * How much the player's look turns the view, across and up and down, as
+	 * the options set it (CheeseStrikeSettings::LookScale): how fast, the
+	 * aimed share while the sights are up, and up and down the other way if
+	 * inverted. A play script looks as the usual settings would.
+	 */
+	FVector2D LookScale() const;
+
 	/** Plays `Text` as a script from now on, in place of any other; see UCheeseStrikePlayScript for the commands. */
 	UCheeseStrikePlayScript* Play(const FString& Text);
 	UCheeseStrikePlayScript* GetPlayScript() const { return PlayScript; }
@@ -47,16 +55,33 @@ public:
 	EMenuPage GetMenuPage() const { return ShownPage; }
 	/** Whether this player has been told to follow the server to another level (and is waiting to): the lobby says where to. */
 	bool IsLeaving() const { return bLeaving; }
+	/** The map (CheeseStrikeRules::Maps) this player was told to follow the server to, or INDEX_NONE. */
+	int32 GetLeavingFor() const { return LeavingFor; }
 	/**
 	 * Whether what this player sees is ready to be shown: a page of the menu
 	 * over the level, or the match through their character. Right after a
 	 * level loads it isn't (a joiner has no controller or character for a
 	 * moment, and the engine's view from the world's origin shows), and the
-	 * loading cover stays up (UCheeseStrikeCurtainSubsystem).
+	 * loading cover stays up (UCheeseStrikeCurtainSubsystem). On a level the
+	 * lobby sent everyone to it stays up until the match begins there, when
+	 * they are all ready (ServerReady), and then the view is the character's.
 	 */
 	bool IsViewReady() const;
-	/** Picks a page of the front end (main, find). */
+	/**
+	 * Server: this player's level is loaded and their view can be shown, so
+	 * a match the lobby sent everyone to may begin (ACheeseStrikeGameMode::
+	 * ReadyToStartMatch). Each player's machine says so once per level.
+	 */
+	UFUNCTION(Server, Reliable)
+	void ServerReady();
+	/** Server: whether this player has said so. */
+	bool HasSaidReady() const { return bSaidReady; }
+	/** Whether this player's machine is ready to say so: on the level, with the match's state and their own. */
+	bool CanSayReady() const;
+	/** Picks a page of the front end (main, find, credits, options), or the options from the pause menu. */
 	void ChooseMenu(EMenuPage Page);
+	/** Back from a page to the one it came from: the front end's main page, or the pause menu. */
+	void BackFromMenu();
 	/** Hosts a match with the usual rules on the first map, through the online service, or the local network without Steam: straight into its lobby. */
 	void HostFromMenu();
 	/** The host sets the match's rules and map from the lobby (INDEX_NONE keeps the map); everyone in it sees them. */
@@ -85,9 +110,9 @@ public:
 	/** From the console or a play script: the host calls off the countdown. */
 	UFUNCTION(Exec)
 	void CheeseStrikeCancel();
-	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find or Credits). */
+	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits or Options, which also opens from the pause menu), and of the options the tab named (Controls, View, Sound or Graphics). */
 	UFUNCTION(Exec)
-	void CheeseStrikePage(const FString& Page);
+	void CheeseStrikePage(const FString& Page, const FString& Tab = TEXT(""));
 
 	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
 	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */
@@ -119,6 +144,9 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel) override;
+	/** Following the server to another level, this player keeps their own `?Nick=`: the server's URL carries the host's. */
+	virtual void ClientTravelInternal_Implementation(const FString& URL, ETravelType TravelType, bool bSeamless, FGuid MapPackageGuid) override;
+
 
 	void ScoreboardStarted();
 	void ScoreboardEnded();
@@ -126,6 +154,8 @@ protected:
 	void ShowMenu(EMenuPage Page);
 	/** Whether the local player is in a hosted or joined match rather than alone on the level. */
 	bool IsInAMatch() const;
+	/** Plays the countdown's tones as the match's seconds go by (CheeseStrikeMenu::CountdownTone). */
+	void SoundCountdown();
 	void ShowMenuCamera();
 	void HideMenuCamera();
 
@@ -142,6 +172,12 @@ protected:
 	EMenuPage ChosenPage = EMenuPage::Main;
 	bool bPaused = false;
 	bool bLeaving = false;
+	int32 LeavingFor = INDEX_NONE;
+	/** Server: this player is ready for a match the lobby sent everyone to; and on their machine, whether it has said so. */
+	bool bSaidReady = false;
+	bool bReadySent = false;
+	/** The last whole second of the countdown sounded, for its tones (CheeseStrikeMenu::CountdownTone). */
+	int32 SecondSounded = INDEX_NONE;
 	bool bScoreboardHeld = false;
 	bool bStartAtTaken = false;
 };

@@ -118,7 +118,8 @@ bool FTheSidesAreFilledWithBots::RunTest(const FString& Parameters)
 	TestEqual(TEXT("no two alike"), Unique.Num(), 16);
 	TestTrue(TEXT("the same seed draws the same"), BotNames(7, 16) == Drawn);
 	TestTrue(TEXT("another seed another order"), BotNames(8, 16) != Drawn);
-	TestEqual(TEXT("every slot without a say"), BotsFrom(TEXT("?listen")), -1);
+	TestEqual(TEXT("the usual seven without a say"), BotsFrom(TEXT("?listen")), DefaultBots);
+	TestEqual(TEXT("or every slot, if asked"), BotsFrom(TEXT("?Bots=-1")), -1);
 	TestEqual(TEXT("or as many as the URL says"), BotsFrom(TEXT("?Bots=3")), 3);
 	TestEqual(TEXT("none at all"), BotsFrom(TEXT("?Bots=0")), 0);
 

@@ -5,6 +5,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "UObject/UObjectGlobals.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
 #include "CheeseStrike.h"
@@ -19,6 +20,12 @@ void UCheeseStrikeSessionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 		FoundHandle = Interface->AddOnFindSessionsCompleteDelegate_Handle(FOnFindSessionsCompleteDelegate::CreateUObject(this, &UCheeseStrikeSessionSubsystem::OnFound));
 		JoinedHandle = Interface->AddOnJoinSessionCompleteDelegate_Handle(FOnJoinSessionCompleteDelegate::CreateUObject(this, &UCheeseStrikeSessionSubsystem::OnJoined));
 		InviteHandle = Interface->AddOnSessionUserInviteAcceptedDelegate_Handle(FOnSessionUserInviteAcceptedDelegate::CreateUObject(this, &UCheeseStrikeSessionSubsystem::OnInviteAccepted));
+	}
+	LoadedHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UCheeseStrikeSessionSubsystem::OnLevelLoaded);
+	if (GEngine != nullptr)
+	{
+		TravelFailedHandle = GEngine->OnTravelFailure().AddUObject(this, &UCheeseStrikeSessionSubsystem::OnTravelFailed);
+		NetworkFailedHandle = GEngine->OnNetworkFailure().AddUObject(this, &UCheeseStrikeSessionSubsystem::OnNetworkFailed);
 	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: through %s"), *ServiceName());
 	// The game's traffic goes through Steam's net driver only when Steam is
@@ -44,6 +51,12 @@ void UCheeseStrikeSessionSubsystem::Deinitialize()
 		Interface->ClearOnFindSessionsCompleteDelegate_Handle(FoundHandle);
 		Interface->ClearOnJoinSessionCompleteDelegate_Handle(JoinedHandle);
 		Interface->ClearOnSessionUserInviteAcceptedDelegate_Handle(InviteHandle);
+	}
+	FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(LoadedHandle);
+	if (GEngine != nullptr)
+	{
+		GEngine->OnTravelFailure().Remove(TravelFailedHandle);
+		GEngine->OnNetworkFailure().Remove(NetworkFailedHandle);
 	}
 	Super::Deinitialize();
 }
@@ -72,6 +85,45 @@ void UCheeseStrikeSessionSubsystem::Say(const FString& What)
 	UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: %s"), *What);
 }
 
+void UCheeseStrikeSessionSubsystem::SetPending(ESessionPending Now)
+{
+	Pending = Now;
+}
+
+void UCheeseStrikeSessionSubsystem::OnLevelLoaded(UWorld* World)
+{
+	// Another game's level (a second player in the same editor) is none of this one's business.
+	if (World == nullptr || World->GetGameInstance() != GetGameInstance())
+	{
+		return;
+	}
+	// Joined: what was found, and the word that it was being joined, are over.
+	if (Pending == ESessionPending::Joining && World->GetNetMode() == NM_Client)
+	{
+		Found.Empty();
+		Results.Empty();
+		Status.Reset();
+		UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: in the host's match"));
+	}
+	SetPending(ESessionPending::None);
+}
+
+void UCheeseStrikeSessionSubsystem::OnTravelFailed(UWorld* World, ETravelFailure::Type Failure, const FString& Error)
+{
+	if (World == nullptr || World->GetGameInstance() == GetGameInstance())
+	{
+		SetPending(ESessionPending::None);
+	}
+}
+
+void UCheeseStrikeSessionSubsystem::OnNetworkFailed(UWorld* World, UNetDriver* Driver, ENetworkFailure::Type Failure, const FString& Error)
+{
+	if (World == nullptr || World->GetGameInstance() == GetGameInstance())
+	{
+		SetPending(ESessionPending::None);
+	}
+}
+
 void UCheeseStrikeSessionSubsystem::Host(const FString& Options, bool bLan)
 {
 	IOnlineSessionPtr Interface = Sessions();
@@ -86,6 +138,7 @@ void UCheeseStrikeSessionSubsystem::Host(const FString& Options, bool bLan)
 		return;
 	}
 	bBusy = true;
+	SetPending(ESessionPending::Hosting);
 	HostingOptions = CheeseStrikeSessions::NormalisedOptions(Options);
 	bHostingLan = bLan;
 	// A match already offered or joined is left first.
@@ -109,6 +162,7 @@ void UCheeseStrikeSessionSubsystem::CreateNow()
 	if (!Sessions()->CreateSession(0, NAME_GameSession, CheeseStrikeSessions::HostSettings(HostingOptions, bHostingLan)))
 	{
 		bBusy = false;
+		SetPending(ESessionPending::None);
 		Say(TEXT("The match couldn't be offered"));
 	}
 }
@@ -122,6 +176,7 @@ void UCheeseStrikeSessionSubsystem::OnCreated(FName SessionName, bool bWasSucces
 	bBusy = false;
 	if (!bWasSuccessful)
 	{
+		SetPending(ESessionPending::None);
 		Say(TEXT("The match couldn't be offered"));
 		return;
 	}
@@ -172,7 +227,7 @@ void UCheeseStrikeSessionSubsystem::OnFound(bool bWasSuccessful)
 			Found.Add(FString::Printf(TEXT("%d. %s"), Found.Num() + 1, *CheeseStrikeSessions::Describe(Result)));
 		}
 	}
-	Say(Found.Num() == 0 ? TEXT("No matches found") : FString::Printf(TEXT("Found %d match%s; CheeseStrikeJoin <number> joins one"), Found.Num(), Found.Num() == 1 ? TEXT("") : TEXT("es")));
+	Say(Found.Num() == 0 ? TEXT("No matches found") : FString::Printf(TEXT("Found %d match%s"), Found.Num(), Found.Num() == 1 ? TEXT("") : TEXT("es")));
 	for (const FString& Line : Found)
 	{
 		UE_LOG(LogCheeseStrike, Display, TEXT("Sessions:   %s"), *Line);
@@ -192,6 +247,7 @@ void UCheeseStrikeSessionSubsystem::Join(int32 Index)
 		return;
 	}
 	bBusy = true;
+	SetPending(ESessionPending::Joining);
 	Joining = Results[Index];
 	if (Sessions()->GetNamedSession(NAME_GameSession) != nullptr)
 	{
@@ -209,10 +265,12 @@ void UCheeseStrikeSessionSubsystem::OnDestroyedToJoin(FName SessionName, bool bW
 
 void UCheeseStrikeSessionSubsystem::JoinNow(const FOnlineSessionSearchResult& Result)
 {
-	Say(FString::Printf(TEXT("Joining %s"), *CheeseStrikeSessions::Describe(Result)));
+	Say(TEXT("Joining the lobby"));
+	UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: joining %s"), *CheeseStrikeSessions::Describe(Result));
 	if (!Sessions()->JoinSession(0, NAME_GameSession, Result))
 	{
 		bBusy = false;
+		SetPending(ESessionPending::None);
 		Say(TEXT("The match couldn't be joined"));
 	}
 }
@@ -227,10 +285,12 @@ void UCheeseStrikeSessionSubsystem::OnJoined(FName SessionName, EOnJoinSessionCo
 	FString Url;
 	if (Result != EOnJoinSessionCompleteResult::Success || !Sessions()->GetResolvedConnectString(NAME_GameSession, Url))
 	{
+		SetPending(ESessionPending::None);
 		Say(FString::Printf(TEXT("The match couldn't be joined (%s)"), LexToString(Result)));
 		return;
 	}
-	Say(TEXT("Joined; travelling to the host"));
+	// Still joining, to the player: the lobby is theirs once the host's level has loaded.
+	UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: joined; travelling to the host"));
 	Travel(Url, false);
 }
 
@@ -243,6 +303,7 @@ void UCheeseStrikeSessionSubsystem::OnInviteAccepted(bool bWasSuccessful, int32 
 	}
 	Say(TEXT("Taking up an invitation"));
 	bBusy = true;
+	SetPending(ESessionPending::Joining);
 	Joining = Invite;
 	if (Sessions()->GetNamedSession(NAME_GameSession) != nullptr)
 	{

@@ -686,8 +686,10 @@ void ACheeseStrikeCharacter::DoAim(float Yaw, float Pitch)
 	const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
 	if (GetController() && (Player == nullptr || !Player->IsPaused()))
 	{
-		AddControllerYawInput(Yaw);
-		AddControllerPitchInput(Pitch);
+		// As fast as the player's options say, and up and down whichever way they say.
+		const FVector2D Scale = Player != nullptr ? Player->LookScale() : FVector2D(1.0, 1.0);
+		AddControllerYawInput(Yaw * Scale.X);
+		AddControllerPitchInput(Pitch * Scale.Y);
 	}
 }
 

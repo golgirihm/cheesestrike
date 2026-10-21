@@ -506,13 +506,13 @@ bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
 			TestNull(TEXT("nobody has a character in the lobby"), Character(Player));
 			TestTrue(TEXT("and the menu shows the lobby"), Controller(Player) != nullptr && Controller(Player)->GetMenuPage() == EMenuPage::Lobby);
 		}
-		// The two are on different sides, and the sides are filled out with bots by name, the same on both machines.
+		// The two are on different sides, and the sides have the bots a hosted match starts with, by name, the same on both machines.
 		if (const ACheeseStrikeGameState* Match = GameState(0))
 		{
 			const TArray<CheeseStrikeRules::FRosterEntry> First = Match->TeamColumn(0);
 			const TArray<CheeseStrikeRules::FRosterEntry> Second = Match->TeamColumn(1);
-			TestEqual(TEXT("the first side is full"), First.Num(), CheeseStrikeRules::TeamSize);
-			TestEqual(TEXT("so is the second"), Second.Num(), CheeseStrikeRules::TeamSize);
+			TestEqual(TEXT("the sides have the players and seven bots"), First.Num() + Second.Num(), 2 + CheeseStrikeRules::DefaultBots);
+			TestEqual(TEXT("dealt evenly"), First.Num() - Second.Num(), 1);
 			TestTrue(TEXT("the host leads the first side"), First.Num() > 0 && !First[0].bBot);
 			TestTrue(TEXT("the joiner the second"), Second.Num() > 0 && !Second[0].bBot);
 			TestTrue(TEXT("the rest are bots"), First.Num() > 1 && First[1].bBot && Second.Num() > 1 && Second[1].bBot);

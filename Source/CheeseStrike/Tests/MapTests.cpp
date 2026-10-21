@@ -183,7 +183,7 @@ bool FTheHostPicksTheMap::RunTest(const FString& Parameters)
 		{
 			Characters += It->GetPlayerState<APlayerState>() != nullptr ? 1 : 0;
 		}
-		TestEqual(TEXT("both players and the bots that fill in, sixteen in all"), Characters, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize);
+		TestEqual(TEXT("both players and the bots a hosted match starts with"), Characters, 2 + CheeseStrikeRules::DefaultBots);
 		TestTrue(TEXT("the bots are the ones the lobby showed"), GameState(0)->GetBotNames() == LobbyBots);
 		TestEqual(TEXT("with the rules the lobby had"), GameState(0)->GetKillLimit(), 5);
 		TestEqual(TEXT("and the map is still the Creamery for the next match"), World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->GetMapIndex(), 0);
