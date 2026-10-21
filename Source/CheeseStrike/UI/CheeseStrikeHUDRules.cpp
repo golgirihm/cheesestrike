@@ -249,6 +249,13 @@ namespace CheeseStrikeHUD
 		return Summary;
 	}
 
+	FScoreSummary GunGame(const TArray<CheeseStrikeRules::FStanding>& SortedBySteps, const FString& Me, int32 Steps)
+	{
+		FScoreSummary Summary = FreeForAll(SortedBySteps, Me, Steps);
+		Summary.Goal = FString::Printf(TEXT("THROUGH ALL %d WEAPONS"), Steps);
+		return Summary;
+	}
+
 	FScoreSummary Teams(const int32 (&Scores)[CheeseStrikeRules::Teams], int32 MyTeam, int32 Limit, const FString& Goal)
 	{
 		FScoreSummary Summary;

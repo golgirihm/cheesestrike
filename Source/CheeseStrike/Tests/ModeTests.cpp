@@ -12,6 +12,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Weapons/CheeseStrikeArsenal.h"
+#include "UI/CheeseStrikeHUDRules.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -285,6 +286,13 @@ bool FGunGameClimbsTheLadder::RunTest(const FString& Parameters)
 	TestTrue(TEXT("a kill on the last step wins"), GunGameKill(Steps - 1, true, Steps).bWins);
 	TestFalse(TEXT("and humiliates nobody"), GunGameKill(Steps - 1, true, Steps).bVictimDemoted);
 	TestTrue(TEXT("the knife is carried until it is the step"), GunGameKeepsKnife(0, Steps) && GunGameKeepsKnife(Steps - 2, Steps) && !GunGameKeepsKnife(Steps - 1, Steps));
+	// The bottom of the HUD: the player's step and the leader's, out of the ladder's.
+	TArray<CheeseStrikeRules::FStanding> BySteps;
+	BySteps.Add({TEXT("Ash"), 5, 0, 1});
+	BySteps.Add({TEXT("Bo"), 2, 3, 2});
+	const CheeseStrikeHUD::FScoreSummary Summary = CheeseStrikeHUD::GunGame(BySteps, TEXT("Bo"), Steps);
+	TestEqual(TEXT("racing to the ladder's end"), Summary.Limit, Steps);
+	TestTrue(TEXT("the player's step and the leader's"), Summary.Lines.Num() == 2 && Summary.Lines[0].bMine && Summary.Lines[0].Score == 2 && Summary.Lines[1].Score == 5);
 	TestTrue(TEXT("a streak's name is known"), CheeseStrikeStreaks::IsStreakName(TEXT("Cheese Strike")) && !CheeseStrikeStreaks::IsStreakName(TEXT("")));
 	return true;
 }

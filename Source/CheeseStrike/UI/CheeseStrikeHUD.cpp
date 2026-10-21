@@ -18,6 +18,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "UI/CheeseStrikeModeHUD.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -133,10 +134,26 @@ CheeseStrikeHUD::FScoreSummary ACheeseStrikeHUD::ScoreSummary(const ACheeseStrik
 	{
 		return CheeseStrikeHUD::FScoreSummary();
 	}
+	if (Match->GetModeInfo().WinBy == CheeseStrikeModes::EWinBy::Ladder)
+	{
+		// Gun Game: each player's step up the ladder of weapons, racing to the last.
+		TArray<CheeseStrikeRules::FStanding> Steps;
+		for (const APlayerState* Each : Match->PlayerArray)
+		{
+			if (const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Each))
+			{
+				CheeseStrikeRules::FStanding Line = Ours->Standing();
+				Line.Kills = Ours->GetGunLevel() + 1;
+				Steps.Add(Line);
+			}
+		}
+		return CheeseStrikeHUD::GunGame(CheeseStrikeRules::Sorted(Steps), Mine != nullptr ? Mine->GetPlayerName() : FString(), CheeseStrikeArsenal::GunGameLadder().Num());
+	}
 	if (!Match->HasTeams())
 	{
 		return CheeseStrikeHUD::FreeForAll(Match->Standings(), Mine != nullptr ? Mine->GetPlayerName() : FString(), Match->GetKillLimit());
 	}
+	// (Execution, like Elimination, is a mode of rounds: its sides' rounds won, and the round.)
 	// A team mode: the sides' scores (rounds won, in Elimination), and the round and its time while one is on.
 	const bool bRounds = Match->GetModeInfo().WinBy == CheeseStrikeModes::EWinBy::Rounds;
 	FString Goal = Match->GoalText();
