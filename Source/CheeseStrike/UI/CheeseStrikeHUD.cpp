@@ -19,7 +19,7 @@
 namespace
 {
 	const FLinearColor White(1.0f, 1.0f, 1.0f, 0.9f);
-	const FLinearColor Dim(1.0f, 1.0f, 1.0f, 0.7f);
+	const FLinearColor Faint(1.0f, 1.0f, 1.0f, 0.7f);
 	const FLinearColor Yellow(0.94f, 0.89f, 0.26f);
 	const FLinearColor Red(0.9f, 0.3f, 0.25f);
 	constexpr float Margin = 24.0f;
@@ -94,7 +94,7 @@ void ACheeseStrikeHUD::DrawSessions()
 	}
 	UFont* Font = GEngine->GetMediumFont();
 	float Y = Margin;
-	DrawText(Sessions->GetStatus(), Dim, Margin, Y, Font, 1.0f);
+	DrawText(Sessions->GetStatus(), Faint, Margin, Y, Font, 1.0f);
 	Y += 22.0f;
 	for (const FString& Line : Sessions->GetFound())
 	{
@@ -144,7 +144,7 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	DrawText(FString::Printf(TEXT("%.0f"), Character->GetHealth()), White, Margin, Height - Margin - 20.0f, Font, 1.6f);
 	if (Character->IsProtected())
 	{
-		DrawText(TEXT("PROTECTED"), Dim, Margin, Height - Margin - 42.0f, Font, 1.0f);
+		DrawText(TEXT("PROTECTED"), Faint, Margin, Height - Margin - 42.0f, Font, 1.0f);
 	}
 	if (Weapon != nullptr)
 	{
@@ -153,7 +153,7 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 		float TextHeight = 0.0f;
 		GetTextSize(Ammo, TextWidth, TextHeight, Font, 1.6f);
 		DrawText(Ammo, White, Width - Margin - TextWidth, Height - Margin - 20.0f, Font, 1.6f);
-		DrawText(Weapon->GetStats().DisplayName.ToString(), Dim, Width - Margin - TextWidth, Height - Margin - 42.0f, Font, 1.0f);
+		DrawText(Weapon->GetStats().DisplayName.ToString(), Faint, Width - Margin - TextWidth, Height - Margin - 42.0f, Font, 1.0f);
 	}
 }
 
@@ -213,11 +213,11 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	const FString Title = bOver ? (Match->GetWinnerName().IsEmpty() ? TEXT("MATCH OVER") : FString::Printf(TEXT("%s WINS"), *Match->GetWinnerName().ToUpper())) : TEXT("FREE-FOR-ALL");
 	DrawCentred(Title, Width / 2.0f, Top + 16.0f, Font, 1.8f, bOver ? Yellow : White);
 	const float ToLobby = Match->GetLobbyAt() > 0.0f ? FMath::Max(0.0f, Match->GetLobbyAt() - static_cast<float>(Match->GetServerWorldTimeSeconds())) : -1.0f;
-	DrawCentred(bOver && ToLobby >= 0.0f ? FString::Printf(TEXT("first to %d kills  ·  back to the lobby in %.0f s"), Match->GetKillLimit(), FMath::CeilToFloat(ToLobby)) : FString::Printf(TEXT("first to %d kills"), Match->GetKillLimit()), Width / 2.0f, Top + 50.0f, Font, 1.0f, Dim);
+	DrawCentred(bOver && ToLobby >= 0.0f ? FString::Printf(TEXT("first to %d kills  ·  back to the lobby in %.0f s"), Match->GetKillLimit(), FMath::CeilToFloat(ToLobby)) : FString::Printf(TEXT("first to %d kills"), Match->GetKillLimit()), Width / 2.0f, Top + 50.0f, Font, 1.0f, Faint);
 	float Y = Top + 80.0f;
-	DrawText(TEXT("PLAYER"), Dim, Left + 20.0f, Y, Font, 1.0f);
-	DrawText(TEXT("KILLS"), Dim, Left + PanelWidth - 150.0f, Y, Font, 1.0f);
-	DrawText(TEXT("DEATHS"), Dim, Left + PanelWidth - 80.0f, Y, Font, 1.0f);
+	DrawText(TEXT("PLAYER"), Faint, Left + 20.0f, Y, Font, 1.0f);
+	DrawText(TEXT("KILLS"), Faint, Left + PanelWidth - 150.0f, Y, Font, 1.0f);
+	DrawText(TEXT("DEATHS"), Faint, Left + PanelWidth - 80.0f, Y, Font, 1.0f);
 	Y += RowHeight;
 	for (const CheeseStrikeRules::FStanding& Line : Standings)
 	{
