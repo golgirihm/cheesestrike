@@ -272,6 +272,9 @@ protected:
 	void ApplyStartAt();
 	UFUNCTION(Server, Reliable)
 	void ServerDie();
+	/** Its own player's machine: it was just hurt by `By`, standing at `From`, for the HUD's damage arc. */
+	UFUNCTION(Client, Unreliable)
+	void ClientHurtFrom(FVector_NetQuantize From, ACheeseStrikeCharacter* By);
 	UFUNCTION(Server, Reliable)
 	void ServerStartAt(FVector_NetQuantize At, float Yaw);
 	UFUNCTION(Client, Reliable)
