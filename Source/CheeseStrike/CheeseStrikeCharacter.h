@@ -10,6 +10,7 @@
 
 class ACheeseStrikeWeapon;
 class UCameraComponent;
+class UCheeseStrikeInventory;
 class UCheeseStrikeMovementComponent;
 class USkeletalMeshComponent;
 struct FInputActionValue;
@@ -25,7 +26,8 @@ struct FInputActionValue;
  * crouches, slides and jumps as CheeseStrikeMovementComponent has it, with
  * every move predicted on its own machine and checked on the server.
  *
- * It holds a weapon (CheeseStrikeWeapon), has health that only the server
+ * It carries weapons (UCheeseStrikeInventory: a primary, the sidearm and
+ * the knife, one in hand, CheeseStrikeWeapon), has health that only the server
  * takes from, and keeps, on the server, where it has lately been, for shots
  * to be judged against where the shooter saw it (FHitHistory).
  *
@@ -53,7 +55,7 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
-	virtual void Destroyed() override;
+	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 
@@ -109,14 +111,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoReload();
 
+	/** Changing weapons: to the one in a slot, to the next (`Step` 1) or the one before (-1), or back to the last. */
+	void DoDrawWeapon(EWeaponSlot Slot);
+	void DoNextWeapon(int32 Step);
+	void DoLastWeapon();
+
 	/** Aiming: the rifle's sight line, across it from its bounds' middle and down from its top, and how far along it from its back end the eye is (cm). */
 	static constexpr float SightSide = 0.0f;
 	static constexpr float SightHeight = 2.0f;
 	static constexpr float SightBack = 14.0f;
+	/** How far below its place (cm) a weapon just drawn comes up from. */
+	static constexpr float DrawDrop = 25.0f;
 
 	/** The weapon in hand, or null before one arrives. */
-	ACheeseStrikeWeapon* GetWeapon() const { return HeldWeapon; }
-	void SetWeapon(ACheeseStrikeWeapon* InWeapon) { HeldWeapon = InWeapon; }
+	ACheeseStrikeWeapon* GetWeapon() const;
+	/** What it carries: the weapons in their slots, and which is in hand. */
+	UCheeseStrikeInventory* GetInventory() const { return Inventory; }
 
 	float GetHealth() const { return Health; }
 	bool IsAlive() const { return Health > 0.0f; }
@@ -174,6 +184,12 @@ protected:
 	void AimStarted();
 	void AimEnded();
 	void ReloadStarted();
+	void PrimaryStarted();
+	void SidearmStarted();
+	void KnifeStarted();
+	void NextWeaponStarted();
+	void PreviousWeaponStarted();
+	void LastWeaponStarted();
 
 	/** Pawn mesh: first person view (seen only by self). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
@@ -190,9 +206,9 @@ protected:
 	/** Where the eyes are above the capsule's centre now, on their way to BaseEyeHeight. */
 	float EyeOffset = 0.0f;
 
-	/** The weapon in hand: spawned by the server, which owns it, and attached on every machine. */
-	UPROPERTY(Replicated)
-	TObjectPtr<ACheeseStrikeWeapon> HeldWeapon;
+	/** The weapons it carries: spawned by the server, which owns them, and attached on every machine. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCheeseStrikeInventory> Inventory;
 	UPROPERTY(ReplicatedUsing=OnRep_Health)
 	float Health = 100.0f;
 	/** Who killed it, and when, in the server's time; set by the server as it dies. */

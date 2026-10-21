@@ -71,6 +71,19 @@ public:
 	TObjectPtr<UInputAction> Aim;
 	UPROPERTY()
 	TObjectPtr<UInputAction> Reload;
+	/** Changing weapons: to the primary (1), the sidearm (2), the knife (3), the next and the one before (the wheel), and back to the last (Q). */
+	UPROPERTY()
+	TObjectPtr<UInputAction> DrawPrimary;
+	UPROPERTY()
+	TObjectPtr<UInputAction> DrawSidearm;
+	UPROPERTY()
+	TObjectPtr<UInputAction> DrawKnife;
+	UPROPERTY()
+	TObjectPtr<UInputAction> NextWeapon;
+	UPROPERTY()
+	TObjectPtr<UInputAction> PreviousWeapon;
+	UPROPERTY()
+	TObjectPtr<UInputAction> LastWeapon;
 	/** Shows the scoreboard while held. */
 	UPROPERTY()
 	TObjectPtr<UInputAction> Scoreboard;

@@ -59,9 +59,20 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	TestTrue(TEXT("escape opens the menu"), InputTests::Has(Set->KeysFor(Set->Menu), EKeys::Escape));
 	TestTrue(TEXT("so does the gamepad's right special button"), InputTests::Has(Set->KeysFor(Set->Menu), EKeys::Gamepad_Special_Right));
 
+	// Changing weapons.
+	TestTrue(TEXT("1 draws the primary"), InputTests::Has(Set->KeysFor(Set->DrawPrimary), EKeys::One));
+	TestTrue(TEXT("2 the sidearm"), InputTests::Has(Set->KeysFor(Set->DrawSidearm), EKeys::Two));
+	TestTrue(TEXT("3 the knife"), InputTests::Has(Set->KeysFor(Set->DrawKnife), EKeys::Three));
+	TestTrue(TEXT("so does pressing the right stick"), InputTests::Has(Set->KeysFor(Set->DrawKnife), EKeys::Gamepad_RightThumbstick));
+	TestTrue(TEXT("the wheel down draws the next"), InputTests::Has(Set->KeysFor(Set->NextWeapon), EKeys::MouseScrollDown));
+	TestTrue(TEXT("so does the top face button"), InputTests::Has(Set->KeysFor(Set->NextWeapon), EKeys::Gamepad_FaceButton_Top));
+	TestTrue(TEXT("the wheel up the one before"), InputTests::Has(Set->KeysFor(Set->PreviousWeapon), EKeys::MouseScrollUp));
+	TestTrue(TEXT("Q the last"), InputTests::Has(Set->KeysFor(Set->LastWeapon), EKeys::Q));
+
 	// No key does two things.
 	TArray<FKey> All;
-	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get(), Set->Fire.Get(), Set->Aim.Get(), Set->Reload.Get(), Set->Scoreboard.Get(), Set->Menu.Get()})
+	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get(), Set->Fire.Get(), Set->Aim.Get(), Set->Reload.Get(), Set->Scoreboard.Get(), Set->Menu.Get(),
+		Set->DrawPrimary.Get(), Set->DrawSidearm.Get(), Set->DrawKnife.Get(), Set->NextWeapon.Get(), Set->PreviousWeapon.Get(), Set->LastWeapon.Get()})
 	{
 		for (const FKey& Key : Set->KeysFor(Action))
 		{

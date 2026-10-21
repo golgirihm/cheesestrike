@@ -4,6 +4,18 @@
 
 #include "CoreMinimal.h"
 
+/** Where a character carries a weapon: one of each. */
+enum class EWeaponSlot : uint8
+{
+	/** The main gun, chosen in the loadout. */
+	Primary,
+	/** The pistol. */
+	Sidearm,
+	/** The cheese knife. */
+	Knife,
+};
+constexpr int32 NumWeaponSlots = 3;
+
 /**
  * What a weapon is and what a shot does, as arithmetic, apart from the
  * engine so that it can be tested alone. The weapon actor
@@ -12,26 +24,32 @@
  * The numbers are the Godot game's (docs/unreal/design.md, "Weapons"), a
  * starting point to tune from. Lengths are centimetres at life size (the
  * Godot game's, which was three times life size, divided by three); times
- * are seconds; angles are degrees.
+ * are seconds; angles are degrees. Every weapon is in CheeseStrikeArsenal.
  */
 struct FWeaponStats
 {
 	FName Id;
 	FText DisplayName;
-	/** Damage of one hit to the body, and how much more to the head. */
+	EWeaponSlot Slot = EWeaponSlot::Primary;
+	/** Damage of one hit (one pellet's, for a shotgun) to the body, and how much more to the head. */
 	float Damage = 20.0f;
 	float HeadMultiplier = 1.75f;
-	/** Seconds between shots, and whether holding the trigger keeps firing. */
+	/** Seconds between shots (from the start of one burst to the next, for a weapon that fires in bursts), and whether holding the trigger keeps firing. */
 	float FireInterval = 0.12f;
 	bool bAutomatic = true;
+	/** Shots each pull of the trigger fires, BurstInterval apart. */
+	int32 Burst = 1;
+	float BurstInterval = 0.07f;
+	/** Rays each shot fires, each spread on its own over the cone. */
+	int32 Pellets = 1;
 	int32 MagazineSize = 24;
 	float ReloadTime = 1.6f;
-	/** Rounds carried besides the magazine at first, and the most that can be. */
+	/** Rounds carried besides the magazine at first, and the most that can be; below zero, there is no end to them. */
 	int32 Reserve = 72;
 	int32 ReserveMax = 120;
 	/** How far a shot reaches at all. */
 	float MaxRange = 5000.0f;
-	/** The cone shots spread over, fully bloomed: aimed down the sights, and from the hip. */
+	/** The width of the cone shots spread over, fully bloomed: aimed down the sights, and from the hip. A shot goes up to half of it off the aim. */
 	float SpreadDegrees = 0.3f;
 	float HipSpreadDegrees = 9.0f;
 	/** Shots in a run over which the spread grows from nothing to its full cone. */
@@ -45,13 +63,30 @@ struct FWeaponStats
 	float RecoilCap = 9.0f;
 	float RecoilSide = 0.35f;
 	float RecoilReset = 0.3f;
-	/** The field of view aimed down the sights, as a share of the usual. */
+	/** The field of view aimed down the sights, as a share of the usual, and whether that is through a scope. */
 	float AimZoom = 0.6f;
+	bool bScoped = false;
+	/** Seconds it takes to come up when changed to, and the share of their usual speed a player moves at with it in hand. */
+	float DrawTime = 0.35f;
+	float CarrySpeed = 1.0f;
+
+	/** The knife: how far from the eyes it reaches, how many degrees either side of the aim its stroke sweeps, the damage of a stroke in the back, the seconds a stroke takes, and how fast the striker lunges with it (cm/s). */
+	float Reach = 0.0f;
+	float SweepDegrees = 0.0f;
+	float BackstabDamage = 0.0f;
+	float SwingTime = 0.0f;
+	float LungeSpeed = 0.0f;
+
+	bool IsMelee() const { return Slot == EWeaponSlot::Knife; }
+	/** Whether it never runs out of rounds to reload with. */
+	bool HasEndlessReserve() const { return Reserve < 0; }
+	/** Whether it fires rounds at all: the knife doesn't. */
+	bool UsesRounds() const { return MagazineSize > 0; }
 };
 
 namespace CheeseStrikeWeapons
 {
-	/** The Cheddar Blaster: the automatic rifle everyone starts the port with. */
+	/** The Cheddar Blaster: the automatic rifle, everyone's primary unless they choose another. */
 	const FWeaponStats& Blaster();
 
 	/** Aiming down the sights steadies the recoil to this share of it. */
@@ -60,15 +95,36 @@ namespace CheeseStrikeWeapons
 	constexpr float HeadRadius = 16.0f;
 	/** Health everyone starts with. */
 	constexpr float MaxHealth = 100.0f;
+	/** Seconds a shot may come early after a weapon is drawn, for the network's jitter: the server allows it so much sooner than the draw time. */
+	constexpr float DrawAllowance = 0.15f;
 
 	/** How much of `Weapon`'s damage a hit at `Distance` does, before the head. */
 	float DamageAt(const FWeaponStats& Weapon, float Distance, bool bHead);
 
-	/** Seconds to kill full health with body shots from `Weapon`, holding the trigger. */
-	float TimeToKill(const FWeaponStats& Weapon);
+	/** Seconds from the first shot to shot number `Index` (0 the first), holding the trigger (or pulling it as fast as it allows). */
+	float ShotTime(const FWeaponStats& Weapon, int32 Index);
+	/** Seconds after a shot, number `InBurst` of its burst (0 the first), until the next may go. */
+	float Cooldown(const FWeaponStats& Weapon, int32 InBurst);
+	/** Shots a second, at most, over a while: what the server holds a shooter to. */
+	float ShotsPerSecond(const FWeaponStats& Weapon);
 
-	/** The cone, in degrees, shot number `Index` of a run (0 the first) spreads over, aimed or from the hip. */
+	/** Seconds to kill full health with body shots from `Weapon` (every pellet hitting, close), holding the trigger; for the knife, strokes from the front. */
+	float TimeToKill(const FWeaponStats& Weapon);
+	/** Shots (or strokes) it takes to kill full health that way. */
+	int32 ShotsToKill(const FWeaponStats& Weapon);
+
+	/** The width of the cone, in degrees, shot number `Index` of a run (0 the first) spreads over, aimed or from the hip. */
 	float SpreadFor(const FWeaponStats& Weapon, int32 Index, bool bAimed);
+
+	/** Whether a weapon drawn at `DrawnAt` (server time) can fire at `Now`, allowing `Allowance` seconds early. */
+	bool IsDrawn(const FWeaponStats& Weapon, float DrawnAt, float Now, float Allowance = 0.0f);
+
+	/** The directions a knife stroke along `Direction` (normalized) is tried in: straight first, then fanned out to each side, halfway and all the way to the sweep. */
+	TArray<FVector> SweepDirections(const FWeaponStats& Knife, const FVector& Direction);
+	/** Whether a stroke along `Direction` lands in the back of someone facing `Yaw` degrees: from within a quarter turn of straight behind. */
+	bool FromBehind(const FVector& Direction, float Yaw);
+	/** The damage of a knife stroke along `Direction` on someone facing `Yaw`. */
+	float StrokeDamage(const FWeaponStats& Knife, const FVector& Direction, float Yaw);
 
 	/**
 	 * How far shot number `Index` of a run of fire (0 for the first, which goes
@@ -84,7 +140,7 @@ namespace CheeseStrikeWeapons
 	/** `Direction` turned by `Degrees` (right, up), with `Up` as up. */
 	FVector Turned(const FVector& Direction, const FVector2D& Degrees, const FVector& Up = FVector::UpVector);
 
-	/** A direction within `ConeDegrees` of `Direction`, from `Random`, which the shooter and the server share. */
+	/** A direction in a cone `ConeDegrees` wide about `Direction` (so at most half that off it), from `Random`, which the shooter and the server share. */
 	FVector Spread(const FVector& Direction, float ConeDegrees, FRandomStream& Random);
 
 	/**
@@ -109,6 +165,8 @@ struct FHitHistory
 		float Time = 0.0f;
 		FVector Feet = FVector::ZeroVector;
 		FVector Head = FVector::ZeroVector;
+		/** Which way they faced, in degrees about the vertical, for a stroke in the back. */
+		float Yaw = 0.0f;
 		float Radius = 34.0f;
 		float Height = 192.0f;
 	};
@@ -117,7 +175,7 @@ struct FHitHistory
 	static constexpr float Kept = 1.0f;
 
 	void Add(const FSample& Sample);
-	/** The feet, head and size at `Time`, between the samples either side of it; the latest for a time past the end, the earliest for one before the start. */
+	/** The feet, head, facing and size at `Time`, between the samples either side of it; the latest for a time past the end, the earliest for one before the start. */
 	FSample At(float Time) const;
 	int32 Num() const { return Samples.Num(); }
 

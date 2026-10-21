@@ -27,6 +27,12 @@ namespace CheeseStrikeMovement
 		return GroundSpeed >= WalkSpeed * SlideFrom;
 	}
 
+	float WithWeapon(float Speed, bool bHeavy, bool bLunging)
+	{
+		const float Carried = bHeavy ? Speed * HeavyFactor : Speed;
+		return bLunging ? FMath::Max(Carried, LungeSpeed) : Carried;
+	}
+
 	float SlideSpeed(float From, float Elapsed)
 	{
 		const float Through = FMath::Clamp(Elapsed / SlideTime, 0.0f, 1.0f);

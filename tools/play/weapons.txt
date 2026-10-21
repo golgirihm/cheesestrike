@@ -1,0 +1,73 @@
+# Looks at every weapon in hand, in first person and on the body: the rifle,
+# the pistol coming up and up, the knife and a stroke, each primary down the
+# sights, for checking how each is held. Each primary is put in hand with
+# CheeseStrikeLoadout just after coming back, while it is fresh.
+wait 2
+state
+shot weapons_01_blaster
+tap Sidearm
+wait 0.12
+shot weapons_02_pistol_drawing
+wait 0.5
+state
+shot weapons_03_pistol
+hold Aim
+wait 0.6
+shot weapons_04_pistol_aimed
+release Aim
+tap Knife
+wait 0.5
+state
+shot weapons_05_knife
+tap Fire
+wait 0.12
+shot weapons_06_knife_stroke
+wait 0.5
+cmd CheeseStrikeOutside 260 50
+wait 0.6
+shot weapons_07_knife_body
+tap Sidearm
+wait 0.6
+shot weapons_08_pistol_body
+cmd CheeseStrikeOutside
+tap Primary
+wait 0.6
+cmd CheeseStrikeDie
+wait 4.5
+cmd CheeseStrikeLoadout carbine
+wait 0.6
+shot weapons_10_carbine
+cmd CheeseStrikeDie
+wait 4.5
+cmd CheeseStrikeLoadout grater
+wait 0.6
+shot weapons_11_grater
+cmd CheeseStrikeDie
+wait 4.5
+cmd CheeseStrikeLoadout munster
+wait 1.2
+shot weapons_12_munster
+cmd CheeseStrikeDie
+wait 4.5
+cmd CheeseStrikeLoadout shotgun
+wait 0.6
+shot weapons_13_shotgun
+hold Aim
+wait 0.6
+shot weapons_14_shotgun_aimed
+release Aim
+cmd CheeseStrikeDie
+wait 4.5
+cmd CheeseStrikeLoadout roquefort
+wait 0.8
+shot weapons_15_roquefort
+hold Aim
+wait 0.6
+state
+shot weapons_16_roquefort_aimed
+release Aim
+cmd CheeseStrikeOutside 260 50
+wait 0.6
+shot weapons_17_roquefort_body
+cmd CheeseStrikeOutside
+quit
