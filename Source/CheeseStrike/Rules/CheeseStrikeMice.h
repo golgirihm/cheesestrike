@@ -59,4 +59,28 @@ namespace CheeseStrikeMice
 
 	/** Seconds a mouse takes to come over the edge of the map, from the top of its wall to the ground. */
 	constexpr float EnterTime = 1.8f;
+
+	/**
+	 * Whether a mouse may go for a block: one still there and not falling, and
+	 * not one the map marks to be left (ACheeseStrikeCheese::IsEdible): the
+	 * walkable way through a map, and what its starts stand on, are never
+	 * eaten (docs/unreal/maps/principles.md).
+	 */
+	bool MayEat(bool bEdible, float Health, bool bFalling);
+
+	/**
+	 * Whether what a block rests on still holds it up, when something under it
+	 * is eaten or falls: `Footprint` is the block seen from above, `Contacts`
+	 * the parts of it that still rest on something (its overlap with each
+	 * thing under it). It is held if its middle is inside them all taken
+	 * together (their convex hull), by at least HeldMargin of its narrower
+	 * side: on a block under its middle, or on walls either side of it (a
+	 * lintel over a door, a roof over a room, a plank over a canal), but not on
+	 * one wall at its edge, nor half on a block beside its middle. What it
+	 * touches over less than HeldThinnest (cm) either way, a door's jamb or a
+	 * rail, doesn't hold it.
+	 */
+	constexpr float HeldMargin = 0.1f;
+	constexpr float HeldThinnest = 15.0f;
+	bool IsHeld(const FBox2D& Footprint, TConstArrayView<FBox2D> Contacts);
 }

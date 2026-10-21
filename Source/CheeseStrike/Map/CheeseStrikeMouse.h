@@ -143,6 +143,8 @@ protected:
 	TMap<TWeakObjectPtr<ACheeseStrikeCheese>, float> GivenUp;
 	TArray<FVector> Path;
 	int32 PathIndex = 0;
+	/** When it found its way. */
+	float PathFoundAt = 0.0f;
 	FVector EnterFrom = FVector::ZeroVector;
 	FVector EnterTo = FVector::ZeroVector;
 	float EnteredFor = 0.0f;

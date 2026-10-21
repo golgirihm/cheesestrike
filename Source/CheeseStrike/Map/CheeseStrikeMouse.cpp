@@ -25,6 +25,9 @@ namespace
 	constexpr float MousePointReached = 40.0f;
 	/** How often it looks again for cheese while going to some (seconds). */
 	constexpr float MouseChooseEvery = 1.0f;
+	/** A way is found afresh when it is this old (seconds), or the mouse this far below it (cm): it fell through eaten cheese. */
+	constexpr float MouseFreshWay = 4.0f;
+	constexpr float MouseFallenBelow = 150.0f;
 	/** A mouse's sounds are a rat's, pitched down by about this for its size, and heard this far (cm), at full loudness within the first. */
 	constexpr float MousePitch = 0.7f;
 	constexpr float MouseHeardWithin = 600.0f;
@@ -253,6 +256,7 @@ bool ACheeseStrikeMouse::FindWay(const FVector& To)
 	}
 	Path = Way->PathPoints;
 	PathIndex = 0;
+	PathFoundAt = Now();
 	return true;
 }
 
@@ -286,7 +290,8 @@ void ACheeseStrikeMouse::ChooseCheese()
 	for (TActorIterator<ACheeseStrikeCheese> It(GetWorld()); It; ++It)
 	{
 		ACheeseStrikeCheese* Cheese = *It;
-		if (Cheese->GetHealth() <= 0.0f || Cheese->IsFalling() || Cheese->IsActorBeingDestroyed())
+		// Never what the map keeps: its way through, and what its starts stand on.
+		if (!CheeseStrikeMice::MayEat(Cheese->IsEdible(), Cheese->GetHealth(), Cheese->IsFalling()) || Cheese->IsActorBeingDestroyed())
 		{
 			continue;
 		}
@@ -482,6 +487,12 @@ void ACheeseStrikeMouse::Tick(float DeltaSeconds)
 	case EMouseDoing::Eating:
 	{
 		ACheeseStrikeCheese* Cheese = Target.Get();
+		// Its way is stale when it has fallen below it (what it walked on was eaten) or is old (the mesh changes as the cheese goes).
+		if (Path.IsValidIndex(PathIndex) && (GetActorLocation().Z - Body->GetScaledBoxExtent().Z < Path[PathIndex].Z - MouseFallenBelow || Time - PathFoundAt > MouseFreshWay))
+		{
+			Path.Reset();
+			NextChoiceAt = FMath::Min(NextChoiceAt, Time);
+		}
 		if (Cheese == nullptr || Cheese->GetHealth() <= 0.0f || Cheese->IsActorBeingDestroyed() || Cheese->IsFalling() || Time >= NextChoiceAt)
 		{
 			NextChoiceAt = Time + MouseChooseEvery;
