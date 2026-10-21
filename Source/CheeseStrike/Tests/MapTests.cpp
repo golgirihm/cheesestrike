@@ -99,8 +99,9 @@ bool FTheCreameryHoldsTogether::RunTest(const FString& Parameters)
 		{
 			Total += Each.Value;
 		}
-		TestTrue(FString::Printf(TEXT("hundreds of blocks of cheese (%d)"), Total), Total >= 500);
-		for (const TCHAR* Structure : {TEXT("WheelStack"), TEXT("HallSeal"), TEXT("Racks"), TEXT("CheeseBridge"), TEXT("DockWallGouda"), TEXT("DockWallMozza"), TEXT("PalletsGouda"), TEXT("PalletsMozza")})
+		TestTrue(FString::Printf(TEXT("a thousand blocks of cheese (%d)"), Total), Total >= 1000);
+		for (const TCHAR* Structure : {TEXT("WheelStack"), TEXT("HallSeal"), TEXT("Racks"), TEXT("CheeseBridge"), TEXT("DockWallGouda"), TEXT("DockWallMozza"), TEXT("PalletsGouda"), TEXT("PalletsMozza"),
+			TEXT("CuringHouseGouda"), TEXT("CuringHouseMozza"), TEXT("RindTunnelGouda"), TEXT("RindTunnelMozza"), TEXT("Catwalks"), TEXT("HallEdges"), TEXT("YardCheeseGouda"), TEXT("YardCheeseMozza")})
 		{
 			TestTrue(FString::Printf(TEXT("the %s is there (%d)"), Structure, Blocks.FindRef(FName(Structure))), Blocks.FindRef(FName(Structure)) > 0);
 		}
@@ -116,11 +117,20 @@ bool FTheCreameryHoldsTogether::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the press stops the line through the hall's main doors"), HallLine != nullptr && HallLine->GetActorLabel().StartsWith(TEXT("Hall_Press")));
 		TestEqual(TEXT("a rack's shelves are full of cheese"), StructureOf(FirstHit(FVector(-2100, 850, 150), FVector(-1500, 850, 150))), FName(TEXT("Racks")));
 		TestNull(TEXT("while the aisles between the racks are clear"), FirstHit(FVector(-1500, 1700, 150), FVector(-1500, 300, 150)));
+		// The houses, the tunnels and the catwalks.
+		TestEqual(TEXT("the Curing House's wall hides its ground floor from the plaza"), StructureOf(FirstHit(FVector(-3550, 500, 150), FVector(-3550, -1300, 150))), FName(TEXT("CuringHouseGouda")));
+		TestNull(TEXT("its upstairs window looks out over the plaza"), FirstHit(FVector(-4240, -1300, 520), FVector(-4240, 1500, 520)));
+		TestEqual(TEXT("the Rind Tunnel's wall hides it from the canal's steps"), StructureOf(FirstHit(FVector(-1800, -2600, 150), FVector(-1800, -2000, 150))), FName(TEXT("RindTunnelGouda")));
+		TestEqual(TEXT("and its roof from the pipe bridge above it"), StructureOf(FirstHit(FVector(-2600, -2075, 700), FVector(-2600, -2075, 100))), FName(TEXT("RindTunnelGouda")));
+		TestEqual(TEXT("a catwalk's deck is cheese"), StructureOf(FirstHit(FVector(-900, 0, 600), FVector(-900, 0, 300))), FName(TEXT("Catwalks")));
+		TestEqual(TEXT("the gallery's edge hides who crouches on it"), StructureOf(FirstHit(FVector(-1500, 1000, 470), FVector(-1500, 1700, 470))), FName(TEXT("HallEdges")));
 	});
 	// Every way up and across can be walked.
 	Walk(this, TEXT("up the dock's ramp onto the platform"), FVector(-5200, -1600, 100), 180.0f, TEXT("3.0"), [](const FVector& At) { return At.Z > 200.0f && At.X < -5900.0f; });
 	Walk(this, TEXT("up to the hall's mezzanine"), FVector(-2150, 0, 100), -90.0f, TEXT("3.5"), [](const FVector& At) { return At.Z > 450.0f; });
-	Walk(this, TEXT("up to the annex's roof, turning onto it at the top"), FVector(-4800, -2070, 100), 0.0f, TEXT("hold Move 0 1\nwait 2.5\nrelease Move\nlook 90 0\nhold Move 0 1\nwait 1\nrelease Move\nwait 0.4"), [](const FVector& At) { return At.Z > 480.0f; });
+	Walk(this, TEXT("up the Curing House's stairs to its upper floor"), FVector(-3500, -1870, 100), 180.0f, TEXT("3.0"), [](const FVector& At) { return At.Z > 400.0f; });
+	Walk(this, TEXT("along the Rind Tunnel and through its door into the hall"), FVector(-3300, -2075, 100), 0.0f, TEXT("hold Move 0 1\nwait 4.2\nrelease Move\nlook 90 0\nhold Move 0 1\nwait 2\nrelease Move\nwait 0.4"), [](const FVector& At) { return At.Y > -1650.0f && At.Z < 200.0f; });
+	Walk(this, TEXT("over a catwalk from the mezzanine to the gallery"), FVector(-900, -1500, 500), 90.0f, TEXT("7.0"), [](const FVector& At) { return At.Y > 1350.0f && At.Z > 450.0f; });
 	Walk(this, TEXT("out of the canal up its ramp"), FVector(-3000, -3200, -200), 180.0f, TEXT("6.5"), [](const FVector& At) { return At.Z > 50.0f && At.X < -5300.0f; });
 	Walk(this, TEXT("out of the canal up its steps"), FVector(-1100, -2950, -200), 180.0f, TEXT("3.5"), [](const FVector& At) { return At.Z > 50.0f; });
 	Walk(this, TEXT("over the Cheese Bridge"), FVector(0, -2500, 100), -90.0f, TEXT("3.0"), [](const FVector& At) { return At.Z > 50.0f && At.Y < -3700.0f; });
