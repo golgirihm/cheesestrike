@@ -1,0 +1,43 @@
+# Walks up to cover and dies against it: facing it, then (after coming back
+# at a player start) with its back to whatever is behind it there. Run with
+# -StartAt facing a wall a few metres off, and -Extra "?RespawnDelay=6".
+wait 2
+hold Move 0 1
+wait 2
+release Move
+state
+cmd CheeseStrikeOutside 240 130 -10
+wait 0.3
+shot cover_1a_facing
+cmd CheeseStrikeDie
+wait 0.4
+shot cover_1b_falling
+wait 2.5
+state
+cmd CheeseStrikeOutside 180 130 20
+wait 0.1
+shot cover_1c_rest
+cmd CheeseStrikeOutside 60 160 -10 260
+wait 0.1
+shot cover_1d_above
+wait 4
+hold Move 0 -1
+wait 2
+release Move
+state
+cmd CheeseStrikeOutside 240 40 -10
+wait 0.3
+shot cover_2a_back
+cmd CheeseStrikeDie
+wait 0.4
+shot cover_2b_falling
+wait 2.5
+state
+cmd CheeseStrikeOutside 180 40 20
+wait 0.1
+shot cover_2c_rest
+cmd CheeseStrikeOutside 60 20 -10 260
+wait 0.1
+shot cover_2d_above
+wait 1
+quit

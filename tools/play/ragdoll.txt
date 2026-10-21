@@ -1,0 +1,97 @@
+# Dies four ways, standing, running, strafing and crouched, and watches each
+# body fall from outside: as it falls, and at rest from two sides and from
+# above.
+# Run with -Extra "?RespawnDelay=6" so that each body lies a while before the
+# next character comes, and with -StartAt for open ground (or beside cover).
+wait 2
+log standing
+cmd CheeseStrikeOutside 280 60 -10
+wait 0.4
+shot ragdoll_1a_standing
+cmd CheeseStrikeDie
+wait 0.3
+shot ragdoll_1b_falling
+wait 0.4
+shot ragdoll_1c_falling
+wait 2.3
+state
+cmd CheeseStrikeOutside 200 60 20
+wait 0.1
+shot ragdoll_1d_rest
+cmd CheeseStrikeOutside 200 200 20
+wait 0.1
+shot ragdoll_1e_rest_behind
+cmd CheeseStrikeOutside 70 120 -10 280
+wait 0.1
+shot ragdoll_1f_rest_above
+wait 3.5
+log running
+hold Move 0 1
+wait 0.8
+cmd CheeseStrikeOutside 320 40 -10
+cmd CheeseStrikeDie
+release Move
+wait 0.3
+shot ragdoll_2b_falling
+wait 0.4
+shot ragdoll_2c_falling
+wait 2.3
+state
+cmd CheeseStrikeOutside 200 60 20
+wait 0.1
+shot ragdoll_2d_rest
+cmd CheeseStrikeOutside 200 200 20
+wait 0.1
+shot ragdoll_2e_rest_behind
+cmd CheeseStrikeOutside 70 120 -10 280
+wait 0.1
+shot ragdoll_2f_rest_above
+wait 3.5
+log strafing
+look 180 0
+hold Move 1 0
+wait 1
+cmd CheeseStrikeOutside 320 0 -10
+cmd CheeseStrikeDie
+release Move
+wait 0.3
+shot ragdoll_3b_falling
+wait 0.4
+shot ragdoll_3c_falling
+wait 2.3
+state
+cmd CheeseStrikeOutside 200 60 20
+wait 0.1
+shot ragdoll_3d_rest
+cmd CheeseStrikeOutside 200 200 20
+wait 0.1
+shot ragdoll_3e_rest_behind
+cmd CheeseStrikeOutside 70 120 -10 280
+wait 0.1
+shot ragdoll_3f_rest_above
+wait 3.5
+log crouched
+hold Crouch
+hold Aim
+wait 1
+cmd CheeseStrikeOutside 280 100 -10
+cmd CheeseStrikeDie
+release Aim
+release Crouch
+wait 0.3
+shot ragdoll_4b_falling
+wait 0.4
+shot ragdoll_4c_falling
+wait 2.3
+state
+cmd CheeseStrikeOutside 200 60 20
+wait 0.1
+shot ragdoll_4d_rest
+cmd CheeseStrikeOutside 200 200 20
+wait 0.1
+shot ragdoll_4e_rest_behind
+cmd CheeseStrikeOutside 70 120 -10 280
+wait 0.1
+shot ragdoll_4f_rest_above
+wait 1
+quit
