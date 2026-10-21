@@ -17,6 +17,7 @@
 #include "CheeseStrikeHUDDraw.h"
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
+#include "Map/CheeseStrikePlace.h"
 
 /** The HUD's drawing, named through an alias rather than used as a whole: the packaged game's unity build would carry a using-directive into the files after this one. */
 namespace HudDraw = CheeseStrikeHUDDraw;
@@ -191,6 +192,9 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 	Shapes.Triangle(Tip, Centre + FVector2D(7.0f * U, 8.0f * U), Notch, HudDraw::Ink);
 	Shapes.Triangle(Tip, Notch, Centre + FVector2D(-7.0f * U, 8.0f * U), HudDraw::Ink);
 
+	// Where the player is, by the map's names for its places, under the minimap.
+	const FString Place = ACheeseStrikePlace::NameAt(World, Eye).ToUpper();
+
 	// The frame, and north riding it.
 	Shapes.Frame(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y, FMath::Max(1.0f, U), HudDraw::Rule);
 	const FVector2D North = Centre + CheeseStrikeHUD::NorthMark(ViewYaw, Half);
@@ -199,6 +203,10 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 	Shapes.Draw(Canvas);
 	const FSlateFontInfo Letter = HudDraw::Font(12.0f * U);
 	HudDraw::Text(Canvas, TEXT("N"), FVector2D(North.X, North.Y - HudDraw::Measure(TEXT("N"), Letter).Y / 2.0f), Letter, HudDraw::Accent, 0.5f, false);
+	if (!Place.IsEmpty())
+	{
+		HudDraw::Text(Canvas, Place, FVector2D(Min.X, Max.Y + 8.0f * U), HudDraw::Font(16.0f * U), HudDraw::Soft);
+	}
 }
 
 void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
