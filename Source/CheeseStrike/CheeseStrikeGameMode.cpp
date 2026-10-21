@@ -314,11 +314,7 @@ void ACheeseStrikeGameMode::HandleMatchHasStarted()
 		StartRound(true);
 	}
 	// The mice come a minute in, when there is cheese for them.
-	int32 Blocks = 0;
-	for (TActorIterator<ACheeseStrikeCheese> It(GetWorld()); It; ++It)
-	{
-		++Blocks;
-	}
+	const int32 Blocks = ACheeseStrikeCheese::CountEdible(GetWorld());
 	if (bMice && CheeseStrikeMice::MiceFor(Blocks) > 0)
 	{
 		if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
@@ -336,11 +332,7 @@ void ACheeseStrikeGameMode::SpawnMice()
 	{
 		return;
 	}
-	int32 Blocks = 0;
-	for (TActorIterator<ACheeseStrikeCheese> It(World); It; ++It)
-	{
-		++Blocks;
-	}
+	const int32 Blocks = ACheeseStrikeCheese::CountEdible(World);
 	const int32 Count = CheeseStrikeMice::MiceFor(Blocks);
 	// Where they come in: the map's MouseEntry points (on top of its edge, facing in), shuffled.
 	TArray<AActor*> Entries;

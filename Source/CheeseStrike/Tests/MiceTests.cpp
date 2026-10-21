@@ -22,7 +22,7 @@ bool FHowManyMiceComeAndWhen::RunTest(const FString& Parameters)
 	TestEqual(TEXT("none for a map without cheese"), MiceFor(0), 0);
 	TestEqual(TEXT("two at the least"), MiceFor(30), 2);
 	TestEqual(TEXT("one for every sixty blocks"), MiceFor(240), 4);
-	TestEqual(TEXT("eight at the most: The Creamery's 692 blocks"), MiceFor(692), 8);
+	TestEqual(TEXT("eight at the most: The Creamery's thousand blocks"), MiceFor(1000), 8);
 	TestTrue(TEXT("a match has mice"), HasMice(TEXT("?listen")));
 	TestFalse(TEXT("unless told not to"), HasMice(TEXT("?Mice=0")));
 	TestEqual(TEXT("a minute in"), ArrivalFrom(TEXT("?listen")), 60.0f);
@@ -69,6 +69,57 @@ bool FAScaredMouseRunsAndComesBack::RunTest(const FString& Parameters)
 	TestEqual(TEXT("and no further than none"), FearAfter(30.0f, 5.0f), 0.0f);
 	TestEqual(TEXT("for six seconds"), FleeFor, 6.0f);
 	TestTrue(TEXT("faster than it walks"), FleeSpeed > WalkSpeed);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMiceLeaveTheWayThrough, "CheeseStrike.Mice.LeaveTheWayThrough", MiceTests::Flags)
+
+bool FMiceLeaveTheWayThrough::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeMice;
+	const float Full = CheeseStrikeRules::CheeseBlockHealth;
+	TestTrue(TEXT("a mouse goes for cheese"), MayEat(true, Full, false));
+	TestTrue(TEXT("and for cheese another has bitten"), MayEat(true, 1.0f, false));
+	TestFalse(TEXT("never for the cheese a map keeps: its way through, what its starts stand on"), MayEat(false, Full, false));
+	TestFalse(TEXT("nor for cheese that is gone"), MayEat(true, 0.0f, false));
+	TestFalse(TEXT("nor for cheese that is falling"), MayEat(true, Full, true));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWhatHoldsCheeseUp, "CheeseStrike.Mice.WhatHoldsCheeseUp", MiceTests::Flags)
+
+bool FWhatHoldsCheeseUp::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeMice;
+	auto Box = [](double X0, double Y0, double X1, double Y1) { return FBox2D(FVector2D(X0, Y0), FVector2D(X1, Y1)); };
+	// A block a metre square.
+	const FBox2D Block = Box(0, 0, 100, 100);
+	TestFalse(TEXT("on nothing it falls"), IsHeld(Block, {}));
+	TestTrue(TEXT("on a block under it it stands"), IsHeld(Block, {Box(0, 0, 100, 100)}));
+	TestTrue(TEXT("on a smaller one under its middle"), IsHeld(Block, {Box(30, 30, 70, 70)}));
+	TestTrue(TEXT("on the ground, wider than it"), IsHeld(Block, {Box(-1000, -1000, 1000, 1000)}));
+	TestFalse(TEXT("half on a block beside its middle it falls"), IsHeld(Block, {Box(0, 0, 50, 100)}));
+	TestTrue(TEXT("mostly on one it stands"), IsHeld(Block, {Box(0, 0, 75, 100)}));
+	TestFalse(TEXT("on one edge it falls"), IsHeld(Block, {Box(-50, 0, 10, 100)}));
+	TestTrue(TEXT("on blocks under both ends it stands"), IsHeld(Block, {Box(0, 0, 20, 100), Box(80, 0, 100, 100)}));
+	TestFalse(TEXT("on a corner it falls"), IsHeld(Block, {Box(0, 0, 20, 20)}));
+	TestTrue(TEXT("on four corners it stands"), IsHeld(Block, {Box(0, 0, 20, 20), Box(80, 0, 100, 20), Box(0, 80, 20, 100), Box(80, 80, 100, 100)}));
+	TestFalse(TEXT("on two corners of one side it falls"), IsHeld(Block, {Box(0, 0, 20, 20), Box(80, 0, 100, 20)}));
+	TestFalse(TEXT("what is beside it, touching only its edge, doesn't hold it"), IsHeld(Block, {Box(100, 0, 200, 100), Box(-100, 0, 0, 100)}));
+	TestFalse(TEXT("nor do thin posts under it, a door's jambs"), IsHeld(Block, {Box(10, 44, 22, 56), Box(78, 44, 90, 56)}));
+	TestTrue(TEXT("but a frame's posts do"), IsHeld(Block, {Box(0, 0, 24, 24), Box(76, 0, 100, 24), Box(0, 76, 24, 100), Box(76, 76, 100, 100)}));
+	// A lintel 4 m long over a 2 m doorway, a metre of wall under each end.
+	const FBox2D Lintel = Box(0, 0, 400, 50);
+	TestTrue(TEXT("a lintel stands on the wall either side of its doorway"), IsHeld(Lintel, {Box(-100, 0, 100, 50), Box(300, 0, 500, 50)}));
+	TestFalse(TEXT("and falls once one side is eaten"), IsHeld(Lintel, {Box(-100, 0, 100, 50)}));
+	// A plank 9 m long across an 8 m canal.
+	const FBox2D Plank = Box(0, 0, 100, 900);
+	TestTrue(TEXT("a plank across a canal stands on both banks"), IsHeld(Plank, {Box(-1000, -500, 1000, 50), Box(-1000, 850, 1000, 2000)}));
+	TestFalse(TEXT("and falls with one bank under it"), IsHeld(Plank, {Box(-1000, -500, 1000, 50)}));
+	// A roof 12 m across a house, on two of its walls.
+	const FBox2D Roof = Box(0, 0, 1200, 200);
+	TestTrue(TEXT("a roof stands on two opposite walls"), IsHeld(Roof, {Box(0, 0, 50, 200), Box(1150, 0, 1200, 200)}));
+	TestFalse(TEXT("but not on one"), IsHeld(Roof, {Box(1150, 0, 1200, 200)}));
 	return true;
 }
 
