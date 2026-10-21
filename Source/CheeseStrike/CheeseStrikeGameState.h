@@ -78,6 +78,17 @@ public:
 	int32 GetBotSkill() const { return BotSkill; }
 	void SetBotSkill(int32 Skill) { BotSkill = Skill; }
 
+	/**
+	 * A match the lobby sent everyone to another level for waits, behind
+	 * each player's loading cover, until they are all ready: how many it
+	 * waits for (0 for a match that doesn't), and how many are ready.
+	 */
+	int32 GetPlayersExpected() const { return PlayersExpected; }
+	int32 GetPlayersReady() const { return PlayersReady; }
+	bool IsWaitingForPlayers() const { return PlayersExpected > 0 && !HasMatchStarted(); }
+	/** Server only. */
+	void SetPlayersReady(int32 Ready, int32 Expected) { PlayersReady = Ready; PlayersExpected = Expected; }
+
 	/** The host's name, as the lobby crowns it; empty until the host is in. */
 	const FString& GetHostName() const { return HostName; }
 	void SetHostName(const FString& Name) { HostName = Name; }
@@ -118,4 +129,8 @@ protected:
 	float LobbyAt = 0.0f;
 	UPROPERTY(Replicated)
 	float MiceAt = 0.0f;
+	UPROPERTY(Replicated)
+	int32 PlayersExpected = 0;
+	UPROPERTY(Replicated)
+	int32 PlayersReady = 0;
 };

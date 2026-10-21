@@ -15,6 +15,7 @@
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 #include "CheeseStrike.h"
+#include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
 #include "Rules/CheeseStrikeRules.h"
 
@@ -51,9 +52,10 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 		return;
 	}
 	Lift();
-	// Where to, if it is one of the game's maps.
+	// Where to, if it is one of the game's maps; then, on a level the lobby sent everyone to, how many are ready.
 	const int32 MapIndex = CheeseStrikeRules::MapIndexFor(World->GetOutermost()->GetName());
-	const FString Saying = MapIndex >= 0 ? FString::Printf(TEXT("Going to %s"), CheeseStrikeRules::Maps[MapIndex].Name) : FString(TEXT("Loading"));
+	const FString Where = MapIndex >= 0 ? FString::Printf(TEXT("Going to %s"), CheeseStrikeRules::Maps[MapIndex].Name) : FString(TEXT("Loading"));
+	TWeakObjectPtr<UWorld> Watched = World;
 	Curtain = SNew(SOverlay)
 		+ SOverlay::Slot()
 		[
@@ -69,13 +71,29 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14.0f, 0.0f, 0.0f, 0.0f))
 			[
-				SNew(STextBlock).Text(FText::FromString(Saying)).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
+				SNew(STextBlock).Text_Lambda([Watched, Where]() { return FText::FromString(SayingFor(Watched.Get(), Where)); }).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
 			]
 		];
 	Viewport->AddViewportWidgetContent(Curtain.ToSharedRef(), CurtainOrder);
+	GoingTo = Where;
 	CoveredWorld = World;
 	UpSince = FPlatformTime::Seconds();
 	Ticker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UCheeseStrikeCurtainSubsystem::Watch));
+}
+
+FString UCheeseStrikeCurtainSubsystem::SayingFor(const UWorld* World, const FString& Otherwise)
+{
+	const ACheeseStrikeGameState* Match = World != nullptr ? World->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	if (Match != nullptr && Match->IsWaitingForPlayers())
+	{
+		return FString::Printf(TEXT("Waiting for players (%d/%d)"), FMath::Min(Match->GetPlayersReady(), Match->GetPlayersExpected()), Match->GetPlayersExpected());
+	}
+	return Otherwise;
+}
+
+FString UCheeseStrikeCurtainSubsystem::GetSaying() const
+{
+	return IsUp() ? SayingFor(CoveredWorld.Get(), GoingTo) : FString();
 }
 
 bool UCheeseStrikeCurtainSubsystem::Watch(float DeltaSeconds)

@@ -118,6 +118,11 @@ namespace CheeseStrikeRules
 		return FMath::Max(0, FMath::RoundToInt(Option(Options, TEXT("Players"), 0.0f)));
 	}
 
+	bool ShouldBegin(int32 Expected, int32 Ready, int32 In, float SecondsWaited)
+	{
+		return In > 0 && (Ready >= Expected || SecondsWaited > WaitForPlayers);
+	}
+
 	int32 BotSeedFrom(const FString& Options, int32 Otherwise)
 	{
 		const FString Value = UGameplayStatics::ParseOption(Options, TEXT("BotSeed"));
@@ -172,13 +177,18 @@ namespace CheeseStrikeRules
 
 	int32 BotsFrom(const FString& Options)
 	{
-		return FMath::Max(-1, FMath::RoundToInt(Option(Options, TEXT("Bots"), -1.0f)));
+		return FMath::Max(-1, FMath::RoundToInt(Option(Options, TEXT("Bots"), static_cast<float>(DefaultBots))));
 	}
 
 	int32 BotsIn(int32 Players, int32 BotsWanted)
 	{
-		const int32 Empty = FMath::Max(0, Teams * TeamSize - Players);
+		const int32 Empty = MostBots(Players);
 		return BotsWanted < 0 ? Empty : FMath::Min(BotsWanted, Empty);
+	}
+
+	int32 MostBots(int32 Players)
+	{
+		return FMath::Max(0, SeatCount - Players);
 	}
 
 	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted)
@@ -230,6 +240,22 @@ namespace CheeseStrikeRules
 			Bot.Team = Team;
 			Bot.bBot = true;
 			Column.Add(Bot);
+		}
+		return Column;
+	}
+
+	TArray<FRosterEntry> WithEmptySeats(TArray<FRosterEntry> Column, int32 NumSeats, int32 Team)
+	{
+		if (Column.Num() > NumSeats)
+		{
+			Column.SetNum(FMath::Max(0, NumSeats));
+		}
+		while (Column.Num() < NumSeats)
+		{
+			FRosterEntry Empty;
+			Empty.Team = Team;
+			Empty.bEmpty = true;
+			Column.Add(Empty);
 		}
 		return Column;
 	}

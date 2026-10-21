@@ -143,9 +143,29 @@ bool ACheeseStrikeGameMode::ReadyToStartMatch_Implementation()
 	{
 		return Super::ReadyToStartMatch_Implementation();
 	}
-	const bool bEveryone = GetNumPlayers() >= PlayersExpected;
-	const bool bWaitedEnough = GetWorld() != nullptr && GetWorld()->GetTimeSeconds() > CheeseStrikeRules::WaitForPlayers;
-	return GetMatchState() == MatchState::WaitingToStart && GetNumPlayers() > 0 && (bEveryone || bWaitedEnough);
+	if (GetMatchState() != MatchState::WaitingToStart || GetWorld() == nullptr)
+	{
+		return false;
+	}
+	// Ready: in, with the level loaded and the view able to be shown (ACheeseStrikePlayerController::ServerReady). Everyone
+	// sees how many are, behind their loading cover.
+	int32 Ready = 0;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(It->Get());
+		Ready += Player != nullptr && Player->HasSaidReady() ? 1 : 0;
+	}
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetPlayersReady(Ready, PlayersExpected);
+	}
+	const float Waited = GetWorld()->GetTimeSeconds();
+	if (!CheeseStrikeRules::ShouldBegin(PlayersExpected, Ready, GetNumPlayers(), Waited))
+	{
+		return false;
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("The match begins: %d of %d ready after %.1f s"), Ready, PlayersExpected, Waited);
+	return true;
 }
 
 void ACheeseStrikeGameMode::RestartGame()
@@ -388,12 +408,13 @@ void ACheeseStrikeGameMode::InitGameState()
 		State->SetBots(CheeseStrikeRules::BotNames(BotSeed, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize), BotsWanted);
 		State->SetMapIndex(MapIndex);
 		State->SetBotSkill(BotSkill);
+		State->SetPlayersReady(0, PlayersExpected);
 	}
 }
 
 void ACheeseStrikeGameMode::SetBotsWanted(int32 Wanted)
 {
-	BotsWanted = Wanted < 0 ? -1 : FMath::Min(Wanted, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize);
+	BotsWanted = Wanted < 0 ? -1 : FMath::Min(Wanted, CheeseStrikeRules::SeatCount - 1);
 	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 	{
 		State->SetBots(State->GetBotNames(), BotsWanted);

@@ -53,6 +53,13 @@ namespace CheeseStrikeRules
 	 */
 	int32 PlayersFrom(const FString& Options);
 	constexpr float WaitForPlayers = 15.0f;
+	/**
+	 * Whether a match the lobby sent everyone to begins: once `Ready` of the
+	 * `Expected` players have said their level is loaded and their view can
+	 * be shown, or, with somebody in, after WaitForPlayers seconds of
+	 * waiting for anyone who never comes.
+	 */
+	bool ShouldBegin(int32 Expected, int32 Ready, int32 In, float SecondsWaited);
 	/** The seed the bots' names were drawn with (`?BotSeed=`), so that a travel keeps the names the lobby showed; or `Otherwise`. */
 	int32 BotSeedFrom(const FString& Options, int32 Otherwise);
 
@@ -102,17 +109,25 @@ namespace CheeseStrikeRules
 	int32 NumBotNames();
 	/** `Count` of them, in an order drawn with `Seed`, no two alike. */
 	TArray<FString> BotNames(int32 Seed, int32 Count);
-	/** How many bots fill in: the URL's `?Bots=`, or every empty slot (-1) without it. */
+	/** The seats in a match, players and bots together. */
+	constexpr int32 SeatCount = Teams * TeamSize;
+	/** How many bots a hosted match starts with, before the host changes it in the lobby. */
+	constexpr int32 DefaultBots = 7;
+	/** How many bots fill in: the URL's `?Bots=` (-1 for every empty slot), or DefaultBots without it. */
 	int32 BotsFrom(const FString& Options);
 	/** How many bots a match with `Players` players has when `BotsWanted` of them are asked for (-1 for every empty slot). */
 	int32 BotsIn(int32 Players, int32 BotsWanted);
+	/** The most bots the host may ask for with `Players` players in: every seat they leave. */
+	int32 MostBots(int32 Players);
 
-	/** One line of a team's column in the lobby. */
+	/** One line of a team's column in the lobby: a player, a bot, or an empty seat. */
 	struct FRosterEntry
 	{
 		FString Name;
 		int32 Team = 0;
 		bool bBot = false;
+		/** A seat nobody holds, drawn as a placeholder. */
+		bool bEmpty = false;
 	};
 	/**
 	 * Team `Team`'s column: its players, then bots from `Bots` (the names
@@ -121,4 +136,10 @@ namespace CheeseStrikeRules
 	 * that many in all, dealt one at a time to whichever side has fewer.
 	 */
 	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted);
+	/**
+	 * A lobby column's seats, as many as `NumSeats`: who is in `Column`
+	 * (players, then bots), then empty seats of `Team` to fill it. A team's
+	 * column has TeamSize seats; a free-for-all's one column has SeatCount.
+	 */
+	TArray<FRosterEntry> WithEmptySeats(TArray<FRosterEntry> Column, int32 NumSeats, int32 Team = 0);
 }

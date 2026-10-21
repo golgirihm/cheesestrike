@@ -3,15 +3,20 @@
 #include "CheeseStrikeMenu.h"
 #include "Brushes/SlateDynamicImageBrush.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
+#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerState.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
 #include "Styling/SlateTypes.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Images/SThrobber.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SSlider.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
@@ -23,6 +28,7 @@
 #include "GameFramework/GameMode.h"
 #include "CheeseStrikePlayerController.h"
 #include "Rules/CheeseStrikeBots.h"
+#include "Settings/CheeseStrikeSettings.h"
 #include "UI/CheeseStrikeCredits.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
@@ -31,10 +37,12 @@ namespace CheeseStrikeMenu
 {
 	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling)
 	{
+		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options;
+		const EMenuPage FrontEnd = bFrontEndPage ? Chosen : EMenuPage::Main;
 		// Going to the map the host picked, or back to the lobby after the results: the lobby, saying so.
 		if (bTravelling)
 		{
-			return bInAMatch ? EMenuPage::Lobby : (Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits ? Chosen : EMenuPage::Main);
+			return bInAMatch ? EMenuPage::Lobby : FrontEnd;
 		}
 		if (bMatchEnded)
 		{
@@ -42,13 +50,56 @@ namespace CheeseStrikeMenu
 		}
 		if (bMatchStarted)
 		{
-			return bPaused ? EMenuPage::Pause : EMenuPage::None;
+			// The options open from the pause menu, the match going on and the player still paused.
+			return bPaused ? (Chosen == EMenuPage::Options ? EMenuPage::Options : EMenuPage::Pause) : EMenuPage::None;
 		}
 		if (bInAMatch)
 		{
 			return EMenuPage::Lobby;
 		}
-		return Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits ? Chosen : EMenuPage::Main;
+		return FrontEnd;
+	}
+
+	ECountdownTone CountdownTone(int32& Sounded, bool bCounting, float Left, bool bOver)
+	{
+		// Over on the server: the end, unless this clock got there first and sounded it.
+		if (bOver)
+		{
+			const bool bEnd = Sounded > 0;
+			Sounded = Sounded == INDEX_NONE ? INDEX_NONE : 0;
+			return bEnd ? ECountdownTone::End : ECountdownTone::None;
+		}
+		// Called off, or none.
+		if (!bCounting)
+		{
+			Sounded = INDEX_NONE;
+			return ECountdownTone::None;
+		}
+		// Each whole second once, going down only: this machine's clock of the server's may waver back across one.
+		const int32 Now = FMath::Max(0, FMath::CeilToInt(Left));
+		// The first second heard of, if most of it is still to come: a clock of the server's ahead of it, or the countdown
+		// coming late, would otherwise sound two seconds at once.
+		if (Sounded == INDEX_NONE)
+		{
+			Sounded = Now;
+			return Now > 0 && Left > Now - 0.5f ? ECountdownTone::Second : ECountdownTone::None;
+		}
+		if (Now < Sounded)
+		{
+			Sounded = Now;
+			return Now > 0 ? ECountdownTone::Second : ECountdownTone::End;
+		}
+		return ECountdownTone::None;
+	}
+
+	FLinearColor TeamColour(int32 Team)
+	{
+		switch (Team)
+		{
+		case 0: return FLinearColor::FromSRGBColor(FColor(230, 159, 0));
+		case 1: return FLinearColor::FromSRGBColor(FColor(86, 180, 233));
+		default: return FLinearColor(0.96f, 0.72f, 0.2f);
+		}
 	}
 
 	ELobbyStatus LobbyStatus(bool bHaveMatch, bool bTravelling, bool bCounting, float SecondsLeft, bool bHost)
@@ -74,7 +125,6 @@ namespace
 	const FLinearColor Ink(0.92f, 0.9f, 0.86f);
 	const FLinearColor Muted(0.6f, 0.58f, 0.55f);
 	const FLinearColor Cheese(0.96f, 0.72f, 0.2f);
-	const FLinearColor Mozzarella(0.85f, 0.9f, 1.0f);
 	const FLinearColor PanelColour(0.04f, 0.04f, 0.045f, 0.82f);
 
 	FSlateFontInfo Font(int32 Size, const FName& Style = FName("Regular"))
@@ -82,19 +132,27 @@ namespace
 		return FCoreStyle::GetDefaultFontStyle(Style, Size);
 	}
 
-	/** The menu's looks, made once: rounded buttons in three kinds, chips, and the pictures from Content/UI. */
+	/** `Colour` darkened (or lightened, above 1) by `Scale`, as opaque. */
+	FLinearColor Shade(const FLinearColor& Colour, float Scale, float Alpha = 1.0f)
+	{
+		return FLinearColor(Colour.R * Scale, Colour.G * Scale, Colour.B * Scale, Alpha);
+	}
+
+	/** The menu's looks, made once: rounded buttons in three kinds, chips, the sliders, and the pictures from Content/UI. */
 	struct FLooks
 	{
 		FButtonStyle Plain;
 		FButtonStyle Primary;
 		FButtonStyle Danger;
-		FSlateRoundedBoxBrush PlayerChip;
 		FSlateRoundedBoxBrush BotChip;
+		FSlateRoundedBoxBrush PrimaryFace;
+		FSliderStyle Slider;
 		TUniquePtr<FSlateDynamicImageBrush> PlayerIcon;
 		TUniquePtr<FSlateDynamicImageBrush> BotIcon;
 		TUniquePtr<FSlateDynamicImageBrush> CrownIcon;
 		TUniquePtr<FSlateDynamicImageBrush> LobbyTile;
 		TMap<FString, TUniquePtr<FSlateDynamicImageBrush>> MapPictures;
+		TMap<FString, TUniquePtr<FSlateRoundedBoxBrush>> Chips;
 
 		/** A map's picture, from Content/UI/Maps, loaded the first time it is asked for. */
 		const FSlateBrush* MapPicture(const FString& File)
@@ -107,9 +165,20 @@ namespace
 			return MapPictures[File].Get();
 		}
 
+		/** A seat's chip, filled with `Fill` and edged with `Edge` (none if clear), made the first time it is asked for. */
+		const FSlateBrush* Chip(const FLinearColor& Fill, const FLinearColor& Edge)
+		{
+			const FString Key = Fill.ToString() + Edge.ToString();
+			if (!Chips.Contains(Key))
+			{
+				Chips.Add(Key, MakeUnique<FSlateRoundedBoxBrush>(Fill, 8.0f, Edge, Edge.A > 0.0f ? 2.0f : 0.0f));
+			}
+			return Chips[Key].Get();
+		}
+
 		FLooks()
-			: PlayerChip(FLinearColor(0.16f, 0.16f, 0.17f, 1.0f), 8.0f)
-			, BotChip(FLinearColor(0.1f, 0.1f, 0.11f, 1.0f), 8.0f)
+			: BotChip(FLinearColor(0.1f, 0.1f, 0.11f, 1.0f), 8.0f)
+			, PrimaryFace(FLinearColor(0.1f, 0.42f, 0.9f), CheeseStrikeMenu::Rounding)
 		{
 			const auto Make = [](FButtonStyle& Style, const FLinearColor& Rest, const FLinearColor& Hover, const FLinearColor& Press)
 			{
@@ -125,6 +194,14 @@ namespace
 			Make(Plain, FLinearColor(0.18f, 0.18f, 0.19f), FLinearColor(0.28f, 0.28f, 0.3f), FLinearColor(0.12f, 0.12f, 0.13f));
 			Make(Primary, FLinearColor(0.1f, 0.42f, 0.9f), FLinearColor(0.2f, 0.52f, 1.0f), FLinearColor(0.08f, 0.32f, 0.72f));
 			Make(Danger, FLinearColor(0.72f, 0.16f, 0.14f), FLinearColor(0.85f, 0.24f, 0.2f), FLinearColor(0.55f, 0.1f, 0.1f));
+			// A slider: a thin rounded bar, and a cheese-coloured knob that lights under the mouse.
+			Slider.SetNormalBarImage(FSlateRoundedBoxBrush(FLinearColor(0.22f, 0.22f, 0.24f), 3.0f));
+			Slider.SetHoveredBarImage(FSlateRoundedBoxBrush(FLinearColor(0.3f, 0.3f, 0.32f), 3.0f));
+			Slider.SetDisabledBarImage(FSlateRoundedBoxBrush(FLinearColor(0.12f, 0.12f, 0.13f), 3.0f));
+			Slider.SetNormalThumbImage(FSlateRoundedBoxBrush(Cheese, 9.0f, FVector2f(18.0f, 18.0f)));
+			Slider.SetHoveredThumbImage(FSlateRoundedBoxBrush(FLinearColor(1.0f, 0.82f, 0.36f), 9.0f, FVector2f(18.0f, 18.0f)));
+			Slider.SetDisabledThumbImage(FSlateRoundedBoxBrush(Muted, 9.0f, FVector2f(18.0f, 18.0f)));
+			Slider.SetBarThickness(6.0f);
 			const FString Folder = FPaths::ProjectContentDir() / TEXT("UI");
 			PlayerIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("player.png"))), FVector2D(22.0, 22.0));
 			BotIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("bot.png"))), FVector2D(22.0, 22.0));
@@ -137,6 +214,44 @@ namespace
 	{
 		static FLooks Made;
 		return Made;
+	}
+
+	UCheeseStrikeSessionSubsystem* SessionsOf(const ACheeseStrikePlayerController* Player)
+	{
+		return Player != nullptr && Player->GetGameInstance() != nullptr ? Player->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+	}
+
+	/** The options' choices that are buttons, in the order they are offered. */
+	const TCHAR* const QualityNames[] = {TEXT("LOW"), TEXT("MEDIUM"), TEXT("HIGH"), TEXT("EPIC")};
+	const EWindowMode::Type WindowModes[] = {EWindowMode::Fullscreen, EWindowMode::WindowedFullscreen, EWindowMode::Windowed};
+	const TCHAR* const WindowModeNames[] = {TEXT("FULLSCREEN"), TEXT("BORDERLESS"), TEXT("WINDOWED")};
+	/** The width of the options' names, left of what sets them. */
+	constexpr float OptionLabelWidth = 250.0f;
+
+	/** The resolutions the options offer on this screen. */
+	TArray<FIntPoint> ResolutionsHere()
+	{
+		TArray<FIntPoint> Supported;
+		UKismetSystemLibrary::GetSupportedFullscreenResolutions(Supported);
+		const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+		return CheeseStrikeSettings::Resolutions(Supported, Settings != nullptr ? Settings->GetDesktopResolution() : FIntPoint(1920, 1080));
+	}
+
+	/** Applies the window and resolution in the settings, unless in the editor, whose window isn't the game's to change; and keeps them. */
+	void ApplyWindow(UCheeseStrikeSettings* Settings)
+	{
+		if (!GIsEditor)
+		{
+			Settings->ApplyResolutionSettings(false);
+		}
+		Settings->SaveSettings();
+	}
+
+	/** Applies the rest of the graphics settings, and keeps them. */
+	void ApplyGraphics(UCheeseStrikeSettings* Settings)
+	{
+		Settings->ApplyNonResolutionSettings();
+		Settings->SaveSettings();
 	}
 }
 
@@ -204,11 +319,12 @@ void SCheeseStrikeMenu::Refresh()
 {
 	const bool bLobby = Page == EMenuPage::Lobby;
 	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
-	// The credits are long: a wider panel, and the game's name out of their way.
+	// The credits and the options are wide: a wider panel, and the game's name out of their way.
+	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options;
 	if (Content.IsValid())
 	{
-		Content->SetWidthOverride(Page == EMenuPage::Credits ? 640.0f : 400.0f);
-		Content->SetVAlign(Page == EMenuPage::Credits ? VAlign_Fill : VAlign_Center);
+		Content->SetWidthOverride(Page == EMenuPage::Options ? 760.0f : (bWide ? 640.0f : 400.0f));
+		Content->SetVAlign(bWide ? VAlign_Fill : VAlign_Center);
 	}
 	if (Lobby.IsValid())
 	{
@@ -276,8 +392,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePage()
 	case EMenuPage::Find: return MakeFind();
 	case EMenuPage::Pause: return MakePause();
 	case EMenuPage::Credits: return MakeCredits();
+	case EMenuPage::Options: return MakeOptions();
 	default: return SNullWidget::NullWidget;
 	}
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeSpinner(float Radius) const
+{
+	return SNew(SCircularThrobber).Radius(Radius).NumPieces(8).Period(1.0f).PieceImage(FCoreStyle::Get().GetBrush("Throbber.CircleChunk")).ColorAndOpacity(FLinearColor::White);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeTitle(const FString& Text)
@@ -314,7 +436,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeButton(const FString& Text, TFunction
 	];
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoices(const FString& Label, const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick)
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoiceButtons(const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick)
 {
 	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
 	for (int32 Index = 0; Index < Choices.Num(); ++Index)
@@ -331,19 +453,46 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoices(const FString& Label, const T
 			]
 		];
 	}
+	return Row;
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoices(const FString& Label, const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick)
+{
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 4.0f)) [ MakeLine(Label, true) ]
-		+ SVerticalBox::Slot().AutoHeight() [ Row ];
+		+ SVerticalBox::Slot().AutoHeight() [ MakeChoiceButtons(Choices, Chosen, bCanPick, MoveTemp(Pick)) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 {
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	const UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
+	const bool bHosting = Sessions != nullptr && Sessions->GetPending() == ESessionPending::Hosting;
+	// Hosting takes a moment (offering the match, then reloading the level into its lobby): the button says so, turning,
+	// and nothing else can be pressed meanwhile.
+	TSharedRef<SWidget> Host = MakeButton(TEXT("HOST A MATCH"), [Player]() { if (Player.IsValid()) Player->HostFromMenu(); });
+	if (bHosting)
+	{
+		Host = SNew(SBox).Padding(FMargin(0.0f, 4.0f))
+			[
+				SNew(SBorder).BorderImage(&Looks().PrimaryFace).Padding(FMargin(18.0f, 10.0f)).ForegroundColor(FLinearColor::White)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ SNew(STextBlock).Text(FText::FromString(TEXT("HOSTING A MATCH"))).Font(Font(18, FName("Bold"))).ColorAndOpacity(FLinearColor::White) ]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14.0f, 0.0f, 0.0f, 0.0f)) [ MakeSpinner(9.0f) ]
+				]
+			];
+	}
 	return SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("HOST A MATCH"), [Player]() { if (Player.IsValid()) Player->HostFromMenu(); }) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ];
+		+ SVerticalBox::Slot().AutoHeight() [ Host ]
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			SNew(SVerticalBox).IsEnabled(!bHosting)
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("OPTIONS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ]
+		];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeCredits()
@@ -359,13 +508,15 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeCredits()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("CREDITS")) ]
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ List ] ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Main); }) ];
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); }) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
 {
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
-	UCheeseStrikeSessionSubsystem* Sessions = Player.IsValid() && Player->GetGameInstance() != nullptr ? Player->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
+	const bool bJoining = Sessions != nullptr && Sessions->GetPending() == ESessionPending::Joining;
+	const bool bSearching = Sessions != nullptr && Sessions->IsBusy() && !bJoining;
 	TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
 	if (Sessions != nullptr)
 	{
@@ -375,27 +526,53 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
 			List->AddSlot().AutoHeight() [ MakeButton(Found[Index], [Sessions, Index]() { Sessions->Join(Index); }) ];
 		}
 	}
+	// What is going on, with a spinner while it goes on: looking, or, once a match is picked, joining it until its lobby comes.
+	const FString Status = bJoining ? FString(TEXT("Joining the lobby")) : (Sessions != nullptr ? Sessions->GetStatus() : FString(TEXT("No online service")));
+	TSharedRef<SHorizontalBox> StatusRow = SNew(SHorizontalBox);
+	if (bJoining || bSearching)
+	{
+		StatusRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 10.0f, 0.0f)) [ MakeSpinner(9.0f) ];
+	}
+	StatusRow->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center) [ MakeLine(Status, !bJoining) ];
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FIND A MATCH")) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Sessions != nullptr ? Sessions->GetStatus() : TEXT("No online service"), true) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ SNew(SScrollBox) + SScrollBox::Slot() [ List ] ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("SEARCH AGAIN"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); }) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Main); }) ];
+		+ SVerticalBox::Slot().AutoHeight() [ StatusRow ]
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			// Nothing to press while joining: the match picked is on its way.
+			SNew(SVerticalBox).IsEnabled(!bJoining)
+			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ SNew(SScrollBox) + SScrollBox::Slot() [ List ] ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("SEARCH AGAIN"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); }) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); }) ]
+		];
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const FString& Name, bool bBot, bool bHost, int32 Team)
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const CheeseStrikeRules::FRosterEntry& Seat, bool bHost, const FLinearColor& Colour)
 {
+	// A player's chip is the side's colour, deep, edged in it; a bot's the same, dimmer; an empty seat only its edge, faint.
+	const FSlateBrush* Brush = Seat.bEmpty ? Looks().Chip(FLinearColor::Transparent, Shade(Colour, 0.55f, 0.55f))
+		: (Seat.bBot ? Looks().Chip(Shade(Colour, 0.2f), FLinearColor::Transparent) : Looks().Chip(Shade(Colour, 0.4f), Colour));
+	if (Seat.bEmpty)
+	{
+		return SNew(SBorder)
+			.BorderImage(Brush)
+			.Padding(FMargin(18.0f, 0.0f))
+			.VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(FText::FromString(TEXT("Open seat"))).Font(Font(18)).ColorAndOpacity(Shade(Colour, 0.8f, 0.6f))
+			];
+	}
 	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 14.0f, 0.0f))
 		[
 			SNew(SBox).WidthOverride(30.0f).HeightOverride(30.0f)
 			[
-				SNew(SImage).Image(bBot ? Looks().BotIcon.Get() : Looks().PlayerIcon.Get()).ColorAndOpacity(bBot ? Muted : (Team == 0 ? Cheese : Mozzarella))
+				SNew(SImage).Image(Seat.bBot ? Looks().BotIcon.Get() : Looks().PlayerIcon.Get()).ColorAndOpacity(Seat.bBot ? Shade(Colour, 0.9f) : FLinearColor::White)
 			]
 		]
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
-			SNew(STextBlock).Text(FText::FromString(Name)).Font(Font(22, bBot ? FName("Regular") : FName("Bold"))).ColorAndOpacity(bBot ? Muted : Ink)
+			SNew(STextBlock).Text(FText::FromString(Seat.Name)).Font(Font(22, Seat.bBot ? FName("Regular") : FName("Bold"))).ColorAndOpacity(Seat.bBot ? FLinearColor(0.78f, 0.77f, 0.74f) : FLinearColor::White)
 		];
 	if (bHost)
 	{
@@ -404,12 +581,12 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const FString& Name, bool bB
 			SNew(SBox).WidthOverride(30.0f).HeightOverride(30.0f) [ SNew(SImage).Image(Looks().CrownIcon.Get()) ]
 		];
 	}
-	else if (bBot)
+	else if (Seat.bBot)
 	{
-		Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(12.0f, 0.0f, 0.0f, 0.0f)) [ SNew(STextBlock).Text(FText::FromString(TEXT("bot"))).Font(Font(14)).ColorAndOpacity(Muted) ];
+		Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(12.0f, 0.0f, 0.0f, 0.0f)) [ SNew(STextBlock).Text(FText::FromString(TEXT("bot"))).Font(Font(14)).ColorAndOpacity(Shade(Colour, 0.9f)) ];
 	}
 	return SNew(SBorder)
-		.BorderImage(bBot ? &Looks().BotChip : &Looks().PlayerChip)
+		.BorderImage(Brush)
 		.Padding(FMargin(18.0f, 0.0f))
 		.VAlign(VAlign_Center)
 		[
@@ -417,27 +594,47 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const FString& Name, bool bB
 		];
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeTeamColumn(int32 Team)
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeSeatColumn(const FString& Title, const FLinearColor& Colour, const TArray<CheeseStrikeRules::FRosterEntry>& Seats)
 {
 	const ACheeseStrikeGameState* Match = Controller.IsValid() && Controller->GetWorld() != nullptr ? Controller->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const FString HostName = Match != nullptr ? Match->GetHostName() : FString();
 	TSharedRef<SVerticalBox> Column = SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(4.0f, 0.0f, 0.0f, 12.0f))
 		[
-			SNew(STextBlock).Text(FText::FromString(FString(CheeseStrikeRules::TeamNames[Team]).ToUpper())).Font(Font(26, FName("Bold"))).ColorAndOpacity(Team == 0 ? Cheese : Mozzarella)
+			SNew(STextBlock).Text(FText::FromString(Title.ToUpper())).Font(Font(26, FName("Bold"))).ColorAndOpacity(Colour)
 		];
-	// A side's eight seats share the height: the column is the side, full or not.
-	const TArray<CheeseStrikeRules::FRosterEntry> Entries = Match != nullptr ? Match->TeamColumn(Team) : TArray<CheeseStrikeRules::FRosterEntry>();
-	for (int32 Seat = 0; Seat < CheeseStrikeRules::TeamSize; ++Seat)
+	// The seats share the column's height: the column is the side, full or not.
+	for (const CheeseStrikeRules::FRosterEntry& Seat : Seats)
 	{
-		TSharedRef<SWidget> Inside = SNew(SSpacer);
-		if (Entries.IsValidIndex(Seat))
-		{
-			const CheeseStrikeRules::FRosterEntry& Entry = Entries[Seat];
-			Inside = MakeNameChip(Entry.Name, Entry.bBot, !Entry.bBot && Entry.Name == Match->GetHostName(), Team);
-		}
-		Column->AddSlot().FillHeight(1.0f).MaxHeight(84.0f).Padding(FMargin(0.0f, 4.0f)) [ Inside ];
+		const bool bHost = !Seat.bBot && !Seat.bEmpty && !HostName.IsEmpty() && Seat.Name == HostName;
+		Column->AddSlot().FillHeight(1.0f).MaxHeight(84.0f).Padding(FMargin(0.0f, 4.0f)) [ MakeNameChip(Seat, bHost, Colour) ];
 	}
 	return Column;
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeSeatColumns(bool bTeams)
+{
+	const ACheeseStrikeGameState* Match = Controller.IsValid() && Controller->GetWorld() != nullptr ? Controller->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	TSharedRef<SHorizontalBox> Columns = SNew(SHorizontalBox);
+	if (bTeams)
+	{
+		// A side each: its players, then the bots that will stand in, then its empty seats, eight in all.
+		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
+		{
+			const TArray<CheeseStrikeRules::FRosterEntry> Seats = CheeseStrikeRules::WithEmptySeats(Match != nullptr ? Match->TeamColumn(Team) : TArray<CheeseStrikeRules::FRosterEntry>(), CheeseStrikeRules::TeamSize, Team);
+			Columns->AddSlot().FillWidth(1.0f).Padding(FMargin(Team > 0 ? 24.0f : 0.0f, 0.0f, 0.0f, 0.0f)) [ MakeSeatColumn(CheeseStrikeRules::TeamNames[Team], CheeseStrikeMenu::TeamColour(Team), Seats) ];
+		}
+		return Columns;
+	}
+	// Everyone for themself: one column of every seat, the players then the bots, in one colour.
+	TArray<CheeseStrikeRules::FRosterEntry> Everyone;
+	for (int32 Team = 0; Team < CheeseStrikeRules::Teams && Match != nullptr; ++Team)
+	{
+		Everyone.Append(Match->TeamColumn(Team));
+	}
+	Everyone.StableSort([](const CheeseStrikeRules::FRosterEntry& A, const CheeseStrikeRules::FRosterEntry& B) { return !A.bBot && B.bBot; });
+	Columns->AddSlot().FillWidth(1.0f) [ MakeSeatColumn(TEXT("Players"), CheeseStrikeMenu::TeamColour(INDEX_NONE), CheeseStrikeRules::WithEmptySeats(Everyone, CheeseStrikeRules::SeatCount, INDEX_NONE)) ];
+	return Columns;
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const FString& Value, bool bCanPick, TFunction<void()> Less, TFunction<void()> More)
@@ -453,21 +650,23 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const F
 				SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(15, FName("Bold")))
 			];
 	};
+	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("-"), Less) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(16.0f, 0.0f))
+		[
+			SNew(SBox).MinDesiredWidth(150.0f)
+			[
+				SNew(STextBlock).Text(FText::FromString(Value)).Font(Font(18, FName("Bold"))).ColorAndOpacity(Ink).Justification(ETextJustify::Center)
+			]
+		]
+		+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("+"), More) ];
+	if (Label.IsEmpty())
+	{
+		return Row;
+	}
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 4.0f)) [ MakeLine(Label, true) ]
-		+ SVerticalBox::Slot().AutoHeight()
-		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("-"), Less) ]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(16.0f, 0.0f))
-			[
-				SNew(SBox).MinDesiredWidth(150.0f)
-				[
-					SNew(STextBlock).Text(FText::FromString(Value)).Font(Font(18, FName("Bold"))).ColorAndOpacity(Ink).Justification(ETextJustify::Center)
-				]
-			]
-			+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("+"), More) ]
-		];
+		+ SVerticalBox::Slot().AutoHeight() [ Row ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeMapPicture(int32 MapIndex)
@@ -529,16 +728,16 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 		Skills.Add(FString(Skill.Name).ToUpper());
 	}
 	const int32 SkillChosen = Match != nullptr ? Match->GetBotSkill() : CheeseStrikeBots::DefaultSkill;
-	// How many bots: from none to every seat the players leave; at the most, every empty seat, however many come.
+	// How many bots: from none to every seat the players leave.
 	int32 Players = 0;
 	for (const CheeseStrikeRules::FRosterEntry& Entry : Match != nullptr ? Match->Roster() : TArray<CheeseStrikeRules::FRosterEntry>())
 	{
 		Players += Entry.bBot ? 0 : 1;
 	}
-	const int32 Seats = FMath::Max(0, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize - Players);
-	const int32 Wanted = Match != nullptr ? Match->GetBotsWanted() : -1;
+	const int32 Most = CheeseStrikeRules::MostBots(Players);
+	const int32 Wanted = Match != nullptr ? Match->GetBotsWanted() : CheeseStrikeRules::DefaultBots;
 	const int32 Bots = CheeseStrikeRules::BotsIn(Players, Wanted);
-	const FString BotsText = Wanted < 0 ? FString::Printf(TEXT("%d (every seat)"), Bots) : FString::FromInt(Bots);
+	const FString BotsText = Bots > 0 && Bots >= Most ? FString::Printf(TEXT("%d (every seat)"), Bots) : FString::FromInt(Bots);
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOBBY")) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 8.0f)) [ MakeMapPicture(MapChosen) ]
@@ -547,7 +746,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Back how long after a death"), Delays, DelayChosen, bHost, [Player, KillLimit](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, CheeseStrikeRules::RespawnDelayChoices[Index]); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeStepper(TEXT("Bots"), BotsText, bHost,
 			[Player, Bots]() { if (Player.IsValid()) Player->SetBotsFromMenu(FMath::Max(0, Bots - 1)); },
-			[Player, Bots, Seats]() { if (Player.IsValid()) Player->SetBotsFromMenu(Bots + 1 >= Seats ? -1 : Bots + 1); }) ]
+			[Player, Bots, Most]() { if (Player.IsValid()) Player->SetBotsFromMenu(FMath::Min(Bots + 1, Most)); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Bot skill"), Skills, SkillChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetBotSkillFromMenu(Index); }) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeLine(bHost ? TEXT("Everyone here sees the rules as you set them.") : TEXT("The host sets the rules."), true) ];
 }
@@ -575,16 +774,28 @@ FString SCheeseStrikeMenu::LobbyKey() const
 FString SCheeseStrikeMenu::PageKey() const
 {
 	FString Key = FString::FromInt(static_cast<int32>(Page));
-	if (Page == EMenuPage::Find)
+	const UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Controller.Get());
+	if (Sessions != nullptr && (Page == EMenuPage::Main || Page == EMenuPage::Find))
 	{
-		const UCheeseStrikeSessionSubsystem* Sessions = Controller.IsValid() && Controller->GetGameInstance() != nullptr ? Controller->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
-		if (Sessions != nullptr)
+		Key += FString::Printf(TEXT("|pending %d"), static_cast<int32>(Sessions->GetPending()));
+	}
+	if (Page == EMenuPage::Find && Sessions != nullptr)
+	{
+		Key += FString::Printf(TEXT("|busy %d|"), Sessions->IsBusy() ? 1 : 0) + Sessions->GetStatus();
+		for (const FString& Found : Sessions->GetFound())
 		{
-			Key += TEXT("|") + Sessions->GetStatus();
-			for (const FString& Found : Sessions->GetFound())
-			{
-				Key += TEXT("|") + Found;
-			}
+			Key += TEXT("|") + Found;
+		}
+	}
+	if (Page == EMenuPage::Options)
+	{
+		// What is pressed rather than slid: the sliders show their values by themselves, and drawing the page again would drop one being dragged.
+		Key += FString::Printf(TEXT("|tab %d"), static_cast<int32>(OptionsTab));
+		if (const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get())
+		{
+			const FIntPoint Resolution = Settings->GetScreenResolution();
+			Key += FString::Printf(TEXT("|%d %d %dx%d %d %.0f %d"), Settings->GetOverallScalabilityLevel(), static_cast<int32>(Settings->GetFullscreenMode()), Resolution.X, Resolution.Y,
+				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0);
 		}
 	}
 	return Key;
@@ -624,38 +835,37 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 	// The seconds count down by themselves, so that the lobby is drawn again only when something in it changes and the spinner turns on unbroken.
 	TWeakObjectPtr<const ACheeseStrikeGameState> Watched = Match;
 	const auto Seconds = [Watched]() { return FText::FromString(Watched.IsValid() ? FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Watched->SecondsToStart())) : FString()); };
-	const auto Spinner = []() { return SNew(SCircularThrobber).Radius(10.0f).NumPieces(8).Period(1.0f).PieceImage(FCoreStyle::Get().GetBrush("Throbber.CircleChunk")).ColorAndOpacity(FLinearColor::White); };
 
 	TSharedRef<SHorizontalBox> Bottom = SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ]
 		+ SHorizontalBox::Slot().FillWidth(1.0f) [ SNew(SSpacer) ];
-	const auto Saying = [this, &Spinner](const FString& Text)
+	const auto Saying = [this](const FString& Text)
 	{
 		return SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Spinner() ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeSpinner() ]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f)) [ MakeLine(Text) ];
 	};
 	if (Status == CheeseStrikeMenu::ELobbyStatus::Joining)
 	{
 		// Nothing of the match yet: no seats or rules to guess at.
-		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ Saying(TEXT("Joining the match")) ];
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ Saying(TEXT("Joining the lobby")) ];
 		return SNew(SVerticalBox)
 			+ SVerticalBox::Slot().FillHeight(1.0f) [ MakeTitle(TEXT("LOBBY")) ]
 			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ Bottom ];
 	}
 	if (Status == CheeseStrikeMenu::ELobbyStatus::Travelling)
 	{
-		const int32 MapIndex = Match != nullptr ? Match->GetMapIndex() : INDEX_NONE;
-		const bool bToTheMatch = Match != nullptr && Match->GetWinnerName().IsEmpty() && MapIndex >= 0 && MapIndex < CheeseStrikeRules::NumMaps();
-		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center)
-		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Spinner() ]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
-			[
-				MakeLine(bToTheMatch ? FString::Printf(TEXT("Going to %s"), CheeseStrikeRules::Maps[MapIndex].Name) : FString(TEXT("Back to the lobby")))
-			]
-		];
+		// Where to: the match's map, or back to the lobby after the results. A joiner whose connection to the level being
+		// left is already closed goes by where the host told them to go.
+		const int32 MapIndex = Match != nullptr ? Match->GetMapIndex() : (Player.IsValid() ? Player->GetLeavingFor() : INDEX_NONE);
+		const bool bToTheMatch = (Match == nullptr || Match->GetWinnerName().IsEmpty()) && MapIndex >= 0 && MapIndex < CheeseStrikeRules::NumMaps();
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ Saying(bToTheMatch ? FString::Printf(TEXT("Going to %s"), CheeseStrikeRules::Maps[MapIndex].Name) : FString(TEXT("Back to the lobby"))) ];
+		if (Match == nullptr)
+		{
+			return SNew(SVerticalBox)
+				+ SVerticalBox::Slot().FillHeight(1.0f) [ MakeTitle(TEXT("LOBBY")) ]
+				+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ Bottom ];
+		}
 	}
 	else if (Status == CheeseStrikeMenu::ELobbyStatus::Starting)
 	{
@@ -664,7 +874,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 	else if (bHost && Status == CheeseStrikeMenu::ELobbyStatus::Counting)
 	{
 		TSharedRef<SHorizontalBox> Inside = SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Spinner() ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeSpinner() ]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f)) [ SNew(STextBlock).Text_Lambda(Seconds).Font(Font(18, FName("Bold"))) ];
 		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("CANCEL"), [Player]() { if (Player.IsValid()) Player->CancelStartFromMenu(); }, EButtonKind::Danger, Inside) ];
 	}
@@ -677,7 +887,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center)
 		[
 			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Spinner() ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeSpinner() ]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f))
 			[
 				SNew(STextBlock).Text_Lambda([Seconds]() { return FText::FromString(TEXT("Starting in ") + Seconds().ToString()); }).Font(Font(16)).ColorAndOpacity(Ink)
@@ -689,6 +899,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeLine(TEXT("Waiting for the host to start."), true) ];
 	}
 
+	// Sides of a team match. A free-for-all (the modes to come) would show one column of every seat: MakeSeatColumns(false).
+	const bool bTeams = true;
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().FillHeight(1.0f)
 		[
@@ -700,8 +912,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 					SNew(SScrollBox) + SScrollBox::Slot() [ MakeLobbyRules() ]
 				]
 			]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(FMargin(0.0f, 0.0f, 24.0f, 0.0f)) [ MakeTeamColumn(0) ]
-			+ SHorizontalBox::Slot().FillWidth(1.0f) [ MakeTeamColumn(1) ]
+			+ SHorizontalBox::Slot().FillWidth(1.0f) [ MakeSeatColumns(bTeams) ]
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ Bottom ];
 }
@@ -713,6 +924,224 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePause()
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("PAUSED")) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("The match goes on without you."), true) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("RESUME"), [Player]() { if (Player.IsValid()) Player->TogglePause(); }, EButtonKind::Primary) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("OPTIONS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("LEAVE THE MATCH"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionRow(const FString& Label, TSharedRef<SWidget> Setter)
+{
+	return SNew(SBox).Padding(FMargin(0.0f, 7.0f)).MinDesiredHeight(40.0f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(OptionLabelWidth) [ SNew(STextBlock).Text(FText::FromString(Label)).Font(Font(17)).ColorAndOpacity(Ink) ]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center) [ Setter ]
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeSlider(float Min, float Max, float Step, TFunction<float()> Get, TFunction<void(float)> Set, TFunction<FString(float)> Show)
+{
+	// Kept when let go, rather than written out at every step of a drag.
+	const auto Keep = []()
+	{
+		if (UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get())
+		{
+			Settings->SaveSettings();
+		}
+	};
+	return SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+		[
+			SNew(SSlider)
+			.Style(&Looks().Slider)
+			.MinValue(Min)
+			.MaxValue(Max)
+			.StepSize(Step)
+			.MouseUsesStep(true)
+			.Value_Lambda([Get]() { return Get(); })
+			.OnValueChanged_Lambda([Set](float Value) { Set(Value); })
+			.OnMouseCaptureEnd_Lambda(Keep)
+			.OnControllerCaptureEnd_Lambda(Keep)
+		]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(16.0f, 0.0f, 0.0f, 0.0f))
+		[
+			SNew(SBox).WidthOverride(150.0f)
+			[
+				SNew(STextBlock).Text_Lambda([Get, Show]() { return FText::FromString(Show(Get())); }).Font(Font(17, FName("Bold"))).ColorAndOpacity(Ink)
+			]
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("VIEW"), TEXT("SOUND"), TEXT("GRAPHICS")};
+	const bool bInMatch = Page == EMenuPage::Options && Player.IsValid() && Player->IsPaused();
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("OPTIONS")) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 18.0f))
+		[
+			MakeChoiceButtons(Tabs, static_cast<int32>(OptionsTab), true, [this](int32 Index)
+			{
+				OptionsTab = static_cast<EOptionsTab>(Index);
+				Refresh();
+			})
+		]
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ MakeOptionsTab() ] ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f)) [ MakeLine(bInMatch ? TEXT("The match goes on; each change is made at once and kept.") : TEXT("Each change is made at once and kept."), true) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f)).HAlign(HAlign_Left)
+		[
+			SNew(SBox).WidthOverride(304.0f) [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); }) ]
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
+{
+	UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+	if (Settings == nullptr)
+	{
+		return MakeLine(TEXT("The settings aren't there to change."), true);
+	}
+	TWeakObjectPtr<UCheeseStrikeSettings> Kept = Settings;
+	TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
+	const auto Add = [&Rows](TSharedRef<SWidget> Row) { Rows->AddSlot().AutoHeight() [ Row ]; };
+	const auto Times = [](float Value) { return FString::Printf(TEXT("%.2f x"), Value); };
+	const auto Percent = [](float Value) { return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Value * 100.0f)); };
+	switch (OptionsTab)
+	{
+	case EOptionsTab::Controls:
+		Add(MakeOptionRow(TEXT("Mouse sensitivity"), MakeSlider(CheeseStrikeSettings::MinSensitivity, CheeseStrikeSettings::MaxSensitivity, 0.05f,
+			[Kept]() { return Kept.IsValid() ? Kept->GetMouseSensitivity() : CheeseStrikeSettings::DefaultSensitivity; },
+			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMouseSensitivity(Value); }, Times)));
+		Add(MakeOptionRow(TEXT("Aiming sensitivity"), MakeSlider(CheeseStrikeSettings::MinAimedSensitivity, CheeseStrikeSettings::MaxAimedSensitivity, 0.05f,
+			[Kept]() { return Kept.IsValid() ? Kept->GetAimedSensitivity() : CheeseStrikeSettings::DefaultAimedSensitivity; },
+			[Kept](float Value) { if (Kept.IsValid()) Kept->SetAimedSensitivity(Value); }, Times)));
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("While aiming down the sights, as a share of the mouse's."), true) ];
+		Add(MakeOptionRow(TEXT("Invert look"), MakeChoiceButtons({TEXT("OFF"), TEXT("ON")}, Settings->IsLookInverted() ? 1 : 0, true, [this, Kept](int32 Index)
+		{
+			if (Kept.IsValid())
+			{
+				Kept->SetLookInverted(Index == 1);
+				Kept->SaveSettings();
+			}
+			Refresh();
+		})));
+		break;
+	case EOptionsTab::View:
+		Add(MakeOptionRow(TEXT("Field of view"), MakeSlider(CheeseStrikeSettings::MinFieldOfView, CheeseStrikeSettings::MaxFieldOfView, 1.0f,
+			[Kept]() { return Kept.IsValid() ? Kept->GetFieldOfView() : CheeseStrikeSettings::DefaultFieldOfView; },
+			[Kept](float Value) { if (Kept.IsValid()) Kept->SetFieldOfView(Value); },
+			[](float Value) { return FString::Printf(TEXT("%.0f°"), Value); })));
+		{
+			// What that is across this screen, which most games give instead.
+			TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+			Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f))
+			[
+				SNew(STextBlock).Font(Font(16)).ColorAndOpacity(Muted).AutoWrapText(true).Text_Lambda([Kept, Player]()
+				{
+					FVector2D Size(16.0, 9.0);
+					const ULocalPlayer* Local = Player.IsValid() ? Player->GetLocalPlayer() : nullptr;
+					if (Local != nullptr && Local->ViewportClient != nullptr)
+					{
+						Local->ViewportClient->GetViewportSize(Size);
+					}
+					const float Aspect = Size.Y > 0.0 ? static_cast<float>(Size.X / Size.Y) : 16.0f / 9.0f;
+					const float Across = CheeseStrikeSettings::HorizontalFieldOfView(Kept.IsValid() ? Kept->GetFieldOfView() : CheeseStrikeSettings::DefaultFieldOfView, Aspect);
+					return FText::FromString(FString::Printf(TEXT("From the top of the view to the bottom; %.0f° across this screen."), Across));
+				})
+			];
+		}
+		break;
+	case EOptionsTab::Sound:
+		Add(MakeOptionRow(TEXT("Master volume"), MakeSlider(0.0f, 1.0f, 0.01f,
+			[Kept]() { return Kept.IsValid() ? Kept->GetMasterVolume() : CheeseStrikeSettings::DefaultVolume; },
+			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMasterVolume(Value); }, Percent)));
+		Add(MakeOptionRow(TEXT("Effects volume"), MakeSlider(0.0f, 1.0f, 0.01f,
+			[Kept]() { return Kept.IsValid() ? Kept->GetEffectsVolume() : CheeseStrikeSettings::DefaultVolume; },
+			[Kept](float Value) { if (Kept.IsValid()) Kept->SetEffectsVolume(Value); }, Percent)));
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("The game's sounds; the master volume is everything, the menu's too."), true) ];
+		break;
+	case EOptionsTab::Graphics:
+	{
+		TArray<FString> Qualities;
+		for (const TCHAR* Name : QualityNames)
+		{
+			Qualities.Add(Name);
+		}
+		Add(MakeOptionRow(TEXT("Quality"), MakeChoiceButtons(Qualities, Settings->GetOverallScalabilityLevel(), true, [this, Kept](int32 Index)
+		{
+			if (Kept.IsValid())
+			{
+				Kept->SetOverallScalabilityLevel(Index);
+				ApplyGraphics(Kept.Get());
+			}
+			Refresh();
+		})));
+		TArray<FString> Modes;
+		int32 ModeChosen = INDEX_NONE;
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(WindowModes); ++Index)
+		{
+			Modes.Add(WindowModeNames[Index]);
+			ModeChosen = WindowModes[Index] == Settings->GetFullscreenMode() ? Index : ModeChosen;
+		}
+		Add(MakeOptionRow(TEXT("Window"), MakeChoiceButtons(Modes, ModeChosen, true, [this, Kept](int32 Index)
+		{
+			if (Kept.IsValid())
+			{
+				Kept->SetFullscreenMode(WindowModes[Index]);
+				// Borderless fills the screen at its own resolution.
+				if (WindowModes[Index] == EWindowMode::WindowedFullscreen)
+				{
+					Kept->SetScreenResolution(Kept->GetDesktopResolution());
+				}
+				ApplyWindow(Kept.Get());
+			}
+			Refresh();
+		})));
+		const TArray<FIntPoint> Resolutions = ResolutionsHere();
+		const int32 ResolutionChosen = CheeseStrikeSettings::ResolutionIndex(Resolutions, Settings->GetScreenResolution());
+		const FIntPoint Shown = Resolutions.IsValidIndex(ResolutionChosen) ? Resolutions[ResolutionChosen] : Settings->GetScreenResolution();
+		const bool bBorderless = Settings->GetFullscreenMode() == EWindowMode::WindowedFullscreen;
+		const auto PickResolution = [this, Kept, Resolutions](int32 Index)
+		{
+			if (Kept.IsValid() && Resolutions.IsValidIndex(Index))
+			{
+				Kept->SetScreenResolution(Resolutions[Index]);
+				ApplyWindow(Kept.Get());
+			}
+			Refresh();
+		};
+		Add(MakeOptionRow(TEXT("Resolution"), MakeStepper(FString(), FString::Printf(TEXT("%d x %d"), Shown.X, Shown.Y), !bBorderless && Resolutions.Num() > 1,
+			[PickResolution, ResolutionChosen]() { PickResolution(FMath::Max(0, ResolutionChosen - 1)); },
+			[PickResolution, ResolutionChosen, Resolutions]() { PickResolution(FMath::Min(Resolutions.Num() - 1, ResolutionChosen + 1)); })));
+		Add(MakeOptionRow(TEXT("VSync"), MakeChoiceButtons({TEXT("OFF"), TEXT("ON")}, Settings->IsVSyncEnabled() ? 1 : 0, true, [this, Kept](int32 Index)
+		{
+			if (Kept.IsValid())
+			{
+				Kept->SetVSyncEnabled(Index == 1);
+				ApplyGraphics(Kept.Get());
+			}
+			Refresh();
+		})));
+		TArray<FString> Limits;
+		for (int32 Index = 0; Index < CheeseStrikeSettings::NumFrameRateLimits(); ++Index)
+		{
+			Limits.Add(CheeseStrikeSettings::FrameRateLimits[Index] > 0 ? FString::FromInt(CheeseStrikeSettings::FrameRateLimits[Index]) : FString(TEXT("NONE")));
+		}
+		Add(MakeOptionRow(TEXT("Frame rate limit"), MakeChoiceButtons(Limits, CheeseStrikeSettings::FrameRateLimitIndex(Settings->GetFrameRateLimit()), true, [this, Kept](int32 Index)
+		{
+			if (Kept.IsValid())
+			{
+				Kept->SetFrameRateLimit(static_cast<float>(CheeseStrikeSettings::FrameRateLimits[Index]));
+				ApplyGraphics(Kept.Get());
+			}
+			Refresh();
+		})));
+		break;
+	}
+	}
+	return Rows;
 }
