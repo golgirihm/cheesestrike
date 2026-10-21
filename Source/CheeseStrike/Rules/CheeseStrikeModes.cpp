@@ -250,11 +250,11 @@ namespace CheeseStrikeModes
 		switch (Team)
 		{
 		case 0:
-			return FLinearColor(0.835f, 0.369f, 0.0f);
+			return FLinearColor::FromSRGBColor(FColor(230, 159, 0));
 		case 1:
-			return FLinearColor(0.337f, 0.706f, 0.914f);
+			return FLinearColor::FromSRGBColor(FColor(86, 180, 233));
 		default:
-			return FLinearColor(0.85f, 0.85f, 0.85f);
+			return FLinearColor(0.96f, 0.72f, 0.2f);
 		}
 	}
 

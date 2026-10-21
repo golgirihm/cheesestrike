@@ -72,15 +72,6 @@ namespace CheeseStrikeMenu
 	 */
 	ECountdownTone CountdownTone(int32& Sounded, bool bCounting, float Left, bool bOver);
 
-	/**
-	 * A side's colour, on its chips and over its column: The Gouda Guys'
-	 * orange and the Mozza Radicals' sky blue (Okabe and Ito's, which eyes
-	 * that see colour differently still tell apart), both clear on the
-	 * lobby's dark tile; any other team, as in a free-for-all, a cheese
-	 * yellow.
-	 */
-	FLinearColor TeamColour(int32 Team);
-
 	/** What the bottom of the lobby says, right of Leave. */
 	enum class ELobbyStatus : uint8
 	{

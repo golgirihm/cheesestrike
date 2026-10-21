@@ -25,10 +25,13 @@ namespace CheeseStrikeHUDDraw
 	inline const FLinearColor Panel(0.02f, 0.02f, 0.025f, 0.42f);
 	inline const FLinearColor Accent(0.98f, 0.76f, 0.22f, 1.0f);
 	inline const FLinearColor Danger(0.93f, 0.2f, 0.15f, 1.0f);
-	/** A side's colour, as the lobby has it (CheeseStrikeMenu::TeamColour): The Gouda Guys' orange, the Mozza Radicals' sky blue. */
+	/** A side's colour, the game's one (CheeseStrikeModes::TeamColour): The Gouda Guys' orange, the Mozza Radicals' sky blue, the cheese's yellow for none. */
 	FLinearColor SideColour(int32 Team);
 	/** `Colour` with its alpha times `Alpha`. */
 	FLinearColor Faded(const FLinearColor& Colour, float Alpha);
+
+	/** Pixels for a design pixel at 1080 lines: the HUD is laid out for 1920 by 1080 and scales with the height. */
+	float Unit(const UCanvas* Canvas);
 
 	/** The HUD's typeface: the engine's Roboto, bold and condensed, at `Size` points. */
 	FSlateFontInfo Font(float Size);

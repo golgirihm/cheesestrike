@@ -205,7 +205,13 @@ namespace CheeseStrikeModes
 	/** What a Gun Game player on step `Level` carries besides its step's weapon: the knife, until the knife is the step. */
 	bool GunGameKeepsKnife(int32 Level, int32 Steps);
 
-	/** The teams' colours (the Godot game's, from Okabe and Ito's palette): The Gouda Guys a red orange, Mozza Radicals a blue; a light grey for no team. */
+	/**
+	 * A side's colour, the game's one, on the lobby's chips and columns, the
+	 * HUD and the announcements: The Gouda Guys' orange and the Mozza
+	 * Radicals' sky blue (Okabe and Ito's, which eyes that see colour
+	 * differently still tell apart), both clear on a dark ground; any other
+	 * team, as in a free-for-all, a cheese yellow.
+	 */
 	FLinearColor TeamColour(int32 Team);
 
 	/** What the scoreboard's title says: the mode's name, in capitals. */
