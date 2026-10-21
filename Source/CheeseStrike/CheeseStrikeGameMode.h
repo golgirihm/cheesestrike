@@ -49,6 +49,12 @@ public:
 	/** The mode being played, and the host changing it from the lobby (on the match's state for everyone, and on the next match's URL). */
 	CheeseStrikeModes::EMode GetMode() const { return Mode; }
 	void SetMode(CheeseStrikeModes::EMode InMode);
+	/** The host sets the rounds to win, from the lobby. */
+	void SetRoundLimit(int32 Rounds);
+	/** Execution: `Victim` has gone down, put there by `By`; down still counts as in, until finished or bled out. */
+	void Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By);
+	/** Gun Game: a character is given its player's step of the ladder (and the knife), as it comes in. */
+	virtual void SetPlayerDefaults(APawn* PlayerPawn) override;
 	/** Elimination's rounds to win, and a round's length. */
 	int32 GetRoundLimit() const { return RoundLimit; }
 	float GetRoundTime() const { return RoundTime; }
@@ -144,6 +150,8 @@ protected:
 	void EndRound(int32 Winner);
 	/** Where an Unmanned Aerial Cheese circles: over the middle of the starts, high above the highest. */
 	void DroneCircle(FVector& OutCentre, float& OutRadius) const;
+	/** Gun Game: gives `Body` its player's step of the ladder, in hand at once, and the knife until the knife is the step. */
+	void ArmForGunGame(TWeakObjectPtr<ACheeseStrikeCharacter> Body);
 
 	int32 KillLimit;
 	float RespawnDelay;

@@ -93,6 +93,9 @@ public:
 	/** Calls in the next kill streak earned (4). */
 	UPROPERTY()
 	TObjectPtr<UInputAction> Streak;
+	/** Interact (E), held: reviving a teammate or finishing an enemy down, in Execution. */
+	UPROPERTY()
+	TObjectPtr<UInputAction> Interact;
 	UPROPERTY()
 	TObjectPtr<UInputMappingContext> Context;
 };

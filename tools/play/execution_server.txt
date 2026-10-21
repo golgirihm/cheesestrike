@@ -1,0 +1,22 @@
+# Execution, the host: starts the match from the lobby once the joiner is in,
+# walks up to the joiner, who has gone down, and finishes them. Run with
+# tools/play.ps1 -Lobby -ClientScript tools/play/execution_client.txt -Extra
+# "?listen?Mode=Execution".
+wait 30
+cmd CheeseStrikeStart now
+wait 9
+shot exec_h1_seen
+hold Move 0 1
+wait 0.55
+release Move
+wait 0.3
+shot exec_h2_prompt
+hold Interact
+wait 0.5
+shot exec_h3_finishing
+wait 1
+release Interact
+wait 1
+shot exec_h4_done
+wait 6
+quit

@@ -59,6 +59,7 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	TestTrue(TEXT("escape opens the menu"), InputTests::Has(Set->KeysFor(Set->Menu), EKeys::Escape));
 	TestTrue(TEXT("so does the gamepad's right special button"), InputTests::Has(Set->KeysFor(Set->Menu), EKeys::Gamepad_Special_Right));
 	TestTrue(TEXT("4 calls in a streak"), InputTests::Has(Set->KeysFor(Set->Streak), EKeys::Four));
+	TestTrue(TEXT("E interacts"), InputTests::Has(Set->KeysFor(Set->Interact), EKeys::E));
 
 	// Changing weapons.
 	TestTrue(TEXT("1 draws the primary"), InputTests::Has(Set->KeysFor(Set->DrawPrimary), EKeys::One));
@@ -73,7 +74,7 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	// No key does two things.
 	TArray<FKey> All;
 	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get(), Set->Fire.Get(), Set->Aim.Get(), Set->Reload.Get(), Set->Scoreboard.Get(), Set->Menu.Get(),
-		Set->DrawPrimary.Get(), Set->DrawSidearm.Get(), Set->DrawKnife.Get(), Set->NextWeapon.Get(), Set->PreviousWeapon.Get(), Set->LastWeapon.Get(), Set->Streak.Get()})
+		Set->DrawPrimary.Get(), Set->DrawSidearm.Get(), Set->DrawKnife.Get(), Set->NextWeapon.Get(), Set->PreviousWeapon.Get(), Set->LastWeapon.Get(), Set->Streak.Get(), Set->Interact.Get()})
 	{
 		for (const FKey& Key : Set->KeysFor(Action))
 		{

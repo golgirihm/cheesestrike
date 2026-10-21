@@ -36,6 +36,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Weapons/CheeseStrikeInventory.h"
+#include "Modes/CheeseStrikeLastStand.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 /** With this on, every character writes its state to the log four times a second, for watching a run from outside. */
@@ -122,6 +123,20 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	Health = CheeseStrikeWeapons::MaxHealth;
 
 	Inventory = CreateDefaultSubobject<UCheeseStrikeInventory>(TEXT("Inventory"));
+	LastStand = CreateDefaultSubobject<UCheeseStrikeLastStand>(TEXT("LastStand"));
+}
+
+bool ACheeseStrikeCharacter::IsDowned() const
+{
+	return LastStand != nullptr && LastStand->IsDowned();
+}
+
+void ACheeseStrikeCharacter::SetHealth(float InHealth)
+{
+	if (HasAuthority())
+	{
+		Health = FMath::Clamp(InHealth, 0.0f, CheeseStrikeWeapons::MaxHealth);
+	}
 }
 
 void ACheeseStrikeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -398,6 +413,17 @@ bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From
 	{
 		return false;
 	}
+	// Execution's last stand may take the hit: down instead of dead, or down already and out of reach.
+	bool bHurt = false;
+	if (LastStand != nullptr && LastStand->Intercept(Damage, From, nullptr, bHurt))
+	{
+		if (bHurt)
+		{
+			LastHurtBy = From;
+			LastHurtAt = ServerNow();
+		}
+		return bHurt;
+	}
 	Health = FMath::Max(0.0f, Health - Damage);
 	LastHurtBy = From;
 	LastHurtAt = ServerNow();
@@ -418,6 +444,12 @@ bool ACheeseStrikeCharacter::TakeBlast(float Damage, ACheeseStrikePlayerState* B
 	if (!HasAuthority() || !CanAct() || IsProtected() || By == nullptr || !CanBeHurtBy(nullptr, By))
 	{
 		return false;
+	}
+	// A streak never finishes anyone down: no hand from up close.
+	bool bHurt = false;
+	if (LastStand != nullptr && LastStand->Intercept(Damage, nullptr, By, bHurt))
+	{
+		return bHurt;
 	}
 	Health = FMath::Max(0.0f, Health - Damage);
 	LastHurtBy = From;
@@ -861,6 +893,24 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	EnhancedInputComponent->BindAction(Input->PreviousWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::PreviousWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->LastWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::LastWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->Streak, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::StreakStarted);
+	EnhancedInputComponent->BindAction(Input->Interact, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::InteractStarted);
+	EnhancedInputComponent->BindAction(Input->Interact, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::InteractEnded);
+}
+
+void ACheeseStrikeCharacter::InteractStarted()
+{
+	if (LastStand != nullptr && TakesInput())
+	{
+		LastStand->SetInteracting(true);
+	}
+}
+
+void ACheeseStrikeCharacter::InteractEnded()
+{
+	if (LastStand != nullptr)
+	{
+		LastStand->SetInteracting(false);
+	}
 }
 
 void ACheeseStrikeCharacter::StreakStarted()
@@ -914,7 +964,7 @@ void ACheeseStrikeCharacter::DoMove(float Right, float Forward)
 
 void ACheeseStrikeCharacter::DoJumpStart()
 {
-	if (TakesInput())
+	if (TakesInput() && !IsDowned())
 	{
 		Jump();
 	}
@@ -929,7 +979,7 @@ void ACheeseStrikeCharacter::DoSprint(bool bHeld)
 {
 	if (UCheeseStrikeMovementComponent* Movement = GetCheeseStrikeMovement())
 	{
-		Movement->SetWantsToSprint(bHeld && TakesInput());
+		Movement->SetWantsToSprint(bHeld && TakesInput() && !IsDowned());
 	}
 }
 
@@ -939,8 +989,9 @@ void ACheeseStrikeCharacter::DoCrouch(bool bHeld)
 	{
 		Crouch();
 	}
-	else
+	else if (!IsDowned())
 	{
+		// Down, it stays crouched (UCheeseStrikeLastStand).
 		UnCrouch();
 	}
 }

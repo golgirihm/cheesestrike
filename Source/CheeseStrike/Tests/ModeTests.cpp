@@ -11,6 +11,7 @@
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -33,7 +34,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheModesAreNamedAndPicked, "CheeseStrike.Rules
 bool FTheModesAreNamedAndPicked::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeModes;
-	TestEqual(TEXT("three modes so far"), NumModes, 3);
+	TestEqual(TEXT("five modes"), NumModes, 5);
 	TestEqual(TEXT("free-for-all first"), FString(Info(EMode::FreeForAll).Name), FString(TEXT("Free-for-all")));
 	TestFalse(TEXT("on no teams"), Info(EMode::FreeForAll).bTeams);
 	TestTrue(TEXT("won by a player's kills"), Info(EMode::FreeForAll).WinBy == EWinBy::PlayerKills);
@@ -42,7 +43,11 @@ bool FTheModesAreNamedAndPicked::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Elimination is two teams"), Info(EMode::Elimination).bTeams);
 	TestTrue(TEXT("won by rounds"), Info(EMode::Elimination).WinBy == EWinBy::Rounds);
 	TestFalse(TEXT("with no coming back within one"), Info(EMode::Elimination).bRespawns);
-	TestTrue(TEXT("the others have the killed come back"), Info(EMode::FreeForAll).bRespawns && Info(EMode::Deathmatch).bRespawns);
+	TestTrue(TEXT("the others have the killed come back"), Info(EMode::FreeForAll).bRespawns && Info(EMode::Deathmatch).bRespawns && Info(EMode::GunGame).bRespawns);
+	TestTrue(TEXT("Execution is rounds of two teams"), Info(EMode::Execution).bTeams && Info(EMode::Execution).WinBy == EWinBy::Rounds && !Info(EMode::Execution).bRespawns);
+	TestTrue(TEXT("with a last stand, which only it has"), Info(EMode::Execution).bLastStand && !Info(EMode::Elimination).bLastStand && !Info(EMode::FreeForAll).bLastStand);
+	TestTrue(TEXT("Gun Game is everyone for themself, up the ladder"), !Info(EMode::GunGame).bTeams && Info(EMode::GunGame).WinBy == EWinBy::Ladder);
+	TestTrue(TEXT("without streaks, which the other modes have"), !Info(EMode::GunGame).bStreaks && Info(EMode::FreeForAll).bStreaks && Info(EMode::Execution).bStreaks);
 	for (int32 Index = 0; Index < NumModes; ++Index)
 	{
 		TestTrue(FString::Printf(TEXT("mode %d is where its number says"), Index), Modes[Index].Mode == ModeAt(Index));
@@ -52,6 +57,8 @@ bool FTheModesAreNamedAndPicked::RunTest(const FString& Parameters)
 	TestTrue(TEXT("one names it by its key"), ModeFrom(TEXT("?Mode=Deathmatch")) == EMode::Deathmatch);
 	TestTrue(TEXT("in any case"), ModeFrom(TEXT("?mode=elimination")) == EMode::Elimination);
 	TestTrue(TEXT("or by its number"), ModeFrom(TEXT("?Mode=2")) == EMode::Elimination);
+	TestTrue(TEXT("Execution by its key"), ModeFrom(TEXT("?Mode=Execution")) == EMode::Execution);
+	TestTrue(TEXT("and Gun Game"), ModeFrom(TEXT("?Mode=GunGame")) == EMode::GunGame);
 	TestTrue(TEXT("and nonsense is free-for-all"), ModeFrom(TEXT("?Mode=Hopscotch")) == EMode::FreeForAll && ModeFrom(TEXT("?Mode=9")) == EMode::FreeForAll);
 
 	TestEqual(TEXT("free-for-all to the usual 20"), KillLimitFor(EMode::FreeForAll, TEXT("")), CheeseStrikeRules::KillLimit);
@@ -68,6 +75,9 @@ bool FTheModesAreNamedAndPicked::RunTest(const FString& Parameters)
 	TestEqual(TEXT("what free-for-all plays to"), Goal(EMode::FreeForAll, 20, 4), FString(TEXT("first to 20 kills")));
 	TestEqual(TEXT("what Deathmatch plays to"), Goal(EMode::Deathmatch, 50, 4), FString(TEXT("first team to 50 kills")));
 	TestEqual(TEXT("what Elimination plays to"), Goal(EMode::Elimination, 20, 4), FString(TEXT("first to win 4 rounds")));
+	TestEqual(TEXT("and Execution"), Goal(EMode::Execution, 20, 3), FString(TEXT("first to win 3 rounds")));
+	TestEqual(TEXT("what Gun Game plays to"), Goal(EMode::GunGame, 20, 4), FString::Printf(TEXT("first through all %d weapons"), CheeseStrikeArsenal::GunGameLadder().Num()));
+	TestEqual(TEXT("a mode without a kill limit of its own plays to the usual if asked"), KillLimitFor(EMode::GunGame, TEXT("")), CheeseStrikeRules::KillLimit);
 	TestTrue(TEXT("the teams' colours differ"), !TeamColour(0).Equals(TeamColour(1)));
 
 	// The match's state says which mode is on.
@@ -231,6 +241,51 @@ bool FTheWheelsFallAndBurst::RunTest(const FString& Parameters)
 	TestTrue(TEXT("faster as it goes: more of the way in its last quarter second than its first"), DropHeight - HeightBefore(Fall * 0.75f) < HeightBefore(Fall * 0.25f));
 	TestTrue(TEXT("the whistle gives time to move before the first lands"), StrikeWarning > Fall);
 	TestTrue(TEXT("the Overload's warning longer"), OverloadWarning >= 3.0f);
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FALastStandTakesTheKillingHit, "CheeseStrike.Rules.ALastStandTakesTheKillingHit", ModeTests::Flags)
+
+bool FALastStandTakesTheKillingHit::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeModes;
+	TestTrue(TEXT("without a last stand, a hit hurts"), LastStandHit(false, false, false, 10.0f, 50.0f, false) == ELastStandHit::Hurt);
+	TestTrue(TEXT("with one, a hit that doesn't kill hurts"), LastStandHit(true, false, false, 100.0f, 50.0f, false) == ELastStandHit::Hurt);
+	TestTrue(TEXT("a hit that would kill puts them down"), LastStandHit(true, false, false, 30.0f, 50.0f, false) == ELastStandHit::Down);
+	TestTrue(TEXT("just to nothing, too"), LastStandHit(true, false, false, 50.0f, 50.0f, false) == ELastStandHit::Down);
+	TestTrue(TEXT("but once a life: the second kills"), LastStandHit(true, false, true, 30.0f, 50.0f, false) == ELastStandHit::Hurt);
+	TestTrue(TEXT("down, nothing from afar harms them"), LastStandHit(true, true, true, 30.0f, 500.0f, false) == ELastStandHit::Absorbed);
+	TestTrue(TEXT("an enemy up close finishes them"), LastStandHit(true, true, true, 30.0f, 1.0f, true) == ELastStandHit::Finish);
+	TestTrue(TEXT("finishing is close: a couple of metres"), FinishRange > 100.0f && FinishRange <= 300.0f);
+
+	TestTrue(TEXT("Interact on a teammate down revives"), InteractWith(true, true, 100.0f) == EInteract::Revive);
+	TestTrue(TEXT("on an enemy down finishes"), InteractWith(true, false, 100.0f) == EInteract::Execute);
+	TestTrue(TEXT("on someone standing, nothing"), InteractWith(false, false, 100.0f) == EInteract::None);
+	TestTrue(TEXT("nor out of reach"), InteractWith(true, true, InteractRange + 1.0f) == EInteract::None);
+	TestTrue(TEXT("reviving takes longer than finishing"), InteractTime(EInteract::Revive) > InteractTime(EInteract::Execute) && InteractTime(EInteract::Execute) > 0.0f);
+	TestEqual(TEXT("nothing takes no time"), InteractTime(EInteract::None), 0.0f);
+	TestTrue(TEXT("revived with some health, not all"), ReviveHealth > 0.0f && ReviveHealth < 100.0f);
+	TestTrue(TEXT("left alone, they last a while"), LastStandTime >= 15.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGunGameClimbsTheLadder, "CheeseStrike.Rules.GunGameClimbsTheLadder", ModeTests::Flags)
+
+bool FGunGameClimbsTheLadder::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeModes;
+	const int32 Steps = CheeseStrikeArsenal::GunGameLadder().Num();
+	TestTrue(TEXT("the ladder has the knife last"), Steps > 2 && CheeseStrikeArsenal::GunGameLadder().Last() == CheeseStrikeArsenal::Knife());
+	const FGunGameKill First = GunGameKill(0, false, Steps);
+	TestTrue(TEXT("a kill moves the killer a step up"), First.KillerLevel == 1 && !First.bWins && !First.bVictimDemoted);
+	const FGunGameKill Knifed = GunGameKill(3, true, Steps);
+	TestTrue(TEXT("a kill with the knife before its step: up, and the killed down a step"), Knifed.KillerLevel == 4 && Knifed.bVictimDemoted && !Knifed.bWins);
+	TestTrue(TEXT("on the last step but one, up to the knife"), GunGameKill(Steps - 2, false, Steps).KillerLevel == Steps - 1);
+	TestTrue(TEXT("a kill on the last step wins"), GunGameKill(Steps - 1, true, Steps).bWins);
+	TestFalse(TEXT("and humiliates nobody"), GunGameKill(Steps - 1, true, Steps).bVictimDemoted);
+	TestTrue(TEXT("the knife is carried until it is the step"), GunGameKeepsKnife(0, Steps) && GunGameKeepsKnife(Steps - 2, Steps) && !GunGameKeepsKnife(Steps - 1, Steps));
+	TestTrue(TEXT("a streak's name is known"), CheeseStrikeStreaks::IsStreakName(TEXT("Cheese Strike")) && !CheeseStrikeStreaks::IsStreakName(TEXT("")));
 	return true;
 }
 

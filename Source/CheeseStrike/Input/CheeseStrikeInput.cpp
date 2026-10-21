@@ -81,6 +81,7 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Set->Scoreboard = MakeAction(Set, TEXT("IA_Scoreboard"), EInputActionValueType::Boolean);
 	Set->Menu = MakeAction(Set, TEXT("IA_Menu"), EInputActionValueType::Boolean);
 	Set->Streak = MakeAction(Set, TEXT("IA_Streak"), EInputActionValueType::Boolean);
+	Set->Interact = MakeAction(Set, TEXT("IA_Interact"), EInputActionValueType::Boolean);
 	UInputMappingContext* Context = NewObject<UInputMappingContext>(Set, TEXT("IMC_CheeseStrike"));
 	Set->Context = Context;
 
@@ -128,6 +129,8 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->Menu, EKeys::Gamepad_Special_Right);
 	// Kill streaks.
 	Map(Context, Set->Streak, EKeys::Four);
+	// Interacting.
+	Map(Context, Set->Interact, EKeys::E);
 	return Set;
 }
 

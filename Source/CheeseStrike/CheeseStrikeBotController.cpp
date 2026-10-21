@@ -11,6 +11,7 @@
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
+#include "Modes/CheeseStrikeLastStand.h"
 #include "HAL/IConsoleManager.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeInventory.h"
@@ -283,9 +284,69 @@ void ACheeseStrikeBotController::ThinkAboutStreaks()
 	}
 }
 
+bool ACheeseStrikeBotController::ThinkAboutTheDown()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	UCheeseStrikeLastStand* Mine = Me != nullptr ? Me->GetLastStand() : nullptr;
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const auto LetGo = [this, Mine]()
+	{
+		if (bInteracting && Mine != nullptr)
+		{
+			Mine->SetInteracting(false);
+		}
+		bInteracting = false;
+	};
+	if (Mine == nullptr || Match == nullptr || !Match->GetModeInfo().bLastStand || Me->IsDowned() || bSeesTarget)
+	{
+		LetGo();
+		return false;
+	}
+	// In reach of someone down: hold Interact over them, still, looking at them.
+	CheeseStrikeModes::EInteract Kind = CheeseStrikeModes::EInteract::None;
+	if (const ACheeseStrikeCharacter* Over = Mine->InteractTarget(Kind))
+	{
+		if (bGoing)
+		{
+			StopMovement();
+			bGoing = false;
+		}
+		Wanted = (Over->GetActorLocation() - EyesAt()).Rotation();
+		if (!bInteracting)
+		{
+			Mine->SetInteracting(true);
+			bInteracting = true;
+		}
+		return true;
+	}
+	LetGo();
+	// Someone down not far off, a teammate to revive or an enemy to finish: go to them.
+	const ACheeseStrikeCharacter* Nearest = nullptr;
+	float NearestAt = TendRange;
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		const float Distance = FVector::Dist(It->GetActorLocation(), Me->GetActorLocation());
+		if (*It != Me && It->IsAlive() && It->IsDowned() && Distance < NearestAt)
+		{
+			Nearest = *It;
+			NearestAt = Distance;
+		}
+	}
+	if (Nearest == nullptr)
+	{
+		return false;
+	}
+	if (!bGoing || FVector::Dist(Goal, Nearest->GetActorLocation()) > 100.0f)
+	{
+		GoTo(Nearest->GetActorLocation(), false);
+	}
+	return true;
+}
+
 void ACheeseStrikeBotController::Think()
 {
 	Perceive();
+	bTending = ThinkAboutTheDown();
 	ChooseWhereToGo();
 	ChooseWeapon();
 	ThinkAboutStreaks();
@@ -338,6 +399,11 @@ void ACheeseStrikeBotController::Perceive()
 		}
 		const FVector ToOther = Other->GetEyes()->GetComponentLocation() - Eyes;
 		const float Distance = ToOther.Size();
+		// Someone down can be harmed only up close: no use shooting them from further (ThinkAboutTheDown goes to them).
+		if (Other->IsDowned() && Distance > CheeseStrikeModes::FinishRange)
+		{
+			continue;
+		}
 		// A shot nearby is heard, whoever fired it.
 		const ACheeseStrikeWeapon* TheirWeapon = Other->GetWeapon();
 		if (TheirWeapon != nullptr && (TheirWeapon->IsFiring() || TheirWeapon->SinceShot() < 0.5f) && Distance < HeardAt)
@@ -501,6 +567,11 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 			}
 			break;
 		}
+		return;
+	}
+	// Tending someone down (ThinkAboutTheDown): its feet are taken care of.
+	if (bTending)
+	{
 		return;
 	}
 	bRetreating = bRetreating && bGoing;

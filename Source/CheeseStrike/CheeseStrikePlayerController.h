@@ -88,6 +88,9 @@ public:
 	void SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map = INDEX_NONE);
 	/** The host sets how well the bots play, and how many there are (-1 for every empty seat), from the lobby. */
 	void SetBotSkillFromMenu(int32 Skill);
+	/** The host picks the mode (CheeseStrikeModes::Modes), and the rounds to win in a mode of rounds, from the lobby. */
+	void SetModeFromMenu(int32 ModeIndex);
+	void SetRoundsFromMenu(int32 Rounds);
 	void SetBotsFromMenu(int32 Wanted);
 	/** Looks for matches, through the service or the local network without Steam. */
 	void FindFromMenu();

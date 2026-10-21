@@ -13,7 +13,9 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
+#include "Modes/CheeseStrikeLastStand.h"
 #include "Modes/CheeseStrikeWatchCamera.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
@@ -204,6 +206,88 @@ namespace
 		Hud->DrawText(FString::Printf(TEXT("UNMANNED AERIAL CHEESE  %.0f"), FMath::CeilToFloat(Until - Now)), ModeHudYellow, ModeHudMargin, Canvas->SizeY * 0.3f, GEngine->GetMediumFont(), 1.1f);
 	}
 
+	/** A bar `Done` (0 to 1) full, its middle at `X`. */
+	void ModeHudBar(AHUD* Hud, float X, float Y, float Width, float Done, const FLinearColor& Colour)
+	{
+		Hud->DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.5f), X - Width / 2.0f, Y, Width, 8.0f);
+		Hud->DrawRect(Colour, X - Width / 2.0f, Y, Width * FMath::Clamp(Done, 0.0f, 1.0f), 8.0f);
+	}
+
+	/** Execution: down, the time left and who comes; standing, the prompt over someone down, and the work under way. */
+	void ModeHudDrawLastStand(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine, const ACheeseStrikeCharacter* Own)
+	{
+		const UCheeseStrikeLastStand* Stand = Own->GetLastStand();
+		if (Stand == nullptr || !Match->GetModeInfo().bLastStand)
+		{
+			return;
+		}
+		UFont* Font = GEngine->GetMediumFont();
+		const float Middle = Canvas->SizeX / 2.0f;
+		const float Y = Canvas->SizeY * 0.66f;
+		// Teammates down, wherever they are: a cross over them, for finding them.
+		for (TActorIterator<ACheeseStrikeCharacter> It(Hud->GetWorld()); It; ++It)
+		{
+			FVector2D At;
+			if (*It != Own && It->IsAlive() && It->IsDowned() && Match->AreTeammates(Mine, It->GetPlayerState()) && ModeHudOnScreen(Hud, It->GetActorLocation() + FVector(0.0f, 0.0f, 110.0f), At))
+			{
+				const FLinearColor Colour = CheeseStrikeModes::TeamColour(Mine->GetTeam());
+				Hud->DrawLine(At.X - 8.0f, At.Y, At.X + 8.0f, At.Y, Colour, 4.0f);
+				Hud->DrawLine(At.X, At.Y - 8.0f, At.X, At.Y + 8.0f, Colour, 4.0f);
+				ModeHudCentred(Hud, TEXT("DOWN"), At.X, At.Y - 30.0f, GEngine->GetSmallFont(), 1.0f, Colour);
+			}
+		}
+		if (Stand->IsDowned())
+		{
+			ModeHudCentred(Hud, FString::Printf(TEXT("DOWN  ·  BLEEDING OUT IN %.0f"), FMath::CeilToFloat(Stand->SecondsToBleedOut())), Middle, Y, Font, 1.5f, ModeHudRed);
+			const ACheeseStrikeCharacter* By = Stand->WorkedOnBy();
+			const UCheeseStrikeLastStand* Theirs = By != nullptr ? By->GetLastStand() : nullptr;
+			if (Theirs != nullptr && Theirs->GetWork() == CheeseStrikeModes::EInteract::Revive)
+			{
+				ModeHudCentred(Hud, FString::Printf(TEXT("%s is reviving you"), *By->DisplayName()), Middle, Y + 32.0f, Font, 1.1f, ModeHudWhite);
+				ModeHudBar(Hud, Middle, Y + 58.0f, 240.0f, Theirs->WorkDone(), CheeseStrikeModes::TeamColour(Mine->GetTeam()));
+			}
+			else if (Theirs != nullptr)
+			{
+				ModeHudCentred(Hud, FString::Printf(TEXT("%s is finishing you"), *By->DisplayName()), Middle, Y + 32.0f, Font, 1.1f, ModeHudRed);
+				ModeHudBar(Hud, Middle, Y + 58.0f, 240.0f, Theirs->WorkDone(), ModeHudRed);
+			}
+			else
+			{
+				ModeHudCentred(Hud, TEXT("only your pistol  ·  a teammate can revive you  ·  an enemy up close can finish you"), Middle, Y + 32.0f, Font, 1.0f, ModeHudFaint);
+			}
+			return;
+		}
+		if (const ACheeseStrikeCharacter* Working = Stand->GetWorkingOn())
+		{
+			const bool bRevive = Stand->GetWork() == CheeseStrikeModes::EInteract::Revive;
+			ModeHudCentred(Hud, FString::Printf(TEXT("%s %s"), bRevive ? TEXT("REVIVING") : TEXT("FINISHING"), *Working->DisplayName().ToUpper()), Middle, Y, Font, 1.3f, bRevive ? CheeseStrikeModes::TeamColour(Mine->GetTeam()) : ModeHudRed);
+			ModeHudBar(Hud, Middle, Y + 30.0f, 240.0f, Stand->WorkDone(), bRevive ? CheeseStrikeModes::TeamColour(Mine->GetTeam()) : ModeHudRed);
+			return;
+		}
+		CheeseStrikeModes::EInteract Kind = CheeseStrikeModes::EInteract::None;
+		if (const ACheeseStrikeCharacter* Near = Stand->InteractTarget(Kind))
+		{
+			const bool bRevive = Kind == CheeseStrikeModes::EInteract::Revive;
+			ModeHudCentred(Hud, FString::Printf(TEXT("HOLD E  ·  %s %s"), bRevive ? TEXT("REVIVE") : TEXT("FINISH"), *Near->DisplayName().ToUpper()), Middle, Y, Font, 1.3f, bRevive ? CheeseStrikeModes::TeamColour(Mine->GetTeam()) : ModeHudRed);
+		}
+	}
+
+	/** Gun Game: the step the player is on, and what comes next. */
+	void ModeHudDrawGunGame(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
+	{
+		if (Match->GetModeInfo().WinBy != CheeseStrikeModes::EWinBy::Ladder)
+		{
+			return;
+		}
+		const int32 Steps = CheeseStrikeArsenal::GunGameLadder().Num();
+		const int32 Level = Mine->GetGunLevel();
+		const FString Line = Level + 1 < Steps
+			? FString::Printf(TEXT("GUN GAME  ·  %d OF %d  ·  %s  ·  next: %s"), Level + 1, Steps, *ACheeseStrikeGameState::GunGameWeaponName(Level).ToUpper(), *ACheeseStrikeGameState::GunGameWeaponName(Level + 1))
+			: FString::Printf(TEXT("GUN GAME  ·  %d OF %d  ·  %s  ·  one kill to win"), Level + 1, Steps, *ACheeseStrikeGameState::GunGameWeaponName(Level).ToUpper());
+		// Over the HUD's score summary at the bottom, where the streaks go in other modes.
+		ModeHudCentred(Hud, Line, Canvas->SizeX / 2.0f, Canvas->SizeY - ModeHudMargin - 72.0f * Canvas->SizeY / 1080.0f - 48.0f, GEngine->GetMediumFont(), 1.1f, ModeHudYellow);
+	}
+
 	void ModeHudDrawOut(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
 	{
 		UFont* Font = GEngine->GetMediumFont();
@@ -257,6 +341,8 @@ namespace CheeseStrikeModeHUD
 		{
 			ModeHudDrawReveal(Hud, Canvas, Match, Mine);
 			ModeHudDrawStreaks(Hud, Canvas, Match, Mine);
+			ModeHudDrawLastStand(Hud, Canvas, Match, Mine, Own);
+			ModeHudDrawGunGame(Hud, Canvas, Match, Mine);
 		}
 	}
 }

@@ -1,0 +1,13 @@
+# Execution, the joiner: once the match is on, goes down (the console kill is
+# a lethal hit) and sees the host come and finish them. With
+# execution_server.txt.
+wait 13
+cmd CheeseStrikeDie
+wait 1.5
+shot exec_c1_down
+wait 3
+shot exec_c2_finishing
+wait 4
+shot exec_c3_out
+wait 4
+quit

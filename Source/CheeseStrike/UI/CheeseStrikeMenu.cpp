@@ -21,6 +21,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSpacer.h"
+#include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
@@ -28,6 +29,7 @@
 #include "GameFramework/GameMode.h"
 #include "CheeseStrikePlayerController.h"
 #include "Rules/CheeseStrikeBots.h"
+#include "Rules/CheeseStrikeModes.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "UI/CheeseStrikeCredits.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -626,14 +628,25 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSeatColumns(bool bTeams)
 		}
 		return Columns;
 	}
-	// Everyone for themself: one column of every seat, the players then the bots, in one colour.
+	// Everyone for themself: every seat in one colour, with no side's name, the players then the bots; laid out in columns of
+	// a side's height, so that the seats are the size they are in a team match.
 	TArray<CheeseStrikeRules::FRosterEntry> Everyone;
 	for (int32 Team = 0; Team < CheeseStrikeRules::Teams && Match != nullptr; ++Team)
 	{
 		Everyone.Append(Match->TeamColumn(Team));
 	}
 	Everyone.StableSort([](const CheeseStrikeRules::FRosterEntry& A, const CheeseStrikeRules::FRosterEntry& B) { return !A.bBot && B.bBot; });
-	Columns->AddSlot().FillWidth(1.0f) [ MakeSeatColumn(TEXT("Players"), CheeseStrikeMenu::TeamColour(INDEX_NONE), CheeseStrikeRules::WithEmptySeats(Everyone, CheeseStrikeRules::SeatCount, INDEX_NONE)) ];
+	const TArray<CheeseStrikeRules::FRosterEntry> Seats = CheeseStrikeRules::WithEmptySeats(Everyone, CheeseStrikeRules::SeatCount, INDEX_NONE);
+	const int32 PerColumn = FMath::DivideAndRoundUp(Seats.Num(), CheeseStrikeMenu::FreeForAllColumns);
+	for (int32 Column = 0; Column < CheeseStrikeMenu::FreeForAllColumns; ++Column)
+	{
+		TArray<CheeseStrikeRules::FRosterEntry> Part;
+		for (int32 Index = Column * PerColumn; Index < FMath::Min(Seats.Num(), (Column + 1) * PerColumn); ++Index)
+		{
+			Part.Add(Seats[Index]);
+		}
+		Columns->AddSlot().FillWidth(1.0f).Padding(FMargin(Column > 0 ? 24.0f : 0.0f, 0.0f, 0.0f, 0.0f)) [ MakeSeatColumn(Column == 0 ? FString(TEXT("Everyone for themself")) : FString(), CheeseStrikeMenu::TeamColour(INDEX_NONE), Part) ];
+	}
 	return Columns;
 }
 
@@ -695,6 +708,34 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	const ACheeseStrikeGameState* Match = Player.IsValid() && Player->GetWorld() != nullptr ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
 	const bool bHost = Player.IsValid() && Player->HasAuthority();
 	const int32 KillLimit = Match != nullptr ? Match->GetKillLimit() : CheeseStrikeRules::KillLimit;
+	const CheeseStrikeModes::EMode ModeNow = Match != nullptr ? Match->GetMode() : CheeseStrikeModes::EMode::FreeForAll;
+	const CheeseStrikeModes::FModeInfo& ModeRules = CheeseStrikeModes::Info(ModeNow);
+	TSharedRef<SWrapBox> ModeButtons = SNew(SWrapBox).UseAllottedSize(true).InnerSlotPadding(FVector2D(6.0f, 6.0f));
+	for (int32 Index = 0; Index < CheeseStrikeModes::NumModes; ++Index)
+	{
+		ModeButtons->AddSlot()
+		[
+			SNew(SButton)
+			.ButtonStyle(&ButtonStyle(CheeseStrikeModes::Modes[Index].Mode == ModeNow ? EButtonKind::Primary : EButtonKind::Plain))
+			.IsEnabled(bHost)
+			.ContentPadding(FMargin(12.0f, 6.0f))
+			.OnClicked_Lambda([Player, Index]() { if (Player.IsValid()) Player->SetModeFromMenu(Index); return FReply::Handled(); })
+			[
+				SNew(STextBlock).Text(FText::FromString(FString(CheeseStrikeModes::Modes[Index].Name).ToUpper())).Font(Font(15, FName("Bold")))
+			]
+		];
+	}
+	const int32 Rounds = Match != nullptr ? Match->GetRoundLimit() : CheeseStrikeModes::RoundLimit;
+	TArray<FString> RoundNames;
+	int32 RoundsChosen = INDEX_NONE;
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeModes::RoundLimitChoices); ++Index)
+	{
+		RoundNames.Add(FString::FromInt(CheeseStrikeModes::RoundLimitChoices[Index]));
+		if (CheeseStrikeModes::RoundLimitChoices[Index] == Rounds)
+		{
+			RoundsChosen = Index;
+		}
+	}
 	const float RespawnDelay = Match != nullptr ? Match->GetRespawnDelay() : CheeseStrikeRules::RespawnDelay;
 	TArray<FString> Limits;
 	int32 LimitChosen = 0;
@@ -738,12 +779,28 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	const int32 Wanted = Match != nullptr ? Match->GetBotsWanted() : CheeseStrikeRules::DefaultBots;
 	const int32 Bots = CheeseStrikeRules::BotsIn(Players, Wanted);
 	const FString BotsText = Bots > 0 && Bots >= Most ? FString::Printf(TEXT("%d (every seat)"), Bots) : FString::FromInt(Bots);
+	// What the mode plays to: kills for one or for a side, rounds, or (Gun Game) the ladder alone; the wait to come back where there is one.
+	TSharedRef<SVerticalBox> ModeRows = SNew(SVerticalBox);
+	if (ModeRules.WinBy == CheeseStrikeModes::EWinBy::PlayerKills || ModeRules.WinBy == CheeseStrikeModes::EWinBy::TeamKills)
+	{
+		ModeRows->AddSlot().AutoHeight() [ MakeChoices(ModeRules.WinBy == CheeseStrikeModes::EWinBy::TeamKills ? TEXT("First team to how many kills") : TEXT("First to how many kills"), Limits, LimitChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeRules::KillLimitChoices[Index], RespawnDelay); }) ];
+	}
+	else if (ModeRules.WinBy == CheeseStrikeModes::EWinBy::Rounds)
+	{
+		ModeRows->AddSlot().AutoHeight() [ MakeChoices(TEXT("First to win how many rounds"), RoundNames, RoundsChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetRoundsFromMenu(CheeseStrikeModes::RoundLimitChoices[Index]); }) ];
+	}
+	if (ModeRules.bRespawns)
+	{
+		ModeRows->AddSlot().AutoHeight() [ MakeChoices(TEXT("Back how long after a death"), Delays, DelayChosen, bHost, [Player, KillLimit](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, CheeseStrikeRules::RespawnDelayChoices[Index]); }) ];
+	}
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOBBY")) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 8.0f)) [ MakeMapPicture(MapChosen) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Map"), MapNames, MapChosen, bHost, [Player, KillLimit, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, RespawnDelay, Index); }) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Free-for-all, first to how many kills"), Limits, LimitChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeRules::KillLimitChoices[Index], RespawnDelay); }) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Back how long after a death"), Delays, DelayChosen, bHost, [Player, KillLimit](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, CheeseStrikeRules::RespawnDelayChoices[Index]); }) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("Mode"), true) ]
+		+ SVerticalBox::Slot().AutoHeight() [ ModeButtons ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 6.0f, 0.0f, 0.0f)) [ MakeLine(ModeRules.Summary, false) ]
+		+ SVerticalBox::Slot().AutoHeight() [ ModeRows ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeStepper(TEXT("Bots"), BotsText, bHost,
 			[Player, Bots]() { if (Player.IsValid()) Player->SetBotsFromMenu(FMath::Max(0, Bots - 1)); },
 			[Player, Bots, Most]() { if (Player.IsValid()) Player->SetBotsFromMenu(FMath::Min(Bots + 1, Most)); }) ]
@@ -759,8 +816,8 @@ FString SCheeseStrikeMenu::LobbyKey() const
 	{
 		return FString::Printf(TEXT("status %d"), static_cast<int32>(Status));
 	}
-	FString Key = FString::Printf(TEXT("%d %.1f %d %d %d %d %d %s|"), Match->GetKillLimit(), Match->GetRespawnDelay(), Match->GetMapIndex(), Match->GetBotSkill(), Match->GetBotsWanted(),
-		static_cast<int32>(Status), Controller->HasAuthority() ? 1 : 0, *Match->GetHostName());
+	FString Key = FString::Printf(TEXT("%d %.1f %d %d %d %d %d %s %d %d|"), Match->GetKillLimit(), Match->GetRespawnDelay(), Match->GetMapIndex(), Match->GetBotSkill(), Match->GetBotsWanted(),
+		static_cast<int32>(Status), Controller->HasAuthority() ? 1 : 0, *Match->GetHostName(), static_cast<int32>(Match->GetMode()), Match->GetRoundLimit());
 	for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
 	{
 		for (const CheeseStrikeRules::FRosterEntry& Entry : Match->TeamColumn(Team))
@@ -899,8 +956,9 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeLine(TEXT("Waiting for the host to start."), true) ];
 	}
 
-	// Sides of a team match. A free-for-all (the modes to come) would show one column of every seat: MakeSeatColumns(false).
-	const bool bTeams = true;
+	// Sides of a team match; everyone in one colour, with no sides, in a free-for-all.
+	const ACheeseStrikeGameState* Shown = Controller.IsValid() && Controller->GetWorld() != nullptr ? Controller->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const bool bTeams = Shown == nullptr || Shown->HasTeams();
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().FillHeight(1.0f)
 		[
