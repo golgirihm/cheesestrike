@@ -34,13 +34,15 @@ param(
   [switch]$Steam,
   [switch]$Lobby,
   [switch]$Bots,
+  [switch]$Mice,
   [int]$TimeoutSeconds = 180,
   [string]$Res = "960x540"
 )
 # The match starts at once (?StartNow), so that a script finds a character
 # to drive; with -Lobby it waits in the lobby instead, as a hosted match
 # does, for a script to start it (cmd CheeseStrikeStart). No bots fill in
-# (?Bots=0) unless -Bots, so that the players are the only characters.
+# (?Bots=0) unless -Bots, so that the players are the only characters; and no
+# mice come (?Mice=0) unless -Mice (with -Extra "?MiceAt=5" to bring them early).
 # Without -Steam the game runs on the Null online service, so that a run on
 # this PC neither needs the Steam client nor shows up as a match on it; with
 # it, the Steam client must be running, and the scripts can host, find and
@@ -67,6 +69,7 @@ $pair = $ClientScript -ne ""
 $serverExtra = if ($pair -and $Extra -eq "") { "?listen" } else { $Extra }
 if (-not $Lobby) { $serverExtra = "${serverExtra}?StartNow" }
 if (-not $Bots) { $serverExtra = "${serverExtra}?Bots=0" }
+if (-not $Mice) { $serverExtra = "${serverExtra}?Mice=0" }
 $game = Launch "${Map}${serverExtra}?Nick=${Name}" $Script $Tag $StartAt 0
 $client = $null
 if ($pair) {

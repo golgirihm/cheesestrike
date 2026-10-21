@@ -16,6 +16,9 @@
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "Map/CheeseStrikeCheese.h"
+#include "Map/CheeseStrikeMouse.h"
+#include "NavigationSystem.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Variant_Shooter/AI/ShooterNPC.h"
 #include "Variant_Shooter/AI/ShooterNPCSpawner.h"
@@ -42,6 +45,8 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	MapIndex = CheeseStrikeRules::MapFrom(Options, CurrentMapIndex());
 	BotSeed = CheeseStrikeRules::BotSeedFrom(Options, FMath::Rand());
 	BotSkill = CheeseStrikeBots::SkillFrom(Options);
+	bMice = CheeseStrikeMice::HasMice(Options);
+	MiceAfter = CheeseStrikeMice::ArrivalFrom(Options);
 	// A match the lobby started on another map begins when everyone has come over (ReadyToStartMatch).
 	PlayersExpected = CheeseStrikeRules::PlayersFrom(Options);
 	if (PlayersExpected > 0)
@@ -274,6 +279,75 @@ void ACheeseStrikeGameMode::HandleMatchHasStarted()
 		State->SetCountdownEndsAt(0.0f);
 	}
 	SpawnBots();
+	// The mice come a minute in, when there is cheese for them.
+	int32 Blocks = 0;
+	for (TActorIterator<ACheeseStrikeCheese> It(GetWorld()); It; ++It)
+	{
+		++Blocks;
+	}
+	if (bMice && CheeseStrikeMice::MiceFor(Blocks) > 0)
+	{
+		if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+		{
+			State->SetMiceAt(State->GetServerWorldTimeSeconds() + MiceAfter);
+		}
+		GetWorldTimerManager().SetTimer(MiceTimer, this, &ACheeseStrikeGameMode::SpawnMice, FMath::Max(0.01f, MiceAfter), false);
+	}
+}
+
+void ACheeseStrikeGameMode::SpawnMice()
+{
+	UWorld* World = GetWorld();
+	if (World == nullptr || !IsMatchInProgress())
+	{
+		return;
+	}
+	int32 Blocks = 0;
+	for (TActorIterator<ACheeseStrikeCheese> It(World); It; ++It)
+	{
+		++Blocks;
+	}
+	const int32 Count = CheeseStrikeMice::MiceFor(Blocks);
+	// Where they come in: the map's MouseEntry points (on top of its edge, facing in), shuffled.
+	TArray<AActor*> Entries;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->ActorHasTag(FName(TEXT("MouseEntry"))))
+		{
+			Entries.Add(*It);
+		}
+	}
+	if (Entries.Num() == 0)
+	{
+		UE_LOG(LogCheeseStrike, Warning, TEXT("No MouseEntry points on this map: no mice"));
+		return;
+	}
+	for (int32 Index = Entries.Num() - 1; Index > 0; --Index)
+	{
+		Entries.Swap(Index, FMath::RandHelper(Index + 1));
+	}
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	int32 Came = 0;
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		const AActor* Entry = Entries[Index % Entries.Num()];
+		const FVector Top = Entry->GetActorLocation();
+		// Down to the ground some way in from the edge.
+		FNavLocation Ground;
+		const FVector Inside = Top + Entry->GetActorForwardVector() * (500.0f + 150.0f * (Index / Entries.Num()));
+		if (Navigation == nullptr || !Navigation->ProjectPointToNavigation(Inside, Ground, FVector(300.0f, 300.0f, 2000.0f)))
+		{
+			continue;
+		}
+		FActorSpawnParameters Parameters;
+		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		if (ACheeseStrikeMouse* Mouse = World->SpawnActor<ACheeseStrikeMouse>(ACheeseStrikeMouse::StaticClass(), FTransform(Top), Parameters))
+		{
+			Mouse->Enter(Top, Ground.Location);
+			++Came;
+		}
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("The mice are here: %d for %d blocks of cheese"), Came, Blocks);
 }
 
 void ACheeseStrikeGameMode::HandleMatchHasEnded()

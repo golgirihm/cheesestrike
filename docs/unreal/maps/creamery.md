@@ -24,6 +24,8 @@ West is The Gouda Guys' side, east the Mozza Radicals'; the map is mirrored acro
 
 Free-for-all has fourteen more starts (tagged "Free"), seven a side through the lanes: the plaza, the yard twice, the hall north and south of its middle aisle, the walkway by the canal, and Tank Row. In free-for-all everyone is an enemy and comes back at the start furthest from them all, so without these a match would begin and come back in a crowd on the docks; with them the bots spread through every lane (`CheeseStrike.Play.BotsPlayTheCreamery`).
 
+The mice come over the outer wall at eight points (`MouseEntry`, in the level's `Mice` folder): three along the north wall over the yard (not where the Wheel Stack meets it), three along the south over Tank Row, and one at each end beside the docks. Eight come for the map's 692 blocks. They take the dock walls and the plazas' pallets first, the nearest cheese low down, then the bottom of the Wheel Stack and the cheese bridge, then the hall's racks, its seals and the rest; what rested on an eaten block falls, so the Wheel Stack comes down from the bottom.
+
 The bots walk a navigation mesh built when the level starts, in the bounds of its `Navigation` volume, and rebuilt where it changes, as it will when the mice eat cheese.
 
 Beyond the outer wall, for a skyline and nothing else: two cold stores, a chimney, a battery of tall silos, offices.

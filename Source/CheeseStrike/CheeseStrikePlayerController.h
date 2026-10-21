@@ -77,6 +77,9 @@ public:
 	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */
 	UFUNCTION(Exec)
 	void CheeseStrikeBots();
+	/** Logs every mouse's state, and how much cheese is left (the host's world only). */
+	UFUNCTION(Exec)
+	void CheeseStrikeMice();
 	UFUNCTION(Exec)
 	void CheeseStrikeHost(const FString& Options = TEXT(""));
 	UFUNCTION(Exec)

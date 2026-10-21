@@ -584,6 +584,21 @@ def free_starts():
             start(f"Start_Free_{side}_{name}", s * x, y, 0, 0 if s < 0 else 180, "Free")
 
 
+# ---------------------------------------------------------------- where the mice come in
+
+def mouse_entries():
+    """Where the mice come over the edge (ACheeseStrikeGameMode::SpawnMice): points on top of the outer wall, each facing in.
+    Three along the north wall (the yard) and the south (Tank Row), one at each end beside the docks; none over the Wheel Stack."""
+    for x in (-3500, 1500, 3500):  # not 0 on the north: the Wheel Stack meets the wall there
+        for y, yaw in ((HALF_Y + 50, -90), (-HALF_Y - 50, 90)):
+            entry = place(unreal.TargetPoint, f"MouseEntry_{x}_{y}", "Mice", (x, y, 1000), (0, yaw, 0))
+            entry.set_editor_property("tags", ["MouseEntry"])
+    for x, yaw in ((-HALF_X - 50, 0), (HALF_X + 50, 180)):
+        entry = place(unreal.TargetPoint, f"MouseEntry_{x}", "Mice", (x, -3000 if x < 0 else 3000, 1000), (0, yaw, 0))
+        entry.set_editor_property("tags", ["MouseEntry"])
+    counts["mouse entries"] = 8
+
+
 # ---------------------------------------------------------------- where the bots can walk
 
 def navigation():
@@ -658,6 +673,7 @@ try:
     details()
     dressing()
     free_starts()
+    mouse_entries()
     navigation()
     sky()
     lines.append("saved " + str(levels.save_current_level()))

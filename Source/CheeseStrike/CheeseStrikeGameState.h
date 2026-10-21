@@ -66,6 +66,10 @@ public:
 	int32 GetMapIndex() const { return MapIndex; }
 	void SetMapIndex(int32 Index) { MapIndex = Index; }
 
+	/** The server's time the mice come (0 for none), for the countdown. */
+	float GetMiceAt() const { return MiceAt; }
+	void SetMiceAt(float At) { MiceAt = At; }
+
 	/** The server's time everyone goes back to the lobby after the results; 0 before the match is over. */
 	float GetLobbyAt() const { return LobbyAt; }
 	void SetLobbyAt(float At) { LobbyAt = At; }
@@ -112,4 +116,6 @@ protected:
 	int32 BotSkill = 1;
 	UPROPERTY(Replicated)
 	float LobbyAt = 0.0f;
+	UPROPERTY(Replicated)
+	float MiceAt = 0.0f;
 };

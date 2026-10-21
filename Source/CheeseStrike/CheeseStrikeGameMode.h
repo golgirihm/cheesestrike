@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
 #include "Rules/CheeseStrikeBots.h"
+#include "Rules/CheeseStrikeMice.h"
 #include "CheeseStrikeGameMode.generated.h"
 
 class ACheeseStrikeCharacter;
@@ -89,6 +90,8 @@ protected:
 	void Respawn(TWeakObjectPtr<AController> Who);
 	/** Fills the empty slots with bots, by the roster the lobby showed. */
 	void SpawnBots();
+	/** The mice come over the edge of the map: one for every so many blocks of cheese, at its MouseEntry points (CheeseStrikeMice). */
+	void SpawnMice();
 	/** The countdown is over: the match starts here, or travels to the map the host picked and starts there. */
 	void CountdownOver();
 	/** The URL options that carry this match's rules to its next level. */
@@ -102,6 +105,10 @@ protected:
 	int32 MapIndex = INDEX_NONE;
 	int32 BotSeed = 0;
 	int32 BotSkill = CheeseStrikeBots::DefaultSkill;
+	/** Whether this match has mice (`?Mice=0` for none), and how long into it they come (`?MiceAt=`). */
+	bool bMice = true;
+	float MiceAfter = 60.0f;
+	FTimerHandle MiceTimer;
 	/** How many players a match started by the lobby on another map waits for; 0 for a match not started that way. */
 	int32 PlayersExpected = 0;
 	FTimerHandle CountdownTimer;

@@ -9,7 +9,9 @@ import unreal, traceback
 # (one in most 42 cm cells); a pixel of the surface inside one follows the
 # view ray to the sphere's far wall and draws that wall: its normal (the
 # cavity's, facing its middle), shading darker with depth. The wall moves
-# with the view as a real hollow's does. (A pixel depth offset to the wall
+# with the view as a real hollow's does. As the mice eat a block (its stage,
+# 0 to 3, in its mesh's custom primitive data 0; ACheeseStrikeCheese), its
+# holes grow and more open. (A pixel depth offset to the wall
 # would make the sun's shadows treat the flat surface as a lid over every
 # hole and black some of them out, so the depth buffer keeps the surface.)
 OUT = unreal.Paths.project_saved_dir() + "cheese_material.txt"
@@ -35,8 +37,9 @@ for (int x = -1; x <= 1; x++)
         {
             float3 cell = c + float3(x, y, z);
             float3 h = frac(sin(float3(dot(cell, float3(127.1, 311.7, 74.7)), dot(cell, float3(269.5, 183.3, 246.1)), dot(cell, float3(113.5, 271.9, 124.6)))) * 43758.5453);
-            float keep = step(0.12, frac(h.x * 7.31 + h.y * 3.17 + h.z * 1.93));
-            float r = lerp(0.16, 0.46, h.z);
+            // Eaten (0 to 3), the holes grow and more of them open.
+            float keep = step(0.12 - 0.035 * Eaten, frac(h.x * 7.31 + h.y * 3.17 + h.z * 1.93));
+            float r = lerp(0.16, 0.46, h.z) * (1.0 + 0.3 * Eaten);
             float3 at = cell + 0.2 + 0.6 * h;
             float dist = length(p - at) - r;
             if (keep > 0.5 && dist < best)
@@ -100,7 +103,7 @@ try:
     camera = node(unreal.MaterialExpressionCameraPositionWS, -1500, 100)
     normal = node(unreal.MaterialExpressionVertexNormalWS, -1500, 200)
     holes = node(unreal.MaterialExpressionCustom, -1200, 0, code=CODE, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, description="Carved cheese holes")
-    holes.set_editor_property("inputs", [custom_input("Pos"), custom_input("Cam"), custom_input("Normal"), custom_input("Holes")])
+    holes.set_editor_property("inputs", [custom_input("Pos"), custom_input("Cam"), custom_input("Normal"), custom_input("Holes"), custom_input("Eaten")])
     holes.set_editor_property("additional_outputs", [
         custom_output("InnerNormal", unreal.CustomMaterialOutputType.CMOT_FLOAT3),
         custom_output("Shade", unreal.CustomMaterialOutputType.CMOT_FLOAT1),
@@ -112,6 +115,8 @@ try:
     # Thin pieces (a slab on the floor) have none: carving them would look like holes in paper (MI_CheeseThin).
     holes_on = node(unreal.MaterialExpressionScalarParameter, -1500, 300, parameter_name="Holes", default_value=1.0)
     link(holes_on, holes, "Holes")
+    eaten = node(unreal.MaterialExpressionCustomPrimitiveData, -1500, 400, primitive_data_index=0)
+    link(eaten, holes, "Eaten")
 
     mottle = node(unreal.MaterialExpressionNoise, -1000, 400, scale=0.003, levels=3, output_min=0.0, output_max=1.0, quality=1)
     pale = node(unreal.MaterialExpressionConstant3Vector, -800, 360, constant=unreal.LinearColor(0.93, 0.68, 0.20, 1.0))

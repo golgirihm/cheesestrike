@@ -122,6 +122,7 @@ for colour, rgb in COLOURS.items():
 PROPS = ["Pallet", "TarpedCrate", "Barrel", "PlasticDrum", "PlasticCrate", "CardboardBoxes", "FluorescentLamp",
          "MetalCabinet", "Workbench", "HandTruck", "GasTank", "TrashCan", "ConcreteBarrier"]
 CONTAINER = "/Game/Fab/SousinhoGames/ShippingContainer"
+RAT = "/Game/Fab/Nestaeric/BlackRat"
 CONTAINER_COLOURS = ("Blue", "Red", "Teal", "Yellow", "Cream")
 # Decals: name -> whether it has a normal (else it only stains).
 DECALS = {"OilStain": True, "Leakage": False, "AsphaltCrack": True, "PaintedOne": True, "PaintedTwo": True, "PaintedThree": True}
@@ -230,9 +231,14 @@ def recolour(node, link, colour_in, x, y):
     return tinted
 
 
-def prop():
-    m = material("M_Prop")
-    m.set_editor_property("used_with_nanite", True)
+def prop(name="M_Prop", masked=False):
+    """A model's own textures; `masked` for cut-out cards (fur, leaves), two-sided, cut by the base colour's alpha."""
+    m = material(name)
+    m.set_editor_property("used_with_nanite", not masked)
+    m.set_editor_property("used_with_skeletal_mesh", True)
+    if masked:
+        m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+        m.set_editor_property("two_sided", True)
     node, link = builder(m)
     samples = {}
     for i, kind in enumerate(MAPS):
@@ -248,8 +254,10 @@ def prop():
     link(samples["Metalness"], metal, "A", "R")
     link(scalar(node, "Metallic", 0.0, -500, 1060), metal, "B")
     mel.connect_material_property(metal, "", unreal.MaterialProperty.MP_METALLIC)
+    if masked:
+        mel.connect_material_property(samples["BaseColor"], "A", unreal.MaterialProperty.MP_OPACITY_MASK)
     mel.recompile_material(m)
-    lines.append("M_Prop saved " + str(lib.save_asset(m.get_path_name(), False)))
+    lines.append(f"{name} saved " + str(lib.save_asset(m.get_path_name(), False)))
     return m
 
 
@@ -335,6 +343,18 @@ try:
                 instance(f"MI_Container_{part}_{colour}", m_prop, textures, {"Metallic": 1.0, "Desaturate": 1.0, "MaxLuminance": 0.14, "Brightness": 3.0}, {"Tint": COLOURS[colour]})
     lib.save_asset(mesh.get_path_name(), False)
     lines.append(f"{len(PROPS)} props and the container")
+    # The rat, for the mice: its fur is cut-out cards, the rest (body, eyes) solid.
+    m_fur = prop("M_PropMasked", True)
+    rat = unreal.load_asset(RAT + "/SK_BlackRat")
+    textures = textures_in(RAT, "T_BlackRat")
+    solid = instance("MI_BlackRat", m_prop, textures, {"Metallic": 1.0} if "Metalness" in textures else None)
+    # The fur's cards catch the sun pale: darker, a black rat's.
+    fur = instance("MI_BlackRat_Fur", m_fur, textures, dict({"Metallic": 1.0} if "Metalness" in textures else {}), {"Tint": (0.45, 0.45, 0.47)})
+    materials = rat.get_editor_property("materials")
+    for slot in materials:
+        slot.set_editor_property("material_interface", fur if "fur" in str(slot.get_editor_property("material_slot_name")).lower() else solid)
+    rat.set_editor_property("materials", materials)
+    lines.append(f"rat slots: {[str(x.get_editor_property('material_slot_name')) for x in materials]}; saved " + str(lib.save_asset(rat.get_path_name(), False)))
 
     m_decal = decal("M_Decal", True)
     m_stain = decal("M_DecalStain", False)
