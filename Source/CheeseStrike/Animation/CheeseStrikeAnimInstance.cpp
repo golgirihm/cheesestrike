@@ -189,14 +189,23 @@ void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set, FName GripAnc
 	AimedCrouched.Base.SetLinkNode(&AimedDownSights);
 	AimedCrouched.Additive.SetLinkNode(&AimCrouch);
 	Slot.SlotName = UCheeseStrikeAnimInstance::SlotName();
-	Slot.Source.SetLinkNode(&AimedCrouched);
+	Locomotion.Shared = &AimedCrouched;
+	Slot.Source.SetLinkNode(&Locomotion);
+	UpperBody.BasePose.SetLinkNode(&AimedCrouched);
+	UpperBody.AddPose();
+	UpperBody.BlendPoses[0].SetLinkNode(&Slot);
+	FBranchFilter Spine;
+	Spine.BoneName = FName(TEXT("spine_01"));
+	Spine.BlendDepth = 0;
+	UpperBody.LayerSetup[0].BranchFilters.Add(Spine);
+	UpperBody.bMeshSpaceRotationBlend = true;
 
 	// The left hand keeps its grip on the rifle, which rides the weapon_r bone in the right hand.
 	LeftHand.IKBone = FBoneReference(FName(TEXT("hand_l")));
 	LeftHand.AnchorBone = FBoneReference(GripAnchor);
 	LeftHand.bAllowStretching = false;
 	LeftHand.Alpha = 1.0f;
-	ToComponentSpace.LocalPose.SetLinkNode(&Slot);
+	ToComponentSpace.LocalPose.SetLinkNode(&UpperBody);
 	LeftHand.ComponentPose.SetLinkNode(&ToComponentSpace);
 	ToLocalSpace.ComponentPose.SetLinkNode(&LeftHand);
 	bLinked = true;

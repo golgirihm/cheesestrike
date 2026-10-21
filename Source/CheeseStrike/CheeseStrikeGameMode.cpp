@@ -15,6 +15,7 @@
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Weapons/CheeseStrikeWeapon.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Variant_Shooter/AI/ShooterNPC.h"
 #include "Variant_Shooter/AI/ShooterNPCSpawner.h"
@@ -59,6 +60,18 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	}
 }
 
+FString ACheeseStrikeGameMode::TravelTo(const FURL& Url)
+{
+	// The map and the options only: travel is relative to where the server is, so it keeps listening on its port, and a URL
+	// naming the host and port (":17777/Game/...") is refused by the engine (CanServerTravel allows no ':').
+	FString To = Url.Map;
+	for (const FString& Option : Url.Op)
+	{
+		To += TEXT("?") + Option;
+	}
+	return To;
+}
+
 int32 ACheeseStrikeGameMode::CurrentMapIndex() const
 {
 	return GetWorld() != nullptr ? CheeseStrikeRules::MapIndexFor(GetWorld()->GetOutermost()->GetName()) : INDEX_NONE;
@@ -87,10 +100,8 @@ FString ACheeseStrikeGameMode::RulesOptions() const
 	{
 		Options += FString::Printf(TEXT("?Map=%d"), MapIndex);
 	}
-	if (BotsWanted >= 0)
-	{
-		Options += FString::Printf(TEXT("?Bots=%d"), BotsWanted);
-	}
+	// Always, -1 too: a travel keeps whatever options of the last URL the new one doesn't name.
+	Options += FString::Printf(TEXT("?Bots=%d"), BotsWanted);
 	return Options;
 }
 
@@ -120,7 +131,7 @@ void ACheeseStrikeGameMode::CountdownOver()
 	{
 		State->SetCountdownEndsAt(0.0f);
 	}
-	GetWorld()->ServerTravel(Url.ToString(), GetTravelType());
+	GetWorld()->ServerTravel(TravelTo(Url), GetTravelType());
 }
 
 bool ACheeseStrikeGameMode::ReadyToStartMatch_Implementation()
@@ -147,14 +158,15 @@ void ACheeseStrikeGameMode::RestartGame()
 	{
 		Url.RemoveOption(Option);
 	}
-	FString Rules = RulesOptions();
+	// Back to waiting in the lobby: no count of players to wait for, which the last URL had if the match came from another map.
+	FString Rules = RulesOptions() + TEXT("?Players=0");
 	TArray<FString> Each;
 	Rules.ParseIntoArray(Each, TEXT("?"));
 	for (const FString& Option : Each)
 	{
 		Url.AddOption(*Option);
 	}
-	GetWorld()->ServerTravel(Url.ToString(), GetTravelType());
+	GetWorld()->ServerTravel(TravelTo(Url), GetTravelType());
 }
 
 void ACheeseStrikeGameMode::PostLogin(APlayerController* NewPlayer)
@@ -269,6 +281,10 @@ void ACheeseStrikeGameMode::HandleMatchHasEnded()
 	Super::HandleMatchHasEnded();
 	// The results stay up a while; then the level is played again from the lobby, the session kept.
 	GetWorldTimerManager().SetTimer(ResultsTimer, this, &AGameMode::RestartGame, CheeseStrikeRules::ResultsTime, false);
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetLobbyAt(State->GetServerWorldTimeSeconds() + CheeseStrikeRules::ResultsTime);
+	}
 }
 
 FString ACheeseStrikeGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
@@ -297,6 +313,16 @@ void ACheeseStrikeGameMode::InitGameState()
 	}
 }
 
+void ACheeseStrikeGameMode::SetBotsWanted(int32 Wanted)
+{
+	BotsWanted = Wanted < 0 ? -1 : FMath::Min(Wanted, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize);
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetBots(State->GetBotNames(), BotsWanted);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Bots: %s"), BotsWanted < 0 ? TEXT("every empty seat") : *FString::FromInt(BotsWanted));
+}
+
 void ACheeseStrikeGameMode::SetBotSkill(int32 Skill)
 {
 	BotSkill = FMath::Clamp(Skill, 0, CheeseStrikeBots::NumSkills - 1);
@@ -319,6 +345,11 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 	if (KillerState != nullptr && KillerState != VictimState)
 	{
 		KillerState->AddKill();
+		// Until there are ammunition crates to go to (docs/unreal/design.md, "Pickups"), a kill brings a magazine's worth, so that nobody runs dry.
+		if (ACheeseStrikeWeapon* Weapon = Killer->GetWeapon())
+		{
+			Weapon->AddReserve(Weapon->GetStats().MagazineSize);
+		}
 	}
 	if (VictimState != nullptr)
 	{

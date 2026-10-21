@@ -305,6 +305,7 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 			TestEqual(TEXT("of the host"), Match->GetKillFeed()[0].Victim, Host->DisplayName());
 		}
 		TestEqual(TEXT("the joiner has a kill"), Joiner->GetPlayerState<ACheeseStrikePlayerState>()->GetKills(), 1);
+		TestTrue(FString::Printf(TEXT("and a magazine's worth more in reserve (%d)"), Joiner->GetWeapon()->GetReserve()), Joiner->GetWeapon()->GetReserve() > Joiner->GetWeapon()->GetStats().Reserve);
 		TestEqual(TEXT("and no deaths"), Joiner->GetPlayerState<ACheeseStrikePlayerState>()->GetDeaths(), 0);
 		TestEqual(TEXT("the host a death"), Host->GetPlayerState<ACheeseStrikePlayerState>()->GetDeaths(), 1);
 		TestEqual(TEXT("the joiner leads"), Match->Standings()[0].Name, Joiner->DisplayName());

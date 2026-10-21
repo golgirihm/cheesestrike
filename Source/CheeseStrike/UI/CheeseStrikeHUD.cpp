@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
+#include "GameFramework/GameMode.h"
 #include "CheeseStrikePlayerController.h"
 #include "Engine/GameInstance.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -39,7 +40,8 @@ void ACheeseStrikeHUD::DrawHUD()
 	}
 	const ACheeseStrikeCharacter* Character = Cast<ACheeseStrikeCharacter>(Controller->GetPawn());
 	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-	const bool bOver = Match != nullptr && Match->HasMatchEnded();
+	// Over, and not just going to another level (from the lobby, or back to it): the lobby covers that.
+	const bool bOver = Match != nullptr && Match->HasMatchEnded() && Match->GetMatchState() != MatchState::LeavingMap;
 	const float FieldOfView = Controller->PlayerCameraManager != nullptr ? Controller->PlayerCameraManager->GetFOVAngle() : 90.0f;
 	if (Character != nullptr && Character->IsAlive() && !bOver)
 	{
@@ -83,7 +85,8 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	const float Height = Canvas->SizeY;
 	const FVector2D Middle(Width / 2.0f, Height / 2.0f);
 
-	// The crosshair: four lines, as far apart as the weapon's spread, and no closer than the least gap; down the sights, the sights are the crosshair.
+	// The crosshair: four lines, as far apart as the weapon's spread, and no closer than the least gap; down the sights, the
+	// sights are the crosshair, with a small dot where the shots go.
 	const float Spread = Weapon != nullptr ? Weapon->CurrentSpread() : 0.0f;
 	const float Gap = CrosshairGap + PixelsForDegrees(Spread, FieldOfView, Width);
 	if (Weapon == nullptr || !Weapon->IsAimed())
@@ -92,6 +95,10 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 		DrawLine(Middle.X + Gap, Middle.Y, Middle.X + Gap + CrosshairLength, Middle.Y, White, CrosshairThickness);
 		DrawLine(Middle.X, Middle.Y - Gap - CrosshairLength, Middle.X, Middle.Y - Gap, White, CrosshairThickness);
 		DrawLine(Middle.X, Middle.Y + Gap, Middle.X, Middle.Y + Gap + CrosshairLength, White, CrosshairThickness);
+	}
+	else
+	{
+		DrawRect(FLinearColor(1.0f, 1.0f, 1.0f, 0.85f), Middle.X - 1.5f, Middle.Y - 1.5f, 3.0f, 3.0f);
 	}
 
 	// A hit: four diagonal ticks, longer and yellow for the head.
@@ -180,7 +187,8 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), Left, Top, PanelWidth, PanelHeight);
 	const FString Title = bOver ? (Match->GetWinnerName().IsEmpty() ? TEXT("MATCH OVER") : FString::Printf(TEXT("%s WINS"), *Match->GetWinnerName().ToUpper())) : TEXT("FREE-FOR-ALL");
 	DrawCentred(Title, Width / 2.0f, Top + 16.0f, Font, 1.8f, bOver ? Yellow : White);
-	DrawCentred(FString::Printf(TEXT("first to %d kills"), Match->GetKillLimit()), Width / 2.0f, Top + 50.0f, Font, 1.0f, Dim);
+	const float ToLobby = Match->GetLobbyAt() > 0.0f ? FMath::Max(0.0f, Match->GetLobbyAt() - static_cast<float>(Match->GetServerWorldTimeSeconds())) : -1.0f;
+	DrawCentred(bOver && ToLobby >= 0.0f ? FString::Printf(TEXT("first to %d kills  ·  back to the lobby in %.0f s"), Match->GetKillLimit(), FMath::CeilToFloat(ToLobby)) : FString::Printf(TEXT("first to %d kills"), Match->GetKillLimit()), Width / 2.0f, Top + 50.0f, Font, 1.0f, Dim);
 	float Y = Top + 80.0f;
 	DrawText(TEXT("PLAYER"), Dim, Left + 20.0f, Y, Font, 1.0f);
 	DrawText(TEXT("KILLS"), Dim, Left + PanelWidth - 150.0f, Y, Font, 1.0f);

@@ -66,6 +66,10 @@ public:
 	int32 GetMapIndex() const { return MapIndex; }
 	void SetMapIndex(int32 Index) { MapIndex = Index; }
 
+	/** The server's time everyone goes back to the lobby after the results; 0 before the match is over. */
+	float GetLobbyAt() const { return LobbyAt; }
+	void SetLobbyAt(float At) { LobbyAt = At; }
+
 	/** How well the bots play (CheeseStrikeBots::Skills), as the host picked it. */
 	int32 GetBotSkill() const { return BotSkill; }
 	void SetBotSkill(int32 Skill) { BotSkill = Skill; }
@@ -106,4 +110,6 @@ protected:
 	int32 MapIndex = INDEX_NONE;
 	UPROPERTY(Replicated)
 	int32 BotSkill = 1;
+	UPROPERTY(Replicated)
+	float LobbyAt = 0.0f;
 };

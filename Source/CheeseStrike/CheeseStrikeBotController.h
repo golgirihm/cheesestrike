@@ -49,6 +49,8 @@ public:
 	/** The seconds from first seeing an enemy to its first shot at them, the last time it shot at someone new; -1 before. */
 	float GetLastReaction() const { return LastReaction; }
 
+	/** One line on its state, for the log. */
+	FString Describe() const;
 	/** Turns its view to `Rotation` at once, as on coming in. */
 	void FaceTo(const FRotator& Rotation);
 
@@ -85,6 +87,8 @@ protected:
 
 	TWeakObjectPtr<ACheeseStrikeCharacter> Target;
 	bool bSeesTarget = false;
+	/** Whether its target is the one shooting it, lately: then it fires back from however far. */
+	bool bShotByTarget = false;
 	/** When it began tracking its target (its reaction and its aim's steadying count from here), when it last saw them, and where. */
 	float TrackingSince = 0.0f;
 	float LastSeenAt = -1000.0f;

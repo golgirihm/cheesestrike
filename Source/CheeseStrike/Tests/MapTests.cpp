@@ -19,6 +19,7 @@
 #include "CheeseStrikePlayerController.h"
 #include "Map/CheeseStrikeCheese.h"
 #include "PlayTesting.h"
+#include "UI/CheeseStrikeMenu.h"
 #include "Rules/CheeseStrikeRules.h"
 
 namespace MapTests
@@ -187,6 +188,30 @@ bool FTheHostPicksTheMap::RunTest(const FString& Parameters)
 		TestEqual(TEXT("with the rules the lobby had"), GameState(0)->GetKillLimit(), 5);
 		TestEqual(TEXT("and the map is still the Creamery for the next match"), World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->GetMapIndex(), 0);
 		TestEqual(TEXT("the bots are as hard as the lobby had them"), World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->GetBotSkill(), 2);
+		// The match is over: after the results, everyone is back in the lobby.
+		World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->EndMatch();
+	});
+	WaitUntil(TEXT("the results counting down to the lobby"), 3.0f, []() { return GameState(1) != nullptr && GameState(1)->HasMatchEnded() && GameState(1)->GetLobbyAt() > 0.0f; });
+	WaitUntil(TEXT("everyone back in the lobby after the results"), CheeseStrikeRules::ResultsTime + 30.0f, []()
+	{
+		for (int32 Player = 0; Player < 2; ++Player)
+		{
+			if (GameState(Player) == nullptr || GameState(Player)->HasMatchStarted() || Controller(Player) == nullptr || Controller(Player)->GetMenuPage() != EMenuPage::Lobby)
+			{
+				return false;
+			}
+		}
+		return true;
+	});
+	Then([this]()
+	{
+		int32 Characters = 0;
+		for (TActorIterator<ACheeseStrikeCharacter> It(World(0)); It; ++It)
+		{
+			Characters += It->IsAlive() ? 1 : 0;
+		}
+		TestEqual(TEXT("nobody plays in the lobby"), Characters, 0);
+		TestEqual(TEXT("the lobby keeps the host's rules"), GameState(1)->GetKillLimit(), 5);
 	});
 	StopPlaying();
 	return true;

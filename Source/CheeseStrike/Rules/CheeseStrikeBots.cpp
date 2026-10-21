@@ -75,6 +75,11 @@ namespace CheeseStrikeBots
 		return Distance > WeaponRange * FightRangeShare * 1.25f ? EMove::Approach : EMove::Hold;
 	}
 
+	bool WouldFireAt(float Distance, float WeaponRange, bool bTheyShootMe)
+	{
+		return Distance <= WeaponRange && (bTheyShootMe || Distance <= WeaponRange * LongShotShare);
+	}
+
 	bool HoldsTrigger(FBursts& Bursts, const FSkill& Skill, bool bWantsToFire, float FireInterval, float Now)
 	{
 		if (Bursts.bFiring)

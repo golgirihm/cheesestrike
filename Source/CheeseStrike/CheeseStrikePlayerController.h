@@ -51,8 +51,9 @@ public:
 	void HostFromMenu();
 	/** The host sets the match's rules and map from the lobby (INDEX_NONE keeps the map); everyone in it sees them. */
 	void SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map = INDEX_NONE);
-	/** The host sets how well the bots play, from the lobby. */
+	/** The host sets how well the bots play, and how many there are (-1 for every empty seat), from the lobby. */
 	void SetBotSkillFromMenu(int32 Skill);
+	void SetBotsFromMenu(int32 Wanted);
 	/** Looks for matches, through the service or the local network without Steam. */
 	void FindFromMenu();
 	/** The host starts the match, after the countdown. */
@@ -73,6 +74,9 @@ public:
 	void CheeseStrikeStart(const FString& AtOnce = TEXT(""));
 
 	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
+	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */
+	UFUNCTION(Exec)
+	void CheeseStrikeBots();
 	UFUNCTION(Exec)
 	void CheeseStrikeHost(const FString& Options = TEXT(""));
 	UFUNCTION(Exec)

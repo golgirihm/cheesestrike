@@ -78,6 +78,8 @@ public:
 	int32 GetBotsWanted() const { return BotsWanted; }
 	/** How well the bots play (CheeseStrikeBots::Skills), as the host picks it in the lobby (`?BotSkill=`). */
 	int32 GetBotSkill() const { return BotSkill; }
+	/** The host sets how many bots fill in, -1 for every empty seat. */
+	void SetBotsWanted(int32 Wanted);
 	void SetBotSkill(int32 Skill);
 	/** A player may name themself with `?Nick=` on the URL they join by (for development; Steam will name them). */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
@@ -91,6 +93,8 @@ protected:
 	void CountdownOver();
 	/** The URL options that carry this match's rules to its next level. */
 	FString RulesOptions() const;
+	/** What ServerTravel is given for `Url`: its map and options, without its host and port. */
+	static FString TravelTo(const FURL& Url);
 
 	int32 KillLimit;
 	float RespawnDelay;

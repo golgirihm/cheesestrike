@@ -75,8 +75,8 @@ namespace CheeseStrikeRules
 	}
 
 	const FMapChoice Maps[] = {
-		{TEXT("The Creamery"), TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery")},
-		{TEXT("Proving Ground"), TEXT("/Game/Variant_Shooter/Lvl_Shooter")},
+		{TEXT("The Creamery"), TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery"), TEXT("creamery.png")},
+		{TEXT("Proving Ground"), TEXT("/Game/Variant_Shooter/Lvl_Shooter"), TEXT("proving_ground.png")},
 	};
 
 	int32 NumMaps()
@@ -175,6 +175,12 @@ namespace CheeseStrikeRules
 		return FMath::Max(-1, FMath::RoundToInt(Option(Options, TEXT("Bots"), -1.0f)));
 	}
 
+	int32 BotsIn(int32 Players, int32 BotsWanted)
+	{
+		const int32 Empty = FMath::Max(0, Teams * TeamSize - Players);
+		return BotsWanted < 0 ? Empty : FMath::Min(BotsWanted, Empty);
+	}
+
 	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted)
 	{
 		TArray<FRosterEntry> Column;
@@ -185,23 +191,33 @@ namespace CheeseStrikeRules
 				Column.Add(Player);
 			}
 		}
-		const int32 Empty = TeamSize - Column.Num();
-		// Every empty slot, or the bots asked for shared out from the first team on.
-		int32 Filling = Empty;
-		if (BotsWanted >= 0)
+		// Every empty slot, or the bots asked for dealt one at a time to the side with fewer, so that the sides stay even.
+		int32 Sizes[Teams] = {};
+		for (const FRosterEntry& Player : Players)
 		{
-			int32 Left = BotsWanted;
-			for (int32 Earlier = 0; Earlier < Team; ++Earlier)
+			if (Player.Team >= 0 && Player.Team < Teams)
 			{
-				int32 Taken = 0;
-				for (const FRosterEntry& Player : Players)
-				{
-					Taken += Player.Team == Earlier ? 1 : 0;
-				}
-				Left -= FMath::Clamp(TeamSize - Taken, 0, Left);
+				Sizes[Player.Team] = FMath::Min(Sizes[Player.Team] + 1, TeamSize);
 			}
-			Filling = FMath::Min(Empty, Left);
 		}
+		int32 Shares[Teams] = {};
+		for (int32 Left = BotsWanted < 0 ? Teams * TeamSize : BotsWanted; Left > 0; --Left)
+		{
+			int32 Smaller = INDEX_NONE;
+			for (int32 Side = 0; Side < Teams; ++Side)
+			{
+				if (Sizes[Side] + Shares[Side] < TeamSize && (Smaller == INDEX_NONE || Sizes[Side] + Shares[Side] < Sizes[Smaller] + Shares[Smaller]))
+				{
+					Smaller = Side;
+				}
+			}
+			if (Smaller == INDEX_NONE)
+			{
+				break;
+			}
+			++Shares[Smaller];
+		}
+		const int32 Filling = Team >= 0 && Team < Teams ? Shares[Team] : 0;
 		for (int32 Index = 0; Index < Filling; ++Index)
 		{
 			const int32 NameIndex = Team * TeamSize + Index;

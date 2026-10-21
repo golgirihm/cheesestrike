@@ -249,6 +249,12 @@ bool ACheeseStrikeWeapon::IsReloading() const
 	return ReloadEndsAt > 0.0f && ServerTime(GetWorld()) < ReloadEndsAt;
 }
 
+FString ACheeseStrikeWeapon::DescribeReload() const
+{
+	const float Left = ReloadEndsAt > 0.0f ? ReloadEndsAt - ServerTime(GetWorld()) : -1.0f;
+	return FString::Printf(TEXT("reload ends in %.1f s, timer %.1f s"), Left, GetWorldTimerManager().GetTimerRemaining(ReloadTimer));
+}
+
 int32 ACheeseStrikeWeapon::NextShotIndex() const
 {
 	return CheeseStrikeWeapons::NextInRun(*Stats, LastShotIndex, ServerTime(GetWorld()) - LastShotAt);
@@ -466,6 +472,14 @@ void ACheeseStrikeWeapon::StartReload()
 	StopFiring();
 	ShowReload();
 	ServerReload();
+}
+
+void ACheeseStrikeWeapon::AddReserve(int32 Rounds)
+{
+	if (HasAuthority())
+	{
+		Reserve = FMath::Clamp(Reserve + Rounds, 0, Stats->ReserveMax);
+	}
 }
 
 void ACheeseStrikeWeapon::ServerReload_Implementation()

@@ -16,7 +16,8 @@
 # after -ClientDelay seconds, starts at -ClientStartAt and plays that script.
 # Both logs are summarised; the client's is Saved/Logs/<tag>_client.log.
 # The players are named -Name and -ClientName, as the kill feed and the
-# scoreboard show them.
+# scoreboard show them. -Res sets the size the game renders at (and its
+# screenshots), "960x540" unless given.
 param(
   [Parameter(Mandatory=$true)][string]$Script,
   [string]$Tag = "play",
@@ -33,7 +34,8 @@ param(
   [switch]$Steam,
   [switch]$Lobby,
   [switch]$Bots,
-  [int]$TimeoutSeconds = 180
+  [int]$TimeoutSeconds = 180,
+  [string]$Res = "960x540"
 )
 # The match starts at once (?StartNow), so that a script finds a character
 # to drive; with -Lobby it waits in the lobby instead, as a hosted match
@@ -50,7 +52,7 @@ $engine = if ($env:UE_ROOT) { $env:UE_ROOT } else { "C:\Program Files\Epic Games
 $editor = Join-Path $engine "Engine\Binaries\Win64\UnrealEditor.exe"
 function Launch($map, $script, $tag, $startAt, $x) {
   $scriptPath = (Resolve-Path $script).Path
-  $arguments = @("`"$project`"", $map, "-game", "-resx=960", "-resy=540", "-WinX=$x", "-WinY=40", "-log=$tag.log", "-nosound", "-unattended",
+  $arguments = @("`"$project`"", $map, "-game", "-resx=$($Res.Split('x')[0])", "-resy=$($Res.Split('x')[1])", "-WinX=$x", "-WinY=40", "-log=$tag.log", "-nosound", "-unattended",
     "-TraceState", "-StartAt=$startAt", "-PlayScript=`"$scriptPath`"")
   if (-not $Window) { $arguments += "-RenderOffscreen" } else { $arguments += "-windowed" }
   if (-not $Steam) { $arguments += "-NOSTEAM" }

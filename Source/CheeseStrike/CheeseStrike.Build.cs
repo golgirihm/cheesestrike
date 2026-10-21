@@ -30,6 +30,8 @@ public class CheeseStrike : ModuleRules
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add("UnrealEd");
+			// For the art scripts' tools (Dev/CheeseStrikeArtTools): making physics assets.
+			PrivateDependencyModuleNames.Add("PhysicsUtilities");
 		}
 
 		PublicIncludePaths.AddRange(new string[] {
