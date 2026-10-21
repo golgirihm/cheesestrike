@@ -29,7 +29,10 @@ class ACheeseStrikeCharacter;
  *
  * It moves its character as a player would: path following and movement
  * input for the feet, its control rotation for the view, and the
- * character's own Do* actions for the trigger, sights, sprint and reload.
+ * character's own Do* actions for the trigger, sights, sprint, reload and
+ * changing weapons. It comes in with a primary suited to its skill, and
+ * changes to the sidearm or the knife when they serve better
+ * (CheeseStrikeBots::ChooseWeapon): someone close, the magazine empty.
  */
 UCLASS()
 class CHEESESTRIKE_API ACheeseStrikeBotController : public AAIController
@@ -58,6 +61,7 @@ public:
 	virtual void UpdateControlRotation(float DeltaTime, bool bUpdatePawn = true) override;
 
 protected:
+	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
@@ -81,6 +85,8 @@ protected:
 	/** A spot on the navigation mesh away from `From`, to get away to. */
 	bool PickRetreatGoal(const FVector& From, FVector& Out) const;
 	void LetGoOfTrigger();
+	/** Changes to the weapon that serves best now. */
+	void ChooseWeapon();
 	void ForgetAll();
 
 	int32 SkillIndex = CheeseStrikeBots::DefaultSkill;
@@ -116,4 +122,6 @@ protected:
 	float StepSide = 1.0f;
 	float NextStepAt = 0.0f;
 	float NextThinkAt = 0.0f;
+	/** When it last changed weapons, so that it doesn't change back and forth. */
+	float ChangedWeaponAt = -1000.0f;
 };

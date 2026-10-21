@@ -6,6 +6,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Rules/CheeseStrikeBots.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -99,6 +100,70 @@ bool FBotKeepsItsDistance::RunTest(const FString& Parameters)
 	TestFalse(TEXT("holds fire at 40 m"), WouldFireAt(4000.0f, 5000.0f, false));
 	TestTrue(TEXT("unless they shoot it"), WouldFireAt(4000.0f, 5000.0f, true));
 	TestFalse(TEXT("never past its reach"), WouldFireAt(5500.0f, 5000.0f, true));
+	// A weapon for close quarters is fought with close: the Swiss Shotgun reaches 13 m, and a bot holds at 4 m rather than backing off.
+	const float Shotgun = CheeseStrikeWeapons::Shotgun().MaxRange;
+	TestTrue(TEXT("with the shotgun, closes in from 10 m"), MoveFor(1000.0f, Shotgun, 100.0f, true) == EMove::Approach);
+	TestTrue(TEXT("holds at 4 m"), MoveFor(400.0f, Shotgun, 100.0f, true) == EMove::Hold);
+	TestTrue(TEXT("backs off only from someone on top of it"), MoveFor(250.0f, Shotgun, 100.0f, true) == EMove::BackOff);
+	// The knife: right up to them, and a stroke once they are in reach.
+	const float Reach = CheeseStrikeWeapons::Knife().Reach;
+	TestTrue(TEXT("with the knife, closes in from 2 m"), MoveFor(200.0f, Reach, 100.0f, true) == EMove::Approach);
+	TestTrue(TEXT("strikes in reach"), WouldStrikeAt(120.0f, Reach));
+	TestFalse(TEXT("not out of it"), WouldStrikeAt(160.0f, Reach));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBotChoosesItsWeapons, "CheeseStrike.Bots.ChoosesItsWeapons", BotTests::Flags)
+
+bool FBotChoosesItsWeapons::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeBots;
+	// Its primary: one of the primaries, suited to its skill.
+	FRandomStream Random(99);
+	for (int32 SkillIndex = 0; SkillIndex < NumSkills; ++SkillIndex)
+	{
+		TSet<FName> Chosen;
+		for (int32 Bot = 0; Bot < 200; ++Bot)
+		{
+			const FName Primary = PrimaryFor(SkillIndex, Random);
+			const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Primary);
+			if (!TestTrue(TEXT("a primary"), Stats != nullptr && Stats->Slot == EWeaponSlot::Primary))
+			{
+				return false;
+			}
+			Chosen.Add(Primary);
+		}
+		AddInfo(FString::Printf(TEXT("%s bots carry %d kinds of primary"), Skill(SkillIndex).Name, Chosen.Num()));
+		TestTrue(FString::Printf(TEXT("%s bots carry several kinds"), Skill(SkillIndex).Name), Chosen.Num() >= 4);
+		TestEqual(FString::Printf(TEXT("easy bots never the scoped rifle; others may (%s)"), Skill(SkillIndex).Name), Chosen.Contains(CheeseStrikeWeapons::Roquefort().Id), SkillIndex > 0);
+	}
+
+	// What it holds.
+	FArmed Armed;
+	Armed.bPrimary = true;
+	Armed.bSidearm = true;
+	Armed.bKnife = true;
+	Armed.PrimaryMagazine = 10;
+	Armed.bPrimaryReserve = true;
+	TestTrue(TEXT("its primary, in a fight at range"), ChooseWeapon(Armed, true, 2000.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
+	TestTrue(TEXT("and out of one"), ChooseWeapon(Armed, false, 0.0f, EWeaponSlot::Knife) == EWeaponSlot::Primary);
+	TestTrue(TEXT("the knife for someone close"), ChooseWeapon(Armed, true, 200.0f, EWeaponSlot::Primary) == EWeaponSlot::Knife);
+	TestTrue(TEXT("kept out as they step back a little"), ChooseWeapon(Armed, true, 300.0f, EWeaponSlot::Knife) == EWeaponSlot::Knife);
+	TestTrue(TEXT("put away when they get away"), ChooseWeapon(Armed, true, 500.0f, EWeaponSlot::Knife) == EWeaponSlot::Primary);
+	Armed.PrimaryMagazine = 0;
+	TestTrue(TEXT("its magazine empty with an enemy near: the sidearm, quicker than reloading"), ChooseWeapon(Armed, true, 1200.0f, EWeaponSlot::Primary) == EWeaponSlot::Sidearm);
+	TestTrue(TEXT("kept to the end of the fight"), ChooseWeapon(Armed, true, 2500.0f, EWeaponSlot::Sidearm) == EWeaponSlot::Sidearm);
+	TestTrue(TEXT("with the enemy far off, it reloads"), ChooseWeapon(Armed, true, 3000.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
+	TestTrue(TEXT("after the fight, back to the primary to reload it"), ChooseWeapon(Armed, false, 0.0f, EWeaponSlot::Sidearm) == EWeaponSlot::Primary);
+	Armed.bPrimaryReserve = false;
+	TestTrue(TEXT("out of rounds for it altogether: the sidearm"), ChooseWeapon(Armed, false, 0.0f, EWeaponSlot::Primary) == EWeaponSlot::Sidearm);
+	// Only what the mode lets it draw.
+	FArmed Execution;
+	Execution.bSidearm = true;
+	TestTrue(TEXT("with only the sidearm, the sidearm"), ChooseWeapon(Execution, true, 100.0f, EWeaponSlot::Sidearm) == EWeaponSlot::Sidearm);
+	FArmed KnifeOnly;
+	KnifeOnly.bKnife = true;
+	TestTrue(TEXT("with only the knife, the knife, near or far"), ChooseWeapon(KnifeOnly, true, 3000.0f, EWeaponSlot::Knife) == EWeaponSlot::Knife);
 	return true;
 }
 
@@ -159,6 +224,7 @@ bool FBotFiresInBurstsAndRests::RunTest(const FString& Parameters)
 #include "CheeseStrikePlayerState.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "PlayTesting.h"
+#include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 namespace BotTests
@@ -224,8 +290,15 @@ bool FABotNoticesAndShoots::RunTest(const FString& Parameters)
 		const float Reaction = Bot->GetLastReaction();
 		TestTrue(FString::Printf(TEXT("not before its reaction time (%.2f s)"), Reaction), Reaction >= CheeseStrikeBots::Skill(2).Reaction - 0.05f);
 		TestTrue(FString::Printf(TEXT("but soon after (%.2f s)"), Reaction), Reaction < 1.5f);
-		const ACheeseStrikeWeapon* Weapon = BodyOf(Bot) != nullptr ? BodyOf(Bot)->GetWeapon() : nullptr;
-		TestTrue(TEXT("its shots were the server's: fired, and hit"), Weapon != nullptr && Weapon->ShotsFired > 0);
+		// With whichever of its weapons it chose.
+		int32 Shots = 0;
+		const UCheeseStrikeInventory* Inventory = BodyOf(Bot) != nullptr ? BodyOf(Bot)->GetInventory() : nullptr;
+		for (const EWeaponSlot Slot : {EWeaponSlot::Primary, EWeaponSlot::Sidearm, EWeaponSlot::Knife})
+		{
+			const ACheeseStrikeWeapon* Weapon = Inventory != nullptr ? Inventory->GetInSlot(Slot) : nullptr;
+			Shots += Weapon != nullptr ? Weapon->ShotsFired : 0;
+		}
+		TestTrue(FString::Printf(TEXT("its shots were the server's: fired (%d), and hit"), Shots), Shots > 0);
 	});
 	StopPlaying();
 	return true;

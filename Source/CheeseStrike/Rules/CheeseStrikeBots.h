@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Weapons/CheeseStrikeShot.h"
 
 /**
  * How a bot plays, as plain functions over plain values, so that they can be
@@ -54,7 +55,7 @@ namespace CheeseStrikeBots
 	/** Whether something `ToTarget` from a bot facing `Facing` is where the bot could see it (line of sight aside). */
 	bool InSight(const FVector& Facing, const FVector& ToTarget);
 
-	/** A bot fights from this share of its weapon's range, backs off from anyone closer than BackOff (cm), and goes for a wedge when its health is under LowHealth. */
+	/** A bot fights from this share of its weapon's range, backs off from anyone closer than BackOff (cm) (or half its fighting distance, for a weapon that fights closer), and goes for a wedge when its health is under LowHealth. */
 	constexpr float FightRangeShare = 0.45f;
 	constexpr float BackOff = 600.0f;
 	constexpr float LowHealth = 45.0f;
@@ -80,6 +81,41 @@ namespace CheeseStrikeBots
 	 */
 	constexpr float LongShotShare = 0.6f;
 	bool WouldFireAt(float Distance, float WeaponRange, bool bTheyShootMe);
+
+	/**
+	 * Its weapons. A bot comes in with a primary suited to its skill, picked
+	 * at random from those it plays well (an easy bot takes what forgives a
+	 * poor aim, a hard one the rifles that reward a good one).
+	 */
+	FName PrimaryFor(int32 SkillIndex, FRandomStream& Random);
+	/** The weights of each primary for a skill, in CheeseStrikeArsenal::InSlot(Primary)'s order. */
+	TArray<TPair<FName, float>> PrimaryWeights(int32 SkillIndex);
+
+	/** Draws the knife on anyone closer than this (cm, from middle to middle), and keeps it out until they are further than KnifeLetGo. */
+	constexpr float KnifeFrom = 250.0f;
+	constexpr float KnifeLetGo = 350.0f;
+	/** With its primary's magazine empty in a fight, it draws the sidearm rather than reload with an enemy closer than this (cm). */
+	constexpr float SidearmWithin = 2000.0f;
+	/** What a bot has to choose from: what it carries and may draw, and what is left in its primary. */
+	struct FArmed
+	{
+		bool bPrimary = false;
+		bool bSidearm = false;
+		bool bKnife = false;
+		/** Rounds left in the primary's magazine, and whether there are any more to reload it with. */
+		int32 PrimaryMagazine = 0;
+		bool bPrimaryReserve = false;
+	};
+	/**
+	 * Which weapon a bot wants in hand: the knife for someone close; the
+	 * sidearm when the primary is spent, or its magazine empty with an enemy
+	 * near (quicker than reloading), until the fight is over; otherwise the
+	 * primary. `Distance` is to the enemy it fights (`bFighting`), `Current`
+	 * the slot in hand. Only what it may draw is chosen.
+	 */
+	EWeaponSlot ChooseWeapon(const FArmed& Armed, bool bFighting, float Distance, EWeaponSlot Current);
+	/** Whether a bot strikes with a knife reaching `Reach` at someone `Distance` from its eyes. */
+	bool WouldStrikeAt(float Distance, float Reach);
 
 	/** Seconds without progress toward where it is going before a bot finds another way. */
 	constexpr float StuckTime = 1.2f;
