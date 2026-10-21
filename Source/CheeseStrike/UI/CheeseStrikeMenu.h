@@ -23,6 +23,8 @@ enum class EMenuPage : uint8
 	Lobby,
 	/** The pause menu during a match. */
 	Pause,
+	/** Who made what the game is made of (CheeseStrikeCredits). */
+	Credits,
 };
 
 namespace CheeseStrikeMenu
@@ -79,6 +81,7 @@ private:
 	TSharedRef<SWidget> MakeLobby();
 	TSharedRef<SWidget> MakeLobbyRules();
 	TSharedRef<SWidget> MakePause();
+	TSharedRef<SWidget> MakeCredits();
 	TSharedRef<SWidget> MakeTitle(const FString& Text);
 	TSharedRef<SWidget> MakeLine(const FString& Text, bool bDim = false);
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain, TSharedPtr<SWidget> Inside = nullptr);

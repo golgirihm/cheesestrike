@@ -171,6 +171,7 @@ bool FTheMenuFollowsTheMatch::RunTest(const FString& Parameters)
 	using CheeseStrikeMenu::PageFor;
 	TestTrue(TEXT("alone before a match, the front end"), PageFor(false, false, false, false, EMenuPage::Main) == EMenuPage::Main);
 	TestTrue(TEXT("or the page chosen in it"), PageFor(false, false, false, false, EMenuPage::Find) == EMenuPage::Find);
+	TestTrue(TEXT("such as the credits"), PageFor(false, false, false, false, EMenuPage::Credits) == EMenuPage::Credits);
 	TestTrue(TEXT("but not a page that isn't the front end's"), PageFor(false, false, false, false, EMenuPage::Pause) == EMenuPage::Main && PageFor(false, false, false, false, EMenuPage::Lobby) == EMenuPage::Main);
 	TestTrue(TEXT("in a hosted or joined match that waits, the lobby"), PageFor(false, false, true, false, EMenuPage::Find) == EMenuPage::Lobby);
 	TestTrue(TEXT("once the match is on, nothing"), PageFor(true, false, true, false, EMenuPage::Main) == EMenuPage::None);

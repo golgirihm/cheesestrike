@@ -8,8 +8,11 @@
 
 class ACheeseStrikeCheese;
 class UAnimSequence;
+class UAudioComponent;
 class UBoxComponent;
+class USkeletalMesh;
 class USkeletalMeshComponent;
+class USoundBase;
 
 /** What a mouse is doing, as every machine shows it. */
 UENUM()
@@ -34,7 +37,9 @@ enum class EMouseDoing : uint8
  *
  * The server runs it; every machine sees it move (replicated movement) and
  * animates it by what it is doing. Its body is Nestaeric's Black Rat at
- * fifteen times a rat's size (Content/Fab/Nestaeric/BlackRat).
+ * fifteen times a rat's size (Content/Fab/Nestaeric/BlackRat), and it squeaks,
+ * gnaws and crunches, and screams when it runs, pitched down for its size
+ * (Content/OpenGameArt/Mice).
  */
 UCLASS()
 class CHEESESTRIKE_API ACheeseStrikeMouse : public AActor
@@ -52,6 +57,10 @@ public:
 	float GetFear() const { return Fear; }
 	/** How many blocks it has finished. */
 	int32 GetEaten() const { return Eaten; }
+	/** Whether it found all its sounds. */
+	bool HasSounds() const;
+	/** Whether it has its body, animations and every material of its body. */
+	bool HasBody() const;
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual float TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
@@ -76,24 +85,58 @@ protected:
 	void KeepOnGround(float DeltaSeconds);
 	UFUNCTION()
 	void OnRep_Doing();
-	/** The animation for what it is doing, on this machine. */
+	/** The animation and the sounds for what it is doing, on this machine. */
 	void ShowDoing();
+	/** Its squeaks now and then, and its crunches while it eats, on this machine. */
+	void Sound(float DeltaSeconds);
+	/** Plays `Sound` from `Speaker`, at `Volume` and a pitch around `Around`. */
+	static void Say(UAudioComponent* Speaker, USoundBase* Sound, float Volume, float Around);
 
 	UPROPERTY(VisibleAnywhere, Category="Mouse")
 	TObjectPtr<UBoxComponent> Body;
 	UPROPERTY(VisibleAnywhere, Category="Mouse")
 	TObjectPtr<USkeletalMeshComponent> Mesh;
+	/**
+	 * Its body and animations, loaded when it comes into play rather than
+	 * found in the constructor: what a constructor loads at the editor's
+	 * start is rooted for good, and the rat's materials could then never be
+	 * rebuilt by tools/art/build_materials.py.
+	 */
+	UPROPERTY()
+	TSoftObjectPtr<USkeletalMesh> Model;
+	UPROPERTY()
+	TSoftObjectPtr<UAnimSequence> Walk;
+	UPROPERTY()
+	TSoftObjectPtr<UAnimSequence> Run;
+	UPROPERTY()
+	TSoftObjectPtr<UAnimSequence> Sniff;
 	UPROPERTY()
 	TObjectPtr<UAnimSequence> WalkAnimation;
 	UPROPERTY()
 	TObjectPtr<UAnimSequence> RunAnimation;
 	UPROPERTY()
 	TObjectPtr<UAnimSequence> EatAnimation;
+	/** Its gnawing while it eats (looping), its crunches, and its voice. */
+	UPROPERTY(VisibleAnywhere, Category="Mouse")
+	TObjectPtr<UAudioComponent> Gnawing;
+	UPROPERTY(VisibleAnywhere, Category="Mouse")
+	TObjectPtr<UAudioComponent> Mouth;
+	UPROPERTY(VisibleAnywhere, Category="Mouse")
+	TObjectPtr<UAudioComponent> Voice;
+	UPROPERTY()
+	TArray<TObjectPtr<USoundBase>> Squeaks;
+	UPROPERTY()
+	TArray<TObjectPtr<USoundBase>> Crunches;
+	UPROPERTY()
+	TObjectPtr<USoundBase> Scream;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Doing)
 	EMouseDoing Doing = EMouseDoing::Entering;
 	EMouseDoing Shown = EMouseDoing::Entering;
 	bool bShownOnce = false;
+	/** When it next squeaks, and next crunches while it eats, on this machine. */
+	float NextSqueakAt = 0.0f;
+	float NextCrunchAt = 0.0f;
 
 	TWeakObjectPtr<ACheeseStrikeCheese> Target;
 	/** Cheese it gave up on, and when it may try it again. */

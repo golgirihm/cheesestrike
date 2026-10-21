@@ -23,6 +23,8 @@
 #include "Movement/CheeseStrikeMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "Map/CheeseStrikeMouse.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "CheeseStrikeGameMode.h"
@@ -347,6 +349,28 @@ void ACheeseStrikeCharacter::CheeseStrikeViewFrom(float X, float Y, float Z, flo
 		const FRotator Kept = Player->GetControlRotation();
 		Player->SetViewTarget(OutsideCamera);
 		Player->SetControlRotation(Kept);
+	}
+}
+
+void ACheeseStrikeCharacter::CheeseStrikeViewMouse(float Distance, float Yaw, float Height)
+{
+	APlayerController* Player = Cast<APlayerController>(GetController());
+	if (Player == nullptr || GetWorld() == nullptr)
+	{
+		return;
+	}
+	TActorIterator<ACheeseStrikeMouse> Mouse(GetWorld());
+	if (!Mouse)
+	{
+		UE_LOG(LogCheeseStrike, Warning, TEXT("CheeseStrikeViewMouse: no mice"));
+		return;
+	}
+	const FVector Middle = Mouse->GetActorLocation();
+	const FVector At = Middle + FRotator(0.0f, Mouse->GetActorRotation().Yaw + Yaw, 0.0f).Vector() * Distance + FVector(0.0f, 0.0f, Height);
+	CheeseStrikeViewFrom(At.X, At.Y, At.Z, (Middle - At).Rotation().Pitch, (Middle - At).Rotation().Yaw);
+	if (OutsideCamera != nullptr)
+	{
+		OutsideCamera->AttachToActor(*Mouse, FAttachmentTransformRules::KeepWorldTransform);
 	}
 }
 

@@ -72,6 +72,9 @@ public:
 	/** From the console or a play script: the host starts the match (at once with any argument). */
 	UFUNCTION(Exec)
 	void CheeseStrikeStart(const FString& AtOnce = TEXT(""));
+	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find or Credits). */
+	UFUNCTION(Exec)
+	void CheeseStrikePage(const FString& Page);
 
 	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
 	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */

@@ -348,13 +348,18 @@ try:
     rat = unreal.load_asset(RAT + "/SK_BlackRat")
     textures = textures_in(RAT, "T_BlackRat")
     solid = instance("MI_BlackRat", m_prop, textures, {"Metallic": 1.0} if "Metalness" in textures else None)
-    # The fur's cards catch the sun pale: darker, a black rat's.
-    fur = instance("MI_BlackRat_Fur", m_fur, textures, dict({"Metallic": 1.0} if "Metalness" in textures else {}), {"Tint": (0.45, 0.45, 0.47)})
-    materials = rat.get_editor_property("materials")
-    for slot in materials:
-        slot.set_editor_property("material_interface", fur if "fur" in str(slot.get_editor_property("material_slot_name")).lower() else solid)
+    fur = instance("MI_BlackRat_Fur", m_fur, textures, {"Metallic": 1.0} if "Metalness" in textures else None)
+    # New slots, not the old ones changed: a slot read from the mesh is a copy, and setting it changes nothing.
+    materials = []
+    for old in rat.get_editor_property("materials"):
+        slot = unreal.SkeletalMaterial()
+        name = old.get_editor_property("material_slot_name")
+        slot.set_editor_property("material_slot_name", name)
+        slot.set_editor_property("material_interface", fur if "fur" in str(name).lower() else solid)
+        materials.append(slot)
+    rat.modify()
     rat.set_editor_property("materials", materials)
-    lines.append(f"rat slots: {[str(x.get_editor_property('material_slot_name')) for x in materials]}; saved " + str(lib.save_asset(rat.get_path_name(), False)))
+    lines.append(f"rat slots: {[(str(x.get_editor_property('material_slot_name')), str(x.get_editor_property('material_interface').get_name())) for x in rat.get_editor_property('materials')]}; saved " + str(lib.save_asset(rat.get_path_name(), False)))
 
     m_decal = decal("M_Decal", True)
     m_stain = decal("M_DecalStain", False)
