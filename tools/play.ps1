@@ -52,10 +52,16 @@ $project = Join-Path $root "CheeseStrike.uproject"
 $version = (Get-Content $project | ConvertFrom-Json).EngineAssociation
 $engine = if ($env:UE_ROOT) { $env:UE_ROOT } else { "C:\Program Files\Epic Games\UE_$version" }
 $editor = Join-Path $engine "Engine\Binaries\Win64\UnrealEditor.exe"
-function Launch($map, $script, $tag, $startAt, $x) {
+# A number of this working copy's own (tools/worktree.py makes others): the pair's port, and the build id that keeps the
+# matches it offers on the local network from being found by another copy's games running at the same time.
+$hash = 0
+foreach ($c in $root.ToLower().ToCharArray()) { $hash = ($hash * 31 + [int]$c) % 1000003 }
+$port = 7800 + ($hash % 1000)
+$buildId = 100000 + ($hash % 900000)
+function Launch($map, $script, $tag, $startAt, $x, $more = @()) {
   $scriptPath = (Resolve-Path $script).Path
   $arguments = @("`"$project`"", $map, "-game", "-resx=$($Res.Split('x')[0])", "-resy=$($Res.Split('x')[1])", "-WinX=$x", "-WinY=40", "-log=$tag.log", "-nosound", "-unattended",
-    "-TraceState", "-StartAt=$startAt", "-PlayScript=`"$scriptPath`"")
+    "-TraceState", "-StartAt=$startAt", "-PlayScript=`"$scriptPath`"", "-BuildIdOverride=$buildId") + $more
   if (-not $Window) { $arguments += "-RenderOffscreen" } else { $arguments += "-windowed" }
   if (-not $Steam) { $arguments += "-NOSTEAM" }
   return Start-Process -FilePath $editor -ArgumentList $arguments -PassThru
@@ -70,12 +76,12 @@ $serverExtra = if ($pair -and $Extra -eq "") { "?listen" } else { $Extra }
 if (-not $Lobby) { $serverExtra = "${serverExtra}?StartNow" }
 if (-not $Bots) { $serverExtra = "${serverExtra}?Bots=0" }
 if (-not $Mice) { $serverExtra = "${serverExtra}?Mice=0" }
-$game = Launch "${Map}${serverExtra}?Nick=${Name}" $Script $Tag $StartAt 0
+$game = Launch "${Map}${serverExtra}?Nick=${Name}" $Script $Tag $StartAt 0 @("-port=$port")
 $client = $null
 if ($pair) {
   Start-Sleep -Seconds $ClientDelay
   # The client joins the host by address, or, with -ClientAlone, starts alone on the level and finds the host through its script.
-  $clientMap = if ($ClientAlone) { $Map } else { "127.0.0.1" }
+  $clientMap = if ($ClientAlone) { $Map } else { "127.0.0.1:$port" }
   $client = Launch "${clientMap}?Nick=${ClientName}" $ClientScript "${Tag}_client" $ClientStartAt 970
 }
 if (-not $game.WaitForExit($TimeoutSeconds * 1000)) {
