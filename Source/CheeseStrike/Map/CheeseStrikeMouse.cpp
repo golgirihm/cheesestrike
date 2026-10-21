@@ -20,22 +20,22 @@
 namespace
 {
 	/** Degrees a second a mouse turns. */
-	constexpr float TurnRate = 200.0f;
+	constexpr float MouseTurnRate = 200.0f;
 	/** How near a point of its way counts as there (cm). */
-	constexpr float PointReached = 40.0f;
+	constexpr float MousePointReached = 40.0f;
 	/** How often it looks again for cheese while going to some (seconds). */
-	constexpr float ChooseEvery = 1.0f;
+	constexpr float MouseChooseEvery = 1.0f;
 	/** A mouse's sounds are a rat's, pitched down by about this for its size, and heard this far (cm), at full loudness within the first. */
-	constexpr float Pitch = 0.7f;
-	constexpr float HeardWithin = 600.0f;
-	constexpr float HeardTo = 3500.0f;
+	constexpr float MousePitch = 0.7f;
+	constexpr float MouseHeardWithin = 600.0f;
+	constexpr float MouseHeardTo = 3500.0f;
 	/** Seconds between its squeaks, from and to; and between its crunches while it eats. */
-	constexpr float SqueakFrom = 4.0f;
-	constexpr float SqueakTo = 9.0f;
-	constexpr float CrunchFrom = 0.4f;
-	constexpr float CrunchTo = 0.9f;
+	constexpr float MouseSqueakFrom = 4.0f;
+	constexpr float MouseSqueakTo = 9.0f;
+	constexpr float MouseCrunchFrom = 0.4f;
+	constexpr float MouseCrunchTo = 0.9f;
 
-	UAudioComponent* Speaker(AActor* Mouse, USceneComponent* Body, const TCHAR* Name)
+	UAudioComponent* MakeSpeaker(AActor* Mouse, USceneComponent* Body, const TCHAR* Name)
 	{
 		UAudioComponent* Audio = Mouse->CreateDefaultSubobject<UAudioComponent>(Name);
 		Audio->SetupAttachment(Body);
@@ -44,12 +44,12 @@ namespace
 		Audio->AttenuationOverrides.bAttenuate = true;
 		Audio->AttenuationOverrides.bSpatialize = true;
 		Audio->AttenuationOverrides.AttenuationShape = EAttenuationShape::Sphere;
-		Audio->AttenuationOverrides.AttenuationShapeExtents = FVector(HeardWithin, 0.0f, 0.0f);
-		Audio->AttenuationOverrides.FalloffDistance = HeardTo - HeardWithin;
+		Audio->AttenuationOverrides.AttenuationShapeExtents = FVector(MouseHeardWithin, 0.0f, 0.0f);
+		Audio->AttenuationOverrides.FalloffDistance = MouseHeardTo - MouseHeardWithin;
 		return Audio;
 	}
 
-	USoundBase* Find(const TCHAR* Name)
+	USoundBase* FindMouseSound(const TCHAR* Name)
 	{
 		ConstructorHelpers::FObjectFinder<USoundBase> Sound(*FString::Printf(TEXT("/Game/OpenGameArt/Mice/SW_%s.SW_%s"), Name, Name));
 		return Sound.Object;
@@ -86,13 +86,13 @@ ACheeseStrikeMouse::ACheeseStrikeMouse()
 	Mesh->SetRelativeScale3D(FVector(CheeseStrikeMice::Scale));
 	Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 
-	Gnawing = Speaker(this, Body, TEXT("Gnawing"));
-	Mouth = Speaker(this, Body, TEXT("Mouth"));
-	Voice = Speaker(this, Body, TEXT("Voice"));
-	Gnawing->SetSound(Find(TEXT("Gnawing")));
-	Squeaks = {Find(TEXT("RatSqueak")), Find(TEXT("RatSqueakPain"))};
-	Crunches = {Find(TEXT("Crunch1")), Find(TEXT("Crunch2")), Find(TEXT("Crunch3")), Find(TEXT("Crunch4"))};
-	Scream = Find(TEXT("RatScream"));
+	Gnawing = MakeSpeaker(this, Body, TEXT("Gnawing"));
+	Mouth = MakeSpeaker(this, Body, TEXT("Mouth"));
+	Voice = MakeSpeaker(this, Body, TEXT("Voice"));
+	Gnawing->SetSound(FindMouseSound(TEXT("Gnawing")));
+	Squeaks = {FindMouseSound(TEXT("RatSqueak")), FindMouseSound(TEXT("RatSqueakPain"))};
+	Crunches = {FindMouseSound(TEXT("Crunch1")), FindMouseSound(TEXT("Crunch2")), FindMouseSound(TEXT("Crunch3")), FindMouseSound(TEXT("Crunch4"))};
+	Scream = FindMouseSound(TEXT("RatScream"));
 }
 
 bool ACheeseStrikeMouse::HasBody() const
@@ -129,7 +129,7 @@ void ACheeseStrikeMouse::BeginPlay()
 	WalkAnimation = Walk.LoadSynchronous();
 	RunAnimation = Run.LoadSynchronous();
 	EatAnimation = Sniff.LoadSynchronous();
-	NextSqueakAt = Now() + FMath::FRandRange(SqueakFrom, SqueakTo);
+	NextSqueakAt = Now() + FMath::FRandRange(MouseSqueakFrom, MouseSqueakTo);
 	ShowDoing();
 }
 
@@ -169,10 +169,10 @@ void ACheeseStrikeMouse::ShowDoing()
 		// Gnawing while it eats; a scream as it runs.
 		if (Doing == EMouseDoing::Eating)
 		{
-			Gnawing->SetPitchMultiplier(Pitch * FMath::FRandRange(0.95f, 1.1f));
+			Gnawing->SetPitchMultiplier(MousePitch * FMath::FRandRange(0.95f, 1.1f));
 			Gnawing->SetVolumeMultiplier(0.6f);
 			Gnawing->Play(FMath::FRandRange(0.0f, 10.0f));
-			NextCrunchAt = Now() + FMath::FRandRange(0.0f, CrunchFrom);
+			NextCrunchAt = Now() + FMath::FRandRange(0.0f, MouseCrunchFrom);
 		}
 		else if (bWasEating)
 		{
@@ -180,7 +180,7 @@ void ACheeseStrikeMouse::ShowDoing()
 		}
 		if (Doing == EMouseDoing::Fleeing && !bFirst)
 		{
-			Say(Voice, Scream, 1.0f, Pitch);
+			Say(Voice, Scream, 1.0f, MousePitch);
 		}
 	}
 	UAnimSequence* Animation = Doing == EMouseDoing::Eating ? EatAnimation.Get() : (Doing == EMouseDoing::Walking ? WalkAnimation.Get() : RunAnimation.Get());
@@ -346,7 +346,7 @@ bool ACheeseStrikeMouse::FollowPath(float Speed, float DeltaSeconds)
 	{
 		const FVector ToPoint = Path[PathIndex] - Here;
 		const float Distance = ToPoint.Size();
-		if (Distance <= FMath::Max(Step, PathIndex == Path.Num() - 1 ? 1.0f : PointReached))
+		if (Distance <= FMath::Max(Step, PathIndex == Path.Num() - 1 ? 1.0f : MousePointReached))
 		{
 			if (Distance <= Step)
 			{
@@ -404,7 +404,7 @@ void ACheeseStrikeMouse::TurnToward(const FVector& Direction, float DeltaSeconds
 		return;
 	}
 	const FRotator Wanted(0.0f, Direction.Rotation().Yaw, 0.0f);
-	SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), Wanted, DeltaSeconds, TurnRate));
+	SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), Wanted, DeltaSeconds, MouseTurnRate));
 }
 
 void ACheeseStrikeMouse::Say(UAudioComponent* Speaker, USoundBase* Sound, float Volume, float Around)
@@ -428,17 +428,17 @@ void ACheeseStrikeMouse::Sound(float DeltaSeconds)
 	const float Time = Now();
 	if (Time >= NextSqueakAt)
 	{
-		NextSqueakAt = Time + FMath::FRandRange(SqueakFrom, SqueakTo);
+		NextSqueakAt = Time + FMath::FRandRange(MouseSqueakFrom, MouseSqueakTo);
 		// Not over its scream.
 		if (!Voice->IsPlaying() && Squeaks.Num() > 0)
 		{
-			Say(Voice, Squeaks[FMath::RandRange(0, Squeaks.Num() - 1)], 0.8f, Pitch);
+			Say(Voice, Squeaks[FMath::RandRange(0, Squeaks.Num() - 1)], 0.8f, MousePitch);
 		}
 	}
 	if (Shown == EMouseDoing::Eating && Time >= NextCrunchAt && Crunches.Num() > 0)
 	{
-		NextCrunchAt = Time + FMath::FRandRange(CrunchFrom, CrunchTo);
-		Say(Mouth, Crunches[FMath::RandRange(0, Crunches.Num() - 1)], 0.7f, Pitch + 0.1f);
+		NextCrunchAt = Time + FMath::FRandRange(MouseCrunchFrom, MouseCrunchTo);
+		Say(Mouth, Crunches[FMath::RandRange(0, Crunches.Num() - 1)], 0.7f, MousePitch + 0.1f);
 	}
 }
 
@@ -484,7 +484,7 @@ void ACheeseStrikeMouse::Tick(float DeltaSeconds)
 		ACheeseStrikeCheese* Cheese = Target.Get();
 		if (Cheese == nullptr || Cheese->GetHealth() <= 0.0f || Cheese->IsActorBeingDestroyed() || Cheese->IsFalling() || Time >= NextChoiceAt)
 		{
-			NextChoiceAt = Time + ChooseEvery;
+			NextChoiceAt = Time + MouseChooseEvery;
 			ChooseCheese();
 			Cheese = Target.Get();
 		}

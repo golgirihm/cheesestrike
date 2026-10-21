@@ -1,0 +1,13 @@
+# tools/package.ps1's first check of a packaged build: the front end, the
+# credits and the lobby, whose icons and map pictures are read as files
+# that the packaging must stage (DirectoriesToAlwaysStageAsUFS).
+wait 5
+shot packaged_1_front_end
+cmd CheeseStrikePage Credits
+wait 1
+shot packaged_2_credits
+cmd CheeseStrikePage Main
+cmd CheeseStrikeHostLan
+wait 8
+shot packaged_3_lobby
+quit
