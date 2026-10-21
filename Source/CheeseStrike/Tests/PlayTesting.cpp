@@ -10,6 +10,8 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerState.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/Crc.h"
+#include "Misc/Paths.h"
 #include "Settings/LevelEditorPlaySettings.h"
 #include "Tests/AutomationCommon.h"
 #include "Tests/AutomationEditorCommon.h"
@@ -155,6 +157,9 @@ namespace PlayTesting
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
 		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 		Settings->SetPlayNumberOfClients(Session.Players);
+		// A port of this working copy's own (tools/worktree.py makes others). The editor finds a free port when the one it is
+		// given is taken, but a match that travels listens again on the one it was given, where another copy's test may be.
+		Settings->SetServerPort(static_cast<uint16>(18000 + FCrc::StrCrc32(*FPaths::ConvertRelativePathToFull(FPaths::ProjectDir()).ToLower()) % 1000));
 		Settings->SetRunUnderOneProcess(true);
 		Settings->bLaunchSeparateServer = false;
 		// The host's options ride on the URL the editor plays, as a person's would from the Play menu.
