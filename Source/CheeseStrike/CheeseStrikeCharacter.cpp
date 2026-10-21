@@ -29,6 +29,7 @@
 #include "GameFramework/PlayerState.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikePlayerController.h"
+#include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -248,9 +249,15 @@ FHitHistory::FSample ACheeseStrikeCharacter::SampleNow(float Time) const
 	return Sample;
 }
 
+bool ACheeseStrikeCharacter::CanBeHurtBy(const ACheeseStrikeCharacter* From, const ACheeseStrikePlayerState* By) const
+{
+	const ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
+	return Mode == nullptr || Mode->CanHurt(By != nullptr ? By : (From != nullptr ? From->GetPlayerState<ACheeseStrikePlayerState>() : nullptr), GetPlayerState<ACheeseStrikePlayerState>(), From == this);
+}
+
 bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead)
 {
-	if (!HasAuthority() || !CanAct() || IsProtected())
+	if (!HasAuthority() || !CanAct() || IsProtected() || !CanBeHurtBy(From, nullptr))
 	{
 		return false;
 	}
@@ -264,15 +271,32 @@ bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From
 	return true;
 }
 
-void ACheeseStrikeCharacter::Die(ACheeseStrikeCharacter* From, bool bHead)
+bool ACheeseStrikeCharacter::TakeBlast(float Damage, ACheeseStrikePlayerState* By, const FString& How)
 {
-	KilledBy = From != nullptr ? From->DisplayName() : FString();
+	ACheeseStrikeCharacter* From = By != nullptr ? By->GetPawn<ACheeseStrikeCharacter>() : nullptr;
+	if (!HasAuthority() || !CanAct() || IsProtected() || By == nullptr || !CanBeHurtBy(nullptr, By))
+	{
+		return false;
+	}
+	Health = FMath::Max(0.0f, Health - Damage);
+	LastHurtBy = From;
+	LastHurtAt = ServerNow();
+	if (!IsAlive())
+	{
+		Die(From, false, By, How);
+	}
+	return true;
+}
+
+void ACheeseStrikeCharacter::Die(ACheeseStrikeCharacter* From, bool bHead, ACheeseStrikePlayerState* By, const FString& How)
+{
+	KilledBy = By != nullptr ? By->GetPlayerName() : (From != nullptr ? From->DisplayName() : FString());
 	DiedAt = ServerNow();
-	UE_LOG(LogCheeseStrike, Display, TEXT("%s is killed by %s"), *DisplayName(), From != nullptr ? *From->DisplayName() : TEXT("nobody"));
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s is killed by %s%s"), *DisplayName(), KilledBy.IsEmpty() ? TEXT("nobody") : *KilledBy, How.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("'s %s"), *How));
 	ShowDeath();
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
 	{
-		Mode->Killed(From, this, bHead);
+		Mode->Killed(From, this, bHead, By, How);
 	}
 }
 
@@ -685,6 +709,15 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	EnhancedInputComponent->BindAction(Input->NextWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::NextWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->PreviousWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::PreviousWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->LastWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::LastWeaponStarted);
+	EnhancedInputComponent->BindAction(Input->Streak, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::StreakStarted);
+}
+
+void ACheeseStrikeCharacter::StreakStarted()
+{
+	if (ACheeseStrikePlayerState* Player = GetPlayerState<ACheeseStrikePlayerState>(); Player != nullptr && TakesInput())
+	{
+		Player->StreakPressed();
+	}
 }
 
 void ACheeseStrikeCharacter::MoveInput(const FInputActionValue& Value)
@@ -875,6 +908,12 @@ void ACheeseStrikeCharacter::LastWeaponStarted()
 
 void ACheeseStrikeCharacter::FireStarted()
 {
+	// Marking where a Cheese Strike goes, the shot marks it instead.
+	if (ACheeseStrikePlayerState* Player = GetPlayerState<ACheeseStrikePlayerState>(); Player != nullptr && Player->IsMarkingStrike() && TakesInput())
+	{
+		Player->MarkStrike();
+		return;
+	}
 	DoFire(true);
 }
 

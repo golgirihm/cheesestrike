@@ -28,6 +28,7 @@
 #include "EngineUtils.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
+#include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "UI/CheeseStrikeTones.h"
@@ -513,6 +514,12 @@ void ACheeseStrikePlayerController::MenuPressed()
 		return;
 	}
 	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
+	// Marking where a Cheese Strike goes, Escape calls it off rather than pausing.
+	if (ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>(); Mine != nullptr && Mine->IsMarkingStrike() && !bPaused)
+	{
+		Mine->CancelStrike();
+		return;
+	}
 	if (State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded())
 	{
 		// From the options back to the pause menu, still paused; otherwise pause or resume.

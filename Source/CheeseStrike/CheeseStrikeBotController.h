@@ -14,8 +14,8 @@ class ACheeseStrikeCharacter;
  * player's, and this, which plays it on the server by the design's bots
  * (docs/unreal/design.md, "Bots"; the numbers in Rules/CheeseStrikeBots.h).
  *
- * Ten times a second it looks: an enemy is anyone else alive and not just
- * come back, in its sight cone (or right beside it) with a clear line to
+ * Ten times a second it looks: an enemy is anyone alive on the other side
+ * (anyone else in free-for-all) and not just come back, in its sight cone (or right beside it) with a clear line to
  * them. It fights the one it was already fighting, else whoever is shooting
  * it, else the nearest; with nobody in sight it turns to whoever shot it or
  * to a shot it heard, goes to where it last saw an enemy, and otherwise
@@ -74,6 +74,10 @@ protected:
 	/** The ten-a-second decisions: what it sees, whom it fights, where it goes. */
 	void Think();
 	void Perceive();
+	/** Whether `Other` is on the other side (anyone else in free-for-all): a bot fights, hears and hunts only its enemies. */
+	bool IsEnemy(const ACheeseStrikeCharacter* Other) const;
+	/** Calls in its next streak, as a player would: the drone and the Overload soon after earning them, the Cheese Strike on an enemy it has just seen. */
+	void ThinkAboutStreaks();
 	void ChooseWhereToGo();
 	/** Every frame: where it looks, whether it fires, and its side steps. */
 	void AimAndFire(float DeltaSeconds);
@@ -124,4 +128,6 @@ protected:
 	float NextThinkAt = 0.0f;
 	/** When it last changed weapons, so that it doesn't change back and forth. */
 	float ChangedWeaponAt = -1000.0f;
+	/** When it began holding the streak it has ready; -1 with none. */
+	float StreakHeldSince = -1.0f;
 };

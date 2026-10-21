@@ -7,21 +7,30 @@
 #include "GameFramework/GameMode.h"
 #include "Rules/CheeseStrikeBots.h"
 #include "Rules/CheeseStrikeMice.h"
+#include "Rules/CheeseStrikeModes.h"
+#include "Rules/CheeseStrikeStreaks.h"
 #include "CheeseStrikeGameMode.generated.h"
 
 class ACheeseStrikeCharacter;
 class ACheeseStrikeGameState;
+class ACheeseStrikePlayerState;
 
 /**
- * The game's rules, applied on the server: a free-for-all. Every player is
- * a CheeseStrikeCharacter driven by a CheeseStrikePlayerController. A kill
- * is scored to the killer (CheeseStrikePlayerState) and shown to everyone
- * (CheeseStrikeGameState's feed); the killed come back after the respawn
- * delay at the start furthest from everyone else; the match ends when
- * someone reaches the kill limit. The host sets the limit and the delay
- * on the map's URL (`?KillLimit=10?RespawnDelay=1`), and may change them
- * from the lobby; the template's own wandering enemies are kept off the
- * level.
+ * The game's rules, applied on the server, in the mode the host picked
+ * (CheeseStrikeModes; `?Mode=` on the map's URL): free-for-all, Deathmatch
+ * (two teams to a kill limit) or Elimination (two teams, one life a round,
+ * first to the round limit). Every player is a CheeseStrikeCharacter driven
+ * by a CheeseStrikePlayerController. A kill is scored to the killer
+ * (CheeseStrikePlayerState), and to their team in Deathmatch, and shown to
+ * everyone (CheeseStrikeGameState's feed); the killed come back after the
+ * respawn delay at the start furthest from their enemies (in a team mode,
+ * at one of their side's), except in Elimination, where they are out until
+ * the next round; the match ends when someone, or a team, reaches the
+ * limit. Friendly fire is off in a team mode. Kills in a row earn streaks
+ * (CheeseStrikeStreaks), called in through CallStreak. The host sets the
+ * limits on the URL (`?KillLimit=10?RespawnDelay=1?Rounds=4?RoundTime=120`),
+ * and may change them from the lobby; the template's own wandering enemies
+ * are kept off the level.
  */
 UCLASS()
 class CHEESESTRIKE_API ACheeseStrikeGameMode : public AGameMode
@@ -34,8 +43,32 @@ public:
 	int32 GetKillLimit() const { return KillLimit; }
 	float GetRespawnDelay() const { return RespawnDelay; }
 
-	/** `Victim` has been killed by `Killer` (null for nobody), on the head or not. */
-	void Killed(ACheeseStrikeCharacter* Killer, ACheeseStrikeCharacter* Victim, bool bHead);
+	/** `Victim` has been killed by `Killer` (null for nobody), on the head or not; or by `By`'s streak, named `How`, whether or not they have a character now. */
+	void Killed(ACheeseStrikeCharacter* Killer, ACheeseStrikeCharacter* Victim, bool bHead, ACheeseStrikePlayerState* By = nullptr, const FString& How = FString());
+
+	/** The mode being played, and the host changing it from the lobby (on the match's state for everyone, and on the next match's URL). */
+	CheeseStrikeModes::EMode GetMode() const { return Mode; }
+	void SetMode(CheeseStrikeModes::EMode InMode);
+	/** Elimination's rounds to win, and a round's length. */
+	int32 GetRoundLimit() const { return RoundLimit; }
+	float GetRoundTime() const { return RoundTime; }
+	/** Whether `Attacker`'s shots or streaks may hurt `Victim` (`bSelf` for their own): never a teammate in a team mode, nobody between rounds; anything with no attacker may. */
+	bool CanHurt(const ACheeseStrikePlayerState* Attacker, const ACheeseStrikePlayerState* Victim, bool bSelf) const;
+	/**
+	 * `Caller` calls in `Kind`, their next streak: the Unmanned Aerial
+	 * Cheese, the Cheese Strike on `Spot` along `Yaw`, or the Gouda
+	 * Overload. False, and nothing happens, unless it is their next, they
+	 * are alive in a match that is on, and (for a strike) the spot is in
+	 * range.
+	 */
+	bool CallStreak(ACheeseStrikePlayerState* Caller, CheeseStrikeStreaks::EStreak Kind, const FVector& Spot, float Yaw);
+	/** From the host's console or a play script: gives a streak (1 the Unmanned Aerial Cheese, 2 the Cheese Strike, 3 the Gouda Overload) to the host, to the player or bot named, or to an enemy of the host's ("enemy"). */
+	UFUNCTION(Exec)
+	void CheeseStrikeGiveStreak(int32 Kind, const FString& Player = TEXT(""));
+	/** In Elimination a newcomer comes in only at a round's start; later, they are out until the next. */
+	virtual bool PlayerCanRestart_Implementation(APlayerController* Player) override;
+	/** Someone leaving may end a round of Elimination. */
+	virtual void Logout(AController* Exiting) override;
 
 	/**
 	 * Starts the match from the lobby: at once, or after the design's
@@ -98,9 +131,28 @@ protected:
 	FString RulesOptions() const;
 	/** What ServerTravel is given for `Url`: its map and options, without its host and port. */
 	static FString TravelTo(const FURL& Url);
+	/** The match is over: `Team` has won it. */
+	void EndMatchFor(int32 Team);
+	/** Elimination: a round begins, everyone back at their side's starts with full health (the first comes with the match). */
+	void StartRound(bool bFirst);
+	void NextRound() { StartRound(false); }
+	/** Elimination: ends the round if a side is gone, or whatever stands when `bTimeUp`. */
+	void CheckRound(bool bTimeUp);
+	void RoundTimeUp() { CheckRound(true); }
+	void CheckRoundNow() { CheckRound(false); }
+	/** Elimination: `Winner` (or nobody, NoTeam) takes the round; the match, at the round limit, or a pause before the next. */
+	void EndRound(int32 Winner);
+	/** Where an Unmanned Aerial Cheese circles: over the middle of the starts, high above the highest. */
+	void DroneCircle(FVector& OutCentre, float& OutRadius) const;
 
 	int32 KillLimit;
 	float RespawnDelay;
+	CheeseStrikeModes::EMode Mode = CheeseStrikeModes::EMode::FreeForAll;
+	int32 RoundLimit = CheeseStrikeModes::RoundLimit;
+	float RoundTime = CheeseStrikeModes::RoundTime;
+	/** The world's time the round being played began. */
+	float RoundStartedAt = 0.0f;
+	FTimerHandle RoundTimer;
 	int32 BotsWanted = -1;
 	int32 MapIndex = INDEX_NONE;
 	int32 BotSeed = 0;

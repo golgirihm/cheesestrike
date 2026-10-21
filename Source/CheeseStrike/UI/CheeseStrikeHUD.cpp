@@ -14,6 +14,7 @@
 #include "Engine/GameInstance.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
+#include "UI/CheeseStrikeModeHUD.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 namespace
@@ -48,11 +49,13 @@ void ACheeseStrikeHUD::DrawHUD()
 	{
 		DrawFight(Character, FieldOfView);
 	}
-	else if (Character != nullptr && !Character->IsAlive() && !bOver)
+	else if (Character != nullptr && !Character->IsAlive() && !bOver && !CheeseStrikeModeHUD::IsOut(this))
 	{
 		DrawDeath(Character, Match);
 	}
 	DrawKillFeed(Match);
+	// The mode's and the streaks' own: the teams' scores, announcements, the streak to call in, the Cheese Strike's mark.
+	CheeseStrikeModeHUD::Draw(this, Canvas);
 	DrawSessions();
 	if (!bOver)
 	{
@@ -210,10 +213,10 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	const float Left = (Width - PanelWidth) / 2.0f;
 	const float Top = Canvas->SizeY * 0.2f;
 	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), Left, Top, PanelWidth, PanelHeight);
-	const FString Title = bOver ? (Match->GetWinnerName().IsEmpty() ? TEXT("MATCH OVER") : FString::Printf(TEXT("%s WINS"), *Match->GetWinnerName().ToUpper())) : TEXT("FREE-FOR-ALL");
+	const FString Title = bOver ? (Match->GetWinnerName().IsEmpty() ? TEXT("MATCH OVER") : FString::Printf(TEXT("%s %s"), *Match->GetWinnerName().ToUpper(), Match->HasTeams() ? TEXT("WIN") : TEXT("WINS"))) : CheeseStrikeModes::Title(Match->GetMode());
 	DrawCentred(Title, Width / 2.0f, Top + 16.0f, Font, 1.8f, bOver ? Yellow : White);
 	const float ToLobby = Match->GetLobbyAt() > 0.0f ? FMath::Max(0.0f, Match->GetLobbyAt() - static_cast<float>(Match->GetServerWorldTimeSeconds())) : -1.0f;
-	DrawCentred(bOver && ToLobby >= 0.0f ? FString::Printf(TEXT("first to %d kills  ·  back to the lobby in %.0f s"), Match->GetKillLimit(), FMath::CeilToFloat(ToLobby)) : FString::Printf(TEXT("first to %d kills"), Match->GetKillLimit()), Width / 2.0f, Top + 50.0f, Font, 1.0f, Faint);
+	DrawCentred(bOver && ToLobby >= 0.0f ? FString::Printf(TEXT("%s  ·  back to the lobby in %.0f s"), *Match->GoalText(), FMath::CeilToFloat(ToLobby)) : Match->GoalText(), Width / 2.0f, Top + 50.0f, Font, 1.0f, Faint);
 	float Y = Top + 80.0f;
 	DrawText(TEXT("PLAYER"), Faint, Left + 20.0f, Y, Font, 1.0f);
 	DrawText(TEXT("KILLS"), Faint, Left + PanelWidth - 150.0f, Y, Font, 1.0f);

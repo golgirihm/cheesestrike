@@ -236,6 +236,7 @@ const UInputAction* UCheeseStrikePlayScript::ActionNamed(const FString& Name) co
 	if (Lower == TEXT("lastweapon")) return Input->LastWeapon;
 	if (Lower == TEXT("scoreboard")) return Input->Scoreboard;
 	if (Lower == TEXT("menu")) return Input->Menu;
+	if (Lower == TEXT("streak")) return Input->Streak;
 	return nullptr;
 }
 

@@ -1,0 +1,26 @@
+// Copyright (c) 2026 Hamid Golgiri. All rights reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+
+class USoundWaveProcedural;
+
+/**
+ * Sounds the streaks make that have no recording yet, made in code: a
+ * falling bomb's whistle and an air-raid siren. Each is a few seconds of
+ * 16-bit mono at SampleRate, played once by a procedural sound wave made
+ * for that one playing. Recorded, licensed sounds may replace them, as
+ * the design's "Audio" says.
+ */
+namespace CheeseStrikeSynth
+{
+	constexpr int32 SampleRate = 22050;
+
+	/** A falling bomb's whistle: a tone gliding down from high to low over `Seconds`, growing louder as it comes. */
+	TArray<int16> Whistle(float Seconds);
+	/** An air-raid siren, rising and falling, for `Seconds`. */
+	TArray<int16> Siren(float Seconds);
+	/** A sound, owned by `Outer`, that plays `Samples` once. */
+	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples);
+}

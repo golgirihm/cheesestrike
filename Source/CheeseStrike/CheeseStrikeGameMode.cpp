@@ -19,6 +19,8 @@
 #include "Map/CheeseStrikeCheese.h"
 #include "Map/CheeseStrikeMouse.h"
 #include "NavigationSystem.h"
+#include "Streaks/CheeseStrikeAerialCheese.h"
+#include "Streaks/CheeseStrikeBombs.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Variant_Shooter/AI/ShooterNPC.h"
 #include "Variant_Shooter/AI/ShooterNPCSpawner.h"
@@ -37,8 +39,11 @@ ACheeseStrikeGameMode::ACheeseStrikeGameMode()
 void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
-	KillLimit = CheeseStrikeRules::KillLimitFrom(Options);
+	Mode = CheeseStrikeModes::ModeFrom(Options);
+	KillLimit = CheeseStrikeModes::KillLimitFor(Mode, Options);
 	RespawnDelay = CheeseStrikeRules::RespawnDelayFrom(Options);
+	RoundLimit = CheeseStrikeModes::RoundLimitFrom(Options);
+	RoundTime = CheeseStrikeModes::RoundTimeFrom(Options);
 	// The match waits in the lobby for the host to start it, unless told not to.
 	bDelayedStart = !CheeseStrikeRules::StartsAtOnce(Options);
 	BotsWanted = CheeseStrikeRules::BotsFrom(Options);
@@ -53,7 +58,7 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	{
 		bDelayedStart = false;
 	}
-	UE_LOG(LogCheeseStrike, Display, TEXT("Free-for-all to %d kills, back %.1f s after a death%s, %s bots"), KillLimit, RespawnDelay, bDelayedStart ? TEXT(", waiting in the lobby") : TEXT(""), BotsWanted < 0 ? TEXT("filling in with") : *FString::FromInt(BotsWanted));
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s, %s, back %.1f s after a death%s, %s bots"), CheeseStrikeModes::Info(Mode).Name, *CheeseStrikeModes::Goal(Mode, KillLimit, RoundLimit), RespawnDelay, bDelayedStart ? TEXT(", waiting in the lobby") : TEXT(""), BotsWanted < 0 ? TEXT("filling in with") : *FString::FromInt(BotsWanted));
 	// The template's level comes with spawners for its own enemies, who would wander about the menu's view and the match: none of them.
 	for (TActorIterator<AShooterNPCSpawner> It(GetWorld()); It; ++It)
 	{
@@ -101,6 +106,7 @@ void ACheeseStrikeGameMode::SetRules(int32 InKillLimit, float InRespawnDelay, in
 FString ACheeseStrikeGameMode::RulesOptions() const
 {
 	FString Options = FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?BotSeed=%d?BotSkill=%d"), KillLimit, RespawnDelay, BotSeed, BotSkill);
+	Options += FString::Printf(TEXT("?Mode=%s?Rounds=%d?RoundTime=%.0f"), CheeseStrikeModes::Info(Mode).Key, RoundLimit, RoundTime);
 	if (MapIndex >= 0)
 	{
 		Options += FString::Printf(TEXT("?Map=%d"), MapIndex);
@@ -121,7 +127,7 @@ void ACheeseStrikeGameMode::CountdownOver()
 	// level's with the map changed, so that the host listens where the players reconnect (the same port).
 	FURL Url = GetWorld()->URL;
 	Url.Map = CheeseStrikeRules::Maps[MapIndex].Level;
-	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("BotSkill"), TEXT("Bots"), TEXT("Players"), TEXT("StartNow")})
+	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("BotSkill"), TEXT("Bots"), TEXT("Players"), TEXT("StartNow"), TEXT("Mode"), TEXT("Rounds"), TEXT("RoundTime")})
 	{
 		Url.RemoveOption(Option);
 	}
@@ -177,7 +183,7 @@ void ACheeseStrikeGameMode::RestartGame()
 	// The engine's restart would travel by the URL the match was hosted with; this one carries the rules as the host left them,
 	// and goes back to the lobby on this map even if the match came here from another.
 	FURL Url = GetWorld()->URL;
-	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("BotSkill"), TEXT("Bots"), TEXT("Players")})
+	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("BotSkill"), TEXT("Bots"), TEXT("Players"), TEXT("Mode"), TEXT("Rounds"), TEXT("RoundTime")})
 	{
 		Url.RemoveOption(Option);
 	}
@@ -303,6 +309,10 @@ void ACheeseStrikeGameMode::HandleMatchHasStarted()
 		State->SetCountdownEndsAt(0.0f);
 	}
 	SpawnBots();
+	if (CheeseStrikeModes::Info(Mode).WinBy == CheeseStrikeModes::EWinBy::Rounds)
+	{
+		StartRound(true);
+	}
 	// The mice come a minute in, when there is cheese for them.
 	int32 Blocks = 0;
 	for (TActorIterator<ACheeseStrikeCheese> It(GetWorld()); It; ++It)
@@ -404,6 +414,8 @@ void ACheeseStrikeGameMode::InitGameState()
 	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 	{
 		State->SetLimits(KillLimit, RespawnDelay);
+		State->SetMode(Mode);
+		State->SetRoundLimit(RoundLimit);
 		// The bots' names are drawn once, so that the lobby and the match agree on them.
 		State->SetBots(CheeseStrikeRules::BotNames(BotSeed, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize), BotsWanted);
 		State->SetMapIndex(MapIndex);
@@ -432,20 +444,31 @@ void ACheeseStrikeGameMode::SetBotSkill(int32 Skill)
 	UE_LOG(LogCheeseStrike, Display, TEXT("Bots play at %s"), CheeseStrikeBots::Skill(BotSkill).Name);
 }
 
-void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrikeCharacter* Victim, bool bHead)
+void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrikeCharacter* Victim, bool bHead, ACheeseStrikePlayerState* By, const FString& How)
 {
 	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
 	if (Victim == nullptr || State == nullptr)
 	{
 		return;
 	}
-	ACheeseStrikePlayerState* KillerState = Killer != nullptr ? Killer->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+	const CheeseStrikeModes::FModeInfo& Rules = CheeseStrikeModes::Info(Mode);
+	ACheeseStrikePlayerState* KillerState = By != nullptr ? By : (Killer != nullptr ? Killer->GetPlayerState<ACheeseStrikePlayerState>() : nullptr);
 	ACheeseStrikePlayerState* VictimState = Victim->GetPlayerState<ACheeseStrikePlayerState>();
 	if (KillerState != nullptr && KillerState != VictimState)
 	{
-		KillerState->AddKill();
+		// A weapon's kill counts toward the next streak; a streak's doesn't.
+		const CheeseStrikeStreaks::EStreak Earned = KillerState->AddKill(How.IsEmpty());
+		if (Earned != CheeseStrikeStreaks::EStreak::None)
+		{
+			UE_LOG(LogCheeseStrike, Display, TEXT("Streak: %s has %d in a row and earns %s %s"), *KillerState->GetPlayerName(), KillerState->GetStreak(), CheeseStrikeStreaks::Info(Earned).Article, CheeseStrikeStreaks::Info(Earned).Name);
+		}
+		if (Rules.WinBy == CheeseStrikeModes::EWinBy::TeamKills && State->AreEnemies(KillerState, VictimState))
+		{
+			State->AddTeamScore(KillerState->GetTeam(), 1);
+		}
 		// Until there are ammunition crates to go to (docs/unreal/design.md, "Pickups"), a kill brings a magazine's worth, so that nobody runs dry.
-		if (ACheeseStrikeWeapon* Weapon = Killer->GetWeapon())
+		ACheeseStrikeCharacter* KillerBody = Killer != nullptr ? Killer : KillerState->GetPawn<ACheeseStrikeCharacter>();
+		if (ACheeseStrikeWeapon* Weapon = KillerBody != nullptr ? KillerBody->GetWeapon() : nullptr)
 		{
 			Weapon->AddReserve(Weapon->GetStats().MagazineSize);
 		}
@@ -454,20 +477,334 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 	{
 		VictimState->AddDeath();
 	}
-	State->AddKill(Killer != nullptr ? Killer->DisplayName() : FString(), Victim->DisplayName(), bHead);
-	UE_LOG(LogCheeseStrike, Display, TEXT("Kill: %s killed %s%s; %d of %d"), Killer != nullptr ? *Killer->DisplayName() : TEXT("nobody"), *Victim->DisplayName(), bHead ? TEXT(" on the head") : TEXT(""), State->MostKills(), KillLimit);
+	const FString KillerName = KillerState != nullptr ? KillerState->GetPlayerName() : (Killer != nullptr ? Killer->DisplayName() : FString());
+	State->AddKill(KillerName, Victim->DisplayName(), bHead, How);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Kill: %s killed %s%s%s; %s"), KillerName.IsEmpty() ? TEXT("nobody") : *KillerName, *Victim->DisplayName(), bHead ? TEXT(" on the head") : TEXT(""), How.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" with the %s"), *How), *State->ScoreSummary());
 
-	if (IsMatchInProgress() && CheeseStrikeRules::IsOver(State->MostKills(), KillLimit))
+	if (!IsMatchInProgress())
 	{
-		State->SetWinnerName(CheeseStrikeRules::Leader(State->Standings()));
-		UE_LOG(LogCheeseStrike, Display, TEXT("Match over: %s wins"), *State->GetWinnerName());
-		EndMatch();
 		return;
 	}
-	if (AController* Player = Victim->GetController())
+	switch (Rules.WinBy)
+	{
+	case CheeseStrikeModes::EWinBy::PlayerKills:
+		if (CheeseStrikeRules::IsOver(State->MostKills(), KillLimit))
+		{
+			State->SetWinnerName(CheeseStrikeRules::Leader(State->Standings()));
+			UE_LOG(LogCheeseStrike, Display, TEXT("Match over: %s wins"), *State->GetWinnerName());
+			EndMatch();
+			return;
+		}
+		break;
+	case CheeseStrikeModes::EWinBy::TeamKills:
+	{
+		const int32 Scores[CheeseStrikeRules::Teams] = {State->GetTeamScore(0), State->GetTeamScore(1)};
+		const int32 Winner = CheeseStrikeModes::TeamAtLimit(Scores, KillLimit);
+		if (Winner != CheeseStrikeModes::NoTeam)
+		{
+			EndMatchFor(Winner);
+			return;
+		}
+		break;
+	}
+	case CheeseStrikeModes::EWinBy::Rounds:
+		// One life a round: out until the next.
+		if (VictimState != nullptr)
+		{
+			VictimState->SetOut(true);
+		}
+		CheckRound(false);
+		return;
+	}
+	AController* Player = Victim->GetController();
+	if (Player != nullptr && Rules.bRespawns)
 	{
 		FTimerHandle Handle;
 		GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateUObject(this, &ACheeseStrikeGameMode::Respawn, TWeakObjectPtr<AController>(Player)), RespawnDelay, false);
+	}
+}
+
+void ACheeseStrikeGameMode::EndMatchFor(int32 Team)
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr || Team < 0 || Team >= CheeseStrikeRules::Teams)
+	{
+		return;
+	}
+	State->SetWinningTeam(Team);
+	State->SetWinnerName(CheeseStrikeRules::TeamNames[Team]);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Match over: %s win, %s"), CheeseStrikeRules::TeamNames[Team], *State->ScoreSummary());
+	EndMatch();
+}
+
+bool ACheeseStrikeGameMode::CanHurt(const ACheeseStrikePlayerState* Attacker, const ACheeseStrikePlayerState* Victim, bool bSelf) const
+{
+	if (Attacker == nullptr || Victim == nullptr)
+	{
+		return true;
+	}
+	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	return CheeseStrikeModes::CanHurt(CheeseStrikeModes::Info(Mode).bTeams, Attacker->GetTeam(), Victim->GetTeam(), bSelf || Attacker == Victim, State != nullptr && State->IsRoundBreak());
+}
+
+void ACheeseStrikeGameMode::SetMode(CheeseStrikeModes::EMode InMode)
+{
+	Mode = InMode;
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetMode(Mode);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Mode: %s"), CheeseStrikeModes::Info(Mode).Name);
+}
+
+bool ACheeseStrikeGameMode::PlayerCanRestart_Implementation(APlayerController* Player)
+{
+	if (!Super::PlayerCanRestart_Implementation(Player))
+	{
+		return false;
+	}
+	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (CheeseStrikeModes::Info(Mode).WinBy != CheeseStrikeModes::EWinBy::Rounds || State == nullptr || !IsMatchInProgress() || State->GetRound() == 0)
+	{
+		return true;
+	}
+	// Into a round well under way, or between rounds: out until the next.
+	const bool bLate = State->IsRoundBreak() || GetWorld()->GetTimeSeconds() - RoundStartedAt > CheeseStrikeModes::LateJoin;
+	if (bLate)
+	{
+		if (ACheeseStrikePlayerState* Theirs = Player != nullptr ? Player->GetPlayerState<ACheeseStrikePlayerState>() : nullptr)
+		{
+			Theirs->SetOut(true);
+		}
+		return false;
+	}
+	return true;
+}
+
+void ACheeseStrikeGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+	if (CheeseStrikeModes::Info(Mode).WinBy == CheeseStrikeModes::EWinBy::Rounds && IsMatchInProgress())
+	{
+		GetWorldTimerManager().SetTimerForNextTick(this, &ACheeseStrikeGameMode::CheckRoundNow);
+	}
+}
+
+void ACheeseStrikeGameMode::StartRound(bool bFirst)
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	UWorld* World = GetWorld();
+	if (State == nullptr || World == nullptr || !IsMatchInProgress())
+	{
+		return;
+	}
+	const int32 Number = bFirst ? 1 : State->GetRound() + 1;
+	RoundStartedAt = World->GetTimeSeconds();
+	State->StartRound(Number, State->GetServerWorldTimeSeconds() + RoundTime);
+	if (!bFirst)
+	{
+		// Everyone back at their side's starts with full health, the living too, and the fallen cleared away.
+		TArray<AController*> Everyone;
+		for (FConstControllerIterator It = World->GetControllerIterator(); It; ++It)
+		{
+			AController* Each = It->Get();
+			if (Each != nullptr && Each->GetPlayerState<ACheeseStrikePlayerState>() != nullptr)
+			{
+				Everyone.Add(Each);
+			}
+		}
+		for (AController* Each : Everyone)
+		{
+			Each->GetPlayerState<ACheeseStrikePlayerState>()->SetOut(false);
+			if (APawn* Body = Each->GetPawn())
+			{
+				Each->UnPossess();
+				Body->Destroy();
+			}
+		}
+		TArray<ACheeseStrikeCharacter*> Fallen;
+		for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+		{
+			Fallen.Add(*It);
+		}
+		for (ACheeseStrikeCharacter* Body : Fallen)
+		{
+			Body->Destroy();
+		}
+		for (AController* Each : Everyone)
+		{
+			RestartPlayer(Each);
+		}
+	}
+	GetWorldTimerManager().SetTimer(RoundTimer, this, &ACheeseStrikeGameMode::RoundTimeUp, RoundTime, false);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Round %d: %s"), Number, *State->ScoreSummary());
+	if (!bFirst)
+	{
+		State->Announce(FString::Printf(TEXT("Round %d"), Number));
+	}
+}
+
+void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || State->GetRound() == 0)
+	{
+		return;
+	}
+	CheeseStrikeModes::FSide Sides[CheeseStrikeRules::Teams];
+	for (const APlayerState* Each : State->PlayerArray)
+	{
+		const ACheeseStrikePlayerState* Player = Cast<ACheeseStrikePlayerState>(Each);
+		if (Player == nullptr || Player->GetTeam() < 0 || Player->GetTeam() >= CheeseStrikeRules::Teams || Player->IsInactive())
+		{
+			continue;
+		}
+		CheeseStrikeModes::FSide& Side = Sides[Player->GetTeam()];
+		++Side.Members;
+		const ACheeseStrikeCharacter* Body = Player->GetPawn<ACheeseStrikeCharacter>();
+		if (!Player->IsOut() && Body != nullptr && Body->IsAlive())
+		{
+			++Side.Alive;
+			Side.Health += Body->GetHealth();
+		}
+	}
+	int32 Winner = CheeseStrikeModes::NoTeam;
+	if (CheeseStrikeModes::RoundOver(Sides[0], Sides[1], bTimeUp, Winner))
+	{
+		EndRound(Winner);
+	}
+}
+
+void ACheeseStrikeGameMode::EndRound(int32 Winner)
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr)
+	{
+		return;
+	}
+	GetWorldTimerManager().ClearTimer(RoundTimer);
+	if (Winner != CheeseStrikeModes::NoTeam)
+	{
+		State->AddTeamScore(Winner, 1);
+	}
+	const FString Word = Winner != CheeseStrikeModes::NoTeam ? FString::Printf(TEXT("%s take round %d"), CheeseStrikeRules::TeamNames[Winner], State->GetRound()) : FString::Printf(TEXT("Round %d is a draw"), State->GetRound());
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s: %s"), *Word, *State->ScoreSummary());
+	if (Winner != CheeseStrikeModes::NoTeam && State->GetTeamScore(Winner) >= RoundLimit)
+	{
+		State->EndRound(Winner, 0.0f);
+		EndMatchFor(Winner);
+		return;
+	}
+	State->EndRound(Winner, State->GetServerWorldTimeSeconds() + CheeseStrikeModes::RoundBreak);
+	State->Announce(Word, CheeseStrikeStreaks::EStreak::None, Winner);
+	GetWorldTimerManager().SetTimer(RoundTimer, this, &ACheeseStrikeGameMode::NextRound, CheeseStrikeModes::RoundBreak, false);
+}
+
+bool ACheeseStrikeGameMode::CallStreak(ACheeseStrikePlayerState* Caller, CheeseStrikeStreaks::EStreak Kind, const FVector& Spot, float Yaw)
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	UWorld* World = GetWorld();
+	const ACheeseStrikeCharacter* Body = Caller != nullptr ? Caller->GetPawn<ACheeseStrikeCharacter>() : nullptr;
+	if (State == nullptr || World == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || Body == nullptr || !Body->IsAlive() || Caller->NextStreak() != Kind)
+	{
+		return false;
+	}
+	if (Kind == CheeseStrikeStreaks::EStreak::CheeseStrike && FVector::Dist(Spot, Body->GetActorLocation()) > CheeseStrikeStreaks::StrikeRange + 500.0f)
+	{
+		UE_LOG(LogCheeseStrike, Warning, TEXT("Cheese Strike from %s refused: out of range"), *Caller->GetPlayerName());
+		return false;
+	}
+	Caller->TakeStreak(Kind);
+	const float Now = State->GetServerWorldTimeSeconds();
+	FActorSpawnParameters Parameters;
+	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	switch (Kind)
+	{
+	case CheeseStrikeStreaks::EStreak::AerialCheese:
+	{
+		State->RevealFor(Caller, Now + CheeseStrikeStreaks::RevealTime);
+		FVector Centre;
+		float Radius = 0.0f;
+		DroneCircle(Centre, Radius);
+		if (ACheeseStrikeAerialCheese* Drone = World->SpawnActor<ACheeseStrikeAerialCheese>(ACheeseStrikeAerialCheese::StaticClass(), FTransform(Centre), Parameters))
+		{
+			Drone->Fly(Centre, Radius, Now, Now + CheeseStrikeStreaks::RevealTime);
+		}
+		break;
+	}
+	case CheeseStrikeStreaks::EStreak::CheeseStrike:
+		if (ACheeseStrikeBombs* Bombs = World->SpawnActor<ACheeseStrikeBombs>(ACheeseStrikeBombs::StaticClass(), FTransform(Spot), Parameters))
+		{
+			Bombs->StartStrike(Caller, Spot, Yaw);
+		}
+		break;
+	case CheeseStrikeStreaks::EStreak::GoudaOverload:
+		if (ACheeseStrikeBombs* Bombs = World->SpawnActor<ACheeseStrikeBombs>(ACheeseStrikeBombs::StaticClass(), FTransform(Body->GetActorLocation()), Parameters))
+		{
+			Bombs->StartOverload(Caller);
+		}
+		break;
+	default:
+		return false;
+	}
+	const FString Word = CheeseStrikeStreaks::CalledIn(Caller->GetPlayerName(), Kind);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Streak: %s"), *Word);
+	State->Announce(Word, Kind, State->HasTeams() ? Caller->GetTeam() : CheeseStrikeModes::NoTeam, Caller->GetPlayerName());
+	return true;
+}
+
+void ACheeseStrikeGameMode::DroneCircle(FVector& OutCentre, float& OutRadius) const
+{
+	FBox Starts(ForceInit);
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	{
+		Starts += It->GetActorLocation();
+	}
+	if (!Starts.IsValid)
+	{
+		OutCentre = FVector(0.0f, 0.0f, CheeseStrikeStreaks::DroneAltitude);
+		OutRadius = 2000.0f;
+		return;
+	}
+	OutCentre = FVector(Starts.GetCenter().X, Starts.GetCenter().Y, Starts.Max.Z + CheeseStrikeStreaks::DroneAltitude);
+	OutRadius = FMath::Clamp(static_cast<float>(Starts.GetExtent().Size2D()) * 0.5f, 1000.0f, 6000.0f);
+}
+
+void ACheeseStrikeGameMode::CheeseStrikeGiveStreak(int32 Kind, const FString& Player)
+{
+	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr)
+	{
+		return;
+	}
+	// The host: the player at the server's own keyboard.
+	const ACheeseStrikePlayerState* Host = nullptr;
+	for (APlayerState* Each : State->PlayerArray)
+	{
+		const APlayerController* Controller = Each != nullptr ? Each->GetPlayerController() : nullptr;
+		if (Controller != nullptr && Controller->IsLocalController())
+		{
+			Host = Cast<ACheeseStrikePlayerState>(Each);
+		}
+	}
+	for (APlayerState* Each : State->PlayerArray)
+	{
+		ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Each);
+		bool bWanted = Ours != nullptr && Ours->GetPlayerName().Equals(Player, ESearchCase::IgnoreCase);
+		if (Player.IsEmpty())
+		{
+			bWanted = Ours != nullptr && Ours == Host;
+		}
+		else if (Player.Equals(TEXT("enemy"), ESearchCase::IgnoreCase))
+		{
+			bWanted = Ours != nullptr && Ours->GetPawn() != nullptr && State->AreEnemies(Host, Ours);
+		}
+		if (bWanted)
+		{
+			Ours->GiveStreak(CheeseStrikeStreaks::StreakAt(Kind));
+			UE_LOG(LogCheeseStrike, Display, TEXT("Streak: %s is given %s"), *Ours->GetPlayerName(), CheeseStrikeStreaks::Info(CheeseStrikeStreaks::StreakAt(Kind)).Name);
+			return;
+		}
 	}
 }
 
@@ -502,13 +839,60 @@ AActor* ACheeseStrikeGameMode::ChoosePlayerStart_Implementation(AController* Pla
 	{
 		return Super::ChoosePlayerStart_Implementation(Player);
 	}
+	const bool bTeams = CheeseStrikeModes::Info(Mode).bTeams;
+	const ACheeseStrikePlayerState* Mine = Player != nullptr ? Player->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+	// In a team mode, the side's own starts: those the map marks for it, or without marks, its half of them.
+	TArray<int32> Allowed;
+	if (bTeams && Mine != nullptr && Mine->GetTeam() >= 0 && Mine->GetTeam() < CheeseStrikeRules::Teams)
+	{
+		const FName Tag(CheeseStrikeModes::TeamStartTags[Mine->GetTeam()]);
+		for (int32 Index = 0; Index < Starts.Num(); ++Index)
+		{
+			if (Starts[Index]->PlayerStartTag == Tag)
+			{
+				Allowed.Add(Index);
+			}
+		}
+		if (Allowed.Num() == 0)
+		{
+			const TArray<int32> Sides = CheeseStrikeModes::SidesOf(Spots);
+			for (int32 Index = 0; Index < Starts.Num(); ++Index)
+			{
+				if (Sides[Index] == Mine->GetTeam())
+				{
+					Allowed.Add(Index);
+				}
+			}
+		}
+	}
+	if (Allowed.Num() == 0)
+	{
+		for (int32 Index = 0; Index < Starts.Num(); ++Index)
+		{
+			Allowed.Add(Index);
+		}
+	}
+	TArray<FVector> Choices;
+	for (const int32 Index : Allowed)
+	{
+		Choices.Add(Spots[Index]);
+	}
+	// Furthest from the enemies, and not on top of anyone.
 	TArray<FVector> Enemies;
+	TArray<FVector> Others;
 	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
 	{
-		if (It->IsAlive() && It->GetController() != Player)
+		if (!It->IsAlive() || It->GetController() == Player)
+		{
+			continue;
+		}
+		Others.Add(It->GetActorLocation());
+		const ACheeseStrikePlayerState* Theirs = It->GetPlayerState<ACheeseStrikePlayerState>();
+		if (!bTeams || Mine == nullptr || Theirs == nullptr || Theirs->GetTeam() != Mine->GetTeam())
 		{
 			Enemies.Add(It->GetActorLocation());
 		}
 	}
-	return Starts[CheeseStrikeRules::FurthestFrom(Spots, Enemies)];
+	const int32 Chosen = CheeseStrikeModes::ChooseStart(Choices, Enemies, Others, 120.0f);
+	return Starts[Allowed[FMath::Max(0, Chosen)]];
 }
