@@ -341,7 +341,9 @@ bool FBotsPlayTheCreamery::RunTest(const FString& Parameters)
 		struct FPlace { const TCHAR* Name; FVector At; };
 		for (const FPlace& Place : {FPlace{TEXT("the yard by the containers"), FVector(-1500, 3550, 100)}, FPlace{TEXT("the yard behind the containers"), FVector(-1200, 4200, 100)},
 			FPlace{TEXT("the Squeeze"), FVector(-1500, 2200, 100)}, FPlace{TEXT("the hall"), FVector(-1500, 0, 100)}, FPlace{TEXT("the mezzanine"), FVector(-1000, -1550, 500)},
-			FPlace{TEXT("the canal's floor"), FVector(-2000, -3200, -200)}, FPlace{TEXT("Tank Row"), FVector(-2200, -4600, 100)}, FPlace{TEXT("the other dock"), FVector(6250, 0, 220)}})
+			FPlace{TEXT("the canal's floor"), FVector(-2000, -3200, -200)}, FPlace{TEXT("Tank Row"), FVector(-2200, -4600, 100)}, FPlace{TEXT("the other dock"), FVector(6250, 0, 220)},
+			FPlace{TEXT("the Curing House's upper floor"), FVector(-4000, -1300, 450)}, FPlace{TEXT("the Rind Tunnel"), FVector(-2200, -2075, 100)}, FPlace{TEXT("the gallery"), FVector(1000, 1550, 500)},
+			FPlace{TEXT("a catwalk"), FVector(900, 0, 500)}})
 		{
 			UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(World(0), Dock, Place.At);
 			const bool bWhole = Path != nullptr && Path->IsValid() && !Path->IsPartial();

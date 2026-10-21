@@ -1,5 +1,6 @@
 # A tour of The Creamery from fixed views: the whole map from above, then each
-# lane and the hall at eye height. Run with -Map /Game/CheeseStrike/Maps/Lvl_Creamery.
+# lane, the houses, the tunnels and the hall at eye height. Run with
+# -Map /Game/CheeseStrike/Maps/Lvl_Creamery.
 wait 20
 cmd CheeseStrikeViewFrom -9000 -7000 7000 -38 38
 wait 2
@@ -22,19 +23,31 @@ shot creamery_6_hall_aisles
 cmd CheeseStrikeViewFrom -2150 -1550 570 -15 30
 wait 2
 shot creamery_7_mezzanine
+cmd CheeseStrikeViewFrom -900 -1250 570 -8 90
+wait 2
+shot creamery_8_catwalk
 cmd CheeseStrikeViewFrom -3900 -3200 -130 0 0
 wait 2
-shot creamery_8_canal
+shot creamery_9_canal
 cmd CheeseStrikeViewFrom -1800 -4800 170 5 45
 wait 2
-shot creamery_9_tank_row
+shot creamery_10_tank_row
 cmd CheeseStrikeViewFrom -6000 -900 300 -5 10
 wait 2
-shot creamery_10_dock
-cmd CheeseStrikeViewFrom -5800 600 350 -5 180
+shot creamery_11_dock
+cmd CheeseStrikeViewFrom -2700 1200 700 -14 -130
 wait 2
-shot creamery_11_dock_door
+shot creamery_12_curing_house
+cmd CheeseStrikeViewFrom -3550 -1300 170 0 180
+wait 2
+shot creamery_13_house_inside
+cmd CheeseStrikeViewFrom -4450 -1300 520 -5 0
+wait 2
+shot creamery_14_house_upstairs
+cmd CheeseStrikeViewFrom -3200 -2075 170 0 0
+wait 2
+shot creamery_15_tunnel
 cmd CheeseStrikeViewFrom -2600 2650 100 -3 90
 wait 2
-shot creamery_12_container
+shot creamery_16_container
 quit
