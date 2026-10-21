@@ -8,6 +8,7 @@
 #include "Weapons/CheeseStrikeShot.h"
 #include "CheeseStrikeCharacter.generated.h"
 
+class ACheeseStrikePlayerState;
 class ACheeseStrikeWeapon;
 class UCameraComponent;
 class UCheeseStrikeInventory;
@@ -147,9 +148,17 @@ public:
 	/**
 	 * Takes `Damage` off the health (server only); for the server's own
 	 * records, from whom and whether on the head. False if it couldn't be
-	 * hurt: dead already, or protected.
+	 * hurt: dead already, protected, or on the shooter's side in a team mode
+	 * (friendly fire is off), or between rounds.
 	 */
 	bool TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead);
+	/**
+	 * Takes `Damage` off the health from a streak (server only): `By`
+	 * called it in, and has the kill even if their character has since
+	 * died; `How` names it for the feed. False if it couldn't be hurt, as
+	 * for TakeShot, or isn't `By`'s enemy.
+	 */
+	bool TakeBlast(float Damage, ACheeseStrikePlayerState* By, const FString& How);
 	/** Server only: who last hurt it, and the server's time they did; a bot turns to whoever shoots it. */
 	ACheeseStrikeCharacter* GetLastHurtBy() const { return LastHurtBy.Get(); }
 	float GetLastHurtAt() const { return LastHurtAt; }
@@ -191,6 +200,8 @@ protected:
 	void NextWeaponStarted();
 	void PreviousWeaponStarted();
 	void LastWeaponStarted();
+	/** The Streak key: its player calls in their next streak (ACheeseStrikePlayerState::StreakPressed). */
+	void StreakStarted();
 
 	/** Pawn mesh: first person view (seen only by self). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
@@ -249,8 +260,10 @@ protected:
 
 	UFUNCTION()
 	void OnRep_Health();
-	/** Server only: it has just run out of health. */
-	void Die(ACheeseStrikeCharacter* From, bool bHead);
+	/** Server only: it has just run out of health; `By` and `How` for a streak's kill (TakeBlast). */
+	void Die(ACheeseStrikeCharacter* From, bool bHead, ACheeseStrikePlayerState* By = nullptr, const FString& How = FString());
+	/** Server only: whether the match lets `From`, or a streak of `By`'s, hurt it (friendly fire is off in a team mode; nobody is hurt between rounds). */
+	bool CanBeHurtBy(const ACheeseStrikeCharacter* From, const ACheeseStrikePlayerState* By) const;
 	/** On every machine: the body falls, the view stays where the eyes were, and nothing more is done. */
 	void ShowDeath();
 	/** The server's clock. */

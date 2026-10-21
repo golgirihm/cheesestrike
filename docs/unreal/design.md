@@ -88,12 +88,13 @@ Up to 16 players, 2 at least (bots fill in, with cheese names of their own: Gorg
 | Mode | Teams | Wins by | Notes |
 |---|---|---|---|
 | Free-for-all | no | kills | |
-| Cheddar vs Brie | two | kills | |
+| Deathmatch (the Godot game's Cheddar vs Brie) | two | kills | the first team to the kill limit (50 unless the host says) |
 | Capture the wheel | two | 3 captures | each base has a wheel of cheese; carry the enemy's to yours; a dropped wheel lies where it fell, returns after a while |
 | Hold the hill | two | 100 points | one zone that moves between five spots; a second a point while one team alone is in it |
 | Points | two | 150 points | three zones (A, B, C) held at once; each held zone scores over time |
-| Rounds | two | 4 rounds | one life a round; a round ends when a side is gone or on its timer |
-| Gun game | no | every weapon | each kill moves a player to the next weapon in the list; the last is the knife |
+| Elimination (the Godot game's Rounds) | two | 4 rounds | one life a round; a round ends when a side is gone or on its timer (2 minutes; at the time, the side with more standing takes it, then the one with more health, else a draw); the out watch a teammate; a 6 s pause, then everyone is back at their starts |
+| Execution | two | rounds or kills | damaged enough, a player drops into a last stand with only the sidearm; only an enemy up close can finish them, and a teammate can revive them (the user's, October 2026; to come with the weapons' inventory) |
+| Gun game | no | every weapon | each kill moves a player to the next weapon in the list; the last is the knife (as Counter-Strike's, simplified; to come with the weapons) |
 | Practice | alone | | the practice range: targets at marked distances, every weapon on a rack, a stats board for each weapon |
 
 Rules presets: standard; instant kill (1 health); low gravity (0.4 ×); launchers only; pistols only; fast and frantic (1.25 × speed, 1 s respawn); tough cheese (200 health); friendly fire. Skies: clear noon, dawn, dusk, night, rain, dust storm, or a surprise.
@@ -133,7 +134,9 @@ The tuning is a guess that play has not yet settled: cover should be plainly goi
 
 **Power-ups** go round in turn, so nobody knows what the pad holds: double damage (12 s), speed (1.3 ×, 15 s), shield (hits do 0.4 ×, 12 s), sight (everyone seen through walls, 10 s). Taking one is announced to all; the holder is tinted in its colour.
 
-**Overload.** Damage dealt charges a meter at 0.5 per point: two kills fill it. Full, the player sets off the kind they chose in the loadout, after a 1 s build-up in which they glow and are heard, so that others can get clear:
+**Kill streaks** (the user's, October 2026, in place of the Overload meter below): kills in a row without dying earn, at 3, the Unmanned Aerial Cheese (a cheese drone circles the map for 25 s, and every 2 s its sweep shows the earner's side every enemy); at 5, the Cheese Strike (the player marks a spot with a shot; after a falling whistle, seven gouda wheels land 3 m apart along the way they faced, each 150 splash damage falling to 40 at 5 m life size, checked for line of sight); at 10, the Gouda Overload (a siren and a warning to everyone for 4 s, then for 8 s a wheel falls every 0.7 s on every enemy, landing within 2 m life size of where they were, 70 falling to 10 over 4.5 m: cover overhead or a wall saves them, and so does keeping on the move). Earned streaks wait, oldest first, until the Streak key (4) calls the next in; they are kept through a death. A streak's kills are the caller's but don't count toward the next streak, and never hurt the caller or their side. Bots call theirs in. Everyone is told who called what.
+
+**Overload** (the Godot game's; kill streaks above take its place). Damage dealt charges a meter at 0.5 per point: two kills fill it. Full, the player sets off the kind they chose in the loadout, after a 1 s build-up in which they glow and are heard, so that others can get clear:
 
 - **Melt** (8 s): 1.35 × speed, and anyone they hit is slowed to 0.6 × for 2 s.
 - **Rind** (8 s): hits on them do half.

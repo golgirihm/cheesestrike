@@ -9,6 +9,7 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
+#include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
 #include "HAL/IConsoleManager.h"
 #include "Weapons/CheeseStrikeArsenal.h"
@@ -221,11 +222,73 @@ void ACheeseStrikeBotController::UpdateControlRotation(float DeltaTime, bool bUp
 	}
 }
 
+bool ACheeseStrikeBotController::IsEnemy(const ACheeseStrikeCharacter* Other) const
+{
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	return Match == nullptr || Other == nullptr || Match->AreEnemies(PlayerState, Other->GetPlayerState());
+}
+
+void ACheeseStrikeBotController::ThinkAboutStreaks()
+{
+	ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>();
+	ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
+	const ACheeseStrikeCharacter* Me = Body();
+	const CheeseStrikeStreaks::EStreak Next = Mine != nullptr ? Mine->NextStreak() : CheeseStrikeStreaks::EStreak::None;
+	if (Next == CheeseStrikeStreaks::EStreak::None || Mode == nullptr || Me == nullptr)
+	{
+		StreakHeldSince = -1.0f;
+		return;
+	}
+	if (StreakHeldSince < 0.0f)
+	{
+		StreakHeldSince = Now();
+	}
+	// A moment's pause, as a player takes, then: the drone and the Overload at once; the strike on an enemy just seen, or,
+	// held a while with nobody seen, on one of them wherever they are.
+	if (Now() - StreakHeldSince < 1.5f)
+	{
+		return;
+	}
+	if (Next != CheeseStrikeStreaks::EStreak::CheeseStrike)
+	{
+		Mode->CallStreak(Mine, Next, FVector::ZeroVector, 0.0f);
+		return;
+	}
+	FVector Spot = FVector::ZeroVector;
+	bool bSpot = false;
+	if (Target.IsValid() && Now() - LastSeenAt < 4.0f && FVector::Dist(LastSeenWhere, Me->GetActorLocation()) > CheeseStrikeStreaks::StrikeBlast.Radius)
+	{
+		Spot = LastSeenWhere;
+		bSpot = true;
+	}
+	else if (Now() - StreakHeldSince > 12.0f)
+	{
+		TArray<const ACheeseStrikeCharacter*> Enemies;
+		for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+		{
+			if (*It != Me && It->IsAlive() && IsEnemy(*It) && FVector::Dist(It->GetActorLocation(), Me->GetActorLocation()) < CheeseStrikeStreaks::StrikeRange)
+			{
+				Enemies.Add(*It);
+			}
+		}
+		if (Enemies.Num() > 0)
+		{
+			Spot = Enemies[FMath::RandHelper(Enemies.Num())]->GetActorLocation();
+			bSpot = true;
+		}
+	}
+	if (bSpot)
+	{
+		Mode->CallStreak(Mine, Next, Spot, (Spot - Me->GetActorLocation()).Rotation().Yaw);
+	}
+}
+
 void ACheeseStrikeBotController::Think()
 {
 	Perceive();
 	ChooseWhereToGo();
 	ChooseWeapon();
+	ThinkAboutStreaks();
 	ACheeseStrikeCharacter* Me = Body();
 	ACheeseStrikeWeapon* Weapon = Me != nullptr ? Me->GetWeapon() : nullptr;
 	if (Weapon == nullptr)
@@ -269,7 +332,7 @@ void ACheeseStrikeBotController::Perceive()
 	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
 	{
 		ACheeseStrikeCharacter* Other = *It;
-		if (Other == Me || !Other->IsAlive())
+		if (Other == Me || !Other->IsAlive() || !IsEnemy(Other))
 		{
 			continue;
 		}
@@ -489,7 +552,7 @@ bool ACheeseStrikeBotController::PickRoamGoal(FVector& Out) const
 		TArray<const ACheeseStrikeCharacter*> Others;
 		for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
 		{
-			if (*It != Me && It->IsAlive())
+			if (*It != Me && It->IsAlive() && IsEnemy(*It))
 			{
 				Others.Add(*It);
 			}

@@ -90,6 +90,9 @@ public:
 	/** Opens and closes the menu: the pause menu in a match, back out of a page otherwise. */
 	UPROPERTY()
 	TObjectPtr<UInputAction> Menu;
+	/** Calls in the next kill streak earned (4). */
+	UPROPERTY()
+	TObjectPtr<UInputAction> Streak;
 	UPROPERTY()
 	TObjectPtr<UInputMappingContext> Context;
 };

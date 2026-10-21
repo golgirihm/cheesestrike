@@ -1,0 +1,25 @@
+# A round of Elimination with bots, for looking at being out: the host dies
+# by the console, sees their fall, then watches a teammate (fire for the
+# next); the round runs out on its timer, a pause, and round 2 brings
+# everyone back. Run with tools/play.ps1 -Map
+# /Game/CheeseStrike/Maps/Lvl_Creamery -Bots -StartAt none -Extra
+# "?Mode=Elimination?Bots=3?RoundTime=30".
+wait 4
+shot elim_1_start
+cmd CheeseStrikeDie
+wait 1
+shot elim_2_dead
+wait 2.5
+shot elim_3_watching
+tap Fire
+wait 1
+shot elim_4_next
+hold Scoreboard
+wait 0.3
+shot elim_5_scoreboard
+release Scoreboard
+wait 24
+shot elim_6_break
+wait 7
+shot elim_7_round2
+quit

@@ -80,6 +80,7 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Set->LastWeapon = MakeAction(Set, TEXT("IA_LastWeapon"), EInputActionValueType::Boolean);
 	Set->Scoreboard = MakeAction(Set, TEXT("IA_Scoreboard"), EInputActionValueType::Boolean);
 	Set->Menu = MakeAction(Set, TEXT("IA_Menu"), EInputActionValueType::Boolean);
+	Set->Streak = MakeAction(Set, TEXT("IA_Streak"), EInputActionValueType::Boolean);
 	UInputMappingContext* Context = NewObject<UInputMappingContext>(Set, TEXT("IMC_CheeseStrike"));
 	Set->Context = Context;
 
@@ -125,6 +126,8 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->Scoreboard, EKeys::Gamepad_Special_Left);
 	Map(Context, Set->Menu, EKeys::Escape);
 	Map(Context, Set->Menu, EKeys::Gamepad_Special_Right);
+	// Kill streaks.
+	Map(Context, Set->Streak, EKeys::Four);
 	return Set;
 }
 
