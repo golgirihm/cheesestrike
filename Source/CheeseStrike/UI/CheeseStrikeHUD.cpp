@@ -3,6 +3,7 @@
 #include "CheeseStrikeHUD.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/Canvas.h"
+#include "Engine/Engine.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
@@ -20,6 +21,9 @@
 #include "UI/CheeseStrikeModeHUD.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeInventory.h"
+#include "RHIGlobals.h"
+#include "CheeseStrike.h"
+#include "Rules/CheeseStrikeStreaks.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 /** The HUD's drawing, named through an alias rather than used as a whole: the packaged game's unity build would carry a using-directive into the files after this one. */
@@ -37,7 +41,80 @@ float ACheeseStrikeHUD::PixelsForDegrees(float Degrees, float FieldOfView, float
 
 float ACheeseStrikeHUD::Unit() const
 {
-	return Canvas != nullptr ? FMath::Max(0.5f, Canvas->SizeY / 1080.0f) : 1.0f;
+	return HudDraw::Unit(Canvas);
+}
+
+void ACheeseStrikeHUD::BeginPlay()
+{
+	Super::BeginPlay();
+	// The engine's messages on the screen (its debug messages, the map's and the renderer's warnings, such as video memory
+	// running out) are for developers: in the game they are kept off the player's screen, as the engine's own
+	// DISABLEALLSCREENMESSAGES does, and the one that matters to a player is written to the log (NoteVideoMemory). Play in
+	// the editor keeps them.
+	if (!GIsEditor)
+	{
+		GAreScreenMessagesEnabled = false;
+	}
+}
+
+void ACheeseStrikeHUD::NoteVideoMemory()
+{
+	const float Now = GetWorld()->GetRealTimeSeconds();
+	if (Now < NextVideoMemoryNote)
+	{
+		return;
+	}
+	NextVideoMemoryNote = Now + 5.0f;
+	// Not drawn, the engine's debug messages would only pile up.
+	if (!GAreScreenMessagesEnabled && GEngine != nullptr)
+	{
+		GEngine->ClearOnScreenDebugMessages();
+	}
+	const float Spilled = static_cast<float>(GDemotedLocalMemorySize) / (1024.0f * 1024.0f);
+	if (FMath::Abs(Spilled - VideoMemorySpilled) >= 64.0f)
+	{
+		if (Spilled > 0.0f)
+		{
+			UE_LOG(LogCheeseStrike, Warning, TEXT("Video memory has run out: %.0f MB over budget, moved to system memory"), Spilled);
+		}
+		else
+		{
+			UE_LOG(LogCheeseStrike, Display, TEXT("Video memory is within budget again"));
+		}
+		VideoMemorySpilled = Spilled;
+	}
+}
+
+void ACheeseStrikeHUD::UpdateSweep(const ACheeseStrikePlayerController* Controller)
+{
+	ACheeseStrikePlayerState* Mine = Controller->GetPlayerState<ACheeseStrikePlayerState>();
+	const ACheeseStrikeGameState* Match = GetWorld()->GetGameState<ACheeseStrikeGameState>();
+	Sweep = Match != nullptr && Mine != nullptr
+		? CheeseStrikeHUD::SweepAt(Match->GetServerWorldTimeSeconds(), Match->RevealEndsFor(Mine), CheeseStrikeStreaks::RevealTime, CheeseStrikeStreaks::SweepPeriod)
+		: CheeseStrikeHUD::FSweep();
+	if (Mine == nullptr)
+	{
+		return;
+	}
+	if (Sweep.Index == INDEX_NONE)
+	{
+		Mine->SweepIndex = INDEX_NONE;
+		Mine->SweepMarks.Reset();
+		return;
+	}
+	// Each sweep sees where every enemy is, and that is what shows until the next.
+	if (Sweep.Index != Mine->SweepIndex)
+	{
+		Mine->SweepIndex = Sweep.Index;
+		Mine->SweepMarks.Reset();
+		for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+		{
+			if (It->IsAlive() && Match->AreEnemies(Mine, It->GetPlayerState()))
+			{
+				Mine->SweepMarks.Add(It->GetActorLocation());
+			}
+		}
+	}
 }
 
 bool ACheeseStrikeHUD::AreTeammates(const APlayerState* A, const APlayerState* B)
@@ -91,10 +168,7 @@ bool ACheeseStrikeHUD::ShowsOnMinimap(const ACheeseStrikeCharacter* Enemy) const
 	{
 		return false;
 	}
-	// An Unmanned Aerial Cheese of the player's side, or one revealed on this machine.
-	const APlayerController* Viewer = GetOwningPlayerController();
-	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-	if (AreEnemiesRevealed() || (Match != nullptr && Viewer != nullptr && Match->IsRevealedTo(Viewer->PlayerState)))
+	if (AreEnemiesRevealed())
 	{
 		return true;
 	}
@@ -231,7 +305,9 @@ void ACheeseStrikeHUD::Tick(float DeltaSeconds)
 	if (const ACheeseStrikePlayerController* Controller = Cast<ACheeseStrikePlayerController>(GetOwningPlayerController()))
 	{
 		LookForEnemies(Controller);
+		UpdateSweep(Controller);
 	}
+	NoteVideoMemory();
 }
 
 void ACheeseStrikeHUD::DrawHUD()
@@ -645,7 +721,7 @@ void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 	const FSlateFontInfo Goal = HudDraw::Font(13.0f * U);
 	const FString GoalText = Summary.Goal.ToUpper();
 	const float GoalWidth = FMath::Max(104.0f * U, HudDraw::Measure(GoalText, Goal).X + 28.0f * U);
-	const float BlockHeight = 56.0f * U;
+	const float BlockHeight = ScoreHeight * U;
 	const int32 OnLeft = (Summary.Lines.Num() + 1) / 2;
 	const float Total = Summary.Lines.Num() * BlockWidth + GoalWidth;
 	float X = (Canvas->SizeX - Total) / 2.0f;
@@ -734,7 +810,8 @@ void ACheeseStrikeHUD::DrawKillFeed(const ACheeseStrikeGameState* Match)
 		}
 		// Killer, then "killed", then the killed, right to left from the edge; the player's own name in the accent.
 		const FString Killer = Kill.Killer.IsEmpty() ? TEXT("nobody") : Kill.Killer;
-		const FString Middle = Kill.bHead ? TEXT("  killed (head)  ") : TEXT("  killed  ");
+		// A streak's kill says which ("Cheese Strike") where the weapon's says "killed".
+		const FString Middle = !Kill.How.IsEmpty() ? FString::Printf(TEXT("  %s  "), *Kill.How) : Kill.bHead ? TEXT("  killed (head)  ") : TEXT("  killed  ");
 		const float VictimWidth = HudDraw::Measure(Kill.Victim, Line).X;
 		const float MiddleWidth = HudDraw::Measure(Middle, Line).X;
 		const float KillerWidth = HudDraw::Measure(Killer, Line).X;
@@ -745,7 +822,7 @@ void ACheeseStrikeHUD::DrawKillFeed(const ACheeseStrikeGameState* Match)
 		float X = Right - 8.0f * U;
 		HudDraw::Text(Canvas, Kill.Victim, FVector2D(X, Y), Line, Kill.Victim == Me ? HudDraw::Accent : HudDraw::Ink, 1.0f);
 		X -= VictimWidth;
-		HudDraw::Text(Canvas, Middle, FVector2D(X, Y), Line, Kill.bHead ? HudDraw::Accent : HudDraw::Soft, 1.0f);
+		HudDraw::Text(Canvas, Middle, FVector2D(X, Y), Line, Kill.bHead || !Kill.How.IsEmpty() ? HudDraw::Accent : HudDraw::Soft, 1.0f);
 		X -= MiddleWidth;
 		HudDraw::Text(Canvas, Killer, FVector2D(X, Y), Line, Kill.Killer == Me ? HudDraw::Accent : HudDraw::Ink, 1.0f);
 		Y += Height + 8.0f * U;
@@ -760,16 +837,75 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	}
 	const float U = Unit();
 	const float Width = Canvas->SizeX;
-	const TArray<CheeseStrikeRules::FStanding> Standings = Match->Standings();
+	const APlayerController* Viewer = GetOwningPlayerController();
+	const FString Me = Viewer != nullptr && Viewer->PlayerState != nullptr ? Viewer->PlayerState->GetPlayerName() : FString();
+
+	// The players in order: in a team mode, each side apart under its name and score; in a free-for-all, everyone together.
+	struct FSection
+	{
+		int32 Team = INDEX_NONE;
+		TArray<CheeseStrikeRules::FStanding> Lines;
+	};
+	TArray<FSection> Sections;
+	TSet<FString> Out;
+	if (Match->HasTeams())
+	{
+		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
+		{
+			Sections.AddDefaulted_GetRef().Team = Team;
+		}
+		for (const APlayerState* Player : Match->PlayerArray)
+		{
+			if (const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Player))
+			{
+				Sections[FMath::Clamp(Match->TeamOf(Ours), 0, CheeseStrikeRules::Teams - 1)].Lines.Add(Ours->Standing());
+			}
+		}
+		for (FSection& Section : Sections)
+		{
+			Section.Lines = CheeseStrikeRules::Sorted(Section.Lines);
+		}
+	}
+	else
+	{
+		Sections.AddDefaulted_GetRef().Lines = Match->Standings();
+	}
+	for (const APlayerState* Player : Match->PlayerArray)
+	{
+		const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Player);
+		if (Ours != nullptr && Ours->IsOut())
+		{
+			Out.Add(Ours->GetPlayerName());
+		}
+	}
+
 	const float RowHeight = 30.0f * U;
+	const float SectionHeight = Match->HasTeams() ? 40.0f * U : 0.0f;
 	const float PanelWidth = 520.0f * U;
-	const float PanelHeight = 128.0f * U + RowHeight * Standings.Num();
+	float PanelHeight = 128.0f * U;
+	for (const FSection& Section : Sections)
+	{
+		PanelHeight += SectionHeight + RowHeight * Section.Lines.Num();
+	}
 	const float Left = (Width - PanelWidth) / 2.0f;
 	const float Top = Canvas->SizeY * 0.2f;
 	HudDraw::FShapes Shapes;
 	Shapes.Rect(Left, Top, PanelWidth, PanelHeight, FLinearColor(0.02f, 0.02f, 0.025f, 0.78f));
 	Shapes.Rect(Left, Top, PanelWidth, 2.0f * U, bOver ? HudDraw::Accent : HudDraw::Ink);
 	Shapes.Rect(Left + 20.0f * U, Top + 104.0f * U, PanelWidth - 40.0f * U, U, HudDraw::Rule);
+	{
+		float Y = Top + 114.0f * U;
+		for (const FSection& Section : Sections)
+		{
+			if (Section.Team != INDEX_NONE)
+			{
+				// A strip of the side's colour down the left of its rows.
+				Shapes.Rect(Left + 10.0f * U, Y + 6.0f * U, 3.0f * U, SectionHeight - 10.0f * U + RowHeight * Section.Lines.Num(), HudDraw::SideColour(Section.Team));
+				Y += SectionHeight;
+			}
+			Y += RowHeight * Section.Lines.Num();
+		}
+	}
 	Shapes.Draw(Canvas);
 	const FString Title = bOver ? (Match->GetWinnerName().IsEmpty() ? TEXT("MATCH OVER") : FString::Printf(TEXT("%s %s"), *Match->GetWinnerName().ToUpper(), Match->HasTeams() ? TEXT("WIN") : TEXT("WINS"))) : CheeseStrikeModes::Title(Match->GetMode()).ToUpper();
 	HudDraw::Text(Canvas, Title, FVector2D(Width / 2.0f, Top + 16.0f * U), HudDraw::Font(30.0f * U), bOver ? HudDraw::Accent : HudDraw::Ink, 0.5f);
@@ -778,19 +914,29 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	HudDraw::Text(Canvas, Under.ToUpper(), FVector2D(Width / 2.0f, Top + 58.0f * U), HudDraw::Font(14.0f * U), HudDraw::Soft, 0.5f);
 	const FSlateFontInfo Heading = HudDraw::Font(13.0f * U);
 	const FSlateFontInfo Row = HudDraw::Font(18.0f * U);
+	const FSlateFontInfo Side = HudDraw::Font(20.0f * U);
 	float Y = Top + 84.0f * U;
-	HudDraw::Text(Canvas, TEXT("PLAYER"), FVector2D(Left + 20.0f * U, Y), Heading, HudDraw::Soft);
+	HudDraw::Text(Canvas, TEXT("PLAYER"), FVector2D(Left + 24.0f * U, Y), Heading, HudDraw::Soft);
 	HudDraw::Text(Canvas, TEXT("KILLS"), FVector2D(Left + PanelWidth - 110.0f * U, Y), Heading, HudDraw::Soft, 1.0f);
 	HudDraw::Text(Canvas, TEXT("DEATHS"), FVector2D(Left + PanelWidth - 20.0f * U, Y), Heading, HudDraw::Soft, 1.0f);
 	Y = Top + 114.0f * U;
-	const APlayerController* Viewer = GetOwningPlayerController();
-	const FString Me = Viewer != nullptr && Viewer->PlayerState != nullptr ? Viewer->PlayerState->GetPlayerName() : FString();
-	for (const CheeseStrikeRules::FStanding& Line : Standings)
+	for (const FSection& Section : Sections)
 	{
-		const FLinearColor Colour = Line.Name == Me ? HudDraw::Accent : HudDraw::Ink;
-		HudDraw::Text(Canvas, Line.Name, FVector2D(Left + 20.0f * U, Y), Row, Colour);
-		HudDraw::Text(Canvas, FString::FromInt(Line.Kills), FVector2D(Left + PanelWidth - 110.0f * U, Y), Row, Colour, 1.0f);
-		HudDraw::Text(Canvas, FString::FromInt(Line.Deaths), FVector2D(Left + PanelWidth - 20.0f * U, Y), Row, Colour, 1.0f);
-		Y += RowHeight;
+		if (Section.Team != INDEX_NONE)
+		{
+			const FLinearColor Colour = HudDraw::SideColour(Section.Team);
+			HudDraw::Text(Canvas, FString(CheeseStrikeRules::TeamNames[Section.Team]).ToUpper(), FVector2D(Left + 24.0f * U, Y + 6.0f * U), Side, Colour);
+			HudDraw::Text(Canvas, FString::FromInt(Match->GetTeamScore(Section.Team)), FVector2D(Left + PanelWidth - 20.0f * U, Y + 4.0f * U), Side, Colour, 1.0f);
+			Y += SectionHeight;
+		}
+		for (const CheeseStrikeRules::FStanding& Line : Section.Lines)
+		{
+			const bool bOut = Out.Contains(Line.Name);
+			const FLinearColor Colour = HudDraw::Faded(Line.Name == Me ? HudDraw::Accent : HudDraw::Ink, bOut ? 0.45f : 1.0f);
+			HudDraw::Text(Canvas, bOut ? Line.Name + TEXT("   OUT") : Line.Name, FVector2D(Left + 24.0f * U, Y), Row, Colour);
+			HudDraw::Text(Canvas, FString::FromInt(Line.Kills), FVector2D(Left + PanelWidth - 110.0f * U, Y), Row, Colour, 1.0f);
+			HudDraw::Text(Canvas, FString::FromInt(Line.Deaths), FVector2D(Left + PanelWidth - 20.0f * U, Y), Row, Colour, 1.0f);
+			Y += RowHeight;
+		}
 	}
 }

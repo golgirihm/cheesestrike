@@ -157,6 +157,34 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 		}
 	}
 
+	// The side's Unmanned Aerial Cheese: every enemy where its last sweep saw them, strong at the sweep and fading towards the
+	// next, and a ring going out from the middle as each sweep comes.
+	if (Sweep.Index != INDEX_NONE)
+	{
+		const ACheeseStrikePlayerState* Mine = Controller->GetPlayerState<ACheeseStrikePlayerState>();
+		if (Mine != nullptr)
+		{
+			// Those further than the minimap reaches are held to its frame, smaller, the way they are.
+			for (const FVector& Mark : Mine->SweepMarks)
+			{
+				FVector2D At = OnMap(Mark);
+				const FVector2D From = At - Centre;
+				const float Out = FMath::Max(FMath::Abs(From.X), FMath::Abs(From.Y));
+				const bool bBeyond = Out > Half - 6.0f * U;
+				if (bBeyond)
+				{
+					At = Centre + From * ((Half - 6.0f * U) / Out);
+				}
+				MapDot(Shapes, At, (bBeyond ? 3.0f : 4.5f) * U, HudDraw::Faded(HudDraw::Danger, Sweep.Fade * (bBeyond ? 0.75f : 1.0f)), 0.0f, false);
+			}
+		}
+		const float Ping = Sweep.Since / 0.7f;
+		if (Ping < 1.0f && Half * 0.95f * Ping > 4.0f * U)
+		{
+			Shapes.Arc(Centre, Half * 0.95f * Ping, 2.0f * U, 0.0f, 360.0f, HudDraw::Faded(HudDraw::Danger, 0.55f * (1.0f - Ping)), false);
+		}
+	}
+
 	// The player: an arrow in the middle, pointing up, the way they face.
 	const FVector2D Tip = Centre + FVector2D(0.0f, -9.0f * U);
 	const FVector2D Notch = Centre + FVector2D(0.0f, 3.5f * U);

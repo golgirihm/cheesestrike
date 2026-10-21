@@ -3,8 +3,6 @@
 #include "CheeseStrikeModeHUD.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/Canvas.h"
-#include "Engine/Engine.h"
-#include "Engine/Font.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameMode.h"
@@ -20,26 +18,16 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Streaks/CheeseStrikeBombs.h"
+#include "UI/CheeseStrikeHUD.h"
+#include "UI/CheeseStrikeHUDDraw.h"
+
+/** The HUD's drawing, named through an alias rather than used as a whole: the packaged game's unity build would carry a using-directive into the files after this one. */
+namespace HudDraw = CheeseStrikeHUDDraw;
 
 namespace
 {
-	const FLinearColor ModeHudWhite(1.0f, 1.0f, 1.0f, 0.92f);
-	const FLinearColor ModeHudFaint(1.0f, 1.0f, 1.0f, 0.7f);
-	const FLinearColor ModeHudYellow(0.94f, 0.89f, 0.26f);
-	const FLinearColor ModeHudRed(1.0f, 0.22f, 0.15f);
-	constexpr float ModeHudMargin = 24.0f;
 	/** Seconds the word that a streak is ready stays big. */
 	constexpr float ModeHudEarnedLife = 3.5f;
-
-	void ModeHudCentred(AHUD* Hud, const FString& Text, float X, float Y, UFont* Font, float Scale, const FLinearColor& Colour)
-	{
-		float Width = 0.0f;
-		float Height = 0.0f;
-		Hud->GetTextSize(Text, Width, Height, Font, Scale);
-		// A shadow, so that it reads over a bright floor.
-		Hud->DrawText(Text, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Colour.A), X - Width / 2.0f + 1.5f, Y + 1.5f, Font, Scale);
-		Hud->DrawText(Text, Colour, X - Width / 2.0f, Y, Font, Scale);
-	}
 
 	/** Where `At` is on the screen; false behind the view. */
 	bool ModeHudOnScreen(const AHUD* Hud, const FVector& At, FVector2D& Out)
@@ -50,46 +38,44 @@ namespace
 	}
 
 	/** A ring on the ground, `Radius` round `Centre`, as the view sees it. */
-	void ModeHudRing(AHUD* Hud, const FVector& Centre, float Radius, const FLinearColor& Colour, float Thickness)
+	void ModeHudRing(const AHUD* Hud, HudDraw::FShapes& Shapes, const FVector& Centre, float Radius, const FLinearColor& Colour, float Thickness)
 	{
-		constexpr int32 Segments = 24;
+		constexpr int32 Segments = 32;
 		FVector2D Last = FVector2D::ZeroVector;
 		bool bLast = false;
 		for (int32 Step = 0; Step <= Segments; ++Step)
 		{
-			const float Angle = 2.0f * PI * Step / Segments;
+			const float Angle = 2.0f * UE_PI * Step / Segments;
 			FVector2D Here;
 			const bool bHere = ModeHudOnScreen(Hud, Centre + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 5.0f), Here);
 			if (bHere && bLast)
 			{
-				Hud->DrawLine(Last.X, Last.Y, Here.X, Here.Y, Colour, Thickness);
+				Shapes.Line(Last, Here, Thickness, Colour);
 			}
 			Last = Here;
 			bLast = bHere;
 		}
 	}
 
-	/** A small diamond with its middle at `At` on the screen. */
-	void ModeHudDiamond(AHUD* Hud, const FVector2D& At, float Size, const FLinearColor& Colour)
+	/**
+	 * A notice in the middle of the screen at `Y`: a title, and a line under
+	 * it if any. Being out of a round says so this way; so can any state a
+	 * mode puts a player in (a last stand).
+	 */
+	void ModeHudNotice(UCanvas* Canvas, float Y, const FString& Title, const FLinearColor& Colour, const FString& Under)
 	{
-		const FVector2D Points[] = {At + FVector2D(0, -Size), At + FVector2D(Size, 0), At + FVector2D(0, Size), At + FVector2D(-Size, 0)};
-		for (int32 Index = 0; Index < 4; ++Index)
+		const float U = HudDraw::Unit(Canvas);
+		const FSlateFontInfo Big = HudDraw::Font(30.0f * U);
+		HudDraw::Text(Canvas, Title, FVector2D(Canvas->SizeX / 2.0f, Y), Big, Colour, 0.5f);
+		if (!Under.IsEmpty())
 		{
-			const FVector2D& From = Points[Index];
-			const FVector2D& To = Points[(Index + 1) % 4];
-			Hud->DrawLine(From.X, From.Y, To.X, To.Y, Colour, 2.0f);
+			HudDraw::Text(Canvas, Under.ToUpper(), FVector2D(Canvas->SizeX / 2.0f, Y + HudDraw::Measure(Title, Big).Y + 4.0f * U), HudDraw::Font(18.0f * U), HudDraw::Soft, 0.5f);
 		}
 	}
 
-	FString ModeHudClock(float Seconds)
+	void ModeHudDrawAnnouncements(UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
 	{
-		const int32 Whole = FMath::CeilToInt(FMath::Max(0.0f, Seconds));
-		return FString::Printf(TEXT("%d:%02d"), Whole / 60, Whole % 60);
-	}
-
-	void ModeHudDrawAnnouncements(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
-	{
-		UFont* Font = GEngine->GetMediumFont();
+		const float U = HudDraw::Unit(Canvas);
 		const float Now = Match->GetServerWorldTimeSeconds();
 		float Y = Canvas->SizeY * 0.2f;
 		for (const FAnnouncement& Word : Match->GetAnnouncements())
@@ -102,49 +88,84 @@ namespace
 			const bool bOverload = Word.Streak == static_cast<uint8>(CheeseStrikeStreaks::EStreak::GoudaOverload);
 			// The Overload's warning, to those it falls on, for as long as it lasts: take cover.
 			const bool bAgainstMe = bOverload && Mine != nullptr && Mine->GetPlayerName() != Word.Who && (Word.Team == CheeseStrikeModes::NoTeam || Word.Team != Mine->GetTeam());
-			const FLinearColor Colour = bAgainstMe ? ModeHudRed : (Word.Team != CheeseStrikeModes::NoTeam && Match->HasTeams() ? CheeseStrikeModes::TeamColour(Word.Team) : ModeHudWhite);
-			ModeHudCentred(Hud, Word.Text, Canvas->SizeX / 2.0f, Y, Font, bOverload ? 1.6f : 1.3f, Colour);
-			Y += bOverload ? 34.0f : 28.0f;
+			const FLinearColor Colour = bAgainstMe ? HudDraw::Danger : (Word.Team != CheeseStrikeModes::NoTeam && Match->HasTeams() ? HudDraw::SideColour(Word.Team) : HudDraw::Ink);
+			// Fading out over its last second.
+			const float Fade = FMath::Clamp(ACheeseStrikeGameState::AnnouncementLife - Age, 0.0f, 1.0f);
+			const FSlateFontInfo Line = HudDraw::Font((bOverload ? 26.0f : 21.0f) * U);
+			HudDraw::Text(Canvas, Word.Text.ToUpper(), FVector2D(Canvas->SizeX / 2.0f, Y), Line, HudDraw::Faded(Colour, Fade), 0.5f);
+			Y += HudDraw::Measure(Word.Text, Line).Y + 6.0f * U;
 			if (bAgainstMe && Age < CheeseStrikeStreaks::OverloadWarning + CheeseStrikeStreaks::OverloadRain)
 			{
 				// Blinking while the warning lasts.
 				if (Age > CheeseStrikeStreaks::OverloadWarning || FMath::Fmod(Age, 0.6f) < 0.4f)
 				{
-					ModeHudCentred(Hud, TEXT("GOUDA OVERLOAD INCOMING  ·  TAKE COVER"), Canvas->SizeX / 2.0f, Y, GEngine->GetLargeFont(), 1.5f, ModeHudRed);
+					HudDraw::Text(Canvas, TEXT("GOUDA OVERLOAD INCOMING  ·  TAKE COVER"), FVector2D(Canvas->SizeX / 2.0f, Y), HudDraw::Font(34.0f * U), HudDraw::Danger, 0.5f);
 				}
-				Y += 40.0f;
+				Y += 52.0f * U;
 			}
 		}
 	}
 
-	void ModeHudDrawStreaks(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
+	/** A bar `Done` (0 to 1) full, `Width` wide, its middle at `X`. */
+	void ModeHudBar(UCanvas* Canvas, float X, float Y, float Width, float Done, const FLinearColor& Colour)
 	{
-		UFont* Font = GEngine->GetMediumFont();
+		const float U = HudDraw::Unit(Canvas);
+		HudDraw::FShapes Shapes;
+		Shapes.Rect(X - Width / 2.0f, Y, Width, 4.0f * U, HudDraw::Dim);
+		Shapes.Rect(X - Width / 2.0f, Y, Width * FMath::Clamp(Done, 0.0f, 1.0f), 4.0f * U, Colour);
+		Shapes.Draw(Canvas);
+	}
+
+	/** Where the modes' lines over the HUD's score summary begin, at the bottom in the middle. */
+	float ModeHudOverScore(const UCanvas* Canvas)
+	{
+		return Canvas->SizeY - (ACheeseStrikeHUD::Margin + ACheeseStrikeHUD::ScoreHeight + 12.0f) * HudDraw::Unit(Canvas);
+	}
+
+	/** The streaks, over `Bottom`: the one to call in, the run of kills, and the Cheese Strike's marking. */
+	void ModeHudDrawStreaks(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine, float Bottom)
+	{
+		const float U = HudDraw::Unit(Canvas);
 		const float Middle = Canvas->SizeX / 2.0f;
-		// Over the HUD's score summary at the bottom.
-		const float Bottom = Canvas->SizeY - ModeHudMargin - 72.0f * Canvas->SizeY / 1080.0f;
 		const TArray<CheeseStrikeStreaks::EStreak> Ready = Mine->GetReadyStreaks();
 		const float SinceEarned = Match->GetServerWorldTimeSeconds() - Mine->GetLastEarnedAt();
 		if (!Mine->IsMarkingStrike() && Mine->GetLastEarned() != CheeseStrikeStreaks::EStreak::None && Mine->GetLastEarnedAt() > 0.0f && SinceEarned < ModeHudEarnedLife && Ready.Contains(Mine->GetLastEarned()))
 		{
-			ModeHudCentred(Hud, FString::Printf(TEXT("%s READY  ·  PRESS 4"), CheeseStrikeStreaks::Info(Mine->GetLastEarned()).Name).ToUpper(), Middle, Canvas->SizeY * 0.62f, Font, 1.6f, ModeHudYellow);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("%s READY  ·  PRESS 4"), CheeseStrikeStreaks::Info(Mine->GetLastEarned()).Name).ToUpper(), FVector2D(Middle, Canvas->SizeY * 0.62f), HudDraw::Font(30.0f * U), HudDraw::Accent, 0.5f);
 		}
+		float Y = Bottom;
 		if (Ready.Num() > 0)
 		{
-			FString Line = FString::Printf(TEXT("[4]  %s"), CheeseStrikeStreaks::Info(Ready[0]).Name).ToUpper();
+			// The streak to call in, with its key in a box: "[4] UNMANNED AERIAL CHEESE +1".
+			const FSlateFontInfo Line = HudDraw::Font(17.0f * U);
+			FString Name = FString(CheeseStrikeStreaks::Info(Ready[0]).Name).ToUpper();
 			if (Ready.Num() > 1)
 			{
-				Line += FString::Printf(TEXT("   +%d"), Ready.Num() - 1);
+				Name += FString::Printf(TEXT("  +%d"), Ready.Num() - 1);
 			}
-			ModeHudCentred(Hud, Line, Middle, Bottom - 48.0f, Font, 1.2f, ModeHudYellow);
+			const FVector2D NameSize = HudDraw::Measure(Name, Line);
+			const float Key = NameSize.Y * 0.95f;
+			const float Width = Key + 10.0f * U + NameSize.X;
+			Y -= Key;
+			const float Left = Middle - Width / 2.0f;
+			HudDraw::FShapes Shapes;
+			Shapes.Rect(Left - 6.0f * U, Y - 3.0f * U, Width + 12.0f * U, Key + 6.0f * U, HudDraw::Panel);
+			Shapes.Frame(Left, Y, Key, Key, FMath::Max(1.0f, 1.5f * U), HudDraw::Accent);
+			Shapes.Draw(Canvas);
+			HudDraw::Text(Canvas, TEXT("4"), FVector2D(Left + Key / 2.0f, Y + (Key - HudDraw::Measure(TEXT("4"), Line).Y) / 2.0f), Line, HudDraw::Accent, 0.5f);
+			HudDraw::Text(Canvas, Name, FVector2D(Left + Key + 10.0f * U, Y + (Key - NameSize.Y) / 2.0f), Line, HudDraw::Accent);
+			Y -= 10.0f * U;
 		}
 		if (Mine->GetStreak() > 0)
 		{
+			// The run of kills, and the streak it is on its way to.
 			const CheeseStrikeStreaks::EStreak Next = CheeseStrikeStreaks::NextAfter(Mine->GetStreak());
 			const FString Run = Next != CheeseStrikeStreaks::EStreak::None
-				? FString::Printf(TEXT("%d in a row  ·  %s at %d"), Mine->GetStreak(), CheeseStrikeStreaks::Info(Next).Name, CheeseStrikeStreaks::Info(Next).Kills)
-				: FString::Printf(TEXT("%d in a row"), Mine->GetStreak());
-			ModeHudCentred(Hud, Run, Middle, Bottom - 24.0f, Font, 1.0f, ModeHudFaint);
+				? FString::Printf(TEXT("%d IN A ROW  ·  %s AT %d"), Mine->GetStreak(), *FString(CheeseStrikeStreaks::Info(Next).Name).ToUpper(), CheeseStrikeStreaks::Info(Next).Kills)
+				: FString::Printf(TEXT("%d IN A ROW"), Mine->GetStreak());
+			const FSlateFontInfo Small = HudDraw::Font(13.0f * U);
+			Y -= HudDraw::Measure(Run, Small).Y;
+			HudDraw::Text(Canvas, Run, FVector2D(Middle, Y), Small, HudDraw::Soft, 0.5f);
 		}
 
 		// Marking a Cheese Strike: where its wheels will land.
@@ -152,6 +173,7 @@ namespace
 		{
 			FVector Spot;
 			float Yaw = 0.0f;
+			HudDraw::FShapes Shapes;
 			if (Mine->StrikeAim(Spot, Yaw))
 			{
 				// Each wheel where it will land: the first thing it meets coming down.
@@ -160,60 +182,55 @@ namespace
 					FVector Impact;
 					if (ACheeseStrikeBombs::Landing(Hud->GetWorld(), Wheel, Impact))
 					{
-						ModeHudRing(Hud, Impact, 90.0f, ModeHudRed, 2.0f);
+						ModeHudRing(Hud, Shapes, Impact, 90.0f, HudDraw::Danger, 2.0f * U);
 					}
 				}
-				ModeHudRing(Hud, Spot, CheeseStrikeStreaks::StrikeBlast.Radius, FLinearColor(1.0f, 0.4f, 0.2f, 0.6f), 1.5f);
+				ModeHudRing(Hud, Shapes, Spot, CheeseStrikeStreaks::StrikeBlast.Radius, HudDraw::Faded(HudDraw::Accent, 0.6f), 1.5f * U);
 			}
-			ModeHudCentred(Hud, TEXT("FIRE TO MARK THE CHEESE STRIKE  ·  4 OR ESC TO CALL IT OFF"), Middle, Canvas->SizeY * 0.68f, Font, 1.2f, ModeHudYellow);
+			Shapes.Draw(Canvas);
+			HudDraw::Text(Canvas, TEXT("FIRE TO MARK THE CHEESE STRIKE  ·  4 OR ESC TO CALL IT OFF"), FVector2D(Middle, Canvas->SizeY * 0.68f), HudDraw::Font(18.0f * U), HudDraw::Accent, 0.5f);
 		}
 	}
 
-	void ModeHudDrawReveal(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, ACheeseStrikePlayerState* Mine)
+	void ModeHudDrawReveal(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
 	{
+		// The sweeps' marks are the HUD's (ACheeseStrikeHUD::UpdateSweep), which also puts them on the minimap.
 		const float Until = Match->RevealEndsFor(Mine);
-		if (Until <= 0.0f)
+		const float Now = Match->GetServerWorldTimeSeconds();
+		const CheeseStrikeHUD::FSweep Sweep = CheeseStrikeHUD::SweepAt(Now, Until, CheeseStrikeStreaks::RevealTime, CheeseStrikeStreaks::SweepPeriod);
+		if (Sweep.Index == INDEX_NONE)
 		{
-			Mine->SweepIndex = -1;
-			Mine->SweepMarks.Reset();
 			return;
 		}
-		const float Now = Match->GetServerWorldTimeSeconds();
-		const float Since = Now - (Until - CheeseStrikeStreaks::RevealTime);
-		const int32 Sweep = FMath::FloorToInt(Since / CheeseStrikeStreaks::SweepPeriod);
-		// Each sweep sees where every enemy is, and that is what shows until the next.
-		if (Sweep != Mine->SweepIndex)
-		{
-			Mine->SweepIndex = Sweep;
-			Mine->SweepMarks.Reset();
-			for (TActorIterator<ACheeseStrikeCharacter> It(Hud->GetWorld()); It; ++It)
-			{
-				if (It->IsAlive() && Match->AreEnemies(Mine, It->GetPlayerState()))
-				{
-					Mine->SweepMarks.Add(It->GetActorLocation() + FVector(0.0f, 0.0f, 40.0f));
-				}
-			}
-		}
-		const float Fade = 1.0f - 0.6f * FMath::Fmod(Since, CheeseStrikeStreaks::SweepPeriod) / CheeseStrikeStreaks::SweepPeriod;
+		const float U = HudDraw::Unit(Canvas);
+		HudDraw::FShapes Shapes;
 		for (const FVector& Mark : Mine->SweepMarks)
 		{
 			FVector2D At;
-			if (ModeHudOnScreen(Hud, Mark, At))
+			if (ModeHudOnScreen(Hud, Mark + FVector(0.0f, 0.0f, 40.0f), At))
 			{
-				ModeHudDiamond(Hud, At, 9.0f, FLinearColor(ModeHudRed.R, ModeHudRed.G, ModeHudRed.B, Fade));
+				// A small red diamond, with a dark rim, where each enemy was.
+				const float Size = 8.0f * U;
+				const float Rim = Size + 2.0f * U;
+				Shapes.Quad(At + FVector2D(0, -Rim), At + FVector2D(Rim, 0), At + FVector2D(0, Rim), At + FVector2D(-Rim, 0), FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Sweep.Fade));
+				Shapes.Quad(At + FVector2D(0, -Size), At + FVector2D(Size, 0), At + FVector2D(0, Size), At + FVector2D(-Size, 0), HudDraw::Faded(HudDraw::Danger, Sweep.Fade));
 			}
 		}
-		Hud->DrawText(FString::Printf(TEXT("UNMANNED AERIAL CHEESE  %.0f"), FMath::CeilToFloat(Until - Now)), ModeHudYellow, ModeHudMargin, Canvas->SizeY * 0.3f, GEngine->GetMediumFont(), 1.1f);
+		// Under the minimap: its name, its seconds, and a bar running down.
+		const float Left = ACheeseStrikeHUD::Margin * U;
+		const float Top = (ACheeseStrikeHUD::Margin + ACheeseStrikeHUD::MapSide + 12.0f) * U;
+		const float Width = ACheeseStrikeHUD::MapSide * U;
+		const float Remaining = FMath::Clamp((Until - Now) / CheeseStrikeStreaks::RevealTime, 0.0f, 1.0f);
+		const FSlateFontInfo Label = HudDraw::Font(14.0f * U);
+		const float LabelHeight = HudDraw::Measure(TEXT("U"), Label).Y;
+		Shapes.Rect(Left, Top + LabelHeight + 4.0f * U, Width, 3.0f * U, HudDraw::Dim);
+		Shapes.Rect(Left, Top + LabelHeight + 4.0f * U, Width * Remaining, 3.0f * U, HudDraw::Accent);
+		Shapes.Draw(Canvas);
+		HudDraw::Text(Canvas, TEXT("UNMANNED AERIAL CHEESE"), FVector2D(Left, Top), Label, HudDraw::Accent);
+		HudDraw::Text(Canvas, FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Until - Now)), FVector2D(Left + Width, Top), Label, HudDraw::Accent, 1.0f);
 	}
 
-	/** A bar `Done` (0 to 1) full, its middle at `X`. */
-	void ModeHudBar(AHUD* Hud, float X, float Y, float Width, float Done, const FLinearColor& Colour)
-	{
-		Hud->DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.5f), X - Width / 2.0f, Y, Width, 8.0f);
-		Hud->DrawRect(Colour, X - Width / 2.0f, Y, Width * FMath::Clamp(Done, 0.0f, 1.0f), 8.0f);
-	}
-
-	/** Execution: down, the time left and who comes; standing, the prompt over someone down, and the work under way. */
+	/** Execution: down, the time left and who comes; standing, a mark over teammates down, the prompt over someone down, and the work under way. */
 	void ModeHudDrawLastStand(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine, const ACheeseStrikeCharacter* Own)
 	{
 		const UCheeseStrikeLastStand* Stand = Own->GetLastStand();
@@ -221,79 +238,79 @@ namespace
 		{
 			return;
 		}
-		UFont* Font = GEngine->GetMediumFont();
+		const float U = HudDraw::Unit(Canvas);
 		const float Middle = Canvas->SizeX / 2.0f;
 		const float Y = Canvas->SizeY * 0.66f;
+		const FLinearColor Side = HudDraw::SideColour(Mine->GetTeam());
 		// Teammates down, wherever they are: a cross over them, for finding them.
+		HudDraw::FShapes Marks;
+		TArray<FVector2D> Down;
 		for (TActorIterator<ACheeseStrikeCharacter> It(Hud->GetWorld()); It; ++It)
 		{
 			FVector2D At;
 			if (*It != Own && It->IsAlive() && It->IsDowned() && Match->AreTeammates(Mine, It->GetPlayerState()) && ModeHudOnScreen(Hud, It->GetActorLocation() + FVector(0.0f, 0.0f, 110.0f), At))
 			{
-				const FLinearColor Colour = CheeseStrikeModes::TeamColour(Mine->GetTeam());
-				Hud->DrawLine(At.X - 8.0f, At.Y, At.X + 8.0f, At.Y, Colour, 4.0f);
-				Hud->DrawLine(At.X, At.Y - 8.0f, At.X, At.Y + 8.0f, Colour, 4.0f);
-				ModeHudCentred(Hud, TEXT("DOWN"), At.X, At.Y - 30.0f, GEngine->GetSmallFont(), 1.0f, Colour);
+				Marks.Line(At - FVector2D(9.0f * U, 0.0f), At + FVector2D(9.0f * U, 0.0f), 4.0f * U, Side);
+				Marks.Line(At - FVector2D(0.0f, 9.0f * U), At + FVector2D(0.0f, 9.0f * U), 4.0f * U, Side);
+				Down.Add(At);
 			}
 		}
+		Marks.Draw(Canvas);
+		for (const FVector2D& At : Down)
+		{
+			HudDraw::Text(Canvas, TEXT("DOWN"), FVector2D(At.X, At.Y - 32.0f * U), HudDraw::Font(14.0f * U), Side, 0.5f);
+		}
+		const FSlateFontInfo Line = HudDraw::Font(18.0f * U);
 		if (Stand->IsDowned())
 		{
-			ModeHudCentred(Hud, FString::Printf(TEXT("DOWN  ·  BLEEDING OUT IN %.0f"), FMath::CeilToFloat(Stand->SecondsToBleedOut())), Middle, Y, Font, 1.5f, ModeHudRed);
 			const ACheeseStrikeCharacter* By = Stand->WorkedOnBy();
 			const UCheeseStrikeLastStand* Theirs = By != nullptr ? By->GetLastStand() : nullptr;
-			if (Theirs != nullptr && Theirs->GetWork() == CheeseStrikeModes::EInteract::Revive)
+			const bool bRevived = Theirs != nullptr && Theirs->GetWork() == CheeseStrikeModes::EInteract::Revive;
+			const FString Under = Theirs == nullptr ? FString(TEXT("only your pistol  ·  a teammate can revive you  ·  an enemy up close can finish you"))
+				: FString::Printf(TEXT("%s is %s you"), *By->DisplayName(), bRevived ? TEXT("reviving") : TEXT("finishing"));
+			ModeHudNotice(Canvas, Y, FString::Printf(TEXT("DOWN  ·  BLEEDING OUT IN %.0f"), FMath::CeilToFloat(Stand->SecondsToBleedOut())), HudDraw::Danger, Under);
+			if (Theirs != nullptr)
 			{
-				ModeHudCentred(Hud, FString::Printf(TEXT("%s is reviving you"), *By->DisplayName()), Middle, Y + 32.0f, Font, 1.1f, ModeHudWhite);
-				ModeHudBar(Hud, Middle, Y + 58.0f, 240.0f, Theirs->WorkDone(), CheeseStrikeModes::TeamColour(Mine->GetTeam()));
-			}
-			else if (Theirs != nullptr)
-			{
-				ModeHudCentred(Hud, FString::Printf(TEXT("%s is finishing you"), *By->DisplayName()), Middle, Y + 32.0f, Font, 1.1f, ModeHudRed);
-				ModeHudBar(Hud, Middle, Y + 58.0f, 240.0f, Theirs->WorkDone(), ModeHudRed);
-			}
-			else
-			{
-				ModeHudCentred(Hud, TEXT("only your pistol  ·  a teammate can revive you  ·  an enemy up close can finish you"), Middle, Y + 32.0f, Font, 1.0f, ModeHudFaint);
+				ModeHudBar(Canvas, Middle, Y + 70.0f * U, 240.0f * U, Theirs->WorkDone(), bRevived ? Side : HudDraw::Danger);
 			}
 			return;
 		}
 		if (const ACheeseStrikeCharacter* Working = Stand->GetWorkingOn())
 		{
 			const bool bRevive = Stand->GetWork() == CheeseStrikeModes::EInteract::Revive;
-			ModeHudCentred(Hud, FString::Printf(TEXT("%s %s"), bRevive ? TEXT("REVIVING") : TEXT("FINISHING"), *Working->DisplayName().ToUpper()), Middle, Y, Font, 1.3f, bRevive ? CheeseStrikeModes::TeamColour(Mine->GetTeam()) : ModeHudRed);
-			ModeHudBar(Hud, Middle, Y + 30.0f, 240.0f, Stand->WorkDone(), bRevive ? CheeseStrikeModes::TeamColour(Mine->GetTeam()) : ModeHudRed);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("%s %s"), bRevive ? TEXT("REVIVING") : TEXT("FINISHING"), *Working->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, bRevive ? Side : HudDraw::Danger, 0.5f);
+			ModeHudBar(Canvas, Middle, Y + 30.0f * U, 240.0f * U, Stand->WorkDone(), bRevive ? Side : HudDraw::Danger);
 			return;
 		}
 		CheeseStrikeModes::EInteract Kind = CheeseStrikeModes::EInteract::None;
 		if (const ACheeseStrikeCharacter* Near = Stand->InteractTarget(Kind))
 		{
 			const bool bRevive = Kind == CheeseStrikeModes::EInteract::Revive;
-			ModeHudCentred(Hud, FString::Printf(TEXT("HOLD E  ·  %s %s"), bRevive ? TEXT("REVIVE") : TEXT("FINISH"), *Near->DisplayName().ToUpper()), Middle, Y, Font, 1.3f, bRevive ? CheeseStrikeModes::TeamColour(Mine->GetTeam()) : ModeHudRed);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("HOLD E  ·  %s %s"), bRevive ? TEXT("REVIVE") : TEXT("FINISH"), *Near->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, bRevive ? Side : HudDraw::Danger, 0.5f);
 		}
 	}
 
-	/** Gun Game: the step the player is on, and what comes next. */
-	void ModeHudDrawGunGame(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
+	/** Gun Game: the step the player is on and what comes next, over `Bottom`; returns where the lines over it may begin. */
+	float ModeHudDrawGunGame(UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine, float Bottom)
 	{
 		if (Match->GetModeInfo().WinBy != CheeseStrikeModes::EWinBy::Ladder)
 		{
-			return;
+			return Bottom;
 		}
+		const float U = HudDraw::Unit(Canvas);
 		const int32 Steps = CheeseStrikeArsenal::GunGameLadder().Num();
 		const int32 Level = Mine->GetGunLevel();
-		const FString Line = Level + 1 < Steps
-			? FString::Printf(TEXT("GUN GAME  ·  %d OF %d  ·  %s  ·  next: %s"), Level + 1, Steps, *ACheeseStrikeGameState::GunGameWeaponName(Level).ToUpper(), *ACheeseStrikeGameState::GunGameWeaponName(Level + 1))
-			: FString::Printf(TEXT("GUN GAME  ·  %d OF %d  ·  %s  ·  one kill to win"), Level + 1, Steps, *ACheeseStrikeGameState::GunGameWeaponName(Level).ToUpper());
-		// Over the HUD's score summary at the bottom, where the streaks go in other modes.
-		ModeHudCentred(Hud, Line, Canvas->SizeX / 2.0f, Canvas->SizeY - ModeHudMargin - 72.0f * Canvas->SizeY / 1080.0f - 48.0f, GEngine->GetMediumFont(), 1.1f, ModeHudYellow);
+		const FString Text = Level + 1 < Steps
+			? FString::Printf(TEXT("%d OF %d  ·  %s  ·  NEXT: %s"), Level + 1, Steps, *ACheeseStrikeGameState::GunGameWeaponName(Level).ToUpper(), *ACheeseStrikeGameState::GunGameWeaponName(Level + 1).ToUpper())
+			: FString::Printf(TEXT("%d OF %d  ·  %s  ·  ONE KILL TO WIN"), Level + 1, Steps, *ACheeseStrikeGameState::GunGameWeaponName(Level).ToUpper());
+		const FSlateFontInfo Line = HudDraw::Font(17.0f * U);
+		const float Top = Bottom - HudDraw::Measure(Text, Line).Y;
+		HudDraw::Text(Canvas, Text, FVector2D(Canvas->SizeX / 2.0f, Top), Line, HudDraw::Accent, 0.5f);
+		return Top - 8.0f * U;
 	}
 
-	void ModeHudDrawOut(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
+	void ModeHudDrawOut(UCanvas* Canvas, const AHUD* Hud, const ACheeseStrikeGameState* Match)
 	{
-		UFont* Font = GEngine->GetMediumFont();
-		const float Middle = Canvas->SizeX / 2.0f;
-		const float Y = Canvas->SizeY * 0.72f;
-		ModeHudCentred(Hud, TEXT("OUT UNTIL THE NEXT ROUND"), Middle, Y, Font, 1.5f, ModeHudRed);
 		const APlayerController* Owner = Hud->GetOwningPlayerController();
 		const ACheeseStrikeWatchCamera* Watch = Owner != nullptr ? Cast<ACheeseStrikeWatchCamera>(Owner->GetViewTarget()) : nullptr;
 		const ACheeseStrikeCharacter* Watched = Watch != nullptr ? Watch->GetWatched() : nullptr;
@@ -302,10 +319,7 @@ namespace
 		{
 			Under = FString::Printf(TEXT("next round in %.0f"), FMath::CeilToFloat(Match->SecondsToNextRound()));
 		}
-		if (!Under.IsEmpty())
-		{
-			ModeHudCentred(Hud, Under, Middle, Y + 34.0f, Font, 1.1f, ModeHudWhite);
-		}
+		ModeHudNotice(Canvas, Canvas->SizeY * 0.72f, TEXT("OUT UNTIL THE NEXT ROUND"), HudDraw::Danger, Under);
 	}
 }
 
@@ -321,13 +335,13 @@ namespace CheeseStrikeModeHUD
 	void Draw(AHUD* Hud, UCanvas* Canvas)
 	{
 		const APlayerController* Owner = Hud != nullptr ? Hud->GetOwningPlayerController() : nullptr;
-		ACheeseStrikePlayerState* Mine = Owner != nullptr ? Owner->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+		const ACheeseStrikePlayerState* Mine = Owner != nullptr ? Owner->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
 		const ACheeseStrikeGameState* Match = Hud != nullptr && Hud->GetWorld() != nullptr ? Hud->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
 		if (Canvas == nullptr || Mine == nullptr || Match == nullptr || !Match->HasMatchStarted() || Match->GetMatchState() == MatchState::LeavingMap)
 		{
 			return;
 		}
-		ModeHudDrawAnnouncements(Hud, Canvas, Match, Mine);
+		ModeHudDrawAnnouncements(Canvas, Match, Mine);
 		if (Match->HasMatchEnded())
 		{
 			return;
@@ -335,14 +349,14 @@ namespace CheeseStrikeModeHUD
 		const ACheeseStrikeCharacter* Own = Cast<ACheeseStrikeCharacter>(Owner->GetPawn());
 		if (Mine->IsOut())
 		{
-			ModeHudDrawOut(Hud, Canvas, Match, Mine);
+			ModeHudDrawOut(Canvas, Hud, Match);
 		}
 		else if (Own != nullptr && Own->IsAlive())
 		{
 			ModeHudDrawReveal(Hud, Canvas, Match, Mine);
-			ModeHudDrawStreaks(Hud, Canvas, Match, Mine);
+			const float Bottom = ModeHudDrawGunGame(Canvas, Match, Mine, ModeHudOverScore(Canvas));
+			ModeHudDrawStreaks(Hud, Canvas, Match, Mine, Bottom);
 			ModeHudDrawLastStand(Hud, Canvas, Match, Mine, Own);
-			ModeHudDrawGunGame(Hud, Canvas, Match, Mine);
 		}
 	}
 }

@@ -120,6 +120,25 @@ bool FTheMinimapShowsWhatIsNearThePlayersHeight::RunTest(const FString& Paramete
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheAerialCheeseSweepsInPulses, "CheeseStrike.HUD.TheAerialCheeseSweepsInPulses", HUDTests::Flags)
+
+bool FTheAerialCheeseSweepsInPulses::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	// One called in at 100 for 25 s of sweeps every 2 s: it ends at 125.
+	TestEqual(TEXT("none before it is called in"), SweepAt(99.0f, 125.0f, 25.0f, 2.0f).Index, INDEX_NONE);
+	TestEqual(TEXT("none once it is over"), SweepAt(125.0f, 125.0f, 25.0f, 2.0f).Index, INDEX_NONE);
+	TestEqual(TEXT("none without one"), SweepAt(50.0f, 0.0f, 25.0f, 2.0f).Index, INDEX_NONE);
+	const FSweep First = SweepAt(100.0f, 125.0f, 25.0f, 2.0f);
+	TestTrue(TEXT("the first sweep as it comes, at full strength"), First.Index == 0 && FMath::IsNearlyEqual(First.Fade, 1.0f));
+	const FSweep Later = SweepAt(101.5f, 125.0f, 25.0f, 2.0f);
+	TestTrue(FString::Printf(TEXT("fading towards the next (%.2f)"), Later.Fade), Later.Index == 0 && Later.Fade < First.Fade && Later.Fade > 0.3f);
+	const FSweep Next = SweepAt(102.1f, 125.0f, 25.0f, 2.0f);
+	TestTrue(TEXT("then the next sweep, full again"), Next.Index == 1 && Next.Fade > 0.95f && FMath::IsNearlyEqual(Next.Since, 0.1f, 0.001f));
+	TestEqual(TEXT("the last sweep"), SweepAt(124.9f, 125.0f, 25.0f, 2.0f).Index, 12);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheDamageArcPointsAtTheShooter, "CheeseStrike.HUD.TheDamageArcPointsAtTheShooter", HUDTests::Flags)
 
 bool FTheDamageArcPointsAtTheShooter::RunTest(const FString& Parameters)

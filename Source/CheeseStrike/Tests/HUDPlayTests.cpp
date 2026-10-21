@@ -120,6 +120,24 @@ bool FTheHUDShowsWhereHitsComeFrom::RunTest(const FString& Parameters)
 		TestTrue(TEXT("revealed, the host is on it unseen"), Hud->ShowsOnMinimap(HostSeen));
 		TestEqual(TEXT("the arc is gone with its time"), Hud->GetDamageArcs().Num(), 0);
 	});
+	// The host calls in an Unmanned Aerial Cheese: its sweeps mark the joiner, an enemy in a free-for-all, for the host's minimap.
+	Play(0, TEXT("cmd CheeseStrikeGiveStreak 1\ntap Streak"));
+	WaitUntil(TEXT("the host's sweep marking the joiner"), 5.0f, []()
+	{
+		const ACheeseStrikePlayerState* Host = Controller(0) != nullptr ? Controller(0)->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+		return Host != nullptr && Host->SweepMarks.Num() > 0;
+	});
+	Then([this]()
+	{
+		const ACheeseStrikePlayerState* Host = Controller(0)->GetPlayerState<ACheeseStrikePlayerState>();
+		const ACheeseStrikeCharacter* JoinerSeen = CharacterOf(1, 0);
+		if (TestEqual(TEXT("one enemy, one mark"), Host->SweepMarks.Num(), 1) && TestNotNull(TEXT("the host sees the joiner"), JoinerSeen))
+		{
+			const float Off = FVector::Dist2D(Host->SweepMarks[0], JoinerSeen->GetActorLocation());
+			TestTrue(FString::Printf(TEXT("where the joiner is (%.0f cm off)"), Off), Off < 100.0f);
+		}
+		TestTrue(TEXT("the joiner's own sweeps mark nobody"), Controller(1)->GetPlayerState<ACheeseStrikePlayerState>()->SweepMarks.Num() == 0);
+	});
 	// Killed, the joiner shows as coming back in the row along the top, on the host's machine and their own.
 	Play(1, TEXT("cmd CheeseStrikeDie"));
 	WaitUntil(TEXT("the joiner dead, as both see it"), 5.0f, []()
