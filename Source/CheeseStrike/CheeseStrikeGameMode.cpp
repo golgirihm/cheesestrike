@@ -209,29 +209,35 @@ void ACheeseStrikeGameMode::SpawnBots()
 	{
 		return;
 	}
+	// Both sides' bots are dealt before any comes in: a bot in is one of the roster's players, and dealing the second side
+	// after the first's had come would deal it the first's again.
+	TArray<CheeseStrikeRules::FRosterEntry> Bots;
 	for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
 	{
 		for (const CheeseStrikeRules::FRosterEntry& Entry : Match->TeamColumn(Team))
 		{
-			if (!Entry.bBot)
+			if (Entry.bBot)
 			{
-				continue;
+				Bots.Add(Entry);
 			}
-			FActorSpawnParameters Parameters;
-			Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			ACheeseStrikeBotController* Bot = World->SpawnActor<ACheeseStrikeBotController>(ACheeseStrikeBotController::StaticClass(), FTransform::Identity, Parameters);
-			if (Bot == nullptr)
-			{
-				continue;
-			}
-			if (ACheeseStrikePlayerState* State = Bot->GetPlayerState<ACheeseStrikePlayerState>())
-			{
-				State->SetPlayerName(Entry.Name);
-				State->SetIsABot(true);
-				State->SetTeam(Team);
-			}
-			RestartPlayer(Bot);
 		}
+	}
+	for (const CheeseStrikeRules::FRosterEntry& Entry : Bots)
+	{
+		FActorSpawnParameters Parameters;
+		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ACheeseStrikeBotController* Bot = World->SpawnActor<ACheeseStrikeBotController>(ACheeseStrikeBotController::StaticClass(), FTransform::Identity, Parameters);
+		if (Bot == nullptr)
+		{
+			continue;
+		}
+		if (ACheeseStrikePlayerState* State = Bot->GetPlayerState<ACheeseStrikePlayerState>())
+		{
+			State->SetPlayerName(Entry.Name);
+			State->SetIsABot(true);
+			State->SetTeam(Entry.Team);
+		}
+		RestartPlayer(Bot);
 	}
 }
 
