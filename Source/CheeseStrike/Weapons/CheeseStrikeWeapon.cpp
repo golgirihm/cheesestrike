@@ -701,9 +701,11 @@ void ACheeseStrikeWeapon::FireShot(int32 InBurst)
 	const FVector Origin = Camera->GetComponentLocation();
 	// A player's view is their camera's; a bot's camera takes its control rotation only when someone looks through it, so a bot aims by that.
 	const FVector Aim = Holder->IsPlayerControlled() ? Camera->GetForwardVector() : Holder->GetControlRotation().Vector();
-	// The view climbs by the shot's kick, so the next lands where the crosshair is.
+	// The view climbs by the shot's kick, so the next lands where the crosshair is: by its degrees, whatever the player's
+	// look sensitivity and however they have their look inverted.
 	const FVector2D Kick = CheeseStrikeWeapons::RecoilFor(*Stats, Index, bAimed) - CheeseStrikeWeapons::RecoilFor(*Stats, Index - 1, bAimed);
-	Holder->DoAim(Kick.X, Kick.Y);
+	Holder->AddControllerYawInput(Kick.X);
+	Holder->AddControllerPitchInput(Kick.Y);
 	if (!HasAuthority())
 	{
 		--Magazine;
