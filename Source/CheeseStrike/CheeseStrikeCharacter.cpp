@@ -30,6 +30,7 @@
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikePlayerController.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 /** With this on, every character writes its state to the log four times a second, for watching a run from outside. */
@@ -97,12 +98,13 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
 	BaseFieldOfView = FirstPersonCameraComponent->FieldOfView;
 	Health = CheeseStrikeWeapons::MaxHealth;
+
+	Inventory = CreateDefaultSubobject<UCheeseStrikeInventory>(TEXT("Inventory"));
 }
 
 void ACheeseStrikeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(ACheeseStrikeCharacter, HeldWeapon);
 	DOREPLIFETIME(ACheeseStrikeCharacter, Health);
 	DOREPLIFETIME(ACheeseStrikeCharacter, KilledBy);
 	DOREPLIFETIME(ACheeseStrikeCharacter, DiedAt);
@@ -182,14 +184,6 @@ void ACheeseStrikeCharacter::BeginPlay()
 	ACheeseStrikeWeapon::HideBuiltInWeapons(GetMesh());
 	FitFirstPersonBody();
 	FirstPersonBase = FirstPersonMesh->GetRelativeTransform();
-	// The server gives every character its weapon; it arrives on every machine as an actor of this character's.
-	if (HasAuthority() && HeldWeapon == nullptr && GetWorld() != nullptr)
-	{
-		FActorSpawnParameters Parameters;
-		Parameters.Owner = this;
-		Parameters.Instigator = this;
-		HeldWeapon = GetWorld()->SpawnActor<ACheeseStrikeWeapon>(ACheeseStrikeWeapon::StaticClass(), GetActorTransform(), Parameters);
-	}
 	// A fresh character can't be hurt for its first seconds, unless it fires.
 	if (HasAuthority())
 	{
@@ -197,13 +191,20 @@ void ACheeseStrikeCharacter::BeginPlay()
 	}
 }
 
-void ACheeseStrikeCharacter::Destroyed()
+void ACheeseStrikeCharacter::PossessedBy(AController* NewController)
 {
-	if (HasAuthority() && HeldWeapon != nullptr)
+	Super::PossessedBy(NewController);
+	// The server gives every character its weapons as it is possessed, with the primary its player chose; they arrive on
+	// every machine as actors of this character's (and go with it). A mode may give others after (SetPlayerDefaults).
+	if (HasAuthority() && Inventory->GetHeld() == nullptr)
 	{
-		HeldWeapon->Destroy();
+		Inventory->GiveSpawnLoadout(NewController);
 	}
-	Super::Destroyed();
+}
+
+ACheeseStrikeWeapon* ACheeseStrikeCharacter::GetWeapon() const
+{
+	return Inventory != nullptr ? Inventory->GetHeld() : nullptr;
 }
 
 float ACheeseStrikeCharacter::ServerNow() const
@@ -243,6 +244,7 @@ FHitHistory::FSample ACheeseStrikeCharacter::SampleNow(float Time) const
 	Sample.Height = GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 2.0f;
 	Sample.Feet = GetActorLocation() - FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 	Sample.Head = Eyes->GetComponentLocation();
+	Sample.Yaw = GetActorRotation().Yaw;
 	return Sample;
 }
 
@@ -298,10 +300,12 @@ void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw, floa
 	GetMesh()->SetOwnerNoSee(!bOutside);
 	GetMesh()->SetFirstPersonPrimitiveType(bOutside ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
 	FirstPersonMesh->SetVisibility(!bOutside, true);
-	if (HeldWeapon != nullptr)
+	for (const EWeaponSlot Slot : {EWeaponSlot::Primary, EWeaponSlot::Sidearm, EWeaponSlot::Knife})
 	{
-		HeldWeapon->GetThirdPersonMesh()->SetOwnerNoSee(!bOutside);
-		HeldWeapon->GetThirdPersonMesh()->SetFirstPersonPrimitiveType(bOutside ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
+		if (ACheeseStrikeWeapon* Carried = Inventory->GetInSlot(Slot))
+		{
+			Carried->SetSeenFromOutside(bOutside);
+		}
 	}
 	if (OutsideCamera != nullptr)
 	{
@@ -396,10 +400,10 @@ void ACheeseStrikeCharacter::ShowDeath()
 		return;
 	}
 	bDeathShown = true;
-	if (HeldWeapon != nullptr)
+	if (ACheeseStrikeWeapon* Held = GetWeapon())
 	{
-		HeldWeapon->StopFiring();
-		HeldWeapon->StopAiming();
+		Held->StopFiring();
+		Held->StopAiming();
 	}
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
@@ -475,7 +479,7 @@ void ACheeseStrikeCharacter::ClientStartAt_Implementation(FVector_NetQuantize At
 
 FVector ACheeseStrikeCharacter::LeftHandOnRifle() const
 {
-	const USkeletalMeshComponent* Rifle = HeldWeapon != nullptr ? HeldWeapon->GetFirstPersonMesh() : nullptr;
+	const USkeletalMeshComponent* Rifle = GetWeapon() != nullptr ? GetWeapon()->GetFirstPersonMesh() : nullptr;
 	if (Rifle == nullptr || FirstPersonMesh == nullptr)
 	{
 		return FVector::ZeroVector;
@@ -489,7 +493,8 @@ static TAutoConsoleVariable<float> CVarSightBack(TEXT("CheeseStrike.SightBack"),
 
 void ACheeseStrikeCharacter::BringRifleToEye()
 {
-	const USkeletalMeshComponent* Rifle = HeldWeapon != nullptr ? HeldWeapon->GetFirstPersonMesh() : nullptr;
+	const ACheeseStrikeWeapon* Held = GetWeapon();
+	const USkeletalMeshComponent* Rifle = Held != nullptr ? Held->GetFirstPersonMesh() : nullptr;
 	const USceneComponent* Parent = FirstPersonMesh->GetAttachParent();
 	// Only for its own player, alive, with the camera riding the arms (after a death it is left where the eyes were).
 	if (!IsLocallyControlled() || Parent == nullptr || !IsAlive() || FirstPersonCameraComponent->GetAttachParent() != FirstPersonMesh)
@@ -499,6 +504,15 @@ void ACheeseStrikeCharacter::BringRifleToEye()
 	// Where the arms are without aiming, and the eye in them.
 	const FTransform Unaimed = FirstPersonBase * FirstPersonMesh->GetAttachParent()->GetSocketTransform(FirstPersonMesh->GetAttachSocketName());
 	const FVector Eye = (FirstPersonMesh->GetSocketTransform(FName("head"), RTS_Component) * Unaimed).TransformPosition(CameraAtHead);
+	// A weapon just drawn comes up from below the view, the arms with it, the eye staying where it is.
+	const float Lowered = Held != nullptr ? FMath::Square(1.0f - Held->DrawnFraction()) : 0.0f;
+	if (Lowered > 0.001f)
+	{
+		const FVector Down = -FRotationMatrix(GetControlRotation()).GetUnitAxis(EAxis::Z) * DrawDrop * Lowered;
+		FirstPersonMesh->SetWorldLocation(Unaimed.GetLocation() + Down);
+		FirstPersonCameraComponent->SetWorldLocation(Eye);
+		return;
+	}
 	if (AimFraction < 0.001f || Rifle == nullptr || Rifle->GetSkeletalMeshAsset() == nullptr)
 	{
 		FirstPersonMesh->SetRelativeTransform(FirstPersonBase);
@@ -538,8 +552,8 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	// moved and turned so that the rifle's sight line runs straight down the view from just in front of
 	// the eye, which stays where the head has it. Shots leave from the eye along the view, so they go
 	// where the sights point.
-	const bool bAimed = HeldWeapon != nullptr && HeldWeapon->IsAimed();
-	const float WantedFieldOfView = BaseFieldOfView * (bAimed ? CheeseStrikeWeapons::Blaster().AimZoom : 1.0f);
+	const bool bAimed = GetWeapon() != nullptr && GetWeapon()->IsAimed();
+	const float WantedFieldOfView = BaseFieldOfView * (bAimed ? GetWeapon()->GetStats().AimZoom : 1.0f);
 	FirstPersonCameraComponent->SetFieldOfView(FMath::FInterpTo(FirstPersonCameraComponent->FieldOfView, WantedFieldOfView, DeltaSeconds, 12.0f));
 	AimFraction = FMath::FInterpTo(AimFraction, bAimed ? 1.0f : 0.0f, DeltaSeconds, 12.0f);
 	BringRifleToEye();
@@ -589,12 +603,14 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 	const FVector At = GetActorLocation();
 	const FVector Eye = FirstPersonCameraComponent->GetComponentLocation();
 	const FVector Body = GetMesh()->GetComponentLocation();
-	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f)"),
+	const ACheeseStrikeWeapon* HeldWeapon = GetWeapon();
+	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d weapon %s drawing %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f)"),
 		At.X, At.Y, At.Z, GetVelocity().Size2D(), Eye.Z - (At.Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), FRotator::NormalizeAxis(GetControlRotation().Pitch), FRotator::NormalizeAxis(GetControlRotation().Yaw),
 		bIsCrouched ? 1 : 0, Movement != nullptr && Movement->IsSprinting() ? 1 : 0, Movement != nullptr && Movement->IsSliding() ? 1 : 0,
 		Movement != nullptr ? Movement->GetSlideElapsed() : -1.0f, Movement != nullptr && Movement->IsFalling() ? 1 : 0, bPressedJump ? 1 : 0, JumpCurrentCount,
 		Health, IsAlive() ? 1 : 0, IsProtected() ? 1 : 0, HeldWeapon != nullptr ? HeldWeapon->GetMagazine() : -1, HeldWeapon != nullptr ? HeldWeapon->GetReserve() : -1, HeldWeapon != nullptr && HeldWeapon->IsAimed() ? 1 : 0,
 		FirstPersonCameraComponent->FieldOfView, HeldWeapon != nullptr ? HeldWeapon->ShotsFired : 0, HeldWeapon != nullptr ? HeldWeapon->HitsConfirmed : 0, HeldWeapon != nullptr && HeldWeapon->IsReloading() ? 1 : 0,
+		HeldWeapon != nullptr ? *HeldWeapon->GetWeaponId().ToString() : TEXT("none"), HeldWeapon != nullptr && HeldWeapon->IsDrawing() ? 1 : 0,
 		Body.X, Body.Y, Body.Z, GetMesh()->IsSimulatingPhysics() ? 1 : 0, Eye.X, Eye.Y, Eye.Z);
 	if (HeldWeapon != nullptr)
 	{
@@ -622,6 +638,7 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 		// Where the first-person rifle is in the body's right hand's space: how a body without weapon_r should hold it.
 		const FTransform Wanted = HeldWeapon->GetFirstPersonMesh()->GetComponentTransform().GetRelativeTransform(GetMesh()->GetSocketTransform(TEXT("hand_r")));
 		UE_LOG(LogCheeseStrike, Display, TEXT("Grip wanted on the body's hand_r: at (%.1f, %.1f, %.1f) turned (pitch %.1f, yaw %.1f, roll %.1f)"), Wanted.GetLocation().X, Wanted.GetLocation().Y, Wanted.GetLocation().Z, Wanted.Rotator().Pitch, Wanted.Rotator().Yaw, Wanted.Rotator().Roll);
+		UE_LOG(LogCheeseStrike, Display, TEXT("Weapon in hand: %s"), *HeldWeapon->DescribeModel(Eye));
 		// And where the left hand is on the rifle, in the rifle's own space: it should stay put whatever the aim.
 		const FVector LeftOnRifle = LeftHandOnRifle();
 		UE_LOG(LogCheeseStrike, Display, TEXT("Hands: first-person hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f) left hand on the rifle at (%.1f, %.1f, %.1f); body hand (%.0f, %.0f, %.0f) rifle (%.0f, %.0f, %.0f) barrel (%.2f, %.2f, %.2f) head (%.0f, %.0f, %.0f) over the feet; view (%.2f, %.2f, %.2f) aim pitch %.0f"),
@@ -659,6 +676,12 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	EnhancedInputComponent->BindAction(Input->Aim, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::AimStarted);
 	EnhancedInputComponent->BindAction(Input->Aim, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::AimEnded);
 	EnhancedInputComponent->BindAction(Input->Reload, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::ReloadStarted);
+	EnhancedInputComponent->BindAction(Input->DrawPrimary, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::PrimaryStarted);
+	EnhancedInputComponent->BindAction(Input->DrawSidearm, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::SidearmStarted);
+	EnhancedInputComponent->BindAction(Input->DrawKnife, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::KnifeStarted);
+	EnhancedInputComponent->BindAction(Input->NextWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::NextWeaponStarted);
+	EnhancedInputComponent->BindAction(Input->PreviousWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::PreviousWeaponStarted);
+	EnhancedInputComponent->BindAction(Input->LastWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::LastWeaponStarted);
 }
 
 void ACheeseStrikeCharacter::MoveInput(const FInputActionValue& Value)
@@ -737,6 +760,7 @@ void ACheeseStrikeCharacter::DoCrouch(bool bHeld)
 
 void ACheeseStrikeCharacter::DoFire(bool bHeld)
 {
+	ACheeseStrikeWeapon* HeldWeapon = GetWeapon();
 	if (HeldWeapon == nullptr)
 	{
 		return;
@@ -753,6 +777,7 @@ void ACheeseStrikeCharacter::DoFire(bool bHeld)
 
 void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 {
+	ACheeseStrikeWeapon* HeldWeapon = GetWeapon();
 	if (HeldWeapon == nullptr)
 	{
 		return;
@@ -769,10 +794,80 @@ void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 
 void ACheeseStrikeCharacter::DoReload()
 {
-	if (HeldWeapon != nullptr && TakesInput())
+	if (GetWeapon() != nullptr && TakesInput())
 	{
-		HeldWeapon->StartReload();
+		GetWeapon()->StartReload();
 	}
+}
+
+void ACheeseStrikeCharacter::DoDrawWeapon(EWeaponSlot Slot)
+{
+	if (TakesInput())
+	{
+		// The sights stay up through a change while they are held.
+		const bool bAiming = GetWeapon() != nullptr && GetWeapon()->IsAimed();
+		Inventory->Draw(Slot);
+		if (bAiming && GetWeapon() != nullptr)
+		{
+			GetWeapon()->StartAiming();
+		}
+	}
+}
+
+void ACheeseStrikeCharacter::DoNextWeapon(int32 Step)
+{
+	if (TakesInput())
+	{
+		const bool bAiming = GetWeapon() != nullptr && GetWeapon()->IsAimed();
+		Inventory->DrawNext(Step);
+		if (bAiming && GetWeapon() != nullptr)
+		{
+			GetWeapon()->StartAiming();
+		}
+	}
+}
+
+void ACheeseStrikeCharacter::DoLastWeapon()
+{
+	if (TakesInput())
+	{
+		const bool bAiming = GetWeapon() != nullptr && GetWeapon()->IsAimed();
+		Inventory->DrawLast();
+		if (bAiming && GetWeapon() != nullptr)
+		{
+			GetWeapon()->StartAiming();
+		}
+	}
+}
+
+void ACheeseStrikeCharacter::PrimaryStarted()
+{
+	DoDrawWeapon(EWeaponSlot::Primary);
+}
+
+void ACheeseStrikeCharacter::SidearmStarted()
+{
+	DoDrawWeapon(EWeaponSlot::Sidearm);
+}
+
+void ACheeseStrikeCharacter::KnifeStarted()
+{
+	DoDrawWeapon(EWeaponSlot::Knife);
+}
+
+void ACheeseStrikeCharacter::NextWeaponStarted()
+{
+	DoNextWeapon(1);
+}
+
+void ACheeseStrikeCharacter::PreviousWeaponStarted()
+{
+	DoNextWeapon(-1);
+}
+
+void ACheeseStrikeCharacter::LastWeaponStarted()
+{
+	DoLastWeapon();
 }
 
 void ACheeseStrikeCharacter::FireStarted()

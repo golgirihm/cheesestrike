@@ -20,7 +20,8 @@ class UInputAction;
  *
  * One command a line, `#` for a comment:
  *   wait <seconds>              do nothing for so long
- *   hold <action> [x [y]]       hold an input from now on: Move x y, Look x y, or Jump, Sprint, Crouch, Fire, Aim, Reload, Scoreboard
+ *   hold <action> [x [y]]       hold an input from now on: Move x y, Look x y, or Jump, Sprint, Crouch, Fire, Aim, Reload, Scoreboard,
+ *                               Primary, Sidearm, Knife, NextWeapon, PreviousWeapon, LastWeapon
  *   release <action>            let it go
  *   tap <action> [x [y]]        hold it for a few frames
  *   look <yaw> <pitch>          turn the view by so many degrees, at once

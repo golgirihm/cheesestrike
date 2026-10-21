@@ -56,6 +56,18 @@ namespace CheeseStrikeMovement
 	constexpr float SlideFrom = 1.2f;
 	constexpr float SlideRest = 0.4f;
 
+	/**
+	 * What a weapon in hand does to it: a heavy one (the Munster Machine Gun)
+	 * slows its carrier to HeavyFactor; a knife's stroke lunges them forward
+	 * at LungeSpeed (the design's 7 m/s against its 6 m/s walk), as fast as
+	 * LungeAcceleration gets them there.
+	 */
+	constexpr float HeavyFactor = 0.85f;
+	constexpr float LungeSpeed = WalkSpeed * 7.0f / 6.0f;
+	constexpr float LungeAcceleration = 8000.0f;
+	/** The top speed `Speed` becomes with a heavy weapon, or in a lunge. */
+	float WithWeapon(float Speed, bool bHeavy, bool bLunging);
+
 	/** How fast a player moves across the ground. */
 	float Speed(bool bSprinting, bool bAiming, bool bCrouching);
 

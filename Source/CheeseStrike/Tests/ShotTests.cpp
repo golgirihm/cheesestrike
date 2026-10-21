@@ -79,12 +79,16 @@ bool FAShotIsTurnedAndSpread::RunTest(const FString& Parameters)
 
 	FRandomStream Random(7);
 	TestTrue(TEXT("no cone, no spread"), CheeseStrikeWeapons::Spread(Ahead, 0.0f, Random).Equals(Ahead, 0.001f));
+	float Widest = 0.0f;
 	for (int32 Shot = 0; Shot < 50; ++Shot)
 	{
 		const FVector Way = CheeseStrikeWeapons::Spread(Ahead, 5.0f, Random);
-		const float Off = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(Way, Ahead)));
-		TestTrue(FString::Printf(TEXT("shot %d stays in the cone"), Shot), Off <= 5.0f + 0.01f);
+		const float Off = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Way, Ahead), -1.0f, 1.0f)));
+		// A cone 5 degrees wide: half of that either side of the aim.
+		TestTrue(FString::Printf(TEXT("shot %d stays in the cone (%.2f off)"), Shot, Off), Off <= 2.5f + 0.01f);
+		Widest = FMath::Max(Widest, Off);
 	}
+	TestTrue(FString::Printf(TEXT("and fills it (%.2f the furthest off)"), Widest), Widest > 1.5f);
 	FRandomStream A(42);
 	FRandomStream B(42);
 	TestTrue(TEXT("the same seed gives the same shot, for the shooter and the server to agree"), CheeseStrikeWeapons::Spread(Ahead, 5.0f, A).Equals(CheeseStrikeWeapons::Spread(Ahead, 5.0f, B), 0.0001f));
@@ -133,11 +137,14 @@ bool FAPlayerIsPutBackWhereTheyWere::RunTest(const FString& Parameters)
 		Sample.Time = Tick * 0.1f;
 		Sample.Feet = FVector(Tick * 100.0f, 0.0f, 0.0f);
 		Sample.Head = Sample.Feet + FVector(0, 0, 160.0f);
+		// Turning, through the back: from 170 degrees round to -170 is 20 degrees, not 340.
+		Sample.Yaw = Tick <= 15 ? 170.0f : -170.0f;
 		History.Add(Sample);
 	}
 	TestTrue(FString::Printf(TEXT("only the last second is kept (%d samples)"), History.Num()), History.Num() >= 10 && History.Num() <= 12);
 	TestTrue(TEXT("between two samples, between their places"), History.At(1.55f).Feet.Equals(FVector(1550.0f, 0.0f, 0.0f), 0.01f));
 	TestTrue(TEXT("the head too"), History.At(1.55f).Head.Equals(FVector(1550.0f, 0.0f, 160.0f), 0.01f));
+	TestTrue(FString::Printf(TEXT("and which way they faced, the short way round (%.1f)"), History.At(1.55f).Yaw), FMath::IsNearlyEqual(FRotator::NormalizeAxis(History.At(1.55f).Yaw), 180.0f, 0.1f) || FMath::IsNearlyEqual(FRotator::NormalizeAxis(History.At(1.55f).Yaw), -180.0f, 0.1f));
 	TestTrue(TEXT("on a sample, that sample"), History.At(1.5f).Feet.Equals(FVector(1500.0f, 0.0f, 0.0f), 0.01f));
 	TestTrue(TEXT("past the end, the latest"), History.At(5.0f).Feet.Equals(FVector(2000.0f, 0.0f, 0.0f), 0.01f));
 	TestTrue(TEXT("before the start, the earliest kept"), History.At(0.0f).Feet.X < 1100.0f);

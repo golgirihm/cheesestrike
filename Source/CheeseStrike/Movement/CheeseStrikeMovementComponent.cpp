@@ -44,7 +44,7 @@ float UCheeseStrikeMovementComponent::GetMaxSpeed() const
 	case MOVE_Walking:
 	case MOVE_NavWalking:
 	case MOVE_Falling:
-		return CheeseStrikeMovement::Speed(bWantsToSprint, false, IsCrouching());
+		return CheeseStrikeMovement::WithWeapon(CheeseStrikeMovement::Speed(bWantsToSprint, false, IsCrouching()), bCarryingHeavy, bLunging);
 	default:
 		return Super::GetMaxSpeed();
 	}
@@ -52,8 +52,12 @@ float UCheeseStrikeMovementComponent::GetMaxSpeed() const
 
 float UCheeseStrikeMovementComponent::GetMaxAcceleration() const
 {
-	// No steering in a slide.
-	return IsSliding() ? 0.0f : Super::GetMaxAcceleration();
+	// No steering in a slide; a lunge gets there at once.
+	if (IsSliding())
+	{
+		return 0.0f;
+	}
+	return bLunging ? CheeseStrikeMovement::LungeAcceleration : Super::GetMaxAcceleration();
 }
 
 float UCheeseStrikeMovementComponent::GetMaxBrakingDeceleration() const
@@ -119,6 +123,8 @@ void UCheeseStrikeMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 {
 	Super::UpdateFromCompressedFlags(Flags);
 	bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+	bCarryingHeavy = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
+	bLunging = (Flags & FSavedMove_Character::FLAG_Custom_2) != 0;
 }
 
 FNetworkPredictionData_Client* UCheeseStrikeMovementComponent::GetPredictionData_Client() const
@@ -139,6 +145,8 @@ void FSavedMove_CheeseStrike::Clear()
 {
 	Super::Clear();
 	bSavedWantsToSprint = false;
+	bSavedCarryingHeavy = false;
+	bSavedLunging = false;
 	SavedSlideElapsed = -1.0f;
 	SavedSlideFrom = 0.0f;
 	SavedSlideDirection = FVector::ForwardVector;
@@ -152,13 +160,21 @@ uint8 FSavedMove_CheeseStrike::GetCompressedFlags() const
 	{
 		Flags |= FLAG_Custom_0;
 	}
+	if (bSavedCarryingHeavy)
+	{
+		Flags |= FLAG_Custom_1;
+	}
+	if (bSavedLunging)
+	{
+		Flags |= FLAG_Custom_2;
+	}
 	return Flags;
 }
 
 bool FSavedMove_CheeseStrike::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
 	const FSavedMove_CheeseStrike* Other = static_cast<const FSavedMove_CheeseStrike*>(NewMove.Get());
-	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || SavedSlideElapsed >= 0.0f || Other->SavedSlideElapsed >= 0.0f)
+	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedCarryingHeavy != Other->bSavedCarryingHeavy || bSavedLunging != Other->bSavedLunging || SavedSlideElapsed >= 0.0f || Other->SavedSlideElapsed >= 0.0f)
 	{
 		return false;
 	}
@@ -171,6 +187,8 @@ void FSavedMove_CheeseStrike::SetMoveFor(ACharacter* C, float InDeltaTime, FVect
 	if (const UCheeseStrikeMovementComponent* Movement = Cast<UCheeseStrikeMovementComponent>(C->GetCharacterMovement()))
 	{
 		bSavedWantsToSprint = Movement->bWantsToSprint;
+		bSavedCarryingHeavy = Movement->bCarryingHeavy;
+		bSavedLunging = Movement->bLunging;
 		SavedSlideElapsed = Movement->SlideElapsed;
 		SavedSlideFrom = Movement->SlideFrom;
 		SavedSlideDirection = Movement->SlideDirection;
@@ -184,6 +202,8 @@ void FSavedMove_CheeseStrike::PrepMoveFor(ACharacter* C)
 	if (UCheeseStrikeMovementComponent* Movement = Cast<UCheeseStrikeMovementComponent>(C->GetCharacterMovement()))
 	{
 		Movement->bWantsToSprint = bSavedWantsToSprint;
+		Movement->bCarryingHeavy = bSavedCarryingHeavy;
+		Movement->bLunging = bSavedLunging;
 		Movement->SlideElapsed = SavedSlideElapsed;
 		Movement->SlideFrom = SavedSlideFrom;
 		Movement->SlideDirection = SavedSlideDirection;

@@ -72,6 +72,12 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Set->Fire = MakeAction(Set, TEXT("IA_Fire"), EInputActionValueType::Boolean);
 	Set->Aim = MakeAction(Set, TEXT("IA_Aim"), EInputActionValueType::Boolean);
 	Set->Reload = MakeAction(Set, TEXT("IA_Reload"), EInputActionValueType::Boolean);
+	Set->DrawPrimary = MakeAction(Set, TEXT("IA_DrawPrimary"), EInputActionValueType::Boolean);
+	Set->DrawSidearm = MakeAction(Set, TEXT("IA_DrawSidearm"), EInputActionValueType::Boolean);
+	Set->DrawKnife = MakeAction(Set, TEXT("IA_DrawKnife"), EInputActionValueType::Boolean);
+	Set->NextWeapon = MakeAction(Set, TEXT("IA_NextWeapon"), EInputActionValueType::Boolean);
+	Set->PreviousWeapon = MakeAction(Set, TEXT("IA_PreviousWeapon"), EInputActionValueType::Boolean);
+	Set->LastWeapon = MakeAction(Set, TEXT("IA_LastWeapon"), EInputActionValueType::Boolean);
 	Set->Scoreboard = MakeAction(Set, TEXT("IA_Scoreboard"), EInputActionValueType::Boolean);
 	Set->Menu = MakeAction(Set, TEXT("IA_Menu"), EInputActionValueType::Boolean);
 	UInputMappingContext* Context = NewObject<UInputMappingContext>(Set, TEXT("IMC_CheeseStrike"));
@@ -105,6 +111,16 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->Aim, EKeys::Gamepad_LeftTrigger);
 	Map(Context, Set->Reload, EKeys::R);
 	Map(Context, Set->Reload, EKeys::Gamepad_FaceButton_Left);
+	// Changing weapons: the number keys, the wheel (down for the next), Q for the last; on a gamepad, the top face button for
+	// the next and pressing the right stick for the knife.
+	Map(Context, Set->DrawPrimary, EKeys::One);
+	Map(Context, Set->DrawSidearm, EKeys::Two);
+	Map(Context, Set->DrawKnife, EKeys::Three);
+	Map(Context, Set->DrawKnife, EKeys::Gamepad_RightThumbstick);
+	Map(Context, Set->NextWeapon, EKeys::MouseScrollDown);
+	Map(Context, Set->NextWeapon, EKeys::Gamepad_FaceButton_Top);
+	Map(Context, Set->PreviousWeapon, EKeys::MouseScrollUp);
+	Map(Context, Set->LastWeapon, EKeys::Q);
 	Map(Context, Set->Scoreboard, EKeys::Tab);
 	Map(Context, Set->Scoreboard, EKeys::Gamepad_Special_Left);
 	Map(Context, Set->Menu, EKeys::Escape);

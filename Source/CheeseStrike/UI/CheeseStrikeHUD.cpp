@@ -148,7 +148,7 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	}
 	if (Weapon != nullptr)
 	{
-		const FString Ammo = Weapon->IsReloading() ? TEXT("RELOADING") : FString::Printf(TEXT("%d / %d"), Weapon->GetMagazine(), Weapon->GetReserve());
+		const FString Ammo = Weapon->IsReloading() ? TEXT("RELOADING") : Weapon->DescribeRounds();
 		float TextWidth = 0.0f;
 		float TextHeight = 0.0f;
 		GetTextSize(Ammo, TextWidth, TextHeight, Font, 1.6f);

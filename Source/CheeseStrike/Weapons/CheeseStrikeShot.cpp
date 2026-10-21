@@ -4,18 +4,6 @@
 
 namespace CheeseStrikeWeapons
 {
-	const FWeaponStats& Blaster()
-	{
-		static const FWeaponStats Stats = []
-		{
-			FWeaponStats Made;
-			Made.Id = FName("blaster");
-			Made.DisplayName = NSLOCTEXT("CheeseStrike", "Blaster", "Cheddar Blaster");
-			return Made;
-		}();
-		return Stats;
-	}
-
 	float DamageAt(const FWeaponStats& Weapon, float Distance, bool bHead)
 	{
 		float Share = 1.0f;
@@ -27,10 +15,71 @@ namespace CheeseStrikeWeapons
 		return Weapon.Damage * Share * (bHead ? Weapon.HeadMultiplier : 1.0f);
 	}
 
+	float ShotTime(const FWeaponStats& Weapon, int32 Index)
+	{
+		const int32 Burst = FMath::Max(Weapon.Burst, 1);
+		return (Index / Burst) * Weapon.FireInterval + (Index % Burst) * Weapon.BurstInterval;
+	}
+
+	float Cooldown(const FWeaponStats& Weapon, int32 InBurst)
+	{
+		const int32 Burst = FMath::Max(Weapon.Burst, 1);
+		if (Burst > 1 && InBurst < Burst - 1)
+		{
+			return Weapon.BurstInterval;
+		}
+		// From the last shot of a burst to the first of the next: what is left of the interval.
+		return FMath::Max(Weapon.FireInterval - (Burst - 1) * Weapon.BurstInterval, Weapon.BurstInterval);
+	}
+
+	float ShotsPerSecond(const FWeaponStats& Weapon)
+	{
+		return FMath::Max(Weapon.Burst, 1) / FMath::Max(Weapon.FireInterval, 0.01f);
+	}
+
+	int32 ShotsToKill(const FWeaponStats& Weapon)
+	{
+		const float PerShot = Weapon.Damage * FMath::Max(Weapon.Pellets, 1);
+		return PerShot > 0.0f ? FMath::CeilToInt(MaxHealth / PerShot) : 0;
+	}
+
 	float TimeToKill(const FWeaponStats& Weapon)
 	{
-		const int32 Shots = FMath::CeilToInt(MaxHealth / Weapon.Damage);
-		return (Shots - 1) * Weapon.FireInterval;
+		return ShotTime(Weapon, FMath::Max(ShotsToKill(Weapon) - 1, 0));
+	}
+
+	bool IsDrawn(const FWeaponStats& Weapon, float DrawnAt, float Now, float Allowance)
+	{
+		return Now >= DrawnAt + Weapon.DrawTime - Allowance;
+	}
+
+	TArray<FVector> SweepDirections(const FWeaponStats& Knife, const FVector& Direction)
+	{
+		TArray<FVector> Fan = {Direction};
+		for (const float Degrees : {Knife.SweepDegrees / 2.0f, Knife.SweepDegrees})
+		{
+			if (Degrees > 0.0f)
+			{
+				for (const float Side : {-1.0f, 1.0f})
+				{
+					Fan.Add(Direction.RotateAngleAxis(Degrees * Side, FVector::UpVector));
+				}
+			}
+		}
+		return Fan;
+	}
+
+	bool FromBehind(const FVector& Direction, float Yaw)
+	{
+		const FVector Along(Direction.X, Direction.Y, 0.0f);
+		const FVector Facing = FRotator(0.0f, Yaw, 0.0f).Vector();
+		// Going the way they face is going into their back.
+		return Along.SizeSquared() > KINDA_SMALL_NUMBER && FVector::DotProduct(Along.GetSafeNormal(), Facing) > 0.5f;
+	}
+
+	float StrokeDamage(const FWeaponStats& Knife, const FVector& Direction, float Yaw)
+	{
+		return FromBehind(Direction, Yaw) ? Knife.BackstabDamage : Knife.Damage;
 	}
 
 	float SpreadFor(const FWeaponStats& Weapon, int32 Index, bool bAimed)
@@ -82,7 +131,8 @@ namespace CheeseStrikeWeapons
 		{
 			return Direction;
 		}
-		return Random.VRandCone(Direction, FMath::DegreesToRadians(ConeDegrees));
+		// The cone's half-angle: the most a shot goes off the aim.
+		return Random.VRandCone(Direction, FMath::DegreesToRadians(ConeDegrees / 2.0f));
 	}
 
 	float RayHitsSphere(const FVector& Origin, const FVector& Direction, const FVector& Centre, float Radius)
@@ -174,6 +224,7 @@ FHitHistory::FSample FHitHistory::At(float Time) const
 			Between.Time = Time;
 			Between.Feet = FMath::Lerp(Before.Feet, After.Feet, Through);
 			Between.Head = FMath::Lerp(Before.Head, After.Head, Through);
+			Between.Yaw = Before.Yaw + FMath::FindDeltaAngleDegrees(Before.Yaw, After.Yaw) * Through;
 			Between.Radius = FMath::Lerp(Before.Radius, After.Radius, Through);
 			Between.Height = FMath::Lerp(Before.Height, After.Height, Through);
 			return Between;
