@@ -150,7 +150,7 @@ namespace PlayTesting
 		bLobbyWanted = Session.bLobby;
 		// A match starts at once, with no bots to get in the way, unless the test wants the lobby, which has them.
 		// No bots unless the test asks for them: the players are the only characters.
-		const FString NoBots = Session.Options.Contains(TEXT("?Bots=")) ? FString() : FString(TEXT("?Bots=0"));
+		const FString NoBots = (Session.Options.Contains(TEXT("?Bots=")) ? FString() : FString(TEXT("?Bots=0"))) + (Session.Options.Contains(TEXT("?Mice=")) ? FString() : FString(TEXT("?Mice=0")));
 		const FString Options = Session.bLobby ? Session.Options : Session.Options + TEXT("?StartNow") + NoBots;
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
 		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);

@@ -15,6 +15,9 @@ import unreal
 # lists each listing. Textures are cut to MAX pixels (small props to SMALL) to keep the
 # assets repository small, as Belica's were.
 FAB = os.environ.get("CHEESESTRIKE_FAB", r"C:\Hamid\code\FabDownloads")
+# What is imported already is left as it is (a re-import saves every asset anew, and Git LFS keeps both copies);
+# set CHEESESTRIKE_FAB_REIMPORT=1 to import everything again.
+REIMPORT = os.environ.get("CHEESESTRIKE_FAB_REIMPORT") == "1"
 WORK = os.path.join(FAB, "x")
 OUT = unreal.Paths.project_saved_dir() + "import_fab.txt"
 ROOT = "/Game/Fab"
@@ -59,13 +62,15 @@ DECALS = [
     ("PaintedTwo", WAREHOUSE, "ukpodcofw/"),
     ("PaintedThree", WAREHOUSE, "ukpodeifw/"),
 ]
+# Nestaeric's Black Rat, for the mice: a rigged mesh with its idle, walk and run animations, and its textures.
+RAT = "blackrat_free_fbx.zip"
 # Sousinho Games' shipping container: one mesh, three materials (sides, doors, frame).
 CONTAINER = "container_orange.zip"
 CONTAINER_MESH = "source/shipping cointainer Orange.zip"
 CONTAINER_PARTS = {"Sides": "corrugated sides", "Doors": "front doors", "Frame": "frame"}
 
-MAPS = {"basecolor": "BaseColor", "normal": "Normal", "roughness": "Roughness", "ao": "AO",
-        "opacity": "Opacity", "metalness": "Metalness", "metallic": "Metalness"}
+MAPS = {"basecolor": "BaseColor", "color": "BaseColor", "normal": "Normal", "roughness": "Roughness", "rough": "Roughness", "ao": "AO",
+        "opacity": "Opacity", "metalness": "Metalness", "metallic": "Metalness", "metal": "Metalness"}
 lines = []
 lib = unreal.EditorAssetLibrary
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -104,6 +109,8 @@ def import_file(path, destination, name, options=None):
 
 def texture(path, destination, name, kind, limit):
     """Imports one texture map and sets it up for what it is."""
+    if not REIMPORT and lib.does_asset_exist(f"{destination}/{name}"):
+        return unreal.load_asset(f"{destination}/{name}")
     imported = [a for a in import_file(path, destination, name) if isinstance(a, unreal.Texture2D)]
     if not imported:
         lines.append(f"  {name}: nothing imported from {path}")
@@ -144,6 +151,8 @@ def texture_set(asset, zip_name, folder, destination, limit):
 
 def model(asset, fbx_path, destination):
     """Imports a mesh, its parts combined into one: Nanite, box collision, no materials (build_materials.py gives it ours)."""
+    if not REIMPORT and lib.does_asset_exist(f"{destination}/SM_{asset}"):
+        return
     options = unreal.FbxImportUI()
     options.set_editor_property("import_mesh", True)
     options.set_editor_property("import_as_skeletal", False)
@@ -179,6 +188,24 @@ def model(asset, fbx_path, destination):
     lines.append(f"  SM_{asset}: {size.x:.0f} x {size.y:.0f} x {size.z:.0f} cm, {len(mesh.get_editor_property('static_materials'))} materials")
 
 
+def skeletal(asset, fbx_path, destination):
+    """Imports a rigged model and its animations: no materials (build_materials.py gives it ours), no physics asset."""
+    if not REIMPORT and lib.does_asset_exist(f"{destination}/SK_{asset}"):
+        return
+    options = unreal.FbxImportUI()
+    options.set_editor_property("import_mesh", True)
+    options.set_editor_property("import_as_skeletal", True)
+    options.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_SKELETAL_MESH)
+    options.set_editor_property("import_materials", False)
+    options.set_editor_property("import_textures", False)
+    options.set_editor_property("import_animations", True)
+    options.set_editor_property("create_physics_asset", False)
+    import_file(fbx_path, destination, "SK_" + asset, options)
+    lib.save_directory(destination, False, True)
+    for path in lib.list_assets(destination, True, False):
+        lines.append(f"  {path.split('.')[-1]}: {lib.find_asset_data(path).asset_class_path.asset_name}")
+
+
 def white():
     """A small linear white texture: what a material uses for a map an asset hasn't got."""
     def chunk(kind, data):
@@ -206,6 +233,11 @@ try:
         z = archive(zip_name)
         fbx = [m for m in z.namelist() if m.startswith(folder) and m.lower().endswith(".fbx")]
         model(asset, extract(z, fbx[0], asset), destination)
+    # The rat, for the mice.
+    destination = f"{ROOT}/Nestaeric/BlackRat"
+    lines.append(f"BlackRat: {texture_set('BlackRat', RAT, '', destination, MAX)}")
+    z = archive(RAT)
+    skeletal("BlackRat", extract(z, "blackrat.fbx", "BlackRat"), destination)
     # The container: its mesh is in a zip in the zip; its textures by part.
     destination = f"{ROOT}/SousinhoGames/ShippingContainer"
     z = archive(CONTAINER)

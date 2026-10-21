@@ -20,6 +20,8 @@
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "CheeseStrikeBotController.h"
+#include "Map/CheeseStrikeCheese.h"
+#include "Map/CheeseStrikeMouse.h"
 #include "CheeseStrikeCharacter.h"
 #include "EngineUtils.h"
 #include "CheeseStrikeGameMode.h"
@@ -268,6 +270,23 @@ void ACheeseStrikePlayerController::CheeseStrikeBots()
 	{
 		UE_LOG(LogCheeseStrike, Display, TEXT("Bot: %s"), *It->Describe());
 	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeMice()
+{
+	static const TCHAR* const Doings[] = {TEXT("entering"), TEXT("walking"), TEXT("eating"), TEXT("fleeing")};
+	for (TActorIterator<ACheeseStrikeMouse> It(GetWorld()); It; ++It)
+	{
+		const ACheeseStrikeCheese* Target = It->GetTarget();
+		UE_LOG(LogCheeseStrike, Display, TEXT("Mouse: %s %s at %s, fear %.0f, ate %d, after %s"), *It->GetName(), Doings[static_cast<int32>(It->GetDoing())],
+			*It->GetActorLocation().ToCompactString(), It->GetFear(), It->GetEaten(), Target != nullptr ? *FString::Printf(TEXT("%s (%s, %.0f left, bottom at %.0f)"), *Target->GetName(), *Target->GetStructure().ToString(), Target->GetHealth(), Target->GetComponentsBoundingBox().Min.Z) : TEXT("nothing"));
+	}
+	int32 Blocks = 0;
+	for (TActorIterator<ACheeseStrikeCheese> It(GetWorld()); It; ++It)
+	{
+		++Blocks;
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Mice: %d blocks of cheese left"), Blocks);
 }
 
 void ACheeseStrikePlayerController::FindFromMenu()

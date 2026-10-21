@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
+#include "Rules/CheeseStrikeMice.h"
 #include "GameFramework/GameMode.h"
 #include "CheeseStrikePlayerController.h"
 #include "Engine/GameInstance.h"
@@ -53,9 +54,33 @@ void ACheeseStrikeHUD::DrawHUD()
 	}
 	DrawKillFeed(Match);
 	DrawSessions();
+	if (!bOver)
+	{
+		DrawMice(Match);
+	}
 	if (bOver || Controller->IsScoreboardShown())
 	{
 		DrawScoreboard(Match, bOver);
+	}
+}
+
+void ACheeseStrikeHUD::DrawMice(const ACheeseStrikeGameState* Match)
+{
+	if (Match == nullptr || Match->GetMiceAt() <= 0.0f)
+	{
+		return;
+	}
+	// The design's red countdown, then word that they are here.
+	const float ToGo = Match->GetMiceAt() - static_cast<float>(Match->GetServerWorldTimeSeconds());
+	UFont* Font = GEngine->GetLargeFont();
+	const FLinearColor Warning(1.0f, 0.18f, 0.12f);
+	if (ToGo > 0.0f && ToGo <= CheeseStrikeMice::Warning)
+	{
+		DrawCentred(FString::Printf(TEXT("THE MICE ARE COMING  %.0f"), FMath::CeilToFloat(ToGo)), Canvas->SizeX / 2.0f, Canvas->SizeY * 0.14f, Font, 1.4f, Warning);
+	}
+	else if (ToGo <= 0.0f && ToGo > -4.0f)
+	{
+		DrawCentred(TEXT("THE MICE ARE HERE"), Canvas->SizeX / 2.0f, Canvas->SizeY * 0.14f, Font, 1.4f, Warning);
 	}
 }
 

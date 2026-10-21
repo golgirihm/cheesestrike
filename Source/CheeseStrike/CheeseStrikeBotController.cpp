@@ -12,8 +12,6 @@
 #include "CheeseStrikePlayerState.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
-using namespace CheeseStrikeBots;
-
 namespace
 {
 	constexpr float ThinkInterval = 0.1f;
@@ -120,7 +118,7 @@ void ACheeseStrikeBotController::ForgetAll()
 	bGoing = false;
 	bSearching = false;
 	bRetreating = false;
-	Bursts = FBursts();
+	Bursts = CheeseStrikeBots::FBursts();
 	bTriggerHeld = false;
 	MovedAt = Now();
 	Wobble = FMath::FRandRange(0.0f, 2.0f * PI);
@@ -192,7 +190,7 @@ void ACheeseStrikeBotController::UpdateControlRotation(float DeltaTime, bool bUp
 	{
 		return;
 	}
-	SetControlRotation(TurnToward(GetControlRotation(), Wanted, Skill(SkillIndex).TurnRate, DeltaTime));
+	SetControlRotation(CheeseStrikeBots::TurnToward(GetControlRotation(), Wanted, CheeseStrikeBots::Skill(SkillIndex).TurnRate, DeltaTime));
 	if (bUpdatePawn)
 	{
 		MyPawn->FaceRotation(ControlRotation, DeltaTime);
@@ -242,7 +240,7 @@ void ACheeseStrikeBotController::Perceive()
 	ACheeseStrikeCharacter* Best = nullptr;
 	float BestScore = TNumericLimits<float>::Max();
 	ACheeseStrikeCharacter* Heard = nullptr;
-	float HeardAt = HearingRange;
+	float HeardAt = CheeseStrikeBots::HearingRange;
 	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
 	{
 		ACheeseStrikeCharacter* Other = *It;
@@ -260,7 +258,7 @@ void ACheeseStrikeBotController::Perceive()
 			HeardAt = Distance;
 		}
 		// Someone just come back can't be hurt: no use shooting at them.
-		if (Other->IsProtected() || !InSight(Facing, ToOther) || !CanSeeInto(Other))
+		if (Other->IsProtected() || !CheeseStrikeBots::InSight(Facing, ToOther) || !CanSeeInto(Other))
 		{
 			continue;
 		}
@@ -302,7 +300,7 @@ void ACheeseStrikeBotController::Perceive()
 		return;
 	}
 	bSeesTarget = false;
-	if (Target.IsValid() && (!Target->IsAlive() || Time - LastSeenAt > SearchTime))
+	if (Target.IsValid() && (!Target->IsAlive() || Time - LastSeenAt > CheeseStrikeBots::SearchTime))
 	{
 		Target = nullptr;
 		bSearching = false;
@@ -361,7 +359,7 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 	{
 		MovedAt = Time;
 	}
-	else if (Time - MovedAt > StuckTime)
+	else if (Time - MovedAt > CheeseStrikeBots::StuckTime)
 	{
 		Me->DoJumpStart();
 		Me->DoJumpEnd();
@@ -384,11 +382,11 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 		// No map has wedges yet: hurt or not, it fights on; with nothing left to shoot, it keeps away.
 		const ACheeseStrikeWeapon* Weapon = Me->GetWeapon();
 		const bool bDry = Weapon != nullptr && Weapon->GetMagazine() == 0 && Weapon->GetReserve() == 0;
-		Move = bDry ? EMove::Retreat : MoveFor(Distance, Me->GetWeapon() != nullptr ? Me->GetWeapon()->GetStats().MaxRange : 5000.0f, Me->GetHealth(), false);
+		Move = bDry ? CheeseStrikeBots::EMove::Retreat : CheeseStrikeBots::MoveFor(Distance, Me->GetWeapon() != nullptr ? Me->GetWeapon()->GetStats().MaxRange : 5000.0f, Me->GetHealth(), false);
 		Me->DoSprint(false);
 		switch (Move)
 		{
-		case EMove::Approach:
+		case CheeseStrikeBots::EMove::Approach:
 			bRetreating = false;
 			// Toward them, a fresh path now and then as they move.
 			if (!bGoing || Time - GoalSetAt > 0.5f)
@@ -396,7 +394,7 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 				GoTo(Target->GetActorLocation(), false);
 			}
 			break;
-		case EMove::Retreat:
+		case CheeseStrikeBots::EMove::Retreat:
 		{
 			FVector Away;
 			if ((!bRetreating || !bGoing) && PickRetreatGoal(Target->GetActorLocation(), Away))
@@ -536,7 +534,7 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 	ACheeseStrikeCharacter* Me = Body();
 	ACheeseStrikeWeapon* Weapon = Me != nullptr ? Me->GetWeapon() : nullptr;
 	const float Time = Now();
-	const FSkill& Skill = CheeseStrikeBots::Skill(SkillIndex);
+	const CheeseStrikeBots::FSkill& Skill = CheeseStrikeBots::Skill(SkillIndex);
 	const FVector Eyes = EyesAt();
 	bool bWantsToFire = false;
 	if (bSeesTarget && Target.IsValid() && Target->IsAlive())
@@ -545,14 +543,14 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 		const FVector Chest = Target->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
 		const FRotator Straight = (Chest - Eyes).Rotation();
 		const float Tracking = Time - TrackingSince;
-		const float Error = AimError(Skill, Tracking);
+		const float Error = CheeseStrikeBots::AimError(Skill, Tracking);
 		Wobble += DeltaSeconds * 1.7f;
 		Wanted = FRotator(Straight.Pitch + Error * 0.6f * FMath::Sin(Wobble * 1.3f), Straight.Yaw + Error * FMath::Cos(Wobble), 0.0f);
 		// It fires once its reaction is over, when the aim is near enough, at what is in reach.
 		const float Off = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(GetControlRotation().Vector(), Straight.Vector()), -1.0f, 1.0f)));
 		const float Range = Weapon != nullptr ? Weapon->GetStats().MaxRange : 5000.0f;
 		const bool bHasAmmo = Weapon != nullptr && (Weapon->GetMagazine() > 0 || Weapon->GetReserve() > 0);
-		bWantsToFire = bHasAmmo && Tracking >= Skill.Reaction && Off <= Error + FireCone && WouldFireAt(FVector::Dist(Eyes, Chest), Range, bShotByTarget);
+		bWantsToFire = bHasAmmo && Tracking >= Skill.Reaction && Off <= Error + FireCone && CheeseStrikeBots::WouldFireAt(FVector::Dist(Eyes, Chest), Range, bShotByTarget);
 	}
 	else if (Target.IsValid())
 	{
@@ -569,7 +567,7 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 	{
 		return;
 	}
-	const bool bHold = HoldsTrigger(Bursts, Skill, bWantsToFire && !Weapon->IsReloading(), Weapon->GetStats().FireInterval, Time);
+	const bool bHold = CheeseStrikeBots::HoldsTrigger(Bursts, Skill, bWantsToFire && !Weapon->IsReloading(), Weapon->GetStats().FireInterval, Time);
 	if (bHold && !bShotAtTarget)
 	{
 		bShotAtTarget = true;
@@ -592,7 +590,7 @@ void ACheeseStrikeBotController::Step(float DeltaSeconds)
 	const float Time = Now();
 	if (Time >= NextStepAt)
 	{
-		NextStepAt = Time + FMath::FRandRange(StepMin, StepMax);
+		NextStepAt = Time + FMath::FRandRange(CheeseStrikeBots::StepMin, CheeseStrikeBots::StepMax);
 		StepSide = FMath::RandBool() ? 1.0f : -1.0f;
 	}
 	const FVector Away = (Me->GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D();
@@ -605,11 +603,11 @@ void ACheeseStrikeBotController::Step(float DeltaSeconds)
 		if (Navigation->NavigationRaycast(GetWorld(), Feet, Feet + Side * 150.0f, Blocked))
 		{
 			StepSide = -StepSide;
-			NextStepAt = Time + StepMin;
+			NextStepAt = Time + CheeseStrikeBots::StepMin;
 		}
 	}
 	Me->AddMovementInput(Side, 1.0f);
-	if (Move == EMove::BackOff)
+	if (Move == CheeseStrikeBots::EMove::BackOff)
 	{
 		Me->AddMovementInput(Away, 1.0f);
 	}
@@ -618,7 +616,7 @@ void ACheeseStrikeBotController::Step(float DeltaSeconds)
 void ACheeseStrikeBotController::LetGoOfTrigger()
 {
 	bTriggerHeld = false;
-	Bursts = FBursts();
+	Bursts = CheeseStrikeBots::FBursts();
 	if (ACheeseStrikeCharacter* Me = Body())
 	{
 		Me->DoFire(false);

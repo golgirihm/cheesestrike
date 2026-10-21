@@ -18,6 +18,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "CheeseStrike.h"
 #include "CheeseStrikeCharacter.h"
+#include "Map/CheeseStrikeMouse.h"
 
 namespace
 {
@@ -443,7 +444,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		// Something of the arena's, or the template's, which takes the engine's damage.
 		const float Damage = CheeseStrikeWeapons::DamageAt(*Stats, Reach, false);
 		UGameplayStatics::ApplyPointDamage(Wall.GetActor(), Damage, Direction, Wall, Holder->GetController(), this, nullptr);
-		if (Wall.GetActor()->IsA<APawn>())
+		if (Wall.GetActor()->IsA<APawn>() || Wall.GetActor()->IsA<ACheeseStrikeMouse>())
 		{
 			ClientHit(Damage, false);
 		}
