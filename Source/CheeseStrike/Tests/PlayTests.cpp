@@ -5,6 +5,7 @@
 // and ending a match over the network.
 
 #include "Misc/AutomationTest.h"
+#include "AnimationRuntime.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -15,6 +16,8 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
+#include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/PhysicsConstraintTemplate.h"
 #include "CheeseStrikeBotController.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
@@ -72,6 +75,92 @@ namespace PlayTests
 		return Most;
 	}
 
+	/**
+	 * How far a fallen body's joints are past what its ragdoll allows (degrees): of every joint, the most its
+	 * twist about the bone, its bend or its lean to the side is beyond its limit, and the joint in `Worst`. 0 if
+	 * all are within.
+	 */
+	float JointsPastLimits(const ACheeseStrikeCharacter* Character, FString& Worst)
+	{
+		const USkeletalMeshComponent* Mesh = Character != nullptr ? Character->GetMesh() : nullptr;
+		const UPhysicsAsset* Ragdoll = Mesh != nullptr ? Mesh->GetPhysicsAsset() : nullptr;
+		float Most = 0.0f;
+		if (Ragdoll == nullptr)
+		{
+			Worst = TEXT("no ragdoll");
+			return 180.0f;
+		}
+		for (const UPhysicsConstraintTemplate* Template : Ragdoll->ConstraintSetup)
+		{
+			const FConstraintInstance& Joint = Template->DefaultInstance;
+			const FConstraintProfileProperties& Profile = Joint.ProfileInstance;
+			FTransform Child = Mesh->GetBoneTransform(Mesh->GetBoneIndex(Joint.ConstraintBone1));
+			FTransform Parent = Mesh->GetBoneTransform(Mesh->GetBoneIndex(Joint.ConstraintBone2));
+			Child.RemoveScaling();
+			Parent.RemoveScaling();
+			// The child's frame as the parent's sees it: twist about X, swing about Y (Swing2) and Z (Swing1).
+			const FQuat Relative = (Joint.GetRefFrame(EConstraintFrame::Frame2) * Parent).GetRotation().Inverse() * (Joint.GetRefFrame(EConstraintFrame::Frame1) * Child).GetRotation();
+			FQuat Swing;
+			FQuat Twist;
+			Relative.ToSwingTwist(FVector::ForwardVector, Swing, Twist);
+			const float Twisted = FMath::Abs(FMath::RadiansToDegrees(Twist.GetTwistAngle(FVector::ForwardVector)));
+			FVector Axis;
+			float Swung;
+			Swing.ToAxisAndAngle(Axis, Swung);
+			Swung = FMath::RadiansToDegrees(Swung);
+			// The engine limits the swing's two parts each to its own limit: the bend, about Y, to Swing2, and the lean
+			// to the side, about Z, to Swing1.
+			const float Bent = Swung * Axis.Y;
+			const float Leant = Swung * Axis.Z;
+			const float Past = FMath::Max3(Twisted - Profile.TwistLimit.TwistLimitDegrees, FMath::Abs(Bent) - Profile.ConeLimit.Swing2LimitDegrees, FMath::Abs(Leant) - Profile.ConeLimit.Swing1LimitDegrees);
+			if (Past > Most)
+			{
+				Most = Past;
+				Worst = FString::Printf(TEXT("%s, twisted %.0f of %.0f, bent %.0f of %.0f and leant %.0f of %.0f"), *Joint.ConstraintBone1.ToString(),
+					Twisted, Profile.TwistLimit.TwistLimitDegrees, Bent, Profile.ConeLimit.Swing2LimitDegrees, Leant, Profile.ConeLimit.Swing1LimitDegrees);
+			}
+		}
+		return Most;
+	}
+
+	/** How far a body's chest (spine_03) is twisted round against its hips (pelvis), about the spine, from how they stand in its reference pose (degrees); -1 if it has no such bones. */
+	float SpineTwist(const ACheeseStrikeCharacter* Character)
+	{
+		const USkeletalMeshComponent* Mesh = Character != nullptr ? Character->GetMesh() : nullptr;
+		const USkeletalMesh* Model = Mesh != nullptr ? Mesh->GetSkeletalMeshAsset() : nullptr;
+		const int32 Hips = Model != nullptr ? Model->GetRefSkeleton().FindBoneIndex(TEXT("pelvis")) : INDEX_NONE;
+		const int32 Chest = Model != nullptr ? Model->GetRefSkeleton().FindBoneIndex(TEXT("spine_03")) : INDEX_NONE;
+		if (Hips == INDEX_NONE || Chest == INDEX_NONE)
+		{
+			return -1.0f;
+		}
+		const FTransform HipsAsMade = FAnimationRuntime::GetComponentSpaceTransformRefPose(Model->GetRefSkeleton(), Hips);
+		const FTransform ChestAsMade = FAnimationRuntime::GetComponentSpaceTransformRefPose(Model->GetRefSkeleton(), Chest);
+		const FQuat Now = Mesh->GetBoneQuaternion(TEXT("pelvis"), EBoneSpaces::ComponentSpace).Inverse() * Mesh->GetBoneQuaternion(TEXT("spine_03"), EBoneSpaces::ComponentSpace);
+		const FQuat AsMade = HipsAsMade.GetRotation().Inverse() * ChestAsMade.GetRotation();
+		// The turn from as made to now, in the hips' space, about the line from the hips to the chest.
+		const FVector Spine = HipsAsMade.InverseTransformVectorNoScale(ChestAsMade.GetLocation() - HipsAsMade.GetLocation()).GetSafeNormal();
+		return FMath::Abs(FMath::RadiansToDegrees((Now * AsMade.Inverse()).GetTwistAngle(Spine)));
+	}
+
+	/** Whether a fallen body has come to rest: none of its bodies moving faster than 5 cm/s. */
+	bool AtRest(const ACheeseStrikeCharacter* Character)
+	{
+		const USkeletalMeshComponent* Mesh = Character != nullptr ? Character->GetMesh() : nullptr;
+		if (Mesh == nullptr || Mesh->Bodies.IsEmpty())
+		{
+			return false;
+		}
+		for (const FBodyInstance* Body : Mesh->Bodies)
+		{
+			if (Body != nullptr && Body->GetUnrealWorldVelocity().Size() > 5.0f)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
 	bool Near(float Value, float Wanted, float Within)
 	{
 		return FMath::Abs(Value - Wanted) <= Within;
@@ -101,6 +190,8 @@ namespace PlayTests
 
 	/** Remembered between steps. */
 	TWeakObjectPtr<ACheeseStrikeCharacter> FirstBody;
+	/** The first body as the other machine sees it. */
+	TWeakObjectPtr<const ACheeseStrikeCharacter> FirstBodySeen;
 	int32 ShotsBefore = 0;
 	float HeadAbove = 0.0f;
 	/** Where the left hand was on the rifle down the sights, to check it stays there. */
@@ -354,6 +445,22 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 		{
 			const float Off = PlayTests::FaceOutOfPlace(Body);
 			TestTrue(FString::Printf(TEXT("the fallen body's face and jaw are in place (%.1f degrees out)"), Off), Off >= 0.0f && Off < 10.0f);
+		}
+		PlayTests::FirstBodySeen = HostAsSeen;
+	});
+	WaitUntil(TEXT("the fallen body coming to rest on both machines"), 6.0f, []() { return PlayTests::AtRest(PlayTests::FirstBody.Get()) && PlayTests::AtRest(PlayTests::FirstBodySeen.Get()); });
+	Then([this]()
+	{
+		// It lies as a body does, on both machines: no joint bent or twisted further than its ragdoll lets a person's
+		// go, and the chest not twisted round on the hips.
+		for (const ACheeseStrikeCharacter* Body : {static_cast<const ACheeseStrikeCharacter*>(PlayTests::FirstBody.Get()), PlayTests::FirstBodySeen.Get()})
+		{
+			FString Worst = TEXT("none");
+			const float Past = PlayTests::JointsPastLimits(Body, Worst);
+			TestTrue(FString::Printf(TEXT("the fallen body's joints are within their limits (%.1f degrees past, the most at %s)"), Past, *Worst), Past < 10.0f);
+			const float Twist = PlayTests::SpineTwist(Body);
+			AddInfo(FString::Printf(TEXT("A fallen body: its joints %.1f degrees past their limits at most (%s), its chest twisted %.0f degrees on its hips"), Past, *Worst, Twist));
+			TestTrue(FString::Printf(TEXT("and its chest is not twisted round on its hips (%.0f degrees)"), Twist), Twist >= 0.0f && Twist < 35.0f);
 		}
 	});
 	WaitUntil(TEXT("the host coming back"), 2.0f + 5.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive() && Host != PlayTests::FirstBody.Get(); });

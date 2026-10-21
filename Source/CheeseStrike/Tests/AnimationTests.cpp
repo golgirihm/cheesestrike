@@ -7,6 +7,9 @@
 #include "Misc/AutomationTest.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/PhysicsConstraintTemplate.h"
+#include "PhysicsEngine/SkeletalBodySetup.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
 #include "CheeseStrikeCharacter.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -114,6 +117,54 @@ bool FTheCharacterIsBelicaInBothViews::RunTest(const FString& Parameters)
 			TestEqual(TEXT("which is Lyra's"), Rifle->GetSkeletalMeshAsset()->GetName(), FString(TEXT("SK_Rifle")));
 		}
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheRagdollBendsAsABodyDoes, "CheeseStrike.Animation.TheRagdollBendsAsABodyDoes", AnimationTests::Flags)
+
+bool FTheRagdollBendsAsABodyDoes::RunTest(const FString& Parameters)
+{
+	const USkeletalMesh* Body = GetDefault<ACheeseStrikeCharacter>()->GetMesh()->GetSkeletalMeshAsset();
+	const UPhysicsAsset* Ragdoll = Body != nullptr ? Body->GetPhysicsAsset() : nullptr;
+	if (!TestNotNull(TEXT("the body has a ragdoll"), Ragdoll))
+	{
+		return false;
+	}
+	// A body for each part of her that moves on its own; none under the head (the face and jaw would slide on the
+	// skull) or for her own guns, which are hidden.
+	for (const TCHAR* Bone : {TEXT("pelvis"), TEXT("spine_03"), TEXT("head"), TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"), TEXT("upperarm_r"), TEXT("lowerarm_r"),
+		TEXT("hand_r"), TEXT("thigh_l"), TEXT("calf_l"), TEXT("foot_l"), TEXT("thigh_r"), TEXT("calf_r"), TEXT("foot_r")})
+	{
+		TestTrue(FString::Printf(TEXT("a body for %s"), Bone), Ragdoll->FindBodyIndex(Bone) != INDEX_NONE);
+	}
+	const FReferenceSkeleton& Skeleton = Body->GetRefSkeleton();
+	const int32 Head = Skeleton.FindBoneIndex(TEXT("head"));
+	for (const USkeletalBodySetup* Part : Ragdoll->SkeletalBodySetups)
+	{
+		const int32 Bone = Skeleton.FindBoneIndex(Part->BoneName);
+		TestFalse(FString::Printf(TEXT("no body under the head (%s)"), *Part->BoneName.ToString()), Bone != Head && Skeleton.BoneIsChildOf(Bone, Head));
+		TestFalse(FString::Printf(TEXT("no body for a gun (%s)"), *Part->BoneName.ToString()), Part->BoneName == TEXT("pistol") || Part->BoneName == TEXT("weapon"));
+	}
+	// Every joint limited every way, on hard limits, twisting no further than a person's; the knees and elbows
+	// hinges; and the spine twisting little at each joint.
+	float SpineTwist = 0.0f;
+	for (const UPhysicsConstraintTemplate* Template : Ragdoll->ConstraintSetup)
+	{
+		const FConstraintProfileProperties& Joint = Template->DefaultInstance.ProfileInstance;
+		const FString Bone = Template->DefaultInstance.ConstraintBone1.ToString();
+		TestTrue(FString::Printf(TEXT("%s is limited every way"), *Bone), Joint.ConeLimit.Swing1Motion != ACM_Free && Joint.ConeLimit.Swing2Motion != ACM_Free && Joint.TwistLimit.TwistMotion != ACM_Free);
+		TestFalse(FString::Printf(TEXT("%s on hard limits"), *Bone), Joint.ConeLimit.bSoftConstraint || Joint.TwistLimit.bSoftConstraint);
+		TestTrue(FString::Printf(TEXT("%s twists no more than 40 degrees (%.0f)"), *Bone, Joint.TwistLimit.TwistLimitDegrees), Joint.TwistLimit.TwistLimitDegrees <= 40.0f);
+		if (Bone.StartsWith(TEXT("lowerarm")) || Bone.StartsWith(TEXT("calf")))
+		{
+			TestTrue(FString::Printf(TEXT("%s is a hinge (%.0f to the side)"), *Bone, Joint.ConeLimit.Swing1LimitDegrees), Joint.ConeLimit.Swing1LimitDegrees <= 5.0f);
+		}
+		if (Bone.StartsWith(TEXT("spine")))
+		{
+			SpineTwist += Joint.TwistLimit.TwistLimitDegrees;
+		}
+	}
+	TestTrue(FString::Printf(TEXT("the spine twists no more than 30 degrees in all (%.0f)"), SpineTwist), SpineTwist > 0.0f && SpineTwist <= 30.0f);
 	return true;
 }
 

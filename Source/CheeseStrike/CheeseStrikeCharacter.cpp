@@ -405,6 +405,8 @@ void ACheeseStrikeCharacter::ShowDeath()
 		Held->StopFiring();
 		Held->StopAiming();
 	}
+	// The body goes on the way the character was going, falling as it goes.
+	const FVector Going = GetVelocity();
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -418,6 +420,7 @@ void ACheeseStrikeCharacter::ShowDeath()
 	GetMesh()->SetOwnerNoSee(false);
 	GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
 	GetMesh()->SetSimulatePhysics(true);
+	GetMesh()->SetAllPhysicsLinearVelocity(Going);
 }
 
 void ACheeseStrikeCharacter::ApplyStartAt()
