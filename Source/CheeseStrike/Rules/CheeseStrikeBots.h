@@ -73,6 +73,14 @@ namespace CheeseStrikeBots
 	/** `bWedges`: whether the map has wedges (health) to go for; a hurt bot with none to go for fights on. */
 	EMove MoveFor(float Distance, float WeaponRange, float Health, bool bWedges);
 
+	/**
+	 * Whether a bot opens fire on someone `Distance` away with a weapon reaching `WeaponRange`:
+	 * within LongShotShare of its reach (where the Cheddar Blaster's damage is down to its floor),
+	 * or further if they are shooting it. No spraying at specks across the map.
+	 */
+	constexpr float LongShotShare = 0.6f;
+	bool WouldFireAt(float Distance, float WeaponRange, bool bTheyShootMe);
+
 	/** Seconds without progress toward where it is going before a bot finds another way. */
 	constexpr float StuckTime = 1.2f;
 	/** Seconds a bot keeps looking for an enemy it lost sight of, at where it saw them last. */

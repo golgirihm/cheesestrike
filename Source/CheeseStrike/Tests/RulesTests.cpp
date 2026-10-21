@@ -135,6 +135,11 @@ bool FTheSidesAreFilledWithBots::RunTest(const FString& Parameters)
 	TestTrue(TEXT("then bots, from the side's share of the names"), First[2].bBot && First[2].Name == Drawn[0] && Second[1].bBot && Second[1].Name == Drawn[TeamSize]);
 	TestEqual(TEXT("asked for three bots, three in all"), TeamColumn(0, Players, Drawn, 3).Num() + TeamColumn(1, Players, Drawn, 3).Num(), Players.Num() + 3);
 	TestEqual(TEXT("asked for none, players only"), TeamColumn(1, Players, Drawn, 0).Num(), 1);
+	TestEqual(TEXT("three bots go to the smaller side first: one to the first"), TeamColumn(0, Players, Drawn, 3).Num(), 3);
+	TestEqual(TEXT("and two to the second, three a side"), TeamColumn(1, Players, Drawn, 3).Num(), 3);
+	TestEqual(TEXT("bots in a match with 3 players, filling in"), BotsIn(3, -1), 13);
+	TestEqual(TEXT("or as many as asked"), BotsIn(3, 5), 5);
+	TestEqual(TEXT("but never more than the seats"), BotsIn(3, 20), 13);
 	return true;
 }
 
@@ -171,6 +176,8 @@ bool FTheMenuFollowsTheMatch::RunTest(const FString& Parameters)
 	TestTrue(TEXT("once the match is on, nothing"), PageFor(true, false, true, false, EMenuPage::Main) == EMenuPage::None);
 	TestTrue(TEXT("unless paused"), PageFor(true, false, true, true, EMenuPage::Main) == EMenuPage::Pause);
 	TestTrue(TEXT("and once it is over, nothing, whatever else"), PageFor(true, true, true, true, EMenuPage::Main) == EMenuPage::None);
+	TestTrue(TEXT("while the match goes to another level, the lobby, however it stands"), PageFor(true, true, true, false, EMenuPage::Main, true) == EMenuPage::Lobby);
+	TestTrue(TEXT("but alone, the front end"), PageFor(true, true, false, false, EMenuPage::Main, true) == EMenuPage::Main);
 	return true;
 }
 

@@ -94,6 +94,11 @@ bool FBotKeepsItsDistance::RunTest(const FString& Parameters)
 	TestTrue(TEXT("hurt: gets away, however far"), MoveFor(2200.0f, 5000.0f, 40.0f, true) == EMove::Retreat);
 	TestTrue(TEXT("at 45 it still fights"), MoveFor(2200.0f, 5000.0f, 45.0f, true) == EMove::Hold);
 	TestTrue(TEXT("hurt with no wedge to go for: fights on"), MoveFor(2200.0f, 5000.0f, 40.0f, false) == EMove::Hold);
+	// It opens fire within 30 m with the Blaster, further only at someone shooting it, and never beyond the weapon's reach.
+	TestTrue(TEXT("fires at 25 m"), WouldFireAt(2500.0f, 5000.0f, false));
+	TestFalse(TEXT("holds fire at 40 m"), WouldFireAt(4000.0f, 5000.0f, false));
+	TestTrue(TEXT("unless they shoot it"), WouldFireAt(4000.0f, 5000.0f, true));
+	TestFalse(TEXT("never past its reach"), WouldFireAt(5500.0f, 5000.0f, true));
 	return true;
 }
 

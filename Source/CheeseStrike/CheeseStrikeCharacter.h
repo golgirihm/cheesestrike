@@ -106,6 +106,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoReload();
 
+	/** Aiming: the rifle's sight line, across it from its bounds' middle and down from its top, and how far along it from its back end the eye is (cm). */
+	static constexpr float SightSide = 0.0f;
+	static constexpr float SightHeight = 2.0f;
+	static constexpr float SightBack = 14.0f;
+
 	/** The weapon in hand, or null before one arrives. */
 	ACheeseStrikeWeapon* GetWeapon() const { return HeldWeapon; }
 	void SetWeapon(ACheeseStrikeWeapon* InWeapon) { HeldWeapon = InWeapon; }
@@ -206,9 +211,10 @@ protected:
 	/** How far the view has come from the head to the rifle's sights, 0 to 1. */
 	float AimFraction = 0.0f;
 	/** Where the eye sits to look through the sights, from the rifle's bounds: so far forward of its back end, so far above its top (the rifle points a little under the view, so the eye sits a little under the top), so far to the left of its middle. */
-	static constexpr float SightEyeDistance = 14.0f;
-	static constexpr float SightEyeHeight = -1.0f;
-	static constexpr float SightEyeSide = -1.5f;
+	/** The arms' place on the body when not aiming. */
+	FTransform FirstPersonBase = FTransform::Identity;
+	/** Aiming: the arms brought so that the rifle's sight line runs down the view through the eye (Tick). */
+	void BringRifleToEye();
 	/** Where the camera sits in the first-person body's head bone: just under its eyes (from the body's eye bones), or where the template had it on the mannequin. */
 	FVector CameraAtHead = DefaultCameraAtHead;
 	static const FVector DefaultCameraAtHead;

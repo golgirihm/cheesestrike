@@ -32,11 +32,12 @@ namespace CheeseStrikeRules
 	/** Whether a match with these URL `Options` begins as soon as there is a player (`?StartNow`), rather than waiting in the lobby for the host. */
 	bool StartsAtOnce(const FString& Options);
 
-	/** A map a host may pick: its name in the lobby, and its level's package. */
+	/** A map a host may pick: its name in the lobby, its level's package, and its picture in the lobby (a file in Content/UI/Maps). */
 	struct FMapChoice
 	{
 		const TCHAR* Name;
 		const TCHAR* Level;
+		const TCHAR* Picture;
 	};
 	/** The maps, the first picked to begin with when hosting from the front end. */
 	extern const FMapChoice Maps[];
@@ -103,6 +104,8 @@ namespace CheeseStrikeRules
 	TArray<FString> BotNames(int32 Seed, int32 Count);
 	/** How many bots fill in: the URL's `?Bots=`, or every empty slot (-1) without it. */
 	int32 BotsFrom(const FString& Options);
+	/** How many bots a match with `Players` players has when `BotsWanted` of them are asked for (-1 for every empty slot). */
+	int32 BotsIn(int32 Players, int32 BotsWanted);
 
 	/** One line of a team's column in the lobby. */
 	struct FRosterEntry
@@ -114,7 +117,8 @@ namespace CheeseStrikeRules
 	/**
 	 * Team `Team`'s column: its players, then bots from `Bots` (the names
 	 * the match drew, the first TeamSize of them for the first team and so
-	 * on) until it is full, or fewer if `BotsWanted` (0 or more) says so.
+	 * on) until it is full; or, if `BotsWanted` (0 or more) says how many,
+	 * that many in all, dealt one at a time to whichever side has fewer.
 	 */
 	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted);
 }

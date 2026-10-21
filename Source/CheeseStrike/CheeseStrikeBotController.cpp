@@ -66,6 +66,19 @@ const TCHAR* ACheeseStrikeBotController::Doing() const
 	return bSearching ? TEXT("searching") : TEXT("roaming");
 }
 
+FString ACheeseStrikeBotController::Describe() const
+{
+	const ACheeseStrikeCharacter* Me = Body();
+	const ACheeseStrikeWeapon* Weapon = Me != nullptr ? Me->GetWeapon() : nullptr;
+	const APlayerState* State = GetPlayerState<APlayerState>();
+	return FString::Printf(TEXT("%s %s, health %.0f, ammo %d/%d%s%s, speed %.0f at %s, target %s%s"),
+		State != nullptr ? *State->GetPlayerName() : *GetName(), Doing(), Me != nullptr ? Me->GetHealth() : 0.0f,
+		Weapon != nullptr ? Weapon->GetMagazine() : -1, Weapon != nullptr ? Weapon->GetReserve() : -1,
+		Weapon != nullptr && Weapon->IsReloading() ? *(TEXT(" reloading, ") + Weapon->DescribeReload()) : TEXT(""), bTriggerHeld ? TEXT(" firing") : TEXT(""),
+		Me != nullptr ? Me->GetVelocity().Size2D() : 0.0f, Me != nullptr ? *Me->GetActorLocation().ToCompactString() : TEXT("-"),
+		Target.IsValid() ? *Target->DisplayName() : TEXT("none"), bSeesTarget ? TEXT(" (seen)") : TEXT(""));
+}
+
 void ACheeseStrikeBotController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -268,6 +281,7 @@ void ACheeseStrikeBotController::Perceive()
 	}
 
 	const bool bWasSeeing = bSeesTarget;
+	bShotByTarget = false;
 	if (Best != nullptr)
 	{
 		// A new enemy, or the same one back in sight after a while, is noticed afresh: the reaction runs from here.
@@ -280,6 +294,7 @@ void ACheeseStrikeBotController::Perceive()
 			TrackingSince = Time;
 		}
 		Target = Best;
+		bShotByTarget = bJustHurt && Best == Attacker;
 		bSeesTarget = true;
 		bSearching = false;
 		LastSeenAt = Time;
@@ -366,8 +381,10 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 	if (bSeesTarget && Target.IsValid())
 	{
 		const float Distance = FVector::Dist(Here, Target->GetActorLocation());
-		// No map has wedges yet: hurt or not, it fights on.
-		Move = MoveFor(Distance, Me->GetWeapon() != nullptr ? Me->GetWeapon()->GetStats().MaxRange : 5000.0f, Me->GetHealth(), false);
+		// No map has wedges yet: hurt or not, it fights on; with nothing left to shoot, it keeps away.
+		const ACheeseStrikeWeapon* Weapon = Me->GetWeapon();
+		const bool bDry = Weapon != nullptr && Weapon->GetMagazine() == 0 && Weapon->GetReserve() == 0;
+		Move = bDry ? EMove::Retreat : MoveFor(Distance, Me->GetWeapon() != nullptr ? Me->GetWeapon()->GetStats().MaxRange : 5000.0f, Me->GetHealth(), false);
 		Me->DoSprint(false);
 		switch (Move)
 		{
@@ -534,7 +551,8 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 		// It fires once its reaction is over, when the aim is near enough, at what is in reach.
 		const float Off = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(GetControlRotation().Vector(), Straight.Vector()), -1.0f, 1.0f)));
 		const float Range = Weapon != nullptr ? Weapon->GetStats().MaxRange : 5000.0f;
-		bWantsToFire = Tracking >= Skill.Reaction && Off <= Error + FireCone && FVector::Dist(Eyes, Chest) <= Range;
+		const bool bHasAmmo = Weapon != nullptr && (Weapon->GetMagazine() > 0 || Weapon->GetReserve() > 0);
+		bWantsToFire = bHasAmmo && Tracking >= Skill.Reaction && Off <= Error + FireCone && WouldFireAt(FVector::Dist(Eyes, Chest), Range, bShotByTarget);
 	}
 	else if (Target.IsValid())
 	{

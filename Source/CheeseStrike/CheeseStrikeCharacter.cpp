@@ -179,6 +179,7 @@ void ACheeseStrikeCharacter::BeginPlay()
 	Super::BeginPlay();
 	ACheeseStrikeWeapon::HideBuiltInWeapons(GetMesh());
 	FitFirstPersonBody();
+	FirstPersonBase = FirstPersonMesh->GetRelativeTransform();
 	// The server gives every character its weapon; it arrives on every machine as an actor of this character's.
 	if (HasAuthority() && HeldWeapon == nullptr && GetWorld() != nullptr)
 	{
@@ -457,6 +458,48 @@ FVector ACheeseStrikeCharacter::LeftHandOnRifle() const
 	return Rifle->GetComponentTransform().InverseTransformPosition(FirstPersonMesh->GetBoneLocation(TEXT("hand_l")));
 }
 
+static TAutoConsoleVariable<float> CVarSightSide(TEXT("CheeseStrike.SightSide"), ACheeseStrikeCharacter::SightSide, TEXT("Where the rifle's sight line is across it, from its bounds' middle (cm)."));
+static TAutoConsoleVariable<float> CVarSightHeight(TEXT("CheeseStrike.SightHeight"), ACheeseStrikeCharacter::SightHeight, TEXT("Where the rifle's sight line is, down from its top (cm)."));
+static TAutoConsoleVariable<float> CVarSightBack(TEXT("CheeseStrike.SightBack"), ACheeseStrikeCharacter::SightBack, TEXT("How far along the rifle from its back end the eye is when aiming (cm)."));
+
+void ACheeseStrikeCharacter::BringRifleToEye()
+{
+	const USkeletalMeshComponent* Rifle = HeldWeapon != nullptr ? HeldWeapon->GetFirstPersonMesh() : nullptr;
+	const USceneComponent* Parent = FirstPersonMesh->GetAttachParent();
+	// Only for its own player, alive, with the camera riding the arms (after a death it is left where the eyes were).
+	if (!IsLocallyControlled() || Parent == nullptr || !IsAlive() || FirstPersonCameraComponent->GetAttachParent() != FirstPersonMesh)
+	{
+		return;
+	}
+	// Where the arms are without aiming, and the eye in them.
+	const FTransform Unaimed = FirstPersonBase * FirstPersonMesh->GetAttachParent()->GetSocketTransform(FirstPersonMesh->GetAttachSocketName());
+	const FVector Eye = (FirstPersonMesh->GetSocketTransform(FName("head"), RTS_Component) * Unaimed).TransformPosition(CameraAtHead);
+	if (AimFraction < 0.001f || Rifle == nullptr || Rifle->GetSkeletalMeshAsset() == nullptr)
+	{
+		FirstPersonMesh->SetRelativeTransform(FirstPersonBase);
+		FirstPersonCameraComponent->SetRelativeLocation(CameraAtHead);
+		return;
+	}
+	// The rifle as the arms hold it (its place in them, from their last pose), and where it should be: its length (its Y)
+	// along the view, its top (its Z) up the view, and its sight line (a little down from its top) through the eye, the
+	// eye SightBack along it from its back end, behind the rear sight as a cheek on the stock puts it.
+	const FTransform RifleInArms = Rifle->GetComponentTransform().GetRelativeTransform(FirstPersonMesh->GetComponentTransform());
+	const FRotator View = GetControlRotation();
+	const FMatrix ViewAxes = FRotationMatrix(View);
+	const FQuat Along = FRotationMatrix::MakeFromYZ(ViewAxes.GetUnitAxis(EAxis::X), ViewAxes.GetUnitAxis(EAxis::Z)).ToQuat();
+	const FBoxSphereBounds Bounds = Rifle->GetSkeletalMeshAsset()->GetBounds();
+	const FVector Sight(Bounds.Origin.X + CVarSightSide.GetValueOnGameThread(), Bounds.Origin.Y - Bounds.BoxExtent.Y + CVarSightBack.GetValueOnGameThread(), Bounds.Origin.Z + Bounds.BoxExtent.Z - CVarSightHeight.GetValueOnGameThread());
+	const FVector Scale = Rifle->GetComponentScale();
+	const FTransform RifleAimed(Along, Eye - Along.RotateVector(Sight * Scale), Scale);
+	// Child = its place in the parent * the parent; so the arms = the rifle's place in them, undone, * where the rifle is to be.
+	const FTransform ArmsAimed = RifleInArms.Inverse() * RifleAimed;
+	FTransform Arms;
+	Arms.Blend(Unaimed, ArmsAimed, AimFraction);
+	FirstPersonMesh->SetWorldTransform(Arms);
+	// The eye stays where the head had it, wherever the arms (which carry the camera on their head) have gone.
+	FirstPersonCameraComponent->SetWorldLocation(Eye);
+}
+
 void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -466,23 +509,15 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	{
 		HitHistory.Add(SampleNow(GetWorld()->GetGameState()->GetServerWorldTimeSeconds()));
 	}
-	// Aiming down the sights narrows the view, smoothly, and brings the eye
-	// from the head to the rifle's sight line: a point behind the rifle's
-	// back end and just above its top, found in the head's own space so
-	// that the camera, which rides the head, lands there.
+	// Aiming down the sights narrows the view, smoothly, and brings the rifle to the eye: the arms are
+	// moved and turned so that the rifle's sight line runs straight down the view from just in front of
+	// the eye, which stays where the head has it. Shots leave from the eye along the view, so they go
+	// where the sights point.
 	const bool bAimed = HeldWeapon != nullptr && HeldWeapon->IsAimed();
 	const float WantedFieldOfView = BaseFieldOfView * (bAimed ? CheeseStrikeWeapons::Blaster().AimZoom : 1.0f);
 	FirstPersonCameraComponent->SetFieldOfView(FMath::FInterpTo(FirstPersonCameraComponent->FieldOfView, WantedFieldOfView, DeltaSeconds, 12.0f));
 	AimFraction = FMath::FInterpTo(AimFraction, bAimed ? 1.0f : 0.0f, DeltaSeconds, 12.0f);
-	const USkeletalMeshComponent* Rifle = HeldWeapon != nullptr ? HeldWeapon->GetFirstPersonMesh() : nullptr;
-	if (IsAlive() && Rifle != nullptr && Rifle->GetSkeletalMeshAsset() != nullptr && IsLocallyControlled())
-	{
-		const FBoxSphereBounds Bounds = Rifle->GetSkeletalMeshAsset()->GetBounds();
-		const FVector SightOnRifle(Bounds.Origin.X + SightEyeSide, Bounds.Origin.Y - Bounds.BoxExtent.Y + SightEyeDistance, Bounds.Origin.Z + Bounds.BoxExtent.Z + SightEyeHeight);
-		const FVector SightInWorld = Rifle->GetComponentTransform().TransformPosition(SightOnRifle);
-		const FVector SightAtHead = FirstPersonMesh->GetSocketTransform(FName("head")).InverseTransformPosition(SightInWorld);
-		FirstPersonCameraComponent->SetRelativeLocation(FMath::Lerp(CameraAtHead, SightAtHead, AimFraction));
-	}
+	BringRifleToEye();
 	// Traced with the console variable, or with -TraceState on the command line.
 	static const bool bTraceSwitch = FParse::Param(FCommandLine::Get(), TEXT("TraceState"));
 	if ((bTraceSwitch || CVarTraceState.GetValueOnGameThread() != 0) && GetWorld() != nullptr)

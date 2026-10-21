@@ -33,12 +33,14 @@ namespace CheeseStrikeMenu
 	 * is up), the lobby while a hosted or joined match waits, and otherwise
 	 * the page the player chose among the front end's.
 	 */
-	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen);
+	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling = false);
 
 	/** How often a page that shows changing things (the lobby, the matches found) is redrawn, in seconds. */
 	constexpr float RefreshEvery = 0.5f;
 	/** Corners, in Slate units. */
 	constexpr float Rounding = 6.0f;
+	/** The lobby's picture of the map, wide (16:9), and its rules' column as wide. */
+	constexpr float MapPictureWidth = 600.0f;
 }
 
 /**
@@ -85,6 +87,12 @@ private:
 	/** One team's column in the lobby: its name, then who is on it, each in a chip with an icon, the host crowned. */
 	TSharedRef<SWidget> MakeTeamColumn(int32 Team);
 	TSharedRef<SWidget> MakeNameChip(const FString& Name, bool bBot, bool bHost, int32 Team);
+	/** A number with a button either side to make it less or more; with `bCanPick` off, the buttons can't be pressed. */
+	TSharedRef<SWidget> MakeStepper(const FString& Label, const FString& Value, bool bCanPick, TFunction<void()> Less, TFunction<void()> More);
+	/** The picture of map `MapIndex` (CheeseStrikeRules::Maps), its name across the bottom. */
+	TSharedRef<SWidget> MakeMapPicture(int32 MapIndex);
+	/** Everything the lobby shows but the seconds, as text: when it changes, the lobby is drawn again. */
+	FString LobbyKey() const;
 	const FButtonStyle& ButtonStyle(EButtonKind Kind) const;
 
 	TWeakObjectPtr<ACheeseStrikePlayerController> Controller;
@@ -95,4 +103,5 @@ private:
 	TSharedPtr<SWidget> Lobby;
 	TSharedPtr<SBox> LobbyContent;
 	EMenuPage Page = EMenuPage::None;
+	FString ShownLobbyKey;
 };

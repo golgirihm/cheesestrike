@@ -39,6 +39,8 @@ public:
 	int32 GetMagazine() const { return Magazine; }
 	int32 GetReserve() const { return Reserve; }
 	bool IsReloading() const;
+	/** For the log: seconds until the reload under way ends, by its end time and by its timer (-1 for none). */
+	FString DescribeReload() const;
 	bool IsAimed() const { return bAimed; }
 	bool IsFiring() const { return bTriggerHeld; }
 	/** Which shot of the run of fire the next would be. */
@@ -69,6 +71,8 @@ public:
 	void StartAiming();
 	void StopAiming();
 	void StartReload();
+	/** Server only: adds `Rounds` to the reserve, up to the most it can hold. */
+	void AddReserve(int32 Rounds);
 
 	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
 	USkeletalMeshComponent* GetThirdPersonMesh() const { return ThirdPersonMesh; }

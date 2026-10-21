@@ -9,6 +9,7 @@
 #include "Animation/AnimNode_SequencePlayer.h"
 #include "Animation/AnimNodeSpaceConversions.h"
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
+#include "AnimNodes/AnimNode_LayeredBoneBlend.h"
 #include "CheeseStrikeGripIK.h"
 #include "AnimNodes/AnimNode_MultiWayBlend.h"
 #include "AnimNodes/AnimNode_Slot.h"
@@ -17,6 +18,27 @@
 
 class UAnimSequence;
 class UBlendSpace;
+
+/**
+ * Evaluates a node that is linked elsewhere in the graph again, for a second
+ * branch, without updating it a second time (which would play its animations
+ * at twice their speed): where the same pose is needed twice.
+ */
+struct FCheeseStrikeSharedPose : public FAnimNode_Base
+{
+	FAnimNode_Base* Shared = nullptr;
+	virtual void Evaluate_AnyThread(FPoseContext& Output) override
+	{
+		if (Shared != nullptr)
+		{
+			Shared->Evaluate_AnyThread(Output);
+		}
+		else
+		{
+			Output.ResetToRefPose();
+		}
+	}
+};
 
 /** The numbers the body's animation is blended by. */
 namespace CheeseStrikeAnimation
@@ -156,8 +178,14 @@ protected:
 	FAnimNode_ApplyMeshSpaceAdditive AimedFromHip;
 	FAnimNode_ApplyMeshSpaceAdditive AimedDownSights;
 	FAnimNode_ApplyMeshSpaceAdditive AimedCrouched;
-	/** Firing and reloading play over everything. */
+	/**
+	 * Firing and reloading play over the body from the spine up; the legs
+	 * keep walking (a reload on the move doesn't slide). The slot's own
+	 * source is the same pose again, shared rather than played twice.
+	 */
+	FCheeseStrikeSharedPose Locomotion;
 	FAnimNode_Slot Slot;
+	FAnimNode_LayeredBoneBlend UpperBody;
 	/**
 	 * Then the left hand is held where it grips the rifle, which rides the
 	 * weapon_r bone, so that the cycles' and the aim offsets' drift never takes

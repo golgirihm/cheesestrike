@@ -15,9 +15,13 @@
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
+#include "GameFramework/GameMode.h"
+#include "GameFramework/GameState.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "CheeseStrikeBotController.h"
 #include "CheeseStrikeCharacter.h"
+#include "EngineUtils.h"
 #include "CheeseStrikeGameMode.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
@@ -81,7 +85,9 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	const AGameStateBase* State = GetWorld()->GetGameState();
 	const bool bStarted = State != nullptr && State->HasMatchStarted();
 	const bool bEnded = State != nullptr && State->HasMatchEnded();
-	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch(), bPaused, ChosenPage);
+	const AGameState* Match = Cast<AGameState>(State);
+	const bool bTravelling = Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap;
+	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch(), bPaused, ChosenPage, bTravelling);
 	if (Wanted != ShownPage)
 	{
 		ShowMenu(Wanted);
@@ -97,7 +103,7 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 		}
 	}
 	// And the level is watched from the menu camera, with the figure before it, until the match is on.
-	if (!bStarted)
+	if (!bStarted || bTravelling)
 	{
 		ShowMenuCamera();
 	}
@@ -232,6 +238,18 @@ void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float Resp
 	}
 }
 
+void ACheeseStrikePlayerController::SetBotsFromMenu(int32 Wanted)
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->SetBotsWanted(Wanted);
+	}
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
+	}
+}
+
 void ACheeseStrikePlayerController::SetBotSkillFromMenu(int32 Skill)
 {
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
@@ -241,6 +259,14 @@ void ACheeseStrikePlayerController::SetBotSkillFromMenu(int32 Skill)
 	if (Menu.IsValid())
 	{
 		Menu->Refresh();
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeBots()
+{
+	for (TActorIterator<ACheeseStrikeBotController> It(GetWorld()); It; ++It)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Bot: %s"), *It->Describe());
 	}
 }
 
