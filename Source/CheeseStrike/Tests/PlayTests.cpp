@@ -42,6 +42,36 @@ namespace PlayTests
 	const FVector JoinerSpot(-231.0f, -700.0f, 100.0f);
 	constexpr float JoinerYaw = 90.0f;
 
+	/**
+	 * How far a body's face has moved on its head from where its pose puts it: of Belica's face
+	 * (faceAttach) and jaw (C_jaw), the most either is turned (degrees) from its place against what it
+	 * hangs from, as the reference pose has it. -1 if the body has no such bones.
+	 */
+	float FaceOutOfPlace(const ACheeseStrikeCharacter* Character)
+	{
+		const USkeletalMeshComponent* Mesh = Character != nullptr ? Character->GetMesh() : nullptr;
+		const USkeletalMesh* Model = Mesh != nullptr ? Mesh->GetSkeletalMeshAsset() : nullptr;
+		if (Model == nullptr)
+		{
+			return -1.0f;
+		}
+		const FReferenceSkeleton& Skeleton = Model->GetRefSkeleton();
+		float Most = -1.0f;
+		for (const TCHAR* Name : {TEXT("faceAttach"), TEXT("C_jaw")})
+		{
+			const int32 Bone = Skeleton.FindBoneIndex(Name);
+			if (Bone == INDEX_NONE)
+			{
+				return -1.0f;
+			}
+			const FName Parent = Skeleton.GetBoneName(Skeleton.GetParentIndex(Bone));
+			const FQuat Relative = Mesh->GetBoneQuaternion(Parent, EBoneSpaces::ComponentSpace).Inverse() * Mesh->GetBoneQuaternion(Name, EBoneSpaces::ComponentSpace);
+			const FQuat Off = Skeleton.GetRefBonePose()[Bone].GetRotation().Inverse() * Relative;
+			Most = FMath::Max(Most, FMath::RadiansToDegrees(Off.AngularDistance(FQuat::Identity)));
+		}
+		return Most;
+	}
+
 	bool Near(float Value, float Wanted, float Within)
 	{
 		return FMath::Abs(Value - Wanted) <= Within;
@@ -319,9 +349,11 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 		{
 			TestFalse(TEXT("dead"), HostAsSeen->IsAlive());
 		}
-		if (ACheeseStrikeCharacter* Joiner = PlayTests::Pawn(1))
+		// The fallen body's face stays on its head, on both machines: the ragdoll moves the head, and the face and jaw follow it as posed.
+		for (const ACheeseStrikeCharacter* Body : {static_cast<const ACheeseStrikeCharacter*>(PlayTests::FirstBody.Get()), HostAsSeen})
 		{
-			TestTrue(FString::Printf(TEXT("the joiner's hits were confirmed (%d)"), Joiner->GetWeapon()->HitsConfirmed), Joiner->GetWeapon()->HitsConfirmed >= 5);
+			const float Off = PlayTests::FaceOutOfPlace(Body);
+			TestTrue(FString::Printf(TEXT("the fallen body's face and jaw are in place (%.1f degrees out)"), Off), Off >= 0.0f && Off < 10.0f);
 		}
 	});
 	WaitUntil(TEXT("the host coming back"), 2.0f + 5.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive() && Host != PlayTests::FirstBody.Get(); });

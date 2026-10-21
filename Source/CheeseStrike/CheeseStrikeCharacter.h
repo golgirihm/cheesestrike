@@ -68,8 +68,8 @@ public:
 	 * on the same PC renders poorly): puts the view `Distance` cm from the
 	 * character, `Yaw` degrees round from in front, looking at the point
 	 * `Height` cm above its middle (70 is the face), and shows the body
-	 * and its rifle as others see them. With no distance, the view goes
-	 * back to the eyes.
+	 * and its rifle as others see them; once dead, round the head of the
+	 * body where it fell. With no distance, the view goes back to the eyes.
 	 */
 	UFUNCTION(Exec)
 	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f, float Height = 30.0f);

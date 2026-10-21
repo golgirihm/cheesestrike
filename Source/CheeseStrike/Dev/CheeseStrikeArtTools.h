@@ -23,8 +23,14 @@ public:
 	/**
 	 * Makes a ragdoll for `Mesh` as the editor's Create Physics Asset does
 	 * (a capsule for each bone of any length, joints with limits), saved as
-	 * the asset `AssetPath`, and makes it the mesh's physics asset.
+	 * the asset `AssetPath`, and makes it the mesh's physics asset. The head
+	 * is the last body: what hangs from it (the face and jaw) follows it as
+	 * posed.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "CheeseStrike|Art")
 	static UPhysicsAsset* MakeRagdoll(USkeletalMesh* Mesh, const FString& AssetPath);
+
+	/** The bones of a ragdoll's bodies. */
+	UFUNCTION(BlueprintCallable, Category = "CheeseStrike|Art")
+	static TArray<FName> RagdollBodies(UPhysicsAsset* Ragdoll);
 };

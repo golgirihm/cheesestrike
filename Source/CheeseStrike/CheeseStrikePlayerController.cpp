@@ -12,6 +12,7 @@
 #include "Dev/CheeseStrikePlayScript.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
@@ -88,7 +89,7 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	const bool bStarted = State != nullptr && State->HasMatchStarted();
 	const bool bEnded = State != nullptr && State->HasMatchEnded();
 	const AGameState* Match = Cast<AGameState>(State);
-	const bool bTravelling = Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap;
+	const bool bTravelling = (Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap) || bLeaving;
 	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch(), bPaused, ChosenPage, bTravelling);
 	if (Wanted != ShownPage)
 	{
@@ -96,13 +97,8 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	}
 	else if (Menu.IsValid() && (Wanted == EMenuPage::Lobby || Wanted == EMenuPage::Find))
 	{
-		// These pages show things that change.
-		SinceMenuRefresh += DeltaSeconds;
-		if (SinceMenuRefresh >= CheeseStrikeMenu::RefreshEvery)
-		{
-			SinceMenuRefresh = 0.0f;
-			Menu->Refresh();
-		}
+		// These pages show things that change: drawn again in the frame they change, and only then.
+		Menu->Refresh();
 	}
 	// And the level is watched from the menu camera, with the figure before it, until the match is on.
 	if (!bStarted || bTravelling)
@@ -115,15 +111,52 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	}
 }
 
+void ACheeseStrikePlayerController::PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel)
+{
+	Super::PreClientTravel(PendingURL, TravelType, bIsSeamlessTravel);
+	// A joiner told by the host to follow it (a travel relative to the server; leaving is absolute) shows where to at once:
+	// the level it leaves gets no more news from the host, and would show the countdown at 0 until the new one has loaded.
+	bLeaving = TravelType != TRAVEL_Absolute;
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
+	}
+}
+
+bool ACheeseStrikePlayerController::IsViewReady() const
+{
+	const UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return false;
+	}
+	const APawn* Body = GetPawn();
+	const bool bThroughCharacter = Body != nullptr && PlayerCameraManager != nullptr && PlayerCameraManager->GetViewTarget() == Body;
+	// A level the lobby sent everyone to starts by itself when they are all there: the character, not the lobby, is what to wait for.
+	FString Options;
+	for (const FString& Option : World->URL.Op)
+	{
+		Options += TEXT("?") + Option;
+	}
+	if (CheeseStrikeRules::PlayersFrom(Options) > 0)
+	{
+		return bThroughCharacter;
+	}
+	return ShownPage != EMenuPage::None || bThroughCharacter;
+}
+
 bool ACheeseStrikePlayerController::IsInAMatch() const
 {
-	return GetWorld() != nullptr && GetWorld()->GetNetMode() != NM_Standalone;
+	// While joining, the level left behind reports itself a client (the engine counts the connection being made) though it
+	// is still the player's own: only a level with a connection of its own is a match, or the lobby would show the
+	// player's own level as one, every seat a bot.
+	const UWorld* World = GetWorld();
+	return World != nullptr && World->GetNetMode() != NM_Standalone && World->GetNetDriver() != nullptr;
 }
 
 void ACheeseStrikePlayerController::ShowMenu(EMenuPage Page)
 {
 	ShownPage = Page;
-	SinceMenuRefresh = 0.0f;
 	// The local player's viewport outlives the level, so a travel can take the menu off it.
 	UGameViewportClient* Viewport = GetLocalPlayer() != nullptr ? GetLocalPlayer()->ViewportClient : nullptr;
 	if (Page == EMenuPage::None)
@@ -328,6 +361,11 @@ void ACheeseStrikePlayerController::CheeseStrikeStart(const FString& AtOnce)
 	{
 		Mode->AskToStart(!AtOnce.IsEmpty());
 	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeCancel()
+{
+	CancelStartFromMenu();
 }
 
 void ACheeseStrikePlayerController::LeaveFromMenu()
