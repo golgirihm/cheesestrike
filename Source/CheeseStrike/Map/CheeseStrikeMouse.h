@@ -78,6 +78,8 @@ protected:
 	bool FollowPath(float Speed, float DeltaSeconds);
 	/** Turns toward `Direction` (flat), no faster than a mouse turns. */
 	void TurnToward(const FVector& Direction, float DeltaSeconds);
+	/** A way to somewhere beside `Cheese` it can eat it from (not on top of it), into Path; false if there is none. */
+	bool FindWayBeside(const ACheeseStrikeCheese* Cheese);
 	/** Whether it can reach `Cheese` from where it is. */
 	bool CanReach(const ACheeseStrikeCheese* Cheese) const;
 	void RunFrom(const FVector& Danger);
