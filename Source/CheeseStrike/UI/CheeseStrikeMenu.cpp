@@ -21,6 +21,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
+#include "Rules/CheeseStrikeBots.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
 
@@ -388,12 +389,19 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 		MapNames.Add(FString(CheeseStrikeRules::Maps[Index].Name).ToUpper());
 	}
 	const int32 MapChosen = Match != nullptr ? Match->GetMapIndex() : INDEX_NONE;
+	TArray<FString> Skills;
+	for (const CheeseStrikeBots::FSkill& Skill : CheeseStrikeBots::Skills)
+	{
+		Skills.Add(FString(Skill.Name).ToUpper());
+	}
+	const int32 SkillChosen = Match != nullptr ? Match->GetBotSkill() : CheeseStrikeBots::DefaultSkill;
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOBBY")) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Free-for-all."), true) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Map"), MapNames, MapChosen, bHost, [Player, KillLimit, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, RespawnDelay, Index); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("First to how many kills"), Limits, LimitChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeRules::KillLimitChoices[Index], RespawnDelay); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Back how long after a death"), Delays, DelayChosen, bHost, [Player, KillLimit](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, CheeseStrikeRules::RespawnDelayChoices[Index]); }) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Bots"), Skills, SkillChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetBotSkillFromMenu(Index); }) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeLine(bHost ? TEXT("Everyone here sees the rules as you set them.") : TEXT("The host sets the rules."), true) ];
 }
 

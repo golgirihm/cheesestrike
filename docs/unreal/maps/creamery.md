@@ -14,13 +14,17 @@ West is The Gouda Guys' side, east the Mozza Radicals'; the map is mirrored acro
 
 | Place | Where | What it is |
 |---|---|---|
-| The Docks | each end | a loading platform 1.2 m up along the outer wall, with two ramps down, roller doors behind; eight starts each, four up, four down, facing the middle |
+| The Docks | each end | a loading platform 1.2 m up along the outer wall, with two ramps down, roller doors behind; eight starts each, four up, four down, facing the middle, a side's starts (tagged with it) |
 | The Plazas | between the docks and the lanes | open ground with pallets of cheese wheels and a forklift; the **Annex** on each, a two-room office with a door at either end, a window to the yard, and a ramp along its south side to its roof, the high ground over the plaza |
 | The Loading Yard | the north lane | shipping containers alone and stacked, a trailer, barriers, lamps; cut in two at the middle by the **Wheel Stack** |
 | The Squeeze | the walkway between the yard and the hall | two overlapping stacks of crates by the hall's north wall: the only way past the Wheel Stack, zig-zagging, with no line along it |
 | The Aging Hall | the middle lane | a hall 48 by 36 m, 9 m high, skylights in its roof; **racks** of cheese wheels in rows either side of a middle aisle, the **press** in the middle, a **mezzanine** 4 m up along the south wall with ramps at either end; main doors at each end (8 m), two doors each in the north and south walls (4 m) |
 | The Whey Canal | the south lane | a channel 8 m wide and 3 m deep, ramps down at each end, steps out along its north wall, two concrete bridges and the **Cheese Bridge** in the middle |
 | Tank Row | south of the canal | steel silos, barriers, and a pipe rack along its length; pipe bridges over the canal to the hall |
+
+Free-for-all has fourteen more starts (tagged "Free"), seven a side through the lanes: the plaza, the yard twice, the hall north and south of its middle aisle, the walkway by the canal, and Tank Row. In free-for-all everyone is an enemy and comes back at the start furthest from them all, so without these a match would begin and come back in a crowd on the docks; with them the bots spread through every lane (`CheeseStrike.Play.BotsPlayTheCreamery`).
+
+The bots walk a navigation mesh built when the level starts, in the bounds of its `Navigation` volume, and rebuilt where it changes, as it will when the mice eat cheese.
 
 Beyond the outer wall, for a skyline and nothing else: two cold stores, a chimney, a battery of tall silos, offices.
 

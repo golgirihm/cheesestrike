@@ -182,8 +182,10 @@ def wheel(label, structure, x, y, bottom, diameter, height, material=None):
     return cheese(label, structure, (x, y, bottom + height / 2.0), (diameter, diameter, height), CYLINDER, material)
 
 
-def start(label, x, y, z, yaw):
-    place(unreal.PlayerStart, label, "Starts", (x, y, z + 100), (0, yaw, 0))
+def start(label, x, y, z, yaw, tag):
+    """A start, tagged with the side it is for ("Gouda", "Mozza"), or "Free" for one that free-for-all adds to them."""
+    actor = place(unreal.PlayerStart, label, "Starts", (x, y, z + 100), (0, yaw, 0))
+    actor.set_editor_property("player_start_tag", tag)
     counts["starts"] = counts.get("starts", 0) + 1
 
 
@@ -238,9 +240,9 @@ def dock(s, side):
     # Starts: four on the platform, four on the ground; all face the middle.
     yaw = 0 if s < 0 else 180
     for i, y in enumerate((-1800, 0, 1800, 3600)):
-        start(f"Start_{team}_Dock_{i}", X(6250), y, 120, yaw)
+        start(f"Start_{team}_Dock_{i}", X(6250), y, 120, yaw, team)
     for i, y in enumerate((-4300, -500, 1300, 4500)):
-        start(f"Start_{team}_Yard_{i}", X(5450), y, 0, yaw)
+        start(f"Start_{team}_Yard_{i}", X(5450), y, 0, yaw, team)
 
     # The plaza between the dock and the lanes: open, with pallets of wheels to dash between.
     p = f"Plaza_{side}"
@@ -571,6 +573,32 @@ def dressing():
             decal(f"{d}_WallLeak_{i}", d, "Leakage", (X(x), -4995, 600), (30, 500, 220), (0, -90, 90))
 
 
+# ---------------------------------------------------------------- starts through the lanes, for free-for-all
+
+def free_starts():
+    """In free-for-all everyone is an enemy, and comes back at the start furthest from them all: so as not to begin and come back
+    in a crowd on a dock, there are starts in every lane too, each facing the middle."""
+    for s, side in ((-1, "West"), (1, "East")):
+        for name, x, y in (("Plaza", 4100, 200), ("Yard", 3600, 3300), ("YardNorth", 1200, 4300), ("HallNorth", 1500, 1500),
+                           ("HallSouth", 1500, -1000), ("Walkway", 900, -2250), ("Tanks", 2600, -4600)):
+            start(f"Start_Free_{side}_{name}", s * x, y, 0, 0 if s < 0 else 180, "Free")
+
+
+# ---------------------------------------------------------------- where the bots can walk
+
+def navigation():
+    """The bounds of the navigation mesh: the playable ground, from the canal's floor to above the annexes' roofs. The mesh itself is built when the level starts (Config/DefaultEngine.ini)."""
+    volume = eas.spawn_actor_from_object(unreal.NavMeshBoundsVolume.static_class(), v(0, 0, 490))
+    volume.set_actor_label("Navigation")
+    volume.set_folder_path("Navigation")
+    # The volume's brush is a 2 m cube.
+    volume.set_actor_scale3d(v((2 * HALF_X + 400) / 200.0, (2 * HALF_Y + 400) / 200.0, 1600 / 200.0))
+    origin, extent = volume.get_actor_bounds(False)
+    lines.append(f"navigation bounds: {extent.x * 2:.0f} x {extent.y * 2:.0f} x {extent.z * 2:.0f} cm")
+    if extent.x < HALF_X:
+        raise RuntimeError("the navigation volume has no brush")
+
+
 # ---------------------------------------------------------------- light, sky and air
 
 def sky():
@@ -629,6 +657,8 @@ try:
     south()
     details()
     dressing()
+    free_starts()
+    navigation()
     sky()
     lines.append("saved " + str(levels.save_current_level()))
     for name in sorted(counts):

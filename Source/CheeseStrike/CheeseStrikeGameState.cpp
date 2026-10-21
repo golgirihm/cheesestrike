@@ -15,6 +15,7 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeGameState, BotsWanted);
 	DOREPLIFETIME(ACheeseStrikeGameState, HostName);
 	DOREPLIFETIME(ACheeseStrikeGameState, MapIndex);
+	DOREPLIFETIME(ACheeseStrikeGameState, BotSkill);
 }
 
 TArray<CheeseStrikeRules::FRosterEntry> ACheeseStrikeGameState::Roster() const

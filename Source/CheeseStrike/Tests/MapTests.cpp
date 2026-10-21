@@ -11,6 +11,8 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/Controller.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
@@ -144,9 +146,11 @@ bool FTheHostPicksTheMap::RunTest(const FString& Parameters)
 		TestEqual(TEXT("the lobby is on the shooter level, and has it picked"), Mode->GetMapIndex(), Mode->CurrentMapIndex());
 		Controller(0)->SetRulesFromMenu(5, 3.0f, 0);
 		TestEqual(TEXT("the host picks the Creamery"), Mode->GetMapIndex(), 0);
+		Controller(0)->SetBotSkillFromMenu(2);
+		TestEqual(TEXT("and hard bots"), Mode->GetBotSkill(), 2);
 		LobbyBots = GameState(0)->GetBotNames();
 	});
-	WaitUntil(TEXT("the joiner seeing the pick"), 3.0f, []() { return GameState(1) != nullptr && GameState(1)->GetMapIndex() == 0; });
+	WaitUntil(TEXT("the joiner seeing the picks"), 3.0f, []() { return GameState(1) != nullptr && GameState(1)->GetMapIndex() == 0 && GameState(1)->GetBotSkill() == 2; });
 	Then([]() { World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->AskToStart(true); });
 	WaitUntil(TEXT("everyone on the Creamery with the match on"), 90.0f, []()
 	{
@@ -172,15 +176,17 @@ bool FTheHostPicksTheMap::RunTest(const FString& Parameters)
 	});
 	Then([this]()
 	{
+		// Everyone has a controller, alive or waiting to come back: the bots fight from the first moment.
 		int32 Characters = 0;
-		for (TActorIterator<ACheeseStrikeCharacter> It(World(0)); It; ++It)
+		for (TActorIterator<AController> It(World(0)); It; ++It)
 		{
-			++Characters;
+			Characters += It->GetPlayerState<APlayerState>() != nullptr ? 1 : 0;
 		}
 		TestEqual(TEXT("both players and the bots that fill in, sixteen in all"), Characters, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize);
 		TestTrue(TEXT("the bots are the ones the lobby showed"), GameState(0)->GetBotNames() == LobbyBots);
 		TestEqual(TEXT("with the rules the lobby had"), GameState(0)->GetKillLimit(), 5);
 		TestEqual(TEXT("and the map is still the Creamery for the next match"), World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->GetMapIndex(), 0);
+		TestEqual(TEXT("the bots are as hard as the lobby had them"), World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->GetBotSkill(), 2);
 	});
 	StopPlaying();
 	return true;
