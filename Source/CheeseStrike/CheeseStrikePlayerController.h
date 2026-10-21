@@ -45,6 +45,16 @@ public:
 	 * until the match starts.
 	 */
 	EMenuPage GetMenuPage() const { return ShownPage; }
+	/** Whether this player has been told to follow the server to another level (and is waiting to): the lobby says where to. */
+	bool IsLeaving() const { return bLeaving; }
+	/**
+	 * Whether what this player sees is ready to be shown: a page of the menu
+	 * over the level, or the match through their character. Right after a
+	 * level loads it isn't (a joiner has no controller or character for a
+	 * moment, and the engine's view from the world's origin shows), and the
+	 * loading cover stays up (UCheeseStrikeCurtainSubsystem).
+	 */
+	bool IsViewReady() const;
 	/** Picks a page of the front end (main, find). */
 	void ChooseMenu(EMenuPage Page);
 	/** Hosts a match with the usual rules on the first map, through the online service, or the local network without Steam: straight into its lobby. */
@@ -72,6 +82,9 @@ public:
 	/** From the console or a play script: the host starts the match (at once with any argument). */
 	UFUNCTION(Exec)
 	void CheeseStrikeStart(const FString& AtOnce = TEXT(""));
+	/** From the console or a play script: the host calls off the countdown. */
+	UFUNCTION(Exec)
+	void CheeseStrikeCancel();
 	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find or Credits). */
 	UFUNCTION(Exec)
 	void CheeseStrikePage(const FString& Page);
@@ -105,6 +118,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel) override;
 
 	void ScoreboardStarted();
 	void ScoreboardEnded();
@@ -127,7 +141,7 @@ protected:
 	EMenuPage ShownPage = EMenuPage::None;
 	EMenuPage ChosenPage = EMenuPage::Main;
 	bool bPaused = false;
-	float SinceMenuRefresh = 0.0f;
+	bool bLeaving = false;
 	bool bScoreboardHeld = false;
 	bool bStartAtTaken = false;
 };

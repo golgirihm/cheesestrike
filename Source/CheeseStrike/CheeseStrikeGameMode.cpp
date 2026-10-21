@@ -132,10 +132,8 @@ void ACheeseStrikeGameMode::CountdownOver()
 		Url.AddOption(*Option);
 	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("To %s: %s"), CheeseStrikeRules::Maps[MapIndex].Name, *Url.ToString());
-	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
-	{
-		State->SetCountdownEndsAt(0.0f);
-	}
+	// The countdown is left at its end, not cleared: the lobby says "Starting" until the travel takes over, rather than
+	// offering Start the Match again for the moment before it does.
 	GetWorld()->ServerTravel(TravelTo(Url), GetTravelType());
 }
 

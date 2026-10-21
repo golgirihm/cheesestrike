@@ -50,6 +50,23 @@ namespace CheeseStrikeMenu
 		}
 		return Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits ? Chosen : EMenuPage::Main;
 	}
+
+	ELobbyStatus LobbyStatus(bool bHaveMatch, bool bTravelling, bool bCounting, float SecondsLeft, bool bHost)
+	{
+		if (bTravelling)
+		{
+			return ELobbyStatus::Travelling;
+		}
+		if (!bHaveMatch)
+		{
+			return ELobbyStatus::Joining;
+		}
+		if (bCounting)
+		{
+			return SecondsLeft <= 0.0f ? ELobbyStatus::Starting : ELobbyStatus::Counting;
+		}
+		return bHost ? ELobbyStatus::CanStart : ELobbyStatus::Waiting;
+	}
 }
 
 namespace
@@ -178,6 +195,8 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 void SCheeseStrikeMenu::Show(EMenuPage InPage)
 {
 	Page = InPage;
+	ShownLobbyKey.Reset();
+	ShownPageKey.Reset();
 	Refresh();
 }
 
@@ -207,7 +226,7 @@ void SCheeseStrikeMenu::Refresh()
 	{
 		// Drawn again only when something in it has changed: rebuilding it restarts the spinner.
 		const FString Key = LobbyKey();
-		if (Key != ShownLobbyKey || Key.IsEmpty())
+		if (Key != ShownLobbyKey)
 		{
 			ShownLobbyKey = Key;
 			LobbyContent->SetContent(MakeLobby());
@@ -215,8 +234,14 @@ void SCheeseStrikeMenu::Refresh()
 	}
 	else if (Content.IsValid())
 	{
+		// Likewise: a page built afresh has no size for a frame, and the panel, centred on it, would jump.
 		ShownLobbyKey.Reset();
-		Content->SetContent(MakePage());
+		const FString Key = PageKey();
+		if (Key != ShownPageKey)
+		{
+			ShownPageKey = Key;
+			Content->SetContent(MakePage());
+		}
 	}
 }
 
@@ -530,12 +555,13 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 FString SCheeseStrikeMenu::LobbyKey() const
 {
 	const ACheeseStrikeGameState* Match = Controller.IsValid() && Controller->GetWorld() != nullptr ? Controller->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-	if (Match == nullptr)
+	const CheeseStrikeMenu::ELobbyStatus Status = LobbyStatusNow();
+	if (Match == nullptr || Status == CheeseStrikeMenu::ELobbyStatus::Joining)
 	{
-		return FString();
+		return FString::Printf(TEXT("status %d"), static_cast<int32>(Status));
 	}
-	FString Key = FString::Printf(TEXT("%d %.1f %d %d %d %d %d %d %s|"), Match->GetKillLimit(), Match->GetRespawnDelay(), Match->GetMapIndex(), Match->GetBotSkill(), Match->GetBotsWanted(),
-		Match->IsCountingDown() ? 1 : 0, Match->GetMatchState() == MatchState::LeavingMap ? 1 : 0, Controller->HasAuthority() ? 1 : 0, *Match->GetHostName());
+	FString Key = FString::Printf(TEXT("%d %.1f %d %d %d %d %d %s|"), Match->GetKillLimit(), Match->GetRespawnDelay(), Match->GetMapIndex(), Match->GetBotSkill(), Match->GetBotsWanted(),
+		static_cast<int32>(Status), Controller->HasAuthority() ? 1 : 0, *Match->GetHostName());
 	for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
 	{
 		for (const CheeseStrikeRules::FRosterEntry& Entry : Match->TeamColumn(Team))
@@ -546,13 +572,55 @@ FString SCheeseStrikeMenu::LobbyKey() const
 	return Key;
 }
 
+FString SCheeseStrikeMenu::PageKey() const
+{
+	FString Key = FString::FromInt(static_cast<int32>(Page));
+	if (Page == EMenuPage::Find)
+	{
+		const UCheeseStrikeSessionSubsystem* Sessions = Controller.IsValid() && Controller->GetGameInstance() != nullptr ? Controller->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+		if (Sessions != nullptr)
+		{
+			Key += TEXT("|") + Sessions->GetStatus();
+			for (const FString& Found : Sessions->GetFound())
+			{
+				Key += TEXT("|") + Found;
+			}
+		}
+	}
+	return Key;
+}
+
+bool SCheeseStrikeMenu::HaveMatch() const
+{
+	const ACheeseStrikePlayerController* Player = Controller.Get();
+	const ACheeseStrikeGameState* Match = Player != nullptr && Player->GetWorld() != nullptr ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	if (Match == nullptr)
+	{
+		return false;
+	}
+	if (Player->HasAuthority())
+	{
+		return true;
+	}
+	// A joiner has the host's match once it has come with the host in it and the joiner too: a lobby drawn before then
+	// would be a guess (every seat a bot, nobody crowned).
+	return Player->PlayerState != nullptr && Match->PlayerArray.Contains(Player->PlayerState) && Match->PlayerArray.Num() >= 2 && !Match->GetHostName().IsEmpty() && Match->GetBotNames().Num() > 0;
+}
+
+CheeseStrikeMenu::ELobbyStatus SCheeseStrikeMenu::LobbyStatusNow() const
+{
+	const ACheeseStrikePlayerController* Player = Controller.Get();
+	const ACheeseStrikeGameState* Match = Player != nullptr && Player->GetWorld() != nullptr ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const bool bTravelling = (Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap) || (Player != nullptr && Player->IsLeaving());
+	return CheeseStrikeMenu::LobbyStatus(HaveMatch(), bTravelling, Match != nullptr && Match->IsCountingDown(), Match != nullptr ? Match->SecondsToStart() : 0.0f, Player != nullptr && Player->HasAuthority());
+}
+
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 {
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 	const ACheeseStrikeGameState* Match = Player.IsValid() && Player->GetWorld() != nullptr ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
 	const bool bHost = Player.IsValid() && Player->HasAuthority();
-	const bool bCounting = Match != nullptr && Match->IsCountingDown();
-	const bool bTravelling = Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap;
+	const CheeseStrikeMenu::ELobbyStatus Status = LobbyStatusNow();
 	// The seconds count down by themselves, so that the lobby is drawn again only when something in it changes and the spinner turns on unbroken.
 	TWeakObjectPtr<const ACheeseStrikeGameState> Watched = Match;
 	const auto Seconds = [Watched]() { return FText::FromString(Watched.IsValid() ? FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Watched->SecondsToStart())) : FString()); };
@@ -561,10 +629,24 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 	TSharedRef<SHorizontalBox> Bottom = SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ]
 		+ SHorizontalBox::Slot().FillWidth(1.0f) [ SNew(SSpacer) ];
-	if (bTravelling)
+	const auto Saying = [this, &Spinner](const FString& Text)
 	{
-		const int32 MapIndex = Match->GetMapIndex();
-		const bool bToTheMatch = Match->GetWinnerName().IsEmpty() && MapIndex >= 0 && MapIndex < CheeseStrikeRules::NumMaps();
+		return SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Spinner() ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f)) [ MakeLine(Text) ];
+	};
+	if (Status == CheeseStrikeMenu::ELobbyStatus::Joining)
+	{
+		// Nothing of the match yet: no seats or rules to guess at.
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ Saying(TEXT("Joining the match")) ];
+		return SNew(SVerticalBox)
+			+ SVerticalBox::Slot().FillHeight(1.0f) [ MakeTitle(TEXT("LOBBY")) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ Bottom ];
+	}
+	if (Status == CheeseStrikeMenu::ELobbyStatus::Travelling)
+	{
+		const int32 MapIndex = Match != nullptr ? Match->GetMapIndex() : INDEX_NONE;
+		const bool bToTheMatch = Match != nullptr && Match->GetWinnerName().IsEmpty() && MapIndex >= 0 && MapIndex < CheeseStrikeRules::NumMaps();
 		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center)
 		[
 			SNew(SHorizontalBox)
@@ -575,18 +657,22 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 			]
 		];
 	}
-	else if (bHost && bCounting)
+	else if (Status == CheeseStrikeMenu::ELobbyStatus::Starting)
+	{
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ Saying(TEXT("Starting")) ];
+	}
+	else if (bHost && Status == CheeseStrikeMenu::ELobbyStatus::Counting)
 	{
 		TSharedRef<SHorizontalBox> Inside = SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Spinner() ]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(10.0f, 0.0f, 0.0f, 0.0f)) [ SNew(STextBlock).Text_Lambda(Seconds).Font(Font(18, FName("Bold"))) ];
 		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("CANCEL"), [Player]() { if (Player.IsValid()) Player->CancelStartFromMenu(); }, EButtonKind::Danger, Inside) ];
 	}
-	else if (bHost)
+	else if (Status == CheeseStrikeMenu::ELobbyStatus::CanStart)
 	{
 		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("START THE MATCH"), [Player]() { if (Player.IsValid()) Player->StartMatchFromMenu(); }, EButtonKind::Primary) ];
 	}
-	else if (bCounting)
+	else if (Status == CheeseStrikeMenu::ELobbyStatus::Counting)
 	{
 		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center)
 		[

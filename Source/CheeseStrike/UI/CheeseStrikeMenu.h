@@ -37,8 +37,29 @@ namespace CheeseStrikeMenu
 	 */
 	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling = false);
 
-	/** How often a page that shows changing things (the lobby, the matches found) is redrawn, in seconds. */
-	constexpr float RefreshEvery = 0.5f;
+	/** What the bottom of the lobby says, right of Leave. */
+	enum class ELobbyStatus : uint8
+	{
+		/** A joiner who hasn't got the host's match yet: "Joining the match", no seats. */
+		Joining,
+		/** Going to another level, the match's map or back to the lobby: "Going to ...". */
+		Travelling,
+		/** The countdown is over and the match about to begin: "Starting", nothing to press. */
+		Starting,
+		/** Counting down: the host's red Cancel with the seconds, or "Starting in N". */
+		Counting,
+		/** The host's blue Start the Match. */
+		CanStart,
+		/** A joiner's "Waiting for the host to start". */
+		Waiting,
+	};
+	/**
+	 * What the lobby's bottom says: `bHaveMatch` once the local player has
+	 * the host's match (its state, the host and themself, for a joiner),
+	 * `bTravelling` once the match is leaving the level, and while counting
+	 * down, the seconds left.
+	 */
+	ELobbyStatus LobbyStatus(bool bHaveMatch, bool bTravelling, bool bCounting, float SecondsLeft, bool bHost);
 	/** Corners, in Slate units. */
 	constexpr float Rounding = 6.0f;
 	/** The lobby's picture of the map, wide (16:9), and its rules' column as wide. */
@@ -65,7 +86,7 @@ public:
 
 	/** Shows `Page`, drawn afresh. */
 	void Show(EMenuPage Page);
-	/** Draws the page again, for what has changed. */
+	/** Draws the page again if what it shows has changed; cheap otherwise, so run every frame. */
 	void Refresh();
 	EMenuPage GetPage() const { return Page; }
 
@@ -96,6 +117,12 @@ private:
 	TSharedRef<SWidget> MakeMapPicture(int32 MapIndex);
 	/** Everything the lobby shows but the seconds, as text: when it changes, the lobby is drawn again. */
 	FString LobbyKey() const;
+	/** The same for the other pages: the page, and on the Find page what was found. */
+	FString PageKey() const;
+	/** Whether the local player has the host's match yet: its state, with the host and themself in it. */
+	bool HaveMatch() const;
+	/** What the lobby's bottom says now (CheeseStrikeMenu::LobbyStatus). */
+	CheeseStrikeMenu::ELobbyStatus LobbyStatusNow() const;
 	const FButtonStyle& ButtonStyle(EButtonKind Kind) const;
 
 	TWeakObjectPtr<ACheeseStrikePlayerController> Controller;
@@ -107,4 +134,5 @@ private:
 	TSharedPtr<SBox> LobbyContent;
 	EMenuPage Page = EMenuPage::None;
 	FString ShownLobbyKey;
+	FString ShownPageKey;
 };

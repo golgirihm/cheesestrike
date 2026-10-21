@@ -313,7 +313,8 @@ void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw, floa
 		Player->SetViewTarget(this);
 		return;
 	}
-	const FVector Middle = GetActorLocation() + FVector(0.0f, 0.0f, Height);
+	// Once dead, the body lies where it fell, not where the character stood: the view is round its head.
+	const FVector Middle = (bDeathShown ? GetMesh()->GetBoneLocation(TEXT("head")) : GetActorLocation()) + FVector(0.0f, 0.0f, Height);
 	const FVector Way = FRotator(0.0f, GetActorRotation().Yaw + Yaw, 0.0f).Vector();
 	const FVector At = Middle + Way * Distance + FVector(0.0f, 0.0f, 20.0f);
 	FActorSpawnParameters Parameters;

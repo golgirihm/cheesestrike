@@ -182,6 +182,22 @@ bool FTheMenuFollowsTheMatch::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheLobbySaysWhereItStands, "CheeseStrike.Rules.TheLobbySaysWhereItStands", RulesTests::Flags)
+
+bool FTheLobbySaysWhereItStands::RunTest(const FString& Parameters)
+{
+	using CheeseStrikeMenu::ELobbyStatus;
+	using CheeseStrikeMenu::LobbyStatus;
+	TestTrue(TEXT("a joiner without the host's match yet is joining, and guesses at nothing"), LobbyStatus(false, false, false, 0.0f, false) == ELobbyStatus::Joining);
+	TestTrue(TEXT("with it, waits for the host"), LobbyStatus(true, false, false, 0.0f, false) == ELobbyStatus::Waiting);
+	TestTrue(TEXT("whom the host can start"), LobbyStatus(true, false, false, 0.0f, true) == ELobbyStatus::CanStart);
+	TestTrue(TEXT("counting down, the seconds"), LobbyStatus(true, false, true, 3.2f, false) == ELobbyStatus::Counting && LobbyStatus(true, false, true, 3.2f, true) == ELobbyStatus::Counting);
+	TestTrue(TEXT("at 0, starting, not \"Starting in 0\" nor Start again"), LobbyStatus(true, false, true, 0.0f, false) == ELobbyStatus::Starting && LobbyStatus(true, false, true, 0.0f, true) == ELobbyStatus::Starting);
+	TestTrue(TEXT("called off, back to waiting at once"), LobbyStatus(true, false, false, 0.0f, false) == ELobbyStatus::Waiting);
+	TestTrue(TEXT("leaving the level, going there, whatever else"), LobbyStatus(true, true, true, 0.0f, true) == ELobbyStatus::Travelling && LobbyStatus(false, true, false, 0.0f, false) == ELobbyStatus::Travelling);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMatchHasItsOwnState, "CheeseStrike.Rules.TheMatchHasItsOwnState", RulesTests::Flags)
 
 bool FTheMatchHasItsOwnState::RunTest(const FString& Parameters)
