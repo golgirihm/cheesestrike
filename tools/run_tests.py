@@ -21,6 +21,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import zlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PROJECT = ROOT / "CheeseStrike.uproject"
@@ -36,6 +37,13 @@ def engine():
     return pathlib.Path(rf"C:\Program Files\Epic Games\UE_{version}")
 
 
+def checkout_id():
+    """A number of this working copy's own (tools/worktree.py makes others), given to the game as its build id, so that
+    a match its tests offer on the local network is never found by another copy's tests running at the same time: the
+    online service lists only matches of the same build id."""
+    return 100000 + zlib.crc32(str(ROOT).lower().encode()) % 900000
+
+
 def build(root):
     command = [str(root / "Engine" / "Build" / "BatchFiles" / "Build.bat"), TARGET, "Win64", "Development",
                f"-Project={PROJECT}", "-WaitMutex", "-NoHotReload"]
@@ -47,7 +55,8 @@ def run_tests(root, name):
     LOG.parent.mkdir(parents=True, exist_ok=True)
     command = [str(root / "Engine" / "Binaries" / "Win64" / "UnrealEditor-Cmd.exe"), str(PROJECT),
                f"-ExecCmds=Automation RunTests {name}", "-TestExit=Automation Test Queue Empty",
-               "-unattended", "-nullrhi", "-nosplash", "-nosound", "-stdout", "-FullStdOutLogOutput", f"-abslog={LOG}"]
+               "-unattended", "-nullrhi", "-nosplash", "-nosound", "-stdout", "-FullStdOutLogOutput", f"-abslog={LOG}",
+               f"-BuildIdOverride={checkout_id()}"]
     print("+", " ".join(command), flush=True)
     process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     results = []
