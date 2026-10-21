@@ -16,6 +16,8 @@
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "Weapons/CheeseStrikeArsenal.h"
+#include "Weapons/CheeseStrikeInventory.h"
 #include "Map/CheeseStrikeCheese.h"
 #include "Map/CheeseStrikeMouse.h"
 #include "NavigationSystem.h"
@@ -446,10 +448,13 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 	const CheeseStrikeModes::FModeInfo& Rules = CheeseStrikeModes::Info(Mode);
 	ACheeseStrikePlayerState* KillerState = By != nullptr ? By : (Killer != nullptr ? Killer->GetPlayerState<ACheeseStrikePlayerState>() : nullptr);
 	ACheeseStrikePlayerState* VictimState = Victim->GetPlayerState<ACheeseStrikePlayerState>();
+	// What made the kill, a hand's: the weapon in the killer's hand as its shot or stroke landed.
+	const ACheeseStrikeWeapon* KillWeapon = Killer != nullptr && How.IsEmpty() ? Killer->GetWeapon() : nullptr;
+	const bool bKnifed = KillWeapon != nullptr && KillWeapon->GetStats().IsMelee();
 	if (KillerState != nullptr && KillerState != VictimState)
 	{
-		// A weapon's kill counts toward the next streak; a streak's doesn't.
-		const CheeseStrikeStreaks::EStreak Earned = KillerState->AddKill(How.IsEmpty());
+		// A hand's kill counts toward the next streak, where the mode has streaks; a streak's doesn't.
+		const CheeseStrikeStreaks::EStreak Earned = KillerState->AddKill(Rules.bStreaks && !CheeseStrikeStreaks::IsStreakName(How));
 		if (Earned != CheeseStrikeStreaks::EStreak::None)
 		{
 			UE_LOG(LogCheeseStrike, Display, TEXT("Streak: %s has %d in a row and earns %s %s"), *KillerState->GetPlayerName(), KillerState->GetStreak(), CheeseStrikeStreaks::Info(Earned).Article, CheeseStrikeStreaks::Info(Earned).Name);
@@ -499,6 +504,33 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 		}
 		break;
 	}
+	case CheeseStrikeModes::EWinBy::Ladder:
+		if (KillerState != nullptr && KillerState != VictimState)
+		{
+			const int32 Steps = CheeseStrikeArsenal::GunGameLadder().Num();
+			const CheeseStrikeModes::FGunGameKill Step = CheeseStrikeModes::GunGameKill(KillerState->GetGunLevel(), bKnifed, Steps);
+			if (Step.bWins)
+			{
+				State->SetWinnerName(KillerState->GetPlayerName());
+				UE_LOG(LogCheeseStrike, Display, TEXT("Match over: %s wins Gun Game with the %s"), *KillerState->GetPlayerName(), *ACheeseStrikeGameState::GunGameWeaponName(KillerState->GetGunLevel()));
+				EndMatch();
+				return;
+			}
+			KillerState->SetGunLevel(Step.KillerLevel);
+			UE_LOG(LogCheeseStrike, Display, TEXT("Gun Game: %s up to the %s, %d of %d"), *KillerState->GetPlayerName(), *ACheeseStrikeGameState::GunGameWeaponName(Step.KillerLevel), Step.KillerLevel + 1, Steps);
+			if (Step.bVictimDemoted && VictimState != nullptr)
+			{
+				VictimState->SetGunLevel(FMath::Max(0, VictimState->GetGunLevel() - 1));
+				State->Announce(FString::Printf(TEXT("%s knifed %s, who drops to the %s"), *KillerState->GetPlayerName(), *VictimState->GetPlayerName(), *ACheeseStrikeGameState::GunGameWeaponName(VictimState->GetGunLevel())), CheeseStrikeStreaks::EStreak::None, CheeseStrikeModes::NoTeam, KillerState->GetPlayerName());
+			}
+			if (Step.KillerLevel == Steps - 1)
+			{
+				State->Announce(FString::Printf(TEXT("%s has the knife: one kill from winning"), *KillerState->GetPlayerName()), CheeseStrikeStreaks::EStreak::None, CheeseStrikeModes::NoTeam, KillerState->GetPlayerName());
+			}
+			// The next weapon in hand at once, once the shot that earned it is done with the one it came from.
+			GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(this, &ACheeseStrikeGameMode::ArmForGunGame, TWeakObjectPtr<ACheeseStrikeCharacter>(KillerState->GetPawn<ACheeseStrikeCharacter>())));
+		}
+		break;
 	case CheeseStrikeModes::EWinBy::Rounds:
 		// One life a round: out until the next.
 		if (VictimState != nullptr)
@@ -541,12 +573,62 @@ bool ACheeseStrikeGameMode::CanHurt(const ACheeseStrikePlayerState* Attacker, co
 
 void ACheeseStrikeGameMode::SetMode(CheeseStrikeModes::EMode InMode)
 {
+	// A mode played to kills starts from its own limit (more for teams than for one player).
+	const int32 Usual = CheeseStrikeModes::Info(InMode).DefaultKillLimit;
+	if (InMode != Mode && Usual > 0)
+	{
+		KillLimit = Usual;
+	}
 	Mode = InMode;
 	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 	{
 		State->SetMode(Mode);
+		State->SetLimits(KillLimit, RespawnDelay);
 	}
-	UE_LOG(LogCheeseStrike, Display, TEXT("Mode: %s"), CheeseStrikeModes::Info(Mode).Name);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Mode: %s, %s"), CheeseStrikeModes::Info(Mode).Name, *CheeseStrikeModes::Goal(Mode, KillLimit, RoundLimit));
+}
+
+void ACheeseStrikeGameMode::SetRoundLimit(int32 Rounds)
+{
+	RoundLimit = FMath::Clamp(Rounds, 1, 15);
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetRoundLimit(RoundLimit);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Rounds: first to win %d"), RoundLimit);
+}
+
+void ACheeseStrikeGameMode::Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By)
+{
+	// Down is not out: the round goes on until they are finished or bleed out.
+	CheckRound(false);
+}
+
+void ACheeseStrikeGameMode::SetPlayerDefaults(APawn* PlayerPawn)
+{
+	Super::SetPlayerDefaults(PlayerPawn);
+	if (CheeseStrikeModes::Info(Mode).WinBy == CheeseStrikeModes::EWinBy::Ladder)
+	{
+		ArmForGunGame(Cast<ACheeseStrikeCharacter>(PlayerPawn));
+	}
+}
+
+void ACheeseStrikeGameMode::ArmForGunGame(TWeakObjectPtr<ACheeseStrikeCharacter> Body)
+{
+	ACheeseStrikeCharacter* Character = Body.Get();
+	const ACheeseStrikePlayerState* Player = Character != nullptr ? Character->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+	UCheeseStrikeInventory* Inventory = Character != nullptr ? Character->GetInventory() : nullptr;
+	if (Player == nullptr || Inventory == nullptr || !Character->IsAlive())
+	{
+		return;
+	}
+	const int32 Steps = CheeseStrikeArsenal::GunGameLadder().Num();
+	FCheeseStrikeLoadout Loadout = FCheeseStrikeLoadout::Only(CheeseStrikeArsenal::GunGameWeapon(Player->GetGunLevel()));
+	if (CheeseStrikeModes::GunGameKeepsKnife(Player->GetGunLevel(), Steps))
+	{
+		Loadout.Knife = CheeseStrikeArsenal::Knife();
+	}
+	Inventory->Give(Loadout);
 }
 
 bool ACheeseStrikeGameMode::PlayerCanRestart_Implementation(APlayerController* Player)
@@ -654,10 +736,12 @@ void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 		CheeseStrikeModes::FSide& Side = Sides[Player->GetTeam()];
 		++Side.Members;
 		const ACheeseStrikeCharacter* Body = Player->GetPawn<ACheeseStrikeCharacter>();
+		// Still in: alive, down or not (someone down fights on with the sidearm until finished or bled out); their health
+		// counts only standing, for the time's tie rule.
 		if (!Player->IsOut() && Body != nullptr && Body->IsAlive())
 		{
 			++Side.Alive;
-			Side.Health += Body->GetHealth();
+			Side.Health += Body->IsDowned() ? 0.0f : Body->GetHealth();
 		}
 	}
 	int32 Winner = CheeseStrikeModes::NoTeam;

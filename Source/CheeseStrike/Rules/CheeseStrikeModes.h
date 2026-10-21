@@ -23,8 +23,12 @@ namespace CheeseStrikeModes
 		Deathmatch,
 		/** Two teams, one life a round; a round is won by the side left standing, the match by the first to the round limit. */
 		Elimination,
+		/** Elimination with a last stand: a player hurt enough goes down with only the sidearm, to be finished by an enemy up close or revived by a teammate. */
+		Execution,
+		/** Everyone for themself, each kill a step up a ladder of weapons; the first to a kill with the last, the knife, wins. */
+		GunGame,
 	};
-	constexpr int32 NumModes = 3;
+	constexpr int32 NumModes = 5;
 
 	/** How a mode is won. */
 	enum class EWinBy : uint8
@@ -35,6 +39,8 @@ namespace CheeseStrikeModes
 		TeamKills,
 		/** A team wins the round limit's rounds. */
 		Rounds,
+		/** A player makes a kill with the last weapon of Gun Game's ladder. */
+		Ladder,
 	};
 
 	struct FModeInfo
@@ -51,8 +57,12 @@ namespace CheeseStrikeModes
 		EWinBy WinBy;
 		/** Whether the killed come back during play; in Elimination they are out until the next round. */
 		bool bRespawns;
-		/** The kill limit a host who names none plays to. */
+		/** The kill limit a host who names none plays to; 0 for a mode that has none. */
 		int32 DefaultKillLimit;
+		/** Whether a player hurt enough goes down into a last stand rather than dying (Execution). */
+		bool bLastStand;
+		/** Whether kills in a row earn streaks (not in Gun Game, which is about the weapons). */
+		bool bStreaks;
 	};
 	extern const FModeInfo Modes[NumModes];
 	const FModeInfo& Info(EMode Mode);
@@ -132,6 +142,68 @@ namespace CheeseStrikeModes
 	 * there are free ones. -1 with no spots.
 	 */
 	int32 ChooseStart(TArrayView<const FVector> Spots, TArrayView<const FVector> Enemies, TArrayView<const FVector> Others, float Room);
+
+	// Execution's last stand.
+
+	/** Seconds a player down can last before bleeding out, as the kill of whoever put them down. */
+	constexpr float LastStandTime = 30.0f;
+	/** How near an enemy must be to finish a player down, by a shot or by Interact (cm): no further, from any weapon or streak, does them any harm. */
+	constexpr float FinishRange = 250.0f;
+	/** How near Interact reaches a player down (cm), and the seconds it is held to finish an enemy or revive a teammate. */
+	constexpr float InteractRange = 220.0f;
+	constexpr float ExecuteTime = 1.0f;
+	constexpr float ReviveTime = 3.0f;
+	/** The health a revived player gets up with. */
+	constexpr float ReviveHealth = 50.0f;
+
+	/** What a hit does to a player in a mode with a last stand. */
+	enum class ELastStandHit : uint8
+	{
+		/** The usual: health off, and death at none. */
+		Hurt,
+		/** It would kill, but they go down instead. */
+		Down,
+		/** They are down, and it does nothing. */
+		Absorbed,
+		/** They are down, and an enemy up close finishes them. */
+		Finish,
+	};
+	/**
+	 * What a hit of `Damage` does to a player with `Health` left: down
+	 * (`bDowned`), only an enemy within FinishRange (`bEnemyClose`) can
+	 * harm them, and that finishes them; standing, a hit that would kill
+	 * puts them down instead, once a life (`bLastStandUsed`). Outside a
+	 * mode with a last stand (`bLastStand`), every hit hurts.
+	 */
+	ELastStandHit LastStandHit(bool bLastStand, bool bDowned, bool bLastStandUsed, float Health, float Damage, bool bEnemyClose);
+
+	/** What Interact does to a player down: a teammate's revives them, an enemy's finishes them; nothing to anyone else, out of reach, or standing. */
+	enum class EInteract : uint8
+	{
+		None,
+		Revive,
+		Execute,
+	};
+	EInteract InteractWith(bool bTargetDowned, bool bSameSide, float Distance);
+	/** Seconds Interact is held for `Kind`. */
+	float InteractTime(EInteract Kind);
+
+	// Gun Game.
+
+	/** What a kill does in Gun Game. */
+	struct FGunGameKill
+	{
+		/** The killer's step on the ladder after it. */
+		int32 KillerLevel = 0;
+		/** Whether the killed drops a step (a kill by the knife before its own step: humiliation, as in Counter-Strike). */
+		bool bVictimDemoted = false;
+		/** Whether it wins the match: a kill on the last step. */
+		bool bWins = false;
+	};
+	/** A kill by a player on step `KillerLevel` of a ladder `Steps` long, `bWithKnife` or not. */
+	FGunGameKill GunGameKill(int32 KillerLevel, bool bWithKnife, int32 Steps);
+	/** What a Gun Game player on step `Level` carries besides its step's weapon: the knife, until the knife is the step. */
+	bool GunGameKeepsKnife(int32 Level, int32 Steps);
 
 	/** The teams' colours (the Godot game's, from Okabe and Ito's palette): The Gouda Guys a red orange, Mozza Radicals a blue; a light grey for no team. */
 	FLinearColor TeamColour(int32 Team);

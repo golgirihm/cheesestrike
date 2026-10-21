@@ -359,6 +359,36 @@ void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float Resp
 	}
 }
 
+void ACheeseStrikePlayerController::SetModeFromMenu(int32 ModeIndex)
+{
+	ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
+	if (Mode == nullptr)
+	{
+		return;
+	}
+	Mode->SetMode(CheeseStrikeModes::ModeAt(ModeIndex));
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	{
+		Sessions->UpdateRules(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?Map=%d?Mode=%s"), Mode->GetKillLimit(), Mode->GetRespawnDelay(), Mode->GetMapIndex(), CheeseStrikeModes::Info(Mode->GetMode()).Key));
+	}
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
+	}
+}
+
+void ACheeseStrikePlayerController::SetRoundsFromMenu(int32 Rounds)
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->SetRoundLimit(Rounds);
+	}
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
+	}
+}
+
 void ACheeseStrikePlayerController::SetBotsFromMenu(int32 Wanted)
 {
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)

@@ -38,6 +38,11 @@ public:
 	void AddDeath();
 	void SetTeam(int32 InTeam) { Team = InTeam; }
 
+	/** In Gun Game, the step of the ladder this player is on (CheeseStrikeArsenal::GunGameLadder), 0 the first. */
+	int32 GetGunLevel() const { return GunLevel; }
+	/** Server only. */
+	void SetGunLevel(int32 Level) { GunLevel = Level; }
+
 	/** This player's line on the scoreboard. */
 	CheeseStrikeRules::FStanding Standing() const;
 
@@ -97,6 +102,8 @@ protected:
 	int32 Deaths = 0;
 	UPROPERTY(Replicated)
 	int32 Team = 0;
+	UPROPERTY(Replicated)
+	int32 GunLevel = 0;
 	UPROPERTY(Replicated)
 	int32 StreakKills = 0;
 	/** The streaks waiting (CheeseStrikeStreaks::EStreak), oldest first. */

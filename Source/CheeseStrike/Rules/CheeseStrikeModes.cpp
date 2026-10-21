@@ -3,13 +3,16 @@
 #include "CheeseStrikeModes.h"
 #include "Kismet/GameplayStatics.h"
 #include "CheeseStrikeRules.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 
 namespace CheeseStrikeModes
 {
 	const FModeInfo Modes[NumModes] = {
-		{EMode::FreeForAll, TEXT("Free-for-all"), TEXT("FreeForAll"), TEXT("Everyone for themself: the first to the kill limit wins."), false, EWinBy::PlayerKills, true, CheeseStrikeRules::KillLimit},
-		{EMode::Deathmatch, TEXT("Deathmatch"), TEXT("Deathmatch"), TEXT("Two teams: the first team to the kill limit wins."), true, EWinBy::TeamKills, true, 50},
-		{EMode::Elimination, TEXT("Elimination"), TEXT("Elimination"), TEXT("Two teams, one life a round: the side left standing takes the round."), true, EWinBy::Rounds, false, CheeseStrikeRules::KillLimit},
+		{EMode::FreeForAll, TEXT("Free-for-all"), TEXT("FreeForAll"), TEXT("Everyone for themself: the first to the kill limit wins."), false, EWinBy::PlayerKills, true, CheeseStrikeRules::KillLimit, false, true},
+		{EMode::Deathmatch, TEXT("Deathmatch"), TEXT("Deathmatch"), TEXT("Two teams: the first team to the kill limit wins."), true, EWinBy::TeamKills, true, 50, false, true},
+		{EMode::Elimination, TEXT("Elimination"), TEXT("Elimination"), TEXT("Two teams, one life a round: the side left standing takes the round."), true, EWinBy::Rounds, false, 0, false, true},
+		{EMode::Execution, TEXT("Execution"), TEXT("Execution"), TEXT("Two teams, one life a round; hurt enough, you go down with your pistol, to be finished up close or revived."), true, EWinBy::Rounds, false, 0, true, true},
+		{EMode::GunGame, TEXT("Gun Game"), TEXT("GunGame"), TEXT("Everyone for themself: each kill moves you to the next weapon; a kill with the last, the knife, wins."), false, EWinBy::Ladder, true, 0, false, false},
 	};
 
 	const FModeInfo& Info(EMode Mode)
@@ -41,7 +44,8 @@ namespace CheeseStrikeModes
 
 	int32 KillLimitFor(EMode Mode, const FString& Options)
 	{
-		const float Asked = CheeseStrikeRules::Option(Options, TEXT("KillLimit"), static_cast<float>(Info(Mode).DefaultKillLimit));
+		const int32 Usual = Info(Mode).DefaultKillLimit > 0 ? Info(Mode).DefaultKillLimit : CheeseStrikeRules::KillLimit;
+		const float Asked = CheeseStrikeRules::Option(Options, TEXT("KillLimit"), static_cast<float>(Usual));
 		return FMath::Clamp(FMath::RoundToInt(Asked), 1, 1000);
 	}
 
@@ -186,6 +190,61 @@ namespace CheeseStrikeModes
 		return FreeIndex[CheeseStrikeRules::FurthestFrom(Free, Enemies)];
 	}
 
+	ELastStandHit LastStandHit(bool bLastStand, bool bDowned, bool bLastStandUsed, float Health, float Damage, bool bEnemyClose)
+	{
+		if (!bLastStand)
+		{
+			return ELastStandHit::Hurt;
+		}
+		if (bDowned)
+		{
+			return bEnemyClose ? ELastStandHit::Finish : ELastStandHit::Absorbed;
+		}
+		return Health - Damage <= 0.0f && !bLastStandUsed ? ELastStandHit::Down : ELastStandHit::Hurt;
+	}
+
+	EInteract InteractWith(bool bTargetDowned, bool bSameSide, float Distance)
+	{
+		if (!bTargetDowned || Distance > InteractRange)
+		{
+			return EInteract::None;
+		}
+		return bSameSide ? EInteract::Revive : EInteract::Execute;
+	}
+
+	float InteractTime(EInteract Kind)
+	{
+		switch (Kind)
+		{
+		case EInteract::Revive:
+			return ReviveTime;
+		case EInteract::Execute:
+			return ExecuteTime;
+		default:
+			return 0.0f;
+		}
+	}
+
+	FGunGameKill GunGameKill(int32 KillerLevel, bool bWithKnife, int32 Steps)
+	{
+		FGunGameKill Kill;
+		const int32 Last = FMath::Max(0, Steps - 1);
+		Kill.KillerLevel = FMath::Clamp(KillerLevel, 0, Last);
+		if (Kill.KillerLevel >= Last)
+		{
+			Kill.bWins = true;
+			return Kill;
+		}
+		Kill.KillerLevel = Kill.KillerLevel + 1;
+		Kill.bVictimDemoted = bWithKnife;
+		return Kill;
+	}
+
+	bool GunGameKeepsKnife(int32 Level, int32 Steps)
+	{
+		return Level < Steps - 1;
+	}
+
 	FLinearColor TeamColour(int32 Team)
 	{
 		switch (Team)
@@ -212,6 +271,8 @@ namespace CheeseStrikeModes
 			return FString::Printf(TEXT("first team to %d kills"), KillLimit);
 		case EWinBy::Rounds:
 			return FString::Printf(TEXT("first to win %d round%s"), Rounds, Rounds == 1 ? TEXT("") : TEXT("s"));
+		case EWinBy::Ladder:
+			return FString::Printf(TEXT("first through all %d weapons"), CheeseStrikeArsenal::GunGameLadder().Num());
 		default:
 			return FString::Printf(TEXT("first to %d kills"), KillLimit);
 		}

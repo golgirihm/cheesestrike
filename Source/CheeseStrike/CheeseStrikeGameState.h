@@ -155,9 +155,14 @@ public:
 	void AddTeamScore(int32 Team, int32 Points);
 	void SetWinningTeam(int32 Team) { WinningTeam = Team; }
 
+	/** In Gun Game, who is furthest up the ladder (most kills among equals); null with nobody. */
+	const ACheeseStrikePlayerState* GunGameLeader() const;
+	/** The name of the weapon of Gun Game's step `Level`. */
+	static FString GunGameWeaponName(int32 Level);
+
 	/** What the match plays to, in words ("first team to 50 kills"), for the scoreboard and the HUD. */
 	FString GoalText() const { return CheeseStrikeModes::Goal(GetMode(), KillLimit, RoundLimit); }
-	/** One line on how it stands, for the top of the HUD: the teams' scores in a team mode ("The Gouda Guys 12 · 9 Mozza Radicals"), with the round in Elimination; the leader's kills in free-for-all. */
+	/** One line on how it stands, for the top of the HUD: the teams' scores in a team mode ("The Gouda Guys 12 · 9 Mozza Radicals"), with the round in Elimination and Execution; the leader's kills in free-for-all; the leader's weapon in Gun Game ("Ash on the Roquefort Rifle, 6 of 8"). */
 	FString ScoreSummary() const;
 
 	// Elimination's rounds.

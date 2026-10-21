@@ -76,6 +76,14 @@ protected:
 	void Perceive();
 	/** Whether `Other` is on the other side (anyone else in free-for-all): a bot fights, hears and hunts only its enemies. */
 	bool IsEnemy(const ACheeseStrikeCharacter* Other) const;
+	/**
+	 * In Execution, with no enemy in sight: goes to someone down near it
+	 * and holds Interact over them, reviving a teammate or finishing an
+	 * enemy. True while it is doing so.
+	 */
+	bool ThinkAboutTheDown();
+	/** How far it goes to someone down (cm). */
+	static constexpr float TendRange = 2500.0f;
 	/** Calls in its next streak, as a player would: the drone and the Overload soon after earning them, the Cheese Strike on an enemy it has just seen. */
 	void ThinkAboutStreaks();
 	void ChooseWhereToGo();
@@ -130,4 +138,7 @@ protected:
 	float ChangedWeaponAt = -1000.0f;
 	/** When it began holding the streak it has ready; -1 with none. */
 	float StreakHeldSince = -1.0f;
+	/** Whether it is tending someone down, and holding Interact. */
+	bool bTending = false;
+	bool bInteracting = false;
 };

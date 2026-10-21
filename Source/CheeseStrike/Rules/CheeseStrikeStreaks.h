@@ -54,6 +54,9 @@ namespace CheeseStrikeStreaks
 	/** The next streak a run of `KillsInARow` is on its way to, or None past the last. */
 	EStreak NextAfter(int32 KillsInARow);
 
+	/** Whether `Name` is a streak's (a kill's How that names a streak doesn't run on the next). */
+	bool IsStreakName(const FString& Name);
+
 	/** What everyone is told: "Camem Bert called in a Cheese Strike". */
 	FString CalledIn(const FString& Who, EStreak Kind);
 

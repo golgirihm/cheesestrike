@@ -108,6 +108,8 @@ namespace CheeseStrikeMenu
 	constexpr float Rounding = 6.0f;
 	/** The lobby's picture of the map, wide (16:9), and its rules' column as wide. */
 	constexpr float MapPictureWidth = 600.0f;
+	/** How many columns a free-for-all's lobby lays its seats out in: as many seats to a column as a side has. */
+	constexpr int32 FreeForAllColumns = 2;
 }
 
 /**

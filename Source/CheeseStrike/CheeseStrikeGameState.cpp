@@ -3,6 +3,7 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 
 ACheeseStrikeGameState::ACheeseStrikeGameState()
 {
@@ -150,8 +151,33 @@ void ACheeseStrikeGameState::AddTeamScore(int32 Team, int32 Points)
 	}
 }
 
+const ACheeseStrikePlayerState* ACheeseStrikeGameState::GunGameLeader() const
+{
+	const ACheeseStrikePlayerState* Leader = nullptr;
+	for (const APlayerState* Each : PlayerArray)
+	{
+		const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Each);
+		if (Ours != nullptr && (Leader == nullptr || Ours->GetGunLevel() > Leader->GetGunLevel() || (Ours->GetGunLevel() == Leader->GetGunLevel() && Ours->GetKills() > Leader->GetKills())))
+		{
+			Leader = Ours;
+		}
+	}
+	return Leader;
+}
+
+FString ACheeseStrikeGameState::GunGameWeaponName(int32 Level)
+{
+	const FWeaponStats* Weapon = CheeseStrikeArsenal::Find(CheeseStrikeArsenal::GunGameWeapon(Level));
+	return Weapon != nullptr ? Weapon->DisplayName.ToString() : FString();
+}
+
 FString ACheeseStrikeGameState::ScoreSummary() const
 {
+	if (GetModeInfo().WinBy == CheeseStrikeModes::EWinBy::Ladder)
+	{
+		const ACheeseStrikePlayerState* Leader = GunGameLeader();
+		return Leader != nullptr ? FString::Printf(TEXT("%s on the %s, %d of %d"), *Leader->GetPlayerName(), *GunGameWeaponName(Leader->GetGunLevel()), Leader->GetGunLevel() + 1, CheeseStrikeArsenal::GunGameLadder().Num()) : FString();
+	}
 	if (!HasTeams())
 	{
 		const TArray<CheeseStrikeRules::FStanding> InOrder = Standings();

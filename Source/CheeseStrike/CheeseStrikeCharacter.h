@@ -13,6 +13,7 @@ class ACheeseStrikeWeapon;
 class UCameraComponent;
 class UMaterialInterface;
 class UCheeseStrikeInventory;
+class UCheeseStrikeLastStand;
 class UCheeseStrikeMovementComponent;
 class USkeletalMeshComponent;
 struct FInputActionValue;
@@ -137,6 +138,12 @@ public:
 	ACheeseStrikeWeapon* GetWeapon() const;
 	/** What it carries: the weapons in their slots, and which is in hand. */
 	UCheeseStrikeInventory* GetInventory() const { return Inventory; }
+	/** Its last stand, in Execution: whether it is down, and its player's Interact. */
+	UCheeseStrikeLastStand* GetLastStand() const { return LastStand; }
+	/** Whether it is down in a last stand: crouched, with only its sidearm, finished only up close. */
+	bool IsDowned() const;
+	/** Server only: sets the health, as a revive does. */
+	void SetHealth(float InHealth);
 
 	float GetHealth() const { return Health; }
 	bool IsAlive() const { return Health > 0.0f; }
@@ -210,6 +217,9 @@ protected:
 	void LastWeaponStarted();
 	/** The Streak key: its player calls in their next streak (ACheeseStrikePlayerState::StreakPressed). */
 	void StreakStarted();
+	/** Interact (E), held and let go: reviving or finishing someone down (UCheeseStrikeLastStand). */
+	void InteractStarted();
+	void InteractEnded();
 
 	/** Pawn mesh: first person view (seen only by self). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
@@ -229,6 +239,8 @@ protected:
 	/** The weapons it carries: spawned by the server, which owns them, and attached on every machine. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCheeseStrikeInventory> Inventory;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCheeseStrikeLastStand> LastStand;
 	UPROPERTY(ReplicatedUsing=OnRep_Health)
 	float Health = 100.0f;
 	/** Who killed it, and when, in the server's time; set by the server as it dies. */

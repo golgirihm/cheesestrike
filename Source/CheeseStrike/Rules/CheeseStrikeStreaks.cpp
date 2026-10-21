@@ -56,6 +56,18 @@ namespace CheeseStrikeStreaks
 		return EStreak::None;
 	}
 
+	bool IsStreakName(const FString& Name)
+	{
+		for (const FStreakInfo& Each : Streaks)
+		{
+			if (Name.Equals(Each.Name))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	FString CalledIn(const FString& Who, EStreak Kind)
 	{
 		const FStreakInfo& Streak = Info(Kind);

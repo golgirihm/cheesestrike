@@ -20,6 +20,9 @@
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Streaks/CheeseStrikeAerialCheese.h"
 #include "Streaks/CheeseStrikeBombs.h"
+#include "Modes/CheeseStrikeLastStand.h"
+#include "Weapons/CheeseStrikeArsenal.h"
+#include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -84,6 +87,15 @@ namespace ModePlayTests
 	{
 		const ACheeseStrikeCharacter* Body = PlayTesting::Character(Player);
 		return Body != nullptr && !Body->IsAlive();
+	}
+
+	/** Beside the host (a metre to its side), and behind it (facing its back when it faces the joiner's way). */
+	const FVector BesideSpot(-131.0f, -300.0f, 100.0f);
+	const FVector BehindSpot(-231.0f, -410.0f, 100.0f);
+
+	FName HeldId(const ACheeseStrikeCharacter* Character)
+	{
+		return Character != nullptr && Character->GetWeapon() != nullptr ? Character->GetWeapon()->GetWeaponId() : NAME_None;
 	}
 
 	TWeakObjectPtr<ACheeseStrikeCharacter> Remembered;
@@ -321,6 +333,150 @@ bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Paramete
 		TestEqual(TEXT("by the Gouda Overload"), Match->GetKillFeed().Last().How, FString(TEXT("Gouda Overload")));
 		const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0));
 		TestTrue(TEXT("its wheels landing round the host"), Bombs != nullptr && Bombs->GetLanded() > 0 && Bombs->GetHits() > 0);
+	});
+	StopPlaying();
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExecutionDownsRevivesAndFinishes, "CheeseStrike.Play.ExecutionDownsRevivesAndFinishes", ModePlayTests::Flags)
+
+bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace ModePlayTests;
+	// The host and the second joiner on one side, the first joiner on the other.
+	StartPlaying({3, TEXT("?Mode=Execution?Rounds=1")});
+	PutAt(0, HostSpot, HostYaw);
+	PutAt(1, JoinerSpot, JoinerYaw);
+	PutAt(2, AsideSpot, AsideYaw);
+	Wait(CheeseStrikeRules::SpawnProtection);
+	// Shot down from four metres: down, not dead.
+	Play(1, Burst);
+	WaitUntil(TEXT("the host going down"), 5.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 0); return Host != nullptr && Host->IsDowned(); });
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		TestTrue(TEXT("down, and alive"), Host->IsAlive());
+		TestFalse(TEXT("not out"), StateOf(0, 0)->IsOut());
+		TestFalse(TEXT("and the round goes on: a teammate stands"), GameState(0)->IsRoundBreak());
+		Remembered = Character(0);
+	});
+	Wait(1.0f);
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		TestEqual(TEXT("with only the pistol in hand"), HeldId(Host), CheeseStrikeWeapons::Pistol().Id);
+		TestFalse(TEXT("the rifle put away for good"), Host->GetInventory()->CanDraw(EWeaponSlot::Primary));
+		TestTrue(TEXT("crouched"), Host->bIsCrouched);
+		TestTrue(TEXT("the host's machine knows it is down"), Host->IsDowned());
+		Remembered = Character(0);
+	});
+	// From four metres, more shots do nothing (aimed down at the crouched host, the recoil of the last burst undone).
+	PutAt(1, JoinerSpot, JoinerYaw);
+	Play(1, FString(TEXT("look 0 -10\n")) + Burst);
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		TestTrue(TEXT("shots from afar don't finish them"), Host != nullptr && Host->IsAlive() && Host->IsDowned());
+	});
+	// A teammate beside them holds Interact: back up.
+	PutAt(2, BesideSpot, 180.0f);
+	Play(2, FString::Printf(TEXT("hold Interact\nwait %.1f\nrelease Interact"), CheeseStrikeModes::ReviveTime + 0.6f));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		if (TestNotNull(TEXT("the host"), Host))
+		{
+			TestFalse(TEXT("revived"), Host->IsDowned());
+			TestEqual(TEXT("with some health"), Host->GetHealth(), CheeseStrikeModes::ReviveHealth);
+			TestTrue(TEXT("and the rifle to draw again"), Host->GetInventory()->CanDraw(EWeaponSlot::Primary));
+		}
+	});
+	// The teammate goes down, and the enemy walks up and finishes them by hand.
+	PutAt(0, AsideSpot, AsideYaw);
+	PutAt(2, HostSpot, HostYaw);
+	PutAt(1, JoinerSpot, JoinerYaw);
+	Play(1, FString(TEXT("tap Reload\nwait 2.2\n")) + Burst);
+	WaitUntil(TEXT("the teammate going down"), 5.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && Mate->IsDowned(); });
+	PutAt(1, BesideSpot, 180.0f);
+	Play(1, FString::Printf(TEXT("hold Interact\nwait %.1f\nrelease Interact"), CheeseStrikeModes::ExecuteTime + 0.6f));
+	WaitUntil(TEXT("the teammate finished"), 3.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && !Mate->IsAlive(); });
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0);
+		const ACheeseStrikeCharacter* Enemy = CharacterOf(1, 0);
+		TestEqual(TEXT("finished by the enemy"), Mate->GetKilledBy(), Enemy->DisplayName());
+		TestTrue(TEXT("and out"), StateOf(2, 0)->IsOut());
+		TestEqual(TEXT("whose kill it is"), StateOf(1, 0)->GetKills(), 1);
+	});
+	// Down a second time in a life, the host dies; with nobody of theirs standing, the round and the match are the enemy's.
+	PutAt(0, HostSpot, HostYaw);
+	PutAt(1, JoinerSpot, JoinerYaw);
+	Play(1, FString(TEXT("tap Reload\nwait 2.2\n")) + Burst);
+	WaitUntil(TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	Then([this]()
+	{
+		TestFalse(TEXT("the host, once revived, isn't downed again but killed"), Character(0)->IsAlive());
+		TestEqual(TEXT("the other side wins"), GameState(0)->GetWinningTeam(), 1);
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGunGameMovesUpTheLadderToTheKnife, "CheeseStrike.Play.GunGameMovesUpTheLadderToTheKnife", ModePlayTests::Flags)
+
+bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace ModePlayTests;
+	StartPlaying({2, TEXT("?Mode=GunGame?RespawnDelay=1")});
+	Then([this]()
+	{
+		const TArray<FName>& Ladder = CheeseStrikeArsenal::GunGameLadder();
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		TestEqual(TEXT("everyone starts on the first weapon"), HeldId(Host), Ladder[0]);
+		TestTrue(TEXT("with the knife besides"), Host->GetInventory()->CanDraw(EWeaponSlot::Knife));
+		TestFalse(TEXT("and nothing else"), Host->GetInventory()->CanDraw(EWeaponSlot::Sidearm));
+	});
+	PutAt(0, HostSpot, HostYaw);
+	PutAt(1, JoinerSpot, JoinerYaw);
+	Wait(CheeseStrikeRules::SpawnProtection);
+	Play(1, Burst);
+	WaitUntil(TEXT("the host dying"), 5.0f, []() { return Dead(0); });
+	Wait(0.5f);
+	Then([this]()
+	{
+		const TArray<FName>& Ladder = CheeseStrikeArsenal::GunGameLadder();
+		TestEqual(TEXT("the joiner moves a step up"), StateOf(1, 0)->GetGunLevel(), 1);
+		TestEqual(TEXT("and holds the next weapon at once"), HeldId(CharacterOf(1, 0)), Ladder[1]);
+		TestEqual(TEXT("on its own machine too"), HeldId(Character(1)), Ladder[1]);
+		TestEqual(TEXT("the host stays where it was"), StateOf(0, 0)->GetGunLevel(), 0);
+		TestFalse(TEXT("the joiner earns no streak"), StateOf(1, 0)->GetStreak() > 0);
+		// Up to the last step: the knife only.
+		StateOf(1, 0)->SetGunLevel(Ladder.Num() - 1);
+		Mode()->SetPlayerDefaults(CharacterOf(1, 0));
+	});
+	WaitUntil(TEXT("the host back"), 4.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive(); });
+	Then([this]()
+	{
+		TestEqual(TEXT("the host back on the first weapon"), HeldId(CharacterOf(0, 0)), CheeseStrikeArsenal::GunGameLadder()[0]);
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		TestEqual(TEXT("the joiner on the last step holds the knife"), HeldId(Joiner), CheeseStrikeArsenal::Knife());
+		TestFalse(TEXT("and nothing else"), Joiner->GetInventory()->CanDraw(EWeaponSlot::Primary) || Joiner->GetInventory()->CanDraw(EWeaponSlot::Sidearm));
+		if (ACheeseStrikeCharacter* Host = CharacterOf(0, 0))
+		{
+			Host->EndProtection();
+		}
+	});
+	// A stroke in the back: a kill with the last weapon wins.
+	PutAt(0, HostSpot, JoinerYaw);
+	PutAt(1, BehindSpot, JoinerYaw);
+	Play(1, TEXT("wait 0.5\ntap Fire\nwait 0.6"));
+	WaitUntil(TEXT("the match ending"), 4.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	Then([this]()
+	{
+		TestEqual(TEXT("the joiner wins"), GameState(0)->GetWinnerName(), CharacterOf(1, 0)->DisplayName());
 	});
 	StopPlaying();
 	return true;
