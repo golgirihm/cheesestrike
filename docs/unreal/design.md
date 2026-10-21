@@ -103,7 +103,7 @@ Also: a session can be private (joined by code only); a player can join to watch
 
 ## Arenas
 
-Each arena has starting spots for 16 (the first two facing each other across a clear line), pickup pads with a kind each, places with names (shown on the HUD and in the kill feed, as "Nice shot · The Fountain"), objectives for the team modes, jump pads and ladders where it has them, doors that open with interact, and a menu camera. Sizes are Godot metres; divide by three.
+Each arena has starting spots for 16 (the first two facing each other across a clear line), pickup pads with a kind each, places with names (shown on the HUD and in the kill feed, as "Nice shot · The Fountain"), objectives for the team modes, jump pads and ladders where it has them, doors that open as anyone comes up to them (no key, no button), and a menu camera. [maps/principles.md](maps/principles.md) is how the maps are designed and built, and lists the maps to build next. Sizes are Godot metres; divide by three.
 
 | Arena | Size | Setting | Character |
 |---|---|---|---|
@@ -116,7 +116,7 @@ Each arena has starting spots for 16 (the first two facing each other across a c
 | Gruyère Grotto | 48 × 44 | cave | always lamp-lit; pillars, a hollow, a ledge |
 | Cracker Duel | 36 × 24 | meadow | small, for two to eight |
 | Practice range | 48 × 156 | meadow | targets at 10, 25, 50 m and more, the weapon rack |
-| The Creamery | 390 × 300 | cheese works | the first built in Unreal (docs/unreal/maps/creamery.md): docks at each end, a loading yard, an aging hall of cheese racks, a sunken canal; a wall of wheels, sealed doors, racks and a cheese bridge that the mice turn from a closed map into an open one |
+| The Creamery | 390 × 300 | cheese works | the first built in Unreal (docs/unreal/maps/creamery.md): docks at each end, a two-storey house of cheese on each plaza, a loading yard, an aging hall of cheese racks with catwalks across it, tunnels of cheese along it, a sunken canal; houses, tunnels, a wall of wheels, sealed doors, racks and a cheese bridge that the mice turn from a closed map into an open one |
 
 Plus arenas players lay out themselves in an editor: a square floor of one of three sizes with blocks (stack two high), walls, crates, pickup pads and jump pads on a grid, encoded as a short code that can be shared in a link; starts and objectives are worked out from the layout. Worth keeping, as Unreal's runtime spawning makes it easy; the editor's interface is a later item.
 
