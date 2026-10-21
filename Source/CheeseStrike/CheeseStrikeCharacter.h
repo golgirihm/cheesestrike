@@ -11,6 +11,7 @@
 class ACheeseStrikePlayerState;
 class ACheeseStrikeWeapon;
 class UCameraComponent;
+class UMaterialInterface;
 class UCheeseStrikeInventory;
 class UCheeseStrikeMovementComponent;
 class USkeletalMeshComponent;
@@ -83,6 +84,13 @@ public:
 	/** For looking at a mouse (development): puts the view `Distance` cm from the first one, `Yaw` degrees round from in front of it and `Height` cm up, following it; CheeseStrikeOutside with no distance puts it back. */
 	UFUNCTION(Exec)
 	void CheeseStrikeViewMouse(float Distance = 600.0f, float Yaw = 45.0f, float Height = 150.0f);
+	/** For looking at the bodies (development): this machine shows the character as body `Index` of CheeseStrikeBodies::All, in side `Team`'s colours (-1 for its own); with no index, as its player's side has it again. */
+	UFUNCTION(Exec)
+	void CheeseStrikeBody(int32 Index = -1, int32 Team = 0);
+
+	/** Which of CheeseStrikeBodies::All it has here, and in which side's colours (INDEX_NONE for its own); INDEX_NONE until it has one. */
+	int32 GetBody() const { return BodyIndex; }
+	int32 GetBodyTeam() const { return BodyTeam; }
 
 	/** Handles aim inputs from either controls or UI interfaces: degrees to turn by. */
 	UFUNCTION(BlueprintCallable, Category="Input")
@@ -253,6 +261,25 @@ protected:
 	static const FVector CameraFromEyes;
 	/** Puts the camera just under the body's eyes, and hides the head (face, hair, eyes) in the first-person copy, which the camera sits inside. */
 	void FitFirstPersonBody();
+	/**
+	 * Every body's mesh (CheeseStrikeBodies::All), and the material instances
+	 * that dress each in each side's colours, by their paths: found as the
+	 * game starts, so that a packaged game has them.
+	 */
+	UPROPERTY()
+	TArray<TObjectPtr<USkeletalMesh>> BodyMeshes;
+	UPROPERTY()
+	TMap<FName, TObjectPtr<UMaterialInterface>> TeamLooks;
+	/** The body it has here, and the side whose colours it wears. */
+	int32 BodyIndex = INDEX_NONE;
+	int32 BodyTeam = INDEX_NONE;
+	/** CheeseStrikeBody's, while it is in use. */
+	int32 ForcedBody = INDEX_NONE;
+	int32 ForcedTeam = 0;
+	/** Puts on the body its player's side has, on every machine (from the side the player state replicates), if it hasn't it already; a fallen body keeps the one it fell in. */
+	void UpdateBody();
+	/** Makes both meshes body `Index` in side `Team`'s colours, its own weapons hidden, the camera at its eyes. */
+	void ApplyBody(int32 Index, int32 Team);
 	/** Seconds since the state was last traced to the log. */
 	float SinceTrace = 0.0f;
 	/** Whether -StartAt has been applied. */

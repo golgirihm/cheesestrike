@@ -1,0 +1,8 @@
+# The joiner of sides_server.txt: stands facing the host, and looks at them.
+wait 3
+state
+shot sides_client_1_sees_host
+wait 10
+log client done
+wait 1
+quit

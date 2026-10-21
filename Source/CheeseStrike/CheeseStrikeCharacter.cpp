@@ -18,6 +18,8 @@
 #include "Misc/Parse.h"
 #include "CheeseStrike.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
+#include "Animation/CheeseStrikeBodies.h"
+#include "Materials/MaterialInterface.h"
 #include "Input/CheeseStrikeInput.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
@@ -28,6 +30,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "CheeseStrikeGameMode.h"
+#include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -43,10 +46,8 @@ const FVector ACheeseStrikeCharacter::CameraFromEyes(-7.8f, -1.0f, 0.0f);
 
 namespace
 {
-	/** The body, the same for everyone and for its own player's first-person view. */
-	const TCHAR* const BodyMesh = TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Meshes/Belica.Belica");
-	/** Words in the names of a body's material slots that are its head, hidden from its own player. */
-	const TCHAR* const HeadSlotWords[] = {TEXT("head"), TEXT("hair"), TEXT("eye"), TEXT("mouth"), TEXT("lash")};
+	/** Words in the names of a body's material slots that are its head, hidden from its own player: the camera is inside it. */
+	const TCHAR* const HeadSlotWords[] = {TEXT("head"), TEXT("face"), TEXT("hair"), TEXT("eye"), TEXT("brow"), TEXT("mouth"), TEXT("teeth"), TEXT("tear"), TEXT("lash"), TEXT("glass")};
 }
 
 ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectInitializer)
@@ -55,13 +56,32 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	using namespace CheeseStrikeMovement;
 	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
 
+	// Every body a character can have, and the looks that dress them in each
+	// side's colours; it starts as the first, and puts on its player's side's
+	// as soon as it knows it (UpdateBody).
+	for (const CheeseStrikeBodies::FBody& Each : CheeseStrikeBodies::All())
+	{
+		ConstructorHelpers::FObjectFinder<USkeletalMesh> Model(Each.Mesh);
+		BodyMeshes.Add(Model.Object);
+		const int32 Index = BodyMeshes.Num() - 1;
+		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
+		{
+			for (int32 Slot = 0; Slot < Each.NumTeamSlots; ++Slot)
+			{
+				const FString Path = CheeseStrikeBodies::TeamLook(Index, Team, Each.TeamSlots[Slot]);
+				ConstructorHelpers::FObjectFinder<UMaterialInterface> Look(*Path);
+				TeamLooks.Add(FName(*Path), Look.Object);
+			}
+		}
+	}
+
 	// The body everyone else sees, and the copy of it its own player sees
 	// (the same mesh and animation, so the arms in view are the character's
-	// own), each animated in code with Lyra's rifle set retargeted to it:
-	// Lt. Belica standing on the capsule's floor, turned to face its front.
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Body(BodyMesh);
-	const TSubclassOf<UAnimInstance> BodyAnimation = UCheeseStrikeBelicaAnimInstance::StaticClass();
-	GetMesh()->SetSkeletalMeshAsset(Body.Object);
+	// own), each animated in code with Lyra's rifle set retargeted to it,
+	// standing on the capsule's floor, turned to face its front.
+	USkeletalMesh* const First = BodyMeshes.IsEmpty() ? nullptr : BodyMeshes[0].Get();
+	const TSubclassOf<UAnimInstance> BodyAnimation = UCheeseStrikeHeroAnimInstance::StaticClass();
+	GetMesh()->SetSkeletalMeshAsset(First);
 	GetMesh()->SetAnimInstanceClass(BodyAnimation);
 	GetMesh()->SetRelativeLocationAndRotation(FVector(-10.0f, 0.0f, -CapsuleHalfHeight), FRotator(0.0f, -90.0f, 0.0f));
 	GetMesh()->SetOwnerNoSee(true);
@@ -69,7 +89,7 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 	FirstPersonMesh->SetupAttachment(GetMesh());
-	FirstPersonMesh->SetSkeletalMeshAsset(Body.Object);
+	FirstPersonMesh->SetSkeletalMeshAsset(First);
 	FirstPersonMesh->SetAnimInstanceClass(BodyAnimation);
 	FirstPersonMesh->SetOnlyOwnerSee(true);
 	FirstPersonMesh->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
@@ -159,7 +179,8 @@ void ACheeseStrikeCharacter::FitFirstPersonBody()
 		CameraAtHead = DefaultCameraAtHead;
 	}
 	FirstPersonCameraComponent->SetRelativeLocation(CameraAtHead);
-	// The head, which the camera is inside, is not drawn for its own player.
+	// The head, which the camera is inside, is not drawn for its own player, nor what else its body hides from it.
+	const int32 Hero = CheeseStrikeBodies::IndexOfMesh(Asset->GetPathName());
 	const TArray<FSkeletalMaterial>& Slots = Asset->GetMaterials();
 	for (int32 Slot = 0; Slot < Slots.Num(); ++Slot)
 	{
@@ -168,6 +189,10 @@ void ACheeseStrikeCharacter::FitFirstPersonBody()
 		for (const TCHAR* Word : HeadSlotWords)
 		{
 			bHead |= Name.Contains(Word, ESearchCase::IgnoreCase);
+		}
+		for (int32 Hidden = 0; Hero != INDEX_NONE && Hidden < CheeseStrikeBodies::All()[Hero].NumFirstPersonHiddenSlots; ++Hidden)
+		{
+			bHead |= Name == CheeseStrikeBodies::All()[Hero].FirstPersonHiddenSlots[Hidden];
 		}
 		if (bHead)
 		{
@@ -178,6 +203,117 @@ void ACheeseStrikeCharacter::FitFirstPersonBody()
 		}
 	}
 	ACheeseStrikeWeapon::HideBuiltInWeapons(FirstPersonMesh);
+}
+
+void ACheeseStrikeCharacter::UpdateBody()
+{
+	if (bDeathShown)
+	{
+		return;
+	}
+	int32 Wanted = ForcedBody;
+	int32 Team = ForcedTeam;
+	if (Wanted == INDEX_NONE)
+	{
+		const ACheeseStrikePlayerState* State = GetPlayerState<ACheeseStrikePlayerState>();
+		if (State == nullptr)
+		{
+			return;
+		}
+		// A team mode's sides, or everyone for themself (CheeseStrikeModes).
+		const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+		const bool bTeams = Match == nullptr || Match->HasTeams();
+		const int32 Side = Match != nullptr ? Match->TeamOf(State) : State->GetTeam();
+		// Its rank: how many players come before it on its side (or in the match), by their ids, which every
+		// machine knows.
+		int32 Rank = 0;
+		for (const APlayerState* Other : Match != nullptr ? Match->PlayerArray : TArray<TObjectPtr<APlayerState>>())
+		{
+			const ACheeseStrikePlayerState* Player = Cast<ACheeseStrikePlayerState>(Other);
+			if (Player != nullptr && Player != State && (!bTeams || Match->TeamOf(Player) == Side) && Player->GetPlayerId() < State->GetPlayerId())
+			{
+				++Rank;
+			}
+		}
+		Team = bTeams ? Side : INDEX_NONE;
+		Wanted = CheeseStrikeBodies::For(bTeams, Side, Rank);
+	}
+	if (Wanted != BodyIndex || Team != BodyTeam)
+	{
+		ApplyBody(Wanted, Team);
+	}
+}
+
+void ACheeseStrikeCharacter::ApplyBody(int32 Index, int32 Team)
+{
+	if (!CheeseStrikeBodies::All().IsValidIndex(Index) || !BodyMeshes.IsValidIndex(Index) || BodyMeshes[Index] == nullptr)
+	{
+		return;
+	}
+	const CheeseStrikeBodies::FBody& Look = CheeseStrikeBodies::All()[Index];
+	USkeletalMesh* const Model = BodyMeshes[Index];
+	for (USkeletalMeshComponent* Shown : {GetMesh(), FirstPersonMesh.Get()})
+	{
+		if (Shown->GetSkeletalMeshAsset() != Model)
+		{
+			Shown->SetSkeletalMeshAsset(Model);
+			// A fresh animation, which plays the new skeleton's set.
+			Shown->SetAnimInstanceClass(nullptr);
+			Shown->SetAnimInstanceClass(UCheeseStrikeHeroAnimInstance::StaticClass());
+		}
+		// Nothing the last body hid stays hidden.
+		Shown->EmptyOverrideMaterials();
+		for (int32 Level = 0; Level < Model->GetLODNum(); ++Level)
+		{
+			Shown->ShowAllMaterialSections(Level);
+		}
+		for (int32 Bone = 0; Bone < Model->GetRefSkeleton().GetNum(); ++Bone)
+		{
+			if (Shown->IsBoneHiddenByName(Model->GetRefSkeleton().GetBoneName(Bone)))
+			{
+				Shown->UnHideBoneByName(Model->GetRefSkeleton().GetBoneName(Bone));
+			}
+		}
+		// Dressed in the side's colours, if it is on one.
+		for (int32 Slot = 0; Team >= 0 && Team < CheeseStrikeRules::Teams && Slot < Look.NumTeamSlots; ++Slot)
+		{
+			if (UMaterialInterface* Dress = TeamLooks.FindRef(FName(*CheeseStrikeBodies::TeamLook(Index, Team, Look.TeamSlots[Slot]))))
+			{
+				Shown->SetMaterialByName(FName(Look.TeamSlots[Slot]), Dress);
+			}
+		}
+		// The weapons it was modelled holding are hidden: only the game's own show.
+		for (int32 Slot = 0; Slot < Look.NumWeaponSlots; ++Slot)
+		{
+			const FName Name(Look.WeaponSlots[Slot]);
+			const int32 Material = Model->GetMaterials().IndexOfByPredicate([&Name](const FSkeletalMaterial& Each) { return Each.MaterialSlotName == Name; });
+			for (int32 Level = 0; Material != INDEX_NONE && Level < Model->GetLODNum(); ++Level)
+			{
+				Shown->ShowMaterialSection(Material, INDEX_NONE, false, Level);
+			}
+		}
+	}
+	ACheeseStrikeWeapon::HideBuiltInWeapons(GetMesh());
+	FitFirstPersonBody();
+	BodyIndex = Index;
+	BodyTeam = Team;
+	// Its weapons, held as this body holds them.
+	TArray<AActor*> Attached;
+	GetAttachedActors(Attached);
+	for (AActor* Each : Attached)
+	{
+		if (ACheeseStrikeWeapon* Weapon = Cast<ACheeseStrikeWeapon>(Each))
+		{
+			Weapon->FitToHands();
+		}
+	}
+}
+
+void ACheeseStrikeCharacter::CheeseStrikeBody(int32 Index, int32 Team)
+{
+	ForcedBody = CheeseStrikeBodies::All().IsValidIndex(Index) ? Index : INDEX_NONE;
+	ForcedTeam = Team;
+	UpdateBody();
 }
 
 void ACheeseStrikeCharacter::BeginPlay()
@@ -584,6 +720,7 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	ApplyStartAt();
+	UpdateBody();
 	// The server keeps where everyone has been, for shots fired at where they were seen.
 	if (HasAuthority() && GetWorld() != nullptr && GetWorld()->GetGameState() != nullptr)
 	{

@@ -1,0 +1,19 @@
+# The host of a pair on opposite sides (the host the Gouda Guys, the joiner
+# the Mozza Radicals): once the joiner is in, 4 m ahead and facing it, looks
+# at the two side by side from 5 m and from 15 m off to the side, and then
+# from where it stands.
+wait 33
+state
+cmd CheeseStrikeViewFrom 269 -500 150 -5 180
+wait 0.5
+shot sides_1_near
+cmd CheeseStrikeViewFrom 1269 -500 220 -4 180
+wait 0.5
+shot sides_2_far
+cmd CheeseStrikeOutside
+wait 0.3
+shot sides_3_host_sees_joiner
+wait 4
+log server done
+wait 1
+quit

@@ -35,7 +35,7 @@ ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
 	Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
 	Body->SetupAttachment(Pedestal);
 	Body->SetSkeletalMeshAsset(Belica.Object);
-	Body->SetAnimInstanceClass(UCheeseStrikeBelicaAnimInstance::StaticClass());
+	Body->SetAnimInstanceClass(UCheeseStrikeHeroAnimInstance::StaticClass());
 	// Undo the pedestal's scale, and stand on its top, facing the way the pedestal faces.
 	Body->SetRelativeScale3D(FVector(100.0f / PedestalWidth, 100.0f / PedestalWidth, 100.0f / PedestalHeight));
 	Body->SetRelativeLocation(FVector(0.0f, 0.0f, 50.0f));

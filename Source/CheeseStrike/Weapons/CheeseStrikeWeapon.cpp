@@ -6,6 +6,7 @@
 #include "Camera/CameraComponent.h"
 #include "Sound/SoundBase.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
+#include "Animation/CheeseStrikeBodies.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -265,10 +266,23 @@ void ACheeseStrikeWeapon::Hold(ACheeseStrikeCharacter* Character)
 	Holder = Character;
 	const FAttachmentTransformRules Snap(EAttachmentRule::SnapToTarget, false);
 	AttachToActor(Character, Snap);
-	PutInHand(FirstPersonMesh, Character->GetFirstPersonMesh());
-	PutInHand(ThirdPersonMesh, Character->GetMesh());
-	PutInHand(FirstPersonModel, Character->GetFirstPersonMesh());
-	PutInHand(ThirdPersonModel, Character->GetMesh());
+	FitToHands();
+	if (UCheeseStrikeInventory* Inventory = Character->GetInventory())
+	{
+		Inventory->Refresh();
+	}
+}
+
+void ACheeseStrikeWeapon::FitToHands()
+{
+	if (Holder == nullptr)
+	{
+		return;
+	}
+	PutInHand(FirstPersonMesh, Holder->GetFirstPersonMesh());
+	PutInHand(ThirdPersonMesh, Holder->GetMesh());
+	PutInHand(FirstPersonModel, Holder->GetFirstPersonMesh());
+	PutInHand(ThirdPersonModel, Holder->GetMesh());
 	for (USceneComponent* Part : {static_cast<USceneComponent*>(FirstPersonMesh), static_cast<USceneComponent*>(ThirdPersonMesh)})
 	{
 		Part->SetRelativeScale3D(Stats->IsMelee() ? FVector::OneVector : ModelScale);
@@ -280,10 +294,6 @@ void ACheeseStrikeWeapon::Hold(ACheeseStrikeCharacter* Character)
 		Model->SetRelativeScale3D(ModelScale);
 	}
 	FirstPersonModelInHand = FirstPersonModel->GetRelativeTransform();
-	if (UCheeseStrikeInventory* Inventory = Character->GetInventory())
-	{
-		Inventory->Refresh();
-	}
 }
 
 void ACheeseStrikeWeapon::SetInHand(bool bIsInHand)
@@ -380,15 +390,18 @@ void ACheeseStrikeWeapon::PutInHand(USceneComponent* Rifle, USkeletalMeshCompone
 	}
 	const FAttachmentTransformRules Snap(EAttachmentRule::SnapToTarget, false);
 	const USkeletalMesh* Mesh = Body->GetSkeletalMeshAsset();
+	// A hero's body (CheeseStrikeBodies) holds it on hand_r at its own grip: a hero's weapon_r, where it has one, stays
+	// where its own guns were.
+	const int32 Hero = Mesh != nullptr ? CheeseStrikeBodies::IndexOfMesh(Mesh->GetPathName()) : INDEX_NONE;
 	// The rifle is modelled along its Y axis; weapon_r points its X the way the character faces.
-	if (Mesh == nullptr || Mesh->GetRefSkeleton().FindBoneIndex(HandSocket) != INDEX_NONE)
+	if (Mesh == nullptr || (Hero == INDEX_NONE && Mesh->GetRefSkeleton().FindBoneIndex(HandSocket) != INDEX_NONE))
 	{
 		Rifle->AttachToComponent(Body, Snap, HandSocket);
 		Rifle->SetRelativeRotation(GripRotation);
 		return;
 	}
 	Rifle->AttachToComponent(Body, Snap, FName(TEXT("hand_r")));
-	Rifle->SetRelativeTransform(HandGrip);
+	Rifle->SetRelativeTransform(Hero != INDEX_NONE ? CheeseStrikeBodies::All()[Hero].HandGrip : HandGrip);
 }
 
 void ACheeseStrikeWeapon::HideBuiltInWeapons(USkeletalMeshComponent* Body)

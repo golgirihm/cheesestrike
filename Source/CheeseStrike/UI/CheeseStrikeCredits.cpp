@@ -7,7 +7,7 @@ namespace CheeseStrikeCredits
 	const FCredit Credits[] = {
 		{TEXT("CheeseStrike: Gouda Overload"), TEXT("Made by Hamid Golgiri.")},
 		{TEXT("Engine"), TEXT("Made with Unreal Engine 5, by Epic Games. Begun from its First Person template.")},
-		{TEXT("The soldier"), TEXT("Lt. Belica, from Paragon, by Epic Games (Fab).")},
+		{TEXT("The soldiers"), TEXT("Lt. Belica, Murdock, Twinblast and Wraith, from Paragon, by Epic Games (Fab).")},
 		{TEXT("Animations, the rifle and its sounds, and the bursts of the streaks"), TEXT("From Lyra Starter Game, by Epic Games.")},
 		{TEXT("Surfaces, props and decals"), TEXT("Quixel Megascans (Fab): the Warehouse pack, Industrial Concrete Floor, Shuttered Concrete Wall, Asphalt, Painted Corrugated Sheets, Scratched Painted Metal Sheet, Garage Door, Concrete Barrier and Oil Stain.")},
 		{TEXT("The shipping container"), TEXT("\"Freight shipping container - Orange\" by Sousinho Games (Fab).")},

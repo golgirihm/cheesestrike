@@ -200,9 +200,9 @@ protected:
 };
 
 /**
- * The mannequin's body, animated by Lyra's rifle set (FCheeseStrikeAnimProxy);
- * the first-person arms are always this. Another body is a subclass that
- * finds the same set retargeted to its skeleton.
+ * The mannequin's body, animated by Lyra's rifle set (FCheeseStrikeAnimProxy).
+ * A subclass knows the same set retargeted to other skeletons, and plays the
+ * one its mesh's skeleton has (UCheeseStrikeHeroAnimInstance).
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeAnimInstance : public UAnimInstance
@@ -212,7 +212,12 @@ class CHEESESTRIKE_API UCheeseStrikeAnimInstance : public UAnimInstance
 public:
 	UCheeseStrikeAnimInstance();
 
+	/** The set it plays: its mesh's skeleton's. */
 	const FCheeseStrikeAnimSet& GetSet() const { return Set; }
+	/** Every set it knows, a skeleton's each. */
+	const TArray<FCheeseStrikeAnimSet>& GetSets() const { return Sets; }
+	/** Plays the set its mesh's skeleton has, of those it knows (the first if none is): as it is initialised. */
+	void PickSet();
 	/** The bone the rifle rides, which the left hand's grip follows. */
 	FName GetGripAnchor() const { return GripAnchor; }
 	/** The slot firing and reloading play in. */
@@ -243,8 +248,10 @@ protected:
 	 * `Locomotion`, the aim offsets in `AimOffsets`, firing and reloading
 	 * in `Actions` (package paths ending in '/'). Constructors only.
 	 */
-	void FindSet(const FString& Locomotion, const FString& AimOffsets, const FString& Actions);
+	static FCheeseStrikeAnimSet FindSet(const FString& Locomotion, const FString& AimOffsets, const FString& Actions);
 
+	UPROPERTY()
+	TArray<FCheeseStrikeAnimSet> Sets;
 	UPROPERTY()
 	FCheeseStrikeAnimSet Set;
 	FName GripAnchor = TEXT("weapon_r");
@@ -252,16 +259,17 @@ protected:
 };
 
 /**
- * Lt. Belica's body (Paragon: Lt. Belica, Content/LICENSES.md): the same
- * rifle set, retargeted from the mannequin to her skeleton through Lyra's
- * UE4-mannequin IK rig. She has no weapon_r bone, so the rifle and the
- * grip ride her right hand.
+ * A Paragon hero's body (CheeseStrikeBodies, Content/LICENSES.md): the same
+ * rifle set, retargeted from the mannequin to each hero's skeleton through
+ * Lyra's UE4-mannequin IK rig; it plays its mesh's. The heroes' weapon_r
+ * bones (where they have them) stay where their own guns were, so the
+ * rifle and the grip ride the right hand.
  */
 UCLASS()
-class CHEESESTRIKE_API UCheeseStrikeBelicaAnimInstance : public UCheeseStrikeAnimInstance
+class CHEESESTRIKE_API UCheeseStrikeHeroAnimInstance : public UCheeseStrikeAnimInstance
 {
 	GENERATED_BODY()
 
 public:
-	UCheeseStrikeBelicaAnimInstance();
+	UCheeseStrikeHeroAnimInstance();
 };
