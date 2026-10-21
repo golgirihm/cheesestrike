@@ -28,6 +28,9 @@ namespace
 	/** A way is found afresh when it is this old (seconds), or the mouse this far below it (cm): it fell through eaten cheese. */
 	constexpr float MouseFreshWay = 4.0f;
 	constexpr float MouseFallenBelow = 150.0f;
+	/** How far off a block it looks for somewhere to stand to eat it (cm), and how many ways there it tries. */
+	constexpr float MouseStandOff = 100.0f;
+	constexpr int32 MouseWaysTried = 4;
 	/** A mouse's sounds are a rat's, pitched down by about this for its size, and heard this far (cm), at full loudness within the first. */
 	constexpr float MousePitch = 0.7f;
 	constexpr float MouseHeardWithin = 600.0f;
@@ -260,6 +263,56 @@ bool ACheeseStrikeMouse::FindWay(const FVector& To)
 	return true;
 }
 
+bool ACheeseStrikeMouse::FindWayBeside(const ACheeseStrikeCheese* Cheese)
+{
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (Navigation == nullptr || Cheese == nullptr)
+	{
+		return false;
+	}
+	// Places to stand beside it, off its sides and corners, the nearest first: not on top of it, nor higher (the
+	// navigation mesh lies on cheese too, and the top of a stack is an island), nor too far below it to reach it.
+	const FBox Box = Cheese->GetComponentsBoundingBox();
+	const FVector Middle = Box.GetCenter();
+	const FVector Half = Box.GetExtent();
+	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z);
+	TArray<FVector> Spots;
+	for (int32 X = -1; X <= 1; ++X)
+	{
+		for (int32 Y = -1; Y <= 1; ++Y)
+		{
+			if (X != 0 || Y != 0)
+			{
+				Spots.Add(FVector(Middle.X + X * (Half.X + MouseStandOff), Middle.Y + Y * (Half.Y + MouseStandOff), Box.Min.Z));
+			}
+		}
+	}
+	Spots.Sort([&Feet](const FVector& A, const FVector& B) { return FVector::DistSquared2D(A, Feet) < FVector::DistSquared2D(B, Feet); });
+	int32 Tries = 0;
+	for (const FVector& Spot : Spots)
+	{
+		FNavLocation Beside;
+		if (!Navigation->ProjectPointToNavigation(Spot, Beside, FVector(MouseStandOff, MouseStandOff, CheeseStrikeMice::ReachUp)))
+		{
+			continue;
+		}
+		const bool bOnIt = Box.ExpandBy(FVector(-10.0f, -10.0f, 0.0f)).IsInsideXY(Beside.Location);
+		if (bOnIt || Beside.Location.Z > Box.Max.Z + 10.0f || Box.Min.Z - Beside.Location.Z > CheeseStrikeMice::ReachUp)
+		{
+			continue;
+		}
+		if (FindWay(Beside.Location))
+		{
+			return true;
+		}
+		if (++Tries >= MouseWaysTried)
+		{
+			break;
+		}
+	}
+	return false;
+}
+
 bool ACheeseStrikeMouse::CanReach(const ACheeseStrikeCheese* Cheese) const
 {
 	if (Cheese == nullptr)
@@ -304,7 +357,6 @@ void ACheeseStrikeMouse::ChooseCheese()
 		Costs.Add({CheeseStrikeMice::CheeseCost(FVector::Dist2D(Box.GetCenter(), Feet), Box.Min.Z - Feet.Z, Taken.Contains(Cheese)), Cheese});
 	}
 	Costs.Sort([](const TPair<float, ACheeseStrikeCheese*>& A, const TPair<float, ACheeseStrikeCheese*>& B) { return A.Key < B.Key; });
-	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	for (int32 Index = 0; Index < FMath::Min(Costs.Num(), 6); ++Index)
 	{
 		ACheeseStrikeCheese* Cheese = Costs[Index].Value;
@@ -312,14 +364,7 @@ void ACheeseStrikeMouse::ChooseCheese()
 		{
 			return;
 		}
-		bool bWay = CanReach(Cheese);
-		if (!bWay && Navigation != nullptr)
-		{
-			// To the ground beside it.
-			const FBox Box = Cheese->GetComponentsBoundingBox();
-			FNavLocation Beside;
-			bWay = Navigation->ProjectPointToNavigation(FVector(Box.GetCenter().X, Box.GetCenter().Y, Box.Min.Z), Beside, FVector(CheeseStrikeMice::ReachAcross, CheeseStrikeMice::ReachAcross, CheeseStrikeMice::ReachUp + 100.0f)) && FindWay(Beside.Location);
-		}
+		const bool bWay = CanReach(Cheese) || FindWayBeside(Cheese);
 		if (bWay)
 		{
 			if (Cheese != Target.Get())

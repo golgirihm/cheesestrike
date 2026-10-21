@@ -18,7 +18,7 @@ Counter-Strike's maps (Dust2, Mirage, Inferno, Nuke) have been played for twenty
 - **Timings.** Work out how long it takes from each spawn to each place at a sprint (6.75 m/s; 4.5 m/s walking). On a mirrored map both sides reach the middle together; on an asymmetric one, measure and even them out. The first fight should come 8 to 12 seconds after the start. Dock to dock across The Creamery is about 20 seconds.
 - **Cover spacing.** On a lane, something to get behind every 8 to 12 m, closer in the open; a mix of crouch cover and full cover, so that a fight has steps.
 - **Readable places.** Each place looks unlike the others, by shape and colour, so a player knows where they are from a glance and can name it. Landmarks that show over the walls (a chimney, a tower) help players find their way.
-- **Team-sided spawns.** Eight starts a side, at their end, spread so that one grenade can't catch them, facing the way out. Hard cover in front of each spawn, so the open map after the mice never has a line into it. Free-for-all adds starts through every lane.
+- **Team-sided spawns.** Eight starts a side, at their end, spread so that one grenade can't catch them, facing the way out, tagged with the side (`CheeseStrikeModes::TeamStartTags`, "Gouda" and "Mozza"; `kit.team_starts`). Hard cover in front of each spawn, so the open map after the mice never has a line into it. Free-for-all adds starts through every lane.
 
 ## What is particular to CheeseStrike
 
@@ -44,10 +44,10 @@ Cheese the mice must leave is marked not edible (`ACheeseStrikeCheese::bEdible`,
 
 - A block has 400 of eating in it, whatever its size; a mouse eats 40 every half second, so a block takes one mouse five seconds. A 1 m cube and a 3 m slab go as fast.
 - One mouse comes for every 60 edible blocks, two at the least and eight at the most: a map with 450 blocks or more gets all eight.
-- With the walking between blocks, a mouse gets through about **nine blocks a minute**; eight mice about **75 a minute** (measured on The Creamery, `tools/play/creamery_mice.txt`). A ten-minute match eats about 650 blocks after the mice's first minute.
+- With the walking between blocks, a mouse gets through about **nine or ten blocks a minute**; eight mice **70 to 80 a minute** (measured on The Creamery, `tools/play/creamery_mice.txt`). A ten-minute match eats about 650 blocks after the mice's first minute.
 - So size the cheese to the match. The Creamery has 1,026 edible blocks: the plazas, docks and houses go in the first four or five minutes, the hall's 360 wheels and the Wheel Stack last. A map that should be bare by its end has fewer, larger blocks; one that should keep its middle has more there.
 - A mouse goes for the cheapest block: its distance, plus four times its height above the mouse's feet, plus 13 m if another mouse has it. So the mice eat near where they come in, low down first, and spread out. Put the ways in (`kit.mouse_entries`, ten on The Creamery for eight mice) where you want the eating to start, mirrored on a mirrored map, and never on top of a spawn.
-- A mouse reaches 2.6 m across from its middle and 2.5 m up from its feet. What is out of reach is eaten when what is under it is eaten and it comes down, or by a mouse that walks up to it (they climb ramps and stairs on the navigation mesh).
+- A mouse reaches 2.6 m across from its middle and 2.5 m up from its feet, and eats standing beside a block, never on top of it. What is out of reach is eaten when what is under it is eaten and it comes down, or by a mouse that walks up to it (they climb ramps and stairs on the navigation mesh). A block with nowhere on the navigation mesh beside it to stand is never eaten: leave a mouse room (a metre and a half) round what it should eat.
 - Shooting a mouse (300 of damage) sends it off for six seconds: players can protect a structure for a while.
 
 ### What falls
@@ -128,7 +128,7 @@ Every part of a map a player would tell a teammate about has a name (`kit.place_
 2. **Look at it.** Copy `tools/play/creamery_tour.txt` (views from fixed places, `cmd CheeseStrikeViewFrom x y z pitch yaw`) and run it with `tools/play.ps1 -Map <level>`; read every picture. Then `tools/play/creamery_mice.txt` with `-Bots -Mice -Extra "?MiceAt=5?KillLimit=50"`: pictures from above every minute while the mice eat, and the cheese left in the log (`CheeseStrikeCheeseLeft`).
 3. **Test it.** Add it to `CheeseStrikeRules::Maps`, and `CheeseStrike.Play.AfterTheMice.<map>` runs on it. Write a test like `CheeseStrike.Play.TheCreameryHoldsTogether`: its starts and structures, the lines its notes promise (traces that must hit a structure, or nothing), and a walk up every ramp and stair and across every bridge.
 4. **Play it.** With bots (`-Bots`): do they reach every lane and fight there? With mice: does the map open as its notes say?
-5. **Its picture.** `python tools/art/map_picture.py <level> <file> x y z pitch yaw` takes the lobby's picture of it from a view that shows it best and saves it into `Content/UI/Maps/`.
+5. **Its picture.** `python tools/art/map_picture.py <level> <file> x y z pitch yaw` takes the lobby's picture of it from a view that shows it best and saves it into `Content/UI/Maps/` (from Git Bash, set `MSYS_NO_PATHCONV=1`, or the level's path is rewritten).
 
 ## Starting a new map
 
