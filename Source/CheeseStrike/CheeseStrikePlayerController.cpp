@@ -278,8 +278,8 @@ void ACheeseStrikePlayerController::CheeseStrikeMice()
 	for (TActorIterator<ACheeseStrikeMouse> It(GetWorld()); It; ++It)
 	{
 		const ACheeseStrikeCheese* Target = It->GetTarget();
-		UE_LOG(LogCheeseStrike, Display, TEXT("Mouse: %s %s at %s, fear %.0f, ate %d, after %s"), *It->GetName(), Doings[static_cast<int32>(It->GetDoing())],
-			*It->GetActorLocation().ToCompactString(), It->GetFear(), It->GetEaten(), Target != nullptr ? *FString::Printf(TEXT("%s (%s, %.0f left, bottom at %.0f)"), *Target->GetName(), *Target->GetStructure().ToString(), Target->GetHealth(), Target->GetComponentsBoundingBox().Min.Z) : TEXT("nothing"));
+		UE_LOG(LogCheeseStrike, Display, TEXT("Mouse: %s %s at %s, fear %.0f, ate %d, body %s, sounds %s, after %s"), *It->GetName(), Doings[static_cast<int32>(It->GetDoing())],
+			*It->GetActorLocation().ToCompactString(), It->GetFear(), It->GetEaten(), It->HasBody() ? TEXT("yes") : TEXT("missing"), It->HasSounds() ? TEXT("yes") : TEXT("missing"), Target != nullptr ? *FString::Printf(TEXT("%s (%s, %.0f left, bottom at %.0f)"), *Target->GetName(), *Target->GetStructure().ToString(), Target->GetHealth(), Target->GetComponentsBoundingBox().Min.Z) : TEXT("nothing"));
 	}
 	int32 Blocks = 0;
 	for (TActorIterator<ACheeseStrikeCheese> It(GetWorld()); It; ++It)

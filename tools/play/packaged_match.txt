@@ -1,0 +1,17 @@
+# tools/package.ps1's second check of a packaged build: a match on The
+# Creamery with bots, and the mice brought in early, whose body and sounds
+# are loaded by path when they come into play.
+wait 8
+cmd CheeseStrikeViewMouse 700 60 250
+wait 3
+shot packaged_4_mouse
+cmd CheeseStrikeMice
+cmd CheeseStrikeBots
+cmd CheeseStrikeViewFrom -9000 -7000 7000 -38 38
+wait 1
+shot packaged_5_creamery
+hold Fire
+wait 1
+release Fire
+state
+quit
