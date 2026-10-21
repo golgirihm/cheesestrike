@@ -87,6 +87,8 @@ public:
 
 	/** Puts the weapon in `Character`'s hands, on both meshes (hidden until it is the one in hand). */
 	void Hold(ACheeseStrikeCharacter* Character);
+	/** Puts it in its holder's hands again, as their body holds it: after the body changes (ACheeseStrikeCharacter::ApplyBody). */
+	void FitToHands();
 	/** Shows it in hand on this machine, or hides it away. */
 	void SetInHand(bool bInHand);
 	bool IsInHand() const { return bInHand; }

@@ -11,6 +11,9 @@
 #include "PhysicsEngine/PhysicsConstraintTemplate.h"
 #include "PhysicsEngine/SkeletalBodySetup.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
+#include "Animation/CheeseStrikeBodies.h"
+#include "Materials/MaterialInterface.h"
+#include "Rules/CheeseStrikeRules.h"
 #include "CheeseStrikeCharacter.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -62,32 +65,41 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheBodyHasEveryAnimation, "CheeseStrike.Animat
 
 bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 {
-	// The mannequin's set, for the first-person arms, and Belica's, retargeted to her skeleton, for the body.
+	// The mannequin's set, and each hero's, retargeted to its skeleton.
 	const UCheeseStrikeAnimInstance* Mannequin = GetDefault<UCheeseStrikeAnimInstance>();
-	const UCheeseStrikeAnimInstance* Belica = GetDefault<UCheeseStrikeBelicaAnimInstance>();
-	for (const UCheeseStrikeAnimInstance* Animation : {Mannequin, Belica})
+	const UCheeseStrikeAnimInstance* Heroes = GetDefault<UCheeseStrikeHeroAnimInstance>();
+	TestEqual(TEXT("a set for every hero"), Heroes->GetSets().Num(), CheeseStrikeBodies::All().Num());
+	TArray<const FCheeseStrikeAnimSet*> Sets = {&Mannequin->GetSet()};
+	for (const FCheeseStrikeAnimSet& Set : Heroes->GetSets())
 	{
-		const FCheeseStrikeAnimSet& Set = Animation->GetSet();
-		TestTrue(FString::Printf(TEXT("%s: every animation was found"), *Animation->GetClass()->GetName()), Set.IsComplete());
+		Sets.Add(&Set);
+	}
+	for (int32 Index = 0; Index < Sets.Num(); ++Index)
+	{
+		const FCheeseStrikeAnimSet& Set = *Sets[Index];
+		const FString Who = Index == 0 ? FString(TEXT("the mannequin")) : FString(CheeseStrikeBodies::All()[Index - 1].Name);
+		TestTrue(FString::Printf(TEXT("%s: every animation was found"), *Who), Set.IsComplete());
 		TestNotNull(TEXT("standing"), Set.Idle.Get());
 		TestNotNull(TEXT("crouched"), Set.CrouchIdle.Get());
 		TestNotNull(TEXT("crouch walking"), Set.CrouchWalk.Get());
 		TestNotNull(TEXT("aiming from the hip"), Set.AimHip.Get());
 		TestNotNull(TEXT("firing"), Set.Fire.Get());
 		TestNotNull(TEXT("reloading"), Set.Reload.Get());
-	}
-	if (Belica->GetSet().Idle != nullptr && Mannequin->GetSet().Idle != nullptr)
-	{
-		TestTrue(TEXT("Belica's are her skeleton's, not the mannequin's"), Belica->GetSet().Idle->GetSkeleton() != Mannequin->GetSet().Idle->GetSkeleton());
+		if (Index > 0 && Set.Idle != nullptr)
+		{
+			const USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, CheeseStrikeBodies::All()[Index - 1].Mesh);
+			TestTrue(FString::Printf(TEXT("%s's are its own skeleton's"), *Who), Mesh != nullptr && Set.Idle->GetSkeleton() == Mesh->GetSkeleton());
+			TestTrue(TEXT("not the mannequin's"), Mannequin->GetSet().Idle == nullptr || Set.Idle->GetSkeleton() != Mannequin->GetSet().Idle->GetSkeleton());
+		}
 	}
 	TestEqual(TEXT("the mannequin's grip follows weapon_r"), Mannequin->GetGripAnchor(), FName(TEXT("weapon_r")));
-	TestEqual(TEXT("Belica's, her right hand"), Belica->GetGripAnchor(), FName(TEXT("hand_r")));
+	TestEqual(TEXT("a hero's, its right hand"), Heroes->GetGripAnchor(), FName(TEXT("hand_r")));
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterIsBelicaInBothViews, "CheeseStrike.Animation.TheCharacterIsBelicaInBothViews", AnimationTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCharacterIsAHeroInBothViews, "CheeseStrike.Animation.TheCharacterIsAHeroInBothViews", AnimationTests::Flags)
 
-bool FTheCharacterIsBelicaInBothViews::RunTest(const FString& Parameters)
+bool FTheCharacterIsAHeroInBothViews::RunTest(const FString& Parameters)
 {
 	const ACheeseStrikeCharacter* Character = GetDefault<ACheeseStrikeCharacter>();
 	// The body others see and the one its own player sees are the same: the arms in view are the character's own.
@@ -100,14 +112,9 @@ bool FTheCharacterIsBelicaInBothViews::RunTest(const FString& Parameters)
 		TestNotNull(TEXT("has a mesh"), Body->GetSkeletalMeshAsset());
 		if (Body->GetSkeletalMeshAsset() != nullptr)
 		{
-			TestEqual(TEXT("which is Belica"), Body->GetSkeletalMeshAsset()->GetName(), FString(TEXT("Belica")));
-			TestTrue(TEXT("with a hand for the rifle"), Body->GetSkeletalMeshAsset()->GetRefSkeleton().FindBoneIndex(FName(TEXT("hand_r"))) != INDEX_NONE);
-			FName Left;
-			FName Right;
-			TestTrue(TEXT("and eyes for the camera"), ACheeseStrikeCharacter::FindEyes(Body->GetSkeletalMeshAsset(), Left, Right));
-			TestTrue(TEXT("and a physics asset to fall with"), Body->GetSkeletalMeshAsset()->GetPhysicsAsset() != nullptr);
+			TestEqual(TEXT("which is the first hero's"), CheeseStrikeBodies::IndexOfMesh(Body->GetSkeletalMeshAsset()->GetPathName()), 0);
 		}
-		TestTrue(TEXT("animated in code, by her set"), Body->AnimClass == UCheeseStrikeBelicaAnimInstance::StaticClass());
+		TestTrue(TEXT("animated in code, by the heroes' sets"), Body->AnimClass == UCheeseStrikeHeroAnimInstance::StaticClass());
 	}
 	const ACheeseStrikeWeapon* Weapon = GetDefault<ACheeseStrikeWeapon>();
 	for (const USkeletalMeshComponent* Rifle : {Weapon->GetFirstPersonMesh(), Weapon->GetThirdPersonMesh()})
@@ -120,51 +127,122 @@ bool FTheCharacterIsBelicaInBothViews::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEveryBodyIsComplete, "CheeseStrike.Animation.EveryBodyIsComplete", AnimationTests::Flags)
+
+bool FEveryBodyIsComplete::RunTest(const FString& Parameters)
+{
+	for (int32 Index = 0; Index < CheeseStrikeBodies::All().Num(); ++Index)
+	{
+		const CheeseStrikeBodies::FBody& Body = CheeseStrikeBodies::All()[Index];
+		const USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, Body.Mesh);
+		if (!TestNotNull(FString::Printf(TEXT("%s has a mesh"), Body.Name), Mesh))
+		{
+			continue;
+		}
+		TestEqual(FString::Printf(TEXT("%s is found by its mesh"), Body.Name), CheeseStrikeBodies::IndexOfMesh(Mesh->GetPathName()), Index);
+		TestTrue(TEXT("with a hand for the rifle"), Mesh->GetRefSkeleton().FindBoneIndex(FName(TEXT("hand_r"))) != INDEX_NONE);
+		FName Left;
+		FName Right;
+		TestTrue(TEXT("eyes for the camera"), ACheeseStrikeCharacter::FindEyes(Mesh, Left, Right));
+		TestTrue(TEXT("its own ragdoll"), Mesh->GetPhysicsAsset() != nullptr && Mesh->GetPhysicsAsset()->GetName().EndsWith(TEXT("_Ragdoll")));
+		for (int32 Slot = 0; Slot < Body.NumWeaponSlots; ++Slot)
+		{
+			const FName Name(Body.WeaponSlots[Slot]);
+			TestTrue(FString::Printf(TEXT("its weapons' slot %s, to hide"), Body.WeaponSlots[Slot]), Mesh->GetMaterials().ContainsByPredicate([&Name](const FSkeletalMaterial& Each) { return Each.MaterialSlotName == Name; }));
+		}
+		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
+		{
+			for (int32 Slot = 0; Slot < Body.NumTeamSlots; ++Slot)
+			{
+				const FString Look = CheeseStrikeBodies::TeamLook(Index, Team, Body.TeamSlots[Slot]);
+				TestNotNull(FString::Printf(TEXT("and %s"), *Look), LoadObject<UMaterialInterface>(nullptr, *Look));
+			}
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSidesHaveBodiesOfTheirOwn, "CheeseStrike.Animation.TheSidesHaveBodiesOfTheirOwn", AnimationTests::Flags)
+
+bool FTheSidesHaveBodiesOfTheirOwn::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeBodies;
+	TestEqual(TEXT("the Gouda Guys are Murdock"), ForTeam(0, 0), IndexOf(TEXT("Murdock")));
+	TestEqual(TEXT("and Twinblast"), ForTeam(0, 1), IndexOf(TEXT("Twinblast")));
+	TestEqual(TEXT("the Mozza Radicals Lt. Belica"), ForTeam(1, 0), IndexOf(TEXT("Lt. Belica")));
+	TestEqual(TEXT("and Wraith"), ForTeam(1, 1), IndexOf(TEXT("Wraith")));
+	// On a side, its heroes in turn, never the other side's; every hero is on a side.
+	for (int32 Rank = 0; Rank < 8; ++Rank)
+	{
+		TestEqual(TEXT("a Gouda Guy is one of theirs"), TeamOf(For(true, 0, Rank)), 0);
+		TestEqual(TEXT("a Mozza Radical one of theirs"), TeamOf(For(true, 1, Rank)), 1);
+		TestNotEqual(TEXT("the next on a side is the other hero"), For(true, 0, Rank), For(true, 0, Rank + 1));
+	}
+	for (int32 Body = 0; Body < All().Num(); ++Body)
+	{
+		TestTrue(FString::Printf(TEXT("%s is on a side"), All()[Body].Name), TeamOf(Body) != INDEX_NONE);
+	}
+	// Without sides, as many players as heroes have every hero.
+	TSet<int32> Seen;
+	for (int32 Rank = 0; Rank < All().Num(); ++Rank)
+	{
+		Seen.Add(For(false, 0, Rank));
+	}
+	TestEqual(TEXT("without sides, every hero in turn"), Seen.Num(), All().Num());
+	TestTrue(TEXT("the sides' words name their looks"), TeamLook(0, 1, TEXT("M_Body")).Contains(TEXT("MI_M_Body_Mozza")));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheRagdollBendsAsABodyDoes, "CheeseStrike.Animation.TheRagdollBendsAsABodyDoes", AnimationTests::Flags)
 
 bool FTheRagdollBendsAsABodyDoes::RunTest(const FString& Parameters)
 {
-	const USkeletalMesh* Body = GetDefault<ACheeseStrikeCharacter>()->GetMesh()->GetSkeletalMeshAsset();
-	const UPhysicsAsset* Ragdoll = Body != nullptr ? Body->GetPhysicsAsset() : nullptr;
-	if (!TestNotNull(TEXT("the body has a ragdoll"), Ragdoll))
+	for (const CheeseStrikeBodies::FBody& Hero : CheeseStrikeBodies::All())
 	{
-		return false;
-	}
-	// A body for each part of her that moves on its own; none under the head (the face and jaw would slide on the
-	// skull) or for her own guns, which are hidden.
-	for (const TCHAR* Bone : {TEXT("pelvis"), TEXT("spine_03"), TEXT("head"), TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"), TEXT("upperarm_r"), TEXT("lowerarm_r"),
-		TEXT("hand_r"), TEXT("thigh_l"), TEXT("calf_l"), TEXT("foot_l"), TEXT("thigh_r"), TEXT("calf_r"), TEXT("foot_r")})
-	{
-		TestTrue(FString::Printf(TEXT("a body for %s"), Bone), Ragdoll->FindBodyIndex(Bone) != INDEX_NONE);
-	}
-	const FReferenceSkeleton& Skeleton = Body->GetRefSkeleton();
-	const int32 Head = Skeleton.FindBoneIndex(TEXT("head"));
-	for (const USkeletalBodySetup* Part : Ragdoll->SkeletalBodySetups)
-	{
-		const int32 Bone = Skeleton.FindBoneIndex(Part->BoneName);
-		TestFalse(FString::Printf(TEXT("no body under the head (%s)"), *Part->BoneName.ToString()), Bone != Head && Skeleton.BoneIsChildOf(Bone, Head));
-		TestFalse(FString::Printf(TEXT("no body for a gun (%s)"), *Part->BoneName.ToString()), Part->BoneName == TEXT("pistol") || Part->BoneName == TEXT("weapon"));
-	}
-	// Every joint limited every way, on hard limits, twisting no further than a person's; the knees and elbows
-	// hinges; and the spine twisting little at each joint.
-	float SpineTwist = 0.0f;
-	for (const UPhysicsConstraintTemplate* Template : Ragdoll->ConstraintSetup)
-	{
-		const FConstraintProfileProperties& Joint = Template->DefaultInstance.ProfileInstance;
-		const FString Bone = Template->DefaultInstance.ConstraintBone1.ToString();
-		TestTrue(FString::Printf(TEXT("%s is limited every way"), *Bone), Joint.ConeLimit.Swing1Motion != ACM_Free && Joint.ConeLimit.Swing2Motion != ACM_Free && Joint.TwistLimit.TwistMotion != ACM_Free);
-		TestFalse(FString::Printf(TEXT("%s on hard limits"), *Bone), Joint.ConeLimit.bSoftConstraint || Joint.TwistLimit.bSoftConstraint);
-		TestTrue(FString::Printf(TEXT("%s twists no more than 40 degrees (%.0f)"), *Bone, Joint.TwistLimit.TwistLimitDegrees), Joint.TwistLimit.TwistLimitDegrees <= 40.0f);
-		if (Bone.StartsWith(TEXT("lowerarm")) || Bone.StartsWith(TEXT("calf")))
+		const USkeletalMesh* Body = LoadObject<USkeletalMesh>(nullptr, Hero.Mesh);
+		const UPhysicsAsset* Ragdoll = Body != nullptr ? Body->GetPhysicsAsset() : nullptr;
+		if (!TestNotNull(FString::Printf(TEXT("%s has a ragdoll"), Hero.Name), Ragdoll))
 		{
-			TestTrue(FString::Printf(TEXT("%s is a hinge (%.0f to the side)"), *Bone, Joint.ConeLimit.Swing1LimitDegrees), Joint.ConeLimit.Swing1LimitDegrees <= 5.0f);
+			continue;
 		}
-		if (Bone.StartsWith(TEXT("spine")))
+		// A body for each part that moves on its own; none under the head (the face and jaw would slide on the
+		// skull) or for the hero's own guns, which are hidden.
+		for (const TCHAR* Bone : {TEXT("pelvis"), TEXT("spine_03"), TEXT("head"), TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"), TEXT("upperarm_r"), TEXT("lowerarm_r"),
+			TEXT("hand_r"), TEXT("thigh_l"), TEXT("calf_l"), TEXT("foot_l"), TEXT("thigh_r"), TEXT("calf_r"), TEXT("foot_r")})
 		{
-			SpineTwist += Joint.TwistLimit.TwistLimitDegrees;
+			TestTrue(FString::Printf(TEXT("%s: a body for %s"), Hero.Name, Bone), Ragdoll->FindBodyIndex(Bone) != INDEX_NONE);
 		}
+		const FReferenceSkeleton& Skeleton = Body->GetRefSkeleton();
+		const int32 Head = Skeleton.FindBoneIndex(TEXT("head"));
+		for (const USkeletalBodySetup* Part : Ragdoll->SkeletalBodySetups)
+		{
+			const int32 Bone = Skeleton.FindBoneIndex(Part->BoneName);
+			const FString Name = Part->BoneName.ToString();
+			TestFalse(FString::Printf(TEXT("%s: no body under the head (%s)"), Hero.Name, *Name), Bone != Head && Skeleton.BoneIsChildOf(Bone, Head));
+			TestFalse(FString::Printf(TEXT("%s: no body for a gun (%s)"), Hero.Name, *Name), Name.Contains(TEXT("pistol")) || Name.Contains(TEXT("weapon")) || Name.Contains(TEXT("gun")));
+		}
+		// Every joint limited every way, on hard limits, twisting no further than a person's; the knees and elbows
+		// hinges; and the spine twisting little at each joint.
+		float SpineTwist = 0.0f;
+		for (const UPhysicsConstraintTemplate* Template : Ragdoll->ConstraintSetup)
+		{
+			const FConstraintProfileProperties& Joint = Template->DefaultInstance.ProfileInstance;
+			const FString Bone = FString(Hero.Name) + TEXT("'s ") + Template->DefaultInstance.ConstraintBone1.ToString();
+			const FString Bare = Template->DefaultInstance.ConstraintBone1.ToString();
+			TestTrue(FString::Printf(TEXT("%s is limited every way"), *Bone), Joint.ConeLimit.Swing1Motion != ACM_Free && Joint.ConeLimit.Swing2Motion != ACM_Free && Joint.TwistLimit.TwistMotion != ACM_Free);
+			TestFalse(FString::Printf(TEXT("%s on hard limits"), *Bone), Joint.ConeLimit.bSoftConstraint || Joint.TwistLimit.bSoftConstraint);
+			TestTrue(FString::Printf(TEXT("%s twists no more than 40 degrees (%.0f)"), *Bone, Joint.TwistLimit.TwistLimitDegrees), Joint.TwistLimit.TwistLimitDegrees <= 40.0f);
+			if (Bare.StartsWith(TEXT("lowerarm")) || Bare.StartsWith(TEXT("calf")))
+			{
+				TestTrue(FString::Printf(TEXT("%s is a hinge (%.0f to the side)"), *Bone, Joint.ConeLimit.Swing1LimitDegrees), Joint.ConeLimit.Swing1LimitDegrees <= 5.0f);
+			}
+			if (Bare.StartsWith(TEXT("spine")))
+			{
+				SpineTwist += Joint.TwistLimit.TwistLimitDegrees;
+			}
+		}
+		TestTrue(FString::Printf(TEXT("%s's spine twists no more than 30 degrees in all (%.0f)"), Hero.Name, SpineTwist), SpineTwist > 0.0f && SpineTwist <= 30.0f);
 	}
-	TestTrue(FString::Printf(TEXT("the spine twists no more than 30 degrees in all (%.0f)"), SpineTwist), SpineTwist > 0.0f && SpineTwist <= 30.0f);
 	return true;
 }
 

@@ -7,6 +7,8 @@
 #include "Misc/AutomationTest.h"
 #include "AnimationRuntime.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
+#include "Animation/CheeseStrikeBodies.h"
+#include "Materials/MaterialInterface.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -406,6 +408,22 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 	Then([]() { PlayTests::FirstBody = Character(0); });
 	// Both have just arrived, and can't be hurt yet.
 	Wait(CheeseStrikeRules::SpawnProtection);
+	Then([this]()
+	{
+		// Everyone for themself: on both machines, the two are different heroes, each in its own colours.
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			const ACheeseStrikeCharacter* Host = CharacterOf(0, Machine);
+			const ACheeseStrikeCharacter* Joiner = CharacterOf(1, Machine);
+			if (TestNotNull(TEXT("both players are there"), Host) && TestNotNull(TEXT("both"), Joiner))
+			{
+				TestTrue(FString::Printf(TEXT("machine %d shows two heroes"), Machine), CheeseStrikeBodies::All().IsValidIndex(Host->GetBody()) && CheeseStrikeBodies::All().IsValidIndex(Joiner->GetBody()));
+				TestNotEqual(TEXT("different ones"), Host->GetBody(), Joiner->GetBody());
+				TestEqual(TEXT("in the host's own colours"), Host->GetBodyTeam(), static_cast<int32>(INDEX_NONE));
+				TestEqual(TEXT("and the joiner's"), Joiner->GetBodyTeam(), static_cast<int32>(INDEX_NONE));
+			}
+		}
+	});
 	Play(1, TEXT("hold Fire\nwait 1.2\nrelease Fire"));
 	WaitUntil(TEXT("the host dying"), 5.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && !Host->IsAlive(); });
 	Then([this]()
@@ -476,6 +494,60 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 		}
 	});
 	WaitUntil(TEXT("the joiner seeing the host back"), 5.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 1); return Host != nullptr && Host->IsAlive(); });
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSidesLookDifferent, "CheeseStrike.Play.TheSidesLookDifferent", PlayTests::Flags)
+
+bool FTheSidesLookDifferent::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	StartPlaying({2, TEXT("?Mode=Deathmatch")});
+	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
+	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
+	Wait(1.0f);
+	Then([this]()
+	{
+		// The two are on different sides, and look it on both machines: each a hero of their side's, in its colours.
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			const ACheeseStrikeCharacter* Host = CharacterOf(0, Machine);
+			const ACheeseStrikeCharacter* Joiner = CharacterOf(1, Machine);
+			const ACheeseStrikeGameState* Match = GameState(Machine);
+			if (!TestNotNull(TEXT("both players are there"), Host) || !TestNotNull(TEXT("both"), Joiner) || !TestNotNull(TEXT("in a match"), Match))
+			{
+				continue;
+			}
+			TestTrue(TEXT("with sides"), Match->HasTeams());
+			const int32 HostTeam = Match->TeamOf(Host->GetPlayerState());
+			const int32 JoinerTeam = Match->TeamOf(Joiner->GetPlayerState());
+			TestNotEqual(TEXT("the host and the joiner are on different sides"), HostTeam, JoinerTeam);
+			TestEqual(FString::Printf(TEXT("machine %d shows the host as one of their side's heroes"), Machine), CheeseStrikeBodies::TeamOf(Host->GetBody()), HostTeam);
+			TestEqual(TEXT("and the joiner as one of theirs"), CheeseStrikeBodies::TeamOf(Joiner->GetBody()), JoinerTeam);
+			TestEqual(TEXT("in their side's colours"), Host->GetBodyTeam(), HostTeam);
+			TestEqual(TEXT("both of them"), Joiner->GetBodyTeam(), JoinerTeam);
+			TestTrue(TEXT("so they look different"), Host->GetMesh()->GetSkeletalMeshAsset() != Joiner->GetMesh()->GetSkeletalMeshAsset());
+			for (const ACheeseStrikeCharacter* Player : {Host, Joiner})
+			{
+				const UMaterialInterface* Dress = Player->GetMesh()->GetMaterial(0);
+				const int32 Side = Player == Host ? HostTeam : JoinerTeam;
+				TestTrue(FString::Printf(TEXT("each wears their side's colours (%s)"), Dress != nullptr ? *Dress->GetName() : TEXT("none")), Dress != nullptr && Side >= 0 && Dress->GetName().Contains(CheeseStrikeBodies::TeamWord(Side)));
+			}
+			// The first-person arms are the same body, holding the rifle as that body does.
+			if (Machine == 0)
+			{
+				TestTrue(TEXT("the host's arms are their body's"), Host->GetFirstPersonMesh()->GetSkeletalMeshAsset() == Host->GetMesh()->GetSkeletalMeshAsset());
+				const ACheeseStrikeWeapon* Weapon = Host->GetWeapon();
+				if (TestNotNull(TEXT("holding a weapon"), Weapon))
+				{
+					const FTransform InHand = Weapon->GetThirdPersonMesh()->GetComponentTransform().GetRelativeTransform(Host->GetMesh()->GetSocketTransform(TEXT("hand_r")));
+					const FTransform Wanted = CheeseStrikeBodies::All()[Host->GetBody()].HandGrip;
+					TestTrue(TEXT("in the right hand, at their body's grip"), InHand.GetRotation().AngularDistance(Wanted.GetRotation()) < 0.05f);
+				}
+			}
+		}
+	});
 	StopPlaying();
 	return true;
 }

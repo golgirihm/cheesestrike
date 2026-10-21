@@ -4,8 +4,12 @@
 #include "Animation/AnimSequence.h"
 #include "Animation/BlendSpace.h"
 #include "Animation/AimOffsetBlendSpace.h"
+#include "Animation/Skeleton.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "CheeseStrikeBodies.h"
 #include "CheeseStrikeCharacter.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -74,37 +78,58 @@ UCheeseStrikeAnimInstance::UCheeseStrikeAnimInstance()
 {
 	// Lyra's rifle set for the mannequin (Content/LICENSES.md).
 	const FString Mannequin = TEXT("/Game/Characters/Heroes/Mannequin/Animations/");
-	FindSet(Mannequin + TEXT("Locomotion/Rifle/"), Mannequin + TEXT("AimOffsets/"), Mannequin + TEXT("Actions/"));
+	Sets.Add(FindSet(Mannequin + TEXT("Locomotion/Rifle/"), Mannequin + TEXT("AimOffsets/"), Mannequin + TEXT("Actions/")));
+	Set = Sets[0];
 }
 
-UCheeseStrikeBelicaAnimInstance::UCheeseStrikeBelicaAnimInstance()
+UCheeseStrikeHeroAnimInstance::UCheeseStrikeHeroAnimInstance()
 {
-	const FString Retargeted = TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Animations/Rifle/");
-	FindSet(Retargeted, Retargeted, Retargeted);
+	Sets.Reset();
+	for (const CheeseStrikeBodies::FBody& Body : CheeseStrikeBodies::All())
+	{
+		Sets.Add(FindSet(Body.Animations, Body.Animations, Body.Animations));
+	}
+	Set = Sets.IsEmpty() ? FCheeseStrikeAnimSet() : Sets[0];
 	GripAnchor = TEXT("hand_r");
 }
 
-void UCheeseStrikeAnimInstance::FindSet(const FString& Locomotion, const FString& AimOffsets, const FString& Actions)
+void UCheeseStrikeAnimInstance::PickSet()
 {
+	const USkeletalMeshComponent* Mesh = GetSkelMeshComponent();
+	const USkeleton* Skeleton = Mesh != nullptr && Mesh->GetSkeletalMeshAsset() != nullptr ? Mesh->GetSkeletalMeshAsset()->GetSkeleton() : nullptr;
+	for (const FCheeseStrikeAnimSet& Each : Sets)
+	{
+		if (Each.Idle != nullptr && Each.Idle->GetSkeleton() == Skeleton)
+		{
+			Set = Each;
+			return;
+		}
+	}
+}
+
+FCheeseStrikeAnimSet UCheeseStrikeAnimInstance::FindSet(const FString& Locomotion, const FString& AimOffsets, const FString& Actions)
+{
+	FCheeseStrikeAnimSet Found;
 	const auto Path = [](const FString& Folder, const TCHAR* Name) { return Folder + Name + TEXT(".") + Name; };
-	Set.Idle = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Idle_Hipfire")));
-	Set.IdleAiming = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Idle_ADS")));
-	Set.WalkForward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Fwd")));
-	Set.WalkBackward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Bwd")));
-	Set.WalkLeft = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Left")));
-	Set.WalkRight = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Right")));
-	Set.JogForward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Fwd")));
-	Set.JogBackward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Bwd")));
-	Set.JogLeft = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Left")));
-	Set.JogRight = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Right")));
-	Set.CrouchIdle = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Crouch_Idle")));
-	Set.CrouchWalk = Find<UBlendSpace>(*Path(Locomotion, TEXT("BS_MM_Rifle_Crouch_Walk")));
-	Set.FallLoop = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jump_Fall_Loop")));
-	Set.AimHip = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Idle_Hipfire")));
-	Set.AimAiming = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Idle_ADS")));
-	Set.AimCrouch = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Crouch_Idle")));
-	Set.Fire = Find<UAnimSequence>(*Path(Actions, TEXT("MM_Rifle_Fire")));
-	Set.Reload = Find<UAnimSequence>(*Path(Actions, TEXT("MM_Rifle_Reload")));
+	Found.Idle = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Idle_Hipfire")));
+	Found.IdleAiming = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Idle_ADS")));
+	Found.WalkForward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Fwd")));
+	Found.WalkBackward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Bwd")));
+	Found.WalkLeft = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Left")));
+	Found.WalkRight = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Right")));
+	Found.JogForward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Fwd")));
+	Found.JogBackward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Bwd")));
+	Found.JogLeft = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Left")));
+	Found.JogRight = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Right")));
+	Found.CrouchIdle = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Crouch_Idle")));
+	Found.CrouchWalk = Find<UBlendSpace>(*Path(Locomotion, TEXT("BS_MM_Rifle_Crouch_Walk")));
+	Found.FallLoop = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jump_Fall_Loop")));
+	Found.AimHip = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Idle_Hipfire")));
+	Found.AimAiming = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Idle_ADS")));
+	Found.AimCrouch = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Crouch_Idle")));
+	Found.Fire = Find<UAnimSequence>(*Path(Actions, TEXT("MM_Rifle_Fire")));
+	Found.Reload = Find<UAnimSequence>(*Path(Actions, TEXT("MM_Rifle_Reload")));
+	return Found;
 }
 
 FAnimInstanceProxy* UCheeseStrikeAnimInstance::CreateAnimInstanceProxy()
@@ -214,10 +239,11 @@ void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set, FName GripAnc
 void FCheeseStrikeAnimProxy::Initialize(UAnimInstance* InAnimInstance)
 {
 	FAnimInstanceProxy::Initialize(InAnimInstance);
-	if (const UCheeseStrikeAnimInstance* Instance = Cast<UCheeseStrikeAnimInstance>(InAnimInstance))
+	if (UCheeseStrikeAnimInstance* Instance = Cast<UCheeseStrikeAnimInstance>(InAnimInstance))
 	{
 		if (!bLinked)
 		{
+			Instance->PickSet();
 			Link(Instance->GetSet(), Instance->GetGripAnchor());
 		}
 		ToLocalSpace.Initialize_AnyThread(FAnimationInitializeContext(this));

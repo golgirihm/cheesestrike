@@ -1,0 +1,70 @@
+# Looks at every body (CheeseStrikeBody), in each side's colours, from
+# outside (CheeseStrikeOutside): standing from in front and to the side,
+# aiming, and walking; then at the first-person view of each.
+wait 2
+cmd CheeseStrikeBody 0 0
+wait 0.5
+cmd CheeseStrikeOutside 300 30
+wait 0.6
+shot bodies_0_gouda_front
+cmd CheeseStrikeBody 0 1
+wait 0.5
+shot bodies_0_mozza_front
+cmd CheeseStrikeOutside 300 120
+hold Aim
+wait 0.8
+shot bodies_0_mozza_aimed
+release Aim
+cmd CheeseStrikeOutside
+wait 0.3
+shot bodies_0_first_person
+cmd CheeseStrikeBody 1 0
+wait 0.5
+cmd CheeseStrikeOutside 300 30
+wait 0.6
+shot bodies_1_gouda_front
+cmd CheeseStrikeBody 1 1
+wait 0.5
+shot bodies_1_mozza_front
+cmd CheeseStrikeOutside 300 120
+hold Aim
+wait 0.8
+shot bodies_1_mozza_aimed
+release Aim
+cmd CheeseStrikeOutside
+wait 0.3
+shot bodies_1_first_person
+cmd CheeseStrikeBody 2 0
+wait 0.5
+cmd CheeseStrikeOutside 300 30
+wait 0.6
+shot bodies_2_gouda_front
+cmd CheeseStrikeBody 2 1
+wait 0.5
+shot bodies_2_mozza_front
+cmd CheeseStrikeOutside 300 120
+hold Aim
+wait 0.8
+shot bodies_2_mozza_aimed
+release Aim
+cmd CheeseStrikeOutside
+wait 0.3
+shot bodies_2_first_person
+cmd CheeseStrikeBody 3 0
+wait 0.5
+cmd CheeseStrikeOutside 300 30
+wait 0.6
+shot bodies_3_gouda_front
+cmd CheeseStrikeBody 3 1
+wait 0.5
+shot bodies_3_mozza_front
+cmd CheeseStrikeOutside 300 120
+hold Aim
+wait 0.8
+shot bodies_3_mozza_aimed
+release Aim
+cmd CheeseStrikeOutside
+wait 0.3
+shot bodies_3_first_person
+wait 0.5
+quit
