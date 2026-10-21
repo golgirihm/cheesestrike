@@ -137,8 +137,13 @@ Write-Output "== zipping into $zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 # Windows' own tar writes zips, quicker than Compress-Archive and without its 2 GB limit. The debug
 # symbols (a third of the build) stay here, under the build's name, for reading a crash log sent back.
-& (Join-Path $env:SystemRoot "System32\tar.exe") -a -c -f "$zip" --exclude "*.pdb" -C "$build" .
+# The build's entries are named, not ".": entries tar names "./..." are invisible to Windows' own unzipping.
+$entries = @(Get-ChildItem $build -Name)
+& (Join-Path $env:SystemRoot "System32\tar.exe") -a -c -f "$zip" --exclude "*.pdb" -C "$build" @entries
 if ($LASTEXITCODE -ne 0) { Fail "zipping failed" }
+# Opened as Explorer opens it, for Extract All: every one of the build's entries must be there.
+$seen = @((New-Object -ComObject Shell.Application).NameSpace($zip).Items() | ForEach-Object { $_.Name })
+if ($seen.Count -ne $entries.Count) { Fail "Windows sees $($seen.Count) of the zip's $($entries.Count) entries ($($seen -join ', '))" }
 $symbols = Join-Path $Out "symbols\$name"
 New-Item -ItemType Directory -Force $symbols | Out-Null
 Get-ChildItem $build -Recurse -Filter *.pdb | Copy-Item -Destination $symbols
