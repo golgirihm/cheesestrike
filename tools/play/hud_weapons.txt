@@ -1,0 +1,19 @@
+# The weapon panel with each weapon in hand: the rifle (1), firing and
+# reloading, the pistol (2), and the knife (3), with the list of weapons
+# carried over it. Run alone with -Res 1920x1080.
+wait 4
+shot weapons_1_rifle
+hold Fire
+wait 0.6
+release Fire
+tap Reload
+wait 0.4
+shot weapons_2_rifle_reloading
+wait 2
+tap Sidearm
+wait 1
+shot weapons_3_pistol
+tap Knife
+wait 1
+shot weapons_4_knife
+quit

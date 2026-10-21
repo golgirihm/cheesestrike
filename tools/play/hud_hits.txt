@@ -1,0 +1,30 @@
+# The damage arcs and the red edges, held still for judging them
+# (CheeseStrikeHitFrom, CheeseStrike.HUD.HoldArcs and CheeseStrike.HUD.Health):
+# one hit from the right, then three from round about, then the edges as health
+# falls and pulses. Run alone with -Res 1920x1080. The arcs from real shots over
+# the network are CheeseStrike.Play.TheHUDShowsWhereHitsComeFrom's.
+wait 4
+cmd CheeseStrike.HUD.HoldArcs 1
+cmd CheeseStrikeHitFrom 70
+wait 0.6
+shot hits_1_one_from_the_right
+cmd CheeseStrikeHitFrom -135
+cmd CheeseStrikeHitFrom 5
+wait 0.6
+shot hits_2_three_round_about
+cmd CheeseStrike.HUD.HoldArcs 0
+wait 2
+cmd CheeseStrike.HUD.Health 55
+wait 0.6
+shot edges_1_health_55
+cmd CheeseStrike.HUD.Health 35
+wait 0.6
+shot edges_2_health_35
+cmd CheeseStrike.HUD.Health 15
+wait 0.3
+shot edges_3_health_15
+wait 0.4
+shot edges_4_health_15_later
+cmd CheeseStrike.HUD.Health -1
+wait 0.5
+quit

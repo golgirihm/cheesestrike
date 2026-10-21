@@ -1,0 +1,34 @@
+# The HUD at a glance, with bots: the minimap as the view turns, the players
+# along the top, the score, the weapon panel and its reload, and the death
+# screen as it melts. Run with -Extra "?Bots=5?BotSkill=0" -Res 1920x1080
+# (and -Map for The Creamery).
+wait 5
+shot hud_1_start
+look 90 0
+wait 0.5
+shot hud_2_turned_right
+look 135 0
+wait 0.5
+shot hud_3_turned_back
+hold Fire
+wait 1.2
+release Fire
+tap Reload
+wait 0.5
+shot hud_4_reloading
+wait 6
+shot hud_5_later
+cmd CheeseStrikeDie
+wait 0.2
+shot hud_death_1
+wait 0.3
+shot hud_death_2
+wait 0.4
+shot hud_death_3
+wait 0.6
+shot hud_death_4
+wait 0.8
+shot hud_death_5
+wait 3
+shot hud_6_back
+quit
