@@ -508,16 +508,17 @@ def cheese_floor(name, structure, low, high, tile=(200, 200), edible=True, holes
 
 # ---------------------------------------------------------------- frames, doors, buildings, tunnels and bridges
 
-def frame_post(label, folder, x, y, bottom, top, size=24, colour="Dark"):
-    """A steel post of the frame that is never eaten."""
-    box(label, folder, (x - size / 2.0, y - size / 2.0, bottom), (x + size / 2.0, y + size / 2.0, top), painted(colour))
+def frame_post(label, folder, x, y, bottom, top, size=24, colour="Dark", material=None):
+    """A steel post of the frame that is never eaten (or of `material`: timber, stone)."""
+    box(label, folder, (x - size / 2.0, y - size / 2.0, bottom), (x + size / 2.0, y + size / 2.0, top), material or painted(colour))
 
 
-def rail(label, folder, start, end, z, height=100, colour="Yellow"):
-    """A rail along x or y at a floor's edge: a top bar and a mid bar on posts, which shots and sight pass between."""
+def rail(label, folder, start, end, z, height=100, colour="Yellow", material=None):
+    """A rail along x or y at a floor's edge: a top bar and a mid bar on posts, which shots and sight pass between.
+    Painted `colour`, or of `material` (timber, iron)."""
     along_x = abs(end[0] - start[0]) >= abs(end[1] - start[1])
     length = abs(end[0] - start[0]) if along_x else abs(end[1] - start[1])
-    m = painted(colour)
+    m = material or painted(colour)
     for bar, h in (("Top", height), ("Mid", height / 2.0)):
         if along_x:
             box(f"{label}_{bar}", folder, (min(start[0], end[0]), start[1] - 4, z + h - 6), (max(start[0], end[0]), start[1] + 4, z + h), m)
@@ -530,10 +531,11 @@ def rail(label, folder, start, end, z, height=100, colour="Yellow"):
         box(f"{label}_Post_{i}", folder, (x - 4, y - 4, z), (x + 4, y + 4, z + height), m)
 
 
-def door(label, folder, at, yaw, width=200, height=220, double=True, leaves=None, jambs=True):
+def door(label, folder, at, yaw, width=200, height=220, double=True, leaves=None, jambs=True, jamb_material=None):
     """A door (ACheeseStrikeDoor) in a doorway whose bottom middle is `at`, its X through the doorway (`yaw` 0 for a
     wall along y, 90 for one along x): it slides open as anyone comes up to it (player, bot or mouse) and shuts behind
-    them; the navigation mesh runs through it. Steel jambs either side stay when the wall round it is eaten."""
+    them; the navigation mesh runs through it. Steel jambs either side (or of `jamb_material`) stay when the wall
+    round it is eaten."""
     actor = place(unreal.CheeseStrikeDoor, label, folder, at, (0, yaw, 0))
     actor.set_editor_property("width", float(width))
     actor.set_editor_property("height", float(height))
@@ -544,7 +546,7 @@ def door(label, folder, at, yaw, width=200, height=220, double=True, leaves=None
         across = (-math.sin(turn), math.cos(turn))
         for side in (-1, 1):
             jx, jy = at[0] + across[0] * side * (width / 2.0 + 6), at[1] + across[1] * side * (width / 2.0 + 6)
-            box(f"{label}_Jamb_{side}", folder, (jx - 6, jy - 6, at[2]), (jx + 6, jy + 6, at[2] + height - 12), painted("Dark"))
+            box(f"{label}_Jamb_{side}", folder, (jx - 6, jy - 6, at[2]), (jx + 6, jy + 6, at[2] + height - 12), jamb_material or painted("Dark"))
     count("doors")
     return actor
 
@@ -564,11 +566,28 @@ def interior_lamp(label, folder, x, y, z, intensity=12.0, radius=900.0, temperat
     return light
 
 
+def point_light(label, folder, at, intensity=8.0, radius=1200.0, temperature=2700.0, shadows=True, source=8.0):
+    """A light shining all round from `at` (a street lamp's lantern, a wall lantern, a brazier), warm unless said: for
+    the lamps that light a dusk or night map. Lumen lights everything; keep shadowed lights to about twenty a map, and
+    give small lamps outdoors `shadows=False`."""
+    light = place(unreal.PointLight, label, folder, at)
+    component = light.get_component_by_class(unreal.PointLightComponent)
+    component.set_editor_property("intensity", float(intensity))
+    component.set_editor_property("attenuation_radius", float(radius))
+    component.set_editor_property("source_radius", float(source))
+    component.set_editor_property("use_temperature", True)
+    component.set_editor_property("temperature", float(temperature))
+    component.set_editor_property("cast_shadows", bool(shadows))
+    count("lamps")
+    return light
+
+
 SIDES = ("N", "S", "E", "W")
 
 
 def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=250, doors=(), windows=(), stairway=None,
-             cheese_roof=True, deck=None, frame="Dark", door_material=None, lamps=True, edible=True, bottom=0):
+             cheese_roof=True, deck=None, frame="Dark", door_material=None, lamps=True, edible=True, bottom=0,
+             doorways=(), frame_material=None, stair_material=None, rail_material=None):
     """A house of cheese, `storeys` high, on the floor at `bottom`: its walls are cheese (eaten from the bottom, so each
     column of a wall comes down as its foot is eaten, and a lintel over each opening falls once a side goes), and its
     upper floors are concrete decks on a steel frame inside the walls, which the mice never eat: once its walls are gone
@@ -584,6 +603,10 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
         ground floor) to `to` (its top, at the first deck: 6 m on for a 350 storey), with a hole in the deck over it and
         a rail round the hole; for more storeys, a list of flights, one a storey, each starting where the hole above
         the last one isn't.
+    `doorways`: (side, at, storey[, width]): an open doorway (no door) in that storey, 120 wide unless said, from its
+        floor to 220 up, with a lintel over it: onto a balcony, a gallery or a bridge from an upper floor.
+    `frame_material`, `stair_material`, `rail_material`: what its posts, corners and door jambs, its stairs, and the
+        rails round its stairwells are made of, if not painted steel (`frame`), steel and yellow paint: timber, stone.
     Returns where its floors are: {"inside": ((x0, y0), (x1, y1)), "floors": [z of each storey's floor]}."""
     f = f"Buildings/{name}"
     x0, y0 = low
@@ -607,7 +630,7 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
         mid = at - (s[0] if side in "NS" else s[1])
         openings[side].append((mid - w / 2.0, mid + w / 2.0, 0, h))
         at_point = (at, walls[side][0][1], bottom) if side in "NS" else (walls[side][0][0], at, bottom)
-        door(f"{name}_Door_{side}_{int(at)}", f, at_point, 90 if side in "NS" else 0, w, h, leaves=door_material)
+        door(f"{name}_Door_{side}_{int(at)}", f, at_point, 90 if side in "NS" else 0, w, h, leaves=door_material, jamb_material=frame_material)
     for wnd in windows:
         side, at, level = wnd[0], wnd[1], wnd[2]
         w = wnd[3] if len(wnd) > 3 else 200
@@ -615,6 +638,12 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
         s = walls[side][0]
         mid = at - (s[0] if side in "NS" else s[1])
         openings[side].append((mid - w / 2.0, mid + w / 2.0, level * storey + sill, level * storey + top))
+    for way in doorways:
+        side, at, level = way[0], way[1], way[2]
+        w = way[3] if len(way) > 3 else 120
+        s = walls[side][0]
+        mid = at - (s[0] if side in "NS" else s[1])
+        openings[side].append((mid - w / 2.0, mid + w / 2.0, level * storey, level * storey + 220))
     for side in SIDES:
         start, end = walls[side]
         cheese_wall(f"{name}_{side}", structure, start, end, bottom, courses, wall, column, openings[side], edible)
@@ -643,7 +672,7 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
         z = bottom + level * storey
         floors.append(z)
         for i, (px, py) in enumerate(posts):
-            frame_post(f"{name}_Post_{level}_{i}", f, px, py, z - storey, z - 25, colour=frame)
+            frame_post(f"{name}_Post_{level}_{i}", f, px, py, z - storey, z - 25, colour=frame, material=frame_material)
         flight = flights[level - 1] if level - 1 < len(flights) else None
         hole = hole_for(flight) if flight else None
         slab(f"{name}_Deck_{level}", f, (ix0, iy0, z - 25), (ix1, iy1, z), m_deck, [hole] if hole else [])
@@ -653,20 +682,20 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
             if flight[0] in "NS":
                 far_x = hx0 if abs(flight[2] - hx1) < abs(flight[2] - hx0) else hx1
                 inner_y = hy1 if flight[0] == "S" else hy0
-                rail(f"{name}_StairRail_{level}", f, (hx0, inner_y), (hx1, inner_y), z)
-                rail(f"{name}_StairEnd_{level}", f, (far_x, hy0), (far_x, hy1), z)
+                rail(f"{name}_StairRail_{level}", f, (hx0, inner_y), (hx1, inner_y), z, material=rail_material)
+                rail(f"{name}_StairEnd_{level}", f, (far_x, hy0), (far_x, hy1), z, material=rail_material)
             else:
                 far_y = hy0 if abs(flight[2] - hy1) < abs(flight[2] - hy0) else hy1
                 inner_x = hx1 if flight[0] == "W" else hx0
-                rail(f"{name}_StairRail_{level}", f, (inner_x, hy0), (inner_x, hy1), z)
-                rail(f"{name}_StairEnd_{level}", f, (hx0, far_y), (hx1, far_y), z)
+                rail(f"{name}_StairRail_{level}", f, (inner_x, hy0), (inner_x, hy1), z, material=rail_material)
+                rail(f"{name}_StairEnd_{level}", f, (hx0, far_y), (hx1, far_y), z, material=rail_material)
     for level, (side, a, b) in enumerate(flights[:storeys - 1]):
         line = {"S": iy0 + 80, "N": iy1 - 80, "W": ix0 + 80, "E": ix1 - 80}[side]
         z0, z1 = bottom + level * storey, bottom + (level + 1) * storey
         if side in "NS":
-            stairs(f"{name}_Stairs_{level}", f, (a, line, z0), (b, line, z1), 150, steel())
+            stairs(f"{name}_Stairs_{level}", f, (a, line, z0), (b, line, z1), 150, stair_material or steel())
         else:
-            stairs(f"{name}_Stairs_{level}", f, (line, a, z0), (line, b, z1), 150, steel())
+            stairs(f"{name}_Stairs_{level}", f, (line, a, z0), (line, b, z1), 150, stair_material or steel())
     # The roof: planks of cheese across the shorter way, from wall to wall.
     if cheese_roof:
         across_x = (x1 - x0) <= (y1 - y0)
@@ -685,20 +714,20 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
             interior_lamp(f"{name}_Lamp_{level}", f, (ix0 + ix1) / 2.0, (iy0 + iy1) / 2.0, bottom + (level + 1) * storey - 32)
     # Steel at its corners outside, up to the roof: it reads as a building, and stands with the decks once the walls go.
     for cx, cy in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)):
-        box(f"{name}_Corner_{int(cx)}_{int(cy)}", f, (cx - 15, cy - 15, bottom), (cx + 15, cy + 15, bottom + height + 30), painted(frame))
+        box(f"{name}_Corner_{int(cx)}_{int(cy)}", f, (cx - 15, cy - 15, bottom), (cx + 15, cy + 15, bottom + height + 30), frame_material or painted(frame))
     count("buildings")
     return {"inside": ((ix0, iy0), (ix1, iy1)), "floors": floors}
 
 
 def tunnel(name, structure, start, end, width=400, height=300, wall=50, bottom=0, openings=(), ends=(False, False),
-           cheese_roof=True, edible=True, lamps=600, sides=("L", "R")):
+           cheese_roof=True, edible=True, lamps=600, sides=("L", "R"), ledger_material=None):
     """A covered way of cheese along x or y from `start` (x, y) to `end`: walls either side, `width` apart inside and
     `height` tall, and a roof of cheese planks from wall to wall. Dark and close until the mice eat it open; a plank
     falls when the wall under one end goes. `openings` in its walls: (side, from, to[, top]): side "L" or "R" (left or
     right walking from start to end), from and to along it from `start`, up to `top` (220 unless said, a course's top,
     with a lintel over it that carries the roof; put a door() in it if it wants one). `ends`: whether each end is walled. A lamp every `lamps` cm inside.
     `sides`: the walls it has; built against a wall that isn't cheese (a shed's), leave that side out, and a steel
-    ledger on that wall carries the roof's planks there instead."""
+    ledger on that wall carries the roof's planks there instead (painted steel, or `ledger_material`)."""
     f = f"Tunnels/{name}"
     along_x = abs(end[0] - start[0]) >= abs(end[1] - start[1])
     length = abs(end[0] - start[0]) if along_x else abs(end[1] - start[1])
@@ -716,7 +745,7 @@ def tunnel(name, structure, start, end, width=400, height=300, wall=50, bottom=0
         if side not in sides:
             low = (min(s[0], e[0]) - (0 if along_x else wall / 2.0), min(s[1], e[1]) - (wall / 2.0 if along_x else 0), bottom + height - 25)
             high = (max(s[0], e[0]) + (0 if along_x else wall / 2.0), max(s[1], e[1]) + (wall / 2.0 if along_x else 0), bottom + height)
-            box(f"{name}_Ledger_{side}", f, low, high, painted("Dark"))
+            box(f"{name}_Ledger_{side}", f, low, high, ledger_material or painted("Dark"))
             continue
         ops = [(a, b, 0, t[0] if t else courses[0]) for (sd, a, b, *t) in openings if sd == side]
         cheese_wall(f"{name}_{side}", structure, s, e, bottom, courses, wall, 200, ops, edible)
@@ -752,13 +781,14 @@ def tunnel(name, structure, start, end, width=400, height=300, wall=50, bottom=0
 
 
 def bridge(name, structure, start, end, width=250, beams=2, beam=40, depth=30, deck=30, cheese_deck=True, rails=True,
-           supports=(), material=None, edible=True, wax_beams=False):
+           supports=(), material=None, edible=True, wax_beams=False, frame_material=None):
     """A level bridge along x or y from `start` (x, y, z: the middle of one end, at its deck's top) to `end`: steel
     beams under it, the length of it, which the mice never eat, and a deck of cheese tiles across them that they do
     (or of `material`, if not `cheese_deck`). Eaten, it leaves its beams: `beams` of them, `beam` cm wide (one 60 cm
     beam down the middle is a way across for a careful player; bots and mice need 70). Rails at its sides if `rails`.
     `supports`: points along it (from `start`) where a post goes down to the ground (z 0). `wax_beams`: the beams are
-    cheese in wax (never eaten) rather than steel: the cheese's own skeleton."""
+    cheese in wax (never eaten) rather than steel: the cheese's own skeleton. `frame_material`: what its beams, rails
+    and supports are made of, if not painted steel (timber)."""
     f = f"Bridges/{name}"
     along_x = abs(end[0] - start[0]) >= abs(end[1] - start[1])
     length = abs(end[0] - start[0]) if along_x else abs(end[1] - start[1])
@@ -779,7 +809,7 @@ def bridge(name, structure, start, end, width=250, beams=2, beam=40, depth=30, d
         if wax_beams:
             cheese_box(f"Cheese_{name}_Beam_{i}", structure, low, high, edible=False)
         else:
-            box(f"{name}_Beam_{i}", f, low, high, painted("Dark"))
+            box(f"{name}_Beam_{i}", f, low, high, frame_material or painted("Dark"))
     if cheese_deck:
         n = max(1, int(round(length / 200.0)))
         unit = length / n
@@ -793,11 +823,11 @@ def bridge(name, structure, start, end, width=250, beams=2, beam=40, depth=30, d
         # On the beams, through the deck: they stay when it is eaten (so give a bridge with rails its beams at the sides).
         for side in (-1, 1):
             a, b = at(0, side * (width / 2.0 - 4)), at(length, side * (width / 2.0 - 4))
-            rail(f"{name}_Rail_{side}", f, a, b, under, height=100 + (z - under))
+            rail(f"{name}_Rail_{side}", f, a, b, under, height=100 + (z - under), material=frame_material)
     for i, a in enumerate(supports):
         for c in centres if beams > 1 else [0.0]:
             p = at(a, c)
-            frame_post(f"{name}_Support_{i}_{int(c)}", f, p[0], p[1], 0, under - depth, size=30)
+            frame_post(f"{name}_Support_{i}_{int(c)}", f, p[0], p[1], 0, under - depth, size=30, material=frame_material)
     count("bridges")
 
 
