@@ -104,20 +104,33 @@ namespace FondueTests
 		return nullptr;
 	}
 
-	/** Eats the tile under `At` and the eight round it. */
-	void EatAround(const FVector& At)
+	/** The middle of the tile nearest `At` (x and y), at the floor. */
+	FVector NearestTile(const FVector& At)
 	{
-		for (int32 X = -1; X <= 1; ++X)
+		FVector Best = At;
+		double BestDistance = TNumericLimits<double>::Max();
+		for (ACheeseStrikeCheese* Each : All<ACheeseStrikeCheese>())
 		{
-			for (int32 Y = -1; Y <= 1; ++Y)
+			const FVector Middle = Each->GetComponentsBoundingBox().GetCenter();
+			if (IsTile(Each) && FVector::Dist2D(Middle, At) < BestDistance)
 			{
-				if (ACheeseStrikeCheese* Tile = TileUnder(At + FVector(X * 200.0f, Y * 200.0f, 0.0f)))
-				{
-					if (Tile->IsEdible())
-					{
-						Tile->Bite(CheeseStrikeRules::CheeseBlockHealth);
-					}
-				}
+				BestDistance = FVector::Dist2D(Middle, At);
+				Best = FVector(Middle.X, Middle.Y, 0.0f);
+			}
+		}
+		return Best;
+	}
+
+	/** Eats the tile nearest `At` and the eight round it; or, not `bUnder`, only those round it, `Rings` deep. */
+	void EatAround(const FVector& At, bool bUnder = true, int32 Rings = 1)
+	{
+		const FVector Centre = NearestTile(At);
+		for (ACheeseStrikeCheese* Each : All<ACheeseStrikeCheese>())
+		{
+			const double Off = FVector::Dist2D(Each->GetComponentsBoundingBox().GetCenter(), Centre);
+			if (IsTile(Each) && Each->IsEdible() && Off < 100.0 + 200.0 * Rings && (bUnder || Off > 50.0))
+			{
+				Each->Bite(CheeseStrikeRules::CheeseBlockHealth);
 			}
 		}
 	}
@@ -367,9 +380,9 @@ bool FAFallIntoTheFondueKills::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAMouseThatFallsInComesBack, "CheeseStrike.Play.AMouseThatFallsInComesBack", FondueTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMiceOnAFloorTheyEat, "CheeseStrike.Play.MiceOnAFloorTheyEat", FondueTests::Flags)
 
-bool FAMouseThatFallsInComesBack::RunTest(const FString& Parameters)
+bool FMiceOnAFloorTheyEat::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
 	using namespace FondueTests;
@@ -387,10 +400,26 @@ bool FAMouseThatFallsInComesBack::RunTest(const FString& Parameters)
 		Mouse = World(0)->SpawnActor<ACheeseStrikeMouse>(ACheeseStrikeMouse::StaticClass(), FTransform(Top), Spawn);
 		if (TestTrue(TEXT("a mouse"), Mouse.IsValid()))
 		{
-			Mouse->Enter(Top, FVector(-2900.0f, 1600.0f, 0.0f));
+			Mouse->Enter(Top, FVector(-2900.0f, 1700.0f, 0.0f));
 		}
 	});
 	WaitUntil(TEXT("the mouse in"), 5.0f, []() { return Mouse.IsValid() && Mouse->GetDoing() != EMouseDoing::Entering; });
+	// The floor round it goes, leaving it on an island: it leaps off it, to floor that leads out.
+	Then([this]()
+	{
+		// Two rings of tiles round it: nothing left within its reach.
+		const FVector Island = NearestTile(Mouse->GetActorLocation());
+		Mouse->SetActorLocation(FVector(Island.X, Island.Y, Mouse->GetActorLocation().Z));
+		EatAround(Island, false, 2);
+	});
+	WaitUntil(TEXT("the mouse leaping off its island"), 15.0f, []() { return Mouse.IsValid() && Mouse->GetLeaps() > 0; });
+	WaitUntil(TEXT("the mouse across"), 5.0f, []() { return Mouse.IsValid() && Mouse->GetDoing() != EMouseDoing::Entering; });
+	Wait(1.0f);
+	Then([this]()
+	{
+		TestEqual(TEXT("it didn't fall in"), Mouse->GetFallenIn(), 0);
+		TestTrue(FString::Printf(TEXT("it is on the floor (%.0f cm)"), Mouse->GetActorLocation().Z), Mouse->GetActorLocation().Z > -50.0f);
+	});
 	// The floor under it goes.
 	Then([this]() { EatAround(Mouse->GetActorLocation()); });
 	WaitUntil(TEXT("the mouse falling in"), 4.0f, []() { return Mouse.IsValid() && Mouse->GetDoing() == EMouseDoing::Sinking; });
