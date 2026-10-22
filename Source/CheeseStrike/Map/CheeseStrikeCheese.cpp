@@ -9,6 +9,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Rules/CheeseStrikeFalls.h"
 #include "Rules/CheeseStrikeMice.h"
 #include "Rules/CheeseStrikeRules.h"
 
@@ -245,6 +246,41 @@ namespace
 	}));
 }
 
+namespace
+{
+	/**
+	 * For looking at a map as the mice leave it (development): eats a share (0 to 1) of the cheese the mice may eat,
+	 * at random, at once, as the mice would (what stood on it falls), on the server; with a structure's name, only
+	 * that structure's.
+	 */
+	FAutoConsoleCommandWithWorldAndArgs EatCheeseCommand(TEXT("CheeseStrikeEatCheese"), TEXT("Eats a share (0 to 1) of the cheese at random, as the mice would: CheeseStrikeEatCheese 0.5 [structure]."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		const float Share = Args.Num() > 0 ? FMath::Clamp(FCString::Atof(*Args[0]), 0.0f, 1.0f) : 1.0f;
+		TArray<ACheeseStrikeCheese*> Edible;
+		for (TActorIterator<ACheeseStrikeCheese> It(World); It; ++It)
+		{
+			if (It->HasAuthority() && It->IsEdible() && !It->IsActorBeingDestroyed() && (Args.Num() < 2 || It->GetStructure().ToString() == Args[1]))
+			{
+				Edible.Add(*It);
+			}
+		}
+		for (int32 Index = Edible.Num() - 1; Index > 0; --Index)
+		{
+			Edible.Swap(Index, FMath::RandHelper(Index + 1));
+		}
+		const int32 Count = FMath::RoundToInt(Share * Edible.Num());
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			if (IsValid(Edible[Index]) && !Edible[Index]->IsActorBeingDestroyed())
+			{
+				Edible[Index]->Bite(CheeseStrikeRules::CheeseBlockHealth);
+			}
+		}
+		UE_LOG(LogTemp, Display, TEXT("CheeseStrikeEatCheese: ate %d of %d blocks"), Count, Edible.Num());
+	}));
+}
+
 void ACheeseStrikeCheese::Fall()
 {
 	if (bFalling)
@@ -323,6 +359,12 @@ void ACheeseStrikeCheese::Tick(float DeltaSeconds)
 		bFalling = false;
 		FallSpeed = 0.0f;
 		SetActorTickEnabled(false);
+		// Come to rest under the map's kill height: sunk into the fondue, and gone.
+		if (CheeseStrikeFalls::IsBelowKillHeight(GetWorld(), GetComponentsBoundingBox().Max.Z))
+		{
+			Destroy();
+			return;
+		}
 		// What fell with it on top of it, and has already come down this frame into it, goes back up onto it.
 		const FBox Landed = GetComponentsBoundingBox();
 		for (TActorIterator<ACheeseStrikeCheese> It(GetWorld()); It; ++It)

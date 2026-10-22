@@ -476,7 +476,15 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 	}
 	const FString KillerName = KillerState != nullptr ? KillerState->GetPlayerName() : (Killer != nullptr ? Killer->DisplayName() : FString());
 	State->AddKill(KillerName, Victim->DisplayName(), bHead, How);
-	UE_LOG(LogCheeseStrike, Display, TEXT("Kill: %s killed %s%s%s; %s"), KillerName.IsEmpty() ? TEXT("nobody") : *KillerName, *Victim->DisplayName(), bHead ? TEXT(" on the head") : TEXT(""), How.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" with the %s"), *How), *State->ScoreSummary());
+	if (KillerName.IsEmpty() && !How.IsEmpty())
+	{
+		// Nobody did it: a fall into a map's fondue ("fell into the fondue").
+		UE_LOG(LogCheeseStrike, Display, TEXT("Kill: %s %s; %s"), *Victim->DisplayName(), *How, *State->ScoreSummary());
+	}
+	else
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Kill: %s killed %s%s%s; %s"), KillerName.IsEmpty() ? TEXT("nobody") : *KillerName, *Victim->DisplayName(), bHead ? TEXT(" on the head") : TEXT(""), How.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" with the %s"), *How), *State->ScoreSummary());
+	}
 
 	if (!IsMatchInProgress())
 	{

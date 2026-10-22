@@ -223,7 +223,8 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 	{
 		// Clear of the letters, however far they sag.
 		const float Below = Height * 0.33f + LineHeight * 1.3f + 16.0f * U;
-		const FString By = Character->GetKilledBy().IsEmpty() ? TEXT("KILLED") : FString::Printf(TEXT("KILLED BY %s"), *Character->GetKilledBy().ToUpper());
+		const FString By = !Character->GetKilledBy().IsEmpty() ? FString::Printf(TEXT("KILLED BY %s"), *Character->GetKilledBy().ToUpper())
+			: (Character->GetDiedHow().IsEmpty() ? FString(TEXT("KILLED")) : Character->GetDiedHow().ToUpper());
 		HudDraw::Text(Canvas, By, FVector2D(Width / 2.0f, Below), HudDraw::Font(30.0f * U), HudDraw::Faded(HudDraw::Ink, Under), 0.5f);
 		if (Match != nullptr)
 		{
