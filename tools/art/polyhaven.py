@@ -1,12 +1,14 @@
 """Downloads the Poly Haven textures and models the maps use (CC0: https://polyhaven.com/license), into
-C:\\Hamid\\code\\FabDownloads\\polyhaven\\<asset>\\ (set CHEESESTRIKE_FAB to put them elsewhere), for
-import_polyhaven.py to import. Run with ordinary Python, outside the editor:
+C:\\Hamid\\code\\FabDownloads\\polyhaven\\<asset>\\<asset>_<map>.<jpg or png> (set CHEESESTRIKE_FAB to put them
+elsewhere), for import_polyhaven.py to import. Run with ordinary Python, outside the editor:
 
     python tools/art/polyhaven.py
 
 Each asset's files come from Poly Haven's public API (api.polyhaven.com/files/<asset>): a texture's base colour,
-DirectX normal, roughness and ambient occlusion as JPEGs at its resolution; a model's FBX with the same maps (and its
-metalness and opacity where it has them). What is downloaded already is kept."""
+OpenGL normal (green up, as Megascans' are; import_polyhaven.py turns it into Unreal's), roughness and ambient
+occlusion as JPEGs at its resolution; a model's FBX with the same maps (and its metalness and opacity where it has
+them). What is downloaded already is kept. A map that uses Poly Haven adds its assets here and in
+import_polyhaven.py."""
 
 import json
 import os
@@ -19,6 +21,11 @@ API = "https://api.polyhaven.com/files/"
 
 # Surfaces, drawn from world space on the maps' blocks: (asset, resolution).
 TEXTURES = [
+    ("medieval_blocks_03", "2k"),      # The Labyrinth's dressed stone: its pillars, its vault, its walls
+    ("medieval_red_brick", "2k"),      # its ceiling's vaults
+    ("monastery_stone_floor", "2k"),   # its floor's flagstones
+    ("old_planks_02", "2k"),           # its gallery's deck, shelves, crates
+    ("medieval_wood", "2k"),           # its doors: planks and iron studs
     ("patterned_cobblestone", "2k"),   # Rind Market's square: setts laid in fans
     ("cobblestone_square", "2k"),      # its streets and alleys
     ("painted_plaster_wall", "2k"),    # the town's outer houses, painted in its colours
@@ -39,7 +46,7 @@ MODELS = [
     ("painted_wooden_bench", "1k"),
 ]
 # The maps a texture or a model has, by Poly Haven's name for them, and ours.
-MAPS = {"Diffuse": "BaseColor", "nor_dx": "Normal", "Rough": "Roughness", "AO": "AO", "Metal": "Metalness", "opacity": "Opacity"}
+MAPS = {"Diffuse": "BaseColor", "nor_gl": "Normal", "Rough": "Roughness", "AO": "AO", "Metal": "Metalness", "opacity": "Opacity"}
 
 
 def get(url, path):

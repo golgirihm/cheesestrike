@@ -4,7 +4,7 @@ import map_kit as kit
 from map_kit import box, solid, cylinder, wheel, polar, wall_between, overhead, painted
 
 # Run with the editor closed, after the materials (build_materials.py, cheese_material.py, wax_material.py,
-# cellar_materials.py) and the wheel (wheel_mesh.py):
+# polyhaven.py and import_polyhaven.py) and the wheel (wheel_mesh.py):
 #   UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/build_labyrinth.py" -unattended -nullrhi
 # (both paths absolute: the editor runs from its own folder). It writes what it built to Saved/Lvl_Labyrinth.txt.
 #

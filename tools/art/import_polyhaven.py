@@ -6,7 +6,8 @@ import unreal
 #   UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/import_polyhaven.py" -unattended -nullrhi
 # (both paths absolute: the editor runs from its own folder). It writes what it did to Saved/import_polyhaven.txt.
 #
-# Imports the Poly Haven textures and models (CC0) the maps use into /Game/PolyHaven/<asset>/: each one's textures
+# Imports the Poly Haven textures and models (CC0) the maps use (polyhaven.py downloads them; a map that uses Poly
+# Haven adds its assets to both) into /Game/PolyHaven/<asset>/: each one's textures
 # (base colour, normal, roughness, ambient occlusion, metalness, opacity, whichever it has) and, for a model, its mesh,
 # with Nanite on and box collision (for shots too), as import_fab.py does for Fab's. Then it makes their materials in
 # /Game/CheeseStrike/Materials, as new assets only (so that it leaves the shared ones as they are):
@@ -17,7 +18,8 @@ import unreal
 #   M_Awning, its instances MI_Awning_<colour>[_V]: striped canvas, the stripes across the world's x (or y, _V).
 FAB = os.environ.get("CHEESESTRIKE_FAB", r"C:\Hamid\code\FabDownloads")
 SOURCE = os.path.join(FAB, "polyhaven")
-# What is imported already is left as it is; set CHEESESTRIKE_FAB_REIMPORT=1 to import everything again.
+# What is there already, a texture, a model or a material, is left as it is (a map that changed nothing of it
+# changes no asset); set CHEESESTRIKE_FAB_REIMPORT=1 to import and make everything again.
 REIMPORT = os.environ.get("CHEESESTRIKE_FAB_REIMPORT") == "1"
 OUT = unreal.Paths.project_saved_dir() + "import_polyhaven.txt"
 ROOT = "/Game/PolyHaven"
@@ -26,7 +28,9 @@ MAPS = ("BaseColor", "Normal", "Roughness", "AO", "Metalness", "Opacity")
 
 # Textures: asset -> the largest size kept (1K: a metre of setts at 1024 pixels is ten to the centimetre), and the maps
 # used (all of them, unless said: the awnings' linen is only its colour).
-TEXTURES = {"patterned_cobblestone": 1024, "cobblestone_square": 1024, "painted_plaster_wall": 1024, "weathered_planks": 1024,
+TEXTURES = {"medieval_blocks_03": 2048, "medieval_red_brick": 2048, "monastery_stone_floor": 2048, "old_planks_02": 1024,
+            "medieval_wood": 1024,
+            "patterned_cobblestone": 1024, "cobblestone_square": 1024, "painted_plaster_wall": 1024, "weathered_planks": 1024,
             "rough_wood": 1024, "clay_roof_tiles_02": 1024, "sandstone_blocks_08": 1024, "castle_wall_slates": 1024,
             "rough_linen": (1024, ("BaseColor",))}
 # Models: asset -> whether its glass glows (a lamp).
@@ -34,6 +38,13 @@ MODELS = {"street_lamp_01": True, "street_lamp_02": True, "wine_barrel_01": Fals
           "wicker_basket_01": False, "painted_wooden_bench": False}
 # Surfaces: name -> (texture, TileU, TileV: the centimetres it covers, as Poly Haven measured it; M_Surface's settings).
 SURFACES = {
+    # The Labyrinth's.
+    "StoneBlocks": ("medieval_blocks_03", 200, 200, {"Macro": 0.3, "Grime": 0.3, "Tint": (0.92, 0.88, 0.82)}),
+    "OldBrick": ("medieval_red_brick", 200, 200, {"Macro": 0.35, "Grime": 0.2, "Tint": (0.85, 0.8, 0.76)}),
+    "Flagstones": ("monastery_stone_floor", 180, 180, {"Macro": 0.35, "Tint": (0.95, 0.92, 0.88)}),
+    "OldPlanks": ("old_planks_02", 200, 200, {"Macro": 0.25, "Tint": (0.8, 0.72, 0.62)}),
+    "StuddedPlanks": ("medieval_wood", 200, 200, {"Macro": 0.15}),
+    # Rind Market's.
     "Cobbles_Fan": ("patterned_cobblestone", 250, 250, {"Macro": 0.35, "Grime": 0.15}),
     "Cobbles": ("cobblestone_square", 100, 100, {"Macro": 0.45, "Grime": 0.15}),
     "Timber": ("rough_wood", 60, 60, {"Macro": 0.2, "Desaturate": 0.3, "Tint": (0.55, 0.45, 0.36)}),
@@ -77,7 +88,7 @@ def import_file(path, destination, name, options=None):
 
 
 def texture(asset, kind, limit):
-    """One map of an asset (Poly Haven's DirectX normal: no flip), set up for what it is and cut to `limit`."""
+    """One map of an asset, set up for what it is and cut to `limit`."""
     destination, name = f"{ROOT}/{asset}", f"T_{asset}_{kind}"
     if not REIMPORT and lib.does_asset_exist(f"{destination}/{name}"):
         return unreal.load_asset(f"{destination}/{name}")
@@ -96,8 +107,10 @@ def texture(asset, kind, limit):
         t.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_WORLD)
         t.set_editor_property("srgb", True)
     elif kind == "Normal":
+        # Poly Haven's OpenGL normals, green up; Unreal's are DirectX's.
         t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
         t.set_editor_property("srgb", False)
+        t.set_editor_property("flip_green_channel", True)
     else:
         t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
         t.set_editor_property("srgb", False)
@@ -157,6 +170,11 @@ def model(asset):
     return mesh
 
 
+def exists(name):
+    """Whether a material of ours is there already, to be left as it is."""
+    return not REIMPORT and lib.does_asset_exist(OURS + "/" + name)
+
+
 def new_material(name):
     """A material of ours made afresh: emptied if it exists."""
     path = OURS + "/" + name
@@ -190,6 +208,8 @@ def colour(node, name, rgb, x, y):
 
 def glow():
     """M_Glow: a surface that gives light, Colour times Strength."""
+    if exists("M_Glow"):
+        return unreal.load_asset(OURS + "/M_Glow")
     m = new_material("M_Glow")
     m.set_editor_property("used_with_nanite", True)
     node, link = builder(m)
@@ -208,6 +228,8 @@ def glow():
 def prop_glow():
     """M_PropGlow: a model's own textures, as M_Prop, and light from what in its base colour is near black (a lamp's
     glass): GlowColour times GlowStrength."""
+    if exists("M_PropGlow"):
+        return unreal.load_asset(OURS + "/M_PropGlow")
     m = new_material("M_PropGlow")
     m.set_editor_property("used_with_nanite", True)
     node, link = builder(m)
@@ -253,6 +275,8 @@ def prop_glow():
 def awning():
     """M_Awning: striped canvas for the market stalls' awnings: ColourA and ColourB in stripes StripeWidth wide, laid
     across the world's x (or its y, if AlongY), with the linen's weave over them."""
+    if exists("M_Awning"):
+        return unreal.load_asset(OURS + "/M_Awning")
     m = new_material("M_Awning")
     m.set_editor_property("used_with_nanite", True)
     m.set_editor_property("two_sided", True)
@@ -307,6 +331,8 @@ def awning():
 
 def instance(name, parent, maps, scalars=None, vectors=None):
     path = OURS + "/" + name
+    if exists(name):
+        return unreal.load_asset(path)
     mi = unreal.load_asset(path) if lib.does_asset_exist(path) else tools.create_asset(name, OURS, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
     mel.set_material_instance_parent(mi, parent)
     mel.clear_all_material_instance_parameters(mi)
@@ -347,14 +373,16 @@ try:
     m_prop_glow = prop_glow()
     for asset, glows in MODELS.items():
         maps = textures(asset, 1024, [k for k in MAPS if k != "Opacity"])
+        fresh = REIMPORT or not lib.does_asset_exist(f"{ROOT}/{asset}/SM_{asset}")
         mesh = model(asset)
         if mesh is None:
             continue
         scalars = {"Metallic": 1.0} if "Metalness" in maps else {"Metallic": 0.0}
         mi = instance("MI_" + asset, m_prop_glow if glows else m_prop, maps, scalars)
-        for index in range(len(mesh.get_editor_property("static_materials"))):
-            mesh.set_material(index, mi)
-        lib.save_asset(mesh.get_path_name(), False)
+        if fresh:
+            for index in range(len(mesh.get_editor_property("static_materials"))):
+                mesh.set_material(index, mi)
+            lib.save_asset(mesh.get_path_name(), False)
         lines.append(f"{asset}: {sorted(maps)}")
 except Exception:
     lines.append(traceback.format_exc())
