@@ -25,6 +25,7 @@ OURS = "/Game/CheeseStrike/Materials"
 MAX = 2048
 SMALL = 1024
 WAREHOUSE = "warehouse_mid.zip"  # Quixel Megascans' Warehouse pack, the files under each asset's id
+MINE = "grotto/mine_mid.zip"  # Quixel Megascans' Old Mine pack, the same
 
 # Surfaces, drawn from world space on the maps' blocks: (asset, zip, folder in the zip).
 SURFACES = [
@@ -36,6 +37,9 @@ SURFACES = [
     ("PaintedMetal", "scratched_painted_metal_sheet_2k.zip", ""),
     ("GarageDoor", "garage_door_2k.zip", ""),
     ("PaintedRoof", WAREHOUSE, "vd3kcjs/"),
+    ("MineRockWall", MINE, "uebmddyn/"),
+    ("MineRockDark", MINE, "ueknfaclw/"),
+    ("CoalMineFloor", MINE, "ud0nfezew/"),
 ]
 # Models: (asset, zip, folder in the zip, texture limit).
 MODELS = [
@@ -52,6 +56,12 @@ MODELS = [
     ("GasTank", WAREHOUSE, "vizqehw/", SMALL),
     ("TrashCan", WAREHOUSE, "vhskccxaw/", SMALL),
     ("ConcreteBarrier", "concrete_barrier_3m_mid.zip", "", MAX),
+    ("QuarryCliff", "grotto/quarry_cliff_uchwaffda_mid.zip", "", MAX),
+    ("QuarryCliffLarge", "grotto/quarry_cliff_ubhubhyda_mid.zip", "", MAX),
+    ("MineCart", MINE, "ufmodhpfa/", SMALL),
+    ("BulkheadLight", MINE, "vgyidfpaw/", SMALL),
+    ("WoodenBeam", MINE, "tgnhde0fa/", SMALL),
+    ("RailTrack", MINE, "ufekaeedw/", SMALL),
 ]
 # Decals, projected on the ground and walls: (asset, zip, folder in the zip).
 DECALS = [
@@ -81,7 +91,7 @@ CONTAINER = "container_orange.zip"
 CONTAINER_MESH = "source/shipping cointainer Orange.zip"
 CONTAINER_PARTS = {"Sides": "corrugated sides", "Doors": "front doors", "Frame": "frame"}
 
-MAPS = {"basecolor": "BaseColor", "color": "BaseColor", "normal": "Normal", "roughness": "Roughness", "rough": "Roughness", "ao": "AO",
+MAPS = {"basecolor": "BaseColor", "color": "BaseColor", "albedo": "BaseColor", "normal": "Normal", "roughness": "Roughness", "rough": "Roughness", "ao": "AO",
         "opacity": "Opacity", "metalness": "Metalness", "metallic": "Metalness", "metal": "Metalness"}
 lines = []
 lib = unreal.EditorAssetLibrary
