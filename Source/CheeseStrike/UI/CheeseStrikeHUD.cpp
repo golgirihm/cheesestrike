@@ -496,31 +496,72 @@ void ACheeseStrikeHUD::DrawHealth(const ACheeseStrikeCharacter* Character)
 	const float U = Unit();
 	const float Left = Margin * U;
 	const float Bottom = Canvas->SizeY - Margin * U;
-	const float Health = HealthShown(Character);
-	const float Fraction = FMath::Clamp(Health / CheeseStrikeWeapons::MaxHealth, 0.0f, 1.0f);
-	const bool bLow = Health <= CheeseStrikeHUD::VignettePulseUnder;
-	const FSlateFontInfo Number = HudDraw::Font(34.0f * U);
-	const FVector2D NumberSize = HudDraw::Measure(TEXT("100"), Number);
+	const float Max = CheeseStrikeWeapons::MaxHealth;
+	const float Health = FMath::Clamp(HealthShown(Character), 0.0f, Max);
+	const float Now = GetWorld()->GetTimeSeconds();
+	const bool bLow = CheeseStrikeHUD::IsHealthLow(Health, Max);
 
-	// The number over a bar, the bar marked in quarters; red when low.
-	HudDraw::FShapes Shapes;
-	const float BarWidth = 230.0f * U;
-	const float BarHeight = 4.0f * U;
-	const float BarTop = Bottom - BarHeight;
-	Shapes.Rect(Left, BarTop, BarWidth, BarHeight, HudDraw::Dim);
-	Shapes.Rect(Left, BarTop, BarWidth * Fraction, BarHeight, bLow ? HudDraw::Danger : HudDraw::Ink);
-	for (int32 Quarter = 1; Quarter < 4; ++Quarter)
+	// The trail: health just lost stays lit a moment, then runs down to what is left; health coming back shows at once.
+	if (HealthTrail < 0.0f || Health >= HealthTrail)
 	{
-		Shapes.Rect(Left + BarWidth * Quarter / 4.0f - U, BarTop, 2.0f * U, BarHeight, FLinearColor(0.0f, 0.0f, 0.0f, 0.5f));
+		HealthTrail = Health;
+	}
+	else
+	{
+		if (Health < HealthBefore)
+		{
+			HealthFellAt = Now;
+		}
+		if (Now - HealthFellAt > 0.45f)
+		{
+			HealthTrail = FMath::Max(Health, HealthTrail - Max * 0.8f * GetWorld()->GetDeltaSeconds());
+		}
+	}
+	HealthBefore = Health;
+
+	// No number: a cross, then a row of blocks, each a share of full health; red and breathing when low.
+	const float Pulse = bLow ? 0.9f + 0.1f * FMath::Sin(Now * 2.0f * UE_PI * 1.2f) : 1.0f;
+	const FLinearColor Fill = bLow ? FLinearColor(HudDraw::Danger.R, HudDraw::Danger.G, HudDraw::Danger.B, Pulse) : HudDraw::Ink;
+	// What was just lost: red against the white, pale against the red when low.
+	const FLinearColor Lost = bLow ? FLinearColor(1.0f, 1.0f, 1.0f, 0.5f) : FLinearColor(HudDraw::Danger.R, HudDraw::Danger.G, HudDraw::Danger.B, 0.8f);
+	const FLinearColor Backing(0.0f, 0.0f, 0.0f, 0.45f);
+	const int32 Count = CheeseStrikeHUD::HealthSegments;
+	const TArray<float> Fills = CheeseStrikeHUD::HealthFills(Health, Max, Count);
+	const TArray<float> Trails = CheeseStrikeHUD::HealthFills(HealthTrail, Max, Count);
+	const float Height = 18.0f * U;
+	const float Top = Bottom - Height;
+	const float CrossSize = 26.0f * U;
+	const float BarLeft = Left + CrossSize + 12.0f * U;
+	const float Gap = 5.0f * U;
+	const float Block = (320.0f * U - Gap * (Count - 1)) / Count;
+
+	HudDraw::FShapes Shapes;
+	// The cross, centred on the bar.
+	const float Arm = CrossSize / 3.0f;
+	const float CrossTop = Top + Height * 0.5f - CrossSize * 0.5f;
+	Shapes.Rect(Left - U, CrossTop + Arm - U, CrossSize + 2.0f * U, Arm + 2.0f * U, Backing);
+	Shapes.Rect(Left + Arm - U, CrossTop - U, Arm + 2.0f * U, CrossSize + 2.0f * U, Backing);
+	Shapes.Rect(Left, CrossTop + Arm, CrossSize, Arm, Fill);
+	Shapes.Rect(Left + Arm, CrossTop, Arm, CrossSize, Fill);
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		const float X = BarLeft + Index * (Block + Gap);
+		Shapes.Rect(X - U, Top - U, Block + 2.0f * U, Height + 2.0f * U, Backing);
+		Shapes.Rect(X, Top, Block, Height, HudDraw::Dim);
+		if (Trails[Index] > Fills[Index])
+		{
+			Shapes.Rect(X, Top, Block * Trails[Index], Height, Lost);
+		}
+		if (Fills[Index] > 0.0f)
+		{
+			Shapes.Rect(X, Top, Block * Fills[Index], Height, Fill);
+		}
 	}
 	Shapes.Draw(Canvas);
-	const float NumberTop = BarTop - 8.0f * U - NumberSize.Y * 0.86f;
-	HudDraw::Text(Canvas, FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Health)), FVector2D(Left, NumberTop), Number, bLow ? HudDraw::Danger : HudDraw::Ink);
-	const FSlateFontInfo Label = HudDraw::Font(12.0f * U);
-	HudDraw::Text(Canvas, TEXT("HEALTH"), FVector2D(Left + NumberSize.X + 10.0f * U, BarTop - 8.0f * U - HudDraw::Measure(TEXT("H"), Label).Y), Label, HudDraw::Soft);
 	if (Character->IsProtected())
 	{
-		HudDraw::Text(Canvas, TEXT("PROTECTED"), FVector2D(Left, NumberTop - HudDraw::Measure(TEXT("P"), Label).Y), Label, HudDraw::Accent);
+		const FSlateFontInfo Label = HudDraw::Font(12.0f * U);
+		HudDraw::Text(Canvas, TEXT("PROTECTED"), FVector2D(Left, CrossTop - 8.0f * U - HudDraw::Measure(TEXT("P"), Label).Y), Label, HudDraw::Accent);
 	}
 }
 

@@ -109,6 +109,18 @@ namespace CheeseStrikeHUD
 	constexpr float VignettePulseUnder = 25.0f;
 	FVignette VignetteFor(float Health, float MaxHealth, float Seconds);
 
+	/**
+	 * Health is never shown as a number: a bar of HealthSegments blocks at
+	 * the lower left, each a share of the most there is. How full each is
+	 * (0 to 1, left to right) at `Health` of `MaxHealth`: the full ones,
+	 * then the one being worn down, then the empty; any health at all keeps
+	 * a sliver of the first, so that alive never looks empty.
+	 */
+	constexpr int32 HealthSegments = 5;
+	TArray<float> HealthFills(float Health, float MaxHealth, int32 Segments = HealthSegments);
+	/** Whether the bar shows as low (red, and the edges pulse): at VignettePulseUnder's share or under. */
+	bool IsHealthLow(float Health, float MaxHealth);
+
 	// ---------------------------------------------------------------- the players along the top
 
 	enum class EStatus : uint8

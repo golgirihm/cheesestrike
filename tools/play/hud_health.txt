@@ -1,0 +1,15 @@
+# The health at the lower left, as blocks and never a number: full, worn to
+# 65, low at 18 (red, breathing with the edges), at 1600 by 900.
+cmd r.SetRes 1600x900w
+wait 6
+shot hud_health_full
+cmd CheeseStrike.HUD.Health 65
+wait 0.3
+shot hud_health_65_hit
+wait 2
+shot hud_health_65
+cmd CheeseStrike.HUD.Health 18
+wait 2
+shot hud_health_18
+cmd CheeseStrike.HUD.Health -1
+quit

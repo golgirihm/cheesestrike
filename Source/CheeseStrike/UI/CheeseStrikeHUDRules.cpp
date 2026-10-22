@@ -183,6 +183,28 @@ namespace CheeseStrikeHUD
 		return 1.0f - Ease((Age - Hold) / (DamageArcLife - Hold));
 	}
 
+	TArray<float> HealthFills(float Health, float MaxHealth, int32 Segments)
+	{
+		TArray<float> Fills;
+		Fills.Init(0.0f, FMath::Max(Segments, 0));
+		if (Segments <= 0 || MaxHealth <= 0.0f || Health <= 0.0f)
+		{
+			return Fills;
+		}
+		const float Blocks = FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f) * Segments;
+		for (int32 Index = 0; Index < Segments; ++Index)
+		{
+			Fills[Index] = FMath::Clamp(Blocks - Index, 0.0f, 1.0f);
+		}
+		Fills[0] = FMath::Max(Fills[0], 0.08f);
+		return Fills;
+	}
+
+	bool IsHealthLow(float Health, float MaxHealth)
+	{
+		return MaxHealth > 0.0f && Health > 0.0f && Health <= VignettePulseUnder * MaxHealth / 100.0f;
+	}
+
 	FVignette VignetteFor(float Health, float MaxHealth, float Seconds)
 	{
 		FVignette Look;
