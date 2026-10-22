@@ -28,7 +28,7 @@ Its places are named (`ACheeseStrikePlace`): Gouda Dock and Mozza Dock, the plaz
 
 Free-for-all has fourteen more starts (tagged "Free"), seven a side through the lanes: the plaza, the yard twice, the hall north and south of its middle aisle, the walkway past the tunnel's mouth, and Tank Row. In free-for-all everyone is an enemy and comes back at the start furthest from them all, so without these a match would begin and come back in a crowd on the docks; with them the bots spread through every lane (`CheeseStrike.Play.BotsPlayTheCreamery`).
 
-The mice come over the outer wall at ten points (`MouseEntry`, in the level's `Mice` folder), mirrored like the map: four along the north wall over the yard (not where the Wheel Stack meets it), four along the south over Tank Row, and one at each end south of the docks. Eight come, at eight of the ten. They take the dock walls, the plazas' pallets, the houses and the cheese by the silos first, the nearest cheese low down, then the tunnels, the Cheese Bridge, the Wheel Stack, the hall's seals and edges, and last the racks.
+The mice come over the outer wall at ten points (`MouseEntry`, in the level's `Mice` folder), mirrored like the map: four along the north wall over the yard (not where the Wheel Stack meets it), four along the south over Tank Row, and one at each end south of the docks. Ten come, one at each. They take the dock walls, the plazas' pallets, the houses and the cheese by the silos first, the nearest cheese low down, then the tunnels, the Cheese Bridge, the Wheel Stack, the hall's seals and edges, and last the racks.
 
 The bots walk a navigation mesh built when the level starts, in the bounds of its `Navigation` volume, and rebuilt where it changes, as it does when the mice eat cheese; their paths are found afresh as it changes. The doors don't block it: a bot walks up to a door and it opens.
 
@@ -36,7 +36,7 @@ Beyond the outer wall, for a skyline and nothing else: two cold stores, a chimne
 
 ## The cheese, and what the mice change
 
-Every block of cheese is an `ACheeseStrikeCheese` (`Source/CheeseStrike/Map/`) with the design's 400 of eating in it and the name of the structure it belongs to. There are 1,026 the mice can eat, and four they can't (the catwalks' waxed beams); the design's one mouse to sixty blocks puts the full eight mice on it. Eight mice eat 70 to 80 blocks a minute, so a ten-minute match leaves the hall's racks and some of the yard: the outside goes first, the middle last. What each structure does before the mice, and what eating it does:
+Every block of cheese is an `ACheeseStrikeCheese` (`Source/CheeseStrike/Map/`) with the design's 400 of eating in it and the name of the structure it belongs to. There are 1,026 the mice can eat, and four they can't (the catwalks' waxed beams); the design's one mouse to sixty blocks puts the full ten mice on it. They eat at a pace that leaves the map bare about four and a half minutes after they come (CheeseStrikeMice::Pace): the outside goes first, the middle last. What each structure does before the mice, and what eating it does:
 
 | Structure | Blocks | Before | Eaten |
 |---|---|---|---|

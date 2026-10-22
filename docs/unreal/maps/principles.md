@@ -26,7 +26,7 @@ Counter-Strike's maps (Dust2, Mirage, Inferno, Nuke) have been played for twenty
 
 Design the closed map and the open map, and the way from one to the other. For each structure write down what it does before the mice and after them; each map's notes have that table (The Creamery's "The cheese, and what the mice change"). Good structures change the fight when they go: a wall of wheels that closes a lane and, eaten, opens a 130 m line; a seal on a door that, eaten, joins two lanes; a house that is a fortress and becomes an open deck. A structure that is eaten without changing anything is only clutter.
 
-Order the change. The mice eat what is nearest them and lowest first (below), so decide which structures should go in the first two minutes, which by the middle of a match and which last, and place them and the mice's ways in to suit.
+Order the change. The mice eat what is nearest them and lowest first (below), and everything within about five minutes, so decide which structures should go in the first minute or two, which by the third and which last, and place them and the mice's ways in to suit.
 
 ### What the mice never eat
 
@@ -42,12 +42,12 @@ Cheese the mice must leave is marked not edible (`ACheeseStrikeCheese::bEdible`,
 
 ### How fast the mice eat
 
-- A block has 400 of eating in it, whatever its size; a mouse eats 40 every half second, so a block takes one mouse five seconds. A 1 m cube and a 3 m slab go as fast.
-- One mouse comes for every 60 edible blocks, two at the least and eight at the most: a map with 450 blocks or more gets all eight.
-- With the walking between blocks, a mouse gets through about **nine or ten blocks a minute**; eight mice **70 to 80 a minute** (measured on The Creamery, `tools/play/creamery_mice.txt`). A ten-minute match eats about 650 blocks after the mice's first minute.
-- So size the cheese to the match. The Creamery has 1,026 edible blocks: the plazas, docks and houses go in the first four or five minutes, the hall's 360 wheels and the Wheel Stack last. A map that should be bare by its end has fewer, larger blocks; one that should keep its middle has more there.
+- A block has 400 of eating in it, whatever its size; a mouse bites every half second, 40 at the usual pace (five seconds a block), more when the mice are behind a steady eating that leaves every map bare about five minutes after they come, less when ahead (`CheeseStrikeMice::Pace`). A 1 m cube and a 3 m slab go as fast.
+- One mouse comes for every 60 edible blocks, two at the least and ten at the most: a map with 570 blocks or more gets all ten.
+- So however much cheese a map has, it is gone about four to five minutes after the mice come (each map's `CheeseStrike.Play.AfterTheMice` checks it): about a sixth of it in the first minute, then steadily.
+- The order matters, not the amount: what goes first is what is nearest the ways in and low down. A map that should keep its middle longest puts its cheese there high or far from the ways in.
 - A mouse goes for the cheapest block: its distance, plus four times its height above the mouse's feet, plus 13 m if another mouse has it. So the mice eat near where they come in, low down first, and spread out. Put the ways in (`kit.mouse_entries`, ten on The Creamery for eight mice) where you want the eating to start, mirrored on a mirrored map, and never on top of a spawn.
-- A mouse reaches 2.6 m across from its middle and 2.5 m up from its feet, and eats standing beside a block, never on top of it. What is out of reach is eaten when what is under it is eaten and it comes down, or by a mouse that walks up to it (they climb ramps and stairs on the navigation mesh). A block with nowhere on the navigation mesh beside it to stand is never eaten: leave a mouse room (a metre and a half) round what it should eat.
+- A mouse reaches 2.6 m across from its middle and 4 m up from its feet, and eats standing beside a block, never on top of it. What is out of reach is eaten when what is under it is eaten and it comes down, or by a mouse that walks up to it (they climb ramps and stairs on the navigation mesh). Every edible block goes within about five minutes of the mice coming (`CheeseStrike.Play.AfterTheMice` checks every map): a block with nowhere to stand beside it that a mouse can walk to, it leaps to from as near as it can walk, and a block standing alone it leaps onto and eats from on top. Still, leave a mouse room (a metre and a half) round what it should eat: leaping is a last resort, and looks it.
 - Shooting a mouse (300 of damage) sends it off for six seconds: players can protect a structure for a while.
 
 ### Drops that kill
@@ -61,7 +61,8 @@ When a block is eaten, or falls, every block resting on it is checked: if what i
 - **Walls in columns.** A wall is columns of blocks, each on the one below (`kit.cheese_wall`); eaten at its foot, a column comes down a block, and keeps coming down as the mice eat its new foot. Don't bond walls like bricks: a block resting half on each of two below it falls when either goes.
 - **A lintel over every opening**, a column wider than the opening at each end, bearing on the wall either side (the kit makes them). It falls once one side is eaten, and what is over it comes down with it. Keep openings out of a wall's end columns (the kit warns), and give two openings a column between them or a lintel they share.
 - **Floors and roofs on two sides.** A plank of cheese across a room, a tunnel or a canal rests on a wall at each end, or on a wall and a steel ledger, or on beams under it. A floor of tiles rests on beams.
-- **A floor that falls.** A deck of slabs each on one pillar under its middle (`kit.pillar_deck`) comes down a slab at a time, whole, onto the level below as the mice eat its pillars, with whoever is on it (nobody is hurt by falling). Never two pillars under a slab: it falls when either goes, and comes down through the one left. Keep the level below clear under the slabs but for their pillars, so that each lands flat. [Gruyère Grotto](grotto.md) is built of them; `CheeseStrike.Play.AGrottoDeckFallsOntoTheLevelBelow` checks that whoever is under a slab or on it ends up standing, not inside it.
+- **Drops.** A fall hurts from 5.5 m (`CheeseStrikeFalls::DamageFor`): keep the drops a player is meant to take (off a ledge, a worktop, a 4 m level) under it; 8 m costs a third of the health, 16 m kills.
+- **A floor that falls.** A deck of slabs each on one pillar under its middle (`kit.pillar_deck`) comes down a slab at a time, whole, onto the level below as the mice eat its pillars, with whoever is on it (riding it down hurts nobody). Never two pillars under a slab: it falls when either goes, and comes down through the one left. Keep the level below clear under the slabs but for their pillars, so that each lands flat. [Gruyère Grotto](grotto.md) is built of them; `CheeseStrike.Play.AGrottoDeckFallsOntoTheLevelBelow` checks that whoever is under a slab or on it ends up standing, not inside it.
 - `CheeseStrikeUnheld` in the console lists every block standing on nothing that holds it: a map's mistake, or a fall that went wrong. `CheeseStrike.Play.AHouseComesDownFromItsFoot` eats a Curing House course by course and checks that nothing is ever left standing on nothing.
 
 ### Buildings of several floors
@@ -91,7 +92,7 @@ The world is life size, in centimetres (`CLAUDE.md`, "Scale"):
 | Doorways | 1.2 to 2 m wide, 2.2 m high; a corridor 1.6 m wide, 2.5 m for two abreast |
 | A storey | 3.5 m, floor to floor |
 | Gaps the bots and mice walk through | 70 cm at least; nothing between 20 and 35 cm high that bots should not step up (their mesh steps 35 cm, players 20) |
-| A mouse | a body 3.4 by 1.6 by 1.5 m; eats 2.6 m across and 2.5 m up; walks 2.7 m/s, runs 6 m/s |
+| A mouse | a body 3.4 by 1.6 by 1.5 m; eats 2.6 m across and 4 m up; walks 2.7 m/s, runs 6 m/s |
 
 ### Cover
 
