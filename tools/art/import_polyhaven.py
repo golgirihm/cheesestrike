@@ -47,7 +47,7 @@ SURFACES = {
     # Rind Market's.
     "Cobbles_Fan": ("patterned_cobblestone", 250, 250, {"Macro": 0.35, "Grime": 0.15}),
     "Cobbles": ("cobblestone_square", 100, 100, {"Macro": 0.45, "Grime": 0.15}),
-    "Timber": ("rough_wood", 60, 60, {"Macro": 0.2, "Desaturate": 0.3, "Tint": (0.55, 0.45, 0.36)}),
+    "OakTimber": ("rough_wood", 60, 60, {"Macro": 0.2, "Desaturate": 0.3, "Tint": (0.55, 0.45, 0.36)}),
     "Planks": ("weathered_planks", 200, 200, {"Macro": 0.3, "Tint": (0.85, 0.78, 0.7)}),
     "RoofTiles": ("clay_roof_tiles_02", 250, 250, {"Macro": 0.4}),
     "Sandstone": ("sandstone_blocks_08", 300, 300, {"Macro": 0.3, "Grime": 0.3, "Tint": (0.9, 0.86, 0.8)}),

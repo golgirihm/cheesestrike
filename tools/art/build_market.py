@@ -258,7 +258,7 @@ def street_lamp(label, folder, x, y, yaw=0, shadows=False):
 # ---------------------------------------------------------------- the houses round the square (s = -1 the west, 1 the east)
 
 def house_style(name):
-    return dict(deck=M("Planks"), frame_material=M("Timber"), stair_material=M("Planks"), rail_material=M("Timber"), door_material=M("Planks"))
+    return dict(deck=M("Planks"), frame_material=M("OakTimber"), stair_material=M("Planks"), rail_material=M("OakTimber"), door_material=M("Planks"))
 
 
 def house_roof(name, low, high, eaves=740, rise=320, along_x=True, gable="Plaster_White"):
@@ -325,10 +325,10 @@ def arcade(s, side):
     piers = [722.5, 1105, 1487.5, 1870]
     for px in piers:
         box(f"Arcade_Pier_{side}_{int(px)}", f, (X(px) - 30, y0, 0), (X(px) + 30, y0 + 60, 270), S)
-        kit.frame_post(f"Arcade_Post_{side}_{int(px)}", f, X(px), y1 - 22, 0, 295, material=M("Timber"))
+        kit.frame_post(f"Arcade_Post_{side}_{int(px)}", f, X(px), y1 - 22, 0, 295, material=M("OakTimber"))
     a, b = span(s, 340, SQUARE_X)
     box(f"Arcade_Band_{side}", f, (a, y0, 270), (b, y0 + 60, 325), S)
-    box(f"Arcade_Beam_{side}", f, (a, y1 - 40, 295), (b, y1, 325), M("Timber"))
+    box(f"Arcade_Beam_{side}", f, (a, y1 - 40, 295), (b, y1, 325), M("OakTimber"))
     box(f"Arcade_Deck_{side}", f, (a, y0, 325), (b, y1, STOREY), M("Planks"))
     # The gallery's parapet: cheese a metre high along its front and its open end, on a rail that stays.
     n = 8
@@ -338,8 +338,8 @@ def arcade(s, side):
         cheese_box(f"Cheese_Gallery_{team}_{i}", f"Gallery{team}", (lo, y0, STOREY), (hi, y0 + 50, STOREY + 100))
     lo, hi = span(s, SQUARE_X - 50, SQUARE_X)
     cheese_box(f"Cheese_Gallery_{team}_End", f"Gallery{team}", (lo, y0 + 50, STOREY), (hi, y1, STOREY + 100))
-    kit.rail(f"Gallery_Rail_{side}", f, (X(340), y0 + 25), (X(SQUARE_X), y0 + 25), STOREY, material=M("Timber"))
-    kit.rail(f"Gallery_RailEnd_{side}", f, (X(SQUARE_X - 25), y0), (X(SQUARE_X - 25), y1), STOREY, material=M("Timber"))
+    kit.rail(f"Gallery_Rail_{side}", f, (X(340), y0 + 25), (X(SQUARE_X), y0 + 25), STOREY, material=M("OakTimber"))
+    kit.rail(f"Gallery_RailEnd_{side}", f, (X(SQUARE_X - 25), y0), (X(SQUARE_X - 25), y1), STOREY, material=M("OakTimber"))
     # Lamps under the arcade.
     for lx in (900, 1500):
         kit.point_light(f"Arcade_Lamp_{side}_{lx}", f, (X(lx), y0 + 150, 300), intensity=4.0, radius=700.0, shadows=False)
@@ -357,7 +357,7 @@ def clock_arch():
     box("ClockArch_Parapet", f, (-340, y0, STOREY), (340, y0 + 40, STOREY + 100), S)
     box("ClockArch_Parapet_Cap", f, (-344, y0 - 4, STOREY + 100), (344, y0 + 44, STOREY + 108), S)
     # Nobody walks off the gallery onto the passage's roof.
-    kit.rail("ClockArch_BackRail", f, (-PASSAGE, y1 - 10), (PASSAGE, y1 - 10), STOREY, material=M("Timber"))
+    kit.rail("ClockArch_BackRail", f, (-PASSAGE, y1 - 10), (PASSAGE, y1 - 10), STOREY, material=M("OakTimber"))
     # The Clock Passage: a covered way of cheese between the arcade houses, from the square to High Street.
     kit.tunnel("ClockPassage", "ClockPassage", (0, NORTH_Y[0]), (0, NORTH_Y[1]), width=2 * PASSAGE - 100, height=300, lamps=550)
 
@@ -385,14 +385,14 @@ def balcony_house(s, side):
     y0, y1 = SOUTH_Y[1], SOUTH_Y[1] + 200
     box(f"{name}_Balcony", f, (bx0, y0, 325), (bx1, y1, STOREY), M("Planks"))
     for px in (bx0 + 12, bx1 - 12):
-        kit.frame_post(f"{name}_Balcony_Post_{int(px)}", f, px, y1 - 12, 0, 325, material=M("Timber"))
+        kit.frame_post(f"{name}_Balcony_Post_{int(px)}", f, px, y1 - 12, 0, 325, material=M("OakTimber"))
     cheese_box(f"Cheese_{name}_Balcony_Front_0", name, (bx0, y1 - 40, STOREY), ((bx0 + bx1) / 2.0, y1, STOREY + 100))
     cheese_box(f"Cheese_{name}_Balcony_Front_1", name, ((bx0 + bx1) / 2.0, y1 - 40, STOREY), (bx1, y1, STOREY + 100))
     cheese_box(f"Cheese_{name}_Balcony_End_0", name, (bx0, y0, STOREY), (bx0 + 40, y1 - 40, STOREY + 100))
     cheese_box(f"Cheese_{name}_Balcony_End_1", name, (bx1 - 40, y0, STOREY), (bx1, y1 - 40, STOREY + 100))
-    kit.rail(f"{name}_BalconyRail_Front", f, (bx0, y1 - 20), (bx1, y1 - 20), STOREY, material=M("Timber"))
+    kit.rail(f"{name}_BalconyRail_Front", f, (bx0, y1 - 20), (bx1, y1 - 20), STOREY, material=M("OakTimber"))
     for ex in (bx0 + 20, bx1 - 20):
-        kit.rail(f"{name}_BalconyRail_{int(ex)}", f, (ex, y0), (ex, y1 - 20), STOREY, material=M("Timber"))
+        kit.rail(f"{name}_BalconyRail_{int(ex)}", f, (ex, y0), (ex, y1 - 20), STOREY, material=M("OakTimber"))
     standing(f"{name}_Crate", f, "wooden_crate_01", X(450), -2300, 0, 90)
     standing(f"{name}_Barrel", f, "wine_barrel_01", X(450), -1700, 0, 70)
     kit.cheese_stack(f"{name}_Upstairs", name, (min(X(600), X(800)), -2200, STOREY), (max(X(600), X(800)), -2000, STOREY + 100), 2, 2, 1)
@@ -424,14 +424,14 @@ def main_street_houses(s, side):
         kit.cheese_stack(f"{name}_Upstairs", name, (min(X(2900), X(3100)), sign * 700 - 100, STOREY), (max(X(2900), X(3100)), sign * 700 + 100, STOREY + 100), 2, 2, 1)
     # The bridge over Main Street, between their upper floors: a deck of cheese on timber beams.
     kit.bridge(f"MainBridge{team}", f"MainBridge{team}", (X(2600), -MAIN_Y, STOREY), (X(2600), MAIN_Y, STOREY), width=150, beams=2, beam=30,
-               depth=25, deck=25, frame_material=M("Timber"))
+               depth=25, deck=25, frame_material=M("OakTimber"))
 
 
 def snicket():
     """The Snicket: the alley between the balcony houses, from the square to the alleys, with a footbridge over it
     between their upper floors."""
     kit.bridge("SnicketBridge", "SnicketBridge", (-PASSAGE, -1962.5, STOREY), (PASSAGE, -1962.5, STOREY), width=150, beams=2, beam=30,
-               depth=25, deck=25, frame_material=M("Timber"))
+               depth=25, deck=25, frame_material=M("OakTimber"))
 
 
 # ---------------------------------------------------------------- the market: stalls of cheese under awnings
@@ -449,7 +449,7 @@ def stall(name, cx, cy, facing, colour, tall_left=True):
     w, d = 300, 200                    # its length along the counter, and its depth
     hx, hy = (w / 2.0, d / 2.0) if along_x else (d / 2.0, w / 2.0)
     fx, fy = {"N": (0, 1), "S": (0, -1), "E": (1, 0), "W": (-1, 0)}[facing]
-    timber = M("Timber")
+    timber = M("OakTimber")
     for i, (px, py) in enumerate(((-hx, -hy), (hx, -hy), (-hx, hy), (hx, hy))):
         box(f"{name}_Post_{i}", f, (cx + px - 5, cy + py - 5, 0), (cx + px + 5, cy + py + 5, 262), timber)
     # The awning, and a valance along its front.
@@ -545,8 +545,8 @@ def cart(label, structure, x, y, yaw, cheese=True):
     bed = solid(f"{label}_Bed", f, (x, y, 85), (240, 140, 12), M("Planks"), rotation=(0, yaw, 0))
     for side in (-1, 1):
         solid(f"{label}_Side_{side}", f, (x + cx * side * 66, y + cy * side * 66, 110), (240, 8, 40), M("Planks"), rotation=(0, yaw, 0))
-        solid(f"{label}_Wheel_{side}", f, (x + cx * side * 82, y + cy * side * 82, 55), (110, 110, 10), M("Timber"), mesh=kit.CYLINDER, rotation=(90, yaw + 90, 0))
-        solid(f"{label}_Shaft_{side}", f, (x + ax * 170 + cx * side * 50, y + ay * 170 + cy * side * 50, 45), (180, 8, 8), M("Timber"), rotation=(-26, yaw, 0))
+        solid(f"{label}_Wheel_{side}", f, (x + cx * side * 82, y + cy * side * 82, 55), (110, 110, 10), M("OakTimber"), mesh=kit.CYLINDER, rotation=(90, yaw + 90, 0))
+        solid(f"{label}_Shaft_{side}", f, (x + ax * 170 + cx * side * 50, y + ay * 170 + cy * side * 50, 45), (180, 8, 8), M("OakTimber"), rotation=(-26, yaw, 0))
     if not cheese:
         for i, along in enumerate((-55, 50)):
             standing(f"{label}_Crate_{i}", f, "wooden_crate_01", x + ax * along, y + ay * along, 91, yaw + 90)
@@ -585,7 +585,7 @@ def court(s, side):
     x0, x1 = span(s, 2350, 3050)
     kit.building(name, name, (x0, -2400), (x1, -1800), storeys=1, column=175,
                  doors=[("W", -2100, 120), ("E", -2100, 120)], windows=[("N", X(2612.5), 0, 150)],
-                 frame_material=M("Timber"), door_material=M("Planks"), deck=M("Planks"))
+                 frame_material=M("OakTimber"), door_material=M("Planks"), deck=M("Planks"))
     house_roof(name, (x0, -2400), (x1, -1800), eaves=390, rise=220, gable="Plaster_Grey")
     f = f"Court_{side}"
     kit.wheel_stack(f"CourtWheels_{team}", f"CourtCheese{team}", X(2050), -2550, 0, 90, 66, 3)
@@ -607,7 +607,7 @@ def alleys(s, side):
     pitched_roof(f"Woodshed_{side}_Roof", f, (x0, -3200), (x1, -2700), 250, 400, along_x=False, overhang=25)
     # The drying rack: a timber frame of three shelves of wheels across the alley's south half.
     rx0, rx1 = span(s, 790, 910)
-    timber = M("Timber")
+    timber = M("OakTimber")
     for py in (-3650, -3400, -3150):
         for px in (rx0 + 5, rx1 - 5):
             box(f"Rack_{side}_Post_{py}_{int(px)}", f, (px - 5, py - 5, 0), (px + 5, py + 5, 300), timber)
@@ -720,7 +720,7 @@ def fronts(name, start, end, fixed, facing, widths, heights, lit, plain=False):
             return box(label, f, (min(d0, d1), u0, z0), (max(d0, d1), u1, z1), m)
 
         block(f"{name}_{i}_Front", a, b, 0, 12, 0, h, M("Plaster_" + colour))
-        block(f"{name}_{i}_Cornice", a, b, 0, 30, h - 30, h, M("Timber"))
+        block(f"{name}_{i}_Cornice", a, b, 0, 30, h - 30, h, M("OakTimber"))
         # The roof: a slope from the cornice back over the outer wall.
         depth = 280
         centre_out = fixed - (n[0] + n[1]) * (depth / 2.0 - 30)
