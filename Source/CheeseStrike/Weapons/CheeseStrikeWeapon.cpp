@@ -951,7 +951,7 @@ ACheeseStrikeWeapon::FRayHit ACheeseStrikeWeapon::TraceRay(const FVector& Origin
 		}
 		const FHitHistory::FSample Then = Player->GetHitHistory().Num() > 0 ? Player->GetHitHistory().At(When) : Player->SampleNow(When);
 		const float HeadHit = CheeseStrikeWeapons::RayHitsSphere(Origin, Direction, Then.Head, CheeseStrikeWeapons::HeadRadius);
-		const float BodyHit = CheeseStrikeWeapons::RayHitsCapsule(Origin, Direction, Then.Feet, Then.Radius, Then.Height);
+		const float BodyHit = FHitHistory::RayHitsBody(Origin, Direction, Then);
 		float Nearest = -1.0f;
 		bool bThisHead = false;
 		if (HeadHit >= 0.0f && (BodyHit < 0.0f || HeadHit <= BodyHit + CheeseStrikeWeapons::HeadRadius))

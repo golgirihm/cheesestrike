@@ -204,8 +204,8 @@ void ACheeseStrikeBombs::Burst(const FCheeseStrikeDrop& Drop)
 	for (ACheeseStrikeCharacter* Victim : Near)
 	{
 		const FVector Head = Victim->GetEyes()->GetComponentLocation();
-		const FVector Chest = Victim->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
-		const FVector Feet = Victim->GetActorLocation() - FVector(0.0f, 0.0f, 70.0f);
+		const FVector Chest = Victim->ChestAt();
+		const FVector Feet = Victim->IsDowned() ? Victim->GetDownShape().Feet : Victim->GetActorLocation() - FVector(0.0f, 0.0f, 70.0f);
 		const float Distance = FMath::Min3(FVector::Dist(From, Head), FVector::Dist(From, Chest), FVector::Dist(From, Feet));
 		const float Damage = CheeseStrikeStreaks::BlastDamage(Blast, Distance);
 		if (Damage <= 0.0f)

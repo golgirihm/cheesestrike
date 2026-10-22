@@ -940,6 +940,19 @@ void ACheeseStrikeGameMode::CheeseStrikeDown(const FString& Player)
 #endif
 }
 
+void ACheeseStrikeGameMode::CheeseStrikeRevive(const FString& Player)
+{
+#if !UE_BUILD_SHIPPING
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		if (It->IsAlive() && It->IsDowned() && It->GetLastStand() != nullptr && (Player.IsEmpty() || It->DisplayName().Equals(Player, ESearchCase::IgnoreCase)))
+		{
+			It->GetLastStand()->Revive();
+		}
+	}
+#endif
+}
+
 void ACheeseStrikeGameMode::Respawn(TWeakObjectPtr<AController> Who)
 {
 	AController* Player = Who.Get();

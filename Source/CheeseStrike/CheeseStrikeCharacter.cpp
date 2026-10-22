@@ -48,7 +48,6 @@ static TAutoConsoleVariable<int32> CVarHipHold(TEXT("CheeseStrike.HipHold"), 1, 
 static TAutoConsoleVariable<int32> CVarTraceState(TEXT("CheeseStrike.TraceState"), 0, TEXT("Log each character's state four times a second."));
 
 const FVector ACheeseStrikeCharacter::DefaultCameraAtHead(-2.8f, 5.89f, 0.0f);
-const FVector ACheeseStrikeCharacter::DownHandDrop(2.0f, 3.0f, -5.0f);
 const FVector ACheeseStrikeCharacter::CameraFromEyes(-7.8f, -1.0f, 0.0f);
 
 namespace
@@ -123,7 +122,7 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	// towards the camera, which would pull it out of the hands' line.
 	FirstPersonCameraComponent->bEnableFirstPersonFieldOfView = true;
 	FirstPersonCameraComponent->bEnableFirstPersonScale = false;
-	FirstPersonCameraComponent->FirstPersonFieldOfView = 70.0f;
+	FirstPersonCameraComponent->FirstPersonFieldOfView = FirstPersonFieldOfViewUp;
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
 	BaseFieldOfView = FirstPersonCameraComponent->FieldOfView;
 	Health = CheeseStrikeWeapons::MaxHealth;
@@ -135,6 +134,141 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 bool ACheeseStrikeCharacter::IsDowned() const
 {
 	return LastStand != nullptr && LastStand->IsDowned();
+}
+
+float ACheeseStrikeCharacter::MeasureLegRoom() const
+{
+	using namespace CheeseStrikeDowned;
+	const UWorld* World = GetWorld();
+	const float Plenty = LegLength + ToeGap + 10.0f;
+	if (World == nullptr)
+	{
+		return Plenty;
+	}
+	// A ball a hand over the floor swept from the capsule's axis (which has room) past where the feet would be, through
+	// whatever stops the character but other players.
+	constexpr float Ball = 8.0f;
+	const FVector Forward = GetActorForwardVector().GetSafeNormal2D();
+	const FVector From = GetActorLocation() + FVector(0.0f, 0.0f, 18.0f - GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeLegRoom), false, this);
+	FCollisionResponseParams Responses;
+	GetCapsuleComponent()->InitSweepCollisionParams(Params, Responses);
+	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+	{
+		Params.AddIgnoredActor(*It);
+	}
+	FHitResult Hit;
+	if (World->SweepSingleByChannel(Hit, From, From + Forward * (HipsAhead + Plenty - Ball), FQuat::Identity, GetCapsuleComponent()->GetCollisionObjectType(), FCollisionShape::MakeSphere(Ball), Params, Responses))
+	{
+		return FMath::Max(0.0f, Hit.Distance + Ball - HipsAhead);
+	}
+	return Plenty;
+}
+
+float ACheeseStrikeCharacter::GetDownAimYaw() const
+{
+	// Where the player looks, from the controls where there are any (its own machine, the server), else as the server sent it.
+	if (Controller != nullptr)
+	{
+		return FMath::Clamp(FRotator::NormalizeAxis(Controller->GetControlRotation().Yaw - GetActorRotation().Yaw), -CheeseStrikeDowned::ConeYaw, CheeseStrikeDowned::ConeYaw);
+	}
+	return DownAimYawSent;
+}
+
+FVector ACheeseStrikeCharacter::DownBodyFrame(const FVector& World) const
+{
+	const FVector Floor = GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	return FRotator(0.0f, GetActorRotation().Yaw, 0.0f).UnrotateVector(World - Floor);
+}
+
+CheeseStrikeDowned::FShape ACheeseStrikeCharacter::GetDownShape() const
+{
+	const FVector Floor = GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	return CheeseStrikeDowned::Shape(Floor, GetActorRotation().Yaw, DownLegRoom);
+}
+
+FVector ACheeseStrikeCharacter::ChestAt() const
+{
+	return DownBlend > 0.5f ? CheeseStrikeDowned::Middle(GetDownShape()) : GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
+}
+
+void ACheeseStrikeCharacter::MakeRoomToLieDown()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	// Short of room for the legs ahead: back as far as is short, or as far as there is room behind.
+	const float Short = CheeseStrikeDowned::LegLength + CheeseStrikeDowned::ToeGap - MeasureLegRoom();
+	if (Short > 1.0f)
+	{
+		SetActorLocation(GetActorLocation() - GetActorForwardVector().GetSafeNormal2D() * Short, true);
+	}
+	DownLegRoom = MeasureLegRoom();
+}
+
+void ACheeseStrikeCharacter::FaceRotation(FRotator NewControlRotation, float DeltaTime)
+{
+	const bool bDown = IsAlive() && IsDowned();
+	if (!IsAlive() || (!bDown && DownBlend <= 0.0f))
+	{
+		Super::FaceRotation(NewControlRotation, DeltaTime);
+		return;
+	}
+	const float BodyYaw = GetActorRotation().Yaw;
+	if (!bDown)
+	{
+		// Getting up: round to the view, quickly.
+		SetActorRotation(FRotator(0.0f, CheeseStrikeDowned::TurnRising(BodyYaw, NewControlRotation.Yaw, DeltaTime), 0.0f));
+		return;
+	}
+	// Down: the body turns round after the view, slowly, and its own machine keeps the view to the cone in front of it
+	// (going down, the pitch eases into it rather than jumping).
+	const float Turned = CheeseStrikeDowned::TurnBody(BodyYaw, NewControlRotation.Yaw, DeltaTime);
+	SetActorRotation(FRotator(0.0f, Turned, 0.0f));
+	if (IsLocallyControlled() && Controller != nullptr && !CheeseStrikeDowned::InCone(NewControlRotation, Turned, 0.01f))
+	{
+		FRotator Kept = CheeseStrikeDowned::ClampView(NewControlRotation, Turned);
+		if (DownBlend < 1.0f)
+		{
+			Kept.Pitch = FMath::FInterpTo(FRotator::NormalizeAxis(NewControlRotation.Pitch), Kept.Pitch, DeltaTime, 6.0f);
+		}
+		Controller->SetControlRotation(Kept);
+	}
+}
+
+void ACheeseStrikeCharacter::UpdateDown(float DeltaSeconds)
+{
+	const bool bDown = IsAlive() && IsDowned();
+	DownBlend = FMath::FInterpConstantTo(DownBlend, bDown ? 1.0f : 0.0f, DeltaSeconds, 1.0f / (bDown ? CheeseStrikeDowned::Seconds : CheeseStrikeDowned::RiseSeconds));
+	DownInView = FMath::SmoothStep(0.0f, 1.0f, DownBlend);
+	if (bDown || DownBlend > 0.0f)
+	{
+		DownLegRoom = MeasureLegRoom();
+	}
+	if (bDown && HasAuthority())
+	{
+		DownAimYawSent = static_cast<int8>(FMath::RoundToInt(GetDownAimYaw()));
+	}
+	// The first-person body is drawn as the world is while down, so that its legs lie on the floor in view.
+	if (IsLocallyControlled())
+	{
+		FirstPersonCameraComponent->FirstPersonFieldOfView = FMath::Lerp(FirstPersonFieldOfViewUp, FirstPersonCameraComponent->FieldOfView, DownInView);
+		// The arm it is propped on is out of the way, beside and behind the view, but too close to it to show.
+		static const FName PropArm(TEXT("upperarm_l"));
+		const bool bHideArm = DownInView > 0.5f && IsAlive();
+		if (FirstPersonMesh->GetSkeletalMeshAsset() != nullptr && FirstPersonMesh->GetBoneIndex(PropArm) != INDEX_NONE && bHideArm != FirstPersonMesh->IsBoneHiddenByName(PropArm))
+		{
+			if (bHideArm)
+			{
+				FirstPersonMesh->HideBoneByName(PropArm, PBO_None);
+			}
+			else
+			{
+				FirstPersonMesh->UnHideBoneByName(PropArm);
+			}
+		}
+	}
 }
 
 void ACheeseStrikeCharacter::SetHealth(float InHealth)
@@ -153,6 +287,7 @@ void ACheeseStrikeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeCharacter, DiedHow);
 	DOREPLIFETIME(ACheeseStrikeCharacter, DiedAt);
 	DOREPLIFETIME(ACheeseStrikeCharacter, ProtectedUntil);
+	DOREPLIFETIME_CONDITION(ACheeseStrikeCharacter, DownAimYawSent, COND_SkipOwner);
 }
 
 UCheeseStrikeMovementComponent* ACheeseStrikeCharacter::GetCheeseStrikeMovement() const
@@ -405,6 +540,15 @@ FHitHistory::FSample ACheeseStrikeCharacter::SampleNow(float Time) const
 	Sample.Feet = GetActorLocation() - FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 	Sample.Head = Eyes->GetComponentLocation();
 	Sample.Yaw = GetActorRotation().Yaw;
+	// Lying (most of the way down), shots find the body where it lies.
+	if (DownBlend > 0.5f)
+	{
+		const CheeseStrikeDowned::FShape Lying = GetDownShape();
+		Sample.bLying = true;
+		Sample.Hips = Lying.Hips;
+		Sample.Shoulders = Lying.Shoulders;
+		Sample.LegsTo = Lying.Feet;
+	}
 	return Sample;
 }
 
@@ -752,7 +896,9 @@ void ACheeseStrikeCharacter::BringRifleToEye(float DeltaSeconds)
 	}
 	// Where the arms are without aiming, and the eye in them.
 	const FTransform Unaimed = FirstPersonBase * FirstPersonMesh->GetAttachParent()->GetSocketTransform(FirstPersonMesh->GetAttachSocketName());
-	const FVector Eye = (FirstPersonMesh->GetSocketTransform(FName("head"), RTS_Component) * Unaimed).TransformPosition(CameraAtHead);
+	// (Down, a little ahead of the face, out of the collar and the shoulders of a body lying propped up.)
+	const FVector Eye = (FirstPersonMesh->GetSocketTransform(FName("head"), RTS_Component) * Unaimed).TransformPosition(CameraAtHead)
+		+ GetControlRotation().Vector() * DownCameraAhead * DownInView;
 	// At the hip the weapon is kept about where its hold has it in view, pointing about the way it has it: crouching and
 	// the cycles lean the body and bring the arms up to the eyes, so the arms are turned about the hand holding it and
 	// moved by however far it has drifted from there, smoothed, which takes out the lasting lean and leaves the cycles' bob.
@@ -771,12 +917,12 @@ void ACheeseStrikeCharacter::BringRifleToEye(float DeltaSeconds)
 		FVector Axis;
 		float Angle;
 		FQuat::FindBetweenNormals(AlongInView, CheeseStrikeWeaponLooks::HipAlong(Held->GetHold())).ToAxisAndAngle(Axis, Angle);
-		const FQuat Turn = View.Quaternion() * FQuat(Axis, FMath::Min(Angle, FMath::DegreesToRadians(MostHipTurn))) * View.Quaternion().Inverse();
+		// Down, the pose holds the pistol out itself, and the arms stay on the body lying in view.
+		const float Hold = 1.0f - DownInView;
+		const FQuat Turn = View.Quaternion() * FQuat(Axis, FMath::Min(Angle, FMath::DegreesToRadians(MostHipTurn)) * Hold) * View.Quaternion().Inverse();
 		Hip.SetRotation(Turn * Hip.GetRotation());
 		Hip.SetLocation(Hand + Turn.RotateVector(Hip.GetLocation() - Hand));
-		// Down, the pistol is held lower and wider, hanging in the one hand, for a view that isn't all pistol.
-		DownInView = FMath::FInterpTo(DownInView, IsDowned() ? 1.0f : 0.0f, DeltaSeconds, 4.0f);
-		const FVector Shift = (CheeseStrikeWeaponLooks::HipHand(Held->GetHold()) + DownHandDrop * DownInView - HandInView).GetClampedToMaxSize(MostHipShift);
+		const FVector Shift = (CheeseStrikeWeaponLooks::HipHand(Held->GetHold()) - HandInView).GetClampedToMaxSize(MostHipShift) * Hold;
 		Hip.AddToTranslation(View.RotateVector(Shift));
 	}
 	// A weapon just drawn comes up from below the view, the arms with it, the eye staying where it is.
@@ -823,6 +969,7 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	ApplyStartAt();
 	UpdateBody();
+	UpdateDown(DeltaSeconds);
 	// The server keeps where everyone has been, for shots fired at where they were seen.
 	if (HasAuthority() && GetWorld() != nullptr && GetWorld()->GetGameState() != nullptr)
 	{
@@ -868,7 +1015,9 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	// itself rides the first-person body's head, which the crouch animation
 	// lowers.
 	EyeOffset = FMath::FInterpTo(EyeOffset, BaseEyeHeight, DeltaSeconds, CheeseStrikeMovement::CrouchRate);
-	Eyes->SetRelativeLocation(FVector(0.0f, 0.0f, EyeOffset));
+	// Down, they are where the raised head is.
+	const FVector LyingHead = CheeseStrikeDowned::HeadAt() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	Eyes->SetRelativeLocation(FMath::Lerp(FVector(0.0f, 0.0f, EyeOffset), LyingHead, FMath::SmoothStep(0.0f, 1.0f, DownBlend)));
 }
 
 void ACheeseStrikeCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
@@ -894,14 +1043,28 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 	// Which way the weapon in view points, in the view's axes (forward, right, up).
 	const UPrimitiveComponent* InView = HeldWeapon != nullptr ? HeldWeapon->GetModel(true) : nullptr;
 	const FVector Along = InView != nullptr ? GetControlRotation().UnrotateVector(InView->GetComponentTransform().GetUnitAxis(EAxis::Y)) : FVector::ZeroVector;
-	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d weapon %s drawing %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f) hand in view (%.0f, %.0f, %.0f) weapon along (%.2f, %.2f, %.2f)"),
+	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d weapon %s drawing %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f) hand in view (%.0f, %.0f, %.0f) weapon along (%.2f, %.2f, %.2f) down %.2f body yaw %.1f leg room %.0f"),
 		At.X, At.Y, At.Z, GetVelocity().Size2D(), Eye.Z - (At.Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), FRotator::NormalizeAxis(GetControlRotation().Pitch), FRotator::NormalizeAxis(GetControlRotation().Yaw),
 		bIsCrouched ? 1 : 0, Movement != nullptr && Movement->IsSprinting() ? 1 : 0, Movement != nullptr && Movement->IsSliding() ? 1 : 0,
 		Movement != nullptr ? Movement->GetSlideElapsed() : -1.0f, Movement != nullptr && Movement->IsFalling() ? 1 : 0, bPressedJump ? 1 : 0, JumpCurrentCount,
 		Health, IsAlive() ? 1 : 0, IsProtected() ? 1 : 0, HeldWeapon != nullptr ? HeldWeapon->GetMagazine() : -1, HeldWeapon != nullptr ? HeldWeapon->GetReserve() : -1, HeldWeapon != nullptr && HeldWeapon->IsAimed() ? 1 : 0,
 		FirstPersonCameraComponent->FieldOfView, HeldWeapon != nullptr ? HeldWeapon->ShotsFired : 0, HeldWeapon != nullptr ? HeldWeapon->HitsConfirmed : 0, HeldWeapon != nullptr && HeldWeapon->IsReloading() ? 1 : 0,
 		HeldWeapon != nullptr ? *HeldWeapon->GetWeaponId().ToString() : TEXT("none"), HeldWeapon != nullptr && HeldWeapon->IsDrawing() ? 1 : 0,
-		Body.X, Body.Y, Body.Z, GetMesh()->IsSimulatingPhysics() ? 1 : 0, Eye.X, Eye.Y, Eye.Z, HandInView.X, HandInView.Y, HandInView.Z, Along.X, Along.Y, Along.Z);
+		Body.X, Body.Y, Body.Z, GetMesh()->IsSimulatingPhysics() ? 1 : 0, Eye.X, Eye.Y, Eye.Z, HandInView.X, HandInView.Y, HandInView.Z, Along.X, Along.Y, Along.Z,
+		DownBlend, FRotator::NormalizeAxis(GetActorRotation().Yaw), DownLegRoom);
+	// Down: where the body's bones are in its frame (ahead toward the feet, right, up from the capsule's axis on the floor).
+	if (DownBlend > 0.0f)
+	{
+		FString Bones;
+		for (const TCHAR* Bone : {TEXT("pelvis"), TEXT("spine_03"), TEXT("head"), TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"), TEXT("upperarm_r"), TEXT("hand_r"), TEXT("calf_l"), TEXT("foot_l"), TEXT("calf_r"), TEXT("foot_r")})
+		{
+			const FVector In = DownBodyFrame(GetMesh()->GetBoneLocation(FName(Bone)));
+			Bones += FString::Printf(TEXT(" %s (%.0f, %.0f, %.0f)"), Bone, In.X, In.Y, In.Z);
+		}
+		const FVector Camera = DownBodyFrame(Eye);
+		const FVector Head = DownBodyFrame(Eyes->GetComponentLocation());
+		UE_LOG(LogCheeseStrike, Display, TEXT("Down: camera (%.0f, %.0f, %.0f) eyes (%.0f, %.0f, %.0f) aim yaw %.1f bones%s"), Camera.X, Camera.Y, Camera.Z, Head.X, Head.Y, Head.Z, GetDownAimYaw(), *Bones);
+	}
 	if (HeldWeapon != nullptr)
 	{
 		// Where the hands and the rifle are, in each body, relative to the eyes: for checking the weapon sits in the hands.
@@ -1037,6 +1200,13 @@ void ACheeseStrikeCharacter::DoMove(float Right, float Forward)
 {
 	if (GetController() && TakesInput())
 	{
+		// Down, it scoots toward its feet or its head, and the sideways keys turn it round slowly (the view, which the body follows).
+		if (IsDowned())
+		{
+			AddMovementInput(GetActorForwardVector(), Forward);
+			AddControllerYawInput(Right * CheeseStrikeDowned::TurnRate * (GetWorld() != nullptr ? GetWorld()->GetDeltaSeconds() : 0.0f));
+			return;
+		}
 		AddMovementInput(GetActorRightVector(), Right);
 		AddMovementInput(GetActorForwardVector(), Forward);
 	}
@@ -1100,7 +1270,8 @@ void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 	{
 		return;
 	}
-	if (bHeld && TakesInput())
+	// Down, from the hip only.
+	if (bHeld && TakesInput() && !IsDowned())
 	{
 		HeldWeapon->StartAiming();
 	}

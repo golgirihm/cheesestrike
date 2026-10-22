@@ -211,11 +211,23 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		const ACheeseStrikeWeapon* Weapon = Character->GetWeapon();
 		bAiming = Weapon != nullptr && Weapon->IsAimed();
 		bDowned = Character->IsAlive() && Character->IsDowned();
-		// Both bodies, the one others see and its player's own, are animated in the frame of the first, turned to face the capsule's front.
+		// Both bodies, the one others see and its player's own, are animated in the frame of the first, turned to face the
+		// capsule's front, its root on the capsule's floor.
 		if (const USkeletalMeshComponent* Main = Character->GetMesh())
 		{
-			BodyForward = Main->GetRelativeRotation().UnrotateVector(FVector::ForwardVector);
+			const FTransform Placed = Main->GetRelativeTransform();
+			BodyForward = Placed.GetRotation().UnrotateVector(FVector::ForwardVector);
+			BodyOrigin = Placed.InverseTransformPosition(FVector(0.0, 0.0, Placed.GetLocation().Z));
 		}
+		// Down: where it aims within its cone, the room for its legs, and how it scoots and turns round.
+		DownAimYaw = Character->GetDownAimYaw();
+		bFirstPersonBody = Character->GetFirstPersonMesh() == GetSkelMeshComponent();
+		LegRoom = Character->GetDownLegRoom();
+		ScootSpeed = FVector::DotProduct(Velocity, Pawn->GetActorForwardVector());
+		const float Yaw = Pawn->GetActorRotation().Yaw;
+		TurnSpeed = bLastYawKnown && DeltaSeconds > 0.0f ? FMath::FindDeltaAngleDegrees(LastYaw, Yaw) / DeltaSeconds : 0.0f;
+		LastYaw = Yaw;
+		bLastYawKnown = true;
 		Hold = Weapon != nullptr ? Weapon->GetHold() : ECheeseStrikeHold::Rifle;
 		LeftHandShift = Weapon != nullptr ? Weapon->LeftHandShiftFor(GetSkelMeshComponent()) : FVector::ZeroVector;
 	}
@@ -311,7 +323,7 @@ void FCheeseStrikeAnimProxy::Link(FName GripAnchor)
 	LeftHand.Alpha = 1.0f;
 	ToComponentSpace.LocalPose.SetLinkNode(&Guarded);
 	LeftHand.ComponentPose.SetLinkNode(&ToComponentSpace);
-	// Last, down: kneeling, hunched over, the left hand off the grip and on the belly.
+	// Last, down: on the back, propped on the left elbow, the pistol out.
 	Downed.ComponentPose.SetLinkNode(&LeftHand);
 	ToLocalSpace.ComponentPose.SetLinkNode(&Downed);
 	bLinked = true;
@@ -372,6 +384,12 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		bAiming = Instance->bAiming;
 		bDowned = Instance->bDowned;
 		BodyForward = Instance->BodyForward;
+		BodyOrigin = Instance->BodyOrigin;
+		DownAimYaw = Instance->DownAimYaw;
+		LegRoom = Instance->LegRoom;
+		ScootSpeed = Instance->ScootSpeed;
+		TurnSpeed = Instance->TurnSpeed;
+		bFirstPersonBody = Instance->bFirstPersonBody;
 		Hold = Instance->Hold;
 		LeftHandShift = Instance->LeftHandShift;
 		// A change of weapon to one held another way: its animations on the same nodes, and the left hand's grip on it
@@ -417,8 +435,12 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	OnGround.Alpha = CrouchBlend;
 	Body.Alpha = AirBlend;
 
-	// The aim offsets: yaw is the body's own turning, so only the pitch applies.
-	const FVector Aim(0.0, AimPitch, 0.0);
+	// Going down and getting up take a moment each, eased at both ends.
+	DownLinear = FMath::FInterpConstantTo(DownLinear, bDowned ? 1.0f : 0.0f, DeltaSeconds, 1.0f / (bDowned ? CheeseStrikeDowned::Seconds : CheeseStrikeDowned::RiseSeconds));
+	Downed.Alpha = FMath::SmoothStep(0.0f, 1.0f, DownLinear);
+
+	// The aim offsets: yaw is the body's own turning, so only the pitch applies; down, the pose aims the pistol itself.
+	const FVector Aim(0.0, AimPitch * (1.0f - Downed.Alpha), 0.0);
 	AimHip.SetPosition(Aim);
 	AimAiming.SetPosition(Aim);
 	AimCrouch.SetPosition(Aim);
@@ -440,17 +462,25 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	LeftHand.Alpha = bGripPending ? 0.0f : SourceWeight * (1.0f - GuardBlend);
 	LeftHand.Shift = LeftHandShift;
 
-	// Going down and getting up take a moment each, eased at both ends; the legs creep with the crouched walk while
-	// moving and kneel while still; the breath comes hard, all the while (so that it doesn't start from nothing).
-	DownLinear = FMath::FInterpConstantTo(DownLinear, bDowned ? 1.0f : 0.0f, DeltaSeconds, 1.0f / CheeseStrikeDowned::Seconds);
-	KneelBlend = FMath::FInterpTo(KneelBlend, 1.0f - MovingWeight(Speed), DeltaSeconds, CheeseStrikeDowned::KneelRate);
+	// Down, the legs push in turn as the body scoots along or round (a push a stride, the phase running on as it goes
+	// toward the head, back as it goes toward the feet); the breath comes hard, all the while (so that it doesn't start
+	// from nothing).
+	const float TurnScoot = FMath::Abs(FMath::DegreesToRadians(TurnSpeed)) * 40.0f;
+	const float Pushing = FMath::Abs(ScootSpeed) > 8.0f ? 1.0f : (TurnScoot > 8.0f ? CheeseStrikeDowned::TurnPush : 0.0f);
+	ScootBlend = FMath::FInterpTo(ScootBlend, Pushing, DeltaSeconds, CheeseStrikeDowned::ScootBlendRate);
+	ScootPhase = FMath::Fmod(ScootPhase + DeltaSeconds * UE_PI * (TurnScoot - ScootSpeed) / CheeseStrikeDowned::ScootStride, UE_TWO_PI * 100.0f);
 	BreathPhase = FMath::Fmod(BreathPhase + DeltaSeconds * UE_TWO_PI * CheeseStrikeDowned::BreathsPerMinute / 60.0f, UE_TWO_PI * 100.0f);
-	Downed.Alpha = FMath::SmoothStep(0.0f, 1.0f, DownLinear);
-	Downed.Kneel = KneelBlend;
 	Downed.Breath = CheeseStrikeDowned::Breath(BreathPhase);
-	// A montage (the reload) takes the left hand off the belly, as it does off the grip.
-	Downed.HandOnWound = SourceWeight;
+	// A montage (the reload) takes the arms, as it takes the left hand off the grip.
+	Downed.ArmsOwn = SourceWeight;
 	Downed.Forward = BodyForward;
+	Downed.Origin = BodyOrigin;
+	Downed.AimYaw = DownAimYaw;
+	Downed.AimPitch = FMath::Clamp(AimPitch, CheeseStrikeDowned::LowestPitch, CheeseStrikeDowned::HighestPitch);
+	Downed.LegReach = CheeseStrikeDowned::LegReach(LegRoom);
+	Downed.Scoot = ScootBlend;
+	Downed.ScootPhase = ScootPhase;
+	Downed.bFirstPerson = bFirstPersonBody;
 }
 
 void FCheeseStrikeAnimProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)

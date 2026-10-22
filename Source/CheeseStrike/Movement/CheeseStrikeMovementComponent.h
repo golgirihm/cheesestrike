@@ -43,6 +43,8 @@ public:
 
 	//~ UCharacterMovementComponent
 	virtual float GetMaxSpeed() const override;
+	/** Down, the input moves the body only along itself (CheeseStrikeDowned::ScootInput). */
+	virtual FVector ConstrainInputAcceleration(const FVector& InputAcceleration) const override;
 	virtual float GetMaxAcceleration() const override;
 	virtual float GetMaxBrakingDeceleration() const override;
 	virtual bool CanCrouchInCurrentState() const override;
@@ -51,6 +53,8 @@ public:
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 
 protected:
+	/** Whether its character is down in a last stand: it scoots, slowly (CheeseStrikeDowned). */
+	bool IsDownedHere() const;
 	/** Begins a slide from the ground speed the character has. */
 	void StartSlide();
 	void EndSlide();

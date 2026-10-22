@@ -5,18 +5,6 @@
 #include "TwoBoneIK.h"
 #include "CheeseStrike.h"
 
-namespace CheeseStrikeDowned
-{
-	float Breath(float Phase)
-	{
-		// A third of the breath drawing in, two thirds letting it out.
-		const float Cycle = FMath::Fmod(Phase / UE_TWO_PI, 1.0f);
-		const float At = Cycle < 0.0f ? Cycle + 1.0f : Cycle;
-		const float Shaped = At < 0.35f ? 0.5f * At / 0.35f : 0.5f + 0.5f * (At - 0.35f) / 0.65f;
-		return -FMath::Cos(Shaped * UE_TWO_PI);
-	}
-}
-
 namespace
 {
 	/** The turn that takes `From` `Degrees` of the way towards `To`. */
@@ -31,6 +19,15 @@ namespace
 	{
 		FTransform Now = Pose.GetComponentSpaceTransform(Bone);
 		Now.SetRotation((Turn * Now.GetRotation()).GetNormalized());
+		const FBoneTransform Set(Bone, Now);
+		Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
+	}
+
+	/** Sets a bone's turn where it is, its children with it. */
+	void DownedSetTurn(FCSPose<FCompactPose>& Pose, FCompactPoseBoneIndex Bone, const FQuat& Turn)
+	{
+		FTransform Now = Pose.GetComponentSpaceTransform(Bone);
+		Now.SetRotation(Turn.GetNormalized());
 		const FBoneTransform Set(Bone, Now);
 		Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
 	}
@@ -84,8 +81,8 @@ void FCheeseStrikeDownedPose::CacheBones_AnyThread(const FAnimationCacheBonesCon
 	bAll &= Bone(LowerArmL, TEXT("lowerarm_l"));
 	bAll &= Bone(HandL, TEXT("hand_l"));
 	bAll &= Bone(UpperArmR, TEXT("upperarm_r"));
-	// The ball of the foot only says how long the foot is.
-	Bone(BallR, TEXT("ball_r"));
+	bAll &= Bone(LowerArmR, TEXT("lowerarm_r"));
+	bAll &= Bone(HandR, TEXT("hand_r"));
 	// A body cut down to fewer bones (at a distance) does without the pose rather than half of it.
 	bBones = bAll;
 	if (!bAll && !bToldMissing && Bones.GetCompactPoseNumBones() > 40)
@@ -134,79 +131,136 @@ void FCheeseStrikeDownedPose::GoDown(FCSPose<FCompactPose>& Pose) const
 	const FBoneContainer& Bones = Pose.GetPose().GetBoneContainer();
 	const auto Index = [&Bones](const FBoneReference& Reference) { return Reference.GetCompactPoseIndex(Bones); };
 	const auto At = [&Pose](FCompactPoseBoneIndex Bone) { return Pose.GetComponentSpaceTransform(Bone).GetLocation(); };
+	const auto TurnOf = [&Pose](FCompactPoseBoneIndex Bone) { return Pose.GetComponentSpaceTransform(Bone).GetRotation(); };
 	const FVector Up = FVector::UpVector;
 	const FVector Ahead = FVector(Forward.X, Forward.Y, 0.0).GetSafeNormal();
 	// The right side, from the hips (whichever way the axes turn).
 	FVector Right = At(Index(ThighR)) - At(Index(ThighL));
 	Right = (Right - Ahead * FVector::DotProduct(Right, Ahead) - Up * Right.Z).GetSafeNormal();
-	if (Right.IsNearlyZero())
+	if (Ahead.IsNearlyZero() || Right.IsNearlyZero())
 	{
 		return;
 	}
 
-	// The legs as they come in: where the feet stand (the floor is at 0, the root's), and how long the bones are.
-	const FVector FootLWas = At(Index(FootL));
-	const FVector FootRWas = At(Index(FootR));
-	const FVector KneeLWas = At(Index(CalfL));
-	const FVector KneeRWas = At(Index(CalfR));
-	const float Thigh = FVector::Dist(At(Index(ThighR)), KneeRWas);
-	const float Shin = FVector::Dist(KneeRWas, FootRWas);
-	const float Ankle = FMath::Clamp(FMath::Min(FootLWas.Z, FootRWas.Z), 4.0f, 20.0f);
-	const float Foot = BallR.IsValidToEvaluate(Bones) ? FVector::Dist(FootRWas, At(Index(BallR))) : Shin * 0.3f;
-	// The knee on the ground is about as high as the ankle is.
-	const float KneeHeight = Ankle * 0.9f;
+	// What comes in: how long the limbs are, and how the head and the pistol hand are turned with the aim straight ahead.
+	const float LegFull = FVector::Dist(At(Index(ThighR)), At(Index(CalfR))) + FVector::Dist(At(Index(CalfR)), At(Index(FootR)));
+	const float UpperArmLength = FVector::Dist(At(Index(UpperArmL)), At(Index(LowerArmL)));
+	const float ForearmLength = FVector::Dist(At(Index(LowerArmL)), At(Index(HandL)));
+	const float ArmR = FVector::Dist(At(Index(UpperArmR)), At(Index(LowerArmR))) + FVector::Dist(At(Index(LowerArmR)), At(Index(HandR)));
+	const FQuat HeadWas = TurnOf(Index(Head));
+	const FQuat HandWas = TurnOf(Index(HandR));
+	// Where the legs are in their pushes, -1 to 1, as much as they are pushing.
+	const float Push = FMath::Sin(ScootPhase) * Scoot;
 
-	// The hips go down until the right thigh, leaning forward a little, stands on its knee on the ground; moving, a little less.
+	// The chest squared to the hips first (the pistol stance turns it), so that lying back doesn't roll it onto a side.
 	{
-		const float HipWanted = KneeHeight + Thigh * FMath::Cos(FMath::DegreesToRadians(ThighLean));
-		const float Drop = FMath::Max(0.0f, At(Index(ThighR)).Z - HipWanted) * FMath::Lerp(0.75f, 1.0f, Kneel);
+		FVector Shoulders = At(Index(UpperArmR)) - At(Index(UpperArmL));
+		Shoulders = FVector(Shoulders.X, Shoulders.Y, 0.0).GetSafeNormal();
+		if (!Shoulders.IsNearlyZero())
+		{
+			const float Off = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Shoulders, Right), -1.0f, 1.0f)));
+			DownedTurn(Pose, Index(Spine[0]), DownedToward(Shoulders, Right, Off));
+		}
+	}
+	// The pelvis laid back on the floor where the hips lie, shuffling and twisting a little with each push.
+	{
 		FTransform Hips = Pose.GetComponentSpaceTransform(Index(Pelvis));
-		Hips.AddToTranslation(Up * (BreathLift * Breath - Drop));
+		const FQuat Lain = DownedToward(Ahead, Right, HipTwist * Push) * DownedToward(Up, -Ahead, PelvisRecline);
+		Hips.SetRotation((Lain * Hips.GetRotation()).GetNormalized());
+		Hips.SetLocation(Origin + Ahead * HipsAhead + Up * (PelvisHeight + HipLift * FMath::Abs(Push)) + Right * HipShuffle * Push);
 		const FBoneTransform Set(Index(Pelvis), Hips);
 		Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
 	}
-
-	// The right knee on the ground ahead of its hip, the shin back along the ground, the toes down.
-	{
-		const FVector Hip = At(Index(ThighR));
-		const float Rise = Hip.Z - KneeHeight;
-		const FVector Knee = FVector(Hip.X, Hip.Y, KneeHeight) + Ahead * FMath::Sqrt(FMath::Max(0.0f, Thigh * Thigh - Rise * Rise)) + Right * 3.0f;
-		const float AnkleUp = FMath::Clamp((Foot * 0.75f - KneeHeight) / FMath::Max(Shin, 1.0f), 0.0f, 0.5f);
-		const FVector Kneeling = Knee + (-Ahead * FMath::Sqrt(1.0f - AnkleUp * AnkleUp) + Up * AnkleUp) * Shin;
-		const FVector Effector = FMath::Lerp(FootRWas, Kneeling, Kneel);
-		const FVector Bend = FMath::Lerp(KneeRWas + Ahead * 40.0f, Knee + Ahead * 20.0f, Kneel);
-		DownedReach(Pose, Index(ThighR), Index(CalfR), Index(FootR), Effector, Bend, Kneel > 0.5f);
-	}
-	// The left foot flat on the ground ahead, its knee up.
-	{
-		const FVector Hip = At(Index(ThighL));
-		const FVector Planted = FVector(Hip.X, Hip.Y, FootLWas.Z) + Ahead * Thigh * 0.8f - Right * 6.0f;
-		const FVector Effector = FMath::Lerp(FootLWas, Planted, Kneel);
-		const FVector Bend = FMath::Lerp(KneeLWas + Ahead * 40.0f, Planted + Up * Shin + Ahead * 30.0f, Kneel);
-		DownedReach(Pose, Index(ThighL), Index(CalfL), Index(FootL), Effector, Bend, false);
-	}
-
-	// Hunched forward and a little to the hurt side, the chest heaving; the neck and head come back up to look ahead.
-	float Bent = 0.0f;
+	// The spine curled up off the floor, the chest heaving.
 	for (int32 Each = 0; Each < 3; ++Each)
 	{
-		const float Bend = SpineBend[Each] - (Each > 0 ? BreathBend * 0.5f * Breath : 0.0f);
-		Bent += Bend;
-		DownedTurn(Pose, Index(Spine[Each]), DownedToward(Up, Ahead, Bend) * DownedToward(Up, Right, Each < 2 ? SideLean * 0.5f : 0.0f));
+		DownedTurn(Pose, Index(Spine[Each]), DownedToward(Up, Ahead, SpineCurl[Each] + (Each > 0 ? BreathBend * 0.5f * Breath : 0.0f)));
 	}
-	DownedTurn(Pose, Index(Neck), DownedToward(Up, Ahead, -NeckBack));
-	DownedTurn(Pose, Index(Head), DownedToward(Up, Ahead, -HeadBack));
-	// The pistol arm comes up again by what the spine took down, so that it points where it did.
-	DownedTurn(Pose, Index(UpperArmR), DownedToward(Up, Ahead, -Bent));
-
-	// The left hand on the belly, a little to its side, the elbow out.
-	if (HandOnWound > 0.001f)
+	// The shoulders level, the left (on its elbow) a little higher.
 	{
-		const FVector Belly = At(Index(Spine[0]));
-		const FVector Wound = Belly + Ahead * 16.0f - Right * 5.0f + Up * 2.0f;
-		const FVector Hand = At(Index(HandL));
-		const FVector Elbow = At(Index(LowerArmL));
-		DownedReach(Pose, Index(UpperArmL), Index(LowerArmL), Index(HandL), FMath::Lerp(Hand, Wound, HandOnWound),
-			FMath::Lerp(Elbow + (Elbow - Hand).GetSafeNormal() * 30.0f, Wound - Right * 30.0f - Ahead * 5.0f, HandOnWound), true);
+		const FVector Shoulders = (At(Index(UpperArmR)) - At(Index(UpperArmL))).GetSafeNormal();
+		const FVector Level = (FVector(Shoulders.X, Shoulders.Y, 0.0).GetSafeNormal() - Up * 0.08f).GetSafeNormal();
+		if (!Shoulders.IsNearlyZero() && !Level.IsNearlyZero())
+		{
+			DownedTurn(Pose, Index(Spine[1]), FQuat::FindBetweenNormals(Shoulders, Level));
+		}
+	}
+	// Propped on the left elbow: the torso turned about the hips until the left shoulder is an upper arm (and an elbow) off the floor.
+	{
+		const FVector Hips = At(Index(Pelvis));
+		FVector Torso = At(Index(UpperArmL)) - Hips;
+		Torso -= Right * FVector::DotProduct(Torso, Right);
+		const float Length = Torso.Size();
+		if (Length > 1.0f)
+		{
+			const float Now = FMath::Atan2(Torso.Z, -FVector::DotProduct(Torso, Ahead));
+			const float Wanted = FMath::Asin(FMath::Clamp((UpperArmLength * 0.95f + ElbowHeight - Hips.Z) / Length, -0.2f, 0.95f));
+			DownedTurn(Pose, Index(Pelvis), DownedToward(Up, Ahead, FMath::RadiansToDegrees(Wanted - Now)));
+		}
+	}
+
+	// The chest turns toward the aim, a share of the way.
+	DownedTurn(Pose, Index(Spine[2]), DownedToward(Ahead, Right, AimYaw * ChestTurn));
+	// The aim, from the way the body faces: so far to the right, then so far up.
+	const FQuat Yawed = DownedToward(Ahead, Right, AimYaw);
+	const FQuat AimTurn = DownedToward(Yawed.RotateVector(Ahead), Up, AimPitch) * Yawed;
+	const FVector Aim = AimTurn.RotateVector(Ahead);
+	// The head looks along it, much of the turn in the neck.
+	{
+		const FQuat Wanted = (AimTurn * HeadWas).GetNormalized();
+		const FQuat Still = Wanted * TurnOf(Index(Head)).Inverse();
+		DownedTurn(Pose, Index(Neck), FQuat::Slerp(FQuat::Identity, Still, NeckShare));
+		DownedSetTurn(Pose, Index(Head), Wanted);
+	}
+
+	// The arms, as far as they are the pose's.
+	if (ArmsOwn > 0.001f)
+	{
+		// The left elbow on the floor under the shoulder, a little out and back, the forearm along the floor ahead.
+		const FVector Shoulder = At(Index(UpperArmL));
+		const FVector Elbow = FVector(Shoulder.X, Shoulder.Y, 4.0) - Right * 7.0f - Ahead * 4.0f;
+		FVector Hand = Elbow + (Ahead - Right * 0.25f).GetSafeNormal() * ForearmLength * 0.95f;
+		Hand.Z = 3.0f;
+		DownedReach(Pose, Index(UpperArmL), Index(LowerArmL), Index(HandL), FMath::Lerp(At(Index(HandL)), Hand, ArmsOwn), Elbow - Up * 10.0f - Right * 5.0f, true);
+	}
+	if (ArmsOwn > 0.001f)
+	{
+		// The pistol held out along the aim from the right shoulder, the elbow a little bent, down and out.
+		const FVector Shoulder = At(Index(UpperArmR));
+		const float Reach = ArmR * PistolReach;
+		FVector Hand = Shoulder + Aim * Reach + Up * PistolUp - Right * PistolIn;
+		// Its own player sees it from the eyes, the arm coming in from the right shoulder under the view, never across it.
+		if (bFirstPerson)
+		{
+			const FVector AimRight = FVector::CrossProduct(Up, Aim).GetSafeNormal();
+			const FVector AimUp = FVector::CrossProduct(Aim, AimRight).GetSafeNormal();
+			Hand = At(Index(Head)) + Aim * FirstPersonPistolOut + AimRight * FirstPersonPistolRight * (FVector::DotProduct(AimRight, Right) >= 0.0f ? 1.0f : -1.0f) - AimUp * FirstPersonPistolUnder;
+		}
+		DownedReach(Pose, Index(UpperArmR), Index(LowerArmR), Index(HandR), FMath::Lerp(At(Index(HandR)), Hand, ArmsOwn), Shoulder + Aim * Reach * 0.5f + Right * 20.0f - Up * 15.0f, false);
+		DownedSetTurn(Pose, Index(HandR), FQuat::Slerp(TurnOf(Index(HandR)), AimTurn * HandWas, ArmsOwn));
+	}
+
+	// The legs out along the floor ahead, as far as there is room: the right straight, the left knee up a little;
+	// scooting, each pushes in turn, the foot coming back lifted.
+	const struct
+	{
+		const FBoneReference& Thigh;
+		const FBoneReference& Calf;
+		const FBoneReference& Foot;
+		float Side;
+		float Out;
+		float Phase;
+	} Legs[] = {{ThighR, CalfR, FootR, 1.0f, RightLegOut, 0.0f}, {ThighL, CalfL, FootL, -1.0f, LeftLegOut, UE_PI}};
+	for (const auto& Leg : Legs)
+	{
+		const FVector Hip = At(Index(Leg.Thigh));
+		const float Drop = FMath::Max(0.0f, Hip.Z - AnkleHeight);
+		const float Flat = FMath::Sqrt(FMath::Max(0.0f, FMath::Square(LegFull * 0.99f) - Drop * Drop));
+		const float Phase = ScootPhase + Leg.Phase;
+		const float Share = FMath::Lerp(Leg.Out, FMath::Lerp(PushFrom, PushTo, 0.5f + 0.5f * FMath::Sin(Phase)), Scoot);
+		const float Lift = FootLift * Scoot * FMath::Max(0.0f, -FMath::Cos(Phase));
+		const float Along = FMath::Max(FMath::Min(Flat * Share, LegReach), LegFull * 0.35f);
+		const FVector Foot = FVector(Hip.X, Hip.Y, AnkleHeight + Lift) + Ahead * Along + Right * Leg.Side * 4.0f;
+		DownedReach(Pose, Index(Leg.Thigh), Index(Leg.Calf), Index(Leg.Foot), Foot, Hip + Ahead * Along * 0.5f + Up * 60.0f + Right * Leg.Side * 10.0f, true);
 	}
 }

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeShot.h"
+#include "Rules/CheeseStrikeDowned.h"
 
 namespace CheeseStrikeWeapons
 {
@@ -187,6 +188,54 @@ namespace CheeseStrikeWeapons
 		Consider(RayHitsSphere(Origin, Direction, Top, Radius));
 		return Best;
 	}
+
+	float RayHitsSegment(const FVector& Origin, const FVector& Direction, const FVector& From, const FVector& To, float Radius)
+	{
+		float Best = -1.0f;
+		const auto Consider = [&Best](float Candidate)
+		{
+			if (Candidate >= 0.0f && (Best < 0.0f || Candidate < Best))
+			{
+				Best = Candidate;
+			}
+		};
+		// The side: the ray against the cylinder about the segment, kept to the segment's length; then the round ends.
+		const FVector Axis = To - From;
+		const FVector Start = Origin - From;
+		const double AxisAxis = FVector::DotProduct(Axis, Axis);
+		const double AxisRay = FVector::DotProduct(Axis, Direction);
+		const double AxisStart = FVector::DotProduct(Axis, Start);
+		const double RayStart = FVector::DotProduct(Direction, Start);
+		const double StartStart = FVector::DotProduct(Start, Start);
+		const double A = AxisAxis - AxisRay * AxisRay;
+		const double B = AxisAxis * RayStart - AxisStart * AxisRay;
+		const double C = AxisAxis * StartStart - AxisStart * AxisStart - Radius * Radius * AxisAxis;
+		const double Discriminant = B * B - A * C;
+		if (A > UE_KINDA_SMALL_NUMBER && Discriminant >= 0.0)
+		{
+			const double Near = (-B - FMath::Sqrt(Discriminant)) / A;
+			const double Along = AxisStart + Near * AxisRay;
+			if (Near >= 0.0 && Along > 0.0 && Along < AxisAxis)
+			{
+				Consider(static_cast<float>(Near));
+			}
+		}
+		Consider(RayHitsSphere(Origin, Direction, From, Radius));
+		Consider(RayHitsSphere(Origin, Direction, To, Radius));
+		return Best;
+	}
+}
+
+float FHitHistory::RayHitsBody(const FVector& Origin, const FVector& Direction, const FSample& Sample)
+{
+	using namespace CheeseStrikeWeapons;
+	if (!Sample.bLying)
+	{
+		return RayHitsCapsule(Origin, Direction, Sample.Feet, Sample.Radius, Sample.Height);
+	}
+	const float Torso = RayHitsSegment(Origin, Direction, Sample.Hips, Sample.Shoulders, CheeseStrikeDowned::TorsoRadius);
+	const float Legs = RayHitsSegment(Origin, Direction, Sample.Hips, Sample.LegsTo, CheeseStrikeDowned::LegRadius);
+	return Torso < 0.0f ? Legs : (Legs < 0.0f ? Torso : FMath::Min(Torso, Legs));
 }
 
 void FHitHistory::Add(const FSample& Sample)
@@ -227,6 +276,13 @@ FHitHistory::FSample FHitHistory::At(float Time) const
 			Between.Yaw = Before.Yaw + FMath::FindDeltaAngleDegrees(Before.Yaw, After.Yaw) * Through;
 			Between.Radius = FMath::Lerp(Before.Radius, After.Radius, Through);
 			Between.Height = FMath::Lerp(Before.Height, After.Height, Through);
+			// Lying as the nearer sample was; where both lie, the body between them.
+			Between.bLying = Through < 0.5f ? Before.bLying : After.bLying;
+			const FSample& Lain = Before.bLying ? Before : After;
+			const bool bBoth = Before.bLying && After.bLying;
+			Between.Hips = bBoth ? FMath::Lerp(Before.Hips, After.Hips, Through) : Lain.Hips;
+			Between.Shoulders = bBoth ? FMath::Lerp(Before.Shoulders, After.Shoulders, Through) : Lain.Shoulders;
+			Between.LegsTo = bBoth ? FMath::Lerp(Before.LegsTo, After.LegsTo, Through) : Lain.LegsTo;
 			return Between;
 		}
 	}

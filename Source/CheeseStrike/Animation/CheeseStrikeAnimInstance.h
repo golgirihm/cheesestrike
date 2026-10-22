@@ -146,8 +146,9 @@ struct FCheeseStrikeAnimSets
  * for firing, reloading, drawing and striking, then for the knife the free
  * arm up on guard, and then the left hand held on the weapon
  * (FCheeseStrikeGripIK) except while a montage moves it, and last, for a
- * player down in Execution's last stand, the pose of one kneeling hurt
- * (FCheeseStrikeDownedPose), blended in and out. The animations are
+ * player down in Execution's last stand, the pose of one lying hurt on
+ * their back, propped up, the pistol out (FCheeseStrikeDownedPose), blended
+ * in and out. The animations are
  * the set for how the weapon in hand is held (rifle, pistol, shotgun,
  * knife), put on the same nodes when it changes. The numbers it blends by
  * come from the character each frame (UCheeseStrikeAnimInstance), and the
@@ -173,8 +174,14 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	bool bFalling = false;
 	bool bAiming = false;
 	bool bDowned = false;
-	/** The way the body faces in component space. */
+	/** The way the body faces in component space, where its capsule's axis meets the floor, where it aims down (degrees right of its facing), how much room its legs have, and its scoot (cm/s along its facing, and degrees a second turning round). */
 	FVector BodyForward = FVector(0.0, 1.0, 0.0);
+	FVector BodyOrigin = FVector::ZeroVector;
+	float DownAimYaw = 0.0f;
+	float LegRoom = CheeseStrikeDowned::LegLength;
+	float ScootSpeed = 0.0f;
+	float TurnSpeed = 0.0f;
+	bool bFirstPersonBody = false;
 	/** The blends under way, eased towards what the character is doing. */
 	float CrouchBlend = 0.0f;
 	float AirBlend = 0.0f;
@@ -184,9 +191,10 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	ECheeseStrikeHold LinkedHold = ECheeseStrikeHold::Rifle;
 	FVector LeftHandShift = FVector::ZeroVector;
 	float GuardBlend = 0.0f;
-	/** Down: how far (0 to 1, at an even pace; the pose takes it smoothed), how much the legs kneel rather than creep, and the breath's phase (radians). */
+	/** Down: how far (0 to 1, at an even pace; the pose takes it smoothed), how much the legs scoot, where they are in their pushes and the breath's phase (radians). */
 	float DownLinear = 0.0f;
-	float KneelBlend = 1.0f;
+	float ScootBlend = 0.0f;
+	float ScootPhase = 0.0f;
 	float BreathPhase = 0.0f;
 
 protected:
@@ -252,7 +260,7 @@ protected:
 	 */
 	FAnimNode_ConvertLocalToComponentSpace ToComponentSpace;
 	FCheeseStrikeGripIK LeftHand;
-	/** Down in Execution's last stand: on one knee, hunched, the left hand to the belly. */
+	/** Down in Execution's last stand: on their back, propped on the elbow, the pistol out. */
 	FCheeseStrikeDownedPose Downed;
 	FAnimNode_ConvertComponentToLocalSpace ToLocalSpace;
 	bool bLinked = false;
@@ -302,8 +310,19 @@ public:
 	/** Down in Execution's last stand (UCheeseStrikeLastStand), and alive. */
 	UPROPERTY(Transient, BlueprintReadOnly, Category="Animation")
 	bool bDowned = false;
-	/** The way the body faces in its mesh's component space (the character's mesh is turned a quarter turn). */
+	/** The way the body faces in its mesh's component space (the character's mesh is turned a quarter turn), and where its capsule's axis meets the floor there. */
 	FVector BodyForward = FVector(0.0, 1.0, 0.0);
+	FVector BodyOrigin = FVector::ZeroVector;
+	/** Down: where it aims, in degrees to the right of the way the body faces; the room ahead of its hips for its legs; how fast it scoots along its facing (cm/s) and turns round (degrees a second). */
+	float DownAimYaw = 0.0f;
+	float LegRoom = CheeseStrikeDowned::LegLength;
+	float ScootSpeed = 0.0f;
+	float TurnSpeed = 0.0f;
+	/** Whether this is the first-person body, its own player's. */
+	bool bFirstPersonBody = false;
+	/** The body's yaw last frame, for its turning. */
+	float LastYaw = 0.0f;
+	bool bLastYawKnown = false;
 	/** How the weapon in hand is held, and where the left hand reaches past its grip on it, in the anchor bone's space (cm). */
 	ECheeseStrikeHold Hold = ECheeseStrikeHold::Rifle;
 	FVector LeftHandShift = FVector::ZeroVector;

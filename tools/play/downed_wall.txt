@@ -1,0 +1,42 @@
+# Execution's last stand by a wall: the host walks up to a wall, goes down
+# facing it (falling back from it so that the legs lie out, bent up if they
+# must), scoots toward it until the legs are folded, turns along it, and is
+# looked at from outside and in their own view. Run with tools/play.ps1
+# -Script tools/play/downed_wall.txt -Extra "?Mode=Execution"
+# -StartAt "-231,-700,100,0".
+wait 4
+hold Move 0 1
+wait 6
+release Move
+wait 0.5
+shot wall_0_standing
+cmd CheeseStrikeDie
+wait 1.6
+shot wall_1_view
+cmd CheeseStrikeOutside 260 90 -20 20
+wait 0.5
+shot wall_2_side
+cmd CheeseStrikeOutside 300 150 -20 120
+wait 0.4
+shot wall_3_above
+cmd CheeseStrikeOutside
+hold Move 0 1
+wait 2
+release Move
+shot wall_4_view_close
+cmd CheeseStrikeOutside 220 90 -20 20
+wait 0.5
+shot wall_5_side_close
+cmd CheeseStrikeOutside 220 -60 -20 40
+wait 0.4
+shot wall_6_left_close
+cmd CheeseStrikeOutside
+look -45 0
+wait 2.5
+cmd CheeseStrikeOutside 260 120 -20 60
+wait 0.5
+shot wall_7_turned
+cmd CheeseStrikeOutside
+wait 0.3
+shot wall_8_view_turned
+quit
