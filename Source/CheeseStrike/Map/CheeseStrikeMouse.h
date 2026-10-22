@@ -61,6 +61,10 @@ public:
 	int32 GetEaten() const { return Eaten; }
 	/** How many times it has fallen in, and come back. */
 	int32 GetFallenIn() const { return FallenIn; }
+	/** How many times it has leapt off an island of floor it had eaten round itself. */
+	int32 GetLeaps() const { return Leaps; }
+	/** What it is doing, where, and after what, in a line (the console's CheeseStrikeMiceNow). */
+	FString Describe() const;
 	/** Whether it found all its sounds. */
 	bool HasSounds() const;
 	/** Whether it has its body, animations and every material of its body. */
@@ -95,6 +99,10 @@ protected:
 	bool StandsOn(const ACheeseStrikeCheese* Cheese) const;
 	/** Server only: back over the edge of the map, at one of its MouseEntry points, after falling in; false if none has ground in. */
 	bool ComeBack();
+	/** Whether `From` is on an island of the navigation mesh, a few metres across, that the cheese round it was eaten from. */
+	bool IsCutOff(const FVector& From) const;
+	/** Server only: cut off on an island it ate the floor round, it leaps across to the nearest floor that leads out; false if none is within a leap. */
+	bool LeapOut();
 	UFUNCTION()
 	void OnRep_Doing();
 	/** The animation and the sounds for what it is doing, on this machine. */
@@ -172,4 +180,8 @@ protected:
 	/** When it comes back after falling in, and how many times it has. */
 	float BackAt = 0.0f;
 	int32 FallenIn = 0;
+	/** When it last bit, or came in; when it next looks whether it is cut off; and its leaps. */
+	float LastBiteAt = 0.0f;
+	float NextStrandedCheck = 0.0f;
+	int32 Leaps = 0;
 };
