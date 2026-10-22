@@ -54,8 +54,11 @@ $name = "CheeseStrike_$(Get-Date -Format 'yyyy-MM-dd_HHmm')_$commit$(if ($dirty)
 Write-Output "== $name"
 
 if (-not $SkipPackage) {
-  $running = Get-Process UnrealEditor, CheeseStrike -ErrorAction SilentlyContinue
-  if ($running) { Fail "close the editor and the game first (process $($running.Id -join ', '))" }
+  # Only an editor or game of this copy (it holds the module and the files cooked) or the packaged game (whose folder is
+  # replaced) is in the way; another working copy's (tools/worktree.py) isn't.
+  $running = Get-CimInstance Win32_Process -Filter "name like 'UnrealEditor%' or name like 'CheeseStrike%'" |
+    Where-Object { $_.CommandLine -like "*$root\*" -or $_.CommandLine -like "*$root`"*" -or ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($Out, [StringComparison]::OrdinalIgnoreCase)) }
+  if ($running) { Fail "close the editor and the game first (process $($running.ProcessId -join ', '))" }
   if (Test-Path $build) { Remove-Item $build -Recurse -Force }
   Write-Output "== packaging into $build (the first time compiles every shader: a long while)"
   $uat = Join-Path $engine "Engine\Build\BatchFiles\RunUAT.bat"
