@@ -1,0 +1,90 @@
+# Looks at the weapons in each hero's hands (CheeseStrikeBody): for each, a rifle, the pistol and the knife from the
+# right side, and the rifle and the pistol in first person, aimed; for checking each hero's grip on each way of holding.
+wait 2
+cmd CheeseStrikeBody 1 0
+wait 0.5
+cmd CheeseStrikeArm carbine
+wait 1
+hold Aim
+wait 0.7
+shot heroes_1_carbine_aimed
+release Aim
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_1_carbine
+cmd CheeseStrikeOutside
+tap Sidearm
+wait 0.8
+hold Aim
+wait 0.7
+shot heroes_1_pistol_aimed
+release Aim
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_1_pistol
+cmd CheeseStrikeOutside
+tap Knife
+wait 0.8
+shot heroes_1_knife_view
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_1_knife
+cmd CheeseStrikeOutside
+cmd CheeseStrikeBody 2 1
+wait 0.5
+cmd CheeseStrikeArm carbine
+wait 1
+hold Aim
+wait 0.7
+shot heroes_2_carbine_aimed
+release Aim
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_2_carbine
+cmd CheeseStrikeOutside
+tap Sidearm
+wait 0.8
+hold Aim
+wait 0.7
+shot heroes_2_pistol_aimed
+release Aim
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_2_pistol
+cmd CheeseStrikeOutside
+tap Knife
+wait 0.8
+shot heroes_2_knife_view
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_2_knife
+cmd CheeseStrikeOutside
+cmd CheeseStrikeBody 3 0
+wait 0.5
+cmd CheeseStrikeArm carbine
+wait 1
+hold Aim
+wait 0.7
+shot heroes_3_carbine_aimed
+release Aim
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_3_carbine
+cmd CheeseStrikeOutside
+tap Sidearm
+wait 0.8
+hold Aim
+wait 0.7
+shot heroes_3_pistol_aimed
+release Aim
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_3_pistol
+cmd CheeseStrikeOutside
+tap Knife
+wait 0.8
+shot heroes_3_knife_view
+cmd CheeseStrikeOutside 120 75 45
+wait 0.6
+shot heroes_3_knife
+quit

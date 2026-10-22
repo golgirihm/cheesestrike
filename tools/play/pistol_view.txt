@@ -1,0 +1,48 @@
+# Looks at the pistol, the knife and a rifle in first person: standing, crouched, aimed, and moving, standing and
+# crouched; for checking that the arms and the weapon sit where they should in view whatever the body does.
+wait 2
+tap Sidearm
+wait 1
+shot view_pistol_standing
+hold Aim
+wait 0.7
+shot view_pistol_aimed
+release Aim
+look 180 0
+hold Crouch
+wait 1
+shot view_pistol_crouched
+hold Aim
+wait 0.7
+shot view_pistol_crouched_aimed
+release Aim
+hold Move 0 1
+wait 0.8
+shot view_pistol_crouched_moving
+release Move
+release Crouch
+wait 0.8
+hold Move 0 1
+wait 0.8
+shot view_pistol_moving
+release Move
+look 180 0
+tap Knife
+wait 1
+shot view_knife_standing
+hold Crouch
+wait 1
+shot view_knife_crouched
+release Crouch
+wait 0.6
+tap Fire
+wait 0.12
+shot view_knife_stroke
+wait 0.6
+tap Primary
+wait 1.2
+hold Crouch
+wait 1
+shot view_rifle_crouched
+release Crouch
+quit

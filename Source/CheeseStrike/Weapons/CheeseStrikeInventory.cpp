@@ -199,7 +199,8 @@ void UCheeseStrikeInventory::Refresh()
 		}
 		return;
 	}
-	Show(HeldSlot, true);
+	// Someone else's: a change is seen being drawn; the first weapon is simply there.
+	Show(HeldSlot, ShownSlot == NoSlot);
 }
 
 void UCheeseStrikeInventory::OnRep_Carried()
@@ -412,6 +413,25 @@ void UCheeseStrikeInventory::ServerChoosePrimary_Implementation(FName Primary)
 	UE_LOG(LogCheeseStrike, Display, TEXT("%s chose the %s"), *Character->DisplayName(), *Stats->DisplayName.ToString());
 }
 
+void UCheeseStrikeInventory::ServerArm_Implementation(FName Weapon)
+{
+#if !UE_BUILD_SHIPPING
+	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
+	if (Stats == nullptr)
+	{
+		return;
+	}
+	if (Stats->Slot == EWeaponSlot::Primary)
+	{
+		Give(FCheeseStrikeLoadout::Usual(Stats->Id));
+	}
+	else
+	{
+		HoldNow(Stats->Slot);
+	}
+#endif
+}
+
 void UCheeseStrikeInventory::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -513,6 +533,24 @@ namespace
 		}
 		UE_LOG(LogCheeseStrike, Display, TEXT("CheeseStrikeLoadout: the %s, from the next time you come in"), *Choice->GetPrimary().ToString());
 	}
+
+#if !UE_BUILD_SHIPPING
+	/** `CheeseStrikeArm <weapon>` (development): that weapon in hand at once, a primary with the pistol and the knife. */
+	void ArmWith(const TArray<FString>& Args, UWorld* World)
+	{
+		APlayerController* Player = World != nullptr ? World->GetFirstPlayerController() : nullptr;
+		ACheeseStrikeCharacter* Character = Player != nullptr ? Cast<ACheeseStrikeCharacter>(Player->GetPawn()) : nullptr;
+		if (Character != nullptr && Args.Num() > 0)
+		{
+			Character->GetInventory()->ServerArm(FName(*Args[0]));
+		}
+	}
+
+	FAutoConsoleCommandWithWorldAndArgs ArmCommand(
+		TEXT("CheeseStrikeArm"),
+		TEXT("CheeseStrikeArm <weapon>: that weapon in hand at once (development)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ArmWith));
+#endif
 
 	FAutoConsoleCommandWithWorldAndArgs LoadoutCommand(
 		TEXT("CheeseStrikeLoadout"),

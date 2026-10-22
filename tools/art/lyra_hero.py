@@ -2,7 +2,7 @@ import unreal, os, sys, traceback
 
 # Run in the Lyra project (C:\Hamid\code\Lyra\LyraStarterGame), with its
 # editor closed and the Lyra lock taken (mkdir C:\Hamid\code\cs-wt\lyra.lock):
-#   UnrealEditor-Cmd.exe <Lyra>/LyraStarterGame.uproject -ExecCmds="py <repo>/tools/art/lyra_hero.py <Hero> [retarget]" -unattended -nullrhi
+#   UnrealEditor-Cmd.exe <Lyra>/LyraStarterGame.uproject -ExecCmds="py <repo>/tools/art/lyra_hero.py <Hero> [retarget|weapons]" -unattended -nullrhi
 # (paths absolute). <Hero> is a Paragon hero the Epic Games Launcher added to
 # the Lyra project: Murdock is /Game/ParagonMurdock/Characters/Heroes/Murdock
 # with its mesh Meshes/Murdock. It writes to Saved/lyra_hero_<Hero>.txt:
@@ -13,8 +13,11 @@ import unreal, os, sys, traceback
 # - with "retarget": an IK rig (the UE4 mannequin's, whose bones Paragon's
 #   heroes have) and a retargeter from Lyra's UE5 mannequin, with the hero's
 #   pose aligned to it, and Lyra's rifle set retargeted to the hero in
-#   <hero>/Animations/Rifle, as Lt. Belica's was;
-# - the packages the game needs (the mesh, the rifle set, and everything
+#   <hero>/Animations/Rifle, as Lt. Belica's was, with the other weapons'
+#   sets (WEAPON_SETS) beside it;
+# - with "weapons": only the other weapons' sets, through the retargeter
+#   "retarget" made, leaving the rig and the rifle set as they are;
+# - the packages the game needs (the mesh, its animations, and everything
 #   they depend on), one a line after "# packages", for
 #   tools/art/copy_from_lyra.py to copy into the game's Content.
 HEROES = {
@@ -37,10 +40,31 @@ RIFLE_SET = [
     AO + "AO_MM_Rifle_Idle_Hipfire", AO + "AO_MM_Rifle_Idle_ADS", AO + "AO_MM_Rifle_Crouch_Idle",
     A + "MM_Rifle_Fire", A + "MM_Rifle_Reload",
 ]
+P = M + "/Animations/Locomotion/Pistol/"
+U = M + "/Animations/Locomotion/Unarmed/"
+# The rest of what the weapons are held by (UCheeseStrikeAnimInstance::FindSets), by the folder beside the rifle set's
+# each goes in: drawing the rifle; the pistol's set, which the knife is held by too, with its blow and the unarmed
+# guard; the shotgun's firing and reloading.
+WEAPON_SETS = {
+    "Rifle": [A + "MM_Rifle_Equip"],
+    "Pistol": [
+        P + "MM_Pistol_Idle_Hipfire", P + "MM_Pistol_Idle_ADS",
+        P + "MM_Pistol_Walk_Fwd", P + "MM_Pistol_Walk_Bwd", P + "MM_Pistol_Walk_Left", P + "MM_Pistol_Walk_Right",
+        P + "MM_Pistol_Jog_Fwd", P + "MM_Pistol_Jog_Bwd", P + "MM_Pistol_Jog_Left", P + "MM_Pistol_Jog_Right",
+        P + "MM_Pistol_Crouch_Idle",
+        P + "MM_Pistol_Crouch_Walk_Fwd", P + "MM_Pistol_Crouch_Walk_Bwd", P + "MM_Pistol_Crouch_Walk_Left", P + "MM_Pistol_Crouch_Walk_Right",
+        P + "MM_Pistol_Jump_Fall_Loop",
+        AO + "AO_MM_Pistol_Idle_ADS",
+        A + "MM_Pistol_Fire", A + "MM_Pistol_Reload", A + "MM_Pistol_Equip", A + "MM_Pistol_Melee",
+        U + "MM_Unarmed_Idle_Ready",
+    ],
+    "Shotgun": [A + "MM_Shotgun_Fire", A + "MM_Shotgun_Reload"],
+}
 
 args = [a for a in sys.argv[1:] if a]
 hero = args[0] if args else "Murdock"
 retarget = "retarget" in args[1:]
+weapons = retarget or "weapons" in args[1:]
 OUT = unreal.Paths.project_saved_dir() + f"lyra_hero_{hero}.txt"
 lines = []
 def say(*parts):
@@ -70,9 +94,10 @@ try:
             say("bone", bone, unreal.AnimPoseExtensions.get_ref_bone_pose(pose, bone, unreal.AnimPoseSpaces.WORLD))
 
     rig_folder = folder + "/Rig"
-    anims = folder + "/Animations/Rifle"
+    animations = folder + "/Animations"
+    anims = animations + "/Rifle"
+    manny = unreal.load_asset(M + "/Meshes/SKM_Manny")
     if retarget:
-        manny = unreal.load_asset(M + "/Meshes/SKM_Manny")
         rig_path = f"{rig_folder}/IK_{hero}"
         if lib.does_asset_exist(rig_path):
             lib.delete_asset(rig_path)
@@ -109,12 +134,36 @@ try:
                                                                      search="", replace="", prefix="", suffix="", target_path=anims, include_referenced_assets=True)
         say("retargeted", len(made))
         lib.save_directory(anims)
+    if weapons:
+        rtg = unreal.load_asset(f"{rig_folder}/RTG_Manny_{hero}")
+        for kind, paths in WEAPON_SETS.items():
+            into = f"{animations}/{kind}"
+            if kind == "Rifle":
+                # Beside the rifle set, which stays: only what this adds goes first.
+                for path in paths:
+                    old = f"{into}/{path.split('/')[-1]}"
+                    if lib.does_asset_exist(old):
+                        lib.delete_asset(old)
+            elif lib.does_directory_exist(into):
+                lib.delete_directory(into)
+            lib.make_directory(into)
+            sources = [lib.find_asset_data(p) for p in paths]
+            missing = [p for p, d in zip(paths, sources) if not d.is_valid()]
+            if missing:
+                say("missing in Lyra", ", ".join(missing))
+            made = unreal.IKRetargetBatchOperation.duplicate_and_retarget(assets_to_retarget=[d for d in sources if d.is_valid()], source_mesh=manny, target_mesh=mesh,
+                                                                         ik_retarget_asset=rtg, search="", replace="", prefix="", suffix="", target_path=into,
+                                                                         include_referenced_assets=True)
+            say("retargeted", kind, len(made))
+            lib.save_directory(into)
 
-    # What the game needs: the mesh and the rifle set, with what they depend on.
+    # What the game needs: the mesh and its animations, with what they depend on.
     registry = unreal.AssetRegistryHelpers.get_asset_registry()
     registry.scan_paths_synchronous(["/Game"], True)
     roots = [mesh.get_outermost().get_name()]
-    roots += [str(a.package_name) for a in registry.get_assets_by_path(anims, True)]
+    # (only the sets made here: the hero's own Paragon animations beside them stay behind)
+    for kind in ["Rifle"] + [k for k in WEAPON_SETS if k != "Rifle"]:
+        roots += [str(a.package_name) for a in registry.get_assets_by_path(f"{animations}/{kind}", True)]
     options = unreal.AssetRegistryDependencyOptions(include_soft_package_references=False, include_hard_package_references=True,
                                                      include_searchable_names=False, include_soft_management_references=False, include_hard_management_references=False)
     seen = set()

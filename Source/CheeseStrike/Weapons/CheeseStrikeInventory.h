@@ -107,6 +107,10 @@ public:
 	/** Shows on this machine the weapon in hand and hides the rest: when something arrives or changes. */
 	void Refresh();
 
+	/** For looking at the weapons (development, `CheeseStrikeArm <weapon>`): the usual loadout with `Weapon` as its primary, or `Weapon` in hand if it is the sidearm or the knife. */
+	UFUNCTION(Server, Reliable)
+	void ServerArm(FName Weapon);
+
 	/** Server: the player's choice of primary, from their machine, kept for their next character (or this one, still fresh). */
 	UFUNCTION(Server, Reliable)
 	void ServerChoosePrimary(FName Primary);

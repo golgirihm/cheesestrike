@@ -61,15 +61,15 @@ namespace CheeseStrikeAnimation
 bool FCheeseStrikeAnimSet::IsComplete() const
 {
 	return Idle && IdleAiming && WalkForward && WalkBackward && WalkLeft && WalkRight && JogForward && JogBackward && JogLeft && JogRight
-		&& CrouchIdle && CrouchWalk && FallLoop && AimHip && AimAiming && AimCrouch && Fire && Reload;
+		&& CrouchIdle && CrouchWalkForward && CrouchWalkBackward && CrouchWalkLeft && CrouchWalkRight && FallLoop && AimHip && AimAiming && AimCrouch && Fire && Reload;
 }
 
 namespace
 {
 	template <typename T>
-	TObjectPtr<T> Find(const TCHAR* Path)
+	TObjectPtr<T> Find(const FString& Folder, const FString& Name)
 	{
-		ConstructorHelpers::FObjectFinder<T> Finder(Path);
+		ConstructorHelpers::FObjectFinder<T> Finder(*(Folder + Name + TEXT(".") + Name));
 		return Finder.Object;
 	}
 }
@@ -78,8 +78,10 @@ UCheeseStrikeAnimInstance::UCheeseStrikeAnimInstance()
 {
 	// Lyra's rifle set for the mannequin (Content/LICENSES.md).
 	const FString Mannequin = TEXT("/Game/Characters/Heroes/Mannequin/Animations/");
-	Sets.Add(FindSet(Mannequin + TEXT("Locomotion/Rifle/"), Mannequin + TEXT("AimOffsets/"), Mannequin + TEXT("Actions/")));
-	Set = Sets[0];
+	FCheeseStrikeAnimSets Rifle;
+	Rifle.Of(ECheeseStrikeHold::Rifle) = FindSet(TEXT("Rifle"), Mannequin + TEXT("Locomotion/Rifle/"), Mannequin + TEXT("AimOffsets/"), Mannequin + TEXT("Actions/"));
+	Sets.Add(Rifle);
+	Picked = Sets[0];
 }
 
 UCheeseStrikeHeroAnimInstance::UCheeseStrikeHeroAnimInstance()
@@ -87,9 +89,9 @@ UCheeseStrikeHeroAnimInstance::UCheeseStrikeHeroAnimInstance()
 	Sets.Reset();
 	for (const CheeseStrikeBodies::FBody& Body : CheeseStrikeBodies::All())
 	{
-		Sets.Add(FindSet(Body.Animations, Body.Animations, Body.Animations));
+		Sets.Add(FindSets(Body.Animations));
 	}
-	Set = Sets.IsEmpty() ? FCheeseStrikeAnimSet() : Sets[0];
+	Picked = Sets.IsEmpty() ? FCheeseStrikeAnimSets() : Sets[0];
 	GripAnchor = TEXT("hand_r");
 }
 
@@ -97,39 +99,85 @@ void UCheeseStrikeAnimInstance::PickSet()
 {
 	const USkeletalMeshComponent* Mesh = GetSkelMeshComponent();
 	const USkeleton* Skeleton = Mesh != nullptr && Mesh->GetSkeletalMeshAsset() != nullptr ? Mesh->GetSkeletalMeshAsset()->GetSkeleton() : nullptr;
-	for (const FCheeseStrikeAnimSet& Each : Sets)
+	for (const FCheeseStrikeAnimSets& Each : Sets)
 	{
-		if (Each.Idle != nullptr && Each.Idle->GetSkeleton() == Skeleton)
+		const FCheeseStrikeAnimSet& Rifle = Each.For(ECheeseStrikeHold::Rifle);
+		if (Rifle.Idle != nullptr && Rifle.Idle->GetSkeleton() == Skeleton)
 		{
-			Set = Each;
+			Picked = Each;
 			return;
 		}
 	}
 }
 
-FCheeseStrikeAnimSet UCheeseStrikeAnimInstance::FindSet(const FString& Locomotion, const FString& AimOffsets, const FString& Actions)
+const FCheeseStrikeAnimSet& FCheeseStrikeAnimSets::For(ECheeseStrikeHold Hold) const
 {
-	FCheeseStrikeAnimSet Found;
-	const auto Path = [](const FString& Folder, const TCHAR* Name) { return Folder + Name + TEXT(".") + Name; };
-	Found.Idle = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Idle_Hipfire")));
-	Found.IdleAiming = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Idle_ADS")));
-	Found.WalkForward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Fwd")));
-	Found.WalkBackward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Bwd")));
-	Found.WalkLeft = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Left")));
-	Found.WalkRight = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Walk_Right")));
-	Found.JogForward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Fwd")));
-	Found.JogBackward = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Bwd")));
-	Found.JogLeft = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Left")));
-	Found.JogRight = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jog_Right")));
-	Found.CrouchIdle = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Crouch_Idle")));
-	Found.CrouchWalk = Find<UBlendSpace>(*Path(Locomotion, TEXT("BS_MM_Rifle_Crouch_Walk")));
-	Found.FallLoop = Find<UAnimSequence>(*Path(Locomotion, TEXT("MM_Rifle_Jump_Fall_Loop")));
-	Found.AimHip = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Idle_Hipfire")));
-	Found.AimAiming = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Idle_ADS")));
-	Found.AimCrouch = Find<UBlendSpace>(*Path(AimOffsets, TEXT("AO_MM_Rifle_Crouch_Idle")));
-	Found.Fire = Find<UAnimSequence>(*Path(Actions, TEXT("MM_Rifle_Fire")));
-	Found.Reload = Find<UAnimSequence>(*Path(Actions, TEXT("MM_Rifle_Reload")));
+	const FCheeseStrikeAnimSet& Wanted = Holds[static_cast<uint8>(Hold)];
+	return Wanted.IsComplete() ? Wanted : Holds[static_cast<uint8>(ECheeseStrikeHold::Rifle)];
+}
+
+FCheeseStrikeAnimSets UCheeseStrikeAnimInstance::FindSets(const FString& Rifles)
+{
+	// <hero>/Animations/Rifle/, and beside it Pistol/ and Shotgun/.
+	const FString Animations = Rifles.EndsWith(TEXT("Rifle/")) ? Rifles.LeftChop(6) : Rifles;
+	const FString Pistols = Animations + TEXT("Pistol/");
+	const FString Shotguns = Animations + TEXT("Shotgun/");
+	FCheeseStrikeAnimSets Found;
+	FCheeseStrikeAnimSet& Rifle = Found.Of(ECheeseStrikeHold::Rifle);
+	Rifle = FindSet(TEXT("Rifle"), Rifles, Rifles, Rifles);
+	Rifle.Equip = Find<UAnimSequence>(Rifles, TEXT("MM_Rifle_Equip"));
+	FCheeseStrikeAnimSet& Pistol = Found.Of(ECheeseStrikeHold::Pistol);
+	Pistol = FindSet(TEXT("Pistol"), Pistols, Pistols, Pistols);
+	Pistol.Equip = Find<UAnimSequence>(Pistols, TEXT("MM_Pistol_Equip"));
+	// The shotgun is held as the rifle is, and fired and reloaded its own way.
+	FCheeseStrikeAnimSet& Shotgun = Found.Of(ECheeseStrikeHold::Shotgun);
+	Shotgun = Rifle;
+	Shotgun.Fire = Find<UAnimSequence>(Shotguns, TEXT("MM_Shotgun_Fire"));
+	Shotgun.Reload = Find<UAnimSequence>(Shotguns, TEXT("MM_Shotgun_Reload"));
+	// The knife in the pistol's stance, struck with the pistol's blow, the free arm up on guard as the unarmed stand ready.
+	FCheeseStrikeAnimSet& Knife = Found.Of(ECheeseStrikeHold::Knife);
+	Knife = Pistol;
+	Knife.Stroke = Find<UAnimSequence>(Pistols, TEXT("MM_Pistol_Melee"));
+	Knife.Guard = Find<UAnimSequence>(Pistols, TEXT("MM_Unarmed_Idle_Ready"));
 	return Found;
+}
+
+FCheeseStrikeAnimSet UCheeseStrikeAnimInstance::FindSet(const TCHAR* Kind, const FString& Locomotion, const FString& AimOffsets, const FString& Actions)
+{
+	const FString Prefix = FString(TEXT("MM_")) + Kind + TEXT("_");
+	FCheeseStrikeAnimSet Set;
+	Set.Idle = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Idle_Hipfire"));
+	Set.IdleAiming = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Idle_ADS"));
+	Set.WalkForward = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Walk_Fwd"));
+	Set.WalkBackward = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Walk_Bwd"));
+	Set.WalkLeft = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Walk_Left"));
+	Set.WalkRight = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Walk_Right"));
+	Set.JogForward = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Jog_Fwd"));
+	Set.JogBackward = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Jog_Bwd"));
+	Set.JogLeft = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Jog_Left"));
+	Set.JogRight = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Jog_Right"));
+	Set.CrouchIdle = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Crouch_Idle"));
+	Set.CrouchWalkForward = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Crouch_Walk_Fwd"));
+	Set.CrouchWalkBackward = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Crouch_Walk_Bwd"));
+	Set.CrouchWalkLeft = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Crouch_Walk_Left"));
+	Set.CrouchWalkRight = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Crouch_Walk_Right"));
+	Set.FallLoop = Find<UAnimSequence>(Locomotion, Prefix + TEXT("Jump_Fall_Loop"));
+	if (FCString::Strcmp(Kind, TEXT("Pistol")) == 0)
+	{
+		// Lyra's pistol has one aim offset, down the sights, for every stance.
+		Set.AimHip = Find<UBlendSpace>(AimOffsets, TEXT("AO_MM_Pistol_Idle_ADS"));
+		Set.AimAiming = Set.AimHip;
+		Set.AimCrouch = Set.AimHip;
+	}
+	else
+	{
+		Set.AimHip = Find<UBlendSpace>(AimOffsets, TEXT("AO_") + Prefix + TEXT("Idle_Hipfire"));
+		Set.AimAiming = Find<UBlendSpace>(AimOffsets, TEXT("AO_") + Prefix + TEXT("Idle_ADS"));
+		Set.AimCrouch = Find<UBlendSpace>(AimOffsets, TEXT("AO_") + Prefix + TEXT("Crouch_Idle"));
+	}
+	Set.Fire = Find<UAnimSequence>(Actions, Prefix + TEXT("Fire"));
+	Set.Reload = Find<UAnimSequence>(Actions, Prefix + TEXT("Reload"));
+	return Set;
 }
 
 FAnimInstanceProxy* UCheeseStrikeAnimInstance::CreateAnimInstanceProxy()
@@ -160,11 +208,14 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	{
 		bCrouched = Character->bIsCrouched;
 		bFalling = Character->GetCharacterMovement() != nullptr && Character->GetCharacterMovement()->IsFalling();
-		bAiming = Character->GetWeapon() != nullptr && Character->GetWeapon()->IsAimed();
+		const ACheeseStrikeWeapon* Weapon = Character->GetWeapon();
+		bAiming = Weapon != nullptr && Weapon->IsAimed();
+		Hold = Weapon != nullptr ? Weapon->GetHold() : ECheeseStrikeHold::Rifle;
+		LeftHandShift = Weapon != nullptr ? Weapon->LeftHandShiftFor(GetSkelMeshComponent()) : FVector::ZeroVector;
 	}
 }
 
-void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set, FName GripAnchor)
+void FCheeseStrikeAnimProxy::Assign(const FCheeseStrikeAnimSet& Set)
 {
 	const auto Loop = [](FAnimNode_SequencePlayer_Standalone& Player, UAnimSequence* Sequence)
 	{
@@ -182,14 +233,20 @@ void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set, FName GripAnc
 	Loop(JogLeft, Set.JogLeft);
 	Loop(JogRight, Set.JogRight);
 	Loop(CrouchIdle, Set.CrouchIdle);
+	Loop(CrouchWalkForward, Set.CrouchWalkForward);
+	Loop(CrouchWalkBackward, Set.CrouchWalkBackward);
+	Loop(CrouchWalkLeft, Set.CrouchWalkLeft);
+	Loop(CrouchWalkRight, Set.CrouchWalkRight);
 	Loop(FallLoop, Set.FallLoop);
-	CrouchWalk.SetBlendSpace(Set.CrouchWalk);
-	CrouchWalk.SetLoop(true);
+	Loop(GuardPose, Set.Guard != nullptr ? Set.Guard.Get() : Set.Idle.Get());
 	AimHip.SetBlendSpace(Set.AimHip);
 	AimAiming.SetBlendSpace(Set.AimAiming);
 	AimCrouch.SetBlendSpace(Set.AimCrouch);
+}
 
-	// The moving cycles: walking and jogging, each in four directions.
+void FCheeseStrikeAnimProxy::Link(FName GripAnchor)
+{
+	// The moving cycles: walking and jogging, each in four directions; and crouched, in four.
 	FAnimNode_SequencePlayer_Standalone* Moving[] = {&WalkForward, &WalkBackward, &WalkLeft, &WalkRight, &JogForward, &JogBackward, &JogLeft, &JogRight};
 	for (FAnimNode_SequencePlayer_Standalone* Cycle : Moving)
 	{
@@ -197,12 +254,18 @@ void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set, FName GripAnc
 		const int32 Index = Cycles.AddPose() - 1;
 		Cycles.Poses[Index].SetLinkNode(Cycle);
 	}
+	FAnimNode_SequencePlayer_Standalone* Creeping[] = {&CrouchWalkForward, &CrouchWalkBackward, &CrouchWalkLeft, &CrouchWalkRight};
+	for (FAnimNode_SequencePlayer_Standalone* Cycle : Creeping)
+	{
+		const int32 Index = CrouchCycles.AddPose() - 1;
+		CrouchCycles.Poses[Index].SetLinkNode(Cycle);
+	}
 	StandingStill.A.SetLinkNode(&Idle);
 	StandingStill.B.SetLinkNode(&IdleAiming);
 	Standing.A.SetLinkNode(&StandingStill);
 	Standing.B.SetLinkNode(&Cycles);
 	Crouched.A.SetLinkNode(&CrouchIdle);
-	Crouched.B.SetLinkNode(&CrouchWalk);
+	Crouched.B.SetLinkNode(&CrouchCycles);
 	OnGround.A.SetLinkNode(&Standing);
 	OnGround.B.SetLinkNode(&Crouched);
 	Body.A.SetLinkNode(&OnGround);
@@ -224,13 +287,23 @@ void FCheeseStrikeAnimProxy::Link(const FCheeseStrikeAnimSet& Set, FName GripAnc
 	Spine.BlendDepth = 0;
 	UpperBody.LayerSetup[0].BranchFilters.Add(Spine);
 	UpperBody.bMeshSpaceRotationBlend = true;
+	// The knife's guard: the left arm, from the collarbone on, from the unarmed ready stance.
+	Guarded.BasePose.SetLinkNode(&UpperBody);
+	Guarded.AddPose();
+	Guarded.BlendPoses[0].SetLinkNode(&GuardPose);
+	FBranchFilter LeftArm;
+	LeftArm.BoneName = FName(TEXT("clavicle_l"));
+	LeftArm.BlendDepth = 0;
+	Guarded.LayerSetup[0].BranchFilters.Add(LeftArm);
+	Guarded.bMeshSpaceRotationBlend = true;
+	Guarded.BlendWeights[0] = 0.0f;
 
 	// The left hand keeps its grip on the rifle, which rides the weapon_r bone in the right hand.
 	LeftHand.IKBone = FBoneReference(FName(TEXT("hand_l")));
 	LeftHand.AnchorBone = FBoneReference(GripAnchor);
 	LeftHand.bAllowStretching = false;
 	LeftHand.Alpha = 1.0f;
-	ToComponentSpace.LocalPose.SetLinkNode(&UpperBody);
+	ToComponentSpace.LocalPose.SetLinkNode(&Guarded);
 	LeftHand.ComponentPose.SetLinkNode(&ToComponentSpace);
 	ToLocalSpace.ComponentPose.SetLinkNode(&LeftHand);
 	bLinked = true;
@@ -244,7 +317,10 @@ void FCheeseStrikeAnimProxy::Initialize(UAnimInstance* InAnimInstance)
 		if (!bLinked)
 		{
 			Instance->PickSet();
-			Link(Instance->GetSet(), Instance->GetGripAnchor());
+			Link(Instance->GetGripAnchor());
+			Hold = Instance->Hold;
+			LinkedHold = Hold;
+			Assign(Instance->GetSet(Hold));
 		}
 		ToLocalSpace.Initialize_AnyThread(FAnimationInitializeContext(this));
 	}
@@ -286,6 +362,17 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		bCrouched = Instance->bCrouched;
 		bFalling = Instance->bFalling;
 		bAiming = Instance->bAiming;
+		Hold = Instance->Hold;
+		LeftHandShift = Instance->LeftHandShift;
+		// A change of weapon to one held another way: its animations on the same nodes, and the left hand's grip on it
+		// measured again once nothing else moves it.
+		if (bLinked && Hold != LinkedHold)
+		{
+			Assign(Instance->GetSet(Hold));
+			LinkedHold = Hold;
+			LeftHand.bGripMeasured = false;
+			bGripPending = true;
+		}
 	}
 }
 
@@ -313,7 +400,10 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	StandingStill.Alpha = AimBlend;
 	Standing.Alpha = MovingWeight(Speed);
 	Crouched.Alpha = MovingWeight(Speed);
-	CrouchWalk.SetPosition(FVector(Direction, 0.0, 0.0));
+	for (int32 Index = 0; Index < 4; ++Index)
+	{
+		CrouchCycles.DesiredAlphas[Index] = Ways[Index];
+	}
 	OnGround.Alpha = CrouchBlend;
 	Body.Alpha = AirBlend;
 
@@ -330,7 +420,15 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	float SourceWeight = 1.0f;
 	float TotalWeight = 0.0f;
 	GetSlotWeight(UCheeseStrikeAnimInstance::SlotName(), SlotWeight, SourceWeight, TotalWeight);
-	LeftHand.Alpha = SourceWeight;
+	// The knife's free arm goes up on guard and lets go of the grip.
+	GuardBlend = FMath::FInterpTo(GuardBlend, Hold == ECheeseStrikeHold::Knife ? 1.0f : 0.0f, DeltaSeconds, BlendRate);
+	Guarded.BlendWeights[0] = GuardBlend;
+	if (bGripPending && SourceWeight > 0.999f)
+	{
+		bGripPending = false;
+	}
+	LeftHand.Alpha = bGripPending ? 0.0f : SourceWeight * (1.0f - GuardBlend);
+	LeftHand.Shift = LeftHandShift;
 }
 
 void FCheeseStrikeAnimProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)
