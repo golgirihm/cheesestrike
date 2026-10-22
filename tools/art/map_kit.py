@@ -358,9 +358,10 @@ def cheese_box(label, structure, low, high, edible=True, material=None):
     return cheese(label, structure, centre, [abs(b - a) for a, b in zip(low, high)], material=material, edible=edible)
 
 
-def wheel(label, structure, x, y, bottom, diameter, height, edible=True, material=None):
-    """A standing wheel of cheese on `bottom`."""
-    return cheese(label, structure, (x, y, bottom + height / 2.0), (diameter, diameter, height), CYLINDER, material, edible)
+def wheel(label, structure, x, y, bottom, diameter, height, edible=True, material=None, mesh=None):
+    """A standing wheel of cheese on `bottom`: the engine's cylinder, or `mesh` (a metre across and high about its
+    middle, as the cylinder is: wheel_mesh.py's SM_CheeseWheel has the rounded edges of a real wheel)."""
+    return cheese(label, structure, (x, y, bottom + height / 2.0), (diameter, diameter, height), mesh or CYLINDER, material, edible)
 
 
 def cheese_stack(name, structure, low, high, nx, ny, nz, edible=True):
@@ -374,10 +375,10 @@ def cheese_stack(name, structure, low, high, nx, ny, nz, edible=True):
                 cheese_box(f"Cheese_{name}_{i}_{j}_{k}", structure, a, (a[0] + sx, a[1] + sy, a[2] + sz), edible)
 
 
-def wheel_stack(name, structure, x, y, bottom, diameter, height, layers, edible=True):
+def wheel_stack(name, structure, x, y, bottom, diameter, height, layers, edible=True, mesh=None):
     """Wheels on top of one another."""
     for k in range(layers):
-        wheel(f"Cheese_{name}_{k}", structure, x, y, bottom + k * height, diameter, height, edible)
+        wheel(f"Cheese_{name}_{k}", structure, x, y, bottom + k * height, diameter, height, edible, mesh=mesh)
 
 
 def cheese_wall(name, structure, start, end, bottom, courses, thickness=50, column=200, openings=(), edible=True):
@@ -758,6 +759,184 @@ def bridge(name, structure, start, end, width=250, beams=2, beam=40, depth=30, d
             p = at(a, c)
             frame_post(f"{name}_Support_{i}_{int(c)}", f, p[0], p[1], 0, under - depth, size=30)
     count("bridges")
+
+
+# ---------------------------------------------------------------- round and slanting things: walls of wheels, round walls, walls and stairs at any angle, ceilings
+
+def polar(centre, radius, angle):
+    """The point (x, y) `radius` from `centre` at `angle` degrees (0 along +x, 90 along +y: anticlockwise from above)."""
+    a = math.radians(angle)
+    return (centre[0] + radius * math.cos(a), centre[1] + radius * math.sin(a))
+
+
+def wall_between(label, folder, a, b, thickness, bottom, top, material):
+    """A straight block at any angle from point `a` to point `b` (x, y), `thickness` across, from `bottom` to `top`: a
+    wall, a beam, a kerb. Its ends are square, at `a` and `b`."""
+    length = math.hypot(b[0] - a[0], b[1] - a[1])
+    yaw = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
+    centre = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0, (bottom + top) / 2.0)
+    return solid(label, folder, centre, (length, thickness, top - bottom), material, rotation=(0, yaw, 0))
+
+
+def round_wall(name, folder, centre, inner, outer, bottom, top, material, openings=(), step=10.0):
+    """A round wall (a vault's, a tower's, a well's) from radius `inner` to `outer` about `centre`, from `bottom` to
+    `top`, of straight pieces about `step` degrees each, leaving `openings`: (angle, width) each, a gap `width` wide
+    (measured along the wall's middle) centred on `angle` degrees. The pieces overlap a little, so it has no slits."""
+    middle = (inner + outer) / 2.0
+    gaps = sorted(((a - math.degrees(w / 2.0 / middle)) % 360.0, math.degrees(w / middle)) for a, w in openings)
+    # The arcs of wall between the gaps, as (from, length) in degrees.
+    arcs = []
+    if not gaps:
+        arcs.append((0.0, 360.0))
+    for i, (start, length) in enumerate(gaps):
+        nxt = gaps[(i + 1) % len(gaps)][0] + (360.0 if i + 1 == len(gaps) else 0.0)
+        if nxt - (start + length) > 0.1:
+            arcs.append((start + length, nxt - (start + length)))
+    made = []
+    for k, (a0, span) in enumerate(arcs):
+        n = max(1, int(math.ceil(span / step)))
+        d = span / n
+        for i in range(n):
+            mid = a0 + d * (i + 0.5)
+            # Each piece a chord of the outer face, long enough that the next one meets it there.
+            length = 2.0 * outer * math.tan(math.radians(d / 2.0))
+            # The end pieces only to the gap's edge, not past it into the opening.
+            at = polar(centre, middle, mid)
+            made.append(solid(f"{name}_{k}_{i}", folder, (at[0], at[1], (bottom + top) / 2.0), (outer - inner, length + 2, top - bottom), material,
+                              rotation=(0, mid, 0)))
+    return made
+
+
+def wheel_line(name, structure, start, end, bottom, diameter=240.0, courses=(100, 100, 100), edible=True, material=None, mesh=None, overlap=2.0):
+    """A wall of wheels of cheese from `start` to `end` (x, y), at any angle: columns of wheels standing on one another
+    (`courses`: each wheel's height, from the bottom), side by side and touching, the end wheels' edges at `start` and
+    `end`. Their size is about `diameter`, made to fit the length exactly, and `overlap` more, so that neighbours press
+    into each other a little (more for a `mesh` with rounded edges, so that no slit shows where they meet). Eaten at its
+    foot, a column comes down a wheel at a time; once a column is gone there is a gap a wheel wide. Returns the blocks."""
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    n = max(1, int(round(length / diameter)))
+    d = length / n
+    made = []
+    for i in range(n):
+        t = (i + 0.5) / n
+        x, y = start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t
+        z = bottom
+        for k, h in enumerate(courses):
+            made.append(wheel(f"Cheese_{name}_{i}_{k}", structure, x, y, z, d + overlap, h, edible, material, mesh))
+            z += h
+    return made
+
+
+def wheel_arc(name, structure, centre, radius, a0, a1, bottom, diameter=240.0, courses=(100, 100, 100), edible=True, material=None, mesh=None, overlap=2.0):
+    """A curved wall of wheels of cheese along the circle of `radius` about `centre`, from angle `a0` to `a1` (degrees,
+    anticlockwise), as wheel_line: touching columns of wheels about `diameter` across, made to fit the arc exactly, the
+    end wheels' edges at its ends. Returns the blocks."""
+    span = (a1 - a0) % 360.0 or 360.0
+    length = math.radians(span) * radius
+    n = max(1, int(round(length / diameter)))
+    # Neighbours touch along their chord, a little shorter than the arc between them.
+    d = 2.0 * radius * math.sin(math.radians(span / n) / 2.0)
+    made = []
+    for i in range(n):
+        x, y = polar(centre, radius, a0 + span * (i + 0.5) / n)
+        z = bottom
+        for k, h in enumerate(courses):
+            made.append(wheel(f"Cheese_{name}_{i}_{k}", structure, x, y, z, d + overlap, h, edible, material, mesh))
+            z += h
+    return made
+
+
+def cheese_rack(name, structure, start, end, frame, depth=80.0, shelves=(10.0, 85.0, 160.0), top=230.0, wheel_size=(70.0, 36.0),
+                edible=True, mesh=None, bottom=0.0):
+    """A rack of shelves from `start` to `end` (x, y, at any angle), `depth` across, with a row of wheels of cheese on
+    each shelf (`wheel_size`: across, high): what an aging room is lined with. Its posts and boards (in `frame`, a
+    material) stay when the wheels are eaten: a bare rack, which sight and shots pass between its boards. Returns the
+    wheels."""
+    f = f"Racks/{name}"
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    ux, uy = (end[0] - start[0]) / length, (end[1] - start[1]) / length
+    nx, ny = -uy, ux
+    posts = max(1, int(round(length / 150.0)))
+    for i in range(posts + 1):
+        t = i / posts * (length - 8.0) + 4.0
+        for side in (-1, 1):
+            p = (start[0] + ux * t + nx * side * (depth / 2.0 - 4.0), start[1] + uy * t + ny * side * (depth / 2.0 - 4.0))
+            box(f"{name}_Post_{i}_{side}", f, (p[0] - 4, p[1] - 4, bottom), (p[0] + 4, p[1] + 4, bottom + top), frame)
+    for z in list(shelves) + [top - 4.0]:
+        wall_between(f"{name}_Board_{int(z)}", f, start, end, depth, bottom + z, bottom + z + 4.0, frame)
+    made = []
+    n = max(1, int(length // (wheel_size[0] + 6.0)))
+    for k, z in enumerate(shelves):
+        for i in range(n):
+            t = (i + 0.5) / n * length
+            made.append(wheel(f"Cheese_{name}_{k}_{i}", structure, start[0] + ux * t, start[1] + uy * t, bottom + z + 4.0,
+                              wheel_size[0], wheel_size[1], edible, mesh=mesh))
+    count("racks")
+    return made
+
+
+def stairs_between(label, folder, start, end, width, material, solid_under=True):
+    """A flight of stairs at any angle, from `start` (x, y, z: the foot of the bottom step, on the floor) to `end` (the
+    top of the flight, at the floor above), steps of at most RISE, as stairs() makes along x or y."""
+    rise = end[2] - start[2]
+    steps = max(1, int(math.ceil(rise / RISE)))
+    run = math.hypot(end[0] - start[0], end[1] - start[1])
+    tread = run / steps
+    if tread < 25:
+        raise RuntimeError(f"{label}: {steps} steps in {run:.0f} cm is too steep")
+    yaw = math.degrees(math.atan2(end[1] - start[1], end[0] - start[0]))
+    for i in range(steps):
+        top = start[2] + rise * (i + 1) / steps
+        low = start[2] if solid_under else top - 20
+        t = (i + 0.5) / steps
+        x, y = start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t
+        solid(f"{label}_{i}", folder, (x, y, (low + top) / 2.0), (tread + 1, width, top - low), material, rotation=(0, yaw, 0))
+
+
+def overhead(actor, tag="Ceiling"):
+    """Makes `actor` something overhead that nobody can reach (a ceiling, its beams): it blocks nothing, so shots,
+    streaks and sight lines pass it and the minimap and the navigation mesh leave it out, and it is tagged `tag`, so
+    that `CheeseStrikeHideTagged Ceiling` hides it for looking at a roofed map from above. Returns it."""
+    component = actor.get_component_by_class(unreal.StaticMeshComponent)
+    component.set_collision_profile_name("NoCollision")
+    component.set_editor_property("can_ever_affect_navigation", False)
+    actor.set_editor_property("tags", [tag])
+    return actor
+
+
+def ceiling(label, folder, low, high, material, holes=()):
+    """A ceiling from corner `low` to corner `high`, with rectangular `holes` ((x0, y0), (x1, y1)): a slab, overhead()."""
+    for i, (a, b) in enumerate(rect_minus(low, high, holes)):
+        overhead(box(f"{label}_{i}", folder, (a[0], a[1], low[2]), (b[0], b[1], high[2]), material))
+
+
+def point_lamp(label, folder, x, y, z, intensity=8.0, radius=800.0, temperature=3000.0, shadows=True, fitting="Dark", colour=None):
+    """A hanging lamp: a point light at (x, y, z) under a small shade (painted `fitting`, or none), lighting all round
+    it, `radius` far. Without `shadows` it is cheap but shines through walls: use it for fill, a few metres across.
+    `colour` (r, g, b) tints it instead of its `temperature`."""
+    light = place(unreal.PointLight, label, folder, (x, y, z))
+    component = light.get_component_by_class(unreal.PointLightComponent)
+    component.set_editor_property("intensity", intensity)
+    component.set_editor_property("attenuation_radius", radius)
+    component.set_editor_property("source_radius", 8.0)
+    component.set_editor_property("cast_shadows", bool(shadows))
+    if colour is not None:
+        component.set_editor_property("light_color", unreal.Color(r=int(colour[0]), g=int(colour[1]), b=int(colour[2]), a=255))
+    else:
+        component.set_editor_property("use_temperature", True)
+        component.set_editor_property("temperature", temperature)
+    if fitting:
+        overhead(cylinder(label + "_Shade", folder, x, y, z + 6, 44, 18, painted(fitting)), "Lamp")
+    count("lamps" if shadows else "fill lamps")
+    return light
+
+
+def place_areas(name, areas):
+    """One named place (place_name) over several boxes, each (low, high): for a place that isn't a box, a ring's
+    corridor or an L. The boxes shouldn't overlap another place's, or the smaller one wins there."""
+    for i, (low, high) in enumerate(areas):
+        actor = place_name(name, low, high)
+        actor.set_actor_label(f"Place_{name.replace(' ', '')}_{i}")
 
 
 # ---------------------------------------------------------------- what a match needs
