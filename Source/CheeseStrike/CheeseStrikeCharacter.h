@@ -7,6 +7,7 @@
 #include "GameFramework/Character.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Rules/CheeseStrikeDowned.h"
+#include "Input/CheeseStrikeAimAssist.h"
 #include "CheeseStrikeCharacter.generated.h"
 
 class ACheeseStrikePlayerState;
@@ -229,6 +230,9 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	/** What the aim assist did on the last frame the look stick turned the view (CheeseStrikeAimAssist), for the tests. */
+	const CheeseStrikeAimAssist::FAssist& GetAimAssist() const { return AimAssist; }
+
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -239,6 +243,10 @@ protected:
 	void SprintEnded();
 	void CrouchStarted();
 	void CrouchEnded();
+	/** A gamepad's: pressing the left stick sprints until the stick is let go (MoveEnded), the player aims or fires, or it is pressed again; B crouches or stands. */
+	void SprintToggled();
+	void CrouchToggled();
+	void MoveEnded();
 	void FireStarted();
 	void FireEnded();
 	void AimStarted();
@@ -255,6 +263,12 @@ protected:
 	/** Interact (E), held and let go: reviving or finishing someone down (UCheeseStrikeLastStand). */
 	void InteractStarted();
 	void InteractEnded();
+
+	/** How long the look stick has been held at its edge across, for the turn's boost (CheeseStrikeInput::StickTurn). */
+	float StickEdgeSeconds = 0.0f;
+	/** Whether a gamepad's sprint is on until the stick is let go (SprintToggled). */
+	bool bSprintLatched = false;
+	CheeseStrikeAimAssist::FAssist AimAssist;
 
 	/** Pawn mesh: first person view (seen only by self). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))

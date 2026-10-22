@@ -193,6 +193,7 @@ void UCheeseStrikeSettings::SetToDefaults()
 	MouseSensitivity = CheeseStrikeSettings::DefaultSensitivity;
 	AimedSensitivity = CheeseStrikeSettings::DefaultAimedSensitivity;
 	bInvertLook = false;
+	bAimAssist = true;
 	FieldOfView = CheeseStrikeSettings::DefaultFieldOfView;
 	MasterVolume = CheeseStrikeSettings::DefaultVolume;
 	EffectsVolume = CheeseStrikeSettings::DefaultVolume;

@@ -2,7 +2,10 @@
 
 #include "CheeseStrikePlayScript.h"
 #include "EnhancedInputSubsystems.h"
+#include "Engine/GameInstance.h"
 #include "Engine/LocalPlayer.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
 #include "InputAction.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/CommandLine.h"
@@ -106,6 +109,20 @@ void UCheeseStrikePlayScript::Advance(float DeltaSeconds)
 			break;
 		}
 	}
+	// Keys pressed through Slate let go when their time is up; a stick's axis is held at its value meanwhile.
+	for (auto It = Pressed.CreateIterator(); It; ++It)
+	{
+		It.Value().Left -= DeltaSeconds;
+		if (It.Value().Left <= 0.0f)
+		{
+			PressKey(It.Key(), false, 0.0f);
+			It.RemoveCurrent();
+		}
+		else if (It.Key().IsAnalog())
+		{
+			PressKey(It.Key(), true, It.Value().Value);
+		}
+	}
 	// Taps let go after a few frames.
 	for (auto It = Tapped.CreateIterator(); It; ++It)
 	{
@@ -139,6 +156,27 @@ bool UCheeseStrikePlayScript::Run(const FCommand& Command)
 		if (Command.Verb == TEXT("tap"))
 		{
 			Tapped.Add(Name, 3);
+		}
+	}
+	else if (Command.Verb == TEXT("key"))
+	{
+		const FKey Key(*Name);
+		if (!Key.IsValid())
+		{
+			UE_LOG(LogCheeseStrike, Error, TEXT("PlayScript: no key called %s"), *Name);
+			return true;
+		}
+		const float Value = Number(2, 1.0f);
+		Pressed.Add(Key, {Number(1, 0.1f), Value});
+		PressKey(Key, true, Value);
+	}
+	else if (Command.Verb == TEXT("device"))
+	{
+		const FString Lower = Name.ToLower();
+		const CheeseStrikeInput::EDevice Device = Lower == TEXT("gamepad") ? CheeseStrikeInput::EDevice::Gamepad : (Lower == TEXT("mouse") ? CheeseStrikeInput::EDevice::Mouse : CheeseStrikeInput::EDevice::Keyboard);
+		if (UCheeseStrikeInputSubsystem* Input = Controller->GetGameInstance() != nullptr ? Controller->GetGameInstance()->GetSubsystem<UCheeseStrikeInputSubsystem>() : nullptr)
+		{
+			Input->SetDevice(SlateUser(), Device);
 		}
 	}
 	else if (Command.Verb == TEXT("release"))
@@ -187,6 +225,35 @@ bool UCheeseStrikePlayScript::Run(const FCommand& Command)
 	return true;
 }
 
+int32 UCheeseStrikePlayScript::SlateUser() const
+{
+	const ULocalPlayer* Local = Controller != nullptr ? Controller->GetLocalPlayer() : nullptr;
+	const TSharedPtr<const FSlateUser> User = Local != nullptr ? Local->GetSlateUser() : nullptr;
+	return User.IsValid() ? User->GetUserIndex() : 0;
+}
+
+void UCheeseStrikePlayScript::PressKey(const FKey& Key, bool bDown, float Value)
+{
+	if (!FSlateApplication::IsInitialized())
+	{
+		return;
+	}
+	FSlateApplication& Slate = FSlateApplication::Get();
+	const uint32 User = static_cast<uint32>(SlateUser());
+	if (Key.IsAnalog())
+	{
+		Slate.ProcessAnalogInputEvent(FAnalogInputEvent(Key, Slate.GetModifierKeys(), User, false, 0, 0, bDown ? Value : 0.0f));
+	}
+	else if (bDown)
+	{
+		Slate.ProcessKeyDownEvent(FKeyEvent(Key, Slate.GetModifierKeys(), User, false, 0, 0));
+	}
+	else
+	{
+		Slate.ProcessKeyUpEvent(FKeyEvent(Key, Slate.GetModifierKeys(), User, false, 0, 0));
+	}
+}
+
 void UCheeseStrikePlayScript::InjectHeld()
 {
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(Controller->GetLocalPlayer());
@@ -225,6 +292,8 @@ const UInputAction* UCheeseStrikePlayScript::ActionNamed(const FString& Name) co
 	if (Lower == TEXT("jump")) return Input->Jump;
 	if (Lower == TEXT("sprint")) return Input->Sprint;
 	if (Lower == TEXT("crouch")) return Input->Crouch;
+	if (Lower == TEXT("sprinttoggle")) return Input->SprintToggle;
+	if (Lower == TEXT("crouchtoggle")) return Input->CrouchToggle;
 	if (Lower == TEXT("fire")) return Input->Fire;
 	if (Lower == TEXT("aim")) return Input->Aim;
 	if (Lower == TEXT("reload")) return Input->Reload;

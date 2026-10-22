@@ -1,0 +1,87 @@
+# Works the menus with a gamepad's buttons, pressed through Slate as a
+# person's are, for looking at the focus as it moves: the front end, the
+# options and a slider, back, hosting, the lobby's dropdowns, then in the
+# match the prompts and the pause menu. Run with tools/play.ps1 -Lobby
+# -Res 1280x720.
+wait 4
+shot pad_01_front_end
+key Gamepad_DPad_Down
+wait 0.3
+key Gamepad_DPad_Down
+wait 0.3
+shot pad_02_on_options
+key Gamepad_FaceButton_Bottom
+wait 0.8
+shot pad_03_options
+key Gamepad_DPad_Down
+wait 0.3
+shot pad_04_slider
+key Gamepad_DPad_Right
+wait 0.2
+key Gamepad_DPad_Right
+wait 0.3
+shot pad_05_slider_moved
+key Gamepad_DPad_Left
+wait 0.2
+key Gamepad_DPad_Left
+wait 0.2
+key Gamepad_DPad_Down
+wait 0.2
+key Gamepad_DPad_Down
+wait 0.2
+key Gamepad_DPad_Down
+wait 0.3
+shot pad_06_down_the_rows
+key Gamepad_FaceButton_Right
+wait 0.8
+shot pad_07_back_on_options
+key Gamepad_DPad_Up
+wait 0.2
+key Gamepad_DPad_Up
+wait 0.3
+key Gamepad_FaceButton_Bottom
+wait 8
+shot pad_08_lobby
+key Gamepad_FaceButton_Bottom
+wait 0.8
+shot pad_09_dropdown_open
+key Gamepad_DPad_Down
+wait 0.3
+shot pad_10_dropdown_down
+key Gamepad_FaceButton_Bottom
+wait 1.5
+shot pad_11_picked
+key Gamepad_DPad_Down
+wait 0.3
+key Gamepad_FaceButton_Bottom
+wait 0.8
+key Gamepad_FaceButton_Right
+wait 0.8
+shot pad_12_dropdown_shut_by_b
+cmd CheeseStrikeStart now
+wait 12
+device gamepad
+cmd CheeseStrikeGiveStreak 2
+wait 0.5
+shot pad_13_in_match_gamepad
+tap Streak
+wait 0.5
+shot pad_13b_marking_gamepad
+key Gamepad_FaceButton_Right
+wait 0.2
+tap Streak
+wait 0.5
+device keyboard
+wait 0.5
+shot pad_14_in_match_keyboard
+key Gamepad_Special_Right
+wait 1
+shot pad_15_paused
+key Gamepad_DPad_Down
+wait 0.3
+shot pad_16_paused_down
+key Gamepad_FaceButton_Right
+wait 1
+shot pad_17_resumed
+state
+quit

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InputCoreTypes.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "UObject/Object.h"
 #include "CheeseStrikePlayScript.generated.h"
@@ -21,9 +22,17 @@ class UInputAction;
  * One command a line, `#` for a comment:
  *   wait <seconds>              do nothing for so long
  *   hold <action> [x [y]]       hold an input from now on: Move x y, Look x y, or Jump, Sprint, Crouch, Fire, Aim, Reload, Scoreboard,
- *                               Primary, Sidearm, Knife, NextWeapon, PreviousWeapon, LastWeapon, Streak, Interact
+ *                               Primary, Sidearm, Knife, NextWeapon, PreviousWeapon, LastWeapon, Streak, Interact,
+ *                               SprintToggle, CrouchToggle (a gamepad's left stick and B)
  *   release <action>            let it go
  *   tap <action> [x [y]]        hold it for a few frames
+ *   key <key> [seconds [value]] press a key by its engine name as a person would, through Slate, so that the menus and
+ *                               the prompts see it: Enter, Escape, Gamepad_DPad_Down, Gamepad_FaceButton_Bottom (A),
+ *                               Gamepad_FaceButton_Right (B), Gamepad_Special_Right (Menu); a stick's axis
+ *                               (Gamepad_LeftX, Gamepad_LeftY) held at `value` (1 by default); let go after `seconds`
+ *                               (a few frames by default)
+ *   device <gamepad|keyboard|mouse>  say the player last played with it, as if they had: the prompts and the menu's
+ *                               focus follow it (the actions above are injected past Slate, which doesn't see them)
  *   look <yaw> <pitch>          turn the view by so many degrees, at once
  *   shot <name>                 save a screenshot as Saved/Screenshots/<platform>/<name>.png
  *   state                       write the character's state to the log now
@@ -83,6 +92,15 @@ private:
 	TMap<FString, FVector2D> Held;
 	/** Taps still to be let go of, by action name, with frames left. */
 	TMap<FString, int32> Tapped;
+	/** Keys pressed through Slate (`key`), with the seconds left until they are let go and a stick's value. */
+	struct FPressed
+	{
+		float Left = 0.0f;
+		float Value = 1.0f;
+	};
+	TMap<FKey, FPressed> Pressed;
+	void PressKey(const FKey& Key, bool bDown, float Value);
+	int32 SlateUser() const;
 };
 
 /**

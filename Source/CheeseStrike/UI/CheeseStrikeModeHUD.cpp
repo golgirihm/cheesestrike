@@ -11,6 +11,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
+#include "Input/CheeseStrikeInput.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Modes/CheeseStrikeWatchCamera.h"
 #include "Weapons/CheeseStrikeArsenal.h"
@@ -128,10 +129,13 @@ namespace
 		const float U = HudDraw::Unit(Canvas);
 		const float Middle = Canvas->SizeX / 2.0f;
 		const TArray<CheeseStrikeStreaks::EStreak> Ready = Mine->GetReadyStreaks();
+		// The keys as the player plays: the keyboard's, or the gamepad's if they last used one.
+		const FString StreakKey = UCheeseStrikeInputSet::Prompt(Hud->PlayerOwner, &UCheeseStrikeInputSet::Streak);
+		const FString MenuKey = UCheeseStrikeInputSet::Prompt(Hud->PlayerOwner, &UCheeseStrikeInputSet::Menu);
 		const float SinceEarned = Match->GetServerWorldTimeSeconds() - Mine->GetLastEarnedAt();
 		if (!Mine->IsMarkingStrike() && Mine->GetLastEarned() != CheeseStrikeStreaks::EStreak::None && Mine->GetLastEarnedAt() > 0.0f && SinceEarned < ModeHudEarnedLife && Ready.Contains(Mine->GetLastEarned()))
 		{
-			HudDraw::Text(Canvas, FString::Printf(TEXT("%s READY  ·  PRESS 4"), CheeseStrikeStreaks::Info(Mine->GetLastEarned()).Name).ToUpper(), FVector2D(Middle, Canvas->SizeY * 0.62f), HudDraw::Font(30.0f * U), HudDraw::Accent, 0.5f);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("%s READY  ·  PRESS %s"), CheeseStrikeStreaks::Info(Mine->GetLastEarned()).Name, *StreakKey).ToUpper(), FVector2D(Middle, Canvas->SizeY * 0.62f), HudDraw::Font(30.0f * U), HudDraw::Accent, 0.5f);
 		}
 		float Y = Bottom;
 		if (Ready.Num() > 0)
@@ -144,16 +148,18 @@ namespace
 				Name += FString::Printf(TEXT("  +%d"), Ready.Num() - 1);
 			}
 			const FVector2D NameSize = HudDraw::Measure(Name, Line);
-			const float Key = NameSize.Y * 0.95f;
+			// The key's box fits its label: "4", or "RB".
+			const float Key = FMath::Max(NameSize.Y * 0.95f, static_cast<float>(HudDraw::Measure(StreakKey, Line).X) + 10.0f * U);
+			const float KeyHigh = NameSize.Y * 0.95f;
 			const float Width = Key + 10.0f * U + NameSize.X;
-			Y -= Key;
+			Y -= KeyHigh;
 			const float Left = Middle - Width / 2.0f;
 			HudDraw::FShapes Shapes;
-			Shapes.Rect(Left - 6.0f * U, Y - 3.0f * U, Width + 12.0f * U, Key + 6.0f * U, HudDraw::Panel);
-			Shapes.Frame(Left, Y, Key, Key, FMath::Max(1.0f, 1.5f * U), HudDraw::Accent);
+			Shapes.Rect(Left - 6.0f * U, Y - 3.0f * U, Width + 12.0f * U, KeyHigh + 6.0f * U, HudDraw::Panel);
+			Shapes.Frame(Left, Y, Key, KeyHigh, FMath::Max(1.0f, 1.5f * U), HudDraw::Accent);
 			Shapes.Draw(Canvas);
-			HudDraw::Text(Canvas, TEXT("4"), FVector2D(Left + Key / 2.0f, Y + (Key - HudDraw::Measure(TEXT("4"), Line).Y) / 2.0f), Line, HudDraw::Accent, 0.5f);
-			HudDraw::Text(Canvas, Name, FVector2D(Left + Key + 10.0f * U, Y + (Key - NameSize.Y) / 2.0f), Line, HudDraw::Accent);
+			HudDraw::Text(Canvas, StreakKey, FVector2D(Left + Key / 2.0f, Y + (KeyHigh - HudDraw::Measure(StreakKey, Line).Y) / 2.0f), Line, HudDraw::Accent, 0.5f);
+			HudDraw::Text(Canvas, Name, FVector2D(Left + Key + 10.0f * U, Y + (KeyHigh - NameSize.Y) / 2.0f), Line, HudDraw::Accent);
 			Y -= 10.0f * U;
 		}
 		if (Mine->GetStreak() > 0)
@@ -188,7 +194,7 @@ namespace
 				ModeHudRing(Hud, Shapes, Spot, CheeseStrikeStreaks::StrikeBlast.Radius, HudDraw::Faded(HudDraw::Accent, 0.6f), 1.5f * U);
 			}
 			Shapes.Draw(Canvas);
-			HudDraw::Text(Canvas, TEXT("FIRE TO MARK THE CHEESE STRIKE  ·  4 OR ESC TO CALL IT OFF"), FVector2D(Middle, Canvas->SizeY * 0.68f), HudDraw::Font(18.0f * U), HudDraw::Accent, 0.5f);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("FIRE TO MARK THE CHEESE STRIKE  ·  %s OR %s TO CALL IT OFF"), *StreakKey, *MenuKey), FVector2D(Middle, Canvas->SizeY * 0.68f), HudDraw::Font(18.0f * U), HudDraw::Accent, 0.5f);
 		}
 	}
 
@@ -286,7 +292,7 @@ namespace
 		if (const ACheeseStrikeCharacter* Near = Stand->InteractTarget(Kind))
 		{
 			const bool bRevive = Kind == CheeseStrikeModes::EInteract::Revive;
-			HudDraw::Text(Canvas, FString::Printf(TEXT("HOLD E  ·  %s %s"), bRevive ? TEXT("REVIVE") : TEXT("FINISH"), *Near->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, bRevive ? Side : HudDraw::Danger, 0.5f);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("HOLD %s  ·  %s %s"), *UCheeseStrikeInputSet::Prompt(Hud->PlayerOwner, &UCheeseStrikeInputSet::Interact), bRevive ? TEXT("REVIVE") : TEXT("FINISH"), *Near->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, bRevive ? Side : HudDraw::Danger, 0.5f);
 		}
 	}
 
