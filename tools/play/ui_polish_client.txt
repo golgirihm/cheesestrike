@@ -1,0 +1,15 @@
+# Joins the host of ui_polish_server.txt: the joiner's lobby, read-only, at
+# three sizes of screen.
+cmd r.SetRes 1280x720w
+wait 3
+shot ui_lobby_joiner_720
+cmd r.SetRes 1600x900w
+wait 1
+shot ui_lobby_joiner_900
+cmd r.SetRes 1920x1080w
+wait 1
+shot ui_lobby_joiner_1080
+wait 14
+shot ui_lobby_joiner_match
+wait 12
+quit

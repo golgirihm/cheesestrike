@@ -203,6 +203,11 @@ bool FTheLobbySaysWhereItStands::RunTest(const FString& Parameters)
 	TestTrue(TEXT("at 0, starting, not \"Starting in 0\" nor Start again"), LobbyStatus(true, false, true, 0.0f, false) == ELobbyStatus::Starting && LobbyStatus(true, false, true, 0.0f, true) == ELobbyStatus::Starting);
 	TestTrue(TEXT("called off, back to waiting at once"), LobbyStatus(true, false, false, 0.0f, false) == ELobbyStatus::Waiting);
 	TestTrue(TEXT("leaving the level, going there, whatever else"), LobbyStatus(true, true, true, 0.0f, true) == ELobbyStatus::Travelling && LobbyStatus(false, true, false, 0.0f, false) == ELobbyStatus::Travelling);
+	using CheeseStrikeMenu::ShouldRedrawLobby;
+	TestTrue(TEXT("the lobby is drawn again when what it shows changes"), ShouldRedrawLobby(true, false, false));
+	TestFalse(TEXT("and only then"), ShouldRedrawLobby(false, false, false) || ShouldRedrawLobby(false, true, true));
+	TestFalse(TEXT("not while the host has a dropdown open, which it would close"), ShouldRedrawLobby(true, false, true));
+	TestTrue(TEXT("unless the lobby has moved on (starting, travelling)"), ShouldRedrawLobby(true, true, true));
 	return true;
 }
 

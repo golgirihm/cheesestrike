@@ -1,0 +1,39 @@
+# Hosts with the lobby for looking at the menus: the lobby with the joiner in
+# it at three sizes of screen, its dropdowns open, then in the match the pause
+# menu and its options over the blurred game. Run with
+# tools/play.ps1 -Lobby -Bots and tools/play/ui_polish_client.txt as the
+# client's script.
+wait 45
+cmd r.SetRes 1280x720w
+wait 1
+shot ui_lobby_host_720
+cmd r.SetRes 1600x900w
+wait 1
+shot ui_lobby_host_900
+cmd CheeseStrikeDropdown 0
+wait 1
+shot ui_lobby_host_900_map
+cmd r.SetRes 1920x1080w
+wait 1
+cmd CheeseStrikeDropdown 1
+wait 1
+shot ui_lobby_host_1080_mode
+cmd CheeseStrikeDropdown 4
+wait 1
+shot ui_lobby_host_1080_bots
+cmd CheeseStrikeDropdown -1
+cmd r.SetRes 1600x900w
+wait 4
+cmd CheeseStrikeStart now
+wait 8
+tap Menu
+wait 1
+shot ui_paused
+cmd CheeseStrikePage Options
+wait 1
+shot ui_paused_options
+tap Menu
+wait 0.5
+tap Menu
+wait 2
+quit

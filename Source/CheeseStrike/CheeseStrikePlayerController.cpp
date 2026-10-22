@@ -492,6 +492,14 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 	}
 }
 
+void ACheeseStrikePlayerController::CheeseStrikeDropdown(int32 Number)
+{
+	if (Menu.IsValid())
+	{
+		Menu->OpenDropdown(Number);
+	}
+}
+
 void ACheeseStrikePlayerController::CheeseStrikeStart(const FString& AtOnce)
 {
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
