@@ -1,0 +1,58 @@
+# Execution's last stand, for looking at a player down: the host crouches,
+# then goes down (the console kill is a lethal hit), and is looked at in
+# their own view and from outside all round, still and creeping, and as
+# each hero. Alone (no
+# bots to finish them): tools/play.ps1 -Script tools/play/downed.txt -Extra
+# "?Mode=Execution". downed_row.txt looks at the row along the top.
+wait 4
+tap Sidearm
+hold Crouch
+wait 1.2
+shot down_0_crouched
+release Crouch
+cmd CheeseStrikeDie
+wait 1.5
+shot down_1_view
+look 0 -25
+wait 0.5
+shot down_2_view_low
+look 0 25
+cmd CheeseStrikeOutside 260 35 -10 10
+wait 0.6
+shot down_3_front_right
+cmd CheeseStrikeOutside 260 95 -10 10
+wait 0.4
+shot down_4_right
+cmd CheeseStrikeOutside 260 -80 -10 10
+wait 0.4
+shot down_5_left
+cmd CheeseStrikeOutside 260 170 -10 30
+wait 0.4
+shot down_6_behind
+cmd CheeseStrikeOutside 260 -20 -10 10
+wait 0.4
+shot down_7_front_left
+hold Move 0 1
+wait 0.4
+shot down_8_creeping
+release Move
+wait 0.6
+cmd CheeseStrikeBody 0 1
+cmd CheeseStrikeOutside 240 30 -10 10
+wait 1.2
+shot down_b0
+cmd CheeseStrikeBody 2 0
+wait 1.2
+shot down_b2
+cmd CheeseStrikeBody 3 1
+cmd CheeseStrikeOutside 240 -60 -10 10
+wait 1.2
+shot down_b3
+cmd CheeseStrikeBody 0 1
+wait 1.2
+shot down_b0_left
+cmd CheeseStrikeBody
+cmd CheeseStrikeOutside
+wait 0.5
+shot down_9_view_after
+quit

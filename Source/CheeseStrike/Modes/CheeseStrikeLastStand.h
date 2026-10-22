@@ -12,7 +12,8 @@ class ACheeseStrikePlayerState;
 
 /**
  * A character's last stand, in Execution (CheeseStrikeModes): hurt enough
- * to die, once a life, it goes down instead. Down, it is crouched, can't
+ * to die, once a life, it goes down instead. Down, it is crouched (and
+ * looks it: on one knee, hunched, FCheeseStrikeDownedPose), can't
  * sprint or jump, carries only its sidearm, and nothing harms it but an
  * enemy within reach (CheeseStrikeModes::FinishRange), whose next hit
  * finishes it; held Interact (E) finishes it too from an enemy, or from a

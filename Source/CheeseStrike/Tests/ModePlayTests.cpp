@@ -21,6 +21,10 @@
 #include "Streaks/CheeseStrikeAerialCheese.h"
 #include "Streaks/CheeseStrikeBombs.h"
 #include "Modes/CheeseStrikeLastStand.h"
+#include "Animation/CheeseStrikeAnimInstance.h"
+#include "Components/CapsuleComponent.h"
+#include "Camera/CameraComponent.h"
+#include "UI/CheeseStrikeHUD.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeShot.h"
@@ -99,6 +103,22 @@ namespace ModePlayTests
 	}
 
 	TWeakObjectPtr<ACheeseStrikeCharacter> Remembered;
+
+	/** How high a bone of the body others see is above the character's feet, on the machine it is seen on (cm). */
+	float BoneHeight(const ACheeseStrikeCharacter* Character, const TCHAR* Bone)
+	{
+		const float Feet = Character->GetActorLocation().Z - Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		return Character->GetMesh()->GetBoneLocation(FName(Bone)).Z - Feet;
+	}
+
+	/** How high its own player's view is above its feet. */
+	float ViewHeight(const ACheeseStrikeCharacter* Character)
+	{
+		return Character->GetFirstPersonCameraComponent()->GetComponentLocation().Z - (Character->GetActorLocation().Z - Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	}
+
+	/** The host's pelvis, down, as each machine had it. */
+	float DownPelvis[3] = {};
 	int32 ShotsBefore = 0;
 }
 
@@ -362,10 +382,39 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 		TestFalse(TEXT("and the round goes on: a teammate stands"), GameState(0)->IsRoundBreak());
 		Remembered = Character(0);
 	});
-	Wait(1.0f);
+	// The teammate crouches, to set the host's pose against.
+	Play(2, TEXT("hold Crouch\nwait 0.2"));
+	Wait(1.4f);
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Host = Character(0);
+		// Down looks it, on every machine: on one knee, lower than crouching, hunched, the pistol out, and the row says so.
+		for (int32 Seen = 0; Seen < 3; ++Seen)
+		{
+			const ACheeseStrikeCharacter* Down = CharacterOf(0, Seen);
+			const ACheeseStrikeCharacter* Crouching = CharacterOf(2, Seen);
+			if (!TestTrue(TEXT("the host and the teammate are on every machine"), Down != nullptr && Crouching != nullptr))
+			{
+				continue;
+			}
+			const UCheeseStrikeAnimInstance* Animation = Cast<UCheeseStrikeAnimInstance>(Down->GetMesh()->GetAnimInstance());
+			TestTrue(FString::Printf(TEXT("the body is animated as down, as player %d sees it"), Seen), Animation != nullptr && Animation->bDowned);
+			TestTrue(FString::Printf(TEXT("holding the pistol, as player %d sees it"), Seen), Animation != nullptr && Animation->Hold == ECheeseStrikeHold::Pistol);
+			const float Pelvis = BoneHeight(Down, TEXT("pelvis"));
+			const float Crouched = BoneHeight(Crouching, TEXT("pelvis"));
+			TestTrue(FString::Printf(TEXT("the teammate crouches, as player %d sees it"), Seen), Crouching->bIsCrouched);
+			TestTrue(FString::Printf(TEXT("the pelvis down (%.0f cm) is well under a crouching one's (%.0f cm), as player %d sees it"), Pelvis, Crouched, Seen), Pelvis < Crouched - 8.0f);
+			TestTrue(FString::Printf(TEXT("the head down (%.0f cm) is under a crouching one's (%.0f cm), as player %d sees it"), BoneHeight(Down, TEXT("head")), BoneHeight(Crouching, TEXT("head")), Seen),
+				BoneHeight(Down, TEXT("head")) < BoneHeight(Crouching, TEXT("head")) - 5.0f);
+			TestTrue(FString::Printf(TEXT("the right knee on the ground (%.0f cm), as player %d sees it"), BoneHeight(Down, TEXT("calf_r")), Seen), BoneHeight(Down, TEXT("calf_r")) < 18.0f);
+			TestTrue(FString::Printf(TEXT("the left knee up (%.0f cm), as player %d sees it"), BoneHeight(Down, TEXT("calf_l")), Seen), BoneHeight(Down, TEXT("calf_l")) > 35.0f);
+			TestTrue(FString::Printf(TEXT("both feet on the ground, not under it, as player %d sees it"), Seen), BoneHeight(Down, TEXT("foot_l")) > 0.0f && BoneHeight(Down, TEXT("foot_r")) > 0.0f);
+			DownPelvis[Seen] = Pelvis;
+			const ACheeseStrikePlayerState* Player = StateOf(0, Seen);
+			TestEqual(FString::Printf(TEXT("the row shows the host down, as player %d sees it"), Seen), ACheeseStrikeHUD::StatusOf(Player, ACheeseStrikeHUD::BodyOf(Player)), CheeseStrikeHUD::EStatus::Down);
+		}
+		// The host's own view sits low too, under the crouching teammate's own.
+		TestTrue(FString::Printf(TEXT("the host's view (%.0f cm) is under a crouching player's (%.0f cm)"), ViewHeight(Host), ViewHeight(Character(2))), ViewHeight(Host) < ViewHeight(Character(2)) - 8.0f);
 		TestEqual(TEXT("with only the pistol in hand"), HeldId(Host), CheeseStrikeWeapons::Pistol().Id);
 		TestFalse(TEXT("the rifle put away for good"), Host->GetInventory()->CanDraw(EWeaponSlot::Primary));
 		TestTrue(TEXT("crouched"), Host->bIsCrouched);
@@ -381,6 +430,7 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 		TestTrue(TEXT("shots from afar don't finish them"), Host != nullptr && Host->IsAlive() && Host->IsDowned());
 	});
 	// A teammate beside them holds Interact: back up.
+	Play(2, TEXT("release Crouch"));
 	PutAt(2, BesideSpot, 180.0f);
 	Play(2, FString::Printf(TEXT("hold Interact\nwait %.1f\nrelease Interact"), CheeseStrikeModes::ReviveTime + 0.6f));
 	Then([this]()
@@ -391,6 +441,33 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 			TestFalse(TEXT("revived"), Host->IsDowned());
 			TestEqual(TEXT("with some health"), Host->GetHealth(), CheeseStrikeModes::ReviveHealth);
 			TestTrue(TEXT("and the rifle to draw again"), Host->GetInventory()->CanDraw(EWeaponSlot::Primary));
+		}
+	});
+	WaitUntil(TEXT("every machine seeing the host up"), 3.0f, []()
+	{
+		for (int32 Seen = 0; Seen < 3; ++Seen)
+		{
+			const ACheeseStrikeCharacter* Host = CharacterOf(0, Seen);
+			if (Host == nullptr || Host->IsDowned())
+			{
+				return false;
+			}
+		}
+		return true;
+	});
+	// Getting up takes a moment, and then the body stands as before.
+	Wait(1.2f);
+	Then([this]()
+	{
+		for (int32 Seen = 0; Seen < 3; ++Seen)
+		{
+			const ACheeseStrikeCharacter* Host = CharacterOf(0, Seen);
+			const ACheeseStrikePlayerState* Player = StateOf(0, Seen);
+			if (TestNotNull(TEXT("the host"), Host))
+			{
+				TestTrue(FString::Printf(TEXT("up again, the pelvis (%.0f cm) well over where it was down (%.0f cm), as player %d sees it"), BoneHeight(Host, TEXT("pelvis")), DownPelvis[Seen], Seen), BoneHeight(Host, TEXT("pelvis")) > DownPelvis[Seen] + 20.0f);
+				TestEqual(FString::Printf(TEXT("the row shows the host alive again, as player %d sees it"), Seen), ACheeseStrikeHUD::StatusOf(Player, ACheeseStrikeHUD::BodyOf(Player)), CheeseStrikeHUD::EStatus::Alive);
+			}
 		}
 	});
 	// The teammate goes down, and the enemy walks up and finishes them by hand.

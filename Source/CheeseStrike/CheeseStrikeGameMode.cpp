@@ -2,6 +2,7 @@
 // Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #include "CheeseStrikeGameMode.h"
+#include "Modes/CheeseStrikeLastStand.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameSession.h"
@@ -890,6 +891,53 @@ void ACheeseStrikeGameMode::CheeseStrikeGiveStreak(int32 Kind, const FString& Pl
 			return;
 		}
 	}
+}
+
+void ACheeseStrikeGameMode::CheeseStrikeDown(const FString& Player)
+{
+#if !UE_BUILD_SHIPPING
+	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr)
+	{
+		return;
+	}
+	const ACheeseStrikePlayerState* Host = nullptr;
+	for (APlayerState* Each : State->PlayerArray)
+	{
+		const APlayerController* Controller = Each != nullptr ? Each->GetPlayerController() : nullptr;
+		if (Controller != nullptr && Controller->IsLocalController())
+		{
+			Host = Cast<ACheeseStrikePlayerState>(Each);
+		}
+	}
+	for (APlayerState* Each : State->PlayerArray)
+	{
+		const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Each);
+		ACheeseStrikeCharacter* Body = Ours != nullptr ? Ours->GetPawn<ACheeseStrikeCharacter>() : nullptr;
+		if (Body == nullptr || !Body->IsAlive() || Body->IsDowned() || Body->GetLastStand() == nullptr)
+		{
+			continue;
+		}
+		bool bWanted = Ours->GetPlayerName().Equals(Player, ESearchCase::IgnoreCase);
+		if (Player.IsEmpty())
+		{
+			bWanted = Ours == Host;
+		}
+		else if (Player.Equals(TEXT("enemy"), ESearchCase::IgnoreCase))
+		{
+			bWanted = State->AreEnemies(Host, Ours);
+		}
+		else if (Player.Equals(TEXT("mate"), ESearchCase::IgnoreCase))
+		{
+			bWanted = Ours != Host && State->AreTeammates(Host, Ours);
+		}
+		if (bWanted)
+		{
+			Body->GetLastStand()->GoDown(nullptr);
+			return;
+		}
+	}
+#endif
 }
 
 void ACheeseStrikeGameMode::Respawn(TWeakObjectPtr<AController> Who)

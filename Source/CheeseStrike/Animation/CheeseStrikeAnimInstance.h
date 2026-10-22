@@ -10,6 +10,7 @@
 #include "Animation/AnimNodeSpaceConversions.h"
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
 #include "AnimNodes/AnimNode_LayeredBoneBlend.h"
+#include "CheeseStrikeDownedPose.h"
 #include "CheeseStrikeGripIK.h"
 #include "AnimNodes/AnimNode_MultiWayBlend.h"
 #include "AnimNodes/AnimNode_Slot.h"
@@ -144,7 +145,9 @@ struct FCheeseStrikeAnimSets
  * by the aim offsets (hip, down the sights, crouched), with a slot on top
  * for firing, reloading, drawing and striking, then for the knife the free
  * arm up on guard, and then the left hand held on the weapon
- * (FCheeseStrikeGripIK) except while a montage moves it. The animations are
+ * (FCheeseStrikeGripIK) except while a montage moves it, and last, for a
+ * player down in Execution's last stand, the pose of one kneeling hurt
+ * (FCheeseStrikeDownedPose), blended in and out. The animations are
  * the set for how the weapon in hand is held (rifle, pistol, shotgun,
  * knife), put on the same nodes when it changes. The numbers it blends by
  * come from the character each frame (UCheeseStrikeAnimInstance), and the
@@ -169,6 +172,9 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	bool bCrouched = false;
 	bool bFalling = false;
 	bool bAiming = false;
+	bool bDowned = false;
+	/** The way the body faces in component space. */
+	FVector BodyForward = FVector(0.0, 1.0, 0.0);
 	/** The blends under way, eased towards what the character is doing. */
 	float CrouchBlend = 0.0f;
 	float AirBlend = 0.0f;
@@ -178,6 +184,10 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	ECheeseStrikeHold LinkedHold = ECheeseStrikeHold::Rifle;
 	FVector LeftHandShift = FVector::ZeroVector;
 	float GuardBlend = 0.0f;
+	/** Down: how far (0 to 1, at an even pace; the pose takes it smoothed), how much the legs kneel rather than creep, and the breath's phase (radians). */
+	float DownLinear = 0.0f;
+	float KneelBlend = 1.0f;
+	float BreathPhase = 0.0f;
 
 protected:
 	/** Puts the nodes together, once, the left hand's grip following `GripAnchor`. */
@@ -242,6 +252,8 @@ protected:
 	 */
 	FAnimNode_ConvertLocalToComponentSpace ToComponentSpace;
 	FCheeseStrikeGripIK LeftHand;
+	/** Down in Execution's last stand: on one knee, hunched, the left hand to the belly. */
+	FCheeseStrikeDownedPose Downed;
 	FAnimNode_ConvertComponentToLocalSpace ToLocalSpace;
 	bool bLinked = false;
 	/** Bones the mesh's reference pose scales, kept at that scale whatever the animations say (Belica's faceAttach). */
@@ -287,6 +299,11 @@ public:
 	bool bFalling = false;
 	UPROPERTY(Transient, BlueprintReadOnly, Category="Animation")
 	bool bAiming = false;
+	/** Down in Execution's last stand (UCheeseStrikeLastStand), and alive. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Animation")
+	bool bDowned = false;
+	/** The way the body faces in its mesh's component space (the character's mesh is turned a quarter turn). */
+	FVector BodyForward = FVector(0.0, 1.0, 0.0);
 	/** How the weapon in hand is held, and where the left hand reaches past its grip on it, in the anchor bone's space (cm). */
 	ECheeseStrikeHold Hold = ECheeseStrikeHold::Rifle;
 	FVector LeftHandShift = FVector::ZeroVector;

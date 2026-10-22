@@ -1,0 +1,17 @@
+# Execution's last stand in the HUD: with bots, a teammate and an enemy go
+# down (CheeseStrikeDown), for the row along the top and the scoreboard,
+# then the host. Run with tools/play.ps1 -Script tools/play/downed_row.txt
+# -Bots -Extra "?Mode=Execution?Bots=5?BotSkill=0".
+wait 3
+cmd CheeseStrikeDown mate
+cmd CheeseStrikeDown enemy
+wait 0.8
+shot down_row_1
+hold Scoreboard
+wait 0.3
+shot down_row_2_scoreboard
+release Scoreboard
+cmd CheeseStrikeDie
+wait 1.5
+shot down_row_3_self
+quit
