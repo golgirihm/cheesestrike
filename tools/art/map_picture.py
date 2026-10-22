@@ -34,8 +34,9 @@ def main():
     script = ROOT / "Saved" / f"{name}.txt"
     script.parent.mkdir(parents=True, exist_ok=True)
     x, y, z, pitch, yaw = args.view
-    # The HUD hidden (showhud), so that the picture is the map alone.
-    script.write_text(f"wait {args.wait}\ncmd showhud\ncmd CheeseStrikeViewFrom {x} {y} {z} {pitch} {yaw}\nwait 3\nshot {name}\nquit\n")
+    # The HUD hidden (showhud), and the engine's on-screen debug messages (a busy PC's texture memory warnings), so that
+    # the picture is the map alone.
+    script.write_text(f"wait {args.wait}\ncmd showhud\ncmd DisableAllScreenMessages\ncmd CheeseStrikeViewFrom {x} {y} {z} {pitch} {yaw}\nwait 3\nshot {name}\nquit\n")
     shot = ROOT / "Saved" / "Screenshots" / "WindowsEditor" / f"{name}.png"
     if shot.exists():
         shot.unlink()
