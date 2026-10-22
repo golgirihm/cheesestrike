@@ -32,7 +32,7 @@ West is The Gouda Guys' side, east the Mozza Radicals'; the map is mirrored acro
 
 Three lanes join each spawn to the other: the Skim (long and zig-zagging, along the north wall), the middle (close, round the Stirrer), and the south (the Rind Run's tunnel, then the Drain). The gantry is the connector between them over the middle, and the high ground; its stairs come down onto the Skim and the Drain. Deck to deck is about 72 m, 11 s at a sprint straight across; by the paths about 15 s.
 
-Free-for-all has fourteen more starts (tagged "Free"), seven a side: on the pump and the boiler, the middle path, the Skim, the Drain, the Stirrer's island and the north path, each on wax.
+Free-for-all has fourteen more starts (tagged "Free"), seven a side: on the pump and the boiler, the middle path, the Skim, the Drain, the Stirrer's island and the north path, each on wax or concrete, never eaten.
 
 The mice come in by ten vents low in the walls (`MouseEntry`): four in each long wall near the middle, where the Skim and the Drain run close to it, and one in each end wall north of the decks. Eight mice come.
 
