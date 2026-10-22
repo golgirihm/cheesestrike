@@ -104,6 +104,8 @@ namespace ModePlayTests
 	}
 
 	TWeakObjectPtr<ACheeseStrikeCharacter> Remembered;
+	/** When the host was killed, by the server's clock. */
+	float KilledAt = 0.0f;
 
 	/** How high a bone of the body others see is above the character's feet, on the machine it is seen on (cm). */
 	float BoneHeight(const ACheeseStrikeCharacter* Character, const TCHAR* Bone)
@@ -230,10 +232,11 @@ bool FAnEliminationRoundEndsWhenASideIsOut::RunTest(const FString& Parameters)
 		TestEqual(TEXT("which has a round"), Match->GetTeamScore(1), 1);
 		TestFalse(TEXT("and the match goes on"), Match->HasMatchEnded());
 		Remembered = Character(0);
+		KilledAt = Now(0);
 	});
 	WaitUntil(TEXT("the joiner hearing the host is out"), 5.0f, []() { const ACheeseStrikePlayerState* Host = StateOf(0, 1); return Host != nullptr && Host->IsOut(); });
 	// Past the respawn delay, between rounds, nobody comes back yet.
-	Wait(CheeseStrikeRules::RespawnDelay + 0.5f);
+	WaitUntil(TEXT("the respawn delay passing"), CheeseStrikeRules::RespawnDelay + 1.0f, []() { return Now(0) > KilledAt + CheeseStrikeRules::RespawnDelay + 0.5f; });
 	Then([this]()
 	{
 		TestTrue(TEXT("the host stays dead between rounds"), Dead(0) && Character(0) == Remembered.Get());

@@ -204,6 +204,25 @@ namespace PlayTests
 			bBackProtected = Host->IsProtected();
 		}
 	}
+	/** `Of`'s fallen body as world `Seen` has it (not their next character, who may be back already), or null. */
+	const ACheeseStrikeCharacter* FallenBodyOf(int32 Of, int32 Seen)
+	{
+		const APlayerController* Own = PlayTesting::Controller(Of);
+		UWorld* Viewer = PlayTesting::World(Seen);
+		if (Own == nullptr || Own->PlayerState == nullptr || Viewer == nullptr)
+		{
+			return nullptr;
+		}
+		for (TActorIterator<ACheeseStrikeCharacter> It(Viewer); It; ++It)
+		{
+			if (!It->IsAlive() && It->GetPlayerState() != nullptr && It->GetPlayerState()->GetPlayerId() == Own->PlayerState->GetPlayerId())
+			{
+				return *It;
+			}
+		}
+		return nullptr;
+	}
+
 	/** The first body as the other machine sees it. */
 	TWeakObjectPtr<const ACheeseStrikeCharacter> FirstBodySeen;
 	int32 ShotsBefore = 0;
@@ -461,14 +480,13 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 		TestEqual(TEXT("the joiner leads"), Match->Standings()[0].Name, Joiner->DisplayName());
 		TestFalse(TEXT("and the match goes on"), Match->HasMatchEnded());
 	});
-	WaitUntil(TEXT("the kill reaching the joiner"), 5.0f, []() { const ACheeseStrikeGameState* Match = GameState(1); return Match != nullptr && Match->GetKillFeed().Num() == 1; });
+	WaitUntil(TEXT("the kill reaching the joiner"), 5.0f, []() { PlayTests::WatchTheHostComeBack(); const ACheeseStrikeGameState* Match = GameState(1); return Match != nullptr && Match->GetKillFeed().Num() == 1; });
+	// The host comes back two seconds after dying, which on a busy PC may be before the kill reaches the joiner: look at the body.
+	WaitUntil(TEXT("the joiner seeing the host dead"), 5.0f, []() { PlayTests::WatchTheHostComeBack(); return PlayTests::FallenBodyOf(0, 1) != nullptr; });
 	Then([this]()
 	{
-		const ACheeseStrikeCharacter* HostAsSeen = CharacterOf(0, 1);
-		if (TestNotNull(TEXT("the joiner sees the host"), HostAsSeen))
-		{
-			TestFalse(TEXT("dead"), HostAsSeen->IsAlive());
-		}
+		const ACheeseStrikeCharacter* HostAsSeen = PlayTests::FallenBodyOf(0, 1);
+		TestNotNull(TEXT("the joiner sees the host's body"), HostAsSeen);
 		// The fallen body's face stays on its head, on both machines: the ragdoll moves the head, and the face and jaw follow it as posed.
 		for (const ACheeseStrikeCharacter* Body : {static_cast<const ACheeseStrikeCharacter*>(PlayTests::FirstBody.Get()), HostAsSeen})
 		{
