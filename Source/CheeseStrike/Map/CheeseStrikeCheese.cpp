@@ -14,7 +14,7 @@
 
 namespace
 {
-	constexpr float Gravity = 980.0f;
+	constexpr float CheeseFallGravity = 980.0f;
 	/** How near a block's bottom is to another's top for it to rest on it (cm), and how far into it it may have sunk. */
 	constexpr float Resting = 8.0f;
 	constexpr float Sunk = 40.0f;
@@ -270,7 +270,7 @@ void ACheeseStrikeCheese::Tick(float DeltaSeconds)
 		return;
 	}
 	FlushNetDormancy();
-	FallSpeed += Gravity * DeltaSeconds;
+	FallSpeed += CheeseFallGravity * DeltaSeconds;
 	const float Drop = FallSpeed * DeltaSeconds;
 	// Down until what it comes onto holds it, as CheeseStrikeMice::IsHeld has it: the level or cheese that isn't falling,
 	// under its middle or on either side of it; not people, mice or doors, and not a post or the edge of a wall that it
