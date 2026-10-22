@@ -1082,9 +1082,34 @@ def place_name(name, low, high):
 
 def kill_below(z):
     """Whoever falls below `z` dies (the world's kill height): for a map with a pit or a drop off its edge."""
-    settings = next(a for a in eas.get_all_level_actors() if isinstance(a, unreal.WorldSettings))
+    # The level's World Settings (not among the actors the editor lists).
+    settings = unreal.EditorLevelLibrary.get_editor_world().get_world_settings()
     settings.set_editor_property("kill_z", float(z))
     lines.append(f"kill below z = {z}")
+
+
+def liquid(label, folder, low, high, material):
+    """A pool's surface (molten fondue, whey) from corner `low` to corner `high`: seen, never stood on. It blocks
+    nothing, not even shots, and the navigation mesh leaves it out, so whoever goes in sinks: give the map a kill height
+    (kill_below) a little under its top, and something under it for what stands in it to stand on."""
+    actor = box(label, folder, low, high, material)
+    component = actor.static_mesh_component
+    component.set_collision_profile_name("NoCollision")
+    component.set_editor_property("can_ever_affect_navigation", False)
+    component.set_editor_property("cast_shadow", False)
+    return actor
+
+
+def steam_column(label, folder, x, y, bottom, diameter, height, steam=None):
+    """A column of steam rising from `bottom` (M_Steam, tools/art/fondue_material.py, unless `steam` is another
+    material): soft wisps that drift up and fade, blocking nothing and casting no shadow."""
+    actor = cylinder(label, folder, x, y, bottom, diameter, height, steam or material("M_Steam"))
+    component = actor.static_mesh_component
+    component.set_collision_profile_name("NoCollision")
+    component.set_editor_property("can_ever_affect_navigation", False)
+    component.set_editor_property("cast_shadow", False)
+    count("steam")
+    return actor
 
 
 # ---------------------------------------------------------------- light, sky and air
