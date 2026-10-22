@@ -35,6 +35,15 @@ TEXTURES = [
     ("sandstone_blocks_08", "1k"),     # the clock tower, the well house, the arcade's piers
     ("castle_wall_slates", "1k"),      # the town wall
     ("rough_linen", "1k"),             # the stalls' awnings, dyed
+    ("oak_wood_planks", "2k"),         # Crumb Kitchen's worktop: varnished oak
+    ("floor_tiles_06", "2k"),          # its floor: chequered marble tiles
+    ("long_white_tiles", "1k"),        # its splashback
+    ("white_plaster_02", "1k"),        # its walls and ceiling, painted
+    ("oak_veneer_01", "1k"),           # its cupboards' doors and chairs, painted or not
+    ("wood_table_001", "1k"),          # its table
+    ("brown_leather", "1k"),           # its books' covers, dyed
+    ("leafy_grass", "1k"),             # the garden through its window
+    ("red_brick_03", "1k"),            # the garden wall
 ]
 # Models: (asset, resolution).
 MODELS = [
@@ -44,9 +53,36 @@ MODELS = [
     ("wooden_crate_01", "1k"),
     ("wicker_basket_01", "1k"),
     ("painted_wooden_bench", "1k"),
+    # Crumb Kitchen's, five times life size.
+    ("vintage_electric_kettle", "2k"),
+    ("vintage_microwave", "2k"),
+    ("electric_stove", "2k"),
+    ("wooden_cutting_board", "2k"),
+    ("brass_pan_01", "1k"),
+    ("pot_enamel_01", "1k"),
+    ("brass_pot_01", "1k"),
+    ("jug_01", "1k"),
+    ("tea_set_01", "1k"),
+    ("wooden_bowl_01", "1k"),
+    ("food_apple_01", "1k"),
+    ("lemon", "1k"),
+    ("bananas", "1k"),
+    ("croissant", "1k"),
+    ("hamburger_buns", "1k"),
+    ("carrot_cake", "1k"),
+    ("long_life_food", "1k"),
+    ("yellow_onion", "1k"),
+    ("bleach_bottle", "1k"),
+    ("multi_cleaner_bottle", "1k"),
+    ("all_purpose_cleaner", "1k"),
+    ("wooden_bucket_01", "1k"),
+    ("metal_trash_can", "1k"),
+    ("modern_ceiling_lamp_01", "1k"),
 ]
-# The maps a texture or a model has, by Poly Haven's name for them, and ours.
+# The maps a texture or a model has, by Poly Haven's name for them, and ours. A model with one material that names its
+# maps after it ("01_diff", "01_nor_gl") has them by these endings instead.
 MAPS = {"Diffuse": "BaseColor", "nor_gl": "Normal", "Rough": "Roughness", "AO": "AO", "Metal": "Metalness", "opacity": "Opacity"}
+ENDINGS = {"_diff": "BaseColor", "_nor_gl": "Normal", "_rough": "Roughness", "_ao": "AO", "_metallic": "Metalness"}
 
 
 def get(url, path):
@@ -68,7 +104,12 @@ def files(asset):
 
 def maps(asset, listing, resolution):
     """The asset's texture maps, as JPEG (or PNG for opacity) files named <asset>_<our map name>.<ext>."""
-    for theirs, ours in MAPS.items():
+    named = {theirs: ours for theirs, ours in MAPS.items() if theirs in listing}
+    for key in listing:
+        ours = next((o for e, o in ENDINGS.items() if key.lower().endswith(e)), None)
+        if ours is not None and ours not in named.values():
+            named[key] = ours
+    for theirs, ours in named.items():
         if theirs not in listing or resolution not in listing[theirs]:
             continue
         formats = listing[theirs][resolution]

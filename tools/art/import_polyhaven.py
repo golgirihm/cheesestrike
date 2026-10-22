@@ -32,10 +32,21 @@ TEXTURES = {"medieval_blocks_03": 2048, "medieval_red_brick": 2048, "monastery_s
             "medieval_wood": 1024,
             "patterned_cobblestone": 1024, "cobblestone_square": 1024, "painted_plaster_wall": 1024, "weathered_planks": 1024,
             "rough_wood": 1024, "clay_roof_tiles_02": 1024, "sandstone_blocks_08": 1024, "castle_wall_slates": 1024,
-            "rough_linen": (1024, ("BaseColor",))}
+            "rough_linen": (1024, ("BaseColor",)),
+            # Crumb Kitchen's.
+            "oak_wood_planks": 2048, "floor_tiles_06": 2048, "long_white_tiles": 1024, "white_plaster_02": 1024,
+            "oak_veneer_01": 1024, "wood_table_001": 1024, "brown_leather": 1024, "leafy_grass": 1024, "red_brick_03": 1024}
 # Models: asset -> whether its glass glows (a lamp).
 MODELS = {"street_lamp_01": True, "street_lamp_02": True, "wine_barrel_01": False, "wooden_crate_01": False,
           "wicker_basket_01": False, "painted_wooden_bench": False}
+# Crumb Kitchen's models, none of them a lamp that glows (its lamps are lit by lights in them).
+for _asset in ("vintage_electric_kettle", "vintage_microwave", "electric_stove", "wooden_cutting_board", "brass_pan_01", "pot_enamel_01",
+               "brass_pot_01", "jug_01", "tea_set_01", "wooden_bowl_01", "food_apple_01", "lemon", "bananas", "croissant", "hamburger_buns",
+               "carrot_cake", "long_life_food", "yellow_onion", "bleach_bottle", "multi_cleaner_bottle", "all_purpose_cleaner",
+               "wooden_bucket_01", "metal_trash_can", "modern_ceiling_lamp_01"):
+    MODELS[_asset] = False
+# Models whose textures are kept larger than 1K: seen close and five times life size.
+MODEL_SIZES = {"vintage_electric_kettle": 2048, "vintage_microwave": 2048, "electric_stove": 2048, "wooden_cutting_board": 2048}
 # Surfaces: name -> (texture, TileU, TileV: the centimetres it covers, as Poly Haven measured it; M_Surface's settings).
 SURFACES = {
     # The Labyrinth's.
@@ -53,6 +64,24 @@ SURFACES = {
     "Sandstone": ("sandstone_blocks_08", 300, 300, {"Macro": 0.3, "Grime": 0.3, "Tint": (0.9, 0.86, 0.8)}),
     "TownWall": ("castle_wall_slates", 250, 250, {"Macro": 0.35, "Grime": 0.25}),
 }
+# Crumb Kitchen's, drawn at five times their real size, as the kitchen is: a 30 cm floor tile is 1.5 m.
+for _name, _source, _size, _settings in (
+        ("Worktop", "oak_wood_planks", 120, {"Macro": 0.2}),
+        ("Floor", "floor_tiles_06", 300, {"Macro": 0.25, "Grime": 0.1}),
+        ("Splashback", "long_white_tiles", 127, {"Macro": 0.1}),
+        ("Wall", "white_plaster_02", 100, {"Macro": 0.1, "Desaturate": 1.0, "Normalise": 1.0, "Contrast": 0.35, "Tint": (0.8, 0.77, 0.7), "Grime": 0.15}),
+        ("Ceiling", "white_plaster_02", 100, {"Macro": 0.05, "Desaturate": 1.0, "Normalise": 1.0, "Contrast": 0.25, "Tint": (0.86, 0.85, 0.83)}),
+        ("Paint_White", "oak_veneer_01", 183, {"Desaturate": 1.0, "Normalise": 1.0, "Contrast": 0.15, "Tint": (0.8, 0.79, 0.75), "RoughnessScale": 0.6}),
+        ("Cupboard", "oak_veneer_01", 183, {"Desaturate": 1.0, "Normalise": 1.0, "Contrast": 0.25, "Tint": (0.26, 0.33, 0.27), "RoughnessScale": 0.7, "Grime": 0.15}),
+        ("Oak", "oak_veneer_01", 183, {"Macro": 0.2}),
+        ("Table", "wood_table_001", 150, {"Macro": 0.15}),
+        ("Grass", "leafy_grass", 200, {"Macro": 0.4}),
+        ("Brick", "red_brick_03", 100, {"Macro": 0.3, "Grime": 0.2})):
+    SURFACES["Kitchen_" + _name] = (_source, _size * 5, _size * 5, _settings)
+# Its books' covers: leather, dyed.
+for _colour, _rgb in (("Red", (0.42, 0.07, 0.05)), ("Green", (0.09, 0.22, 0.13)), ("Blue", (0.07, 0.12, 0.28)), ("Brown", (0.3, 0.17, 0.08)),
+                      ("Ochre", (0.6, 0.4, 0.1)), ("Black", (0.05, 0.05, 0.05)), ("Cream", (0.62, 0.56, 0.44))):
+    SURFACES["Kitchen_Cover_" + _colour] = ("brown_leather", 300, 300, {"Desaturate": 1.0, "Normalise": 1.0, "Contrast": 0.6, "Tint": _rgb, "Macro": 0.15})
 # The town's plaster, painted, and its awnings' canvas, dyed, in these colours.
 PLASTER = {"Cream": (0.6, 0.57, 0.5), "Ochre": (0.55, 0.46, 0.33), "Rose": (0.55, 0.43, 0.39), "Sage": (0.44, 0.47, 0.41),
            "Blue": (0.41, 0.46, 0.52), "White": (0.66, 0.65, 0.62), "Grey": (0.48, 0.48, 0.47)}
@@ -372,7 +401,7 @@ try:
     m_prop = unreal.load_asset(OURS + "/M_Prop")
     m_prop_glow = prop_glow()
     for asset, glows in MODELS.items():
-        maps = textures(asset, 1024, [k for k in MAPS if k != "Opacity"])
+        maps = textures(asset, MODEL_SIZES.get(asset, 1024), [k for k in MAPS if k != "Opacity"])
         fresh = REIMPORT or not lib.does_asset_exist(f"{ROOT}/{asset}/SM_{asset}")
         mesh = model(asset)
         if mesh is None:
