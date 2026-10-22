@@ -37,4 +37,30 @@ namespace CheeseStrikeFalls
 		const FString Where = Place.TrimStartAndEnd();
 		return Where.IsEmpty() ? FString(TEXT("fell")) : FString::Printf(TEXT("fell into %s"), *Where.ToLower());
 	}
+
+	float DropFor(float Speed, float Gravity)
+	{
+		return Speed > 0.0f && Gravity > 0.0f ? Speed * Speed / (2.0f * Gravity) : 0.0f;
+	}
+
+	float DamageFor(float Drop)
+	{
+		if (Drop <= SafeDrop)
+		{
+			return 0.0f;
+		}
+		// Linear in the speed of the landing (as Counter-Strike's is), which goes as the root of the drop.
+		const float Through = (FMath::Sqrt(Drop) - FMath::Sqrt(SafeDrop)) / (FMath::Sqrt(DeadlyDrop) - FMath::Sqrt(SafeDrop));
+		return FMath::Clamp(FMath::CeilToFloat(DeadlyDamage * Through), 0.0f, DeadlyDamage);
+	}
+
+	bool BotMayStepOff(float Drop)
+	{
+		return DamageFor(Drop) <= 0.0f;
+	}
+
+	FString HardLandingWords()
+	{
+		return Words(FString());
+	}
 }

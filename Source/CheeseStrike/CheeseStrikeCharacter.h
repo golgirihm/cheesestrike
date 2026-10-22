@@ -63,6 +63,8 @@ public:
 	virtual void PossessedBy(AController* NewController) override;
 	/** Under the map's kill height (into its fondue, off its edge): killed by the fall (server only; CheeseStrikeFalls). */
 	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
+	/** Lands: a long fall hurts (server only; CheeseStrikeFalls::DamageFor), by the speed it comes down at. */
+	virtual void Landed(const FHitResult& Hit) override;
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 
@@ -225,6 +227,14 @@ public:
 	 * for TakeShot, or isn't `By`'s enemy.
 	 */
 	bool TakeBlast(float Damage, ACheeseStrikePlayerState* By, const FString& How);
+	/**
+	 * Takes `Damage` off the health from a fall (server only). A kill goes
+	 * to whoever hurt it in the seconds before (CheeseStrikeFalls::CreditFor),
+	 * as a fall into the fondue does, else the feed says it fell; in
+	 * Execution a fall that would kill puts it down, as any hit would. Every
+	 * machine hears it land hard. False if it couldn't be hurt.
+	 */
+	bool TakeFall(float Damage);
 	/** Server only: who last hurt it, and the server's time they did; a bot turns to whoever shoots it. */
 	ACheeseStrikeCharacter* GetLastHurtBy() const { return LastHurtBy.Get(); }
 	float GetLastHurtAt() const { return LastHurtAt; }
@@ -422,6 +432,11 @@ protected:
 	/** Its own player's machine: it was just hurt by `By`, standing at `From`, for the HUD's damage arc. */
 	UFUNCTION(Client, Unreliable)
 	void ClientHurtFrom(FVector_NetQuantize From, ACheeseStrikeCharacter* By);
+	/** Every machine: a landing that hurt, a thud and a grunt where it landed, louder the more it hurt. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastHardLanding(float Damage);
+	/** Who a fall's kill goes to: whoever hurt it lately and may, or nobody. */
+	ACheeseStrikeCharacter* FallCreditedTo() const;
 	UFUNCTION(Server, Reliable)
 	void ServerStartAt(FVector_NetQuantize At, float Yaw);
 	UFUNCTION(Client, Reliable)
