@@ -79,8 +79,8 @@ namespace CheeseStrikeModes
 	{
 		OutWinner = NoTeam;
 		const bool bBothHavePlayers = First.Members > 0 && Second.Members > 0;
-		const bool bFirstGone = First.Alive <= 0;
-		const bool bSecondGone = Second.Alive <= 0;
+		const bool bFirstGone = First.IsOut();
+		const bool bSecondGone = Second.IsOut();
 		if (bBothHavePlayers && (bFirstGone || bSecondGone))
 		{
 			OutWinner = bFirstGone && bSecondGone ? NoTeam : (bFirstGone ? 1 : 0);
@@ -225,7 +225,21 @@ namespace CheeseStrikeModes
 		}
 	}
 
-	FGunGameKill GunGameKill(int32 KillerLevel, bool bWithKnife, int32 Steps)
+	FWeaponStats DownedWeapon(const FWeaponStats& Weapon)
+	{
+		FWeaponStats Down = Weapon;
+		Down.Damage *= DownedDamage;
+		Down.BackstabDamage *= DownedDamage;
+		Down.FireInterval *= DownedFireInterval;
+		Down.BurstInterval *= DownedFireInterval;
+		Down.HipSpreadDegrees *= DownedSpread;
+		Down.SpreadDegrees *= DownedSpread;
+		// Fully spread from the first shot: no steady first shot to tap out one at a time.
+		Down.BloomShots = 1;
+		return Down;
+	}
+
+	FGunGameKill GunGameKill(int32 KillerLevel, int32 Steps)
 	{
 		FGunGameKill Kill;
 		const int32 Last = FMath::Max(0, Steps - 1);
@@ -236,13 +250,7 @@ namespace CheeseStrikeModes
 			return Kill;
 		}
 		Kill.KillerLevel = Kill.KillerLevel + 1;
-		Kill.bVictimDemoted = bWithKnife;
 		return Kill;
-	}
-
-	bool GunGameKeepsKnife(int32 Level, int32 Steps)
-	{
-		return Level < Steps - 1;
 	}
 
 	FLinearColor TeamColour(int32 Team)

@@ -130,15 +130,13 @@ namespace CheeseStrikeHUD
 		Respawning,
 		/** Killed for good, until the round is over (Elimination). */
 		Out,
-		/** Down in Execution's last stand: alive, bleeding out, until revived or finished. */
+		/** Down in Execution's last stand: alive, until revived or finished. */
 		Down
 	};
 	/** Out, then dead, then down, then alive: a body down that dies, or a player out, is no longer down. */
 	EStatus StatusOf(bool bOut, bool bDead, bool bDown = false);
 	/** The colour of being down, on the row and the scoreboard: a red-orange, apart from both sides' colours. */
 	inline const FLinearColor DownColour(1.0f, 0.12f, 0.03f, 1.0f);
-	/** How much of a player's bleeding out is left (1 just down, 0 gone), with `Seconds` of `Total` to go. */
-	float BleedLeft(float Seconds, float Total);
 	/** Whole seconds until a player killed at `DiedAt` comes back, at `Now` (the server's time as this machine has it); 0 to the whole delay. */
 	int32 SecondsToComeBack(float RespawnDelay, float Now, float DiedAt);
 	/** A Steam id from a player's unique net id, given as its type and its text; 0 if it isn't Steam's. */

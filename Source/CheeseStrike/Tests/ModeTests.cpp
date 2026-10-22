@@ -125,6 +125,18 @@ bool FARoundGoesToTheSideLeftStanding::RunTest(const FString& Parameters)
 	TestTrue(TEXT("level on both: a draw"), RoundOver(Side(4, 2, 100), Side(4, 2, 100), true, Winner) && Winner == NoTeam);
 	TestTrue(TEXT("and a lone player, at the time, takes it"), RoundOver(Side(1, 1, 100), Side(0, 0, 0), true, Winner) && Winner == 0);
 	TestTrue(TEXT("rounds are short and the break shorter"), RoundTime >= 60.0f && RoundBreak > 0.0f && RoundBreak <= 10.0f);
+	// Execution: someone down is in while a teammate is up to revive them; a side all down is out.
+	FSide OneDown = Side(3, 2, 60);
+	OneDown.Down = 1;
+	TestFalse(TEXT("one down, one up: still in"), OneDown.IsOut() || RoundOver(OneDown, Side(3, 1, 100), false, Winner));
+	FSide AllDown = Side(3, 2, 0);
+	AllDown.Down = 2;
+	TestTrue(TEXT("everyone left down: out"), AllDown.IsOut());
+	TestTrue(TEXT("and the round is the other side's"), RoundOver(Side(3, 1, 40), AllDown, false, Winner) && Winner == 0);
+	FSide LoneDown = Side(1, 1, 0);
+	LoneDown.Down = 1;
+	TestTrue(TEXT("a side of one, down: out"), RoundOver(LoneDown, Side(1, 1, 100), false, Winner) && Winner == 1);
+	TestTrue(TEXT("both sides all down at once: a draw"), RoundOver(LoneDown, AllDown, false, Winner) && Winner == NoTeam);
 	return true;
 }
 
@@ -268,7 +280,26 @@ bool FALastStandTakesTheKillingHit::RunTest(const FString& Parameters)
 	TestTrue(TEXT("reviving takes longer than finishing"), InteractTime(EInteract::Revive) > InteractTime(EInteract::Execute) && InteractTime(EInteract::Execute) > 0.0f);
 	TestEqual(TEXT("nothing takes no time"), InteractTime(EInteract::None), 0.0f);
 	TestTrue(TEXT("revived with some health, not all"), ReviveHealth > 0.0f && ReviveHealth < 100.0f);
-	TestTrue(TEXT("left alone, they last a while"), LastStandTime >= 15.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheDownedFightWorse, "CheeseStrike.Rules.TheDownedFightWorse", ModeTests::Flags)
+
+bool FTheDownedFightWorse::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeModes;
+	const FWeaponStats& Pistol = CheeseStrikeWeapons::Pistol();
+	const FWeaponStats Down = DownedWeapon(Pistol);
+	TestTrue(FString::Printf(TEXT("down, the pistol hits softer (%.1f, standing %.1f)"), Down.Damage, Pistol.Damage), Down.Damage < Pistol.Damage && Down.Damage >= Pistol.Damage * 0.5f);
+	TestTrue(FString::Printf(TEXT("fires slower (%.2f s, standing %.2f s)"), Down.FireInterval, Pistol.FireInterval), Down.FireInterval > Pistol.FireInterval * 1.2f);
+	TestTrue(TEXT("spreads wider from the hip"), Down.HipSpreadDegrees > Pistol.HipSpreadDegrees);
+	TestEqual(TEXT("and its first shot spreads as much as any: no steady first shot"), CheeseStrikeWeapons::SpreadFor(Down, 0, false), Down.HipSpreadDegrees);
+	TestEqual(TEXT("standing, the first shot goes where it is aimed"), CheeseStrikeWeapons::SpreadFor(Pistol, 0, false), 0.0f);
+	// Every shot landing, down takes about twice as long to kill a full-health enemy: a threat to one careless enemy, not a squad.
+	const float Standing = CheeseStrikeWeapons::TimeToKill(Pistol);
+	const float Lying = CheeseStrikeWeapons::TimeToKill(Down);
+	TestTrue(FString::Printf(TEXT("killing takes %.1f s down, %.1f s standing"), Lying, Standing), Lying > Standing * 1.7f && Lying < 8.0f);
+	TestEqual(TEXT("the same weapon, the same rounds"), Down.MagazineSize, Pistol.MagazineSize);
 	return true;
 }
 
@@ -279,14 +310,10 @@ bool FGunGameClimbsTheLadder::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeModes;
 	const int32 Steps = CheeseStrikeArsenal::GunGameLadder().Num();
 	TestTrue(TEXT("the ladder has the knife last"), Steps > 2 && CheeseStrikeArsenal::GunGameLadder().Last() == CheeseStrikeArsenal::Knife());
-	const FGunGameKill First = GunGameKill(0, false, Steps);
-	TestTrue(TEXT("a kill moves the killer a step up"), First.KillerLevel == 1 && !First.bWins && !First.bVictimDemoted);
-	const FGunGameKill Knifed = GunGameKill(3, true, Steps);
-	TestTrue(TEXT("a kill with the knife before its step: up, and the killed down a step"), Knifed.KillerLevel == 4 && Knifed.bVictimDemoted && !Knifed.bWins);
-	TestTrue(TEXT("on the last step but one, up to the knife"), GunGameKill(Steps - 2, false, Steps).KillerLevel == Steps - 1);
-	TestTrue(TEXT("a kill on the last step wins"), GunGameKill(Steps - 1, true, Steps).bWins);
-	TestFalse(TEXT("and humiliates nobody"), GunGameKill(Steps - 1, true, Steps).bVictimDemoted);
-	TestTrue(TEXT("the knife is carried until it is the step"), GunGameKeepsKnife(0, Steps) && GunGameKeepsKnife(Steps - 2, Steps) && !GunGameKeepsKnife(Steps - 1, Steps));
+	const FGunGameKill First = GunGameKill(0, Steps);
+	TestTrue(TEXT("a kill moves the killer a step up"), First.KillerLevel == 1 && !First.bWins);
+	TestTrue(TEXT("on the last step but one, up to the knife"), GunGameKill(Steps - 2, Steps).KillerLevel == Steps - 1);
+	TestTrue(TEXT("a kill on the last step wins"), GunGameKill(Steps - 1, Steps).bWins);
 	// The bottom of the HUD: the player's step and the leader's, out of the ladder's.
 	TArray<CheeseStrikeRules::FStanding> BySteps;
 	BySteps.Add({TEXT("Ash"), 5, 0, 1});

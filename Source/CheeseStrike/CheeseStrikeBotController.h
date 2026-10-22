@@ -90,8 +90,8 @@ protected:
 	/** Every frame: where it looks, whether it fires, and its side steps. */
 	void AimAndFire(float DeltaSeconds);
 	void Step(float DeltaSeconds);
-	/** Starts going to `Where` on the navigation mesh, if it can; `bSprint` to run. */
-	bool GoTo(const FVector& Where, bool bSprint);
+	/** Starts going to `Where` on the navigation mesh, if it can; `bSprint` to run; `bRightThere` to stop only right on it (not near it). */
+	bool GoTo(const FVector& Where, bool bSprint, bool bRightThere = false);
 	/** A spot on the navigation mesh to roam to: toward another player, or somewhere new well away from here. */
 	bool PickRoamGoal(FVector& Out) const;
 	/** A spot on the navigation mesh away from `From`, to get away to. */
@@ -124,6 +124,9 @@ protected:
 	float GoalSetAt = -1000.0f;
 	/** When it last made progress, for being stuck. */
 	float MovedAt = 0.0f;
+	FVector MovedFrom = FVector::ZeroVector;
+	/** Which way round it goes to finish someone down (CheeseStrikeBots::FinishApproach): changed when it gets stuck going one way. */
+	float FlankSide = 1.0f;
 
 	/** Where it wants to look; the view turns toward this each frame. */
 	FRotator Wanted = FRotator::ZeroRotator;

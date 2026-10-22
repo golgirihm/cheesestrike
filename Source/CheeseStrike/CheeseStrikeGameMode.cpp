@@ -449,9 +449,6 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 	const CheeseStrikeModes::FModeInfo& Rules = CheeseStrikeModes::Info(Mode);
 	ACheeseStrikePlayerState* KillerState = By != nullptr ? By : (Killer != nullptr ? Killer->GetPlayerState<ACheeseStrikePlayerState>() : nullptr);
 	ACheeseStrikePlayerState* VictimState = Victim->GetPlayerState<ACheeseStrikePlayerState>();
-	// What made the kill, a hand's: the weapon in the killer's hand as its shot or stroke landed.
-	const ACheeseStrikeWeapon* KillWeapon = Killer != nullptr && How.IsEmpty() ? Killer->GetWeapon() : nullptr;
-	const bool bKnifed = KillWeapon != nullptr && KillWeapon->GetStats().IsMelee();
 	if (KillerState != nullptr && KillerState != VictimState)
 	{
 		// A hand's kill counts toward the next streak, where the mode has streaks; a streak's doesn't.
@@ -517,7 +514,7 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 		if (KillerState != nullptr && KillerState != VictimState)
 		{
 			const int32 Steps = CheeseStrikeArsenal::GunGameLadder().Num();
-			const CheeseStrikeModes::FGunGameKill Step = CheeseStrikeModes::GunGameKill(KillerState->GetGunLevel(), bKnifed, Steps);
+			const CheeseStrikeModes::FGunGameKill Step = CheeseStrikeModes::GunGameKill(KillerState->GetGunLevel(), Steps);
 			if (Step.bWins)
 			{
 				State->SetWinnerName(KillerState->GetPlayerName());
@@ -527,11 +524,6 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 			}
 			KillerState->SetGunLevel(Step.KillerLevel);
 			UE_LOG(LogCheeseStrike, Display, TEXT("Gun Game: %s up to the %s, %d of %d"), *KillerState->GetPlayerName(), *ACheeseStrikeGameState::GunGameWeaponName(Step.KillerLevel), Step.KillerLevel + 1, Steps);
-			if (Step.bVictimDemoted && VictimState != nullptr)
-			{
-				VictimState->SetGunLevel(FMath::Max(0, VictimState->GetGunLevel() - 1));
-				State->Announce(FString::Printf(TEXT("%s knifed %s, who drops to the %s"), *KillerState->GetPlayerName(), *VictimState->GetPlayerName(), *ACheeseStrikeGameState::GunGameWeaponName(VictimState->GetGunLevel())), CheeseStrikeStreaks::EStreak::None, CheeseStrikeModes::NoTeam, KillerState->GetPlayerName());
-			}
 			if (Step.KillerLevel == Steps - 1)
 			{
 				State->Announce(FString::Printf(TEXT("%s has the knife: one kill from winning"), *KillerState->GetPlayerName()), CheeseStrikeStreaks::EStreak::None, CheeseStrikeModes::NoTeam, KillerState->GetPlayerName());
@@ -609,8 +601,9 @@ void ACheeseStrikeGameMode::SetRoundLimit(int32 Rounds)
 
 void ACheeseStrikeGameMode::Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By)
 {
-	// Down is not out: the round goes on until they are finished or bleed out.
-	CheckRound(false);
+	// Down is not out while a teammate is up to revive them; if none is, the side is out. Decided once the hit that
+	// put them down is done with.
+	GetWorldTimerManager().SetTimerForNextTick(this, &ACheeseStrikeGameMode::CheckRoundNow);
 }
 
 void ACheeseStrikeGameMode::SetPlayerDefaults(APawn* PlayerPawn)
@@ -631,13 +624,8 @@ void ACheeseStrikeGameMode::ArmForGunGame(TWeakObjectPtr<ACheeseStrikeCharacter>
 	{
 		return;
 	}
-	const int32 Steps = CheeseStrikeArsenal::GunGameLadder().Num();
-	FCheeseStrikeLoadout Loadout = FCheeseStrikeLoadout::Only(CheeseStrikeArsenal::GunGameWeapon(Player->GetGunLevel()));
-	if (CheeseStrikeModes::GunGameKeepsKnife(Player->GetGunLevel(), Steps))
-	{
-		Loadout.Knife = CheeseStrikeArsenal::Knife();
-	}
-	Inventory->Give(Loadout);
+	// The step's weapon and nothing else: no changing to a sidearm or the knife.
+	Inventory->Give(FCheeseStrikeLoadout::Only(CheeseStrikeArsenal::GunGameWeapon(Player->GetGunLevel())));
 }
 
 bool ACheeseStrikeGameMode::PlayerCanRestart_Implementation(APlayerController* Player)
@@ -730,11 +718,12 @@ void ACheeseStrikeGameMode::StartRound(bool bFirst)
 void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 {
 	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
-	if (State == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || State->GetRound() == 0)
+	if (State == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || State->GetRound() == 0 || bDecidingRound)
 	{
 		return;
 	}
 	CheeseStrikeModes::FSide Sides[CheeseStrikeRules::Teams];
+	TArray<ACheeseStrikeCharacter*> Down[CheeseStrikeRules::Teams];
 	for (const APlayerState* Each : State->PlayerArray)
 	{
 		const ACheeseStrikePlayerState* Player = Cast<ACheeseStrikePlayerState>(Each);
@@ -744,20 +733,43 @@ void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 		}
 		CheeseStrikeModes::FSide& Side = Sides[Player->GetTeam()];
 		++Side.Members;
-		const ACheeseStrikeCharacter* Body = Player->GetPawn<ACheeseStrikeCharacter>();
-		// Still in: alive, down or not (someone down fights on with the sidearm until finished or bled out); their health
-		// counts only standing, for the time's tie rule.
+		ACheeseStrikeCharacter* Body = Player->GetPawn<ACheeseStrikeCharacter>();
+		// Still in: alive, down or not (someone down fights on with the sidearm while a teammate is up to revive them);
+		// their health counts only standing, for the time's tie rule.
 		if (!Player->IsOut() && Body != nullptr && Body->IsAlive())
 		{
 			++Side.Alive;
 			Side.Health += Body->IsDowned() ? 0.0f : Body->GetHealth();
+			if (Body->IsDowned())
+			{
+				++Side.Down;
+				Down[Player->GetTeam()].Add(Body);
+			}
 		}
 	}
 	int32 Winner = CheeseStrikeModes::NoTeam;
-	if (CheeseStrikeModes::RoundOver(Sides[0], Sides[1], bTimeUp, Winner))
+	if (!CheeseStrikeModes::RoundOver(Sides[0], Sides[1], bTimeUp, Winner))
 	{
-		EndRound(Winner);
+		return;
 	}
+	// A side out with players still down: nobody can revive them, so they are finished, each the kill of whoever put them down.
+	bDecidingRound = true;
+	for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
+	{
+		if (!Sides[Team].IsOut())
+		{
+			continue;
+		}
+		for (ACheeseStrikeCharacter* Body : Down[Team])
+		{
+			if (UCheeseStrikeLastStand* Stand = IsValid(Body) ? Body->GetLastStand() : nullptr)
+			{
+				Stand->GiveUp();
+			}
+		}
+	}
+	bDecidingRound = false;
+	EndRound(Winner);
 }
 
 void ACheeseStrikeGameMode::EndRound(int32 Winner)

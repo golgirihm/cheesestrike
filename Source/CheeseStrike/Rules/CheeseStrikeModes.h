@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 
+struct FWeaponStats;
+
 /**
  * The modes a match is played in, as plain functions over plain values, so
  * that they can be tested without a world (docs/unreal/design.md,
@@ -97,14 +99,18 @@ namespace CheeseStrikeModes
 	{
 		/** Players on it, out or not. */
 		int32 Members = 0;
-		/** Of those, how many are still standing, and their health together. */
+		/** Of those, how many are still in (alive, down or not), and their health together. */
 		int32 Alive = 0;
 		float Health = 0.0f;
+		/** Of those still in, how many are down (Execution's last stand). */
+		int32 Down = 0;
+		/** Whether it is out: nobody left in, or (Execution) everyone left down, with nobody up to revive them. */
+		bool IsOut() const { return Alive - Down <= 0; }
 	};
 	/**
 	 * Whether a round of Elimination is over, and who took it (`OutWinner`,
-	 * NoTeam for a draw). It is over once a side with players has none left
-	 * standing while the other has players (nothing ends while a side is
+	 * NoTeam for a draw). It is over once a side with players is out
+	 * (FSide::IsOut: none left standing, someone down not counting) while the other has players (nothing ends while a side is
 	 * empty: there is nobody to beat), and the other side takes it; both
 	 * gone at once is a draw. When its time is up (`bTimeUp`) it is over
 	 * whatever stands: the side with more left standing takes it, then the
@@ -145,8 +151,6 @@ namespace CheeseStrikeModes
 
 	// Execution's last stand.
 
-	/** Seconds a player down can last before bleeding out, as the kill of whoever put them down. */
-	constexpr float LastStandTime = 30.0f;
 	/** How near an enemy must be to finish a player down, by a shot or by Interact (cm): no further, from any weapon or streak, does them any harm. */
 	constexpr float FinishRange = 250.0f;
 	/** How near Interact reaches a player down (cm), and the seconds it is held to finish an enemy or revive a teammate. */
@@ -188,22 +192,35 @@ namespace CheeseStrikeModes
 	/** Seconds Interact is held for `Kind`. */
 	float InteractTime(EInteract Kind);
 
+	/**
+	 * Down, a player fights worse: lying on their back, propped on an elbow,
+	 * the pistol held out one-handed. Their shots do DownedDamage of their
+	 * damage, come DownedFireInterval times further apart, and spread over
+	 * DownedSpread times the hip's cone from the first shot of a run (no
+	 * steady first shot); enough to see off one careless enemy up close, not
+	 * a squad. Bots down fight by the same weapon.
+	 */
+	constexpr float DownedDamage = 0.75f;
+	constexpr float DownedFireInterval = 1.4f;
+	constexpr float DownedSpread = 1.3f;
+	/** `Weapon` as someone down fires it. */
+	FWeaponStats DownedWeapon(const FWeaponStats& Weapon);
+
 	// Gun Game.
 
-	/** What a kill does in Gun Game. */
+	/**
+	 * What a kill does in Gun Game, where each player carries only their
+	 * step's weapon (the knife only once it is the step: no changing weapons).
+	 */
 	struct FGunGameKill
 	{
 		/** The killer's step on the ladder after it. */
 		int32 KillerLevel = 0;
-		/** Whether the killed drops a step (a kill by the knife before its own step: humiliation, as in Counter-Strike). */
-		bool bVictimDemoted = false;
 		/** Whether it wins the match: a kill on the last step. */
 		bool bWins = false;
 	};
-	/** A kill by a player on step `KillerLevel` of a ladder `Steps` long, `bWithKnife` or not. */
-	FGunGameKill GunGameKill(int32 KillerLevel, bool bWithKnife, int32 Steps);
-	/** What a Gun Game player on step `Level` carries besides its step's weapon: the knife, until the knife is the step. */
-	bool GunGameKeepsKnife(int32 Level, int32 Steps);
+	/** A kill by a player on step `KillerLevel` of a ladder `Steps` long. */
+	FGunGameKill GunGameKill(int32 KillerLevel, int32 Steps);
 
 	/**
 	 * A side's colour, the game's one, on the lobby's chips and columns, the

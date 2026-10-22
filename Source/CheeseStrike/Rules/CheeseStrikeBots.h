@@ -139,4 +139,31 @@ namespace CheeseStrikeBots
 	 * starts a fresh burst when it wants to again, unless it is resting.
 	 */
 	bool HoldsTrigger(FBursts& Bursts, const FSkill& Skill, bool bWantsToFire, float FireInterval, float Now);
+	/**
+	 * Execution: going to finish an enemy down, who can aim only within
+	 * CheeseStrikeDowned::ConeYaw of the way their body faces. A bot keeps
+	 * out of that aim: outside it (by half FlankMargin more), it goes straight in
+	 * to stand FlankStandOff beside them, on its own side of them; in it, it
+	 * makes for the nearer edge, FlankMargin past it, circling no further out
+	 * than FlankRadius, a step at a time (ZigzagStep ahead) swerving
+	 * ZigzagWidth from side to side across their line of fire every ZigzagPeriod, never straight down
+	 * the barrel.
+	 */
+	constexpr float FlankMargin = 25.0f;
+	constexpr float FlankStandOff = 150.0f;
+	constexpr float FlankRadius = 600.0f;
+	constexpr float ZigzagStep = 300.0f;
+	constexpr float ZigzagWidth = 130.0f;
+	constexpr float ZigzagPeriod = 1.2f;
+	/** How far round from the way someone down at `Downed` faces (`Yaw`) `At` is, in degrees either side (-180 to 180), on the flat. */
+	float BearingFromDowned(const FVector& At, const FVector& Downed, float Yaw);
+	/** Whether `At` is where someone down at `Downed` facing `Yaw` can aim, give or take `Margin` degrees. */
+	bool InDownedAim(const FVector& At, const FVector& Downed, float Yaw, float Margin = 0.0f);
+	/**
+	 * Where a bot at `At` makes for next, to finish someone down at `Downed`
+	 * facing `Yaw`, at time `Now` (for the swerving). In their aim it goes
+	 * round by the nearer edge, or with `Way` -1 (having got stuck that
+	 * way) by the further.
+	 */
+	FVector FinishApproach(const FVector& At, const FVector& Downed, float Yaw, float Now, float Way = 1.0f);
 }

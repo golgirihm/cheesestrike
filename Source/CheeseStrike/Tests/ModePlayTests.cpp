@@ -559,6 +559,83 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExecutionSideIsOutWhenAllAreDown, "CheeseStrike.Play.ExecutionSideIsOutWhenAllAreDown", ModePlayTests::Flags)
+
+bool FExecutionSideIsOutWhenAllAreDown::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace ModePlayTests;
+	// The host and the second joiner on one side, the first joiner on the other.
+	StartPlaying({3, TEXT("?Mode=Execution?Rounds=1")});
+	PutAt(0, HostSpot, HostYaw);
+	PutAt(1, JoinerSpot, JoinerYaw);
+	PutAt(2, AsideSpot, AsideYaw);
+	Wait(CheeseStrikeRules::SpawnProtection);
+	// The joiner puts the host down; a teammate stands, so the round goes on, and stays on: there is no bleeding out.
+	Then([this]()
+	{
+		CharacterOf(0, 0)->GetLastStand()->GoDown(StateOf(1, 0));
+	});
+	Wait(1.5f);
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		TestTrue(TEXT("the host is down"), Host->IsAlive() && Host->IsDowned());
+		TestFalse(TEXT("and the round goes on: a teammate is up"), GameState(0)->IsRoundBreak() || GameState(0)->HasMatchEnded());
+		// Down, the pistol is the worse for it, on the server and on the host's own machine alike.
+		const FWeaponStats Worse = CheeseStrikeModes::DownedWeapon(CheeseStrikeWeapons::Pistol());
+		for (const ACheeseStrikeCharacter* Seen : TArray<const ACheeseStrikeCharacter*>{Host, Character(0)})
+		{
+			const ACheeseStrikeWeapon* Held = Seen->GetWeapon();
+			if (TestNotNull(TEXT("the pistol in hand"), Held))
+			{
+				TestEqual(TEXT("its damage the downed's"), Held->FiringStats().Damage, Worse.Damage);
+				TestEqual(TEXT("its rate the downed's"), Held->FiringStats().FireInterval, Worse.FireInterval);
+				TestEqual(TEXT("and its spread"), Held->FiringStats().HipSpreadDegrees, Worse.HipSpreadDegrees);
+			}
+		}
+		if (const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0))
+		{
+			const ACheeseStrikeWeapon* Theirs = Joiner->GetWeapon();
+			TestTrue(TEXT("while the enemy standing fires as usual"), Theirs != nullptr && Theirs->FiringStats().Damage == Theirs->GetStats().Damage);
+		}
+		CharacterOf(1, 0)->EndProtection();
+	});
+	// The host shoots back from where it lies, across 4 m: what lands, lands at the downed's damage.
+	Play(0, TEXT("tap Fire\nwait 0.5\ntap Fire\nwait 0.5\ntap Fire\nwait 0.5"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		const float Lost = 100.0f - Joiner->GetHealth();
+		const FWeaponStats Worse = CheeseStrikeModes::DownedWeapon(CheeseStrikeWeapons::Pistol());
+		const float Most = 3.0f * Worse.Damage * Worse.HeadMultiplier;
+		TestTrue(FString::Printf(TEXT("three shots from the host down took %.1f health, no more than its downed pistol can (%.1f)"), Lost, Most), Lost <= Most + 0.1f);
+		const ACheeseStrikeWeapon* Held = Character(0)->GetWeapon();
+		TestTrue(FString::Printf(TEXT("a hit is the downed's damage (%.1f)"), Held->LastHitDamage), Held->LastHitDamage == 0.0f || Held->LastHitDamage <= Worse.Damage * Worse.HeadMultiplier + 0.01f);
+	});
+	// The teammate goes down too, by the same enemy: nobody of theirs is up to revive them, so their side is out.
+	Then([this]()
+	{
+		CharacterOf(2, 0)->GetLastStand()->GoDown(StateOf(1, 0));
+	});
+	WaitUntil(TEXT("the match ending"), 4.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	Then([this]()
+	{
+		TestEqual(TEXT("the other side wins"), GameState(0)->GetWinningTeam(), 1);
+		const FString Enemy = CharacterOf(1, 0)->DisplayName();
+		for (const int32 Player : {0, 2})
+		{
+			const ACheeseStrikeCharacter* Body = CharacterOf(Player, 0);
+			TestFalse(FString::Printf(TEXT("player %d, down, is finished"), Player), Body->IsAlive());
+			TestEqual(FString::Printf(TEXT("as the kill of whoever put them down")), Body->GetKilledBy(), Enemy);
+			TestTrue(FString::Printf(TEXT("and out")), StateOf(Player, 0)->IsOut());
+		}
+		TestEqual(TEXT("the enemy scores both"), StateOf(1, 0)->GetKills(), 2);
+	});
+	StopPlaying();
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGunGameMovesUpTheLadderToTheKnife, "CheeseStrike.Play.GunGameMovesUpTheLadderToTheKnife", ModePlayTests::Flags)
 
 bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
@@ -571,8 +648,22 @@ bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
 		const TArray<FName>& Ladder = CheeseStrikeArsenal::GunGameLadder();
 		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
 		TestEqual(TEXT("everyone starts on the first weapon"), HeldId(Host), Ladder[0]);
-		TestTrue(TEXT("with the knife besides"), Host->GetInventory()->CanDraw(EWeaponSlot::Knife));
-		TestFalse(TEXT("and nothing else"), Host->GetInventory()->CanDraw(EWeaponSlot::Sidearm));
+		TestFalse(TEXT("and nothing else: no knife"), Host->GetInventory()->CanDraw(EWeaponSlot::Knife));
+		TestFalse(TEXT("no pistol"), Host->GetInventory()->CanDraw(EWeaponSlot::Sidearm));
+	});
+	// Every way of changing weapons does nothing: there is nothing to change to, and the HUD lists only the one.
+	Play(0, TEXT("tap Knife\nwait 0.3\ntap Sidearm\nwait 0.3\ntap NextWeapon\nwait 0.3\ntap PreviousWeapon\nwait 0.3\ntap LastWeapon\nwait 0.3"));
+	Then([this]()
+	{
+		const TArray<FName>& Ladder = CheeseStrikeArsenal::GunGameLadder();
+		TestEqual(TEXT("still the first weapon in hand"), HeldId(Character(0)), Ladder[0]);
+		TestEqual(TEXT("on the server too"), HeldId(CharacterOf(0, 0)), Ladder[0]);
+		const ACheeseStrikeHUD* Hud = Controller(0) != nullptr ? Cast<ACheeseStrikeHUD>(Controller(0)->GetHUD()) : nullptr;
+		if (TestNotNull(TEXT("the HUD"), Hud))
+		{
+			const TArray<ACheeseStrikeHUD::FWeaponSlot> Slots = Hud->WeaponSlots(Character(0));
+			TestTrue(FString::Printf(TEXT("the HUD lists only that weapon (%d)"), Slots.Num()), Slots.Num() == 1 && Slots[0].Id == Ladder[0]);
+		}
 	});
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
@@ -584,6 +675,7 @@ bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
 		const TArray<FName>& Ladder = CheeseStrikeArsenal::GunGameLadder();
 		TestEqual(TEXT("the joiner moves a step up"), StateOf(1, 0)->GetGunLevel(), 1);
 		TestEqual(TEXT("and holds the next weapon at once"), HeldId(CharacterOf(1, 0)), Ladder[1]);
+		TestFalse(TEXT("and nothing else"), CharacterOf(1, 0)->GetInventory()->CanDraw(EWeaponSlot::Knife) || CharacterOf(1, 0)->GetInventory()->CanDraw(EWeaponSlot::Sidearm));
 		TestEqual(TEXT("on its own machine too"), HeldId(Character(1)), Ladder[1]);
 		TestEqual(TEXT("the host stays where it was"), StateOf(0, 0)->GetGunLevel(), 0);
 		TestFalse(TEXT("the joiner earns no streak"), StateOf(1, 0)->GetStreak() > 0);

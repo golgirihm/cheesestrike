@@ -19,12 +19,15 @@ class ACheeseStrikePlayerState;
  * down the sights, carries only its sidearm, and nothing harms it but an
  * enemy within reach (CheeseStrikeModes::FinishRange), whose next hit
  * finishes it; held Interact (E) finishes it too from an enemy, or from a
- * teammate gets it back up; left alone it bleeds out, the kill of whoever
- * put it down. Interact is this component's too: held near someone down,
- * it works on them while it is held and nobody moves out of reach.
+ * teammate gets it back up. It stays down until one of those, or until its
+ * side has nobody up to revive it (ACheeseStrikeGameMode::CheckRound, which
+ * then has it GiveUp), or the round ends. Its shots are weaker while down
+ * (CheeseStrikeModes::DownedWeapon). Interact is this component's too: held
+ * near someone down, it works on them while it is held and nobody moves out
+ * of reach.
  *
- * The server decides; every machine sees whether it is down, until when,
- * and whom its player is working on, for the HUD.
+ * The server decides; every machine sees whether it is down and whom its
+ * player is working on, for the HUD.
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeLastStand : public UActorComponent
@@ -35,8 +38,6 @@ public:
 	UCheeseStrikeLastStand();
 
 	bool IsDowned() const { return bDowned; }
-	/** Seconds left before bleeding out, while down; 0 otherwise. */
-	float SecondsToBleedOut() const;
 	/** Whom its player is reviving or finishing just now, and how far through (0 to 1); null for nobody. */
 	ACheeseStrikeCharacter* GetWorkingOn() const { return WorkingOn; }
 	CheeseStrikeModes::EInteract GetWork() const { return static_cast<CheeseStrikeModes::EInteract>(Work); }
@@ -57,6 +58,8 @@ public:
 	void SetInteracting(bool bHeld);
 	/** Server: gets up again, revived. */
 	void Revive();
+	/** Server: down with nobody of its side up to revive it, it is finished, as the kill of whoever put it down. */
+	void GiveUp();
 
 	/** For the play tests: down now, as if hurt enough by `By`. */
 	void GoDown(ACheeseStrikePlayerState* By);
@@ -74,7 +77,7 @@ protected:
 	float ServerNow() const;
 	/** Whether the match has a last stand. */
 	bool HasLastStand() const;
-	/** Server: finishes it, as `By`'s kill (from `From`'s hand if they have one), or bleeds out. */
+	/** Server: finishes it, as `By`'s kill (from their hand if they have one; from nowhere with nobody). */
 	void Finish(ACheeseStrikePlayerState* By);
 	/** Server: what Interact does this frame. */
 	void DoWork(float DeltaTime);
@@ -84,8 +87,6 @@ protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_Downed)
 	bool bDowned = false;
-	UPROPERTY(Replicated)
-	float BleedOutAt = 0.0f;
 	UPROPERTY(Replicated)
 	TObjectPtr<ACheeseStrikeCharacter> WorkingOn;
 	UPROPERTY(Replicated)

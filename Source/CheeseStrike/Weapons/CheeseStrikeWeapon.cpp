@@ -30,6 +30,7 @@
 #include "CheeseStrikeInventory.h"
 #include "CheeseStrikeWeaponLooks.h"
 #include "Map/CheeseStrikeMouse.h"
+#include "Rules/CheeseStrikeModes.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 
 /** With this on, every shot heard here is written to the log with how loud and how dull it is heard. */
@@ -738,7 +739,7 @@ bool ACheeseStrikeWeapon::IsReady() const
 {
 	const float Now = ServerTime(GetWorld());
 	return bInHand && !IsDrawing() && !IsReloading() && BurstLeft <= 0
-		&& Now - LastShotAt >= CheeseStrikeWeapons::Cooldown(*Stats, LastInBurst) * 0.9f
+		&& Now - LastShotAt >= CheeseStrikeWeapons::Cooldown(FiringStats(), LastInBurst) * 0.9f
 		&& (Stats->IsMelee() || Magazine > 0);
 }
 
@@ -757,9 +758,19 @@ int32 ACheeseStrikeWeapon::NextShotIndex() const
 	return CheeseStrikeWeapons::NextInRun(*Stats, LastShotIndex, ServerTime(GetWorld()) - LastShotAt);
 }
 
+const FWeaponStats& ACheeseStrikeWeapon::FiringStats() const
+{
+	if (Holder != nullptr && Holder->IsDowned())
+	{
+		DownedStats = CheeseStrikeModes::DownedWeapon(*Stats);
+		return DownedStats;
+	}
+	return *Stats;
+}
+
 float ACheeseStrikeWeapon::CurrentSpread() const
 {
-	return CheeseStrikeWeapons::SpreadFor(*Stats, NextShotIndex(), bAimed) / 2.0f;
+	return CheeseStrikeWeapons::SpreadFor(FiringStats(), NextShotIndex(), bAimed) / 2.0f;
 }
 
 float ACheeseStrikeWeapon::SinceHit() const
@@ -782,7 +793,7 @@ void ACheeseStrikeWeapon::StartFiring()
 	FireOnce();
 	if (Stats->bAutomatic)
 	{
-		GetWorldTimerManager().SetTimer(FireTimer, this, &ACheeseStrikeWeapon::FireOnce, Stats->FireInterval, true);
+		GetWorldTimerManager().SetTimer(FireTimer, this, &ACheeseStrikeWeapon::FireOnce, FiringStats().FireInterval, true);
 	}
 	else if (IsDrawing() && bInHand)
 	{
@@ -816,7 +827,7 @@ void ACheeseStrikeWeapon::FireOnce()
 		return;
 	}
 	const float Now = ServerTime(GetWorld());
-	if (IsDrawing() || IsReloading() || BurstLeft > 0 || Now - LastShotAt < CheeseStrikeWeapons::Cooldown(*Stats, LastInBurst) * 0.9f)
+	if (IsDrawing() || IsReloading() || BurstLeft > 0 || Now - LastShotAt < CheeseStrikeWeapons::Cooldown(FiringStats(), LastInBurst) * 0.9f)
 	{
 		return;
 	}
@@ -904,7 +915,7 @@ bool ACheeseStrikeWeapon::ServerAllowsShot(float Now)
 		return false;
 	}
 	ServerShotTimes.RemoveAll([Now](float Time) { return Time < Now - 1.0f; });
-	const float Allowed = CheeseStrikeWeapons::ShotsPerSecond(*Stats) + RateBurst;
+	const float Allowed = CheeseStrikeWeapons::ShotsPerSecond(FiringStats()) + RateBurst;
 	if (ServerShotTimes.Num() >= Allowed || (Stats->UsesRounds() && Magazine <= 0) || IsReloading())
 	{
 		return false;
@@ -1002,7 +1013,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 	// Which ways it went: the shooter's aim, each pellet spread as the shooter's seed had it.
 	const int32 RunIndex = FMath::Max(0, Index);
 	FRandomStream Random(Seed);
-	const float Cone = CheeseStrikeWeapons::SpreadFor(*Stats, RunIndex, bWasAimed);
+	const float Cone = CheeseStrikeWeapons::SpreadFor(FiringStats(), RunIndex, bWasAimed);
 	struct FHurt
 	{
 		float Damage = 0.0f;
@@ -1018,7 +1029,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		if (Hit.Victim != nullptr)
 		{
 			FHurt& Theirs = Hurt.FindOrAdd(Hit.Victim);
-			Theirs.Damage += CheeseStrikeWeapons::DamageAt(*Stats, Hit.Distance, Hit.bHead);
+			Theirs.Damage += CheeseStrikeWeapons::DamageAt(FiringStats(), Hit.Distance, Hit.bHead);
 			Theirs.bHead |= Hit.bHead;
 			Theirs.Distance = Hit.Distance;
 			++Theirs.Pellets;
@@ -1026,7 +1037,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		else if (Hit.bWall && Hit.Wall.GetActor() != nullptr)
 		{
 			// Something of the arena's, or the template's, which takes the engine's damage.
-			const float Damage = CheeseStrikeWeapons::DamageAt(*Stats, Hit.Distance, false);
+			const float Damage = CheeseStrikeWeapons::DamageAt(FiringStats(), Hit.Distance, false);
 			UGameplayStatics::ApplyPointDamage(Hit.Wall.GetActor(), Damage, Direction, Hit.Wall, Holder->GetController(), this, nullptr);
 			if (Hit.Wall.GetActor()->IsA<APawn>() || Hit.Wall.GetActor()->IsA<ACheeseStrikeMouse>())
 			{

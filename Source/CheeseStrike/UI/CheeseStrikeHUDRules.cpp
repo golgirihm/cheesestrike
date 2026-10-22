@@ -230,11 +230,6 @@ namespace CheeseStrikeHUD
 		return bOut ? EStatus::Out : bDead ? EStatus::Respawning : bDown ? EStatus::Down : EStatus::Alive;
 	}
 
-	float BleedLeft(float Seconds, float Total)
-	{
-		return Total > 0.0f ? FMath::Clamp(Seconds / Total, 0.0f, 1.0f) : 0.0f;
-	}
-
 	int32 SecondsToComeBack(float RespawnDelay, float Now, float DiedAt)
 	{
 		// A joiner's idea of the server's time can lag the death it was told of: never more than the whole delay.

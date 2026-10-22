@@ -61,6 +61,8 @@ public:
 	void SetWeapon(FName Id);
 	FName GetWeaponId() const { return WeaponId; }
 	const FWeaponStats& GetStats() const { return *Stats; }
+	/** The numbers it fires by now: its own, or worse in the hand of someone down (CheeseStrikeModes::DownedWeapon). */
+	const FWeaponStats& FiringStats() const;
 	int32 GetMagazine() const { return Magazine; }
 	/** Rounds in reserve; below zero, there is no end to them. */
 	int32 GetReserve() const { return Reserve; }
@@ -221,6 +223,8 @@ protected:
 	FName WeaponId;
 	/** The weapon's numbers. */
 	const FWeaponStats* Stats = nullptr;
+	/** Its numbers as someone down fires it, made when asked for. */
+	mutable FWeaponStats DownedStats;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> FirstPersonMesh;

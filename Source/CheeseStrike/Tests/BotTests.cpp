@@ -210,6 +210,70 @@ bool FBotFiresInBurstsAndRests::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBotsKeepOutOfTheDownedsAim, "CheeseStrike.Bots.KeepOutOfTheDownedsAim", BotTests::Flags)
+
+bool FBotsKeepOutOfTheDownedsAim::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeBots;
+	// Someone down at the origin, facing +X: they aim within 45 degrees of it.
+	const FVector Downed(0.0f, 0.0f, 0.0f);
+	TestTrue(TEXT("straight ahead of them is in their aim"), InDownedAim(FVector(800, 0, 0), Downed, 0.0f));
+	TestFalse(TEXT("beside them isn't"), InDownedAim(FVector(0, 800, 0), Downed, 0.0f));
+	TestFalse(TEXT("nor behind their head"), InDownedAim(FVector(-800, 0, 0), Downed, 0.0f));
+	TestTrue(TEXT("the aim turns with the body"), InDownedAim(FVector(0, 800, 0), Downed, 90.0f));
+
+	// Out of their aim: straight in, to stand beside them on that side, out of it still.
+	const FVector Beside = FinishApproach(FVector(0, 1000, 0), Downed, 0.0f, 0.0f);
+	TestTrue(FString::Printf(TEXT("from the side, it goes to stand beside them (%s)"), *Beside.ToCompactString()), FVector::Dist2D(Beside, Downed) <= FlankStandOff + 1.0f && Beside.Y > 0.0f);
+	TestFalse(TEXT("out of their aim"), InDownedAim(Beside, Downed, 0.0f));
+
+	// In their aim, far off: never straight at them; round to the nearer edge, swerving from side to side.
+	const FVector Ahead(1000.0f, 150.0f, 0.0f);
+	const FVector ToThem = (Downed - Ahead).GetSafeNormal2D();
+	TArray<FVector> Steps;
+	for (float Time = 0.0f; Time < ZigzagPeriod; Time += ZigzagPeriod / 8.0f)
+	{
+		Steps.Add(FinishApproach(Ahead, Downed, 0.0f, Time));
+	}
+	bool bLeft = false;
+	bool bRight = false;
+	const FVector Straight = (FinishApproach(Ahead, Downed, 0.0f, 0.0f) + FinishApproach(Ahead, Downed, 0.0f, ZigzagPeriod * 0.75f)) / 2.0f - Ahead;
+	for (const FVector& Step : Steps)
+	{
+		const FVector Way = (Step - Ahead).GetSafeNormal2D();
+		const float Off = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(Way, ToThem)));
+		TestTrue(FString::Printf(TEXT("in their aim, it heads %.0f degrees off straight at them"), Off), Off > 8.0f);
+		TestTrue(TEXT("moving round toward its nearer edge, their left"), BearingFromDowned(Step, Downed, 0.0f) > BearingFromDowned(Ahead, Downed, 0.0f) + 2.0f);
+		const float Across = FVector::CrossProduct(Straight.GetSafeNormal2D(), Way).Z;
+		bLeft |= Across > 0.1f;
+		bRight |= Across < -0.1f;
+		TestTrue(TEXT("a step at a time"), FVector::Dist2D(Step, Ahead) < ZigzagStep + ZigzagWidth + 1.0f);
+	}
+	TestTrue(TEXT("swerving one way and the other as it goes"), bLeft && bRight);
+	// Going on, it leaves the aim well before it is near them, and comes to stand beside them.
+	FVector At = Ahead;
+	float Time = 0.0f;
+	float OutAt = -1.0f;
+	for (int32 Tick = 0; Tick < 300 && FVector::Dist2D(At, Downed) > FlankStandOff + 20.0f; ++Tick)
+	{
+		const FVector Toward = FinishApproach(At, Downed, 0.0f, Time) - At;
+		At += Toward.GetSafeNormal2D() * FMath::Min(40.0f, static_cast<float>(Toward.Size2D()));
+		Time += 0.1f;
+		if (InDownedAim(At, Downed, 0.0f))
+		{
+			TestTrue(FString::Printf(TEXT("never in their aim close up (%.0f cm off)"), FVector::Dist2D(At, Downed)), FVector::Dist2D(At, Downed) > 350.0f);
+		}
+		else if (OutAt < 0.0f)
+		{
+			OutAt = FVector::Dist2D(At, Downed);
+		}
+	}
+	TestTrue(FString::Printf(TEXT("out of their aim %.0f cm from them"), OutAt), OutAt > 350.0f);
+	TestTrue(FString::Printf(TEXT("and it gets to them in the end (%.0f cm off)"), FVector::Dist2D(At, Downed)), FVector::Dist2D(At, Downed) <= FlankStandOff + 25.0f);
+	TestFalse(TEXT("beside them"), InDownedAim(At, Downed, 0.0f));
+	return true;
+}
+
 #endif
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
@@ -224,6 +288,8 @@ bool FBotFiresInBurstsAndRests::RunTest(const FString& Parameters)
 #include "CheeseStrikePlayerState.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "PlayTesting.h"
+#include "Modes/CheeseStrikeLastStand.h"
+#include "Rules/CheeseStrikeModes.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -299,6 +365,114 @@ bool FABotNoticesAndShoots::RunTest(const FString& Parameters)
 			Shots += Weapon != nullptr ? Weapon->ShotsFired : 0;
 		}
 		TestTrue(FString::Printf(TEXT("its shots were the server's: fired (%d), and hit"), Shots), Shots > 0);
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FABotFinishesFromOutsideTheAim, "CheeseStrike.Play.ABotFinishesFromOutsideTheAim", BotTests::Flags)
+
+bool FABotFinishesFromOutsideTheAim::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace BotTests;
+	// Execution: the host and the second joiner on one side, the first joiner and a hard bot on the other.
+	static float InAimNear = 0.0f;
+	static float LastSample = -1.0f;
+	static float Nearest = 0.0f;
+	static float StartedInAim = 0.0f;
+	InAimNear = 0.0f;
+	LastSample = -1.0f;
+	Nearest = TNumericLimits<float>::Max();
+	StartedInAim = 0.0f;
+	// The level's long clear run (as ABotNoticesAndShoots), the others well away.
+	const FVector Down(1150.0f, -1450.0f, 100.0f);
+	constexpr float DownYaw = 117.0f;
+	StartPlaying({3, TEXT("?Mode=Execution?Rounds=1?Bots=1?BotSkill=2")});
+	WaitUntil(TEXT("a bot in the match"), 10.0f, []() { return Bots().Num() == 1 && BodyOf(Bots()[0]) != nullptr; });
+	WaitUntil(TEXT("the navigation mesh"), 15.0f, []()
+	{
+		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World(0));
+		FNavLocation Spot;
+		return Navigation != nullptr && Navigation->ProjectPointToNavigation(FVector(1150.0f, -1450.0f, 100.0f), Spot, FVector(100, 100, 300));
+	});
+	PutAt(0, Down, DownYaw);
+	PutAt(1, FVector(-231.0f, -700.0f, 100.0f), 90.0f);
+	PutAt(2, FVector(-231.0f, -300.0f, 100.0f), -90.0f);
+	Then([this, Down, DownYaw]()
+	{
+		ACheeseStrikeBotController* Bot = Bots()[0];
+		ACheeseStrikeCharacter* Body = BodyOf(Bot);
+		const ACheeseStrikePlayerState* Theirs = Bot->GetPlayerState<ACheeseStrikePlayerState>();
+		const ACheeseStrikePlayerState* Host = CharacterOf(0, 0)->GetPlayerState<ACheeseStrikePlayerState>();
+		TestTrue(TEXT("the bot is on the other side from the host"), Theirs != nullptr && Host != nullptr && Theirs->GetTeam() != Host->GetTeam());
+		// The bot 8 m straight down the host's aim, facing them.
+		Bot->StopMovement();
+		Body->GetMovementComponent()->StopMovementImmediately();
+		Body->SetActorLocation(Down + FRotator(0.0f, DownYaw, 0.0f).Vector() * 800.0f);
+		Bot->FaceTo(FRotator(0.0f, DownYaw + 180.0f, 0.0f));
+		Body->EndProtection();
+		CharacterOf(0, 0)->GetLastStand()->GoDown(Bot->GetPlayerState<ACheeseStrikePlayerState>());
+	});
+	// It comes to finish them, keeping out of their aim when it is near.
+	WaitUntil(TEXT("the bot finishing the host"), 25.0f, [Down]()
+	{
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		const ACheeseStrikeCharacter* Body = Bots().Num() > 0 ? BodyOf(Bots()[0]) : nullptr;
+		if (Host == nullptr || !Host->IsAlive())
+		{
+			return true;
+		}
+		const float Time = Now(0);
+		if (Body != nullptr && Host->IsDowned() && LastSample >= 0.0f)
+		{
+			const float Apart = FVector::Dist2D(Body->GetActorLocation(), Host->GetActorLocation());
+			const bool bInAim = CheeseStrikeBots::InDownedAim(Body->GetActorLocation(), Host->GetActorLocation(), Host->GetActorRotation().Yaw);
+			Nearest = FMath::Min(Nearest, Apart);
+			if (bInAim && Apart < 400.0f)
+			{
+				InAimNear += Time - LastSample;
+			}
+			if (bInAim && Apart > 600.0f)
+			{
+				StartedInAim += Time - LastSample;
+			}
+		}
+		LastSample = Time;
+		return false;
+	});
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		ACheeseStrikeBotController* Bot = Bots()[0];
+		AddInfo(FString::Printf(TEXT("bot %s, %s; host at %s"), *BodyOf(Bot)->GetActorLocation().ToCompactString(), Bot->Doing(), *Host->GetActorLocation().ToCompactString()));
+		TestFalse(TEXT("the host is finished"), Host->IsAlive());
+		TestEqual(TEXT("by the bot"), Host->GetKilledBy(), BodyOf(Bot)->DisplayName());
+		TestTrue(FString::Printf(TEXT("it came close (%.0f cm)"), Nearest), Nearest <= CheeseStrikeModes::FinishRange);
+		TestTrue(FString::Printf(TEXT("from outside the host's aim: %.2f s in it within 4 m"), InAimNear), InAimNear < 0.5f);
+	});
+	// Its own teammate (whichever joiner is on its side) goes down a few metres off: it goes and revives them.
+	static int32 Mate = 1;
+	Then([this, Down]()
+	{
+		const ACheeseStrikePlayerState* Theirs = Bots()[0]->GetPlayerState<ACheeseStrikePlayerState>();
+		Mate = CharacterOf(1, 0)->GetPlayerState<ACheeseStrikePlayerState>()->GetTeam() == Theirs->GetTeam() ? 1 : 2;
+		TestEqual(TEXT("one joiner is on the bot's side"), CharacterOf(Mate, 0)->GetPlayerState<ACheeseStrikePlayerState>()->GetTeam(), Theirs->GetTeam());
+		CharacterOf(Mate, 0)->SetActorLocation(Down + FRotator(0.0f, DownYaw, 0.0f).Vector() * 600.0f);
+	});
+	Wait(0.5f);
+	Then([this]()
+	{
+		CharacterOf(Mate, 0)->GetLastStand()->GoDown(nullptr);
+	});
+	WaitUntil(TEXT("the bot reviving its teammate"), 15.0f, []()
+	{
+		const ACheeseStrikeCharacter* Lying = CharacterOf(Mate, 0);
+		return Lying != nullptr && Lying->IsAlive() && !Lying->IsDowned();
+	});
+	Then([this]()
+	{
+		TestEqual(TEXT("revived, with the revived's health"), CharacterOf(Mate, 0)->GetHealth(), CheeseStrikeModes::ReviveHealth);
 	});
 	StopPlaying();
 	return true;

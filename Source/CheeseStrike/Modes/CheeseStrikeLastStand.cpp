@@ -26,7 +26,6 @@ void UCheeseStrikeLastStand::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UCheeseStrikeLastStand, bDowned);
-	DOREPLIFETIME(UCheeseStrikeLastStand, BleedOutAt);
 	DOREPLIFETIME(UCheeseStrikeLastStand, WorkingOn);
 	DOREPLIFETIME(UCheeseStrikeLastStand, Work);
 	DOREPLIFETIME(UCheeseStrikeLastStand, WorkStartedAt);
@@ -47,11 +46,6 @@ bool UCheeseStrikeLastStand::HasLastStand() const
 {
 	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
 	return Match != nullptr && Match->GetModeInfo().bLastStand;
-}
-
-float UCheeseStrikeLastStand::SecondsToBleedOut() const
-{
-	return bDowned ? FMath::Max(0.0f, BleedOutAt - ServerNow()) : 0.0f;
 }
 
 float UCheeseStrikeLastStand::WorkDone() const
@@ -145,7 +139,6 @@ void UCheeseStrikeLastStand::GoDown(ACheeseStrikePlayerState* By)
 	bDowned = true;
 	bUsed = true;
 	DownedBy = By;
-	BleedOutAt = ServerNow() + CheeseStrikeModes::LastStandTime;
 	bInteractHeld = false;
 	StopWork();
 	// Only the sidearm, in hand at once.
@@ -156,7 +149,7 @@ void UCheeseStrikeLastStand::GoDown(ACheeseStrikePlayerState* By)
 	KeepDown();
 	// Falling back from whatever is just ahead, so that the legs lie out on the floor.
 	Me->MakeRoomToLieDown();
-	UE_LOG(LogCheeseStrike, Display, TEXT("%s is down, by %s; bleeds out in %.0f s"), *Me->DisplayName(), By != nullptr ? *By->GetPlayerName() : TEXT("nobody"), CheeseStrikeModes::LastStandTime);
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s is down, by %s"), *Me->DisplayName(), By != nullptr ? *By->GetPlayerName() : TEXT("nobody"));
 	if (ACheeseStrikeGameMode* Mode = GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>())
 	{
 		Mode->Downed(Me, By);
@@ -171,7 +164,6 @@ void UCheeseStrikeLastStand::Revive()
 		return;
 	}
 	bDowned = false;
-	BleedOutAt = 0.0f;
 	DownedBy = nullptr;
 	Me->SetHealth(CheeseStrikeModes::ReviveHealth);
 	if (UCheeseStrikeInventory* Inventory = Me->GetInventory())
@@ -180,6 +172,18 @@ void UCheeseStrikeLastStand::Revive()
 	}
 	OnRep_Downed();
 	UE_LOG(LogCheeseStrike, Display, TEXT("%s is back up"), *Me->DisplayName());
+}
+
+void UCheeseStrikeLastStand::GiveUp()
+{
+	const ACheeseStrikeCharacter* Me = Body();
+	if (Me == nullptr || !Me->HasAuthority() || !bDowned || !Me->IsAlive())
+	{
+		return;
+	}
+	ACheeseStrikePlayerState* By = DownedBy.Get();
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s has nobody up to revive them: finished, as %s's kill"), *Me->DisplayName(), By != nullptr ? *By->GetPlayerName() : TEXT("nobody"));
+	Finish(By);
 }
 
 void UCheeseStrikeLastStand::Finish(ACheeseStrikePlayerState* By)
@@ -340,12 +344,6 @@ void UCheeseStrikeLastStand::TickComponent(float DeltaTime, ELevelTick TickType,
 	if (bDowned && !Me->IsAlive())
 	{
 		bDowned = false;
-	}
-	if (bDowned && ServerNow() >= BleedOutAt)
-	{
-		UE_LOG(LogCheeseStrike, Display, TEXT("%s bleeds out"), *Me->DisplayName());
-		Finish(DownedBy.Get());
-		return;
 	}
 	if (bInteractHeld && Me->CanAct() && !bDowned)
 	{

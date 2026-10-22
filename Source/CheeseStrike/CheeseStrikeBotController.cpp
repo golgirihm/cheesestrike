@@ -73,6 +73,10 @@ const TCHAR* ACheeseStrikeBotController::Doing() const
 	{
 		return TEXT("fighting");
 	}
+	if (bTending)
+	{
+		return bInteracting ? TEXT("reviving or finishing") : TEXT("going to someone down");
+	}
 	return bSearching ? TEXT("searching") : TEXT("roaming");
 }
 
@@ -157,6 +161,7 @@ void ACheeseStrikeBotController::ForgetAll()
 	Bursts = CheeseStrikeBots::FBursts();
 	bTriggerHeld = false;
 	MovedAt = Now();
+	MovedFrom = Body() != nullptr ? Body()->GetActorLocation() : FVector::ZeroVector;
 	Wobble = FMath::FRandRange(0.0f, 2.0f * PI);
 }
 
@@ -346,9 +351,22 @@ bool ACheeseStrikeBotController::ThinkAboutTheDown()
 	{
 		return false;
 	}
-	if (!bGoing || FVector::Dist(Goal, Nearest->GetActorLocation()) > 100.0f)
+	// A teammate: straight to them. An enemy, who may still shoot: from outside their aim, swerving while in it.
+	FVector Where = Nearest->GetActorLocation();
+	bool bInAim = false;
+	if (IsEnemy(Nearest))
 	{
-		GoTo(Nearest->GetActorLocation(), false);
+		const float Yaw = Nearest->GetActorRotation().Yaw;
+		bInAim = CheeseStrikeBots::InDownedAim(Me->GetActorLocation(), Where, Yaw, CheeseStrikeBots::FlankMargin);
+		Where = CheeseStrikeBots::FinishApproach(Me->GetActorLocation(), Where, Yaw, Now(), FlankSide);
+	}
+	if (!bGoing || FVector::Dist(Goal, Where) > 100.0f)
+	{
+		// Somewhere it can't get to: straight to them after all.
+		if (!GoTo(Where, bInAim, true))
+		{
+			GoTo(Nearest->GetActorLocation(), false);
+		}
 	}
 	return true;
 }
@@ -421,8 +439,9 @@ void ACheeseStrikeBotController::Perceive()
 		}
 		const FVector ToOther = Other->GetEyes()->GetComponentLocation() - Eyes;
 		const float Distance = ToOther.Size();
-		// Someone down can be harmed only up close: no use shooting them from further (ThinkAboutTheDown goes to them).
-		if (Other->IsDowned() && Distance > CheeseStrikeModes::FinishRange)
+		// Someone down is no one to fight: harmed only up close, they are finished by hand (ThinkAboutTheDown goes to them
+		// from outside their aim and holds Interact over them), not shot at from wherever it stands.
+		if (Other->IsDowned())
 		{
 			continue;
 		}
@@ -496,7 +515,7 @@ void ACheeseStrikeBotController::Perceive()
 	}
 }
 
-bool ACheeseStrikeBotController::GoTo(const FVector& Where, bool bSprint)
+bool ACheeseStrikeBotController::GoTo(const FVector& Where, bool bSprint, bool bRightThere)
 {
 	ACheeseStrikeCharacter* Me = Body();
 	if (Me == nullptr)
@@ -504,7 +523,7 @@ bool ACheeseStrikeBotController::GoTo(const FVector& Where, bool bSprint)
 		return false;
 	}
 	// The view is its own, turned by the bot: the path only moves the feet.
-	const EPathFollowingRequestResult::Type Result = MoveToLocation(Where, GoalReached * 0.5f, true, true, true, true);
+	const EPathFollowingRequestResult::Type Result = MoveToLocation(Where, bRightThere ? 10.0f : GoalReached * 0.5f, !bRightThere, true, true, true);
 	if (Result == EPathFollowingRequestResult::Failed)
 	{
 		return false;
@@ -530,10 +549,11 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 	{
 		bGoing = false;
 	}
-	// Stuck: going somewhere and getting nowhere. A jump, and somewhere else.
-	if (!bGoing || Me->GetVelocity().Size2D() > ProgressSpeed)
+	// Stuck: going somewhere and getting nowhere (by where it is, not its velocity, which runs on into a wall). A jump, and somewhere else.
+	if (!bGoing || FVector::Dist2D(Here, MovedFrom) > ProgressSpeed * CheeseStrikeBots::StuckTime * 0.5f)
 	{
 		MovedAt = Time;
+		MovedFrom = Here;
 	}
 	else if (Time - MovedAt > CheeseStrikeBots::StuckTime)
 	{
@@ -544,6 +564,12 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 		bSearching = false;
 		bRetreating = false;
 		MovedAt = Time;
+		// Tending someone down: the other way round to them for a while (ThinkAboutTheDown), rather than off elsewhere.
+		if (bTending)
+		{
+			FlankSide = -FlankSide;
+			return;
+		}
 		FVector Elsewhere;
 		if (PickRoamGoal(Elsewhere))
 		{
