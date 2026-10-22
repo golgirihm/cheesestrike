@@ -71,6 +71,9 @@ public:
 	/** From the host's console or a play script: gives a streak (1 the Unmanned Aerial Cheese, 2 the Cheese Strike, 3 the Gouda Overload) to the host, to the player or bot named, or to an enemy of the host's ("enemy"). */
 	UFUNCTION(Exec)
 	void CheeseStrikeGiveStreak(int32 Kind, const FString& Player = TEXT(""));
+	/** From the host's console or a play script, in a mode with a last stand (not in shipping builds): puts down the host, the player or bot named, or the first of the host's enemies or teammates ("enemy", "mate"), as if hurt enough by nobody. */
+	UFUNCTION(Exec)
+	void CheeseStrikeDown(const FString& Player = TEXT(""));
 	/** In Elimination a newcomer comes in only at a round's start; later, they are out until the next. */
 	virtual bool PlayerCanRestart_Implementation(APlayerController* Player) override;
 	/** Someone leaving may end a round of Elimination. */

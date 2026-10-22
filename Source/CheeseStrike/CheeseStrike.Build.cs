@@ -21,7 +21,8 @@ public class CheeseStrike : ModuleRules
 			"UMG",
 			"Slate",
 			"SlateCore",
-			"AnimGraphRuntime"
+			"AnimGraphRuntime",
+			"AnimationCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "EngineSettings", "AssetRegistry", "OnlineBase", "OnlineSubsystem", "OnlineSubsystemUtils", "AudioExtensions", "CoreOnline", "RenderCore", "RHI" });

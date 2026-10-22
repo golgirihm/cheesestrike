@@ -48,6 +48,7 @@ static TAutoConsoleVariable<int32> CVarHipHold(TEXT("CheeseStrike.HipHold"), 1, 
 static TAutoConsoleVariable<int32> CVarTraceState(TEXT("CheeseStrike.TraceState"), 0, TEXT("Log each character's state four times a second."));
 
 const FVector ACheeseStrikeCharacter::DefaultCameraAtHead(-2.8f, 5.89f, 0.0f);
+const FVector ACheeseStrikeCharacter::DownHandDrop(2.0f, 3.0f, -5.0f);
 const FVector ACheeseStrikeCharacter::CameraFromEyes(-7.8f, -1.0f, 0.0f);
 
 namespace
@@ -773,7 +774,9 @@ void ACheeseStrikeCharacter::BringRifleToEye(float DeltaSeconds)
 		const FQuat Turn = View.Quaternion() * FQuat(Axis, FMath::Min(Angle, FMath::DegreesToRadians(MostHipTurn))) * View.Quaternion().Inverse();
 		Hip.SetRotation(Turn * Hip.GetRotation());
 		Hip.SetLocation(Hand + Turn.RotateVector(Hip.GetLocation() - Hand));
-		const FVector Shift = (CheeseStrikeWeaponLooks::HipHand(Held->GetHold()) - HandInView).GetClampedToMaxSize(MostHipShift);
+		// Down, the pistol is held lower and wider, hanging in the one hand, for a view that isn't all pistol.
+		DownInView = FMath::FInterpTo(DownInView, IsDowned() ? 1.0f : 0.0f, DeltaSeconds, 4.0f);
+		const FVector Shift = (CheeseStrikeWeaponLooks::HipHand(Held->GetHold()) + DownHandDrop * DownInView - HandInView).GetClampedToMaxSize(MostHipShift);
 		Hip.AddToTranslation(View.RotateVector(Shift));
 	}
 	// A weapon just drawn comes up from below the view, the arms with it, the eye staying where it is.

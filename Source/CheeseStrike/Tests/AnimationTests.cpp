@@ -168,6 +168,10 @@ bool FEveryBodyIsComplete::RunTest(const FString& Parameters)
 		FName Left;
 		FName Right;
 		TestTrue(TEXT("eyes for the camera"), ACheeseStrikeCharacter::FindEyes(Mesh, Left, Right));
+		for (const TCHAR* Bone : CheeseStrikeDowned::PoseBones)
+		{
+			TestTrue(FString::Printf(TEXT("%s has %s, for the pose of a player down"), Body.Name, Bone), Mesh->GetRefSkeleton().FindBoneIndex(FName(Bone)) != INDEX_NONE);
+		}
 		TestTrue(TEXT("its own ragdoll"), Mesh->GetPhysicsAsset() != nullptr && Mesh->GetPhysicsAsset()->GetName().EndsWith(TEXT("_Ragdoll")));
 		for (int32 Slot = 0; Slot < Body.NumWeaponSlots; ++Slot)
 		{
@@ -271,3 +275,24 @@ bool FTheRagdollBendsAsABodyDoes::RunTest(const FString& Parameters)
 }
 
 #endif
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FADownedPlayerBreathesHard, "CheeseStrike.Animation.ADownedPlayerBreathesHard", AnimationTests::Flags)
+
+bool FADownedPlayerBreathesHard::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeDowned;
+	TestTrue(TEXT("a breath starts let out"), FMath::IsNearlyEqual(Breath(0.0f), -1.0f, 1.0e-3f));
+	TestTrue(TEXT("and is drawn in by a third of the way"), FMath::IsNearlyEqual(Breath(UE_TWO_PI * 0.35f), 1.0f, 1.0e-3f));
+	TestTrue(TEXT("let out slowly"), Breath(UE_TWO_PI * 0.6f) > 0.0f && Breath(UE_TWO_PI * 0.9f) < 0.0f);
+	TestTrue(TEXT("and comes round again"), FMath::IsNearlyEqual(Breath(UE_TWO_PI * 3.2f), Breath(UE_TWO_PI * 0.2f), 1.0e-3f));
+	float Lowest = 1.0f;
+	float Highest = -1.0f;
+	for (float Phase = -10.0f; Phase < 30.0f; Phase += 0.05f)
+	{
+		Lowest = FMath::Min(Lowest, Breath(Phase));
+		Highest = FMath::Max(Highest, Breath(Phase));
+	}
+	TestTrue(TEXT("never past a whole breath"), Lowest >= -1.0f - 1.0e-4f && Highest <= 1.0f + 1.0e-4f);
+	TestTrue(TEXT("a laboured breath: quicker than a resting one, slower than panting"), BreathsPerMinute > 16.0f && BreathsPerMinute < 40.0f);
+	return true;
+}

@@ -210,6 +210,12 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		bFalling = Character->GetCharacterMovement() != nullptr && Character->GetCharacterMovement()->IsFalling();
 		const ACheeseStrikeWeapon* Weapon = Character->GetWeapon();
 		bAiming = Weapon != nullptr && Weapon->IsAimed();
+		bDowned = Character->IsAlive() && Character->IsDowned();
+		// Both bodies, the one others see and its player's own, are animated in the frame of the first, turned to face the capsule's front.
+		if (const USkeletalMeshComponent* Main = Character->GetMesh())
+		{
+			BodyForward = Main->GetRelativeRotation().UnrotateVector(FVector::ForwardVector);
+		}
 		Hold = Weapon != nullptr ? Weapon->GetHold() : ECheeseStrikeHold::Rifle;
 		LeftHandShift = Weapon != nullptr ? Weapon->LeftHandShiftFor(GetSkelMeshComponent()) : FVector::ZeroVector;
 	}
@@ -305,7 +311,9 @@ void FCheeseStrikeAnimProxy::Link(FName GripAnchor)
 	LeftHand.Alpha = 1.0f;
 	ToComponentSpace.LocalPose.SetLinkNode(&Guarded);
 	LeftHand.ComponentPose.SetLinkNode(&ToComponentSpace);
-	ToLocalSpace.ComponentPose.SetLinkNode(&LeftHand);
+	// Last, down: kneeling, hunched over, the left hand off the grip and on the belly.
+	Downed.ComponentPose.SetLinkNode(&LeftHand);
+	ToLocalSpace.ComponentPose.SetLinkNode(&Downed);
 	bLinked = true;
 }
 
@@ -362,6 +370,8 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		bCrouched = Instance->bCrouched;
 		bFalling = Instance->bFalling;
 		bAiming = Instance->bAiming;
+		bDowned = Instance->bDowned;
+		BodyForward = Instance->BodyForward;
 		Hold = Instance->Hold;
 		LeftHandShift = Instance->LeftHandShift;
 		// A change of weapon to one held another way: its animations on the same nodes, and the left hand's grip on it
@@ -429,6 +439,18 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	}
 	LeftHand.Alpha = bGripPending ? 0.0f : SourceWeight * (1.0f - GuardBlend);
 	LeftHand.Shift = LeftHandShift;
+
+	// Going down and getting up take a moment each, eased at both ends; the legs creep with the crouched walk while
+	// moving and kneel while still; the breath comes hard, all the while (so that it doesn't start from nothing).
+	DownLinear = FMath::FInterpConstantTo(DownLinear, bDowned ? 1.0f : 0.0f, DeltaSeconds, 1.0f / CheeseStrikeDowned::Seconds);
+	KneelBlend = FMath::FInterpTo(KneelBlend, 1.0f - MovingWeight(Speed), DeltaSeconds, CheeseStrikeDowned::KneelRate);
+	BreathPhase = FMath::Fmod(BreathPhase + DeltaSeconds * UE_TWO_PI * CheeseStrikeDowned::BreathsPerMinute / 60.0f, UE_TWO_PI * 100.0f);
+	Downed.Alpha = FMath::SmoothStep(0.0f, 1.0f, DownLinear);
+	Downed.Kneel = KneelBlend;
+	Downed.Breath = CheeseStrikeDowned::Breath(BreathPhase);
+	// A montage (the reload) takes the left hand off the belly, as it does off the grip.
+	Downed.HandOnWound = SourceWeight;
+	Downed.Forward = BodyForward;
 }
 
 void FCheeseStrikeAnimProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)

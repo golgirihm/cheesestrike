@@ -294,6 +294,9 @@ protected:
 	static constexpr float MostHipShift = 25.0f;
 	/** And turned, about the hand (degrees). */
 	static constexpr float MostHipTurn = 20.0f;
+	/** Down in Execution's last stand, the sidearm is held this much lower and further out in view (forward, right, up; cm), eased in and out by DownInView. */
+	static const FVector DownHandDrop;
+	float DownInView = 0.0f;
 	/** Where the camera sits in the first-person body's head bone: just under its eyes (from the body's eye bones), or where the template had it on the mannequin. */
 	FVector CameraAtHead = DefaultCameraAtHead;
 	static const FVector DefaultCameraAtHead;
