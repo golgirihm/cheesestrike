@@ -186,7 +186,7 @@ bool ACheeseStrikeBotController::CanSeeInto(const ACheeseStrikeCharacter* Other)
 	}
 	const FVector From = EyesAt();
 	FHitResult Hit;
-	for (const FVector& To : {Other->GetEyes()->GetComponentLocation(), Other->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f)})
+	for (const FVector& To : {Other->GetEyes()->GetComponentLocation(), Other->ChestAt()})
 	{
 		if (!World->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params))
 		{
@@ -355,12 +355,24 @@ bool ACheeseStrikeBotController::ThinkAboutTheDown()
 
 void ACheeseStrikeBotController::Think()
 {
+	ACheeseStrikeCharacter* Me = Body();
 	Perceive();
 	bTending = ThinkAboutTheDown();
-	ChooseWhereToGo();
+	// Down, it stays where it lies and fights from there, turning round as its view takes it (its feet are no use for paths).
+	if (Me != nullptr && Me->IsDowned())
+	{
+		if (bGoing)
+		{
+			StopMovement();
+			bGoing = false;
+		}
+	}
+	else
+	{
+		ChooseWhereToGo();
+	}
 	ChooseWeapon();
 	ThinkAboutStreaks();
-	ACheeseStrikeCharacter* Me = Body();
 	ACheeseStrikeWeapon* Weapon = Me != nullptr ? Me->GetWeapon() : nullptr;
 	if (Weapon == nullptr)
 	{
@@ -709,7 +721,7 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 	if (bSeesTarget && Target.IsValid() && Target->IsAlive())
 	{
 		// At their chest, off by the error its tracking has steadied to, the error drifting round.
-		const FVector Chest = Target->GetActorLocation() + FVector(0.0f, 0.0f, 20.0f);
+		const FVector Chest = Target->ChestAt();
 		const FRotator Straight = (Chest - Eyes).Rotation();
 		const float Tracking = Time - TrackingSince;
 		const float Error = CheeseStrikeBots::AimError(Skill, Tracking);
@@ -799,7 +811,7 @@ void ACheeseStrikeBotController::ChooseWeapon()
 void ACheeseStrikeBotController::Step(float DeltaSeconds)
 {
 	ACheeseStrikeCharacter* Me = Body();
-	if (Me == nullptr || !bSeesTarget || !Target.IsValid() || bGoing)
+	if (Me == nullptr || !bSeesTarget || !Target.IsValid() || bGoing || Me->IsDowned())
 	{
 		return;
 	}

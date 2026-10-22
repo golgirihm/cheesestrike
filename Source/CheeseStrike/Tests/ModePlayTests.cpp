@@ -21,6 +21,7 @@
 #include "Streaks/CheeseStrikeAerialCheese.h"
 #include "Streaks/CheeseStrikeBombs.h"
 #include "Modes/CheeseStrikeLastStand.h"
+#include "Rules/CheeseStrikeDowned.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Camera/CameraComponent.h"
@@ -111,14 +112,21 @@ namespace ModePlayTests
 		return Character->GetMesh()->GetBoneLocation(FName(Bone)).Z - Feet;
 	}
 
+	/** Where a bone of the body others see is, in the body's frame (ahead, right, up from the capsule's axis on the floor), on the machine it is seen on. */
+	FVector BoneInBody(const ACheeseStrikeCharacter* Character, const TCHAR* Bone)
+	{
+		return Character->DownBodyFrame(Character->GetMesh()->GetBoneLocation(FName(Bone)));
+	}
+
 	/** How high its own player's view is above its feet. */
 	float ViewHeight(const ACheeseStrikeCharacter* Character)
 	{
 		return Character->GetFirstPersonCameraComponent()->GetComponentLocation().Z - (Character->GetActorLocation().Z - Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 	}
 
-	/** The host's pelvis, down, as each machine had it. */
+	/** The host's pelvis, down, as each machine had it, and the way its body faced down. */
 	float DownPelvis[3] = {};
+	float DownYaw = 0.0f;
 	int32 ShotsBefore = 0;
 }
 
@@ -388,7 +396,8 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Host = Character(0);
-		// Down looks it, on every machine: on one knee, lower than crouching, hunched, the pistol out, and the row says so.
+		// Down looks it, on every machine: on the back, the hips on the floor, the legs out ahead along it, propped on the
+		// left elbow with the head raised over the chest, the pistol held out ahead, and the row says so.
 		for (int32 Seen = 0; Seen < 3; ++Seen)
 		{
 			const ACheeseStrikeCharacter* Down = CharacterOf(0, Seen);
@@ -403,24 +412,73 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 			const float Pelvis = BoneHeight(Down, TEXT("pelvis"));
 			const float Crouched = BoneHeight(Crouching, TEXT("pelvis"));
 			TestTrue(FString::Printf(TEXT("the teammate crouches, as player %d sees it"), Seen), Crouching->bIsCrouched);
-			TestTrue(FString::Printf(TEXT("the pelvis down (%.0f cm) is well under a crouching one's (%.0f cm), as player %d sees it"), Pelvis, Crouched, Seen), Pelvis < Crouched - 8.0f);
-			TestTrue(FString::Printf(TEXT("the head down (%.0f cm) is under a crouching one's (%.0f cm), as player %d sees it"), BoneHeight(Down, TEXT("head")), BoneHeight(Crouching, TEXT("head")), Seen),
-				BoneHeight(Down, TEXT("head")) < BoneHeight(Crouching, TEXT("head")) - 5.0f);
-			TestTrue(FString::Printf(TEXT("the right knee on the ground (%.0f cm), as player %d sees it"), BoneHeight(Down, TEXT("calf_r")), Seen), BoneHeight(Down, TEXT("calf_r")) < 18.0f);
-			TestTrue(FString::Printf(TEXT("the left knee up (%.0f cm), as player %d sees it"), BoneHeight(Down, TEXT("calf_l")), Seen), BoneHeight(Down, TEXT("calf_l")) > 35.0f);
-			TestTrue(FString::Printf(TEXT("both feet on the ground, not under it, as player %d sees it"), Seen), BoneHeight(Down, TEXT("foot_l")) > 0.0f && BoneHeight(Down, TEXT("foot_r")) > 0.0f);
+			TestTrue(FString::Printf(TEXT("the pelvis on the floor (%.0f cm), far under a crouching one's (%.0f cm), as player %d sees it"), Pelvis, Crouched, Seen), Pelvis < 22.0f && Pelvis < Crouched - 25.0f);
+			const FVector Hips = BoneInBody(Down, TEXT("pelvis"));
+			const FVector Chest = BoneInBody(Down, TEXT("spine_03"));
+			const FVector Head = BoneInBody(Down, TEXT("head"));
+			for (const TCHAR* Foot : {TEXT("foot_l"), TEXT("foot_r")})
+			{
+				const FVector At = BoneInBody(Down, Foot);
+				TestTrue(FString::Printf(TEXT("%s out ahead of the hips (%.0f cm) on the floor (%.0f cm), as player %d sees it"), Foot, At.X - Hips.X, At.Z, Seen), At.X - Hips.X > 60.0f && At.Z > 0.0f && At.Z < 20.0f);
+			}
+			TestTrue(FString::Printf(TEXT("the body lies along the floor: the head %.0f cm behind the feet, as player %d sees it"), BoneInBody(Down, TEXT("foot_r")).X - Head.X, Seen), BoneInBody(Down, TEXT("foot_r")).X - Head.X > 90.0f);
+			TestTrue(FString::Printf(TEXT("the head raised (%.0f cm) over the chest (%.0f cm), as player %d sees it"), Head.Z, Chest.Z, Seen), Head.Z > Chest.Z + 10.0f && Head.Z > 30.0f && Head.Z < 65.0f);
+			TestTrue(FString::Printf(TEXT("propped on the left elbow (%.0f cm off the floor), as player %d sees it"), BoneInBody(Down, TEXT("lowerarm_l")).Z, Seen), BoneInBody(Down, TEXT("lowerarm_l")).Z < 18.0f);
+			const FVector Hand = BoneInBody(Down, TEXT("hand_r"));
+			TestTrue(FString::Printf(TEXT("the pistol held out ahead of the chest (%.0f cm) and up (%.0f cm), as player %d sees it"), Hand.X - Chest.X, Hand.Z, Seen), Hand.X - Chest.X > 15.0f && Hand.Z > 20.0f);
 			DownPelvis[Seen] = Pelvis;
 			const ACheeseStrikePlayerState* Player = StateOf(0, Seen);
 			TestEqual(FString::Printf(TEXT("the row shows the host down, as player %d sees it"), Seen), ACheeseStrikeHUD::StatusOf(Player, ACheeseStrikeHUD::BodyOf(Player)), CheeseStrikeHUD::EStatus::Down);
 		}
-		// The host's own view sits low too, under the crouching teammate's own.
-		TestTrue(FString::Printf(TEXT("the host's view (%.0f cm) is under a crouching player's (%.0f cm)"), ViewHeight(Host), ViewHeight(Character(2))), ViewHeight(Host) < ViewHeight(Character(2)) - 8.0f);
+		// The server finds the head and the body where they lie: the eyes at the raised head, shots at the bones.
+		const ACheeseStrikeCharacter* OnServer = CharacterOf(0, 0);
+		const float EyesOff = FVector::Dist(OnServer->GetEyes()->GetComponentLocation(), OnServer->GetMesh()->GetBoneLocation(TEXT("head")));
+		TestTrue(FString::Printf(TEXT("the eyes are at the head (%.0f cm off)"), EyesOff), EyesOff < 18.0f);
+		const FHitHistory::FSample Lying = OnServer->SampleNow(0.0f);
+		TestTrue(TEXT("shots take the body to be lying"), Lying.bLying);
+		for (const TCHAR* Bone : {TEXT("pelvis"), TEXT("spine_02"), TEXT("calf_r"), TEXT("foot_l")})
+		{
+			const FVector Target = OnServer->GetMesh()->GetBoneLocation(FName(Bone));
+			const FVector From = Target + FVector(0.0f, 0.0f, 25.0f) + OnServer->GetActorRightVector() * 400.0f;
+			TestTrue(FString::Printf(TEXT("a shot from the side at its %s hits it"), Bone), FHitHistory::RayHitsBody(From, (Target - From).GetSafeNormal(), Lying) > 0.0f);
+		}
+		const FVector Standing = OnServer->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+		TestEqual(TEXT("but a shot where a standing chest would be misses"), FHitHistory::RayHitsBody(Standing + OnServer->GetActorRightVector() * 400.0f, -OnServer->GetActorRightVector(), Lying), -1.0f);
+		// The host's own view sits low too, about 40 cm up, under the crouching teammate's own.
+		TestTrue(FString::Printf(TEXT("the host's view (%.0f cm) is low, under a crouching player's (%.0f cm)"), ViewHeight(Host), ViewHeight(Character(2))), ViewHeight(Host) < ViewHeight(Character(2)) - 30.0f && ViewHeight(Host) > 28.0f && ViewHeight(Host) < 52.0f);
 		TestEqual(TEXT("with only the pistol in hand"), HeldId(Host), CheeseStrikeWeapons::Pistol().Id);
 		TestFalse(TEXT("the rifle put away for good"), Host->GetInventory()->CanDraw(EWeaponSlot::Primary));
 		TestTrue(TEXT("crouched"), Host->bIsCrouched);
 		TestTrue(TEXT("the host's machine knows it is down"), Host->IsDowned());
 		Remembered = Character(0);
+		DownYaw = Host->GetActorRotation().Yaw;
 	});
+	// The host looks far aside and down: the view stays in the cone toward the feet, and the body only begins to turn.
+	Play(0, TEXT("look 100 0\nlook 0 -70\nwait 0.2"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		const FRotator View = Host->GetControlRotation();
+		const float Off = FRotator::NormalizeAxis(View.Yaw - Host->GetActorRotation().Yaw);
+		TestTrue(FString::Printf(TEXT("the view (%.1f off the body, pitch %.1f) is kept to the cone"), Off, FRotator::NormalizeAxis(View.Pitch)), CheeseStrikeDowned::InCone(View, Host->GetActorRotation().Yaw, 1.0f));
+		TestTrue(TEXT("at its lowest"), FMath::IsNearlyEqual(FRotator::NormalizeAxis(View.Pitch), CheeseStrikeDowned::LowestPitch, 1.0f));
+		const float Turned = FMath::Abs(FRotator::NormalizeAxis(Host->GetActorRotation().Yaw - DownYaw));
+		TestTrue(FString::Printf(TEXT("the body turns after it, slowly (%.1f degrees)"), Turned), Turned > 1.0f && Turned < 25.0f);
+		// The others see it aim where it does.
+		const ACheeseStrikeCharacter* Seen = CharacterOf(0, 1);
+		TestTrue(FString::Printf(TEXT("a joiner sees the host aim aside (%.0f)"), Seen != nullptr ? Seen->GetDownAimYaw() : 0.0f), Seen != nullptr && Seen->GetDownAimYaw() > 20.0f);
+	});
+	// It scoots on its back, toward its head, slowly.
+	Play(0, TEXT("look -100 70\nhold Move 0 -1\nwait 1.0"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		const float Speed = Host->GetVelocity().Size2D();
+		TestTrue(FString::Printf(TEXT("scooting at %.0f cm/s, a scoot's speed"), Speed), Speed > CheeseStrikeDowned::ScootSpeed * 0.6f && Speed < CheeseStrikeDowned::ScootSpeed + 2.0f);
+		TestTrue(TEXT("toward the head"), FVector::DotProduct(Host->GetVelocity(), Host->GetActorForwardVector()) < 0.0f);
+	});
+	Play(0, TEXT("release Move\nwait 0.3"));
+	PutAt(0, HostSpot, HostYaw);
 	// From four metres, more shots do nothing (aimed down at the crouched host, the recoil of the last burst undone).
 	PutAt(1, JoinerSpot, JoinerYaw);
 	Play(1, FString(TEXT("look 0 -10\n")) + Burst);

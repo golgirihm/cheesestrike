@@ -6,6 +6,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Weapons/CheeseStrikeShot.h"
+#include "Rules/CheeseStrikeDowned.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -148,6 +149,52 @@ bool FAPlayerIsPutBackWhereTheyWere::RunTest(const FString& Parameters)
 	TestTrue(TEXT("on a sample, that sample"), History.At(1.5f).Feet.Equals(FVector(1500.0f, 0.0f, 0.0f), 0.01f));
 	TestTrue(TEXT("past the end, the latest"), History.At(5.0f).Feet.Equals(FVector(2000.0f, 0.0f, 0.0f), 0.01f));
 	TestTrue(TEXT("before the start, the earliest kept"), History.At(0.0f).Feet.X < 1100.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAShotFindsABodyLyingDown, "CheeseStrike.Shot.AShotFindsABodyLyingDown", ShotTests::Flags)
+
+bool FAShotFindsABodyLyingDown::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	// A capsule lying any way: along X from 0 to 100, 10 thick.
+	const FVector From(0.0f, 0.0f, 20.0f);
+	const FVector To(100.0f, 0.0f, 20.0f);
+	TestTrue(TEXT("a shot from the side hits its side"), FMath::IsNearlyEqual(RayHitsSegment(FVector(50, -500, 20), FVector(0, 1, 0), From, To, 10.0f), 490.0f, 0.01f));
+	TestTrue(TEXT("a shot down the length hits its round end"), FMath::IsNearlyEqual(RayHitsSegment(FVector(-500, 0, 20), FVector(1, 0, 0), From, To, 10.0f), 490.0f, 0.01f));
+	TestTrue(TEXT("a shot from above hits its top"), FMath::IsNearlyEqual(RayHitsSegment(FVector(30, 0, 520), FVector(0, 0, -1), From, To, 10.0f), 490.0f, 0.01f));
+	TestEqual(TEXT("over it is a miss"), RayHitsSegment(FVector(50, -500, 31), FVector(0, 1, 0), From, To, 10.0f), -1.0f);
+	TestEqual(TEXT("past its end is a miss"), RayHitsSegment(FVector(111, -500, 20), FVector(0, 1, 0), From, To, 10.0f), -1.0f);
+	TestEqual(TEXT("from inside, no hit"), RayHitsSegment(FVector(50, 0, 20), FVector(0, 1, 0), From, To, 10.0f), -1.0f);
+	// A player lying down, facing +X, the capsule's axis meeting the floor at the origin.
+	const CheeseStrikeDowned::FShape Body = CheeseStrikeDowned::Shape(FVector::ZeroVector, 0.0f, 500.0f);
+	FHitHistory::FSample Lying;
+	Lying.bLying = true;
+	Lying.Feet = FVector::ZeroVector;
+	Lying.Head = Body.Head;
+	Lying.Hips = Body.Hips;
+	Lying.Shoulders = Body.Shoulders;
+	Lying.LegsTo = Body.Feet;
+	Lying.Height = 88.0f;
+	const FVector Side(0.0f, 1.0f, 0.0f);
+	TestTrue(TEXT("lying, a shot at the hips from the side hits"), FHitHistory::RayHitsBody(FVector(Body.Hips.X, -500, Body.Hips.Z), Side, Lying) > 0.0f);
+	TestTrue(TEXT("and at the shins, out ahead along the floor"), FHitHistory::RayHitsBody(FVector(Body.Feet.X - 10.0f, -500, 10.0f), Side, Lying) > 0.0f);
+	TestEqual(TEXT("but not at the chest of someone standing there"), FHitHistory::RayHitsBody(FVector(0, -500, 120.0f), Side, Lying), -1.0f);
+	TestEqual(TEXT("nor over the legs"), FHitHistory::RayHitsBody(FVector(Body.Feet.X - 20.0f, -500, 40.0f), Side, Lying), -1.0f);
+	FHitHistory::FSample Standing = Lying;
+	Standing.bLying = false;
+	Standing.Height = 192.0f;
+	TestTrue(TEXT("standing, the upright capsule as before"), FHitHistory::RayHitsBody(FVector(0, -500, 120.0f), Side, Standing) > 0.0f);
+	// Put back between a sample standing and one lying, it is as the nearer was.
+	FHitHistory History;
+	FHitHistory::FSample Before = Standing;
+	Before.Time = 0.0f;
+	FHitHistory::FSample After = Lying;
+	After.Time = 0.1f;
+	History.Add(Before);
+	History.Add(After);
+	TestFalse(TEXT("nearer the standing sample, standing"), History.At(0.04f).bLying);
+	TestTrue(TEXT("nearer the lying one, lying where it lay"), History.At(0.06f).bLying && History.At(0.06f).Hips.Equals(Body.Hips, 0.01f));
 	return true;
 }
 

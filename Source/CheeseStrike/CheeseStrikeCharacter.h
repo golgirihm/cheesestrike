@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Weapons/CheeseStrikeShot.h"
+#include "Rules/CheeseStrikeDowned.h"
 #include "CheeseStrikeCharacter.generated.h"
 
 class ACheeseStrikePlayerState;
@@ -146,8 +147,34 @@ public:
 	UCheeseStrikeInventory* GetInventory() const { return Inventory; }
 	/** Its last stand, in Execution: whether it is down, and its player's Interact. */
 	UCheeseStrikeLastStand* GetLastStand() const { return LastStand; }
-	/** Whether it is down in a last stand: crouched, with only its sidearm, finished only up close. */
+	/** Whether it is down in a last stand: on its back (crouched), with only its sidearm, finished only up close. */
 	bool IsDowned() const;
+	/**
+	 * How far down it is, 0 standing to 1 lying, at an even pace as it goes
+	 * down (CheeseStrikeDowned::Seconds) and gets up (RiseSeconds), on every
+	 * machine: the eyes, the shots' shape of it and the first-person view follow it.
+	 */
+	float GetDownBlend() const { return DownBlend; }
+	/** Down: how much room there is ahead of its hips for its legs (cm; CheeseStrikeDowned::LegLength or more for all they need), as last measured, and measured now. */
+	float GetDownLegRoom() const { return DownLegRoom; }
+	float MeasureLegRoom() const;
+	/** Down: where it aims, in degrees to the right of the way its body faces (within CheeseStrikeDowned::ConeYaw), on every machine. */
+	float GetDownAimYaw() const;
+	/** Down: where its body lies (CheeseStrikeDowned::Shape). */
+	CheeseStrikeDowned::FShape GetDownShape() const;
+	/** A point in the world in its body's frame (CheeseStrikeDowned's: ahead, right, up from the capsule's axis on the floor), for looking at the pose and testing it. */
+	FVector DownBodyFrame(const FVector& World) const;
+	/** Where its chest is, standing or lying, for aiming at it. */
+	FVector ChestAt() const;
+	/** Server: as it goes down, it falls back from whatever is just in front of it, as far as there is room behind, so that its legs have room. */
+	void MakeRoomToLieDown();
+	/**
+	 * Down, the body faces where it does and turns round after the view only
+	 * slowly (CheeseStrikeDowned::TurnBody), and its own machine keeps the
+	 * view to the cone in front of it; getting up, it turns to the view; else
+	 * as usual.
+	 */
+	virtual void FaceRotation(FRotator NewControlRotation, float DeltaTime = 0.0f) override;
 	/** Server only: sets the health, as a revive does. */
 	void SetHealth(float InHealth);
 
@@ -294,9 +321,20 @@ protected:
 	static constexpr float MostHipShift = 25.0f;
 	/** And turned, about the hand (degrees). */
 	static constexpr float MostHipTurn = 20.0f;
-	/** Down in Execution's last stand, the sidearm is held this much lower and further out in view (forward, right, up; cm), eased in and out by DownInView. */
-	static const FVector DownHandDrop;
+	/** How far the first-person view is down (eased): the arms are then where the pose puts them, and the first-person body is drawn at the world's field of view, its legs lying on the floor in view. */
 	float DownInView = 0.0f;
+	/** Down, the view sits this far ahead of where the head has it (cm). */
+	static constexpr float DownCameraAhead = 9.0f;
+	/** The first-person body's own field of view, standing. */
+	float FirstPersonFieldOfViewUp = 70.0f;
+	/** GetDownBlend's, and the room for the legs. */
+	float DownBlend = 0.0f;
+	float DownLegRoom = CheeseStrikeDowned::LegLength;
+	/** Down: where it aims from its body's facing (degrees), as the server has it, for the other machines. */
+	UPROPERTY(Replicated)
+	int8 DownAimYawSent = 0;
+	/** Every frame: how far down it is, the room for the legs, the aim sent, and the eyes where the head is. */
+	void UpdateDown(float DeltaSeconds);
 	/** Where the camera sits in the first-person body's head bone: just under its eyes (from the body's eye bones), or where the template had it on the mannequin. */
 	FVector CameraAtHead = DefaultCameraAtHead;
 	static const FVector DefaultCameraAtHead;

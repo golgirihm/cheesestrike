@@ -5,49 +5,71 @@
 #include "CoreMinimal.h"
 #include "Animation/AnimNodeBase.h"
 #include "BoneContainer.h"
+#include "Rules/CheeseStrikeDowned.h"
 
-/** The numbers the pose of a player down (Execution's last stand) is made by. */
+/** The numbers the pose of a player down (Execution's last stand) is made by; the rest are CheeseStrikeDowned's rules. */
 namespace CheeseStrikeDowned
 {
-	/** How long going down and getting up again take, in seconds (eased at both ends). */
-	constexpr float Seconds = 0.7f;
-	/** How fast the legs go from kneeling to creeping with the crouched walk and back, per second (eased). */
-	constexpr float KneelRate = 4.0f;
-	/** Breaths a minute, laboured. */
-	constexpr float BreathsPerMinute = 26.0f;
-	/** How far forward the down thigh leans from upright, in degrees: the hips sunk back towards the heel of the knee on the ground, lower than a crouch. */
-	constexpr float ThighLean = 65.0f;
-	/** How far forward each of the three spine bones bends, in degrees, and how far the neck and head come back up to look ahead. */
-	constexpr float SpineBend[3] = {12.0f, 12.0f, 6.0f};
-	constexpr float NeckBack = 14.0f;
-	constexpr float HeadBack = 10.0f;
-	/** How far the body leans to the side of the knee that is down, in degrees. */
-	constexpr float SideLean = 5.0f;
-	/** How much a breath bends the chest (degrees) and lifts the hips (cm). */
-	constexpr float BreathBend = 1.5f;
-	constexpr float BreathLift = 0.5f;
-
-	/** A laboured breath at `Phase` (radians): -1 out to 1 in, drawn in quickly and let out slowly. */
-	float Breath(float Phase);
+	/** How far back the hips lie from upright, in degrees, before the torso is propped up on the elbow (which sets it in the end). */
+	constexpr float PelvisRecline = 70.0f;
+	/** How far forward each of the three spine bones curls, lifting the shoulders off the floor. */
+	constexpr float SpineCurl[3] = {4.0f, 8.0f, 14.0f};
+	/** How high the ankles of legs out along the floor are. */
+	constexpr float AnkleHeight = 9.0f;
+	/** How much of the way out the legs reach lying still: the right one out straight, the left bent, its knee up. */
+	constexpr float RightLegOut = 0.985f;
+	constexpr float LeftLegOut = 0.95f;
+	/** Scooting, each leg pushes between these shares of its reach, a foot lifted this much as it comes back for the next push. */
+	constexpr float PushFrom = 0.7f;
+	constexpr float PushTo = 0.97f;
+	constexpr float FootLift = 5.0f;
+	/** How much the hips shuffle from side to side and lift with each push (cm), and turn (degrees). */
+	constexpr float HipShuffle = 2.0f;
+	constexpr float HipLift = 1.5f;
+	constexpr float HipTwist = 5.0f;
+	/** Turning round on the spot, the legs push this much of a full scoot. */
+	constexpr float TurnPush = 0.5f;
+	/** How fast the scoot comes in and out of the legs (per second). */
+	constexpr float ScootBlendRate = 5.0f;
+	/** How high the left elbow's joint is, the forearm flat on the floor: the shoulder is an upper arm over it. */
+	constexpr float ElbowHeight = 12.0f;
+	/** How much of the aim to the side the chest turns with (the rest is the head's and the arm's). */
+	constexpr float ChestTurn = 0.8f;
+	/** How much of the head's turn to look along the aim is taken in the neck. */
+	constexpr float NeckShare = 0.7f;
+	/** The pistol hand: so much of the arm's length out along the aim from the shoulder, and so far up and in from that (cm). */
+	constexpr float PistolReach = 0.86f;
+	constexpr float PistolUp = 5.0f;
+	constexpr float PistolIn = 4.0f;
+	/** In its own player's view (the first-person body), the pistol is held where it shows from the eyes, whichever way they look: so far out along the aim from the head, to the right of it and under it (cm). */
+	constexpr float FirstPersonPistolOut = 44.0f;
+	constexpr float FirstPersonPistolRight = 13.0f;
+	constexpr float FirstPersonPistolUnder = 13.0f;
+	/** How much a breath bends the chest (degrees). */
+	constexpr float BreathBend = 2.0f;
 
 	/** The bones the pose moves (the UE4 mannequin's names), which every body must have (FCheeseStrikeDownedPose::CacheBones_AnyThread finds them by these names). */
 	inline const TCHAR* const PoseBones[] = {TEXT("pelvis"), TEXT("spine_01"), TEXT("spine_02"), TEXT("spine_03"), TEXT("neck_01"), TEXT("head"),
-		TEXT("thigh_l"), TEXT("calf_l"), TEXT("foot_l"), TEXT("thigh_r"), TEXT("calf_r"), TEXT("foot_r"), TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"), TEXT("upperarm_r")};
+		TEXT("thigh_l"), TEXT("calf_l"), TEXT("foot_l"), TEXT("thigh_r"), TEXT("calf_r"), TEXT("foot_r"),
+		TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"), TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r")};
 }
 
 /**
- * The pose of a player down: on one knee (the right, the shooting hand's),
- * the other foot planted ahead, hunched forward over the hurt, the left hand
- * pressed to the belly and the sidearm held out in the right, breathing
- * hard. Made in component space from whatever pose comes in (the crouched
- * pistol set), by bone names every hero shares (the UE4 mannequin's), so it
- * fits every body: the hips go down until the right knee touches the ground,
- * two-bone IK puts the legs where kneeling has them (or, moving, keeps the
- * crouched walk's feet on the ground), the spine bends forward and the neck
- * back up, the right arm comes up again by what the spine took down so that
- * the pistol still points where the player aims, and the left arm reaches
- * for the belly. The whole is blended in by Alpha, bone by bone in local
- * space, so that going down and getting up are a movement, not a snap.
+ * The pose of a player down: on their back, the hips on the floor, the legs
+ * out along it ahead (the right straight, the left knee a little up), the
+ * spine curled up so that the shoulders and the head are raised, propped on
+ * the left elbow, and the pistol held out in the right hand past the feet,
+ * where the player aims, breathing hard. Made in component space from
+ * whatever pose comes in (the crouched pistol set), by bone names every hero
+ * shares (the UE4 mannequin's), so it fits every body: the pelvis laid back
+ * on the floor where CheeseStrikeDowned's rules have the hips, the spine
+ * curled until the left shoulder is an upper arm over the floor, the head
+ * turned to look along the aim, two-bone IK for the arms (the left elbow on
+ * the floor, the right hand out along the aim, the pistol turned with it) and
+ * for the legs (out along the floor as far as there is room, scooting: each
+ * pushing in turn, the hips shuffling). The whole is blended in by Alpha,
+ * bone by bone in local space, so that going down and getting up are a
+ * movement, not a snap.
  */
 struct FCheeseStrikeDownedPose : public FAnimNode_Base
 {
@@ -55,14 +77,24 @@ struct FCheeseStrikeDownedPose : public FAnimNode_Base
 
 	/** How far down, 0 (not at all) to 1. */
 	float Alpha = 0.0f;
-	/** How much the legs kneel, against following the crouched walk's feet (1 still, 0 moving). */
-	float Kneel = 1.0f;
 	/** The breath now, -1 to 1 (CheeseStrikeDowned::Breath). */
 	float Breath = 0.0f;
-	/** How much the left hand is on the belly rather than where the pose has it (a montage takes it, as the grip lets it go). */
-	float HandOnWound = 1.0f;
+	/** How much the arms are the pose's rather than what comes in (a montage, the reload, takes them). */
+	float ArmsOwn = 1.0f;
 	/** The way the body faces, in component space (Paragon's and the mannequin's +Y). */
 	FVector Forward = FVector(0.0, 1.0, 0.0);
+	/** Where the capsule's axis meets the floor, in component space. */
+	FVector Origin = FVector::ZeroVector;
+	/** Where the player aims, from the way the body faces: degrees to the right and up. */
+	float AimYaw = 0.0f;
+	float AimPitch = 0.0f;
+	/** How far the legs reach along the floor from the hips at most (CheeseStrikeDowned::LegReach). */
+	float LegReach = CheeseStrikeDowned::LegLength;
+	/** Scooting: how much (0 still, 1 pushing), and where the legs are in their pushes (radians). */
+	float Scoot = 0.0f;
+	float ScootPhase = 0.0f;
+	/** Whether this is the body its own player sees from inside. */
+	bool bFirstPerson = false;
 
 	/** Whether it has every bone it needs (logged once if not). */
 	bool HasBones() const { return bBones; }
@@ -86,11 +118,12 @@ private:
 	FBoneReference ThighR;
 	FBoneReference CalfR;
 	FBoneReference FootR;
-	FBoneReference BallR;
 	FBoneReference UpperArmL;
 	FBoneReference LowerArmL;
 	FBoneReference HandL;
 	FBoneReference UpperArmR;
+	FBoneReference LowerArmR;
+	FBoneReference HandR;
 	bool bBones = false;
 	bool bToldMissing = false;
 };

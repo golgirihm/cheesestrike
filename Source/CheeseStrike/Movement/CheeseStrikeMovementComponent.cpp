@@ -3,6 +3,8 @@
 #include "CheeseStrikeMovementComponent.h"
 #include "CheeseStrikeMovement.h"
 #include "GameFramework/Character.h"
+#include "CheeseStrikeCharacter.h"
+#include "Rules/CheeseStrikeDowned.h"
 
 UCheeseStrikeMovementComponent::UCheeseStrikeMovementComponent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -33,8 +35,32 @@ bool UCheeseStrikeMovementComponent::IsSprinting() const
 	return bWantsToSprint && IsMovingOnGround() && !IsCrouching() && !IsSliding() && !Velocity.IsNearlyZero(1.0f);
 }
 
+bool UCheeseStrikeMovementComponent::IsDownedHere() const
+{
+	const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(CharacterOwner);
+	return Body != nullptr && Body->IsAlive() && Body->IsDowned();
+}
+
+FVector UCheeseStrikeMovementComponent::ConstrainInputAcceleration(const FVector& InputAcceleration) const
+{
+	const FVector Constrained = Super::ConstrainInputAcceleration(InputAcceleration);
+	// Down, only along the body, toward the feet while the legs have room.
+	if (IsDownedHere())
+	{
+		const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(CharacterOwner);
+		const FVector Forward = Body->GetActorForwardVector();
+		const bool bTowardFeet = FVector::DotProduct(Constrained, Forward) > 0.0f;
+		return CheeseStrikeDowned::ScootInput(Constrained, Forward, bTowardFeet ? Body->MeasureLegRoom() : CheeseStrikeDowned::LegLength);
+	}
+	return Constrained;
+}
+
 float UCheeseStrikeMovementComponent::GetMaxSpeed() const
 {
+	if (IsDownedHere() && (MovementMode == MOVE_Walking || MovementMode == MOVE_NavWalking))
+	{
+		return CheeseStrikeDowned::ScootSpeed;
+	}
 	if (IsSliding())
 	{
 		return CheeseStrikeMovement::SlideSpeed(SlideFrom, SlideElapsed);

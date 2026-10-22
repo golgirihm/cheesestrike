@@ -12,6 +12,7 @@
 #include "CheeseStrikePlayerState.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 #include "Weapons/CheeseStrikeInventory.h"
+#include "Weapons/CheeseStrikeWeapon.h"
 
 using CheeseStrikeModes::EInteract;
 
@@ -153,6 +154,8 @@ void UCheeseStrikeLastStand::GoDown(ACheeseStrikePlayerState* By)
 		Inventory->RestrictTo(EWeaponSlot::Sidearm);
 	}
 	KeepDown();
+	// Falling back from whatever is just ahead, so that the legs lie out on the floor.
+	Me->MakeRoomToLieDown();
 	UE_LOG(LogCheeseStrike, Display, TEXT("%s is down, by %s; bleeds out in %.0f s"), *Me->DisplayName(), By != nullptr ? *By->GetPlayerName() : TEXT("nobody"), CheeseStrikeModes::LastStandTime);
 	if (ACheeseStrikeGameMode* Mode = GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>())
 	{
@@ -288,6 +291,11 @@ void UCheeseStrikeLastStand::KeepDown()
 	if (!Me->IsLocallyControlled())
 	{
 		return;
+	}
+	// From the hip only.
+	if (const ACheeseStrikeWeapon* Held = Me->GetWeapon(); Held != nullptr && Held->IsAimed())
+	{
+		Me->DoAimDownSights(false);
 	}
 	if (UCheeseStrikeMovementComponent* Movement = Me->GetCheeseStrikeMovement())
 	{

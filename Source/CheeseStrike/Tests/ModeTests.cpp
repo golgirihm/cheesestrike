@@ -9,6 +9,7 @@
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
 #include "Rules/CheeseStrikeModes.h"
+#include "Rules/CheeseStrikeDowned.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Weapons/CheeseStrikeArsenal.h"
@@ -294,6 +295,49 @@ bool FGunGameClimbsTheLadder::RunTest(const FString& Parameters)
 	TestEqual(TEXT("racing to the ladder's end"), Summary.Limit, Steps);
 	TestTrue(TEXT("the player's step and the leader's"), Summary.Lines.Num() == 2 && Summary.Lines[0].bMine && Summary.Lines[0].Score == 2 && Summary.Lines[1].Score == 5);
 	TestTrue(TEXT("a streak's name is known"), CheeseStrikeStreaks::IsStreakName(TEXT("Cheese Strike")) && !CheeseStrikeStreaks::IsStreakName(TEXT("")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FADownedPlayerAimsAheadAndScootsRound, "CheeseStrike.Rules.ADownedPlayerAimsAheadAndScootsRound", ModeTests::Flags)
+
+bool FADownedPlayerAimsAheadAndScootsRound::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeDowned;
+	// The cone: a body facing 90 degrees aims only so far either side of it, and so far up and down.
+	TestTrue(TEXT("a cone toward the feet of 45 to 60 degrees each way"), ConeYaw >= 45.0f && ConeYaw <= 60.0f);
+	TestTrue(TEXT("and a little up and down"), LowestPitch < 0.0f && LowestPitch >= -25.0f && HighestPitch > 15.0f && HighestPitch <= 40.0f);
+	TestTrue(TEXT("within it, the view is kept"), ClampView(FRotator(10.0f, 100.0f, 0.0f), 90.0f).Equals(FRotator(10.0f, 100.0f, 0.0f), 0.01f));
+	TestTrue(TEXT("past its side, at its edge"), FMath::IsNearlyEqual(ClampView(FRotator(0.0f, 170.0f, 0.0f), 90.0f).Yaw, 90.0f + ConeYaw, 0.01f));
+	TestTrue(TEXT("the other side, the short way round"), FMath::IsNearlyEqual(ClampView(FRotator(0.0f, -100.0f, 0.0f), 170.0f).Yaw, FRotator::NormalizeAxis(170.0f + ConeYaw), 0.01f));
+	TestTrue(TEXT("too low, at the lowest"), FMath::IsNearlyEqual(ClampView(FRotator(-60.0f, 90.0f, 0.0f), 90.0f).Pitch, LowestPitch, 0.01f));
+	TestTrue(TEXT("too high, at the highest"), FMath::IsNearlyEqual(ClampView(FRotator(80.0f, 90.0f, 0.0f), 90.0f).Pitch, HighestPitch, 0.01f));
+	TestTrue(TEXT("a pitch of 350 is 10 down"), FMath::IsNearlyEqual(ClampView(FRotator(350.0f, 90.0f, 0.0f), 90.0f).Pitch, FMath::Max(-10.0f, LowestPitch), 0.01f));
+	TestTrue(TEXT("in the cone"), InCone(FRotator(5.0f, 90.0f + ConeYaw - 1.0f, 0.0f), 90.0f));
+	TestFalse(TEXT("out of it"), InCone(FRotator(0.0f, 90.0f + ConeYaw + 2.0f, 0.0f), 90.0f));
+	// Turning round: not for a look a little aside, slowly after the view beyond that.
+	TestEqual(TEXT("the body stays put for a look a little aside"), TurnBody(90.0f, 90.0f + TurnFree - 1.0f, 0.5f), 90.0f);
+	TestTrue(TEXT("and turns slowly after a look further"), FMath::IsNearlyEqual(TurnBody(90.0f, 90.0f + ConeYaw, 0.1f), 90.0f + TurnRate * 0.1f, 0.01f));
+	TestTrue(TEXT("until the view is within reach of its facing again"), FMath::IsNearlyEqual(TurnBody(90.0f, 90.0f + TurnFree + 1.0f, 1.0f), 91.0f, 0.01f));
+	TestTrue(TEXT("either way, through the back"), FMath::IsNearlyEqual(TurnBody(175.0f, -140.0f, 0.1f), FRotator::NormalizeAxis(175.0f + TurnRate * 0.1f), 0.01f));
+	TestTrue(TEXT("slowly: a half turn takes seconds"), 180.0f / TurnRate >= 3.0f);
+	TestTrue(TEXT("getting up, it turns to the view, quickly"), FMath::IsNearlyEqual(TurnRising(90.0f, 100.0f, 0.5f), 100.0f, 0.01f));
+	// Scooting: slowly, along the body only, and not into what its legs are against.
+	TestTrue(TEXT("a scoot is well under a crouched walk"), ScootSpeed < 0.4f * 225.0f && ScootSpeed > 20.0f);
+	const FVector Facing(0.0f, 1.0f, 0.0f);
+	TestTrue(TEXT("toward the feet, with room"), ScootInput(FVector(0.0f, 1.0f, 0.0f), Facing, 100.0f).Equals(Facing, 0.001f));
+	TestTrue(TEXT("toward the head"), ScootInput(FVector(0.0f, -1.0f, 0.0f), Facing, 0.0f).Equals(-Facing, 0.001f));
+	TestTrue(TEXT("never sideways"), ScootInput(FVector(1.0f, 0.0f, 0.0f), Facing, 100.0f).IsNearlyZero(0.001f));
+	TestTrue(TEXT("nor toward the feet with the legs against a wall"), ScootInput(FVector(0.0f, 1.0f, 0.0f), Facing, LegRoomToScoot - 1.0f).IsNearlyZero(0.001f));
+	TestEqual(TEXT("the legs reach out all the way with room"), LegReach(500.0f), LegLength);
+	TestEqual(TEXT("short of the wall"), LegReach(80.0f), 80.0f - ToeGap);
+	TestEqual(TEXT("and fold up no further than so far"), LegReach(0.0f), LegReachLeast);
+	// The body lies along its facing: the hips ahead of the capsule's axis, the legs further, the head raised behind.
+	const FShape Body = Shape(FVector(0.0f, 0.0f, 100.0f), 90.0f, 500.0f);
+	TestTrue(TEXT("the hips on the floor, ahead of the axis"), Body.Hips.Y > 10.0f && Body.Hips.Z - 100.0f < 20.0f && FMath::Abs(Body.Hips.X) < 0.01f);
+	TestTrue(TEXT("the feet out ahead of the hips"), Body.Feet.Y - Body.Hips.Y > 80.0f && Body.Feet.Z - 100.0f < 20.0f);
+	TestTrue(TEXT("the head raised, over the shoulders, the shoulders over the hips"), Body.Head.Z > Body.Shoulders.Z && Body.Shoulders.Z > Body.Hips.Z + 10.0f);
+	TestTrue(TEXT("the head about 40 cm up, within the capsule's radius of its axis"), Body.Head.Z - 100.0f > 35.0f && Body.Head.Z - 100.0f < 55.0f && FVector::Dist2D(Body.Head, FVector::ZeroVector) < 34.0f);
+	TestTrue(TEXT("its middle between the shoulders and the hips"), Middle(Body).Y > Body.Shoulders.Y && Middle(Body).Y < Body.Hips.Y);
 	return true;
 }
 

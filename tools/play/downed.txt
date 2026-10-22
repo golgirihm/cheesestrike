@@ -1,58 +1,108 @@
-# Execution's last stand, for looking at a player down: the host crouches,
-# then goes down (the console kill is a lethal hit), and is looked at in
-# their own view and from outside all round, still and creeping, and as
-# each hero. Alone (no
-# bots to finish them): tools/play.ps1 -Script tools/play/downed.txt -Extra
-# "?Mode=Execution". downed_row.txt looks at the row along the top.
+# Execution's last stand, for looking at a player down: the host goes down
+# (the console kill is a lethal hit) onto their back, and is looked at in
+# their own view (straight, low, high, at the cone's edge), from outside all
+# round, scooting, aiming aside and turning round, and as each hero. Alone
+# (no bots to finish them), getting up at the end (CheeseStrikeRevive):
+# tools/play.ps1 -Script tools/play/downed.txt -Extra "?Mode=Execution".
+# downed_wall.txt goes down by a wall;
+# downed_row.txt looks at the row along the top.
 wait 4
-tap Sidearm
-hold Crouch
-wait 1.2
-shot down_0_crouched
-release Crouch
+cmd CheeseStrikeOutside 260 100 -20 30
+wait 0.3
 cmd CheeseStrikeDie
-wait 1.5
+wait 0.25
+shot down_0a_falling
+wait 0.25
+shot down_0b_falling
+wait 1.0
+cmd CheeseStrikeOutside
+wait 0.4
 shot down_1_view
-look 0 -25
-wait 0.5
+look 0 -40
+wait 0.4
 shot down_2_view_low
-look 0 25
-cmd CheeseStrikeOutside 260 35 -10 10
+look 0 80
+wait 0.4
+shot down_3_view_high
+look 0 -45
+look 70 0
+wait 0.1
+shot down_4_view_edge
+look -70 0
+wait 1.2
+cmd CheeseStrikeOutside 260 35 -20 20
 wait 0.6
-shot down_3_front_right
-cmd CheeseStrikeOutside 260 95 -10 10
+shot down_5_front_right
+cmd CheeseStrikeOutside 260 100 -20 20
 wait 0.4
-shot down_4_right
-cmd CheeseStrikeOutside 260 -80 -10 10
+shot down_6_right
+cmd CheeseStrikeOutside 260 -90 -20 20
 wait 0.4
-shot down_5_left
-cmd CheeseStrikeOutside 260 170 -10 30
+shot down_7_left
+cmd CheeseStrikeOutside 260 180 -20 40
 wait 0.4
-shot down_6_behind
-cmd CheeseStrikeOutside 260 -20 -10 10
+shot down_8_behind
+cmd CheeseStrikeOutside 220 0 -20 10
 wait 0.4
-shot down_7_front_left
-hold Move 0 1
+shot down_9_front
+cmd CheeseStrikeOutside 300 60 -20 160
 wait 0.4
-shot down_8_creeping
+shot down_10_above
+cmd CheeseStrikeOutside 260 100 -20 20
+hold Move 0 -1
+wait 0.6
+shot down_11_scoot_back
+wait 0.25
+shot down_12_scoot_back
 release Move
+hold Move 0 1
 wait 0.6
+shot down_13_scoot_on
+release Move
+look 40 0
+wait 0.4
+shot down_14_aim_right
+look 60 0
+wait 1.0
+shot down_15_turning
+wait 1.5
+cmd CheeseStrikeOutside
+wait 0.4
+shot down_16_view_after_turn
+hold Move -1 0
+wait 1.0
+release Move
+shot down_17_view_turned_left
 cmd CheeseStrikeBody 0 1
-cmd CheeseStrikeOutside 240 30 -10 10
+cmd CheeseStrikeOutside 240 40 -20 20
 wait 1.2
 shot down_b0
+cmd CheeseStrikeBody 1 0
+wait 1.2
+shot down_b1
 cmd CheeseStrikeBody 2 0
 wait 1.2
 shot down_b2
 cmd CheeseStrikeBody 3 1
-cmd CheeseStrikeOutside 240 -60 -10 10
 wait 1.2
 shot down_b3
-cmd CheeseStrikeBody 0 1
+cmd CheeseStrikeOutside 240 -70 -20 20
+wait 0.6
+shot down_b3_left
+cmd CheeseStrikeBody 1 0
 wait 1.2
-shot down_b0_left
+shot down_b1_left
 cmd CheeseStrikeBody
 cmd CheeseStrikeOutside
-wait 0.5
-shot down_9_view_after
+wait 1.5
+shot down_18_view_after
+cmd CheeseStrikeOutside 260 100 -20 30
+wait 0.3
+cmd CheeseStrikeRevive
+wait 0.3
+shot down_19_rising
+wait 0.3
+shot down_20_rising
+wait 0.8
+shot down_21_up
 quit

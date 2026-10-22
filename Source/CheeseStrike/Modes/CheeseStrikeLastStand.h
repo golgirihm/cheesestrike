@@ -12,9 +12,11 @@ class ACheeseStrikePlayerState;
 
 /**
  * A character's last stand, in Execution (CheeseStrikeModes): hurt enough
- * to die, once a life, it goes down instead. Down, it is crouched (and
- * looks it: on one knee, hunched, FCheeseStrikeDownedPose), can't
- * sprint or jump, carries only its sidearm, and nothing harms it but an
+ * to die, once a life, it goes down instead. Down, it lies on its back,
+ * propped on an elbow (FCheeseStrikeDownedPose; its capsule crouched, its
+ * legs out ahead of it), aims only in a cone toward its feet, scoots slowly
+ * and turns round slowly (CheeseStrikeDowned), can't sprint, jump or aim
+ * down the sights, carries only its sidearm, and nothing harms it but an
  * enemy within reach (CheeseStrikeModes::FinishRange), whose next hit
  * finishes it; held Interact (E) finishes it too from an enemy, or from a
  * teammate gets it back up; left alone it bleeds out, the kill of whoever
@@ -77,7 +79,7 @@ protected:
 	/** Server: what Interact does this frame. */
 	void DoWork(float DeltaTime);
 	void StopWork();
-	/** Every machine its player is on: keeps it crouched and not sprinting while down. */
+	/** Every machine its player is on: keeps it crouched, not sprinting and not aimed down the sights while down. */
 	void KeepDown();
 
 	UPROPERTY(ReplicatedUsing=OnRep_Downed)

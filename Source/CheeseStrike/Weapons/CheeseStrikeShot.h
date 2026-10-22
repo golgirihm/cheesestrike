@@ -162,6 +162,9 @@ namespace CheeseStrikeWeapons
 
 	/** How far along the ray it first touches a sphere, or -1. */
 	float RayHitsSphere(const FVector& Origin, const FVector& Direction, const FVector& Centre, float Radius);
+
+	/** How far along the ray it first touches a capsule lying any way, round the segment from `From` to `To`, or -1. A ray that starts inside doesn't hit it. */
+	float RayHitsSegment(const FVector& Origin, const FVector& Direction, const FVector& From, const FVector& To, float Radius);
 }
 
 /**
@@ -179,6 +182,11 @@ struct FHitHistory
 		float Yaw = 0.0f;
 		float Radius = 34.0f;
 		float Height = 192.0f;
+		/** Lying down (Execution's last stand): the body is then the torso from the hips to the shoulders and the legs from the hips to the feet (CheeseStrikeDowned's shape and radii), not the upright capsule. */
+		bool bLying = false;
+		FVector Hips = FVector::ZeroVector;
+		FVector Shoulders = FVector::ZeroVector;
+		FVector LegsTo = FVector::ZeroVector;
 	};
 
 	/** Seconds kept. */
@@ -187,6 +195,8 @@ struct FHitHistory
 	void Add(const FSample& Sample);
 	/** The feet, head, facing and size at `Time`, between the samples either side of it; the latest for a time past the end, the earliest for one before the start. */
 	FSample At(float Time) const;
+	/** How far along a ray a body sampled as `Sample` is first touched, or -1: the upright capsule, or the torso and legs lying. */
+	static float RayHitsBody(const FVector& Origin, const FVector& Direction, const FSample& Sample);
 	int32 Num() const { return Samples.Num(); }
 
 private:
