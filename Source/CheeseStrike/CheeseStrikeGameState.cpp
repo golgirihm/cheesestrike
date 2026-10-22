@@ -25,6 +25,7 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeGameState, BotSkill);
 	DOREPLIFETIME(ACheeseStrikeGameState, LobbyAt);
 	DOREPLIFETIME(ACheeseStrikeGameState, MiceAt);
+	DOREPLIFETIME(ACheeseStrikeGameState, GoAt);
 	DOREPLIFETIME(ACheeseStrikeGameState, PlayersExpected);
 	DOREPLIFETIME(ACheeseStrikeGameState, PlayersReady);
 	DOREPLIFETIME(ACheeseStrikeGameState, Mode);

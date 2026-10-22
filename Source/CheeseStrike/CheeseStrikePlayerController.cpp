@@ -220,6 +220,16 @@ void ACheeseStrikePlayerController::SoundCountdown()
 	{
 		CheeseStrikeTones::Play(GetWorld(), Tone == CheeseStrikeMenu::ECountdownTone::End ? CheeseStrikeTones::ETone::End : CheeseStrikeTones::ETone::Second);
 	}
+	// The count before the match and each round sounds the same: a tone each second, the chime as it ends. It is heard of
+	// until a second after its end, so that the chime sounds however this machine's clock of the server's falls.
+	const float GoAt = Match != nullptr ? Match->GetGoAt() : 0.0f;
+	const float SinceGo = Match != nullptr ? static_cast<float>(Match->GetServerWorldTimeSeconds()) - GoAt : 0.0f;
+	const bool bCountingIn = GoAt > 0.0f && SinceGo < 1.0f && Match->HasMatchStarted() && !Match->HasMatchEnded();
+	const CheeseStrikeMenu::ECountdownTone GoTone = CheeseStrikeMenu::CountdownTone(GoSounded, bCountingIn, FMath::Max(0.0f, -SinceGo), false);
+	if (GoTone != CheeseStrikeMenu::ECountdownTone::None)
+	{
+		CheeseStrikeTones::Play(GetWorld(), GoTone == CheeseStrikeMenu::ECountdownTone::End ? CheeseStrikeTones::ETone::End : CheeseStrikeTones::ETone::Second);
+	}
 }
 
 bool ACheeseStrikePlayerController::IsInAMatch() const

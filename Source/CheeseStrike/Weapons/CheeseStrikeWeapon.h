@@ -142,6 +142,8 @@ public:
 
 	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
 	USkeletalMeshComponent* GetThirdPersonMesh() const { return ThirdPersonMesh; }
+	/** Lays `Overlay` over its model on the body and `ViewOverlay` over the one in its holder's view (the ghostly look of a protected holder), or takes them off with null. */
+	void SetOverlay(UMaterialInterface* Overlay, UMaterialInterface* ViewOverlay);
 	/** For the log: where its first-person and body models are from `Eye`, and whether they are drawn. */
 	FString DescribeModel(const FVector& Eye) const;
 	/** Shows the weapon on the body to its own player as well (CheeseStrikeOutside), or keeps it from them as in play. */

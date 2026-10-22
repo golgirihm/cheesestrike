@@ -1,0 +1,22 @@
+# The joiner of a pair (tools/play/ghost_server.txt): looks at the host, ghostly
+# while protected, every couple of seconds, through the host firing and the look fading.
+wait 3
+state
+shot ghostpair_client_1
+wait 2
+shot ghostpair_client_2
+wait 2
+shot ghostpair_client_3
+wait 2
+shot ghostpair_client_4
+wait 2
+shot ghostpair_client_5
+wait 2
+shot ghostpair_client_6
+wait 2
+shot ghostpair_client_7
+wait 2
+shot ghostpair_client_8
+wait 2
+state
+quit

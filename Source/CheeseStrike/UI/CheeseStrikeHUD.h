@@ -146,6 +146,8 @@ protected:
 	void DrawScoreboard(const ACheeseStrikeGameState* Match, bool bOver);
 	/** The mice's countdown, red, and word of their coming. */
 	void DrawMice(const ACheeseStrikeGameState* Match);
+	/** The count before the match and its rounds, big in the middle (UI/CheeseStrikeHUDCountdown.cpp). */
+	void DrawCountdown(const ACheeseStrikeGameState* Match);
 	/** The health the HUD shows: the character's, or CheeseStrike.HUD.Health's for judging the red edges (development). */
 	static float HealthShown(const ACheeseStrikeCharacter* Character);
 	/**

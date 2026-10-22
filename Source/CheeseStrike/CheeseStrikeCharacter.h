@@ -72,6 +72,9 @@ public:
 	/** Kills the character, from the console, for looking at a death without another player. */
 	UFUNCTION(Exec)
 	void CheeseStrikeDie();
+	/** Protects the character for `Seconds` from now, from the console, for looking at its ghostly look (it ends as usual when it attacks). */
+	UFUNCTION(Exec)
+	void CheeseStrikeProtect(float Seconds = 30.0f);
 	/**
 	 * For looking at the body from outside with one player (a second game
 	 * on the same PC renders poorly): puts the view `Distance` cm from the
@@ -181,14 +184,26 @@ public:
 
 	float GetHealth() const { return Health; }
 	bool IsAlive() const { return Health > 0.0f; }
-	/** Whether it can do anything but look: alive, in a match still on. */
+	/** Whether it can do anything but look: alive, in a match still on, and not held by the count before it or its round. */
 	bool CanAct() const;
+	/** Whether the count before the match or its round holds it where it stands (ACheeseStrikeGameState::IsFrozen). */
+	bool IsFrozen() const;
 	/** Whether its player's input reaches it: it can act, and its player hasn't paused (a paused player looks at the menu, and the match goes on without them). */
 	bool TakesInput() const;
-	/** Whether it has just come back and can't yet be hurt. */
+	/** Whether it has just come back and can't yet be hurt (CheeseStrikeStart: a few seconds from the count's end, or until it attacks). */
 	bool IsProtected() const;
-	/** Server only: ends that, as firing does. */
-	void EndProtection() { ProtectedUntil = 0.0f; }
+	/** Server only: ends that, as firing, striking with the knife and calling in a streak do; its ghostly look fades from now on every machine. */
+	void EndProtection();
+	/**
+	 * How ghostly it looks on this machine (0 to 1, CheeseStrikeStart::GhostAmount):
+	 * while protected its body, its first-person arms and its weapons wear
+	 * M_Ghost as an overlay (pale, translucent, with a shimmer and a bright
+	 * rim), fading as the protection ends.
+	 */
+	float GetGhostShown() const { return GhostShown; }
+	/** The ghost's overlay materials, once made here: for the body others see, and for the first-person arms and weapon (a softer rim, seen up close). */
+	class UMaterialInstanceDynamic* GetGhostMaterial() const { return GhostMaterial; }
+	class UMaterialInstanceDynamic* GetGhostViewMaterial() const { return GhostViewMaterial; }
 	/** The player's name, as the feed and the scoreboard show it, or the actor's where there is no player. */
 	FString DisplayName() const;
 	/** Who killed it, once it is dead, and the server's time it died (-1 while alive). */
@@ -302,6 +317,14 @@ protected:
 	/** The server's time its protection as a fresh spawn ends. */
 	UPROPERTY(Replicated)
 	float ProtectedUntil = 0.0f;
+	/** The ghost's overlay, made on first need, and how ghostly it was last shown. */
+	UPROPERTY(Transient)
+	TObjectPtr<class UMaterialInstanceDynamic> GhostMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<class UMaterialInstanceDynamic> GhostViewMaterial;
+	float GhostShown = 0.0f;
+	/** Puts on or takes off the ghostly look, as the protection says. */
+	void UpdateGhost();
 	/** Whether its death has been shown here. */
 	bool bDeathShown = false;
 	TWeakObjectPtr<ACheeseStrikeCharacter> LastHurtBy;
@@ -394,6 +417,8 @@ protected:
 	void ApplyStartAt();
 	UFUNCTION(Server, Reliable)
 	void ServerDie();
+	UFUNCTION(Server, Reliable)
+	void ServerProtect(float Seconds);
 	/** Its own player's machine: it was just hurt by `By`, standing at `From`, for the HUD's damage arc. */
 	UFUNCTION(Client, Unreliable)
 	void ClientHurtFrom(FVector_NetQuantize From, ACheeseStrikeCharacter* By);

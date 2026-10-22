@@ -37,6 +37,8 @@
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeFalls.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Rules/CheeseStrikeStart.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Modes/CheeseStrikeLastStand.h"
@@ -479,10 +481,12 @@ void ACheeseStrikeCharacter::BeginPlay()
 	ACheeseStrikeWeapon::HideBuiltInWeapons(GetMesh());
 	FitFirstPersonBody();
 	FirstPersonBase = FirstPersonMesh->GetRelativeTransform();
-	// A fresh character can't be hurt for its first seconds, unless it fires.
+	// A fresh character can't be hurt for its first seconds, counted from the end of the count before the match or its
+	// round, unless it attacks.
 	if (HasAuthority())
 	{
-		ProtectedUntil = ServerNow() + CheeseStrikeRules::SpawnProtection;
+		const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+		ProtectedUntil = CheeseStrikeStart::ProtectedUntil(ServerNow(), Match != nullptr ? Match->GetGoAt() : 0.0f);
 	}
 }
 
@@ -511,7 +515,13 @@ float ACheeseStrikeCharacter::ServerNow() const
 bool ACheeseStrikeCharacter::CanAct() const
 {
 	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
-	return IsAlive() && (State == nullptr || !State->HasMatchEnded());
+	return IsAlive() && (State == nullptr || !State->HasMatchEnded()) && !IsFrozen();
+}
+
+bool ACheeseStrikeCharacter::IsFrozen() const
+{
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	return Match != nullptr && Match->IsFrozen();
 }
 
 bool ACheeseStrikeCharacter::TakesInput() const
@@ -522,7 +532,64 @@ bool ACheeseStrikeCharacter::TakesInput() const
 
 bool ACheeseStrikeCharacter::IsProtected() const
 {
-	return IsAlive() && ServerNow() < ProtectedUntil;
+	return IsAlive() && CheeseStrikeStart::IsProtected(ServerNow(), ProtectedUntil);
+}
+
+void ACheeseStrikeCharacter::EndProtection()
+{
+	ProtectedUntil = CheeseStrikeStart::AfterAttack(ProtectedUntil, ServerNow());
+}
+
+void ACheeseStrikeCharacter::UpdateGhost()
+{
+	const float Amount = IsAlive() ? CheeseStrikeStart::GhostAmount(ServerNow(), ProtectedUntil) : 0.0f;
+	if (Amount <= 0.0f && GhostShown <= 0.0f)
+	{
+		return;
+	}
+	// The overlay is loaded by path (tools/art/ghost_material.py rebuilds it), instances of it per character for its fade:
+	// one for the body, one with a softer rim for the first-person arms and weapon, which are seen up close and mostly
+	// edge-on, where a full rim would turn them white.
+	if (Amount > 0.0f && GhostMaterial == nullptr)
+	{
+		if (UMaterialInterface* Ghost = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/CheeseStrike/Effects/M_Ghost.M_Ghost")))
+		{
+			GhostMaterial = UMaterialInstanceDynamic::Create(Ghost, this);
+			GhostViewMaterial = UMaterialInstanceDynamic::Create(Ghost, this);
+			GhostViewMaterial->SetScalarParameterValue(TEXT("RimCover"), 0.22f);
+			GhostViewMaterial->SetScalarParameterValue(TEXT("RimGlow"), 0.45f);
+			GhostViewMaterial->SetScalarParameterValue(TEXT("Cover"), 0.18f);
+			GhostViewMaterial->SetScalarParameterValue(TEXT("Wash"), 0.14f);
+		}
+	}
+	for (UMaterialInstanceDynamic* Ghost : {GhostMaterial.Get(), GhostViewMaterial.Get()})
+	{
+		if (Ghost != nullptr)
+		{
+			Ghost->SetScalarParameterValue(TEXT("Amount"), Amount);
+		}
+	}
+	UMaterialInterface* Overlay = Amount > 0.0f ? GhostMaterial.Get() : nullptr;
+	UMaterialInterface* ViewOverlay = Amount > 0.0f ? GhostViewMaterial.Get() : nullptr;
+	if (GetMesh()->GetOverlayMaterial() != Overlay)
+	{
+		GetMesh()->SetOverlayMaterial(Overlay);
+	}
+	if (FirstPersonMesh->GetOverlayMaterial() != ViewOverlay)
+	{
+		FirstPersonMesh->SetOverlayMaterial(ViewOverlay);
+	}
+	// Its weapons too, the one in its own view and the one others see.
+	TArray<AActor*> Attached;
+	GetAttachedActors(Attached);
+	for (AActor* Each : Attached)
+	{
+		if (ACheeseStrikeWeapon* Weapon = Cast<ACheeseStrikeWeapon>(Each))
+		{
+			Weapon->SetOverlay(Overlay, ViewOverlay);
+		}
+	}
+	GhostShown = Amount;
 }
 
 FString ACheeseStrikeCharacter::DisplayName() const
@@ -663,6 +730,25 @@ void ACheeseStrikeCharacter::CheeseStrikeDie()
 	{
 		ServerDie();
 	}
+}
+
+void ACheeseStrikeCharacter::CheeseStrikeProtect(float Seconds)
+{
+	if (HasAuthority())
+	{
+		ServerProtect_Implementation(Seconds);
+	}
+	else
+	{
+		ServerProtect(Seconds);
+	}
+}
+
+void ACheeseStrikeCharacter::ServerProtect_Implementation(float Seconds)
+{
+#if !UE_BUILD_SHIPPING
+	ProtectedUntil = ServerNow() + FMath::Clamp(Seconds, 0.0f, 600.0f);
+#endif
 }
 
 void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw, float Height, float Rise)
@@ -969,6 +1055,7 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	ApplyStartAt();
 	UpdateBody();
+	UpdateGhost();
 	UpdateDown(DeltaSeconds);
 	// The server keeps where everyone has been, for shots fired at where they were seen.
 	if (HasAuthority() && GetWorld() != nullptr && GetWorld()->GetGameState() != nullptr)
@@ -1043,11 +1130,11 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 	// Which way the weapon in view points, in the view's axes (forward, right, up).
 	const UPrimitiveComponent* InView = HeldWeapon != nullptr ? HeldWeapon->GetModel(true) : nullptr;
 	const FVector Along = InView != nullptr ? GetControlRotation().UnrotateVector(InView->GetComponentTransform().GetUnitAxis(EAxis::Y)) : FVector::ZeroVector;
-	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d weapon %s drawing %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f) hand in view (%.0f, %.0f, %.0f) weapon along (%.2f, %.2f, %.2f) down %.2f body yaw %.1f leg room %.0f"),
+	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ghost %.2f frozen %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d weapon %s drawing %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f) hand in view (%.0f, %.0f, %.0f) weapon along (%.2f, %.2f, %.2f) down %.2f body yaw %.1f leg room %.0f"),
 		At.X, At.Y, At.Z, GetVelocity().Size2D(), Eye.Z - (At.Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), FRotator::NormalizeAxis(GetControlRotation().Pitch), FRotator::NormalizeAxis(GetControlRotation().Yaw),
 		bIsCrouched ? 1 : 0, Movement != nullptr && Movement->IsSprinting() ? 1 : 0, Movement != nullptr && Movement->IsSliding() ? 1 : 0,
 		Movement != nullptr ? Movement->GetSlideElapsed() : -1.0f, Movement != nullptr && Movement->IsFalling() ? 1 : 0, bPressedJump ? 1 : 0, JumpCurrentCount,
-		Health, IsAlive() ? 1 : 0, IsProtected() ? 1 : 0, HeldWeapon != nullptr ? HeldWeapon->GetMagazine() : -1, HeldWeapon != nullptr ? HeldWeapon->GetReserve() : -1, HeldWeapon != nullptr && HeldWeapon->IsAimed() ? 1 : 0,
+		Health, IsAlive() ? 1 : 0, IsProtected() ? 1 : 0, GhostShown, IsFrozen() ? 1 : 0, HeldWeapon != nullptr ? HeldWeapon->GetMagazine() : -1, HeldWeapon != nullptr ? HeldWeapon->GetReserve() : -1, HeldWeapon != nullptr && HeldWeapon->IsAimed() ? 1 : 0,
 		FirstPersonCameraComponent->FieldOfView, HeldWeapon != nullptr ? HeldWeapon->ShotsFired : 0, HeldWeapon != nullptr ? HeldWeapon->HitsConfirmed : 0, HeldWeapon != nullptr && HeldWeapon->IsReloading() ? 1 : 0,
 		HeldWeapon != nullptr ? *HeldWeapon->GetWeaponId().ToString() : TEXT("none"), HeldWeapon != nullptr && HeldWeapon->IsDrawing() ? 1 : 0,
 		Body.X, Body.Y, Body.Z, GetMesh()->IsSimulatingPhysics() ? 1 : 0, Eye.X, Eye.Y, Eye.Z, HandInView.X, HandInView.Y, HandInView.Z, Along.X, Along.Y, Along.Z,
