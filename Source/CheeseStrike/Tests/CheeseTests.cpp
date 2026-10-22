@@ -17,6 +17,8 @@
 #include "NavigationSystem.h"
 #include "Map/CheeseStrikeCheese.h"
 #include "Map/CheeseStrikeDoor.h"
+#include "Map/CheeseStrikeMouse.h"
+#include "Misc/App.h"
 #include "CheeseStrikeCharacter.h"
 #include "PlayTesting.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -24,6 +26,10 @@
 namespace CheeseTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
+	/** The mice in AfterTheMice: when they come, by when they have eaten everything, and the most of the blocks left a minute after they came (they do eat). */
+	constexpr int32 MiceAt = 8;
+	constexpr float EatenBy = 330.0f;
+	constexpr float MostLeftAfterAMinute = 0.95f;
 	const TCHAR* const Level = TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery");
 	/** A house of cheese in it, and a door. */
 	const FName House(TEXT("CuringHouseGouda"));
@@ -218,16 +224,25 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 	using namespace CheeseTests;
 	static TArray<TPair<TWeakObjectPtr<ACheeseStrikeCheese>, FBox>> Kept;
 	static int32 Edible = 0;
+	// How the mice got on: when they came, the share of the blocks left a minute after, and when the last went (or -1).
+	static float CameAt = 0.0f;
+	static float LeftAfterAMinute = 1.0f;
+	static float GoneAfter = -1.0f;
+	static float LastSeen = 0.0f;
 	Kept.Reset();
+	CameAt = 0.0f;
+	LeftAfterAMinute = 1.0f;
+	GoneAfter = -1.0f;
+	LastSeen = 0.0f;
 	FSession Session;
 	Session.Level = Parameters;
+	Session.Options = FString::Printf(TEXT("?Mice=1?MiceAt=%d"), MiceAt);
 	StartPlaying(Session);
 	WaitUntil(TEXT("the navigation mesh"), 30.0f, []()
 	{
 		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World(0));
 		return Navigation != nullptr && Navigation->GetDefaultNavDataInstance() != nullptr && !Navigation->IsNavigationBeingBuilt(World(0));
 	});
-	// The mice eat all they may, at once.
 	Then([this]()
 	{
 		Edible = 0;
@@ -237,16 +252,90 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 			{
 				Kept.Add({Each, Each->GetComponentsBoundingBox()});
 			}
+			else
+			{
+				++Edible;
+			}
 		}
+		AddInfo(FString::Printf(TEXT("%d blocks to eat, %d kept"), Edible, Kept.Num()));
+	});
+	// The mice come, and eat all they may in about five minutes, steadily: played at a fixed step, as fast as the
+	// editor goes, so that five minutes of play take much less.
+	WaitUntil(TEXT("the mice coming"), 60.0f, []()
+	{
+		if (Edible == 0)
+		{
+			return true;
+		}
+		for (TActorIterator<ACheeseStrikeMouse> It(World(0)); It; ++It)
+		{
+			CameAt = World(0)->GetTimeSeconds();
+			FApp::SetUseFixedTimeStep(true);
+			FApp::SetFixedDeltaTime(1.0 / 30.0);
+			return true;
+		}
+		return false;
+	});
+	WaitUntil(TEXT("the mice eating everything"), 900.0f, []()
+	{
+		if (Edible == 0)
+		{
+			return true;
+		}
+		const float Since = World(0)->GetTimeSeconds() - CameAt;
+		const int32 Left = ACheeseStrikeCheese::CountEdible(World(0));
+		if (Since >= 60.0f && LastSeen < 60.0f)
+		{
+			LeftAfterAMinute = static_cast<float>(Left) / Edible;
+		}
+		if (FMath::FloorToInt(Since / 30.0f) != FMath::FloorToInt(LastSeen / 30.0f))
+		{
+			Test()->AddInfo(FString::Printf(TEXT("%.0f s after the mice came: %d of %d blocks left"), Since, Left, Edible));
+		}
+		LastSeen = Since;
+		if (Left == 0)
+		{
+			GoneAfter = Since;
+			return true;
+		}
+		return Since > EatenBy + 30.0f;
+	});
+	Then([this]()
+	{
+		FApp::SetUseFixedTimeStep(false);
+		if (Edible == 0)
+		{
+			return;
+		}
+		AddInfo(FString::Printf(TEXT("all %d blocks eaten %.0f s after the mice came; %.0f%% left after a minute"), Edible, GoneAfter, 100.0f * LeftAfterAMinute));
+		if (GoneAfter < 0.0f)
+		{
+			// What is left, and what the mice are doing, to see why.
+			TMap<FName, int32> Left;
+			for (ACheeseStrikeCheese* Each : AllCheese())
+			{
+				if (Each->IsEdible())
+				{
+					Left.FindOrAdd(Each->GetStructure())++;
+					AddInfo(FString::Printf(TEXT("left: %s (%s) at %s, %.0f health"), *Each->GetActorLabel(), *Each->GetStructure().ToString(), *Each->GetComponentsBoundingBox().GetCenter().ToCompactString(), Each->GetHealth()));
+				}
+			}
+			for (TActorIterator<ACheeseStrikeMouse> It(World(0)); It; ++It)
+			{
+				AddInfo(FString::Printf(TEXT("mouse: %s"), *It->Describe()));
+			}
+		}
+		TestTrue(FString::Printf(TEXT("the mice eat everything within %.0f s of coming (%.0f s)"), EatenBy, GoneAfter), GoneAfter >= 0.0f && GoneAfter <= EatenBy);
+		TestTrue(FString::Printf(TEXT("the mice eat steadily: more than half the blocks left a minute after they came (%.0f%%)"), 100.0f * LeftAfterAMinute), LeftAfterAMinute > 0.5f);
+		TestTrue(FString::Printf(TEXT("the mice eat steadily: no more than %.0f%% of the blocks left a minute after they came (%.0f%%)"), 100.0f * MostLeftAfterAMinute, 100.0f * LeftAfterAMinute), LeftAfterAMinute <= MostLeftAfterAMinute);
+		// Whatever is left, eaten at once, for the checks of what the map keeps.
 		for (ACheeseStrikeCheese* Each : AllCheese())
 		{
 			if (Each->IsEdible())
 			{
 				Each->Bite(CheeseStrikeRules::CheeseBlockHealth);
-				++Edible;
 			}
 		}
-		AddInfo(FString::Printf(TEXT("%d blocks eaten, %d kept"), Edible, Kept.Num()));
 	});
 	WaitUntil(TEXT("what was on the cheese settling"), 10.0f, []()
 	{

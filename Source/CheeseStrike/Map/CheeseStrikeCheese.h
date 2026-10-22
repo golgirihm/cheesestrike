@@ -47,6 +47,8 @@ public:
 	bool IsEdible() const { return bEdible; }
 	/** How many blocks of cheese in `World` the mice may eat (what the number of mice goes by). */
 	static int32 CountEdible(const UWorld* World);
+	/** The health of all the cheese in `World` the mice may eat (what their pace goes by: CheeseStrikeMice::Pace). */
+	static float EdibleHealth(const UWorld* World);
 	/** Whether what is under it now holds it up (CheeseStrikeMice::IsHeld); `Why`, if given, gets what it stands on. */
 	bool IsHeld(FString* Why = nullptr) const;
 	/** The blocks in `World` that nothing under them holds up, and that aren't falling (the console's CheeseStrikeUnheld lists them). */

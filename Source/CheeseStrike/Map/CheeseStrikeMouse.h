@@ -54,6 +54,11 @@ public:
 	/** Server only: comes in over the edge, from `From` (on top of the map's wall) down to the ground at `To`. */
 	void Enter(const FVector& From, const FVector& To);
 
+	/** Server only: the mice came at `CameAt` (the server's time) to `FullHealth` of edible cheese; its bites keep to the pace that eats it all in time (CheeseStrikeMice::Pace). Without it, it bites as Bite says. */
+	void SetSchedule(float CameAt, float FullHealth);
+	/** How much its next bite takes. */
+	float NextBite() const;
+
 	EMouseDoing GetDoing() const { return Doing; }
 	ACheeseStrikeCheese* GetTarget() const { return Target.Get(); }
 	float GetFear() const { return Fear; }
@@ -81,13 +86,13 @@ protected:
 	/** Chooses the cheapest cheese it can walk to, and the way there. */
 	void ChooseCheese();
 	/** A way on the navigation mesh to `To`, into Path; false if there is none. */
-	bool FindWay(const FVector& To);
+	bool FindWay(const FVector& To, bool bLeapAtEnd = false);
 	/** Walks along Path at `Speed`, turning as it goes. True once at its end. */
 	bool FollowPath(float Speed, float DeltaSeconds);
 	/** Turns toward `Direction` (flat), no faster than a mouse turns. */
 	void TurnToward(const FVector& Direction, float DeltaSeconds);
 	/** A way to somewhere beside `Cheese` it can eat it from (not on top of it), into Path; false if there is none. */
-	bool FindWayBeside(const ACheeseStrikeCheese* Cheese);
+	bool FindWayBeside(const ACheeseStrikeCheese* Cheese, bool bLeapAtEnd = false);
 	/** Whether it can reach `Cheese` from where it is. */
 	bool CanReach(const ACheeseStrikeCheese* Cheese) const;
 	void RunFrom(const FVector& Danger);
@@ -174,14 +179,34 @@ protected:
 	float NextChoiceAt = 0.0f;
 	/** When it last made progress on its cheese (closer to it, or a bite), and how close it had come. */
 	float ProgressAt = 0.0f;
+	/** Where and when it was last scared, and how many blocks it had eaten then (CheeseStrikeMice::StillAvoids); ScaredWhen < 0 for never. */
+	FVector ScaredWhere = FVector::ZeroVector;
+	float ScaredWhen = -1.0f;
+	int32 EatenWhenScared = 0;
+	/** The middle of the map, from above: the middle of its ways in (the maps are mirrored), found when first wanted. */
+	TOptional<FVector2D> MapMiddle;
+	FVector2D GetMapMiddle();
+	/** When it last came nearer whatever it was after (choosing another doesn't count). */
+	float GainedAt = 0.0f;
 	float Closest = 0.0f;
 	int32 Eaten = 0;
 	float FallSpeed = 0.0f;
 	/** When it comes back after falling in, and how many times it has. */
 	float BackAt = 0.0f;
 	int32 FallenIn = 0;
+	/** Where it leaps to at the end of its way, onto cheese it can't walk to (an island of The Fondue Floor, an upper floor no stairs lead to); unset for none. */
+	TOptional<FVector> LeapTo;
+	/** A block standing alone that it leapt onto to eat from on top (its one exception to never eating what it stands on). */
+	TWeakObjectPtr<ACheeseStrikeCheese> EatsUnderfoot;
+	/** A way to the top of `Cheese`, leaping onto it from as near as it can walk; false if there is none. */
+	bool FindWayOnto(const ACheeseStrikeCheese* Cheese);
+	/** Server only: with nothing it can walk or leap to, it bounds straight to `Cheese` (beside it, or onto it if it stands alone); false if there is nowhere to land. */
+	bool BoundTo(ACheeseStrikeCheese* Cheese);
 	/** When it last bit, or came in; when it next looks whether it is cut off; and its leaps. */
 	float LastBiteAt = 0.0f;
 	float NextStrandedCheck = 0.0f;
 	int32 Leaps = 0;
+	/** When the mice came, and the edible cheese's health then (0: no schedule). */
+	float ScheduleFrom = 0.0f;
+	float ScheduleHealth = 0.0f;
 };
