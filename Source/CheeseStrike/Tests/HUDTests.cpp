@@ -199,6 +199,12 @@ bool FThePlayersRowSaysWhoIsAlive::RunTest(const FString& Parameters)
 	TestEqual(TEXT("alive"), StatusOf(false, false), EStatus::Alive);
 	TestEqual(TEXT("killed and coming back"), StatusOf(false, true), EStatus::Respawning);
 	TestEqual(TEXT("out is out, dead or not"), StatusOf(true, true), EStatus::Out);
+	TestEqual(TEXT("down, alive"), StatusOf(false, false, true), EStatus::Down);
+	TestEqual(TEXT("down and dead is dead"), StatusOf(false, true, true), EStatus::Respawning);
+	TestEqual(TEXT("down and out is out"), StatusOf(true, true, true), EStatus::Out);
+	TestEqual(TEXT("just down: all the bleeding out to go"), BleedLeft(30.0f, 30.0f), 1.0f);
+	TestEqual(TEXT("half way"), BleedLeft(15.0f, 30.0f), 0.5f);
+	TestEqual(TEXT("never past either end"), BleedLeft(-2.0f, 30.0f) + BleedLeft(40.0f, 30.0f), 1.0f);
 	TestEqual(TEXT("killed at 10 with a 3 s delay, at 10.5: back in 3"), SecondsToComeBack(3.0f, 10.5f, 10.0f), 3);
 	TestEqual(TEXT("at 12.2: back in 1"), SecondsToComeBack(3.0f, 12.2f, 10.0f), 1);
 	TestEqual(TEXT("late: 0, never less"), SecondsToComeBack(3.0f, 14.0f, 10.0f), 0);

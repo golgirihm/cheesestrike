@@ -289,7 +289,7 @@ ACheeseStrikeCharacter* ACheeseStrikeHUD::BodyOf(const APlayerState* Player)
 
 CheeseStrikeHUD::EStatus ACheeseStrikeHUD::StatusOf(const ACheeseStrikePlayerState* Player, const ACheeseStrikeCharacter* Body)
 {
-	return CheeseStrikeHUD::StatusOf(Player != nullptr && Player->IsOut(), Body != nullptr && !Body->IsAlive());
+	return CheeseStrikeHUD::StatusOf(Player != nullptr && Player->IsOut(), Body != nullptr && !Body->IsAlive(), Body != nullptr && Body->IsDowned());
 }
 
 void ACheeseStrikeHUD::Tick(float DeltaSeconds)
@@ -974,6 +974,7 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	};
 	TArray<FSection> Sections;
 	TSet<FString> Out;
+	TSet<FString> Down;
 	if (Match->HasTeams())
 	{
 		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
@@ -1002,6 +1003,10 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 		if (Ours != nullptr && Ours->IsOut())
 		{
 			Out.Add(Ours->GetPlayerName());
+		}
+		else if (Ours != nullptr && StatusOf(Ours, BodyOf(Ours)) == CheeseStrikeHUD::EStatus::Down)
+		{
+			Down.Add(Ours->GetPlayerName());
 		}
 	}
 
@@ -1060,6 +1065,10 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 			const bool bOut = Out.Contains(Line.Name);
 			const FLinearColor Colour = HudDraw::Faded(Line.Name == Me ? HudDraw::Accent : HudDraw::Ink, bOut ? 0.45f : 1.0f);
 			HudDraw::Text(Canvas, bOut ? Line.Name + TEXT("   OUT") : Line.Name, FVector2D(Left + 24.0f * U, Y), Row, Colour);
+			if (!bOut && Down.Contains(Line.Name))
+			{
+				HudDraw::Text(Canvas, TEXT("DOWN"), FVector2D(Left + 24.0f * U + HudDraw::Measure(Line.Name + TEXT("   "), Row).X, Y), Row, CheeseStrikeHUD::DownColour);
+			}
 			HudDraw::Text(Canvas, FString::FromInt(Line.Kills), FVector2D(Left + PanelWidth - 110.0f * U, Y), Row, Colour, 1.0f);
 			HudDraw::Text(Canvas, FString::FromInt(Line.Deaths), FVector2D(Left + PanelWidth - 20.0f * U, Y), Row, Colour, 1.0f);
 			Y += RowHeight;

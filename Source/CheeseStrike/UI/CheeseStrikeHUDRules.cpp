@@ -203,9 +203,14 @@ namespace CheeseStrikeHUD
 		return Look;
 	}
 
-	EStatus StatusOf(bool bOut, bool bDead)
+	EStatus StatusOf(bool bOut, bool bDead, bool bDown)
 	{
-		return bOut ? EStatus::Out : bDead ? EStatus::Respawning : EStatus::Alive;
+		return bOut ? EStatus::Out : bDead ? EStatus::Respawning : bDown ? EStatus::Down : EStatus::Alive;
+	}
+
+	float BleedLeft(float Seconds, float Total)
+	{
+		return Total > 0.0f ? FMath::Clamp(Seconds / Total, 0.0f, 1.0f) : 0.0f;
 	}
 
 	int32 SecondsToComeBack(float RespawnDelay, float Now, float DiedAt)

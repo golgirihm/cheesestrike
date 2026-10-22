@@ -18,6 +18,7 @@
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Map/CheeseStrikePlace.h"
+#include "Modes/CheeseStrikeLastStand.h"
 
 /** The HUD's drawing, named through an alias rather than used as a whole: the packaged game's unity build would carry a using-directive into the files after this one. */
 namespace HudDraw = CheeseStrikeHUDDraw;
@@ -246,6 +247,7 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 	const float Now = Match->GetServerWorldTimeSeconds();
 	const FSlateFontInfo Initials = HudDraw::Font(16.0f * U);
 	const FSlateFontInfo Seconds = HudDraw::Font(20.0f * U);
+	const FSlateFontInfo DownWord = HudDraw::Font(12.0f * U);
 
 	struct FIcon
 	{
@@ -254,6 +256,8 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 		CheeseStrikeHUD::EStatus Status;
 		int32 Back;
 		UTexture2D* Avatar;
+		/** Down: how much of the bleeding out is left. */
+		float Bleed;
 	};
 	TArray<FIcon> Icons;
 	for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
@@ -266,7 +270,9 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 			const ACheeseStrikeCharacter* Body = BodyOf(Player);
 			const CheeseStrikeHUD::EStatus Status = StatusOf(Player, Body);
 			const int32 Back = Status == CheeseStrikeHUD::EStatus::Respawning ? CheeseStrikeHUD::SecondsToComeBack(Match->GetRespawnDelay(), Now, Body->GetDiedAt()) : 0;
-			Icons.Add({Player, FVector2D(X, Top), Status, Back, Avatars->For(Player)});
+			const UCheeseStrikeLastStand* Stand = Status == CheeseStrikeHUD::EStatus::Down ? Body->GetLastStand() : nullptr;
+			const float Bleed = Stand != nullptr ? CheeseStrikeHUD::BleedLeft(Stand->SecondsToBleedOut(), CheeseStrikeModes::LastStandTime) : 0.0f;
+			Icons.Add({Player, FVector2D(X, Top), Status, Back, Avatars->For(Player), Bleed});
 			X += Size + Gap;
 		}
 	}
@@ -275,7 +281,8 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 		return;
 	}
 
-	// The tiles: a picture, or the initials on the side's colour; a strip of the side's colour under; dimmed while coming back, darker and struck through when out.
+	// The tiles: a picture, or the initials on the side's colour; a strip of the side's colour under; dimmed while coming back, darker and struck through when out;
+	// down, washed and framed in orange, slowly pulsing, the strip under it the bleeding out running down.
 	HudDraw::FShapes Under;
 	HudDraw::FShapes Over;
 	if (bTeams)
@@ -290,7 +297,16 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 			Under.Quad(Icon.At, Icon.At + FVector2D(Size, 0.0f), Icon.At + FVector2D(Size, Size), Icon.At + FVector2D(0.0f, Size),
 				Side * FLinearColor(0.55f, 0.55f, 0.55f, 0.92f), Side * FLinearColor(0.5f, 0.5f, 0.5f, 0.92f), Side * FLinearColor(0.32f, 0.32f, 0.32f, 0.92f), Side * FLinearColor(0.36f, 0.36f, 0.36f, 0.92f));
 		}
-		if (Icon.Status != CheeseStrikeHUD::EStatus::Alive)
+		if (Icon.Status == CheeseStrikeHUD::EStatus::Down)
+		{
+			const float Pulse = 0.5f + 0.5f * FMath::Sin(Now * 5.0f);
+			Over.Rect(Icon.At.X, Icon.At.Y, Size, Size, FLinearColor(0.0f, 0.0f, 0.0f, 0.3f));
+			Over.Rect(Icon.At.X, Icon.At.Y, Size, Size, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.2f + 0.2f * Pulse));
+			Over.Frame(Icon.At.X, Icon.At.Y, Size, Size, FMath::Max(1.0f, 2.0f * U), CheeseStrikeHUD::DownColour);
+			Over.Rect(Icon.At.X, Icon.At.Y + Size, Size, 3.0f * U, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.3f));
+			Over.Rect(Icon.At.X, Icon.At.Y + Size, Size * Icon.Bleed, 3.0f * U, CheeseStrikeHUD::DownColour);
+		}
+		else if (Icon.Status != CheeseStrikeHUD::EStatus::Alive)
 		{
 			Over.Rect(Icon.At.X, Icon.At.Y, Size, Size, FLinearColor(0.0f, 0.0f, 0.0f, Icon.Status == CheeseStrikeHUD::EStatus::Out ? 0.78f : 0.6f));
 		}
@@ -298,7 +314,10 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 		{
 			Over.Line(Icon.At + FVector2D(6.0f * U, Size - 6.0f * U), Icon.At + FVector2D(Size - 6.0f * U, 6.0f * U), 2.0f * U, HudDraw::Faded(HudDraw::Danger, 0.8f));
 		}
-		Over.Rect(Icon.At.X, Icon.At.Y + Size, Size, 3.0f * U, Icon.Status == CheeseStrikeHUD::EStatus::Alive ? Side : HudDraw::Faded(Side, 0.35f));
+		if (Icon.Status != CheeseStrikeHUD::EStatus::Down)
+		{
+			Over.Rect(Icon.At.X, Icon.At.Y + Size, Size, 3.0f * U, Icon.Status == CheeseStrikeHUD::EStatus::Alive ? Side : HudDraw::Faded(Side, 0.35f));
+		}
 		if (Icon.Player == Me)
 		{
 			Over.Frame(Icon.At.X - 2.0f * U, Icon.At.Y - 2.0f * U, Size + 4.0f * U, Size + 7.0f * U, FMath::Max(1.0f, 1.5f * U), HudDraw::Ink);
@@ -324,6 +343,15 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 		{
 			const FString Count = FString::FromInt(Icon.Back);
 			HudDraw::Text(Canvas, Count, FVector2D(Icon.At.X + Size / 2.0f, Icon.At.Y + (Size - HudDraw::Measure(Count, Seconds).Y) / 2.0f), Seconds, HudDraw::Ink, 0.5f);
+		}
+		else if (Icon.Status == CheeseStrikeHUD::EStatus::Down)
+		{
+			// The word across the foot of the tile, white on a band of the colour, so that it reads on any picture.
+			const FVector2D Word = HudDraw::Measure(TEXT("DOWN"), DownWord);
+			HudDraw::FShapes Band;
+			Band.Rect(Icon.At.X, Icon.At.Y + Size - Word.Y - 2.0f * U, Size, Word.Y + 2.0f * U, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.9f));
+			Band.Draw(Canvas);
+			HudDraw::Text(Canvas, TEXT("DOWN"), FVector2D(Icon.At.X + Size / 2.0f, Icon.At.Y + Size - Word.Y - 1.0f * U), DownWord, HudDraw::Ink, 0.5f, false);
 		}
 	}
 }
