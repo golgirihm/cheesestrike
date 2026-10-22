@@ -80,6 +80,7 @@ namespace CheeseStrikeRules
 		{TEXT("Gruyère Grotto"), TEXT("/Game/CheeseStrike/Maps/Lvl_Grotto"), TEXT("grotto.png")},
 		{TEXT("Rind Market"), TEXT("/Game/CheeseStrike/Maps/Lvl_RindMarket"), TEXT("market.png")},
 		{TEXT("Proving Ground"), TEXT("/Game/Variant_Shooter/Lvl_Shooter"), TEXT("proving_ground.png")},
+		{TEXT("The Fondue Floor"), TEXT("/Game/CheeseStrike/Maps/Lvl_FondueFloor"), TEXT("fondue.png")},
 	};
 
 	int32 NumMaps()

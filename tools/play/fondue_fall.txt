@@ -1,0 +1,22 @@
+# A fall into The Fondue Floor's fondue, seen from outside: the player stands on the floor, the floor under them is
+# eaten (CheeseStrikeEatCheese), and they go in; the kill feed and the death screen say so. Run with
+# -Map /Game/CheeseStrike/Maps/Lvl_FondueFloor -StartAt -2100,500,100,0 (a tile of floor west of the middle).
+wait 20
+cmd CheeseStrikeOutside 420 140 20 140
+wait 1
+shot fondue_fall_0_before
+cmd CheeseStrikeEatCheese 1 FloorGouda
+wait 0.3
+shot fondue_fall_1_going
+wait 0.3
+shot fondue_fall_2_in
+wait 1.2
+shot fondue_fall_3_gone
+cmd CheeseStrikeOutside
+wait 0.2
+shot fondue_fall_4_death_screen
+wait 4
+cmd CheeseStrikeViewFrom -2100 -200 260 -35 90
+wait 1
+shot fondue_fall_5_where
+quit
