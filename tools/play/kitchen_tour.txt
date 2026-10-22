@@ -1,0 +1,58 @@
+# A tour of Crumb Kitchen from fixed views: the room from its corners, then each
+# lane and place at eye height. Run with -Map /Game/CheeseStrike/Maps/Lvl_Kitchen.
+wait 20
+cmd CheeseStrikeViewFrom 3350 -1950 1150 -24 142
+wait 3
+shot kitchen_1_from_southeast
+cmd CheeseStrikeViewFrom -3350 -1950 1150 -24 38
+wait 2
+shot kitchen_2_from_southwest
+cmd CheeseStrikeViewFrom 0 -450 170 4 90
+wait 2
+shot kitchen_3_wedge
+cmd CheeseStrikeViewFrom -2750 1950 620 -4 0
+wait 2
+shot kitchen_4_worktop_west
+cmd CheeseStrikeViewFrom -1000 1700 150 0 0
+wait 2
+shot kitchen_5_hollow
+cmd CheeseStrikeViewFrom -1900 2200 170 0 0
+wait 2
+shot kitchen_6_cupboard
+cmd CheeseStrikeViewFrom -1100 -1100 150 0 0
+wait 2
+shot kitchen_7_under_table
+cmd CheeseStrikeViewFrom -2600 -300 500 -12 -38
+wait 2
+shot kitchen_8_table_books
+cmd CheeseStrikeViewFrom -1400 800 350 -8 140
+wait 2
+shot kitchen_9_cookbooks
+cmd CheeseStrikeViewFrom 0 2050 620 -12 -90
+wait 2
+shot kitchen_10_down_the_wedge
+cmd CheeseStrikeViewFrom -2560 1300 380 -12 90
+wait 2
+shot kitchen_11_cooker
+cmd CheeseStrikeViewFrom -1200 -1100 540 -5 0
+wait 2
+shot kitchen_12_table_top
+cmd CheeseStrikeViewFrom -2200 600 300 0 15
+wait 2
+shot kitchen_13_wedge_side
+cmd CheeseStrikeViewFrom 2750 1950 620 -4 180
+wait 2
+shot kitchen_14_worktop_east
+cmd CheeseStrikeViewFrom -1500 0 600 -10 180
+wait 2
+shot kitchen_15_gouda_dresser
+cmd CheeseStrikeViewFrom -3450 -1300 700 -25 45
+wait 2
+shot kitchen_16_gouda_starts
+cmd CheeseStrikeViewFrom 1500 0 600 -10 0
+wait 2
+shot kitchen_17_mozza_dresser
+cmd CheeseStrikeViewFrom 1900 2200 170 0 180
+wait 2
+shot kitchen_18_cupboard_east
+quit
