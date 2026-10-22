@@ -38,7 +38,7 @@ The mice come in at the drains, two in each side face, eight in all, and land 5 
 
 ## The cheese, and what the mice change
 
-About 680 blocks the mice can eat, and about 140 they can't (the spines, the Mother Wheel, the bridges' beams): the full eight mice. They eat 75 to 85 blocks a minute here, so the maze is gone by about nine minutes after they come: the gutter first, then the outer ring, the middle, the inner, and last the gallery's parapet and bridges.
+About 680 blocks the mice can eat, and about 140 they can't (the spines, the Mother Wheel, the bridges' beams): the full ten mice. They keep to the mice's pace, so the maze is gone about four minutes after they come: the gutter first, then the outer ring, the middle, the inner, and last the gallery's parapet and bridges.
 
 | Structure | Before | Eaten |
 |---|---|---|

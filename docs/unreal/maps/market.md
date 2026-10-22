@@ -44,7 +44,7 @@ The mice come in at ten points (`MouseEntry`, in the `Mice` folder): over the ro
 
 ## The cheese, and what the mice change
 
-There are 1,092 blocks of cheese, all of them edible; the full eight mice come. Eight mice eat about 70 blocks a minute here (`tools/play/market_mice.txt`), so a ten-minute match eats about 650: the stalls, the stores, the courts and the alleys' cheese in the first four minutes, then the arcade and balcony houses' walls, and the Inns and Bakeries last. What each structure does before the mice, and what eating it does:
+There are 1,092 blocks of cheese, all of them edible; the full ten mice come. They keep to the mice's pace (`tools/play/market_mice.txt`), so the square is bare about four and a half minutes after they come: the stalls, the stores, the courts and the alleys' cheese in the first four minutes, then the arcade and balcony houses' walls, and the Inns and Bakeries last. What each structure does before the mice, and what eating it does:
 
 | Structure | Blocks | Before | Eaten |
 |---|---|---|---|

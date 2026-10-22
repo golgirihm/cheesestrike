@@ -35,7 +35,7 @@ Where this document gives a length in metres, it is a Godot metre unless marked 
 | Jump | 7.8 m/s upward; one jump; air steering at 14 m/s² |
 | Step | up to 0.6 m is walked over; a ledge up to 2.5 m is climbed (mantled) in 0.4 s |
 | Slide | from a sprint, crouching: 0.9 s, 1.15 × speed at first, usable from 1.2 × walk, a 0.4 s rest after |
-| Fall damage | none up to 14 m/s of fall; 8 damage per m/s over that; a hard landing (over 0.7 of the safe speed) slows for 0.5 s |
+| Fall damage | as in Counter-Strike (the user's, October 2026): none from a drop up to 5.5 m, then growing with the landing's speed to 100 at a drop of 16 m (`Rules/CheeseStrikeFalls.h`); credited to whoever hurt the faller in the 5 s before, else "fell" |
 | Flinch | being hit slows to 0.4 of speed for 0.7 s |
 | Lean | left and right, held or toggled |
 | Ladders | climbed at 5 m/s; jump pads throw along a set arc |
@@ -124,9 +124,9 @@ Lighting and weather are per session: a sun or moon at a height and bearing, amb
 
 ## The mice
 
-The host runs them; everyone sees the same. One minute into a match, after a red countdown, all the mice come in together over the edge. How many: two on a small arena, up to eight, one for every sixty blocks of cheese. A mouse is 12 m long and 6 m high (Godot metres: about twice a player's height, which at life size makes them giant rats the size of a car). Each goes for the nearest cheese low down (height costs 4 m of distance per metre up; cheese another mouse has costs 40 m), walks at 8 m/s, climbs over anything under 3 m and goes round the rest, eats a block bite by bite (40 of a block's 400, every half second: a block lasts five seconds of one mouse, and is drawn in three stages of being eaten) and moves on. Blocks are eaten from the bottom; a house of cheese loses its walls from the ground up. A mouse hurt by 300 (wearing off at 20 a second) runs at 18 m/s for 6 s and comes back; a mouse that makes no progress for 8 s gives up that cheese for 30 s. Mice hurt nobody and block nothing. They gnaw and squeak, and bob as they walk.
+The host runs them; everyone sees the same. One minute into a match, after a red countdown, all the mice come in together over the edge. How many: two on a small arena, up to ten, one for every sixty blocks of cheese. A mouse is 12 m long and 6 m high (Godot metres: about twice a player's height, which at life size makes them giant rats the size of a car). Each goes for the nearest cheese low down (height costs 4 m of distance per metre up; cheese another mouse has costs 40 m), walks at 8 m/s, climbs over anything under 3 m and goes round the rest, eats a block bite by bite (40 of a block's 400, every half second: a block lasts five seconds of one mouse, and is drawn in three stages of being eaten) and moves on. Blocks are eaten from the bottom; a house of cheese loses its walls from the ground up. A mouse hurt by 300 (wearing off at 20 a second) runs at 18 m/s for 6 s and comes back, and then eats away from where it was scared, the far side of the map if it can, for a minute or four blocks (the user's, October 2026); a mouse that makes no progress for 8 s gives up that cheese for 30 s. Mice hurt nobody and block nothing. They gnaw and squeak, and bob as they walk.
 
-The tuning is a guess that play has not yet settled: cover should be plainly going by the middle of a match and mostly gone by its end, without the last minutes being a plain with nowhere to stand.
+The tuning is a guess that play has not yet settled: cover should be plainly going by the middle of a match and mostly gone by its end, without the last minutes being a plain with nowhere to stand. The user's, October 2026: every map is eaten bare about five minutes after the mice come, steadily, whatever its size; the mice keep to that pace by the size of their bites (bigger when behind a steady eating, smaller when ahead; `CheeseStrikeMice::Pace`).
 
 ## Pickups, power-ups and the Overload
 
