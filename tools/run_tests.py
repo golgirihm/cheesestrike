@@ -46,7 +46,7 @@ def checkout_id():
 
 def build(root):
     command = [str(root / "Engine" / "Build" / "BatchFiles" / "Build.bat"), TARGET, "Win64", "Development",
-               f"-Project={PROJECT}", "-WaitMutex", "-NoHotReload"]
+               f"-Project={PROJECT}", "-WaitMutex", "-NoHotReload", "-NoHotReloadFromIDE"]
     print("+", " ".join(command), flush=True)
     return subprocess.run(command, cwd=ROOT).returncode == 0
 
