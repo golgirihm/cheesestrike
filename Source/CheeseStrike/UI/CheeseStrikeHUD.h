@@ -108,6 +108,8 @@ public:
 	/** One of the character's weapons, as the list over the ammunition shows it: the key that takes it out, its name, whether it is in hand, and whether it may be taken out. */
 	struct FWeaponSlot
 	{
+		/** The weapon's id, for its icon. */
+		FName Id;
 		FString Key;
 		FString Name;
 		bool bHeld = false;
@@ -160,6 +162,14 @@ protected:
 	/** The red edges' picture: white, clear in the middle and solid at the edges, made in code. */
 	UPROPERTY(Transient)
 	TObjectPtr<UTexture2D> VignetteTexture;
+	/** Each weapon's icon, its silhouette from the side (tools/art/weapon_icons.py), loaded as it is first shown; null where there is none. */
+	UPROPERTY(Transient)
+	TMap<FName, TObjectPtr<UTexture2D>> WeaponIcons;
+	UTexture2D* WeaponIcon(FName Id);
+	/** Draws `Id`'s icon to fit `Size` at `At` (its right side at At.X + Size.X), in `Colour`; false if it has none. */
+	bool DrawWeaponPicture(FName Id, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour);
+	/** Looking through a scope: the view round it black, a reticle across it. */
+	void DrawScope(const ACheeseStrikeCharacter* Character);
 	UPROPERTY(Transient)
 	TObjectPtr<UCheeseStrikeAvatars> Avatars;
 	FCheeseStrikeMinimap Minimap;

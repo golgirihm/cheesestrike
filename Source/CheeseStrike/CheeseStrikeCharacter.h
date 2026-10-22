@@ -134,6 +134,10 @@ public:
 	/** How far below its place (cm) a weapon just drawn comes up from. */
 	static constexpr float DrawDrop = 25.0f;
 
+	/** How far the view has come down the sights, 0 to 1; from ScopeFrom, a scoped weapon is looked through (its model hidden, the HUD's scope drawn). */
+	float GetAimFraction() const { return AimFraction; }
+	static constexpr float ScopeFrom = 0.9f;
+
 	/** The weapon in hand, or null before one arrives. */
 	ACheeseStrikeWeapon* GetWeapon() const;
 	/** What it carries: the weapons in their slots, and which is in hand. */
@@ -261,11 +265,29 @@ protected:
 	float BaseFieldOfView = 90.0f;
 	/** How far the view has come from the head to the rifle's sights, 0 to 1. */
 	float AimFraction = 0.0f;
+	/** Whether the view is through a scope now, the first-person body hidden. */
+	bool bLookingThroughScope = false;
 	/** Where the eye sits to look through the sights, from the rifle's bounds: so far forward of its back end, so far above its top (the rifle points a little under the view, so the eye sits a little under the top), so far to the left of its middle. */
 	/** The arms' place on the body when not aiming. */
 	FTransform FirstPersonBase = FTransform::Identity;
-	/** Aiming: the arms brought so that the rifle's sight line runs down the view through the eye (Tick). */
-	void BringRifleToEye();
+	/**
+	 * Places the arms, which carry the camera on their head, the eye staying
+	 * where the head has it (Tick): at the hip, so that the hand holding the
+	 * weapon stays about where its hold has it in view however the body leans
+	 * (CheeseStrikeWeaponLooks::HipHand); aiming, so that the weapon's sight
+	 * line runs down the view through the eye.
+	 */
+	void BringRifleToEye(float DeltaSeconds);
+	/** Where the hand holding the weapon has been in view lately (forward, right, up from the eye, cm), and which way the weapon has pointed, smoothed. */
+	FVector HandInView = FVector::ZeroVector;
+	FVector AlongInView = FVector::ForwardVector;
+	bool bHandInViewKnown = false;
+	/** How fast that follows the hand (per second): slow enough that the cycles' bob still shows. */
+	static constexpr float HipSettleRate = 4.0f;
+	/** The most the arms are moved at the hip (cm). */
+	static constexpr float MostHipShift = 25.0f;
+	/** And turned, about the hand (degrees). */
+	static constexpr float MostHipTurn = 20.0f;
 	/** Where the camera sits in the first-person body's head bone: just under its eyes (from the body's eye bones), or where the template had it on the mannequin. */
 	FVector CameraAtHead = DefaultCameraAtHead;
 	static const FVector DefaultCameraAtHead;

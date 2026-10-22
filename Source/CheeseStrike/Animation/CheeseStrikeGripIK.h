@@ -28,6 +28,8 @@ struct FCheeseStrikeGripIK : public FAnimNode_TwoBoneIK
 	/** Where the hand is relative to the anchor, once measured. */
 	FTransform Grip = FTransform::Identity;
 	bool bGripMeasured = false;
+	/** How far past the grip the hand reaches, in the anchor's space (cm): along the weapon to its fore-end. */
+	FVector Shift = FVector::ZeroVector;
 	/** How far beyond the elbow the bend is aimed, in cm. */
 	float ElbowReach = 50.0f;
 

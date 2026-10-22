@@ -8,6 +8,7 @@
 #include "Animation/CheeseStrikeAnimInstance.h"
 #include "Animation/CheeseStrikeBodies.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -18,6 +19,7 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -26,6 +28,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGunfire.h"
 #include "CheeseStrikeInventory.h"
+#include "CheeseStrikeWeaponLooks.h"
 #include "Map/CheeseStrikeMouse.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 
@@ -51,6 +54,10 @@ namespace
 	const FTransform HandGrip(FRotator(-0.6f, 87.3f, 7.7f), FVector(-1.2f, 1.3f, -0.5f));
 	/** The bones Belica's own guns are skinned to. */
 	const TCHAR* const BuiltInWeaponBones[] = {TEXT("weapon"), TEXT("weapon_l"), TEXT("pistol")};
+	/** How long a muzzle flash shows, and how bright its light is (lumens) and how far it reaches. */
+	constexpr float FlashTime = 0.05f;
+	constexpr float FlashBrightness = 300.0f;
+	constexpr float FlashReach = 350.0f;
 
 	float ServerTime(const UWorld* World)
 	{
@@ -58,39 +65,18 @@ namespace
 		return State != nullptr ? State->GetServerWorldTimeSeconds() : (World != nullptr ? World->GetTimeSeconds() : 0.0f);
 	}
 
-	/** Which model a weapon has. */
-	enum class EWeaponModel : uint8
+	/** The asset at `Path`, loaded now if it isn't yet; null for none. */
+	template <typename T>
+	T* LoadLook(const TCHAR* Path)
 	{
-		Rifle,
-		Pistol,
-		Blade,
-	};
-	/**
-	 * How each weapon looks and sounds until it has a model of its own: the
-	 * rifle at a size, its shots higher or lower and softer or louder; the
-	 * pistol Lyra's; the knife a plain blade.
-	 */
-	struct FWeaponLook
+		return Path != nullptr ? LoadObject<T>(nullptr, Path) : nullptr;
+	}
+
+	/** One of `Sounds` at random, or null. */
+	USoundBase* AnyOf(const TArray<TObjectPtr<USoundBase>>& Sounds)
 	{
-		const TCHAR* Id;
-		EWeaponModel Model;
-		float Scale;
-		float Volume;
-		float Pitch;
-	};
-	const FWeaponLook WeaponLooks[] = {
-		{TEXT("blaster"), EWeaponModel::Rifle, 1.0f, 1.0f, 1.0f},
-		{TEXT("carbine"), EWeaponModel::Rifle, 0.92f, 0.95f, 1.08f},
-		{TEXT("grater"), EWeaponModel::Rifle, 0.8f, 0.8f, 1.25f},
-		{TEXT("munster"), EWeaponModel::Rifle, 1.15f, 1.1f, 0.85f},
-		{TEXT("shotgun"), EWeaponModel::Rifle, 1.05f, 1.2f, 0.65f},
-		{TEXT("roquefort"), EWeaponModel::Rifle, 1.2f, 1.2f, 0.6f},
-		{TEXT("pistol"), EWeaponModel::Pistol, 1.0f, 0.75f, 1.35f},
-		{TEXT("knife"), EWeaponModel::Blade, 1.0f, 0.6f, 1.6f},
-	};
-	/** The knife's stand-in blade: the engine's metre cube made 22 cm long, 3 cm deep and a few millimetres thin, along Y as the rifle is. */
-	const FVector KnifeBladeSize(0.006f, 0.24f, 0.035f);
-	const FVector KnifeBladeOffset(0.0f, 9.0f, 2.0f);
+		return Sounds.Num() > 0 ? Sounds[FMath::RandHelper(Sounds.Num())].Get() : nullptr;
+	}
 }
 
 ACheeseStrikeWeapon::ACheeseStrikeWeapon()
@@ -103,29 +89,8 @@ ACheeseStrikeWeapon::ACheeseStrikeWeapon()
 
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
-	// Lyra's rifle, its animations and its sounds (Content/LICENSES.md).
+	// Lyra's rifle (Content/LICENSES.md), until it becomes the weapon it is; then its look's model, loaded as it does.
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Rifle(TEXT("/Game/Weapons/Rifle/Mesh/SK_Rifle.SK_Rifle"));
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Pistol(TEXT("/Game/Weapons/Pistol/Meshes/SKM_Pistol.SKM_Pistol"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Block(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	static ConstructorHelpers::FObjectFinder<UAnimSequence> Fire(TEXT("/Game/Weapons/Rifle/Animations/Weap_Rifle_Fire.Weap_Rifle_Fire"));
-	static ConstructorHelpers::FObjectFinder<UAnimSequence> Reload(TEXT("/Game/Weapons/Rifle/Animations/Weap_Rifle_Reload.Weap_Rifle_Reload"));
-	static ConstructorHelpers::FObjectFinder<USoundBase> Shot1(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Punch-Close_01.Weapons_Rifle_Punch-Close_01"));
-	static ConstructorHelpers::FObjectFinder<USoundBase> Shot2(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Punch-Close_02.Weapons_Rifle_Punch-Close_02"));
-	static ConstructorHelpers::FObjectFinder<USoundBase> Shot3(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Punch-Close_03.Weapons_Rifle_Punch-Close_03"));
-	static ConstructorHelpers::FObjectFinder<USoundBase> DryFire(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_DryFire_01.Weapons_Rifle_DryFire_01"));
-	static ConstructorHelpers::FObjectFinder<USoundBase> ClipOut(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_ClipOut_01.Weapons_Rifle_ClipOut_01"));
-	static ConstructorHelpers::FObjectFinder<USoundBase> ClipIn(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_ClipIn_01.Weapons_Rifle_ClipIn_01"));
-	static ConstructorHelpers::FObjectFinder<USoundBase> Bolt(TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Bolt_01.Weapons_Rifle_Bolt_01"));
-	RifleMesh = Rifle.Object;
-	PistolMesh = Pistol.Object;
-	BlockMesh = Block.Object;
-	RifleFire = Fire.Object;
-	RifleReload = Reload.Object;
-	FireSounds = {Shot1.Object, Shot2.Object, Shot3.Object};
-	DryFireSound = DryFire.Object;
-	ClipOutSound = ClipOut.Object;
-	ClipInSound = ClipIn.Object;
-	BoltSound = Bolt.Object;
 
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 	FirstPersonMesh->SetupAttachment(RootComponent);
@@ -155,6 +120,30 @@ ACheeseStrikeWeapon::ACheeseStrikeWeapon()
 	ThirdPersonModel->bOwnerNoSee = true;
 	ThirdPersonModel->SetHiddenInGame(true);
 
+	// The muzzle's flash: a star of light in its player's view and on the body, and a moment's light round it.
+	FirstPersonFlash = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("First Person Flash"));
+	FirstPersonFlash->SetupAttachment(RootComponent);
+	FirstPersonFlash->SetCollisionProfileName(FName("NoCollision"));
+	FirstPersonFlash->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
+	FirstPersonFlash->bOnlyOwnerSee = true;
+	FirstPersonFlash->SetCastShadow(false);
+	FirstPersonFlash->SetHiddenInGame(true);
+	ThirdPersonFlash = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Third Person Flash"));
+	ThirdPersonFlash->SetupAttachment(RootComponent);
+	ThirdPersonFlash->SetCollisionProfileName(FName("NoCollision"));
+	ThirdPersonFlash->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::WorldSpaceRepresentation);
+	ThirdPersonFlash->bOwnerNoSee = true;
+	ThirdPersonFlash->SetCastShadow(false);
+	ThirdPersonFlash->SetHiddenInGame(true);
+	FlashLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("Flash Light"));
+	FlashLight->SetupAttachment(RootComponent);
+	FlashLight->SetIntensityUnits(ELightUnits::Lumens);
+	FlashLight->SetIntensity(FlashBrightness);
+	FlashLight->SetAttenuationRadius(FlashReach);
+	FlashLight->SetLightColor(FLinearColor(1.0f, 0.72f, 0.38f));
+	FlashLight->SetCastShadows(false);
+	FlashLight->SetVisibility(false);
+
 	Magazine = Stats->MagazineSize;
 	Reserve = Stats->Reserve;
 }
@@ -175,34 +164,90 @@ void ACheeseStrikeWeapon::SetWeapon(FName Id)
 	WeaponId = Stats->Id;
 	Magazine = Stats->MagazineSize;
 	Reserve = Stats->Reserve;
-	ApplyWeapon();
 }
 
 void ACheeseStrikeWeapon::ApplyWeapon()
 {
 	const FWeaponStats* Found = CheeseStrikeArsenal::Find(WeaponId);
 	Stats = Found != nullptr ? Found : &CheeseStrikeWeapons::Blaster();
-	const FWeaponLook* Look = &WeaponLooks[0];
-	for (const FWeaponLook& Each : WeaponLooks)
-	{
-		if (Stats->Id == FName(Each.Id))
-		{
-			Look = &Each;
-		}
-	}
-	ShotVolume = Look->Volume;
-	ShotPitch = Look->Pitch;
-	const bool bBlade = Look->Model == EWeaponModel::Blade;
-	ModelScale = bBlade ? KnifeBladeSize : FVector(Look->Scale);
+	Look = &CheeseStrikeWeaponLooks::For(Stats->Id);
+	USkeletalMesh* Skinned = LoadLook<USkeletalMesh>(Look->SkinnedModel);
+	UStaticMesh* Plain = LoadLook<UStaticMesh>(Look->PlainModel);
 	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
 	{
-		Mesh->SetSkeletalMeshAsset(bBlade ? nullptr : Look->Model == EWeaponModel::Pistol ? PistolMesh.Get() : RifleMesh.Get());
+		Mesh->SetSkeletalMeshAsset(Skinned);
 	}
 	for (UStaticMeshComponent* Model : {FirstPersonModel.Get(), ThirdPersonModel.Get()})
 	{
-		Model->SetStaticMesh(bBlade ? BlockMesh.Get() : nullptr);
+		Model->SetStaticMesh(Plain);
 	}
+	// Its cheese, slot by slot.
+	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(Look->Materials); ++Slot)
+	{
+		if (UMaterialInterface* Material = LoadLook<UMaterialInterface>(Look->Materials[Slot]))
+		{
+			for (UPrimitiveComponent* Part : {GetModel(true), GetModel(false)})
+			{
+				if (Part != nullptr && Slot < Part->GetNumMaterials())
+				{
+					Part->SetMaterial(Slot, Material);
+				}
+			}
+		}
+	}
+	// The flash, if it has one.
+	UStaticMesh* FlashModel = Look->FlashSize > 0.0f ? LoadLook<UStaticMesh>(CheeseStrikeWeaponLooks::FlashModel) : nullptr;
+	UMaterialInterface* FlashSide = FlashModel != nullptr ? LoadLook<UMaterialInterface>(CheeseStrikeWeaponLooks::FlashMaterial) : nullptr;
+	UMaterialInterface* FlashFront = FlashModel != nullptr ? LoadLook<UMaterialInterface>(CheeseStrikeWeaponLooks::FlashFrontMaterial) : nullptr;
+	for (UStaticMeshComponent* Star : {FirstPersonFlash.Get(), ThirdPersonFlash.Get()})
+	{
+		Star->SetStaticMesh(FlashModel);
+		if (FlashSide != nullptr && FlashFront != nullptr)
+		{
+			// The cards along the barrel, and the one facing along it (tools/art/weapon_models.py's Side and Front).
+			Star->SetMaterialByName(FName(TEXT("SideMat")), FlashSide);
+			Star->SetMaterialByName(FName(TEXT("FrontMat")), FlashFront);
+		}
+	}
+	ModelFire = LoadLook<UAnimSequence>(Look->FireAnimation);
+	ModelReload = LoadLook<UAnimSequence>(Look->ReloadAnimation);
+	FireSounds.Reset();
+	const bool bKnife = Stats->IsMelee();
+	for (const TCHAR* Path : Look->Shots)
+	{
+		if (USoundBase* Sound = LoadLook<USoundBase>(Path))
+		{
+			FireSounds.Add(Sound);
+		}
+	}
+	if (bKnife)
+	{
+		for (const TCHAR* Path : CheeseStrikeWeaponLooks::KnifeSwings)
+		{
+			FireSounds.Add(LoadLook<USoundBase>(Path));
+		}
+		HitSounds.Reset();
+		for (const TCHAR* Path : CheeseStrikeWeaponLooks::KnifeHits)
+		{
+			HitSounds.Add(LoadLook<USoundBase>(Path));
+		}
+	}
+	DrawSounds.Reset();
+	for (const TCHAR* Path : CheeseStrikeWeaponLooks::DrawSounds)
+	{
+		DrawSounds.Add(LoadLook<USoundBase>(Path));
+	}
+	FireSounds.RemoveAll([](const TObjectPtr<USoundBase>& Sound) { return Sound == nullptr; });
+	HitSounds.RemoveAll([](const TObjectPtr<USoundBase>& Sound) { return Sound == nullptr; });
+	DrawSounds.RemoveAll([](const TObjectPtr<USoundBase>& Sound) { return Sound == nullptr; });
+	DryFireSound = LoadLook<USoundBase>(Look->DryFire);
+	ClipOutSound = LoadLook<USoundBase>(Look->ReloadSounds[0]);
+	ClipInSound = LoadLook<USoundBase>(Look->ReloadSounds[1]);
+	BoltSound = LoadLook<USoundBase>(Look->ReloadSounds[2]);
+	ShotVolume = Look->ShotVolume;
+	ShotPitch = Look->ShotPitch;
 	SetInHand(bInHand);
+	FitToHands();
 }
 
 void ACheeseStrikeWeapon::BeginPlay()
@@ -227,6 +272,14 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 			Hold(Character);
 		}
 	}
+	// The flash goes out.
+	if (FlashUntil > 0.0f && GetWorld()->GetTimeSeconds() >= FlashUntil)
+	{
+		FlashUntil = 0.0f;
+		FirstPersonFlash->SetHiddenInGame(true);
+		ThirdPersonFlash->SetHiddenInGame(true);
+		FlashLight->SetVisibility(false);
+	}
 	if (Holder == nullptr || !Holder->IsLocallyControlled())
 	{
 		return;
@@ -245,15 +298,6 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 				Holder->AddMovementInput(Holder->GetActorForwardVector(), 1.0f);
 			}
 		}
-	}
-	// The knife's stroke, in its player's view: a cut from the right, across and back.
-	if (Stats->IsMelee() && bInHand)
-	{
-		const float Since = ServerTime(GetWorld()) - LastShotAt;
-		const float Through = Stats->SwingTime > 0.0f ? FMath::Clamp(Since / Stats->SwingTime, 0.0f, 1.0f) : 1.0f;
-		const float Arc = FMath::Sin(Through * PI);
-		const FQuat Cut = FRotator(-35.0f * Arc, 50.0f * Arc, 20.0f * Arc).Quaternion();
-		FirstPersonModel->SetRelativeTransform(FTransform(Cut) * FirstPersonModelInHand);
 	}
 }
 
@@ -275,35 +319,102 @@ void ACheeseStrikeWeapon::Hold(ACheeseStrikeCharacter* Character)
 
 void ACheeseStrikeWeapon::FitToHands()
 {
-	if (Holder == nullptr)
+	if (Holder == nullptr || Look == nullptr)
 	{
 		return;
 	}
-	PutInHand(FirstPersonMesh, Holder->GetFirstPersonMesh());
-	PutInHand(ThirdPersonMesh, Holder->GetMesh());
-	PutInHand(FirstPersonModel, Holder->GetFirstPersonMesh());
-	PutInHand(ThirdPersonModel, Holder->GetMesh());
-	for (USceneComponent* Part : {static_cast<USceneComponent*>(FirstPersonMesh), static_cast<USceneComponent*>(ThirdPersonMesh)})
+	const TPair<UPrimitiveComponent*, USkeletalMeshComponent*> Parts[] = {
+		{FirstPersonMesh, Holder->GetFirstPersonMesh()}, {ThirdPersonMesh, Holder->GetMesh()},
+		{FirstPersonModel, Holder->GetFirstPersonMesh()}, {ThirdPersonModel, Holder->GetMesh()}};
+	for (const TPair<UPrimitiveComponent*, USkeletalMeshComponent*>& Part : Parts)
 	{
-		Part->SetRelativeScale3D(Stats->IsMelee() ? FVector::OneVector : ModelScale);
-	}
-	// The blade sits in the fist, along the way the rifle would point.
-	for (UStaticMeshComponent* Model : {FirstPersonModel.Get(), ThirdPersonModel.Get()})
-	{
-		Model->SetRelativeTransform(FTransform(KnifeBladeOffset) * Model->GetRelativeTransform());
-		Model->SetRelativeScale3D(ModelScale);
+		PutInHand(Part.Key, Part.Value);
+		// The model's own size, turn and place in the grip, then the grip's in the hand.
+		Part.Key->SetRelativeTransform(Look->Model * Part.Key->GetRelativeTransform());
 	}
 	FirstPersonModelInHand = FirstPersonModel->GetRelativeTransform();
+	// The flash at the muzzle, the light just in front of it.
+	const FVector Muzzle = Look->Muzzle;
+	const float Size = FMath::Max(Look->FlashSize, 0.01f);
+	for (const TPair<UStaticMeshComponent*, bool>& Star : {TPair<UStaticMeshComponent*, bool>(FirstPersonFlash, true), TPair<UStaticMeshComponent*, bool>(ThirdPersonFlash, false)})
+	{
+		UPrimitiveComponent* Model = GetModel(Star.Value);
+		if (Model != nullptr)
+		{
+			Star.Key->AttachToComponent(Model, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+			// In the model's space, which may be scaled: the flash keeps its own size.
+			const FVector Scale = Model->GetComponentScale();
+			Star.Key->SetRelativeLocation(Muzzle);
+			Star.Key->SetRelativeScale3D(FVector(Size) / Scale.GetMax());
+		}
+	}
+	if (UPrimitiveComponent* Model = GetModel(false))
+	{
+		FlashLight->AttachToComponent(Model, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		FlashLight->SetRelativeLocation(Muzzle + FVector(0.0f, 10.0f, 0.0f) / Model->GetComponentScale().GetMax());
+	}
+}
+
+ECheeseStrikeHold ACheeseStrikeWeapon::GetHold() const
+{
+	return Look != nullptr ? Look->Hold : ECheeseStrikeHold::Rifle;
+}
+
+UPrimitiveComponent* ACheeseStrikeWeapon::GetModel(bool bFirstPerson) const
+{
+	const bool bPlain = Look != nullptr && Look->PlainModel != nullptr;
+	if (bPlain)
+	{
+		return bFirstPerson ? static_cast<UPrimitiveComponent*>(FirstPersonModel) : static_cast<UPrimitiveComponent*>(ThirdPersonModel);
+	}
+	return bFirstPerson ? static_cast<UPrimitiveComponent*>(FirstPersonMesh) : static_cast<UPrimitiveComponent*>(ThirdPersonMesh);
+}
+
+bool ACheeseStrikeWeapon::GetSight(FVector& Out) const
+{
+	if (Look == nullptr || !Look->Sight.IsSet())
+	{
+		return false;
+	}
+	Out = Look->Sight.GetValue();
+	return true;
+}
+
+FVector ACheeseStrikeWeapon::LeftHandShiftFor(const USkeletalMeshComponent* Body) const
+{
+	if (Look == nullptr || !Look->LeftHand.IsSet() || Holder == nullptr)
+	{
+		return FVector::ZeroVector;
+	}
+	// Where the free hand should be, against where the rifle's animations put it, in the rifle's frame in the hand; then
+	// in the space of the bone the weapon rides.
+	const FVector Wanted = Look->Model.TransformPosition(Look->LeftHand.GetValue());
+	const FVector RifleHand = CheeseStrikeWeaponLooks::RifleLeftHand;
+	const FVector Shift(Wanted.X, Wanted.Y - RifleHand.Y, Wanted.Z - RifleHand.Z);
+	const UPrimitiveComponent* Model = GetModel(Body == Holder->GetFirstPersonMesh());
+	if (Model == nullptr)
+	{
+		return FVector::ZeroVector;
+	}
+	// The model's place in its bone is the grip's, then the model's own: the grip's turn alone turns the shift.
+	const FTransform InBone = Look->Model.Inverse() * Model->GetRelativeTransform();
+	return InBone.TransformVectorNoScale(Shift);
 }
 
 void ACheeseStrikeWeapon::SetInHand(bool bIsInHand)
 {
 	bInHand = bIsInHand;
-	const bool bBlade = Stats->IsMelee();
-	FirstPersonMesh->SetHiddenInGame(!bInHand || bBlade);
-	ThirdPersonMesh->SetHiddenInGame(!bInHand || bBlade);
-	FirstPersonModel->SetHiddenInGame(!bInHand || !bBlade);
-	ThirdPersonModel->SetHiddenInGame(!bInHand || !bBlade);
+	const bool bPlain = Look != nullptr && Look->PlainModel != nullptr;
+	FirstPersonMesh->SetHiddenInGame(!bInHand || bPlain);
+	ThirdPersonMesh->SetHiddenInGame(!bInHand || bPlain);
+	FirstPersonModel->SetHiddenInGame(!bInHand || !bPlain);
+	ThirdPersonModel->SetHiddenInGame(!bInHand || !bPlain);
+	if (!bInHand)
+	{
+		FirstPersonFlash->SetHiddenInGame(true);
+		ThirdPersonFlash->SetHiddenInGame(true);
+		FlashLight->SetVisibility(false);
+	}
 }
 
 FString ACheeseStrikeWeapon::DescribeModel(const FVector& Eye) const
@@ -319,7 +430,7 @@ FString ACheeseStrikeWeapon::DescribeModel(const FVector& Eye) const
 
 void ACheeseStrikeWeapon::SetSeenFromOutside(bool bOutside)
 {
-	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel)})
+	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel), static_cast<UPrimitiveComponent*>(ThirdPersonFlash)})
 	{
 		Part->SetOwnerNoSee(!bOutside);
 		Part->SetFirstPersonPrimitiveType(bOutside ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
@@ -329,6 +440,39 @@ void ACheeseStrikeWeapon::SetSeenFromOutside(bool bOutside)
 void ACheeseStrikeWeapon::BeginDraw(float Now)
 {
 	DrawnAt = Now;
+	// Drawn in play (not put in hand at once): the hands bring it up, and it is heard.
+	if (Now > -999.0f)
+	{
+		ShowDraw();
+	}
+}
+
+void ACheeseStrikeWeapon::ShowDraw()
+{
+	if (Holder == nullptr || Stats->DrawTime <= 0.0f)
+	{
+		return;
+	}
+	const float DrawTime = Stats->DrawTime;
+	PlayOnBodies(&FCheeseStrikeAnimSet::Equip, [DrawTime](const UAnimSequence* Equip) { return Equip->GetPlayLength() > 0.0f ? Equip->GetPlayLength() / DrawTime : 1.0f; });
+	PlaySound(AnyOf(DrawSounds));
+}
+
+void ACheeseStrikeWeapon::Flash()
+{
+	if (Look == nullptr || Look->FlashSize <= 0.0f || GetWorld() == nullptr)
+	{
+		return;
+	}
+	// A different star each time: turned about the barrel at random (the flash's cards came in pointing back, so turned round).
+	const FQuat Turn = FQuat(FVector::YAxisVector, FMath::FRandRange(0.0f, 2.0f * PI)) * FQuat(FVector::ZAxisVector, PI);
+	for (UStaticMeshComponent* Star : {FirstPersonFlash.Get(), ThirdPersonFlash.Get()})
+	{
+		Star->SetRelativeRotation(Turn);
+		Star->SetHiddenInGame(Star->GetStaticMesh() == nullptr);
+	}
+	FlashLight->SetVisibility(true);
+	FlashUntil = GetWorld()->GetTimeSeconds() + FlashTime;
 }
 
 void ACheeseStrikeWeapon::PutAway()
@@ -426,11 +570,11 @@ void ACheeseStrikeWeapon::PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAn
 	{
 		return;
 	}
-	// Each body plays its own skeleton's copy.
+	// Each body plays its own skeleton's copy, from the set for how this weapon is held (the body may not have caught up).
 	for (USkeletalMeshComponent* Body : {Holder->GetFirstPersonMesh(), Holder->GetMesh()})
 	{
 		UCheeseStrikeAnimInstance* Instance = Body != nullptr ? Cast<UCheeseStrikeAnimInstance>(Body->GetAnimInstance()) : nullptr;
-		UAnimSequence* Animation = Instance != nullptr ? (Instance->GetSet().*Which).Get() : nullptr;
+		UAnimSequence* Animation = Instance != nullptr ? (Instance->GetSet(GetHold()).*Which).Get() : nullptr;
 		if (Animation != nullptr)
 		{
 			Instance->PlaySlotAnimationAsDynamicMontage(Animation, UCheeseStrikeAnimInstance::SlotName(), 0.1f, 0.15f, RateFor ? RateFor(Animation) : 1.0f);
@@ -487,29 +631,33 @@ void ACheeseStrikeWeapon::ShowShot()
 {
 	if (Stats->IsMelee())
 	{
-		// A whoosh, until the knife has a sound of its own: the rifle's magazine sliding, quick and high.
+		// The knife's stroke, in the time a stroke takes, with a swoosh.
+		const float SwingTime = Stats->SwingTime;
+		PlayOnBodies(&FCheeseStrikeAnimSet::Stroke, [SwingTime](const UAnimSequence* Stroke) { return SwingTime > 0.0f && Stroke->GetPlayLength() > 0.0f ? FMath::Max(1.0f, Stroke->GetPlayLength() / (SwingTime * 2.0f)) : 1.0f; });
+		USoundBase* Swoosh = AnyOf(FireSounds);
 		if (Holder != nullptr && Holder->IsLocallyControlled() && Holder->IsPlayerControlled())
 		{
-			UGameplayStatics::PlaySound2D(this, ClipOutSound, ShotVolume, ShotPitch);
+			UGameplayStatics::PlaySound2D(this, Swoosh, ShotVolume);
 		}
-		else if (ClipOutSound != nullptr)
+		else if (Swoosh != nullptr)
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, ClipOutSound, GetActorLocation(), FRotator::ZeroRotator, ShotVolume, ShotPitch, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
+			UGameplayStatics::PlaySoundAtLocation(this, Swoosh, GetActorLocation(), FRotator::ZeroRotator, ShotVolume, 1.0f, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
 		}
 		return;
 	}
 	PlayOnBodies(&FCheeseStrikeAnimSet::Fire);
-	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
+	if (ModelFire != nullptr)
 	{
-		if (Mesh->GetSkeletalMeshAsset() == RifleMesh)
+		for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
 		{
-			Mesh->PlayAnimation(RifleFire, false);
+			if (Mesh->GetSkeletalMeshAsset() != nullptr)
+			{
+				Mesh->PlayAnimation(ModelFire, false);
+			}
 		}
 	}
-	if (FireSounds.Num() > 0)
-	{
-		PlayShotSound(FireSounds[FMath::RandHelper(FireSounds.Num())]);
-	}
+	Flash();
+	PlayShotSound(AnyOf(FireSounds));
 }
 
 void ACheeseStrikeWeapon::ShowReload()
@@ -517,19 +665,22 @@ void ACheeseStrikeWeapon::ShowReload()
 	// The animations take the reload's time, however long they were made.
 	const float ReloadTime = Stats->ReloadTime;
 	PlayOnBodies(&FCheeseStrikeAnimSet::Reload, [ReloadTime](const UAnimSequence* Reload) { return Reload->GetPlayLength() > 0.0f ? Reload->GetPlayLength() / ReloadTime : 1.0f; });
-	const float RifleRate = RifleReload != nullptr && RifleReload->GetPlayLength() > 0.0f ? RifleReload->GetPlayLength() / Stats->ReloadTime : 1.0f;
-	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
+	if (ModelReload != nullptr)
 	{
-		if (Mesh->GetSkeletalMeshAsset() == RifleMesh)
+		const float ModelRate = ModelReload->GetPlayLength() > 0.0f ? ModelReload->GetPlayLength() / ReloadTime : 1.0f;
+		for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
 		{
-			Mesh->SetPlayRate(RifleRate);
-			Mesh->PlayAnimation(RifleReload, false);
+			if (Mesh->GetSkeletalMeshAsset() != nullptr)
+			{
+				Mesh->SetPlayRate(ModelRate);
+				Mesh->PlayAnimation(ModelReload, false);
+			}
 		}
 	}
 	// The magazine comes out at once, goes in two thirds of the way through, and the bolt follows.
 	PlaySound(ClipOutSound);
-	GetWorldTimerManager().SetTimer(ClipInTimer, FTimerDelegate::CreateUObject(this, &ACheeseStrikeWeapon::PlaySound, ClipInSound.Get()), Stats->ReloadTime * 0.65f, false);
-	GetWorldTimerManager().SetTimer(BoltTimer, FTimerDelegate::CreateUObject(this, &ACheeseStrikeWeapon::PlaySound, BoltSound.Get()), Stats->ReloadTime * 0.85f, false);
+	GetWorldTimerManager().SetTimer(ClipInTimer, FTimerDelegate::CreateUObject(this, &ACheeseStrikeWeapon::PlaySound, ClipInSound.Get()), ReloadTime * 0.65f, false);
+	GetWorldTimerManager().SetTimer(BoltTimer, FTimerDelegate::CreateUObject(this, &ACheeseStrikeWeapon::PlaySound, BoltSound.Get()), ReloadTime * 0.85f, false);
 }
 
 void ACheeseStrikeWeapon::MulticastShot_Implementation()
@@ -964,6 +1115,11 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 
 void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead)
 {
+	// The knife's stroke landing, heard by the one who struck.
+	if (Stats->IsMelee())
+	{
+		UGameplayStatics::PlaySound2D(this, AnyOf(HitSounds));
+	}
 	++HitsConfirmed;
 	LastHitDamage = Damage;
 	bLastHitHead = bHead;

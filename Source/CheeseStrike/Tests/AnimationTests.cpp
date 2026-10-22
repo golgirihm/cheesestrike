@@ -65,14 +65,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheBodyHasEveryAnimation, "CheeseStrike.Animat
 
 bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 {
-	// The mannequin's set, and each hero's, retargeted to its skeleton.
+	// The mannequin's rifle set, and each hero's sets, retargeted to its skeleton.
 	const UCheeseStrikeAnimInstance* Mannequin = GetDefault<UCheeseStrikeAnimInstance>();
 	const UCheeseStrikeAnimInstance* Heroes = GetDefault<UCheeseStrikeHeroAnimInstance>();
-	TestEqual(TEXT("a set for every hero"), Heroes->GetSets().Num(), CheeseStrikeBodies::All().Num());
+	TestEqual(TEXT("a body's sets for every hero"), Heroes->GetSets().Num(), CheeseStrikeBodies::All().Num());
 	TArray<const FCheeseStrikeAnimSet*> Sets = {&Mannequin->GetSet()};
-	for (const FCheeseStrikeAnimSet& Set : Heroes->GetSets())
+	for (const FCheeseStrikeAnimSets& Body : Heroes->GetSets())
 	{
-		Sets.Add(&Set);
+		Sets.Add(&Body.For(ECheeseStrikeHold::Rifle));
 	}
 	for (int32 Index = 0; Index < Sets.Num(); ++Index)
 	{
@@ -81,7 +81,7 @@ bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("%s: every animation was found"), *Who), Set.IsComplete());
 		TestNotNull(TEXT("standing"), Set.Idle.Get());
 		TestNotNull(TEXT("crouched"), Set.CrouchIdle.Get());
-		TestNotNull(TEXT("crouch walking"), Set.CrouchWalk.Get());
+		TestNotNull(TEXT("crouch walking"), Set.CrouchWalkForward.Get());
 		TestNotNull(TEXT("aiming from the hip"), Set.AimHip.Get());
 		TestNotNull(TEXT("firing"), Set.Fire.Get());
 		TestNotNull(TEXT("reloading"), Set.Reload.Get());
@@ -92,6 +92,30 @@ bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 			TestTrue(TEXT("not the mannequin's"), Mannequin->GetSet().Idle == nullptr || Set.Idle->GetSkeleton() != Mannequin->GetSet().Idle->GetSkeleton());
 		}
 	}
+	// Every hero holds every weapon its own way: the pistol's set, the shotgun's firing and reloading, the knife's
+	// stroke and guard, and draws them; all retargeted to its own skeleton.
+	for (int32 Index = 0; Index < Heroes->GetSets().Num(); ++Index)
+	{
+		const FCheeseStrikeAnimSets& Body = Heroes->GetSets()[Index];
+		const FString Who = CheeseStrikeBodies::All()[Index].Name;
+		const FCheeseStrikeAnimSet& Rifle = Body.For(ECheeseStrikeHold::Rifle);
+		const FCheeseStrikeAnimSet& Pistol = Body.For(ECheeseStrikeHold::Pistol);
+		TestTrue(FString::Printf(TEXT("%s has the pistol's set"), *Who), Body.Holds[static_cast<uint8>(ECheeseStrikeHold::Pistol)].IsComplete() && Pistol.Idle != Rifle.Idle);
+		TestNotNull(FString::Printf(TEXT("%s draws the pistol"), *Who), Pistol.Equip.Get());
+		TestNotNull(FString::Printf(TEXT("%s draws the rifle"), *Who), Rifle.Equip.Get());
+		const FCheeseStrikeAnimSet& Shotgun = Body.For(ECheeseStrikeHold::Shotgun);
+		TestTrue(TEXT("the shotgun walks as the rifle does"), Shotgun.Idle == Rifle.Idle);
+		TestTrue(FString::Printf(TEXT("%s fires and reloads the shotgun its own way"), *Who), Shotgun.Fire != nullptr && Shotgun.Fire != Rifle.Fire && Shotgun.Reload != nullptr && Shotgun.Reload != Rifle.Reload);
+		const FCheeseStrikeAnimSet& Knife = Body.For(ECheeseStrikeHold::Knife);
+		TestTrue(FString::Printf(TEXT("%s strikes with the knife, the free arm on guard"), *Who), Knife.Stroke != nullptr && Knife.Guard != nullptr && Knife.Idle == Pistol.Idle);
+		for (const UAnimationAsset* Each : {static_cast<const UAnimationAsset*>(Pistol.Idle.Get()), static_cast<const UAnimationAsset*>(Pistol.AimHip.Get()),
+			static_cast<const UAnimationAsset*>(Pistol.Equip.Get()), static_cast<const UAnimationAsset*>(Rifle.Equip.Get()), static_cast<const UAnimationAsset*>(Shotgun.Fire.Get()),
+			static_cast<const UAnimationAsset*>(Shotgun.Reload.Get()), static_cast<const UAnimationAsset*>(Knife.Stroke.Get()), static_cast<const UAnimationAsset*>(Knife.Guard.Get())})
+		{
+			TestTrue(FString::Printf(TEXT("%s's are all on its skeleton"), *Who), Each != nullptr && Rifle.Idle != nullptr && Each->GetSkeleton() == Rifle.Idle->GetSkeleton());
+		}
+	}
+	TestTrue(TEXT("a body without a pistol's set uses its rifle's"), &Mannequin->GetSet(ECheeseStrikeHold::Pistol) == &Mannequin->GetSet(ECheeseStrikeHold::Rifle));
 	TestEqual(TEXT("the mannequin's grip follows weapon_r"), Mannequin->GetGripAnchor(), FName(TEXT("weapon_r")));
 	TestEqual(TEXT("a hero's, its right hand"), Heroes->GetGripAnchor(), FName(TEXT("hand_r")));
 	return true;

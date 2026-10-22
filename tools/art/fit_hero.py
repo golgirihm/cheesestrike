@@ -2,7 +2,7 @@ import unreal, sys, traceback
 
 # Run in the game's project, with its editor closed, after
 # tools/art/copy_from_lyra.py has copied a hero in:
-#   UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/fit_hero.py <Hero>" -unattended -nullrhi
+#   UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/fit_hero.py <Hero> [animations]" -unattended -nullrhi
 # (paths absolute). It writes what it did to Saved/fit_hero_<Hero>.txt. Fits
 # a Paragon hero from the Lyra project to the game, as Lt. Belica was:
 #
@@ -14,7 +14,9 @@ import unreal, sys, traceback
 #   tracks and keep the hero's pose.
 # - Paragon's textures are 4K sources; a soldier seen across an arena needs
 #   far less. Every texture's stored source is cut to 1024 pixels (2048 for
-#   the body's own maps, if MAIN_TEXTURE_SIZE says so), in 8 bits.
+#   the body's own maps, if MAIN_TEXTURE_SIZE says so), in 8 bits; with
+#   "animations", which fits only the animations (after new sets come in
+#   for weapons), the textures are left as they are.
 HEROES = {
     "Belica": "/Game/ParagonLtBelica",
     "Murdock": "/Game/ParagonMurdock",
@@ -32,6 +34,7 @@ TEXTURE_SIZE = 1024
 
 args = [a for a in sys.argv[1:] if a]
 hero = args[0]
+only_animations = "animations" in args[1:]
 OUT = unreal.Paths.project_saved_dir() + f"fit_hero_{hero}.txt"
 lines = []
 try:
@@ -49,7 +52,7 @@ try:
     lines.append("bones the reference pose scales: " + ", ".join(scaled))
 
     stripped = fixed = 0
-    for data in registry.get_assets_by_path(folder + "/Animations/Rifle", True):
+    for data in registry.get_assets_by_path(folder + "/Animations", True):
         kind = str(data.asset_class_path.asset_name)
         if kind not in ("AnimSequence", "BlendSpace1D", "BlendSpace", "AimOffsetBlendSpace"):
             continue
@@ -75,7 +78,7 @@ try:
 
     fns = unreal.TextureAssetActionsBlueprintFns
     counts = {}
-    for data in registry.get_assets_by_path(pack, True):
+    for data in [] if only_animations else registry.get_assets_by_path(pack, True):
         kind = str(data.asset_class_path.asset_name)
         if kind not in ("Texture2D", "TextureCube"):
             continue

@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeHUD.h"
 #include "Camera/PlayerCameraManager.h"
+#include "CanvasItem.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Texture2D.h"
@@ -258,7 +259,7 @@ TArray<ACheeseStrikeHUD::FWeaponSlot> ACheeseStrikeHUD::WeaponSlots(const AChees
 		const EWeaponSlot Slot = static_cast<EWeaponSlot>(Index);
 		if (const ACheeseStrikeWeapon* Carried = Inventory->GetInSlot(Slot))
 		{
-			Slots.Add({FString::FromInt(Index + 1), Carried->GetStats().DisplayName.ToString(), bHolding && Held == Slot, Inventory->CanDraw(Slot)});
+			Slots.Add({Carried->GetWeaponId(), FString::FromInt(Index + 1), Carried->GetStats().DisplayName.ToString(), bHolding && Held == Slot, Inventory->CanDraw(Slot)});
 		}
 	}
 	return Slots;
@@ -421,8 +422,73 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	}
 	Shapes.Draw(Canvas);
 
+	DrawScope(Character);
 	DrawHealth(Character);
 	DrawWeapon(Character);
+}
+
+UTexture2D* ACheeseStrikeHUD::WeaponIcon(FName Id)
+{
+	if (const TObjectPtr<UTexture2D>* Known = WeaponIcons.Find(Id))
+	{
+		return Known->Get();
+	}
+	const FString Name = FString::Printf(TEXT("T_Icon_%s"), *Id.ToString());
+	UTexture2D* Icon = LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("/Game/CheeseStrike/Weapons/Icons/%s.%s"), *Name, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	WeaponIcons.Add(Id, Icon);
+	return Icon;
+}
+
+bool ACheeseStrikeHUD::DrawWeaponPicture(FName Id, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour)
+{
+	UTexture2D* Icon = WeaponIcon(Id);
+	if (Icon == nullptr || Icon->GetResource() == nullptr || Icon->GetSizeY() <= 0)
+	{
+		return false;
+	}
+	// As big as fits, its own shape kept, against the right of the space given.
+	const float Aspect = static_cast<float>(Icon->GetSizeX()) / Icon->GetSizeY();
+	const FVector2D Fitted = Size.X / Size.Y > Aspect ? FVector2D(Size.Y * Aspect, Size.Y) : FVector2D(Size.X, Size.X / Aspect);
+	FCanvasTileItem Tile(FVector2D(At.X + Size.X - Fitted.X, At.Y + (Size.Y - Fitted.Y) * 0.5f), Icon->GetResource(), Fitted, Colour);
+	Tile.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Tile);
+	return true;
+}
+
+void ACheeseStrikeHUD::DrawScope(const ACheeseStrikeCharacter* Character)
+{
+	const ACheeseStrikeWeapon* Weapon = Character->GetWeapon();
+	if (Weapon == nullptr || !Weapon->GetStats().bScoped || Character->GetAimFraction() < ACheeseStrikeCharacter::ScopeFrom)
+	{
+		return;
+	}
+	// The lens a circle most of the view high, everything round it black; across it thin hairs, thick towards the rim.
+	const FVector2D Middle(Canvas->SizeX / 2.0f, Canvas->SizeY / 2.0f);
+	const float Radius = Canvas->SizeY * 0.46f;
+	const float Far = FMath::Max(Canvas->SizeX, Canvas->SizeY) * 2.0f;
+	const FLinearColor Black(0.0f, 0.0f, 0.0f, 1.0f);
+	HudDraw::FShapes Scope;
+	const int32 Sides = 72;
+	for (int32 Side = 0; Side < Sides; ++Side)
+	{
+		const float A = 2.0f * PI * Side / Sides;
+		const float B = 2.0f * PI * (Side + 1) / Sides;
+		const FVector2D InA = Middle + FVector2D(FMath::Cos(A), FMath::Sin(A)) * Radius;
+		const FVector2D InB = Middle + FVector2D(FMath::Cos(B), FMath::Sin(B)) * Radius;
+		Scope.Quad(InA, InB, Middle + FVector2D(FMath::Cos(B), FMath::Sin(B)) * Far, Middle + FVector2D(FMath::Cos(A), FMath::Sin(A)) * Far, Black);
+	}
+	// A dark ring just inside the rim, as the tube's edge.
+	Scope.Arc(Middle, Radius - 6.0f, 12.0f, 0.0f, 360.0f, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f), false);
+	const float Thin = 1.5f;
+	const float Thick = 4.0f;
+	const float Gap = Radius * 0.42f;
+	Scope.Line(Middle - FVector2D(Radius, 0.0f), Middle + FVector2D(Radius, 0.0f), Thin, Black);
+	Scope.Line(Middle - FVector2D(0.0f, Radius), Middle + FVector2D(0.0f, Radius), Thin, Black);
+	for (const FVector2D& Way : {FVector2D(1, 0), FVector2D(-1, 0), FVector2D(0, 1)})
+	{
+		Scope.Line(Middle + Way * Gap, Middle + Way * Radius, Thick, Black);
+	}
+	Scope.Draw(Canvas);
 }
 
 void ACheeseStrikeHUD::DrawHealth(const ACheeseStrikeCharacter* Character)
@@ -572,8 +638,19 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 	const float IconWidth = (Stats.Slot == EWeaponSlot::Primary ? 116.0f : 80.0f) * U;
 	const FVector2D IconSize(IconWidth, IconWidth * 0.4f * (Stats.Slot == EWeaponSlot::Primary ? 1.0f : 1.3f));
 	const float IconRight = bRounds ? RoundsRight - WidestRounds.X - 22.0f * U : Right - HudDraw::Measure(Name, Small).X - 22.0f * U;
-	DrawWeaponIcon(Shapes, Stats.Slot, FVector2D(IconRight - IconSize.X, Baseline - IconSize.Y + 2.0f * U), IconSize, FLinearColor(1.0f, 1.0f, 1.0f, 0.42f));
+	// The weapon's own silhouette if it has one (tools/art/weapon_icons.py), or its kind's outline.
+	const FVector2D IconAt(IconRight - IconSize.X, Baseline - IconSize.Y + 2.0f * U);
+	const FLinearColor IconColour(1.0f, 1.0f, 1.0f, 0.42f);
+	const bool bPicture = WeaponIcon(Weapon->GetWeaponId()) != nullptr;
+	if (!bPicture)
+	{
+		DrawWeaponIcon(Shapes, Stats.Slot, IconAt, IconSize, IconColour);
+	}
 	Shapes.Draw(Canvas);
+	if (bPicture)
+	{
+		DrawWeaponPicture(Weapon->GetWeaponId(), IconAt, IconSize, IconColour);
+	}
 
 	float SlotsBottom = NameTop;
 	if (!bRounds)
@@ -628,7 +705,11 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 		for (const FWeaponSlot& Slot : Slots)
 		{
 			const FLinearColor Colour = Slot.bHeld ? HudDraw::Ink : Slot.bCanDraw ? HudDraw::Soft : HudDraw::Dim;
-			HudDraw::Text(Canvas, FString::Printf(TEXT("%s   %s"), *Slot.Name.ToUpper(), *Slot.Key), FVector2D(Right, Y), Label, Colour, 1.0f);
+			const FString Text = FString::Printf(TEXT("%s   %s"), *Slot.Name.ToUpper(), *Slot.Key);
+			HudDraw::Text(Canvas, Text, FVector2D(Right, Y), Label, Colour, 1.0f);
+			// Each weapon's silhouette before its name.
+			const FVector2D Thumb(Row * 2.4f, Row * 0.8f);
+			DrawWeaponPicture(Slot.Id, FVector2D(Right - HudDraw::Measure(Text, Label).X - 8.0f * U - Thumb.X, Y + Row * 0.05f), Thumb, FLinearColor(Colour.R, Colour.G, Colour.B, Colour.A * 0.8f));
 			Y += Row;
 		}
 	}

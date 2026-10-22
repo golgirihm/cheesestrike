@@ -16,6 +16,16 @@ enum class EWeaponSlot : uint8
 };
 constexpr int32 NumWeaponSlots = 3;
 
+/** How a weapon is held, which picks the body's animations: a long gun two-handed, a pistol, the shotgun (a long gun with its own firing and reloading), or the knife (the pistol's stance, the free hand up on guard). */
+enum class ECheeseStrikeHold : uint8
+{
+	Rifle,
+	Pistol,
+	Shotgun,
+	Knife,
+};
+constexpr int32 NumHolds = 4;
+
 /**
  * What a weapon is and what a shot does, as arithmetic, apart from the
  * engine so that it can be tested alone. The weapon actor

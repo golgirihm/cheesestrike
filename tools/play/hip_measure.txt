@@ -1,0 +1,173 @@
+# Measures where the hand holding each kind of weapon sits in view, standing and crouched, for each hero, with the
+# arms left where the animation puts them (CheeseStrike.HipHold 0): the numbers CheeseStrikeWeaponLooks::HipHand keeps.
+wait 2
+cmd CheeseStrike.HipHold 0
+cmd CheeseStrikeBody 0 1
+wait 0.5
+cmd CheeseStrikeArm blaster
+wait 1.6
+log measure body 0 rifle standing
+state
+hold Crouch
+wait 1.6
+log measure body 0 rifle crouched
+state
+release Crouch
+wait 0.8
+cmd CheeseStrikeArm shotgun
+wait 1.6
+log measure body 0 shotgun standing
+state
+hold Crouch
+wait 1.6
+log measure body 0 shotgun crouched
+state
+release Crouch
+wait 0.8
+tap Sidearm
+wait 1.6
+log measure body 0 pistol standing
+state
+hold Crouch
+wait 1.6
+log measure body 0 pistol crouched
+state
+release Crouch
+wait 0.8
+tap Knife
+wait 1.6
+log measure body 0 knife standing
+state
+hold Crouch
+wait 1.6
+log measure body 0 knife crouched
+state
+release Crouch
+wait 0.8
+cmd CheeseStrikeBody 1 0
+wait 0.5
+cmd CheeseStrikeArm blaster
+wait 1.6
+log measure body 1 rifle standing
+state
+hold Crouch
+wait 1.6
+log measure body 1 rifle crouched
+state
+release Crouch
+wait 0.8
+cmd CheeseStrikeArm shotgun
+wait 1.6
+log measure body 1 shotgun standing
+state
+hold Crouch
+wait 1.6
+log measure body 1 shotgun crouched
+state
+release Crouch
+wait 0.8
+tap Sidearm
+wait 1.6
+log measure body 1 pistol standing
+state
+hold Crouch
+wait 1.6
+log measure body 1 pistol crouched
+state
+release Crouch
+wait 0.8
+tap Knife
+wait 1.6
+log measure body 1 knife standing
+state
+hold Crouch
+wait 1.6
+log measure body 1 knife crouched
+state
+release Crouch
+wait 0.8
+cmd CheeseStrikeBody 2 1
+wait 0.5
+cmd CheeseStrikeArm blaster
+wait 1.6
+log measure body 2 rifle standing
+state
+hold Crouch
+wait 1.6
+log measure body 2 rifle crouched
+state
+release Crouch
+wait 0.8
+cmd CheeseStrikeArm shotgun
+wait 1.6
+log measure body 2 shotgun standing
+state
+hold Crouch
+wait 1.6
+log measure body 2 shotgun crouched
+state
+release Crouch
+wait 0.8
+tap Sidearm
+wait 1.6
+log measure body 2 pistol standing
+state
+hold Crouch
+wait 1.6
+log measure body 2 pistol crouched
+state
+release Crouch
+wait 0.8
+tap Knife
+wait 1.6
+log measure body 2 knife standing
+state
+hold Crouch
+wait 1.6
+log measure body 2 knife crouched
+state
+release Crouch
+wait 0.8
+cmd CheeseStrikeBody 3 0
+wait 0.5
+cmd CheeseStrikeArm blaster
+wait 1.6
+log measure body 3 rifle standing
+state
+hold Crouch
+wait 1.6
+log measure body 3 rifle crouched
+state
+release Crouch
+wait 0.8
+cmd CheeseStrikeArm shotgun
+wait 1.6
+log measure body 3 shotgun standing
+state
+hold Crouch
+wait 1.6
+log measure body 3 shotgun crouched
+state
+release Crouch
+wait 0.8
+tap Sidearm
+wait 1.6
+log measure body 3 pistol standing
+state
+hold Crouch
+wait 1.6
+log measure body 3 pistol crouched
+state
+release Crouch
+wait 0.8
+tap Knife
+wait 1.6
+log measure body 3 knife standing
+state
+hold Crouch
+wait 1.6
+log measure body 3 knife crouched
+state
+release Crouch
+wait 0.8
+quit

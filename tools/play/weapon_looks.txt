@@ -1,0 +1,114 @@
+# Looks at every weapon in hand (CheeseStrikeArm puts each in hand at once): in first person from the hip and down the
+# sights, and on the body from its right side, for checking how each is held and how its cheese looks.
+wait 2
+cmd CheeseStrikeArm blaster
+wait 0.8
+shot looks_blaster_1
+hold Aim
+wait 0.7
+shot looks_blaster_2
+release Aim
+cmd CheeseStrikeOutside 110 75 45
+wait 0.6
+shot looks_blaster_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm carbine
+wait 0.8
+shot looks_carbine_1
+hold Aim
+wait 0.7
+shot looks_carbine_2
+release Aim
+cmd CheeseStrikeOutside 110 75 45
+wait 0.6
+shot looks_carbine_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm grater
+wait 0.8
+shot looks_grater_1
+hold Aim
+wait 0.7
+shot looks_grater_2
+release Aim
+cmd CheeseStrikeOutside 110 75 45
+wait 0.6
+shot looks_grater_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 1.2
+shot looks_munster_1
+hold Aim
+wait 0.7
+shot looks_munster_2
+release Aim
+cmd CheeseStrikeOutside 130 75 45
+wait 0.6
+shot looks_munster_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm shotgun
+wait 0.8
+shot looks_shotgun_1
+hold Aim
+wait 0.7
+shot looks_shotgun_2
+release Aim
+cmd CheeseStrikeOutside 110 75 45
+wait 0.6
+shot looks_shotgun_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm roquefort
+wait 0.9
+shot looks_roquefort_1
+hold Aim
+wait 0.7
+shot looks_roquefort_2
+release Aim
+cmd CheeseStrikeOutside 130 75 45
+wait 0.6
+shot looks_roquefort_3
+cmd CheeseStrikeOutside
+tap Sidearm
+wait 0.8
+shot looks_pistol_1
+hold Aim
+wait 0.7
+shot looks_pistol_2
+release Aim
+cmd CheeseStrikeOutside 110 75 45
+wait 0.6
+shot looks_pistol_3
+cmd CheeseStrikeOutside
+tap Knife
+wait 0.8
+shot looks_knife_1
+tap Fire
+wait 0.15
+shot looks_knife_2
+wait 0.6
+cmd CheeseStrikeOutside 110 75 45
+wait 0.6
+shot looks_knife_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm blaster
+wait 1
+hold Fire
+wait 0.02
+shot looks_flash_1
+wait 0.03
+shot looks_flash_2
+wait 0.03
+shot looks_flash_3
+wait 0.3
+release Fire
+cmd CheeseStrikeOutside 160 60 30
+wait 0.5
+hold Fire
+wait 0.02
+shot looks_flash_4
+wait 0.03
+shot looks_flash_5
+wait 0.03
+shot looks_flash_6
+wait 0.3
+release Fire
+quit

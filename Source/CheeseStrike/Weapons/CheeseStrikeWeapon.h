@@ -14,8 +14,12 @@ struct FCheeseStrikeAnimSet;
 class USkeletalMesh;
 class USkeletalMeshComponent;
 class USoundBase;
+class UMaterialInterface;
+class UPointLightComponent;
+class UPrimitiveComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
+struct FWeaponLook;
 
 /**
  * A weapon a character carries (UCheeseStrikeInventory holds one in each
@@ -39,6 +43,11 @@ class UStaticMeshComponent;
  *
  * Its shots are heard from where they were fired, fading and growing duller
  * with distance (CheeseStrikeGunfire); its own player hears them whole.
+ *
+ * How it looks, sounds and is held is its FWeaponLook
+ * (CheeseStrikeWeaponLooks): a skinned model (Lyra's rifle, shotgun and
+ * pistol) or a plain one (the Fab guns, the knife) in the hand, its cheese
+ * materials, its sights, its muzzle's flash, where the free hand holds it.
  */
 UCLASS()
 class CHEESESTRIKE_API ACheeseStrikeWeapon : public AActor
@@ -85,9 +94,22 @@ public:
 	/** Seconds since it last fired (or struck), as this machine knows: its own player's machine and the server. */
 	float SinceShot() const;
 
+	/** How it is held, which picks the body's animations. */
+	ECheeseStrikeHold GetHold() const;
+	/** Where the free hand reaches past the grip the body's animations give it, for `Body`'s hand on this weapon: in the space of the bone the weapon rides (cm). */
+	FVector LeftHandShiftFor(const USkeletalMeshComponent* Body) const;
+	/** The model drawn in its player's view, or on the body: the skinned or the plain one, whichever it has. */
+	UPrimitiveComponent* GetModel(bool bFirstPerson) const;
+	/** Where the eye goes down its sights, in its model's own space, if its look says (else the rifle's way, from its bounds). */
+	bool GetSight(FVector& Out) const;
+
 	/** Puts the weapon in `Character`'s hands, on both meshes (hidden until it is the one in hand). */
 	void Hold(ACheeseStrikeCharacter* Character);
-	/** Puts it in its holder's hands again, as their body holds it: after the body changes (ACheeseStrikeCharacter::ApplyBody). */
+	/**
+	 * Puts its models in its holder's hands, as their body holds it and where
+	 * its look has them, with the flash at the muzzle: as it is held, as its
+	 * look changes, and after the body changes (ACheeseStrikeCharacter::ApplyBody).
+	 */
 	void FitToHands();
 	/** Shows it in hand on this machine, or hides it away. */
 	void SetInHand(bool bInHand);
@@ -151,8 +173,12 @@ protected:
 	void FinishReload();
 	/** Ends a reload under way without filling the magazine (the weapon is put away). */
 	void CancelReload();
-	/** Shows a shot on this machine: the body's and the rifle's firing animations, and the sound. */
+	/** Shows a shot on this machine: the body's and the rifle's firing animations, the muzzle's flash, and the sound. */
 	void ShowShot();
+	/** Shows a draw on this machine: the body's animation for bringing it up, and its sound. */
+	void ShowDraw();
+	/** Lights the muzzle for a moment. */
+	void Flash();
 	/** Shows a reload on this machine: the body's and the rifle's animations, and the sounds along the way. */
 	void ShowReload();
 	/** Tells every other machine of a shot or a reload the server allowed, to show it. */
@@ -205,23 +231,24 @@ protected:
 	TObjectPtr<UStaticMeshComponent> FirstPersonModel;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> ThirdPersonModel;
-	/** The model's size, and where the first-person one sits in the hand before a stroke swings it. */
-	FVector ModelScale = FVector::OneVector;
+	/** The muzzle's flash, in its player's view and on the body, and its light. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> FirstPersonFlash;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> ThirdPersonFlash;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPointLightComponent> FlashLight;
+	/** The look it has, and where its first-person plain model sits in the hand before a knife's stroke swings it. */
+	const FWeaponLook* Look = nullptr;
 	FTransform FirstPersonModelInHand = FTransform::Identity;
+	/** When the flash goes out (world time). */
+	float FlashUntil = 0.0f;
 
-	/** The rifle's mesh and own animations, and the sounds it makes (Lyra's; Content/LICENSES.md). */
+	/** What its look names, loaded as it becomes that weapon: its model's own animations, and its sounds (Lyra's; Content/LICENSES.md). */
 	UPROPERTY()
-	TObjectPtr<USkeletalMesh> RifleMesh;
-	/** Lyra's pistol, as the First Person template has it (Content/Weapons/Pistol/). */
+	TObjectPtr<UAnimSequence> ModelFire;
 	UPROPERTY()
-	TObjectPtr<USkeletalMesh> PistolMesh;
-	/** The knife's stand-in until it has a model of its own: a plain block. */
-	UPROPERTY()
-	TObjectPtr<UStaticMesh> BlockMesh;
-	UPROPERTY()
-	TObjectPtr<UAnimSequence> RifleFire;
-	UPROPERTY()
-	TObjectPtr<UAnimSequence> RifleReload;
+	TObjectPtr<UAnimSequence> ModelReload;
 	UPROPERTY()
 	TArray<TObjectPtr<USoundBase>> FireSounds;
 	UPROPERTY()
@@ -232,7 +259,10 @@ protected:
 	TObjectPtr<USoundBase> ClipInSound;
 	UPROPERTY()
 	TObjectPtr<USoundBase> BoltSound;
-	/** How loud and how high its shots sound beside the rifle's, until each weapon has its own. */
+	UPROPERTY()
+	TArray<TObjectPtr<USoundBase>> HitSounds;
+	UPROPERTY()
+	TArray<TObjectPtr<USoundBase>> DrawSounds;
 	float ShotVolume = 1.0f;
 	float ShotPitch = 1.0f;
 	FTimerHandle ClipInTimer;

@@ -28,7 +28,9 @@ void FCheeseStrikeGripIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseC
 		UE_LOG(LogCheeseStrike, Display, TEXT("Grip: %s sits at (%.1f, %.1f, %.1f) from %s, turned (%.0f, %.0f, %.0f)"), *IKBone.BoneName.ToString(), Grip.GetTranslation().X, Grip.GetTranslation().Y, Grip.GetTranslation().Z, *AnchorBone.BoneName.ToString(), Grip.Rotator().Pitch, Grip.Rotator().Yaw, Grip.Rotator().Roll);
 	}
 	// The target, where the grip is on the anchor as it stands now.
-	const FTransform Target = Grip * Anchor;
+	FTransform Reach = Grip;
+	Reach.AddToTranslation(Shift);
+	const FTransform Target = Reach * Anchor;
 	EffectorLocationSpace = BCS_ComponentSpace;
 	EffectorLocation = Target.GetTranslation();
 	// The elbow bends as the animation has it: a point beyond the elbow, away from the line from shoulder to hand.
