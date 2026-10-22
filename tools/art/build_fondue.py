@@ -29,7 +29,7 @@ VAT = -600        # the vat's floor, which the tiles stand on, out of sight unde
 DECK = 120        # the spawn decks' top
 GANTRY = 320      # the gantry's deck, over the middle
 HALL_TOP = 1200   # the hall's walls; its roof is on them
-VENT_Z = 650      # the vents the mice come in by, in the long walls
+VENT_Z = 220      # the vents the mice come in by, low in the walls
 
 # The west half of the floor, a 2 m cell to a character, the north row first and the west wall on the left; the east
 # half is its mirror. Cell (c, r) has its south-west corner at (X0 + 200c, Y0 + 200r).
@@ -311,7 +311,7 @@ def cover(s, side):
     crate(f"N_PumpSouth_{team}", north, C(11), 13)
     crate(f"N_PumpSouth2_{team}", north, C(12), 13, high=1)
     wheels(f"N_Run_{team}", north, C(15), 16)
-    crate(f"N_Stairs_{team}", north, C(16), 17)
+    crate(f"N_Stairs_{team}", north, C(15), 15)
     low_wall(f"N_Wall_{team}", north, C(16), 19, True)
     crate(f"N_Field_{team}", north, C(8), 13, high=1)
     crate(f"N_Field2_{team}", north, C(14), 14)
@@ -332,7 +332,7 @@ def cover(s, side):
     crate(f"S_Field_{team}", south, C(9), 6)
     crate(f"S_Field2_{team}", south, C(12), 5, high=1)
     wheels(f"S_Tunnel_{team}", south, C(13), 5)
-    crate(f"S_Drain_{team}", south, C(13), 1)
+    crate(f"S_Drain_{team}", south, C(14), 1)
     crate(f"S_Drain2_{team}", south, C(16), 3, high=1)
     wheels(f"S_Field3_{team}", south, C(16), 6)
     # The Rind Run: a covered way of cheese over the path east of the boiler, its walls on the tiles either side and
