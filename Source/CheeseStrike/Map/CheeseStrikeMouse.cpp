@@ -416,14 +416,20 @@ bool ACheeseStrikeMouse::IsCutOff(const FVector& From) const
 	{
 		return false;
 	}
-	// Where it can walk to from here, by a few tries: all of it close by, it is on an island.
+	// Where it can walk to from here, by a few tries: all of it close by, it is on an island. Off the mesh (beside a
+	// machine it brushes), it can't tell, and isn't.
+	FNavLocation On;
+	if (!Navigation->ProjectPointToNavigation(From, On, FVector(150.0f, 150.0f, 150.0f)))
+	{
+		return false;
+	}
 	float Furthest = 0.0f;
 	for (int32 Try = 0; Try < 10 && Furthest < MouseIslandAcross; ++Try)
 	{
 		FNavLocation Spot;
-		if (Navigation->GetRandomReachablePointInRadius(From, 2000.0f, Spot))
+		if (Navigation->GetRandomReachablePointInRadius(On.Location, 2000.0f, Spot))
 		{
-			Furthest = FMath::Max(Furthest, static_cast<float>(FVector::Dist2D(Spot.Location, From)));
+			Furthest = FMath::Max(Furthest, static_cast<float>(FVector::Dist2D(Spot.Location, On.Location)));
 		}
 	}
 	return Furthest < MouseIslandAcross;
