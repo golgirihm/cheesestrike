@@ -95,10 +95,22 @@ namespace CheeseStrikeMenu
 	 * down, the seconds left.
 	 */
 	ELobbyStatus LobbyStatus(bool bHaveMatch, bool bTravelling, bool bCounting, float SecondsLeft, bool bHost);
+	/**
+	 * Whether the lobby is drawn again this frame: when what it shows has
+	 * `bChanged`, but not while the host has a dropdown open (drawing it
+	 * again would close it under the mouse) unless its status has changed
+	 * (travelling, starting), which outweighs any choice being made.
+	 */
+	bool ShouldRedrawLobby(bool bChanged, bool bStatusChanged, bool bDropdownOpen);
 	/** Corners, in Slate units. */
 	constexpr float Rounding = 6.0f;
 	/** The lobby's picture of the map, wide (16:9), and its rules' column as wide. */
 	constexpr float MapPictureWidth = 600.0f;
+	/** The width of the names of the lobby's rules, left of their dropdowns. */
+	constexpr float RuleLabelWidth = 210.0f;
+	/** Paused, how much the game behind the menu is blurred (Slate's blur strength) and darkened (black's opacity over it). */
+	constexpr float PauseBlur = 12.0f;
+	constexpr float PauseDarkening = 0.4f;
 	/** How many columns a free-for-all's lobby lays its seats out in: as many seats to a column as a side has. */
 	constexpr int32 FreeForAllColumns = 2;
 }
@@ -129,12 +141,16 @@ public:
 	/** Shows `Tab` of the options when they show. */
 	void SetOptionsTab(EOptionsTab Tab) { OptionsTab = Tab; ShownPageKey.Reset(); }
 	EOptionsTab GetOptionsTab() const { return OptionsTab; }
+	/** Opens the lobby's dropdown `Index` (in the order they show), shutting any other; out of range, shuts them all. */
+	void OpenDropdown(int32 Index);
+	/** Whether the game behind the menu is blurred: under the pause menu, and the options opened from it. */
+	bool IsBlurringTheGame() const;
 
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 private:
-	enum class EButtonKind : uint8 { Plain, Primary, Danger };
+	enum class EButtonKind : uint8 { Plain, Primary, Danger, Quiet };
 
 	TSharedRef<SWidget> MakePage();
 	TSharedRef<SWidget> MakeMain();
@@ -157,8 +173,21 @@ private:
 	TSharedRef<SWidget> MakeTitle(const FString& Text);
 	TSharedRef<SWidget> MakeLine(const FString& Text, bool bDim = false);
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain, TSharedPtr<SWidget> Inside = nullptr);
-	/** A row of choices, the chosen one lit; with `bCanPick` off, only the chosen one is shown lit and none can be pressed. */
-	TSharedRef<SWidget> MakeChoices(const FString& Label, const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick);
+	/**
+	 * A dropdown: the chosen one of `Choices` on a button that opens the
+	 * list of them (each with its picture from `Pictures`, if any), the
+	 * chosen one lit, `Pick` called with the one clicked. With `bCanPick`
+	 * off (a joiner's lobby), only the chosen one, on nothing to press.
+	 * Kept in Dropdowns, so that the lobby isn't drawn again while one is
+	 * open.
+	 */
+	TSharedRef<SWidget> MakeDropdown(const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick, TArray<const FSlateBrush*> Pictures = {});
+	/** A rule's value with nothing to press, as a joiner sees what the host chose. */
+	TSharedRef<SWidget> MakeReadOnly(const FString& Value);
+	/** A row of the lobby's rules: its name on the left, then what sets it. */
+	TSharedRef<SWidget> MakeRuleRow(const FString& Label, TSharedRef<SWidget> Setter);
+	/** Whether one of the lobby's dropdowns is open. */
+	bool IsDropdownOpen() const;
 	/**
 	 * A column of the lobby's seats: `Title` over them in `Colour`, then
 	 * `Seats` (players, bots, then empty seats; CheeseStrikeRules::
@@ -196,5 +225,10 @@ private:
 	EMenuPage Page = EMenuPage::None;
 	EOptionsTab OptionsTab = EOptionsTab::Controls;
 	FString ShownLobbyKey;
+	int32 ShownLobbyStatus = INDEX_NONE;
+	/** The lobby's dropdowns as last drawn. */
+	TArray<TWeakPtr<class SMenuAnchor>> Dropdowns;
+	/** The blur over the game behind the pause menu. */
+	TSharedPtr<SWidget> Blur;
 	FString ShownPageKey;
 };

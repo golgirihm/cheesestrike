@@ -16,13 +16,15 @@
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Images/SThrobber.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SMenuAnchor.h"
 #include "Widgets/Input/SSlider.h"
+#include "Widgets/Layout/SBackgroundBlur.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSpacer.h"
-#include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/SLeafWidget.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 #include "CheeseStrikeGameState.h"
@@ -94,6 +96,13 @@ namespace CheeseStrikeMenu
 		return ECountdownTone::None;
 	}
 
+	bool ShouldRedrawLobby(bool bChanged, bool bStatusChanged, bool bDropdownOpen)
+	{
+		// A dropdown the host has open would close as the lobby is drawn again: wait for it, unless the lobby itself has
+		// moved on (travelling, starting), which nothing in the dropdown could matter to.
+		return bChanged && (!bDropdownOpen || bStatusChanged);
+	}
+
 	ELobbyStatus LobbyStatus(bool bHaveMatch, bool bTravelling, bool bCounting, float SecondsLeft, bool bHost)
 	{
 		if (bTravelling)
@@ -124,6 +133,12 @@ namespace
 		return FCoreStyle::GetDefaultFontStyle(Style, Size);
 	}
 
+	/** `Text` in capitals, accents and all (Gruyère's è, which FString's ToUpper leaves). */
+	FString Upper(const TCHAR* Text)
+	{
+		return FText::FromString(Text).ToUpper().ToString();
+	}
+
 	/** `Colour` darkened (or lightened, above 1) by `Scale`, as opaque. */
 	FLinearColor Shade(const FLinearColor& Colour, float Scale, float Alpha = 1.0f)
 	{
@@ -138,6 +153,11 @@ namespace
 		FButtonStyle Danger;
 		FSlateRoundedBoxBrush BotChip;
 		FSlateRoundedBoxBrush PrimaryFace;
+		/** A dropdown's choices that aren't chosen: clear until the mouse is over them. */
+		FButtonStyle Quiet;
+		/** A dropdown's list, and a rule's value as a joiner sees it (nothing to press). */
+		FSlateRoundedBoxBrush DropdownList;
+		FSlateRoundedBoxBrush ReadOnlyValue;
 		FSliderStyle Slider;
 		TUniquePtr<FSlateDynamicImageBrush> PlayerIcon;
 		TUniquePtr<FSlateDynamicImageBrush> BotIcon;
@@ -171,6 +191,8 @@ namespace
 		FLooks()
 			: BotChip(FLinearColor(0.1f, 0.1f, 0.11f, 1.0f), 8.0f)
 			, PrimaryFace(FLinearColor(0.1f, 0.42f, 0.9f), CheeseStrikeMenu::Rounding)
+			, DropdownList(FLinearColor(0.025f, 0.025f, 0.028f, 1.0f), CheeseStrikeMenu::Rounding, FLinearColor(0.22f, 0.22f, 0.24f), 1.0f)
+			, ReadOnlyValue(FLinearColor(0.12f, 0.12f, 0.13f, 0.9f), CheeseStrikeMenu::Rounding)
 		{
 			const auto Make = [](FButtonStyle& Style, const FLinearColor& Rest, const FLinearColor& Hover, const FLinearColor& Press)
 			{
@@ -186,6 +208,7 @@ namespace
 			Make(Plain, FLinearColor(0.18f, 0.18f, 0.19f), FLinearColor(0.28f, 0.28f, 0.3f), FLinearColor(0.12f, 0.12f, 0.13f));
 			Make(Primary, FLinearColor(0.1f, 0.42f, 0.9f), FLinearColor(0.2f, 0.52f, 1.0f), FLinearColor(0.08f, 0.32f, 0.72f));
 			Make(Danger, FLinearColor(0.72f, 0.16f, 0.14f), FLinearColor(0.85f, 0.24f, 0.2f), FLinearColor(0.55f, 0.1f, 0.1f));
+			Make(Quiet, FLinearColor(0.0f, 0.0f, 0.0f, 0.0f), FLinearColor(0.24f, 0.24f, 0.26f), FLinearColor(0.12f, 0.12f, 0.13f));
 			// A slider: a thin rounded bar, and a cheese-coloured knob that lights under the mouse.
 			Slider.SetNormalBarImage(FSlateRoundedBoxBrush(FLinearColor(0.22f, 0.22f, 0.24f), 3.0f));
 			Slider.SetHoveredBarImage(FSlateRoundedBoxBrush(FLinearColor(0.3f, 0.3f, 0.32f), 3.0f));
@@ -207,6 +230,36 @@ namespace
 		static FLooks Made;
 		return Made;
 	}
+
+	/** A dropdown's chevron, drawn in the button's own colour: down, or up while its list is open. */
+	class SCheeseStrikeDropArrow : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SCheeseStrikeDropArrow) {}
+			SLATE_ATTRIBUTE(bool, Open)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			Open = InArgs._Open;
+		}
+
+		virtual FVector2D ComputeDesiredSize(float) const override
+		{
+			return FVector2D(16.0, 10.0);
+		}
+
+		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
+		{
+			const bool bUp = Open.Get(false);
+			TArray<FVector2f> Points = bUp ? TArray<FVector2f>({{2.0f, 8.0f}, {8.0f, 2.0f}, {14.0f, 8.0f}}) : TArray<FVector2f>({{2.0f, 2.0f}, {8.0f, 8.0f}, {14.0f, 2.0f}});
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), MoveTemp(Points), ESlateDrawEffect::None, InWidgetStyle.GetForegroundColor(), true, 3.0f);
+			return LayerId;
+		}
+
+	private:
+		TAttribute<bool> Open;
+	};
 
 	UCheeseStrikeSessionSubsystem* SessionsOf(const ACheeseStrikePlayerController* Player)
 	{
@@ -253,6 +306,17 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 	ChildSlot
 	[
 		SNew(SOverlay)
+		// Paused, the game behind the menu is blurred and a little darker: it goes on, but the player is out of it.
+		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Fill)
+		[
+			SAssignNew(Blur, SBackgroundBlur)
+			.BlurStrength(CheeseStrikeMenu::PauseBlur)
+			.Padding(0.0f)
+			.Visibility(EVisibility::Collapsed)
+			[
+				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.0f, 0.0f, 0.0f, CheeseStrikeMenu::PauseDarkening))
+			]
+		]
 		// The lobby covers the whole view, over its tile.
 		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Fill)
 		[
@@ -302,7 +366,16 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 void SCheeseStrikeMenu::Show(EMenuPage InPage)
 {
 	Page = InPage;
+	// Whatever was open of the last page is shut, and the page drawn afresh.
+	for (const TWeakPtr<SMenuAnchor>& Each : Dropdowns)
+	{
+		if (const TSharedPtr<SMenuAnchor> Anchor = Each.Pin())
+		{
+			Anchor->SetIsOpen(false);
+		}
+	}
 	ShownLobbyKey.Reset();
+	ShownLobbyStatus = INDEX_NONE;
 	ShownPageKey.Reset();
 	Refresh();
 }
@@ -322,6 +395,12 @@ void SCheeseStrikeMenu::Refresh()
 	{
 		Lobby->SetVisibility(bLobby ? EVisibility::Visible : EVisibility::Collapsed);
 	}
+	if (Blur.IsValid())
+	{
+		// The pause menu, and the options opened from it while still paused; not the front end's options.
+		const bool bPausedHere = Page == EMenuPage::Pause || (Page == EMenuPage::Options && Controller.IsValid() && Controller->IsPaused());
+		Blur->SetVisibility(bPausedHere ? EVisibility::HitTestInvisible : EVisibility::Collapsed);
+	}
 	if (Masthead.IsValid())
 	{
 		Masthead->SetVisibility(bFrontEnd ? EVisibility::HitTestInvisible : EVisibility::Collapsed);
@@ -333,10 +412,14 @@ void SCheeseStrikeMenu::Refresh()
 	if (bLobby && LobbyContent.IsValid())
 	{
 		// Drawn again only when something in it has changed: rebuilding it restarts the spinner.
+		// Nor while the host has a dropdown open, which drawing it again would close.
 		const FString Key = LobbyKey();
-		if (Key != ShownLobbyKey)
+		const int32 Status = static_cast<int32>(LobbyStatusNow());
+		if (CheeseStrikeMenu::ShouldRedrawLobby(Key != ShownLobbyKey, Status != ShownLobbyStatus, IsDropdownOpen()))
 		{
 			ShownLobbyKey = Key;
+			ShownLobbyStatus = Status;
+			Dropdowns.Reset();
 			LobbyContent->SetContent(MakeLobby());
 		}
 	}
@@ -351,6 +434,22 @@ void SCheeseStrikeMenu::Refresh()
 			Content->SetContent(MakePage());
 		}
 	}
+}
+
+void SCheeseStrikeMenu::OpenDropdown(int32 Index)
+{
+	for (int32 Each = 0; Each < Dropdowns.Num(); ++Each)
+	{
+		if (const TSharedPtr<SMenuAnchor> Anchor = Dropdowns[Each].Pin())
+		{
+			Anchor->SetIsOpen(Each == Index);
+		}
+	}
+}
+
+bool SCheeseStrikeMenu::IsBlurringTheGame() const
+{
+	return Blur.IsValid() && Blur->GetVisibility() != EVisibility::Collapsed;
 }
 
 FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
@@ -372,6 +471,7 @@ const FButtonStyle& SCheeseStrikeMenu::ButtonStyle(EButtonKind Kind) const
 	{
 	case EButtonKind::Primary: return Looks().Primary;
 	case EButtonKind::Danger: return Looks().Danger;
+	case EButtonKind::Quiet: return Looks().Quiet;
 	default: return Looks().Plain;
 	}
 }
@@ -448,11 +548,134 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoiceButtons(const TArray<FString>& 
 	return Row;
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoices(const FString& Label, const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick)
+bool SCheeseStrikeMenu::IsDropdownOpen() const
 {
-	return SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 4.0f)) [ MakeLine(Label, true) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeChoiceButtons(Choices, Chosen, bCanPick, MoveTemp(Pick)) ];
+	for (const TWeakPtr<SMenuAnchor>& Each : Dropdowns)
+	{
+		const TSharedPtr<SMenuAnchor> Anchor = Each.Pin();
+		if (Anchor.IsValid() && Anchor->IsOpen())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeReadOnly(const FString& Value)
+{
+	return SNew(SBorder)
+		.BorderImage(&Looks().ReadOnlyValue)
+		.Padding(FMargin(16.0f, 10.0f))
+		[
+			SNew(STextBlock).Text(FText::FromString(Value)).Font(Font(18, FName("Bold"))).ColorAndOpacity(Ink)
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick, TArray<const FSlateBrush*> Pictures)
+{
+	const FString Shown = Choices.IsValidIndex(Chosen) ? Choices[Chosen] : FString(TEXT("-"));
+	if (!bCanPick)
+	{
+		// What the host chose, as plain as the host's own dropdown shut, with nothing to press.
+		return MakeReadOnly(Shown);
+	}
+	// The anchor is made after its list's buttons, which close it: they reach it through this.
+	const TSharedRef<TWeakPtr<SMenuAnchor>> Holder = MakeShared<TWeakPtr<SMenuAnchor>>();
+	const auto List = [this, Holder, Choices, Chosen, Pick, Pictures]() -> TSharedRef<SWidget>
+	{
+		const TSharedPtr<SMenuAnchor> Anchor = Holder->Pin();
+		const float Width = Anchor.IsValid() ? static_cast<float>(Anchor->GetCachedGeometry().GetLocalSize().X) : 0.0f;
+		TSharedRef<SVerticalBox> Items = SNew(SVerticalBox);
+		for (int32 Index = 0; Index < Choices.Num(); ++Index)
+		{
+			TSharedRef<SHorizontalBox> Inside = SNew(SHorizontalBox);
+			if (Pictures.IsValidIndex(Index) && Pictures[Index] != nullptr)
+			{
+				Inside->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f))
+				[
+					SNew(SBox).WidthOverride(64.0f).HeightOverride(36.0f) [ SNew(SImage).Image(Pictures[Index]) ]
+				];
+			}
+			Inside->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(FText::FromString(Choices[Index])).Font(Font(18, FName("Bold")))
+			];
+			Items->AddSlot().AutoHeight().Padding(FMargin(0.0f, 1.0f))
+			[
+				SNew(SButton)
+				.ButtonStyle(&ButtonStyle(Index == Chosen ? EButtonKind::Primary : EButtonKind::Quiet))
+				.ContentPadding(FMargin(12.0f, 7.0f))
+				.OnClicked_Lambda([Holder, Pick, Index]()
+				{
+					// Shut first, so that the lobby may be drawn again with the choice.
+					if (const TSharedPtr<SMenuAnchor> Open = Holder->Pin())
+					{
+						Open->SetIsOpen(false);
+					}
+					Pick(Index);
+					return FReply::Handled();
+				})
+				[
+					Inside
+				]
+			];
+		}
+		return SNew(SBox).MinDesiredWidth(Width)
+			[
+				SNew(SBorder).BorderImage(&Looks().DropdownList).Padding(FMargin(4.0f))
+				[
+					Items
+				]
+			];
+	};
+	TSharedRef<SMenuAnchor> Anchor = SNew(SMenuAnchor)
+		.Placement(MenuPlacement_ComboBox)
+		.Method(EPopupMethod::UseCurrentWindow)
+		.ShowMenuBackground(false)
+		.OnGetMenuContent_Lambda(List);
+	*Holder = Anchor;
+	Dropdowns.Add(Anchor);
+	TWeakPtr<SMenuAnchor> Weak = Anchor;
+	Anchor->SetContent(
+		SNew(SButton)
+		.ButtonStyle(&ButtonStyle(EButtonKind::Plain))
+		.ContentPadding(FMargin(16.0f, 10.0f))
+		.OnClicked_Lambda([Weak]()
+		{
+			if (const TSharedPtr<SMenuAnchor> Open = Weak.Pin())
+			{
+				Open->SetIsOpen(!Open->IsOpen());
+			}
+			return FReply::Handled();
+		})
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(FText::FromString(Shown)).Font(Font(18, FName("Bold")))
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(12.0f, 0.0f, 0.0f, 0.0f))
+			[
+				SNew(SCheeseStrikeDropArrow).Open_Lambda([Weak]() { const TSharedPtr<SMenuAnchor> Open = Weak.Pin(); return Open.IsValid() && Open->IsOpen(); })
+			]
+		]);
+	return Anchor;
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeRuleRow(const FString& Label, TSharedRef<SWidget> Setter)
+{
+	return SNew(SBox).Padding(FMargin(0.0f, 6.0f))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(CheeseStrikeMenu::RuleLabelWidth)
+				[
+					SNew(STextBlock).Text(FText::FromString(Label)).Font(Font(18)).ColorAndOpacity(Muted)
+				]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center) [ Setter ]
+		];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
@@ -675,7 +898,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const F
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeMapPicture(int32 MapIndex)
 {
 	const bool bKnown = MapIndex >= 0 && MapIndex < CheeseStrikeRules::NumMaps();
-	const FString Name = bKnown ? FString(CheeseStrikeRules::Maps[MapIndex].Name).ToUpper() : FString(TEXT("THIS LEVEL"));
+	const FString Name = bKnown ? Upper(CheeseStrikeRules::Maps[MapIndex].Name) : FString(TEXT("THIS LEVEL"));
 	const FSlateBrush* Picture = bKnown ? Looks().MapPicture(CheeseStrikeRules::Maps[MapIndex].Picture) : nullptr;
 	return SNew(SBox).WidthOverride(CheeseStrikeMenu::MapPictureWidth).HeightOverride(CheeseStrikeMenu::MapPictureWidth * 9.0f / 16.0f)
 		[
@@ -700,20 +923,15 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	const int32 KillLimit = Match != nullptr ? Match->GetKillLimit() : CheeseStrikeRules::KillLimit;
 	const CheeseStrikeModes::EMode ModeNow = Match != nullptr ? Match->GetMode() : CheeseStrikeModes::EMode::FreeForAll;
 	const CheeseStrikeModes::FModeInfo& ModeRules = CheeseStrikeModes::Info(ModeNow);
-	TSharedRef<SWrapBox> ModeButtons = SNew(SWrapBox).UseAllottedSize(true).InnerSlotPadding(FVector2D(6.0f, 6.0f));
+	TArray<FString> ModeNames;
+	int32 ModeChosen = INDEX_NONE;
 	for (int32 Index = 0; Index < CheeseStrikeModes::NumModes; ++Index)
 	{
-		ModeButtons->AddSlot()
-		[
-			SNew(SButton)
-			.ButtonStyle(&ButtonStyle(CheeseStrikeModes::Modes[Index].Mode == ModeNow ? EButtonKind::Primary : EButtonKind::Plain))
-			.IsEnabled(bHost)
-			.ContentPadding(FMargin(12.0f, 6.0f))
-			.OnClicked_Lambda([Player, Index]() { if (Player.IsValid()) Player->SetModeFromMenu(Index); return FReply::Handled(); })
-			[
-				SNew(STextBlock).Text(FText::FromString(FString(CheeseStrikeModes::Modes[Index].Name).ToUpper())).Font(Font(15, FName("Bold")))
-			]
-		];
+		ModeNames.Add(Upper(CheeseStrikeModes::Modes[Index].Name));
+		if (CheeseStrikeModes::Modes[Index].Mode == ModeNow)
+		{
+			ModeChosen = Index;
+		}
 	}
 	const int32 Rounds = Match != nullptr ? Match->GetRoundLimit() : CheeseStrikeModes::RoundLimit;
 	TArray<FString> RoundNames;
@@ -748,15 +966,17 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 		}
 	}
 	TArray<FString> MapNames;
+	TArray<const FSlateBrush*> MapPictures;
 	for (int32 Index = 0; Index < CheeseStrikeRules::NumMaps(); ++Index)
 	{
-		MapNames.Add(FString(CheeseStrikeRules::Maps[Index].Name).ToUpper());
+		MapNames.Add(Upper(CheeseStrikeRules::Maps[Index].Name));
+		MapPictures.Add(Looks().MapPicture(CheeseStrikeRules::Maps[Index].Picture));
 	}
 	const int32 MapChosen = Match != nullptr ? Match->GetMapIndex() : INDEX_NONE;
 	TArray<FString> Skills;
 	for (const CheeseStrikeBots::FSkill& Skill : CheeseStrikeBots::Skills)
 	{
-		Skills.Add(FString(Skill.Name).ToUpper());
+		Skills.Add(Upper(Skill.Name));
 	}
 	const int32 SkillChosen = Match != nullptr ? Match->GetBotSkill() : CheeseStrikeBots::DefaultSkill;
 	// How many bots: from none to every seat the players leave.
@@ -768,34 +988,45 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	const int32 Most = CheeseStrikeRules::MostBots(Players);
 	const int32 Wanted = Match != nullptr ? Match->GetBotsWanted() : CheeseStrikeRules::DefaultBots;
 	const int32 Bots = CheeseStrikeRules::BotsIn(Players, Wanted);
-	const FString BotsText = Bots > 0 && Bots >= Most ? FString::Printf(TEXT("%d (every seat)"), Bots) : FString::FromInt(Bots);
+
+	// A row a rule, each showing its choice and opening onto the rest, so that the whole lobby fits on the screen.
+	TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
+	const auto Row = [this, &Rows](const FString& Label, TSharedRef<SWidget> Setter) { Rows->AddSlot().AutoHeight() [ MakeRuleRow(Label, Setter) ]; };
+	Row(TEXT("Map"), MakeDropdown(MapNames, MapChosen, bHost, [Player, KillLimit, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, RespawnDelay, Index); }, MapPictures));
+	Row(TEXT("Mode"), MakeDropdown(ModeNames, ModeChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetModeFromMenu(Index); }));
+	Rows->AddSlot().AutoHeight().Padding(FMargin(CheeseStrikeMenu::RuleLabelWidth, 0.0f, 0.0f, 4.0f))
+	[
+		SNew(STextBlock).Text(FText::FromString(ModeRules.Summary)).Font(Font(14)).ColorAndOpacity(Muted).AutoWrapText(true)
+	];
 	// What the mode plays to: kills for one or for a side, rounds, or (Gun Game) the ladder alone; the wait to come back where there is one.
-	TSharedRef<SVerticalBox> ModeRows = SNew(SVerticalBox);
 	if (ModeRules.WinBy == CheeseStrikeModes::EWinBy::PlayerKills || ModeRules.WinBy == CheeseStrikeModes::EWinBy::TeamKills)
 	{
-		ModeRows->AddSlot().AutoHeight() [ MakeChoices(ModeRules.WinBy == CheeseStrikeModes::EWinBy::TeamKills ? TEXT("First team to how many kills") : TEXT("First to how many kills"), Limits, LimitChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeRules::KillLimitChoices[Index], RespawnDelay); }) ];
+		Row(ModeRules.WinBy == CheeseStrikeModes::EWinBy::TeamKills ? TEXT("Team kills to win") : TEXT("Kills to win"),
+			MakeDropdown(Limits, LimitChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeRules::KillLimitChoices[Index], RespawnDelay); }));
 	}
 	else if (ModeRules.WinBy == CheeseStrikeModes::EWinBy::Rounds)
 	{
-		ModeRows->AddSlot().AutoHeight() [ MakeChoices(TEXT("First to win how many rounds"), RoundNames, RoundsChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetRoundsFromMenu(CheeseStrikeModes::RoundLimitChoices[Index]); }) ];
+		Row(TEXT("Rounds to win"), MakeDropdown(RoundNames, RoundsChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetRoundsFromMenu(CheeseStrikeModes::RoundLimitChoices[Index]); }));
 	}
 	if (ModeRules.bRespawns)
 	{
-		ModeRows->AddSlot().AutoHeight() [ MakeChoices(TEXT("Back how long after a death"), Delays, DelayChosen, bHost, [Player, KillLimit](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, CheeseStrikeRules::RespawnDelayChoices[Index]); }) ];
+		Row(TEXT("Back after a death"), MakeDropdown(Delays, DelayChosen, bHost, [Player, KillLimit](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, CheeseStrikeRules::RespawnDelayChoices[Index]); }));
+	}
+	TArray<FString> BotCounts;
+	for (int32 Count = 0; Count <= FMath::Max(Most, Bots); ++Count)
+	{
+		BotCounts.Add(Count > 0 && Count >= Most ? FString::Printf(TEXT("%d (every seat)"), Count) : FString::FromInt(Count));
+	}
+	Row(TEXT("Bots"), MakeDropdown(BotCounts, Bots, bHost, [Player](int32 Count) { if (Player.IsValid()) Player->SetBotsFromMenu(Count); }));
+	Row(TEXT("Bot skill"), MakeDropdown(Skills, SkillChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetBotSkillFromMenu(Index); }));
+	if (!bHost)
+	{
+		Rows->AddSlot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 0.0f)) [ MakeLine(TEXT("The host sets the rules."), true) ];
 	}
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOBBY")) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 8.0f)) [ MakeMapPicture(MapChosen) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Map"), MapNames, MapChosen, bHost, [Player, KillLimit, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimit, RespawnDelay, Index); }) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("Mode"), true) ]
-		+ SVerticalBox::Slot().AutoHeight() [ ModeButtons ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 6.0f, 0.0f, 0.0f)) [ MakeLine(ModeRules.Summary, false) ]
-		+ SVerticalBox::Slot().AutoHeight() [ ModeRows ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeStepper(TEXT("Bots"), BotsText, bHost,
-			[Player, Bots]() { if (Player.IsValid()) Player->SetBotsFromMenu(FMath::Max(0, Bots - 1)); },
-			[Player, Bots, Most]() { if (Player.IsValid()) Player->SetBotsFromMenu(FMath::Min(Bots + 1, Most)); }) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeChoices(TEXT("Bot skill"), Skills, SkillChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetBotSkillFromMenu(Index); }) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeLine(bHost ? TEXT("Everyone here sees the rules as you set them.") : TEXT("The host sets the rules."), true) ];
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 10.0f)) [ MakeMapPicture(MapChosen) ]
+		+ SVerticalBox::Slot().AutoHeight() [ Rows ];
 }
 
 FString SCheeseStrikeMenu::LobbyKey() const
@@ -943,7 +1174,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 	}
 	else
 	{
-		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeLine(TEXT("Waiting for the host to start."), true) ];
+		Bottom->AddSlot().AutoWidth().VAlign(VAlign_Center) [ SNew(STextBlock).Text(FText::FromString(TEXT("Waiting for the host to start."))).Font(Font(16)).ColorAndOpacity(Muted) ];
 	}
 
 	// Sides of a team match; everyone in one colour, with no sides, in a free-for-all.
@@ -957,7 +1188,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 			[
 				SNew(SBox).WidthOverride(CheeseStrikeMenu::MapPictureWidth)
 				[
-					SNew(SScrollBox) + SScrollBox::Slot() [ MakeLobbyRules() ]
+					MakeLobbyRules()
 				]
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f) [ MakeSeatColumns(bTeams) ]

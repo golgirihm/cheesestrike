@@ -11,6 +11,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/UserInterfaceSettings.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "CheeseStrikeBotController.h"
@@ -24,6 +25,7 @@
 #include "UI/CheeseStrikeCurtain.h"
 #include "UI/CheeseStrikeMenu.h"
 #include "UI/CheeseStrikeTones.h"
+#include "Widgets/Text/STextBlock.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -275,6 +277,17 @@ namespace LobbyTests
 		return Theirs != nullptr && Theirs->GetGameInstance() != nullptr ? Theirs->GetGameInstance()->GetSubsystem<UCheeseStrikeCurtainSubsystem>() : nullptr;
 	}
 
+	/** Every widget under `Widget`, itself first. */
+	void AllWidgets(const TSharedRef<SWidget>& Widget, TArray<TSharedRef<SWidget>>& Found)
+	{
+		Found.Add(Widget);
+		FChildren* Children = Widget->GetChildren();
+		for (int32 Index = 0; Children != nullptr && Index < Children->Num(); ++Index)
+		{
+			AllWidgets(Children->GetChildAt(Index), Found);
+		}
+	}
+
 	/** Looks at both players this frame; true once both are in the match on The Creamery, seeing it. */
 	bool LookAtEveryone()
 	{
@@ -343,6 +356,41 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 		TestEqual(TEXT("no bot plays in the lobby"), LobbyTests::BotsIn(World(0)), 0);
 		Watched.Seconds = CheeseStrikeTones::TimesPlayed(CheeseStrikeTones::ETone::Second);
 		Watched.Ends = CheeseStrikeTones::TimesPlayed(CheeseStrikeTones::ETone::End);
+		// The lobby fits the screen, the host's and the joiner's, with no scrolling: its rules are dropdowns.
+		for (int32 Each = 0; Each < 2; ++Each)
+		{
+			const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(Each));
+			Menu->Show(EMenuPage::Lobby);
+			Menu->SlatePrepass(1.0f);
+			const FVector2D Wants = Menu->GetDesiredSize();
+			const FString Who = Each == 0 ? TEXT("the host's") : TEXT("the joiner's");
+			AddInfo(FString::Printf(TEXT("%s lobby wants %.0f x %.0f"), *Who, Wants.X, Wants.Y));
+			for (const FIntPoint Screen : {FIntPoint(1280, 720), FIntPoint(1600, 900), FIntPoint(1920, 1080)})
+			{
+				// The screen in the menu's own units: Slate scales the menu with the screen's height (the engine's DPI curve).
+				const float Scale = GetDefault<UUserInterfaceSettings>()->GetDPIScaleBasedOnSize(Screen);
+				const FVector2D Room(Screen.X / Scale, Screen.Y / Scale);
+				TestTrue(FString::Printf(TEXT("%s lobby (%.0f x %.0f) fits %d x %d (%.0f x %.0f)"), *Who, Wants.X, Wants.Y, Screen.X, Screen.Y, Room.X, Room.Y), Wants.X <= Room.X + 1.0 && Wants.Y <= Room.Y + 1.0);
+			}
+			TArray<TSharedRef<SWidget>> Widgets;
+			LobbyTests::AllWidgets(Menu, Widgets);
+			bool bScrolls = false;
+			bool bRules = false;
+			bool bOldNote = false;
+			for (const TSharedRef<SWidget>& Widget : Widgets)
+			{
+				bScrolls |= Widget->GetType() == FName(TEXT("SScrollBox"));
+				if (Widget->GetType() == FName(TEXT("STextBlock")))
+				{
+					const FString Text = StaticCastSharedRef<STextBlock>(Widget)->GetText().ToString();
+					bRules |= Text == TEXT("Bot skill");
+					bOldNote |= Text.Contains(TEXT("sees the rules"));
+				}
+			}
+			TestFalse(FString::Printf(TEXT("%s lobby has nothing to scroll"), *Who), bScrolls);
+			TestTrue(FString::Printf(TEXT("%s lobby shows the rules"), *Who), bRules);
+			TestFalse(TEXT("and doesn't say everyone sees them"), bOldNote);
+		}
 		World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->AskToStart(false);
 	});
 	WaitUntil(TEXT("everyone in the match on The Creamery, seeing it"), CheeseStrikeRules::MatchCountdown + 90.0f, &LobbyTests::LookAtEveryone);
@@ -401,6 +449,12 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the match goes on"), GameState(0) != nullptr && GameState(0)->IsMatchInProgress());
 		TestTrue(TEXT("paused still"), Controller(0)->IsPaused());
 		TestFalse(TEXT("so the character takes no input"), Character(0) != nullptr && Character(0)->TakesInput());
+		// Paused, the game behind the menu is blurred, under the options too.
+		const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(0));
+		Menu->Show(EMenuPage::Options);
+		TestTrue(TEXT("the options opened from the pause menu blur the game"), Menu->IsBlurringTheGame());
+		Menu->Show(EMenuPage::Pause);
+		TestTrue(TEXT("as the pause menu does"), Menu->IsBlurringTheGame());
 		Controller(0)->MenuPressed();
 	});
 	WaitUntil(TEXT("Escape going back to the pause menu"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::Pause; });
@@ -413,6 +467,9 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 	Then([this]()
 	{
 		TestTrue(TEXT("and the character takes input again"), Character(0) != nullptr && Character(0)->TakesInput());
+		const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(0));
+		Menu->Show(EMenuPage::Options);
+		TestFalse(TEXT("options not opened from a pause (the front end's) leave the view as it is"), Menu->IsBlurringTheGame());
 	});
 	StopPlaying();
 	return true;

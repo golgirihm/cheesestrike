@@ -116,6 +116,9 @@ public:
 	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits or Options, which also opens from the pause menu), and of the options the tab named (Controls, View, Sound or Graphics). */
 	UFUNCTION(Exec)
 	void CheeseStrikePage(const FString& Page, const FString& Tab = TEXT(""));
+	/** From the console or a play script: opens the lobby's nth dropdown (0 the map, then the mode and on down), for looking at it; -1 shuts it. */
+	UFUNCTION(Exec)
+	void CheeseStrikeDropdown(int32 Number = 0);
 
 	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
 	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */
