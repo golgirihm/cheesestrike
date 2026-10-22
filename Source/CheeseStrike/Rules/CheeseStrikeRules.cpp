@@ -76,6 +76,7 @@ namespace CheeseStrikeRules
 
 	const FMapChoice Maps[] = {
 		{TEXT("The Creamery"), TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery"), TEXT("creamery.png")},
+		{TEXT("The Labyrinth"), TEXT("/Game/CheeseStrike/Maps/Lvl_Labyrinth"), TEXT("labyrinth.png")},
 		{TEXT("Proving Ground"), TEXT("/Game/Variant_Shooter/Lvl_Shooter"), TEXT("proving_ground.png")},
 	};
 
