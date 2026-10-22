@@ -910,17 +910,19 @@ void ACheeseStrikeHUD::DrawKillFeed(const ACheeseStrikeGameState* Match)
 		{
 			continue;
 		}
-		// And where, as the design has it: "... · The Hall".
-		const FString Where = KillPlace(Kill, Now);
+		// And where, as the design has it: "... · The Hall"; a death nobody did is "<the killed>  fell into the fondue", which says where.
+		const bool bNobody = Kill.Killer.IsEmpty() && !Kill.How.IsEmpty();
+		const FString Where = bNobody ? FString() : KillPlace(Kill, Now);
 		Showing.Add(FString::Printf(TEXT("%s@%.2f"), *Kill.Victim, Kill.At));
 		const FString Place = Where.IsEmpty() ? FString() : FString::Printf(TEXT("  ·  %s"), *Where);
 		const float PlaceWidth = Place.IsEmpty() ? 0.0f : HudDraw::Measure(Place, Line).X;
 		// Killer, then "killed", then the killed, right to left from the edge; the player's own name in the accent.
-		const FString Killer = Kill.Killer.IsEmpty() ? TEXT("nobody") : Kill.Killer;
+		const FString Killer = bNobody ? Kill.Victim : (Kill.Killer.IsEmpty() ? TEXT("nobody") : Kill.Killer);
 		// A streak's kill says which ("Cheese Strike") where the weapon's says "killed".
-		const FString Middle = !Kill.How.IsEmpty() ? FString::Printf(TEXT("  %s  "), *Kill.How) : Kill.bHead ? TEXT("  killed (head)  ") : TEXT("  killed  ");
-		const float VictimWidth = HudDraw::Measure(Kill.Victim, Line).X;
-		const float MiddleWidth = HudDraw::Measure(Middle, Line).X;
+		const FString Middle = bNobody ? FString() : !Kill.How.IsEmpty() ? FString::Printf(TEXT("  %s  "), *Kill.How) : Kill.bHead ? TEXT("  killed (head)  ") : TEXT("  killed  ");
+		const FString Victim = bNobody ? FString::Printf(TEXT("  %s"), *Kill.How) : Kill.Victim;
+		const float VictimWidth = HudDraw::Measure(Victim, Line).X;
+		const float MiddleWidth = Middle.IsEmpty() ? 0.0f : HudDraw::Measure(Middle, Line).X;
 		const float KillerWidth = HudDraw::Measure(Killer, Line).X;
 		const float Height = HudDraw::Measure(TEXT("A"), Line).Y;
 		HudDraw::FShapes Shapes;
@@ -933,11 +935,14 @@ void ACheeseStrikeHUD::DrawKillFeed(const ACheeseStrikeGameState* Match)
 			HudDraw::Text(Canvas, Place, FVector2D(X, Y), Line, HudDraw::Soft, 1.0f);
 			X -= PlaceWidth;
 		}
-		HudDraw::Text(Canvas, Kill.Victim, FVector2D(X, Y), Line, Kill.Victim == Me ? HudDraw::Accent : HudDraw::Ink, 1.0f);
+		HudDraw::Text(Canvas, Victim, FVector2D(X, Y), Line, bNobody ? HudDraw::Soft : (Kill.Victim == Me ? HudDraw::Accent : HudDraw::Ink), 1.0f);
 		X -= VictimWidth;
-		HudDraw::Text(Canvas, Middle, FVector2D(X, Y), Line, Kill.bHead || !Kill.How.IsEmpty() ? HudDraw::Accent : HudDraw::Soft, 1.0f);
-		X -= MiddleWidth;
-		HudDraw::Text(Canvas, Killer, FVector2D(X, Y), Line, Kill.Killer == Me ? HudDraw::Accent : HudDraw::Ink, 1.0f);
+		if (!Middle.IsEmpty())
+		{
+			HudDraw::Text(Canvas, Middle, FVector2D(X, Y), Line, Kill.bHead || !Kill.How.IsEmpty() ? HudDraw::Accent : HudDraw::Soft, 1.0f);
+			X -= MiddleWidth;
+		}
+		HudDraw::Text(Canvas, Killer, FVector2D(X, Y), Line, (bNobody ? Kill.Victim : Kill.Killer) == Me ? HudDraw::Accent : HudDraw::Ink, 1.0f);
 		Y += Height + 8.0f * U;
 	}
 	// Forget the places of kills gone from the feed.

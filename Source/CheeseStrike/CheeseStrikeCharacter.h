@@ -59,6 +59,8 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
 	virtual void PossessedBy(AController* NewController) override;
+	/** Under the map's kill height (into its fondue, off its edge): killed by the fall (server only; CheeseStrikeFalls). */
+	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 
@@ -163,6 +165,8 @@ public:
 	FString DisplayName() const;
 	/** Who killed it, once it is dead, and the server's time it died (-1 while alive). */
 	const FString& GetKilledBy() const { return KilledBy; }
+	/** How it died when nobody killed it ("fell into the fondue"), for the death screen; empty otherwise. */
+	const FString& GetDiedHow() const { return DiedHow; }
 	float GetDiedAt() const { return DiedAt; }
 	/**
 	 * Takes `Damage` off the health (server only); for the server's own
@@ -250,6 +254,8 @@ protected:
 	/** Who killed it, and when, in the server's time; set by the server as it dies. */
 	UPROPERTY(Replicated)
 	FString KilledBy;
+	UPROPERTY(Replicated)
+	FString DiedHow;
 	UPROPERTY(Replicated)
 	float DiedAt = -1.0f;
 	/** The server's time its protection as a fresh spawn ends. */

@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeBotController.h"
 #include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameStateBase.h"
@@ -13,6 +14,7 @@
 #include "CheeseStrikePlayerState.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "HAL/IConsoleManager.h"
+#include "Rules/CheeseStrikeFalls.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -114,6 +116,14 @@ void ACheeseStrikeBotController::OnPossess(APawn* InPawn)
 	if (InPawn != nullptr)
 	{
 		FaceTo(InPawn->GetActorRotation());
+	}
+	// On a map where a fall kills (a vat of fondue), a bot never walks off an edge; it can still fall when the floor
+	// under it is eaten.
+	if (const ACheeseStrikeCharacter* Me = Body())
+	{
+		const bool bMayDrop = !CheeseStrikeFalls::HasKillHeight(CheeseStrikeFalls::KillHeight(GetWorld()));
+		Me->GetCharacterMovement()->bCanWalkOffLedges = bMayDrop;
+		Me->GetCharacterMovement()->bCanWalkOffLedgesWhenCrouching = bMayDrop;
 	}
 	// A moment's pause on coming in, a little different for each, so that they don't all move as one.
 	NextThinkAt = Now() + FMath::FRandRange(0.2f, 0.6f);
@@ -800,8 +810,11 @@ void ACheeseStrikeBotController::Step(float DeltaSeconds)
 		StepSide = FMath::RandBool() ? 1.0f : -1.0f;
 	}
 	const FVector Away = (Me->GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D();
-	const FVector Side = FVector::CrossProduct(FVector::UpVector, Away) * StepSide;
-	// Not off the mesh: a step toward a wall or a drop goes the other way.
+	FVector Side = FVector::CrossProduct(FVector::UpVector, Away) * StepSide;
+	// Not off the mesh: a step toward a wall or a drop goes the other way, and with neither way clear (a narrow path
+	// over the fondue), it stands; it backs off only where there is room behind.
+	bool bSideClear = true;
+	bool bBackClear = true;
 	if (UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
 	{
 		FVector Blocked;
@@ -809,11 +822,17 @@ void ACheeseStrikeBotController::Step(float DeltaSeconds)
 		if (Navigation->NavigationRaycast(GetWorld(), Feet, Feet + Side * 150.0f, Blocked))
 		{
 			StepSide = -StepSide;
+			Side = -Side;
 			NextStepAt = Time + CheeseStrikeBots::StepMin;
+			bSideClear = !Navigation->NavigationRaycast(GetWorld(), Feet, Feet + Side * 150.0f, Blocked);
 		}
+		bBackClear = !Navigation->NavigationRaycast(GetWorld(), Feet, Feet + Away * 150.0f, Blocked);
 	}
-	Me->AddMovementInput(Side, 1.0f);
-	if (Move == CheeseStrikeBots::EMove::BackOff)
+	if (bSideClear)
+	{
+		Me->AddMovementInput(Side, 1.0f);
+	}
+	if (Move == CheeseStrikeBots::EMove::BackOff && bBackClear)
 	{
 		Me->AddMovementInput(Away, 1.0f);
 	}

@@ -25,6 +25,8 @@ enum class EMouseDoing : uint8
 	Eating,
 	/** Scared off by shots. */
 	Fleeing,
+	/** Fallen below the map's kill height (into The Fondue Floor's fondue): gone a while, then back over the edge. */
+	Sinking,
 };
 
 /**
@@ -57,6 +59,8 @@ public:
 	float GetFear() const { return Fear; }
 	/** How many blocks it has finished. */
 	int32 GetEaten() const { return Eaten; }
+	/** How many times it has fallen in, and come back. */
+	int32 GetFallenIn() const { return FallenIn; }
 	/** Whether it found all its sounds. */
 	bool HasSounds() const;
 	/** Whether it has its body, animations and every material of its body. */
@@ -85,6 +89,12 @@ protected:
 	void RunFrom(const FVector& Danger);
 	/** Keeps its feet on what is under it (rising a little, as up a ramp), falling when what it stood on is eaten. */
 	void KeepOnGround(float DeltaSeconds);
+	/** Whether there is ground to stand on at `Feet` (a point at its feet): it never walks off an edge. */
+	bool HasGroundAt(const FVector& Feet) const;
+	/** Whether it stands on `Cheese` (its feet over it, at its top). */
+	bool StandsOn(const ACheeseStrikeCheese* Cheese) const;
+	/** Server only: back over the edge of the map, at one of its MouseEntry points, after falling in; false if none has ground in. */
+	bool ComeBack();
 	UFUNCTION()
 	void OnRep_Doing();
 	/** The animation and the sounds for what it is doing, on this machine. */
@@ -159,4 +169,7 @@ protected:
 	float Closest = 0.0f;
 	int32 Eaten = 0;
 	float FallSpeed = 0.0f;
+	/** When it comes back after falling in, and how many times it has. */
+	float BackAt = 0.0f;
+	int32 FallenIn = 0;
 };

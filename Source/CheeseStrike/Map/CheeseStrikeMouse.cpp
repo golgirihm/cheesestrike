@@ -15,6 +15,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "CheeseStrike.h"
 #include "Map/CheeseStrikeCheese.h"
+#include "Rules/CheeseStrikeFalls.h"
 #include "Rules/CheeseStrikeMice.h"
 
 namespace
@@ -40,6 +41,14 @@ namespace
 	constexpr float MouseSqueakTo = 9.0f;
 	constexpr float MouseCrunchFrom = 0.4f;
 	constexpr float MouseCrunchTo = 0.9f;
+	/** How far below its feet it looks for ground before a step (cm): a step down a stair or a ramp, not off an edge. */
+	constexpr float MouseStepDown = 100.0f;
+	/** Seconds after falling in that it is out of sight, under the fondue. */
+	constexpr float MouseSunkAfter = 1.5f;
+	/** What it feels the ground with, under its middle (cm): a ball, which a crack between two blocks doesn't let through. */
+	constexpr float MouseFootRadius = 8.0f;
+	/** It stands on a block whose top its feet are on, or that is within this of them (cm) across: eating it, it would fall. */
+	constexpr float MouseStandsWithin = 30.0f;
 
 	UAudioComponent* MakeSpeaker(AActor* Mouse, USceneComponent* Body, const TCHAR* Name)
 	{
@@ -184,7 +193,7 @@ void ACheeseStrikeMouse::ShowDoing()
 		{
 			Gnawing->FadeOut(0.3f, 0.0f);
 		}
-		if (Doing == EMouseDoing::Fleeing && !bFirst)
+		if ((Doing == EMouseDoing::Fleeing || Doing == EMouseDoing::Sinking) && !bFirst)
 		{
 			Say(Voice, Scream, 1.0f, MousePitch);
 		}
@@ -201,7 +210,7 @@ void ACheeseStrikeMouse::ShowDoing()
 float ACheeseStrikeMouse::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	const float Taken = Super::TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
-	if (!HasAuthority() || Doing == EMouseDoing::Entering)
+	if (!HasAuthority() || Doing == EMouseDoing::Entering || Doing == EMouseDoing::Sinking)
 	{
 		return Taken;
 	}
@@ -276,6 +285,9 @@ bool ACheeseStrikeMouse::FindWayBeside(const ACheeseStrikeCheese* Cheese)
 	const FVector Middle = Box.GetCenter();
 	const FVector Half = Box.GetExtent();
 	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z);
+	// At its foot; or, for one taller than a mouse reaches (a tile of The Fondue Floor, standing in the vat), looking
+	// from a little under its top.
+	const float StandAt = Box.Max.Z - Box.Min.Z > CheeseStrikeMice::ReachUp ? Box.Max.Z - CheeseStrikeMice::ReachUp + 50.0f : Box.Min.Z;
 	TArray<FVector> Spots;
 	for (int32 X = -1; X <= 1; ++X)
 	{
@@ -283,7 +295,7 @@ bool ACheeseStrikeMouse::FindWayBeside(const ACheeseStrikeCheese* Cheese)
 		{
 			if (X != 0 || Y != 0)
 			{
-				Spots.Add(FVector(Middle.X + X * (Half.X + MouseStandOff), Middle.Y + Y * (Half.Y + MouseStandOff), Box.Min.Z));
+				Spots.Add(FVector(Middle.X + X * (Half.X + MouseStandOff), Middle.Y + Y * (Half.Y + MouseStandOff), StandAt));
 			}
 		}
 	}
@@ -296,7 +308,9 @@ bool ACheeseStrikeMouse::FindWayBeside(const ACheeseStrikeCheese* Cheese)
 		{
 			continue;
 		}
-		const bool bOnIt = Box.ExpandBy(FVector(-10.0f, -10.0f, 0.0f)).IsInsideXY(Beside.Location);
+		// Over it, or level with its top so near its edge that it would stand on it (StandsOn).
+		const bool bOnIt = Box.ExpandBy(FVector(-10.0f, -10.0f, 0.0f)).IsInsideXY(Beside.Location)
+			|| (Box.ExpandBy(FVector(MouseStandsWithin, MouseStandsWithin, 0.0f)).IsInsideXY(Beside.Location) && FMath::Abs(Beside.Location.Z - Box.Max.Z) < 30.0f);
 		if (bOnIt || Beside.Location.Z > Box.Max.Z + 10.0f || Box.Min.Z - Beside.Location.Z > CheeseStrikeMice::ReachUp)
 		{
 			continue;
@@ -322,7 +336,74 @@ bool ACheeseStrikeMouse::CanReach(const ACheeseStrikeCheese* Cheese) const
 	const FBox Box = Cheese->GetComponentsBoundingBox();
 	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z);
 	const FVector Nearest = Box.GetClosestPointTo(Feet);
-	return FVector::Dist2D(Nearest, Feet) <= CheeseStrikeMice::ReachAcross && Box.Min.Z - Feet.Z <= CheeseStrikeMice::ReachUp && Box.Max.Z > Feet.Z - 50.0f;
+	// Never from on top of it: it would eat the floor from under its own feet.
+	return FVector::Dist2D(Nearest, Feet) <= CheeseStrikeMice::ReachAcross && Box.Min.Z - Feet.Z <= CheeseStrikeMice::ReachUp && Box.Max.Z > Feet.Z - 50.0f && !StandsOn(Cheese);
+}
+
+bool ACheeseStrikeMouse::StandsOn(const ACheeseStrikeCheese* Cheese) const
+{
+	if (Cheese == nullptr)
+	{
+		return false;
+	}
+	const FBox Box = Cheese->GetComponentsBoundingBox();
+	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z);
+	return Box.ExpandBy(FVector(MouseStandsWithin, MouseStandsWithin, 0.0f)).IsInsideXY(Feet) && FMath::Abs(Feet.Z - Box.Max.Z) < 30.0f;
+}
+
+bool ACheeseStrikeMouse::HasGroundAt(const FVector& Feet) const
+{
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(MouseStep), false, this);
+	for (TActorIterator<ACheeseStrikeMouse> It(GetWorld()); It; ++It)
+	{
+		Params.AddIgnoredActor(*It);
+	}
+	FHitResult Ground;
+	return GetWorld()->SweepSingleByObjectType(Ground, Feet + FVector(0.0f, 0.0f, 60.0f), Feet - FVector(0.0f, 0.0f, MouseStepDown), FQuat::Identity, Objects, FCollisionShape::MakeSphere(MouseFootRadius), Params);
+}
+
+bool ACheeseStrikeMouse::ComeBack()
+{
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (Navigation == nullptr)
+	{
+		return false;
+	}
+	// Over the edge as the mice first came (ACheeseStrikeGameMode::SpawnMice), at whichever way in still has ground near inside it.
+	TArray<AActor*> Entries;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(FName(TEXT("MouseEntry"))))
+		{
+			Entries.Add(*It);
+		}
+	}
+	for (int32 Index = Entries.Num() - 1; Index > 0; --Index)
+	{
+		Entries.Swap(Index, FMath::RandHelper(Index + 1));
+	}
+	for (const AActor* Entry : Entries)
+	{
+		const FVector Top = Entry->GetActorLocation();
+		FNavLocation Ground;
+		if (Navigation->ProjectPointToNavigation(Top + Entry->GetActorForwardVector() * 500.0f, Ground, FVector(600.0f, 600.0f, 2000.0f)) && !CheeseStrikeFalls::IsBelowKillHeight(GetWorld(), Ground.Location.Z))
+		{
+			SetActorHiddenInGame(false);
+			SetActorEnableCollision(true);
+			FallSpeed = 0.0f;
+			Fear = 0.0f;
+			Target = nullptr;
+			Path.Reset();
+			GivenUp.Reset();
+			UE_LOG(LogCheeseStrike, Display, TEXT("Mouse %s comes back out of the fondue, over the edge at %s"), *GetName(), *Top.ToCompactString());
+			Enter(Top, Ground.Location);
+			return true;
+		}
+	}
+	return false;
 }
 
 void ACheeseStrikeMouse::ChooseCheese()
@@ -331,11 +412,16 @@ void ACheeseStrikeMouse::ChooseCheese()
 	const float Time = Now();
 	// What the other mice have.
 	TSet<const ACheeseStrikeCheese*> Taken;
+	TArray<const ACheeseStrikeMouse*> Others;
 	for (TActorIterator<ACheeseStrikeMouse> It(GetWorld()); It; ++It)
 	{
 		if (*It != this && It->GetTarget() != nullptr)
 		{
 			Taken.Add(It->GetTarget());
+		}
+		if (*It != this && It->GetDoing() != EMouseDoing::Sinking)
+		{
+			Others.Add(*It);
 		}
 	}
 	// Every block's cost, the cheapest first; the first that can be walked to (or reached from here) is the one.
@@ -354,7 +440,14 @@ void ACheeseStrikeMouse::ChooseCheese()
 			continue;
 		}
 		const FBox Box = Cheese->GetComponentsBoundingBox();
-		Costs.Add({CheeseStrikeMice::CheeseCost(FVector::Dist2D(Box.GetCenter(), Feet), Box.Min.Z - Feet.Z, Taken.Contains(Cheese)), Cheese});
+		// Sunk into the fondue: out of reach for good.
+		if (CheeseStrikeFalls::IsBelowKillHeight(GetWorld(), Box.Max.Z))
+		{
+			continue;
+		}
+		// What another mouse stands on is as good as theirs: eaten, it would drop them in.
+		const bool bTheirs = Taken.Contains(Cheese) || Others.ContainsByPredicate([Cheese](const ACheeseStrikeMouse* Other) { return Other->StandsOn(Cheese); });
+		Costs.Add({CheeseStrikeMice::CheeseCost(FVector::Dist2D(Box.GetCenter(), Feet), Box.Min.Z - Feet.Z, bTheirs), Cheese});
 	}
 	Costs.Sort([](const TPair<float, ACheeseStrikeCheese*>& A, const TPair<float, ACheeseStrikeCheese*>& B) { return A.Key < B.Key; });
 	for (int32 Index = 0; Index < FMath::Min(Costs.Num(), 6); ++Index)
@@ -410,6 +503,13 @@ bool ACheeseStrikeMouse::FollowPath(float Speed, float DeltaSeconds)
 		Here += Heading * Step;
 		Step = 0.0f;
 	}
+	// Never off an edge: a way found before the cheese ahead was eaten leads into a hole. It stops, and finds its way afresh.
+	if (!HasGroundAt(Here))
+	{
+		Path.Reset();
+		TurnToward(Heading, DeltaSeconds);
+		return true;
+	}
 	SetActorLocation(Here + FVector(0.0f, 0.0f, Lift));
 	TurnToward(Heading, DeltaSeconds);
 	return !Path.IsValidIndex(PathIndex);
@@ -428,8 +528,9 @@ void ACheeseStrikeMouse::KeepOnGround(float DeltaSeconds)
 		Params.AddIgnoredActor(*It);
 	}
 	FHitResult Ground;
-	// From a step above its feet: it walks up a ramp's rise, not onto a crate it brushes past.
-	if (!GetWorld()->LineTraceSingleByObjectType(Ground, Feet + FVector(0.0f, 0.0f, 60.0f), Feet - FVector(0.0f, 0.0f, 5000.0f), Objects, Params))
+	// From a step above its feet: it walks up a ramp's rise, not onto a crate it brushes past. Felt with a small ball, so
+	// that it doesn't drop through the crack between two blocks it stands across.
+	if (!GetWorld()->SweepSingleByObjectType(Ground, Feet + FVector(0.0f, 0.0f, 60.0f), Feet - FVector(0.0f, 0.0f, 5000.0f), FQuat::Identity, Objects, FCollisionShape::MakeSphere(MouseFootRadius), Params))
 	{
 		return;
 	}
@@ -476,6 +577,10 @@ void ACheeseStrikeMouse::Sound(float DeltaSeconds)
 		return;
 	}
 	const float Time = Now();
+	if (Shown == EMouseDoing::Sinking)
+	{
+		return;
+	}
 	if (Time >= NextSqueakAt)
 	{
 		NextSqueakAt = Time + FMath::FRandRange(MouseSqueakFrom, MouseSqueakTo);
@@ -502,8 +607,29 @@ void ACheeseStrikeMouse::Tick(float DeltaSeconds)
 	}
 	const float Time = Now();
 	Fear = CheeseStrikeMice::FearAfter(Fear, DeltaSeconds);
+	// Below the map's kill height, it has fallen into the fondue: it screams and goes under, and comes back over the edge a while later.
+	if (Doing != EMouseDoing::Entering && Doing != EMouseDoing::Sinking && CheeseStrikeFalls::IsBelowKillHeight(GetWorld(), GetActorLocation().Z - Body->GetScaledBoxExtent().Z))
+	{
+		Doing = EMouseDoing::Sinking;
+		BackAt = Time + CheeseStrikeFalls::MouseGoneFor;
+		++FallenIn;
+		Target = nullptr;
+		Path.Reset();
+		SetActorEnableCollision(false);
+		UE_LOG(LogCheeseStrike, Display, TEXT("Mouse %s fell in at %s"), *GetName(), *GetActorLocation().ToCompactString());
+	}
 	switch (Doing)
 	{
+	case EMouseDoing::Sinking:
+		if (!IsHidden() && Time >= BackAt - CheeseStrikeFalls::MouseGoneFor + MouseSunkAfter)
+		{
+			SetActorHiddenInGame(true);
+		}
+		if (Time >= BackAt && !ComeBack())
+		{
+			BackAt = Time + 2.0f;
+		}
+		break;
 	case EMouseDoing::Entering:
 	{
 		// Over the top of the wall and down to the ground, in an arc.

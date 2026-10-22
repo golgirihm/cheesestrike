@@ -28,12 +28,14 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Map/CheeseStrikeMouse.h"
+#include "Map/CheeseStrikePlace.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
+#include "Rules/CheeseStrikeFalls.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Weapons/CheeseStrikeInventory.h"
@@ -147,6 +149,7 @@ void ACheeseStrikeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ACheeseStrikeCharacter, Health);
 	DOREPLIFETIME(ACheeseStrikeCharacter, KilledBy);
+	DOREPLIFETIME(ACheeseStrikeCharacter, DiedHow);
 	DOREPLIFETIME(ACheeseStrikeCharacter, DiedAt);
 	DOREPLIFETIME(ACheeseStrikeCharacter, ProtectedUntil);
 }
@@ -467,13 +470,42 @@ bool ACheeseStrikeCharacter::TakeBlast(float Damage, ACheeseStrikePlayerState* B
 void ACheeseStrikeCharacter::Die(ACheeseStrikeCharacter* From, bool bHead, ACheeseStrikePlayerState* By, const FString& How)
 {
 	KilledBy = By != nullptr ? By->GetPlayerName() : (From != nullptr ? From->DisplayName() : FString());
+	DiedHow = KilledBy.IsEmpty() ? How : FString();
 	DiedAt = ServerNow();
-	UE_LOG(LogCheeseStrike, Display, TEXT("%s is killed by %s%s"), *DisplayName(), KilledBy.IsEmpty() ? TEXT("nobody") : *KilledBy, How.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("'s %s"), *How));
+	if (KilledBy.IsEmpty() && !How.IsEmpty())
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s %s"), *DisplayName(), *How);
+	}
+	else
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s is killed by %s%s"), *DisplayName(), KilledBy.IsEmpty() ? TEXT("nobody") : *KilledBy, How.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("'s %s"), *How));
+	}
 	ShowDeath();
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
 	{
 		Mode->Killed(From, this, bHead, By, How);
 	}
+}
+
+void ACheeseStrikeCharacter::FellOutOfWorld(const UDamageType& DamageType)
+{
+	// Under the map's kill height (into The Fondue Floor's vat): killed by the fall, not destroyed as the engine
+	// would, so that the body is seen going in and its player watches from where they fell. It counts as a kill for
+	// whoever hurt them just before; else the feed says how they died. The engine asks again every frame the body
+	// stays down there.
+	if (!HasAuthority() || !CanAct())
+	{
+		return;
+	}
+	ACheeseStrikeCharacter* Pusher = LastHurtBy.Get();
+	if (Pusher == this || !CheeseStrikeFalls::CreditsHurter(LastHurtAt, ServerNow()) || !CanBeHurtBy(Pusher, nullptr))
+	{
+		Pusher = nullptr;
+	}
+	const FString How = Pusher != nullptr ? FString() : CheeseStrikeFalls::Words(ACheeseStrikePlace::NameAt(GetWorld(), GetActorLocation()));
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s fell below the kill height at %s"), *DisplayName(), *GetActorLocation().ToCompactString());
+	Health = 0.0f;
+	Die(Pusher, false, nullptr, How);
 }
 
 void ACheeseStrikeCharacter::CheeseStrikeDie()
