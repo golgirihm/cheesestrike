@@ -5,6 +5,9 @@
 #include "GameFramework/Character.h"
 #include "CheeseStrikeCharacter.h"
 #include "Rules/CheeseStrikeDowned.h"
+#include "Rules/CheeseStrikeFalls.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/World.h"
 
 UCheeseStrikeMovementComponent::UCheeseStrikeMovementComponent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -95,6 +98,40 @@ float UCheeseStrikeMovementComponent::GetMaxBrakingDeceleration() const
 bool UCheeseStrikeMovementComponent::CanCrouchInCurrentState() const
 {
 	return Super::CanCrouchInCurrentState();
+}
+
+bool UCheeseStrikeMovementComponent::CanWalkOffLedges() const
+{
+	if (!Super::CanWalkOffLedges())
+	{
+		return false;
+	}
+	// Players go where they like; a bot (on the server) looks down just ahead of where it is going.
+	const ACharacter* Owner = CharacterOwner;
+	if (Owner == nullptr || Owner->IsPlayerControlled() || Owner->GetController() == nullptr || GetWorld() == nullptr)
+	{
+		return true;
+	}
+	return IsDropAheadSafe(Acceleration.SizeSquared2D() > UE_KINDA_SMALL_NUMBER ? Acceleration : Velocity);
+}
+
+bool UCheeseStrikeMovementComponent::IsDropAheadSafe(const FVector& Way) const
+{
+	const ACharacter* Owner = CharacterOwner;
+	const FVector Going = Way.GetSafeNormal2D();
+	if (Owner == nullptr || Going.IsZero() || GetWorld() == nullptr)
+	{
+		return true;
+	}
+	const UCapsuleComponent* Capsule = Owner->GetCapsuleComponent();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	const FVector Ahead = UpdatedComponent->GetComponentLocation() + Going * (Capsule->GetScaledCapsuleRadius() + 30.0f);
+	const FVector Feet = Ahead - FVector(0.0f, 0.0f, HalfHeight);
+	FHitResult Hit;
+	FCollisionQueryParams Params(FName(TEXT("BotLedge")), false, Owner);
+	const float Look = CheeseStrikeFalls::SafeDrop + 100.0f;
+	const bool bGround = GetWorld()->LineTraceSingleByChannel(Hit, Ahead, Feet - FVector(0.0f, 0.0f, Look), UpdatedComponent->GetCollisionObjectType(), Params);
+	return CheeseStrikeFalls::BotMayStepOff(bGround ? FMath::Max(0.0f, Feet.Z - Hit.ImpactPoint.Z) : Look);
 }
 
 void UCheeseStrikeMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)

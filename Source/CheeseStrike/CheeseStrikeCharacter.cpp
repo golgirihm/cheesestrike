@@ -14,6 +14,8 @@
 #include "Engine/SkeletalMesh.h"
 #include "InputActionValue.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -40,6 +42,7 @@
 #include "Rules/CheeseStrikeStart.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UI/CheeseStrikeHUD.h"
+#include "Weapons/CheeseStrikeGunfire.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -709,15 +712,76 @@ void ACheeseStrikeCharacter::FellOutOfWorld(const UDamageType& DamageType)
 	{
 		return;
 	}
-	ACheeseStrikeCharacter* Pusher = LastHurtBy.Get();
-	if (Pusher == this || !CheeseStrikeFalls::CreditsHurter(LastHurtAt, ServerNow()) || !CanBeHurtBy(Pusher, nullptr))
-	{
-		Pusher = nullptr;
-	}
+	ACheeseStrikeCharacter* Pusher = FallCreditedTo();
 	const FString How = Pusher != nullptr ? FString() : CheeseStrikeFalls::Words(ACheeseStrikePlace::NameAt(GetWorld(), GetActorLocation()));
 	UE_LOG(LogCheeseStrike, Display, TEXT("%s fell below the kill height at %s"), *DisplayName(), *GetActorLocation().ToCompactString());
 	Health = 0.0f;
 	Die(Pusher, false, nullptr, How);
+}
+
+ACheeseStrikeCharacter* ACheeseStrikeCharacter::FallCreditedTo() const
+{
+	ACheeseStrikeCharacter* Pusher = LastHurtBy.Get();
+	if (Pusher == this || !CheeseStrikeFalls::CreditsHurter(LastHurtAt, ServerNow()) || !CanBeHurtBy(Pusher, nullptr))
+	{
+		return nullptr;
+	}
+	return Pusher;
+}
+
+void ACheeseStrikeCharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+	// The speed it comes down at (the server's own simulation of the fall, a player's as their moves arrive) tells
+	// the drop, a jump's rise included.
+	if (!HasAuthority() || GetCharacterMovement() == nullptr)
+	{
+		return;
+	}
+	const float Drop = CheeseStrikeFalls::DropFor(-GetCharacterMovement()->Velocity.Z, -GetCharacterMovement()->GetGravityZ());
+	const float Damage = CheeseStrikeFalls::DamageFor(Drop);
+	if (Damage > 0.0f)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s lands after a drop of %.0f cm: %.0f damage"), *DisplayName(), Drop, Damage);
+		TakeFall(Damage);
+	}
+}
+
+bool ACheeseStrikeCharacter::TakeFall(float Damage)
+{
+	if (!HasAuthority() || !CanAct() || IsProtected() || Damage <= 0.0f)
+	{
+		return false;
+	}
+	ACheeseStrikeCharacter* Pusher = FallCreditedTo();
+	MulticastHardLanding(Damage);
+	// Execution's last stand takes a fall as any hit: down instead of dead (to whoever pushed them), and once down, a
+	// fall never finishes them.
+	bool bHurt = false;
+	if (LastStand != nullptr && LastStand->Intercept(Damage, nullptr, Pusher != nullptr ? Pusher->GetPlayerState<ACheeseStrikePlayerState>() : nullptr, bHurt))
+	{
+		return bHurt;
+	}
+	Health = FMath::Max(0.0f, Health - Damage);
+	if (!IsAlive())
+	{
+		Die(Pusher, false, nullptr, Pusher != nullptr ? FString() : CheeseStrikeFalls::HardLandingWords());
+	}
+	return true;
+}
+
+void ACheeseStrikeCharacter::MulticastHardLanding_Implementation(float Damage)
+{
+	static TSoftObjectPtr<USoundBase> Thud(FSoftObjectPath(TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_02.Lyra_MeleeImpact_02")));
+	USoundBase* Sound = Thud.LoadSynchronous();
+	if (Sound == nullptr || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	// A heavy, low thud: the knife's impact pitched down, louder and lower the harder the landing.
+	const float Hard = FMath::Clamp(Damage / CheeseStrikeFalls::DeadlyDamage, 0.0f, 1.0f);
+	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	UGameplayStatics::PlaySoundAtLocation(this, Sound, Feet, FRotator::ZeroRotator, 0.8f + 0.7f * Hard, 0.62f - 0.2f * Hard, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
 }
 
 void ACheeseStrikeCharacter::CheeseStrikeDie()

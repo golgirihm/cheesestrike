@@ -48,6 +48,10 @@ public:
 	virtual float GetMaxAcceleration() const override;
 	virtual float GetMaxBrakingDeceleration() const override;
 	virtual bool CanCrouchInCurrentState() const override;
+	/** A bot never steps off an edge where the drop ahead would hurt it (CheeseStrikeFalls::BotMayStepOff); a player may. */
+	virtual bool CanWalkOffLedges() const override;
+	/** Whether the ground just ahead, going `Going` (flat), is near enough below the feet that stepping off can't hurt. */
+	bool IsDropAheadSafe(const FVector& Going) const;
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
