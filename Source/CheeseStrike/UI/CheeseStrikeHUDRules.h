@@ -9,7 +9,7 @@
  * The HUD's rules, as plain functions that a test can call without a world
  * (CheeseStrike.HUD.*): how the minimap turns and what of the level it
  * shows, which way a damage arc points, how red the edges are, what the row
- * of players says about each, what the score summary shows, how a name tag
+ * of players and the scoreboard say about each, what the score summary shows, how a name tag
  * shrinks with distance, and how the death screen's cheese runs.
  * ACheeseStrikeHUD draws by them.
  */
@@ -143,6 +143,39 @@ namespace CheeseStrikeHUD
 	uint64 SteamIdFrom(const FString& Type, const FString& Id);
 	/** What stands for a player without a picture: the first letters of their first two words, or the first two of one word. */
 	FString Initials(const FString& Name);
+
+	// ---------------------------------------------------------------- the scoreboard
+
+	/** Who plays a row of the scoreboard, shown by a small figure at its left: a person or a robot. */
+	enum class EPlayerKind : uint8
+	{
+		Person,
+		Bot
+	};
+	/** A bot (APlayerState::IsABot) shows as one; everyone else is a person. */
+	EPlayerKind KindOf(bool bIsABot);
+	/**
+	 * What the scoreboard's status column says for `Status`: nothing while
+	 * alive, "DOWN" in Execution's last stand, "OUT" out of the round, and
+	 * "DEAD" while coming back.
+	 */
+	FString StatusWord(EStatus Status);
+	/** How solid a row is for `Status`: a player out of the round is faded, one coming back a little. */
+	float RowAlpha(EStatus Status);
+	/** One row of the scoreboard, as drawn. */
+	struct FBoardRow
+	{
+		FString Name;
+		int32 Kills = 0;
+		int32 Deaths = 0;
+		EStatus Status = EStatus::Alive;
+		EPlayerKind Kind = EPlayerKind::Person;
+		/** The local player's own row. */
+		bool bMine = false;
+	};
+	FBoardRow BoardRow(const CheeseStrikeRules::FStanding& Line, EStatus Status, bool bIsABot, bool bMine);
+	/** `Name` as it fits `Width`: whole if it does, else cut and ended with "...", by `Measure` (its width as drawn). */
+	FString FitName(const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure);
 
 	// ---------------------------------------------------------------- the score summary
 

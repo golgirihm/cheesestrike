@@ -1,0 +1,29 @@
+# The scoreboard's columns: who plays each row (a person or a robot), the
+# status (blank, DOWN, OUT, DEAD), Gun Game's step, kills and deaths. With a
+# full match of bots, and a long name for the host:
+#   tools/play.ps1 -Script tools/play/scoreboard.txt -Bots -Res 1280x720
+#     -Name ReginaldCheddaringtonTheThird -Extra "?Mode=Execution?Bots=15?BotSkill=3"
+# (or Elimination, FreeForAll, Deathmatch, GunGame). Offscreen, -Res stops at
+# 1280x720: for 1920x1080 put "cmd r.SetRes 1920x1080w" before the first wait. In Execution a
+# teammate and an enemy go down; the bots fight a while, so that some are
+# dead or out; then the host dies.
+wait 3
+cmd CheeseStrikeDown mate
+cmd CheeseStrikeDown enemy
+wait 0.5
+hold Scoreboard
+wait 0.3
+shot scoreboard_1
+release Scoreboard
+wait 14
+hold Scoreboard
+wait 0.3
+shot scoreboard_2
+release Scoreboard
+cmd CheeseStrikeDie
+wait 1
+hold Scoreboard
+wait 0.3
+shot scoreboard_3
+release Scoreboard
+quit
