@@ -236,6 +236,58 @@ namespace CheeseStrikeHUD
 		return FMath::Clamp(FMath::CeilToInt(RespawnDelay - (Now - DiedAt)), 0, FMath::CeilToInt(RespawnDelay));
 	}
 
+	EPlayerKind KindOf(bool bIsABot)
+	{
+		return bIsABot ? EPlayerKind::Bot : EPlayerKind::Person;
+	}
+
+	FString StatusWord(EStatus Status)
+	{
+		switch (Status)
+		{
+		case EStatus::Down:
+			return TEXT("DOWN");
+		case EStatus::Out:
+			return TEXT("OUT");
+		case EStatus::Respawning:
+			return TEXT("DEAD");
+		default:
+			return FString();
+		}
+	}
+
+	float RowAlpha(EStatus Status)
+	{
+		return Status == EStatus::Out ? 0.45f : Status == EStatus::Respawning ? 0.7f : 1.0f;
+	}
+
+	FBoardRow BoardRow(const CheeseStrikeRules::FStanding& Line, EStatus Status, bool bIsABot, bool bMine)
+	{
+		FBoardRow Row;
+		Row.Name = Line.Name;
+		Row.Kills = Line.Kills;
+		Row.Deaths = Line.Deaths;
+		Row.Status = Status;
+		Row.Kind = KindOf(bIsABot);
+		Row.bMine = bMine;
+		return Row;
+	}
+
+	FString FitName(const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure)
+	{
+		if (Measure(Name) <= Width)
+		{
+			return Name;
+		}
+		// The longest start of the name that fits with the dots after it; at least its first letter.
+		int32 Keep = Name.Len() - 1;
+		while (Keep > 1 && Measure(Name.Left(Keep).TrimEnd() + TEXT("...")) > Width)
+		{
+			--Keep;
+		}
+		return Name.Left(FMath::Max(1, Keep)).TrimEnd() + TEXT("...");
+	}
+
 	uint64 SteamIdFrom(const FString& Type, const FString& Id)
 	{
 		if (!Type.Equals(TEXT("STEAM"), ESearchCase::IgnoreCase) || Id.IsEmpty() || Id.Len() > 20)

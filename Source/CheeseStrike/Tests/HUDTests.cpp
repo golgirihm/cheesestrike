@@ -241,6 +241,43 @@ bool FThePlayersRowSaysWhoIsAlive::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheScoreboardShowsStatusAndWhoPlays, "CheeseStrike.HUD.TheScoreboardShowsStatusAndWhoPlays", HUDTests::Flags)
+
+bool FTheScoreboardShowsStatusAndWhoPlays::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	TestEqual(TEXT("alive: the status column is blank"), StatusWord(EStatus::Alive), FString());
+	TestEqual(TEXT("down in Execution"), StatusWord(EStatus::Down), FString(TEXT("DOWN")));
+	TestEqual(TEXT("out of the round"), StatusWord(EStatus::Out), FString(TEXT("OUT")));
+	TestEqual(TEXT("waiting to come back"), StatusWord(EStatus::Respawning), FString(TEXT("DEAD")));
+	TestEqual(TEXT("down and out says out"), StatusWord(StatusOf(true, false, true)), FString(TEXT("OUT")));
+	TestEqual(TEXT("an alive row is solid"), RowAlpha(EStatus::Alive), 1.0f);
+	TestEqual(TEXT("so is a down one"), RowAlpha(EStatus::Down), 1.0f);
+	TestTrue(TEXT("out fades more than dead"), RowAlpha(EStatus::Out) < RowAlpha(EStatus::Respawning) && RowAlpha(EStatus::Respawning) < 1.0f);
+
+	TestEqual(TEXT("a bot is a bot"), KindOf(true), EPlayerKind::Bot);
+	TestEqual(TEXT("anyone else a person"), KindOf(false), EPlayerKind::Person);
+	const FBoardRow Bot = BoardRow(HUDTests::Line(TEXT("Gorgon Zola"), 4, 2, 7), EStatus::Down, true, false);
+	TestEqual(TEXT("a row keeps the name"), Bot.Name, FString(TEXT("Gorgon Zola")));
+	TestEqual(TEXT("the kills"), Bot.Kills, 4);
+	TestEqual(TEXT("the deaths"), Bot.Deaths, 2);
+	TestEqual(TEXT("the status"), Bot.Status, EStatus::Down);
+	TestEqual(TEXT("a bot's row shows a robot"), Bot.Kind, EPlayerKind::Bot);
+	TestFalse(TEXT("not mine"), Bot.bMine);
+	const FBoardRow Me = BoardRow(HUDTests::Line(TEXT("Host"), 0, 0, 1), EStatus::Alive, false, true);
+	TestEqual(TEXT("a player's row shows a person"), Me.Kind, EPlayerKind::Person);
+	TestTrue(TEXT("mine"), Me.bMine);
+
+	// Names are cut to their column, measured as ten pixels a letter.
+	const auto Measure = [](const FString& Text) { return 10.0f * Text.Len(); };
+	TestEqual(TEXT("a name that fits is whole"), FitName(TEXT("Host"), 100.0f, Measure), FString(TEXT("Host")));
+	TestEqual(TEXT("exactly fitting is whole"), FitName(TEXT("0123456789"), 100.0f, Measure), FString(TEXT("0123456789")));
+	TestEqual(TEXT("a long name is cut with dots, within the width"), FitName(TEXT("Sir Reginald Cheddarington"), 100.0f, Measure), FString(TEXT("Sir Reg...")));
+	TestEqual(TEXT("no space left before the dots"), FitName(TEXT("Sir Reginald"), 70.0f, Measure), FString(TEXT("Sir...")));
+	TestEqual(TEXT("never less than a letter"), FitName(TEXT("Cheddar"), 5.0f, Measure), FString(TEXT("C...")));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheScoreSummaryShowsYouAndTheLeader, "CheeseStrike.HUD.TheScoreSummaryShowsYouAndTheLeader", HUDTests::Flags)
 
 bool FTheScoreSummaryShowsYouAndTheLeader::RunTest(const FString& Parameters)
