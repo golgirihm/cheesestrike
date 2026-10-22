@@ -230,7 +230,8 @@ bool FTheMiceEatTheCreamery::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the shot mouse runs"), Scared->GetDoing() == EMouseDoing::Fleeing);
 	});
 	WaitUntil(TEXT("the wheel on the eaten one coming down"), 5.0f, []() { return Upper.IsValid() && !Upper->IsFalling() && Upper->GetComponentsBoundingBox().Min.Z < UpperWasAt - 80.0f; });
-	Wait(1.5f);
+	// It runs for FleeFor seconds; how far it has got a moment after depends on its path and, on a busy PC, the frames.
+	WaitUntil(TEXT("the shot mouse running off"), CheeseStrikeMice::FleeFor, []() { return Scared.IsValid() && FVector::Dist2D(Scared->GetActorLocation(), ScaredFrom) > 500.0f; });
 	Then([this]()
 	{
 		TestTrue(FString::Printf(TEXT("the shot mouse ran off (%.0f m)"), FVector::Dist2D(Scared->GetActorLocation(), ScaredFrom) / 100.0f), Scared.IsValid() && FVector::Dist2D(Scared->GetActorLocation(), ScaredFrom) > 500.0f);
