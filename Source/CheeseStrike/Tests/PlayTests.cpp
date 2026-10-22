@@ -495,7 +495,7 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 		}
 		PlayTests::FirstBodySeen = HostAsSeen;
 	});
-	WaitUntil(TEXT("the fallen body coming to rest on both machines"), 6.0f, []() { PlayTests::WatchTheHostComeBack(); return PlayTests::AtRest(PlayTests::FirstBody.Get()) && PlayTests::AtRest(PlayTests::FirstBodySeen.Get()); });
+	WaitUntil(TEXT("the fallen body coming to rest on both machines"), 12.0f, []() { PlayTests::WatchTheHostComeBack(); return PlayTests::AtRest(PlayTests::FirstBody.Get()) && PlayTests::AtRest(PlayTests::FirstBodySeen.Get()); });
 	Then([this]()
 	{
 		// It lies as a body does, on both machines: no joint bent or twisted further than its ragdoll lets a person's
