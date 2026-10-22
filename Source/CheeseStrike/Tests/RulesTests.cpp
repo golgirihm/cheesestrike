@@ -152,7 +152,14 @@ bool FAHostPicksAMap::RunTest(const FString& Parameters)
 	TestTrue(TEXT("there is more than one map"), NumMaps() >= 2);
 	TestEqual(TEXT("the first is the Creamery"), FString(Maps[0].Name), FString(TEXT("The Creamery")));
 	TestEqual(TEXT("a level is known by its package"), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery")), 0);
-	TestEqual(TEXT("or by its object path"), MapIndexFor(TEXT("/Game/Variant_Shooter/Lvl_Shooter.Lvl_Shooter")), 1);
+	// The shooter level is one of them, wherever the list has it.
+	int32 Shooter = INDEX_NONE;
+	for (int32 Index = 0; Index < NumMaps(); ++Index)
+	{
+		Shooter = FString(Maps[Index].Level) == TEXT("/Game/Variant_Shooter/Lvl_Shooter") ? Index : Shooter;
+	}
+	TestTrue(TEXT("the shooter level is one"), Shooter > 0);
+	TestEqual(TEXT("or by its object path"), MapIndexFor(TEXT("/Game/Variant_Shooter/Lvl_Shooter.Lvl_Shooter")), Shooter);
 	TestEqual(TEXT("or as it is played in the editor"), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/UEDPIE_1_Lvl_Creamery")), 0);
 	TestEqual(TEXT("and a level that isn't one of them is none"), MapIndexFor(TEXT("/Game/Elsewhere/Lvl_Other")), static_cast<int32>(INDEX_NONE));
 	TestEqual(TEXT("the URL picks a map"), MapFrom(TEXT("?Map=1"), 0), 1);
