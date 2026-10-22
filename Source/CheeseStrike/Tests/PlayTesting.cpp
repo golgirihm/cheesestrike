@@ -36,7 +36,86 @@ namespace PlayTesting
 		/** Whether the match waits in the lobby, with nobody spawned, rather than being on. */
 		bool bLobbyWanted = false;
 
-		/** Waits for a condition, for a reason, up to a limit. */
+		/** The server's world, or the only one: the first PIE world the editor made. */
+		UWorld* FirstWorld()
+		{
+			UWorld* First = nullptr;
+			int32 FirstInstance = MAX_int32;
+			for (const FWorldContext& Context : GEngine->GetWorldContexts())
+			{
+				if (Context.WorldType == EWorldType::PIE && Context.World() != nullptr && Context.PIEInstance < FirstInstance)
+				{
+					First = Context.World();
+					FirstInstance = Context.PIEInstance;
+				}
+			}
+			return First;
+		}
+
+		/**
+		 * Seconds of play since it was made, counted by the server's clock where there is one, else the PC's. The game keeps
+		 * its time in the world's seconds, which fall behind the PC's when frames take longer than the engine lets a world
+		 * step at once (a busy PC), so a wait or a limit counted on the PC's clock would end early by the game's.
+		 */
+		class FPlayClock
+		{
+		public:
+			/** Moves the clock on; call once an update. It starts at the first. */
+			void Tick()
+			{
+				const double Real = FPlatformTime::Seconds();
+				UWorld* Server = FirstWorld();
+				const double Game = Server != nullptr ? Server->GetTimeSeconds() : 0.0;
+				if (!bStarted)
+				{
+					bStarted = true;
+					StartReal = Real;
+					LastReal = Real;
+				}
+				double Step = Real - LastReal;
+				// The same world as last time: its own seconds (not limited by the PC's since the last update, which can be fewer:
+				// a stall between a frame's start and this update counts on the PC's clock in one update and the world's in the
+				// next). A new world (a level loading, a travel) has only the PC's.
+				if (Server != nullptr && Server == LastWorld.Get())
+				{
+					Step = FMath::Max(Game - LastGame, 0.0);
+				}
+				Elapsed += Step;
+				LastReal = Real;
+				LastGame = Game;
+				LastWorld = Server;
+			}
+
+			double Seconds() const { return Elapsed; }
+			double RealSeconds() const { return LastReal - StartReal; }
+
+		private:
+			bool bStarted = false;
+			double Elapsed = 0.0;
+			double LastReal = 0.0;
+			double StartReal = 0.0;
+			double LastGame = 0.0;
+			TWeakObjectPtr<UWorld> LastWorld;
+		};
+
+		/** Waits `Seconds` of play. */
+		class FWaitPlayCommand : public IAutomationLatentCommand
+		{
+		public:
+			explicit FWaitPlayCommand(float InSeconds) : Duration(InSeconds) {}
+
+			virtual bool Update() override
+			{
+				Clock.Tick();
+				return Clock.Seconds() >= Duration;
+			}
+
+		private:
+			float Duration;
+			FPlayClock Clock;
+		};
+
+		/** Waits for a condition, for a reason, up to a limit in seconds of play (and, should the game stall, a few times that on the PC's clock). */
 		class FWaitUntilCommand : public IAutomationLatentCommand
 		{
 		public:
@@ -47,15 +126,16 @@ namespace PlayTesting
 
 			virtual bool Update() override
 			{
+				Clock.Tick();
 				if (Condition())
 				{
 					return true;
 				}
-				if (GetCurrentRunTime() > Timeout)
+				if (Clock.Seconds() > Timeout || Clock.RealSeconds() > 4.0 * Timeout)
 				{
 					if (FAutomationTestBase* Current = Test())
 					{
-						Current->AddError(FString::Printf(TEXT("%s didn't happen in %.0f s"), *What, Timeout));
+						Current->AddError(FString::Printf(TEXT("%s didn't happen in %.0f s (%.0f s of play, %.0f s on the PC's clock)"), *What, Timeout, Clock.Seconds(), Clock.RealSeconds()));
 					}
 					return true;
 				}
@@ -66,6 +146,7 @@ namespace PlayTesting
 			FString What;
 			float Timeout;
 			TFunction<bool()> Condition;
+			FPlayClock Clock;
 		};
 
 		/** The worlds being played, in the order the editor made them: the host's (or the only one) first, then the joiners'. A world's place holds across a travel. */
@@ -114,6 +195,13 @@ namespace PlayTesting
 				return !State->HasMatchStarted() && Local->PlayerState != nullptr && Pawn == nullptr;
 			}
 			return State->HasMatchStarted() && Pawn != nullptr && Pawn->IsAlive() && Pawn->GetWeapon() != nullptr && Pawn->GetPlayerState() != nullptr;
+		}
+
+		/** The server's clock as the match's state last brought it to this world: it comes ten times a second while the server's news is reaching the player. */
+		double ServerTimeHeard(const AGameStateBase* State)
+		{
+			static const FDoubleProperty* Heard = FindFProperty<FDoubleProperty>(AGameStateBase::StaticClass(), TEXT("ReplicatedWorldTimeSecondsDouble"));
+			return Heard != nullptr && State != nullptr ? Heard->GetPropertyValue_InContainer(State) : -1.0;
 		}
 
 		bool EveryoneIsIn()
@@ -176,6 +264,36 @@ namespace PlayTesting
 			return true;
 		}));
 		WaitUntil(FString::Printf(TEXT("%d player(s) being in with their weapons"), Session.Players), 90.0f, &EveryoneIsIn);
+		if (PlayersTogether > 1)
+		{
+			// A joiner that has just come in hears nothing more from the server for a while (a second, or several on a busy PC),
+			// so what the test does next would reach them late. Go on once every joiner has heard the server's clock for a
+			// second, and lately.
+			TSharedRef<TArray<double>> FirstHeard = MakeShared<TArray<double>>();
+			WaitUntil(TEXT("every joiner hearing the server"), 30.0f, [FirstHeard]()
+			{
+				const ACheeseStrikeGameState* Server = GameState(0);
+				if (Server == nullptr)
+				{
+					return false;
+				}
+				FirstHeard->SetNum(PlayersTogether);
+				bool bAll = true;
+				for (int32 Joiner = 1; Joiner < PlayersTogether; ++Joiner)
+				{
+					const double Heard = ServerTimeHeard(GameState(Joiner));
+					double& First = (*FirstHeard)[Joiner];
+					if (Heard <= 0.0)
+					{
+						bAll = false;
+						continue;
+					}
+					First = First > 0.0 ? First : Heard;
+					bAll &= Heard >= First + 1.0 && Heard >= Server->GetServerWorldTimeSeconds() - 0.5;
+				}
+				return bAll;
+			});
+		}
 		// Nothing is drawn here, and a body that isn't drawn isn't posed; the tests look at the bones, so pose them anyway.
 		Then([]()
 		{
@@ -213,7 +331,7 @@ namespace PlayTesting
 
 	void Wait(float Seconds)
 	{
-		ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(Seconds));
+		ADD_LATENT_AUTOMATION_COMMAND(FWaitPlayCommand(Seconds));
 	}
 
 	void Then(TFunction<void()> Do)
@@ -239,6 +357,13 @@ namespace PlayTesting
 			const ACheeseStrikePlayerController* Local = Controller(Player);
 			return Local == nullptr || Local->GetPlayScript() == nullptr || Local->GetPlayScript()->IsFinished();
 		});
+	}
+
+	void FireUntil(int32 Shooter, const FString& What, float Timeout, TFunction<bool()> Done)
+	{
+		Play(Shooter, TEXT("hold Fire"));
+		WaitUntil(What, Timeout, MoveTemp(Done));
+		Play(Shooter, TEXT("release Fire"));
 	}
 
 	void PutAt(int32 Player, const FVector& At, float Yaw)
