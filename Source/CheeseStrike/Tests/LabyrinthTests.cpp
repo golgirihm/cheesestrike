@@ -143,7 +143,7 @@ bool FTheLabyrinthHoldsTogether::RunTest(const FString& Parameters)
 			Kept.FindOrAdd(It->GetStructure()) += It->IsEdible() ? 0 : 1;
 			Edible += It->IsEdible() ? 1 : 0;
 		}
-		TestTrue(FString::Printf(TEXT("six to nine hundred blocks to eat, for eight mice (%d)"), Edible), Edible >= 600 && Edible <= 900);
+		TestTrue(FString::Printf(TEXT("six to nine hundred blocks to eat, for ten mice (%d)"), Edible), Edible >= 600 && Edible <= 900);
 		for (const TCHAR* Side : {TEXT("West"), TEXT("North"), TEXT("South"), TEXT("East")})
 		{
 			for (int32 Ring = 1; Ring <= 3; ++Ring)
@@ -276,7 +276,7 @@ bool FBotsAndMiceInTheLabyrinth::RunTest(const FString& Parameters)
 		}
 		StartedAt = Now(0);
 	});
-	WaitUntil(TEXT("eight mice in"), 20.0f, []() { return Every<ACheeseStrikeMouse>().Num() == 8; });
+	WaitUntil(TEXT("ten mice in"), 20.0f, []() { return Every<ACheeseStrikeMouse>().Num() == 10; });
 	// The bots find their way through the maze to one another, and the mice eat.
 	WaitUntil(TEXT("the bots roaming the cellar and killing, and the mice eating"), 120.0f, []()
 	{

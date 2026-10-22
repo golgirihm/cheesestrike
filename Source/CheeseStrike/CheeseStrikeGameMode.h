@@ -183,6 +183,11 @@ protected:
 	FTimerHandle MiceTimer;
 	/** Seconds counted before the match begins (`?Countdown=`; CheeseStrikeStart), and so before each later round. */
 	float StartCountdown = 3.0f;
+	/** When the mice came (the world's time), how many blocks they came to, and the log of how they are getting on (every ten seconds, until all is eaten). */
+	float MiceCameAt = -1.0f;
+	int32 MiceCameTo = 0;
+	FTimerHandle MiceProgressTimer;
+	void LogMiceProgress();
 	/** How many players a match started by the lobby on another map waits for; 0 for a match not started that way. */
 	int32 PlayersExpected = 0;
 	FTimerHandle CountdownTimer;

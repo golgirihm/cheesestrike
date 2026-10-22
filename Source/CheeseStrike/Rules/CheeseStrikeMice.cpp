@@ -30,6 +30,27 @@ namespace CheeseStrikeMice
 		return Distance + HeightCost * FMath::Max(0.0f, Height) + (bClaimedByAnother ? Claimed : 0.0f);
 	}
 
+	float PlannedLeft(float SecondsIn)
+	{
+		return FMath::Clamp(1.0f - SecondsIn / PlannedWithin, 0.0f, 1.0f);
+	}
+
+	float Pace(float ShareLeft, float SecondsIn)
+	{
+		if (ShareLeft <= 0.0f)
+		{
+			return 1.0f;
+		}
+		// Cubed, so that a little behind is caught up at once.
+		const float Behind = ShareLeft / FMath::Max(PlannedLeft(SecondsIn), UE_KINDA_SMALL_NUMBER);
+		return FMath::Clamp(Behind * Behind * Behind, MinPace, MaxPace);
+	}
+
+	float BiteFor(float ShareLeft, float SecondsIn)
+	{
+		return Bite * Pace(ShareLeft, SecondsIn);
+	}
+
 	int32 Stage(float Health, float Full)
 	{
 		if (Full <= 0.0f || Health >= Full)
@@ -44,6 +65,17 @@ namespace CheeseStrikeMice
 	float FearAfter(float Fear, float Seconds)
 	{
 		return FMath::Max(0.0f, Fear - FearFades * Seconds);
+	}
+
+	bool StillAvoids(float SecondsSinceScare, int32 EatenSinceScare)
+	{
+		return SecondsSinceScare >= 0.0f && SecondsSinceScare < AvoidFor && EatenSinceScare < AvoidUntilEaten;
+	}
+
+	float ScareCost(const FVector2D& Block, const FVector2D& ScaredAt, const FVector2D& Middle)
+	{
+		const bool bScareSide = FVector2D::DotProduct(Block - Middle, ScaredAt - Middle) > 0.0;
+		return (bScareSide ? AvoidSide : 0.0f) + FMath::Max(0.0f, AvoidNear - static_cast<float>(FVector2D::Distance(Block, ScaredAt)));
 	}
 
 	bool MayEat(bool bEdible, float Health, bool bFalling)

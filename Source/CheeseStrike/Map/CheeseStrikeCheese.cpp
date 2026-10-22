@@ -82,6 +82,19 @@ int32 ACheeseStrikeCheese::CountEdible(const UWorld* World)
 	return Count;
 }
 
+float ACheeseStrikeCheese::EdibleHealth(const UWorld* World)
+{
+	float Total = 0.0f;
+	if (World != nullptr)
+	{
+		for (TActorIterator<ACheeseStrikeCheese> It(World); It; ++It)
+		{
+			Total += It->IsEdible() && !It->IsActorBeingDestroyed() ? FMath::Max(0.0f, It->GetHealth()) : 0.0f;
+		}
+	}
+	return Total;
+}
+
 void ACheeseStrikeCheese::Bite(float Amount)
 {
 	if (!HasAuthority() || IsActorBeingDestroyed() || Health <= 0.0f)

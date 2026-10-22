@@ -371,6 +371,10 @@ void ACheeseStrikeGameMode::SpawnMice()
 	}
 	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 	int32 Came = 0;
+	// They eat it all in about five minutes from now, at a steady pace (CheeseStrikeMice::Pace).
+	MiceCameAt = World->GetTimeSeconds();
+	MiceCameTo = Blocks;
+	const float FullHealth = ACheeseStrikeCheese::EdibleHealth(World);
 	for (int32 Index = 0; Index < Count; ++Index)
 	{
 		const AActor* Entry = Entries[Index % Entries.Num()];
@@ -386,11 +390,26 @@ void ACheeseStrikeGameMode::SpawnMice()
 		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		if (ACheeseStrikeMouse* Mouse = World->SpawnActor<ACheeseStrikeMouse>(ACheeseStrikeMouse::StaticClass(), FTransform(Top), Parameters))
 		{
+			Mouse->SetSchedule(MiceCameAt, FullHealth);
 			Mouse->Enter(Top, Ground.Location);
 			++Came;
 		}
 	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("The mice are here: %d for %d blocks of cheese"), Came, Blocks);
+	GetWorldTimerManager().SetTimer(MiceProgressTimer, this, &ACheeseStrikeGameMode::LogMiceProgress, 10.0f, true);
+}
+
+void ACheeseStrikeGameMode::LogMiceProgress()
+{
+	const int32 Left = ACheeseStrikeCheese::CountEdible(GetWorld());
+	const float Since = GetWorld()->GetTimeSeconds() - MiceCameAt;
+	if (Left == 0)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Mice: all %d blocks eaten, %.0f s after they came"), MiceCameTo, Since);
+		GetWorldTimerManager().ClearTimer(MiceProgressTimer);
+		return;
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Mice: %d of %d blocks left, %.0f s after they came"), Left, MiceCameTo, Since);
 }
 
 void ACheeseStrikeGameMode::HandleMatchHasEnded()
