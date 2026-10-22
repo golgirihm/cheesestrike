@@ -51,9 +51,9 @@ public:
 	void SetMode(CheeseStrikeModes::EMode InMode);
 	/** The host sets the rounds to win, from the lobby. */
 	void SetRoundLimit(int32 Rounds);
-	/** Execution: `Victim` has gone down, put there by `By`; down still counts as in, until finished or bled out. */
+	/** Execution: `Victim` has gone down, put there by `By`; down still counts as in, while someone of their side is up to revive them. */
 	void Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By);
-	/** Gun Game: a character is given its player's step of the ladder (and the knife), as it comes in. */
+	/** Gun Game: a character is given its player's step of the ladder (and nothing else), as it comes in. */
 	virtual void SetPlayerDefaults(APawn* PlayerPawn) override;
 	/** Elimination's rounds to win, and a round's length. */
 	int32 GetRoundLimit() const { return RoundLimit; }
@@ -148,7 +148,11 @@ protected:
 	/** Elimination: a round begins, everyone back at their side's starts with full health (the first comes with the match). */
 	void StartRound(bool bFirst);
 	void NextRound() { StartRound(false); }
-	/** Elimination: ends the round if a side is gone, or whatever stands when `bTimeUp`. */
+	/**
+	 * Elimination: ends the round if a side is gone, or whatever stands when
+	 * `bTimeUp`. In Execution a side whose players left in are all down is
+	 * gone too: each of them is finished first, as the kill of whoever put them down.
+	 */
 	void CheckRound(bool bTimeUp);
 	void RoundTimeUp() { CheckRound(true); }
 	void CheckRoundNow() { CheckRound(false); }
@@ -156,7 +160,7 @@ protected:
 	void EndRound(int32 Winner);
 	/** Where an Unmanned Aerial Cheese circles: over the middle of the starts, high above the highest. */
 	void DroneCircle(FVector& OutCentre, float& OutRadius) const;
-	/** Gun Game: gives `Body` its player's step of the ladder, in hand at once, and the knife until the knife is the step. */
+	/** Gun Game: gives `Body` its player's step of the ladder, in hand at once, and nothing else. */
 	void ArmForGunGame(TWeakObjectPtr<ACheeseStrikeCharacter> Body);
 
 	int32 KillLimit;
@@ -167,6 +171,8 @@ protected:
 	/** The world's time the round being played began. */
 	float RoundStartedAt = 0.0f;
 	FTimerHandle RoundTimer;
+	/** Whether CheckRound is finishing a side's players down, whose deaths ask it again. */
+	bool bDecidingRound = false;
 	int32 BotsWanted = -1;
 	int32 MapIndex = INDEX_NONE;
 	int32 BotSeed = 0;

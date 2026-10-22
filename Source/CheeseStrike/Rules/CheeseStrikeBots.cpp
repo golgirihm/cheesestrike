@@ -3,6 +3,7 @@
 #include "CheeseStrikeBots.h"
 #include "Kismet/GameplayStatics.h"
 #include "Weapons/CheeseStrikeArsenal.h"
+#include "Rules/CheeseStrikeDowned.h"
 
 namespace CheeseStrikeBots
 {
@@ -176,5 +177,50 @@ namespace CheeseStrikeBots
 			return true;
 		}
 		return false;
+	}
+	float BearingFromDowned(const FVector& At, const FVector& Downed, float Yaw)
+	{
+		const FVector Offset = FVector(At.X - Downed.X, At.Y - Downed.Y, 0.0f);
+		if (Offset.SizeSquared() < 1.0f)
+		{
+			return 0.0f;
+		}
+		return FRotator::NormalizeAxis(Offset.Rotation().Yaw - Yaw);
+	}
+
+	bool InDownedAim(const FVector& At, const FVector& Downed, float Yaw, float Margin)
+	{
+		return FMath::Abs(BearingFromDowned(At, Downed, Yaw)) <= CheeseStrikeDowned::ConeYaw + Margin;
+	}
+
+	FVector FinishApproach(const FVector& At, const FVector& Downed, float Yaw, float Now, float Way)
+	{
+		const float Bearing = BearingFromDowned(At, Downed, Yaw);
+		const float Safe = CheeseStrikeDowned::ConeYaw + FlankMargin;
+		// Out of their aim by half the margin is out (so that, come round to the edge, it goes in rather than circling on).
+		if (FMath::Abs(Bearing) >= CheeseStrikeDowned::ConeYaw + FlankMargin * 0.5f)
+		{
+			// Out of their aim already: straight in, along the same bearing, to stand beside them.
+			return Downed + FRotator(0.0f, Yaw + Bearing, 0.0f).Vector() * FlankStandOff;
+		}
+		// In their aim: round to the nearer edge and past it, swerving on the way.
+		const float Side = (Bearing >= 0.0f ? 1.0f : -1.0f) * (Way < 0.0f ? -1.0f : 1.0f);
+		const float Distance = FVector::Dist2D(At, Downed);
+		const float Radius = FMath::Clamp(Distance, FlankStandOff, FlankRadius);
+		const FVector Edge = Downed + FRotator(0.0f, Yaw + Side * Safe, 0.0f).Vector() * Radius;
+		const FVector ToEdge = FVector(Edge.X - At.X, Edge.Y - At.Y, 0.0f);
+		const float Left = ToEdge.Size();
+		if (Left < 1.0f)
+		{
+			return Edge;
+		}
+		const FVector Along = ToEdge / Left;
+		// The swerve is across their line of fire, not across the way it goes.
+		const FVector ToThem = FVector(Downed.X - At.X, Downed.Y - At.Y, 0.0f).GetSafeNormal();
+		const FVector Across(-ToThem.Y, ToThem.X, 0.0f);
+		const float Swerve = FMath::Sin(2.0f * PI * Now / ZigzagPeriod) >= 0.0f ? 1.0f : -1.0f;
+		const float Ahead = FMath::Min(Left, ZigzagStep);
+		// The swerve dies down as the edge comes near, so as not to swing back into the aim.
+		return FVector(At.X, At.Y, Downed.Z) + Along * Ahead + Across * Swerve * ZigzagWidth * FMath::Min(1.0f, Left / ZigzagStep);
 	}
 }

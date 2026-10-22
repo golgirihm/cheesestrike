@@ -256,8 +256,6 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 		CheeseStrikeHUD::EStatus Status;
 		int32 Back;
 		UTexture2D* Avatar;
-		/** Down: how much of the bleeding out is left. */
-		float Bleed;
 	};
 	TArray<FIcon> Icons;
 	for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
@@ -270,9 +268,7 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 			const ACheeseStrikeCharacter* Body = BodyOf(Player);
 			const CheeseStrikeHUD::EStatus Status = StatusOf(Player, Body);
 			const int32 Back = Status == CheeseStrikeHUD::EStatus::Respawning ? CheeseStrikeHUD::SecondsToComeBack(Match->GetRespawnDelay(), Now, Body->GetDiedAt()) : 0;
-			const UCheeseStrikeLastStand* Stand = Status == CheeseStrikeHUD::EStatus::Down ? Body->GetLastStand() : nullptr;
-			const float Bleed = Stand != nullptr ? CheeseStrikeHUD::BleedLeft(Stand->SecondsToBleedOut(), CheeseStrikeModes::LastStandTime) : 0.0f;
-			Icons.Add({Player, FVector2D(X, Top), Status, Back, Avatars->For(Player), Bleed});
+			Icons.Add({Player, FVector2D(X, Top), Status, Back, Avatars->For(Player)});
 			X += Size + Gap;
 		}
 	}
@@ -282,7 +278,7 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 	}
 
 	// The tiles: a picture, or the initials on the side's colour; a strip of the side's colour under; dimmed while coming back, darker and struck through when out;
-	// down, washed and framed in orange, slowly pulsing, the strip under it the bleeding out running down.
+	// down, washed and framed in orange, slowly pulsing, the strip under it orange.
 	HudDraw::FShapes Under;
 	HudDraw::FShapes Over;
 	if (bTeams)
@@ -303,8 +299,7 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 			Over.Rect(Icon.At.X, Icon.At.Y, Size, Size, FLinearColor(0.0f, 0.0f, 0.0f, 0.3f));
 			Over.Rect(Icon.At.X, Icon.At.Y, Size, Size, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.2f + 0.2f * Pulse));
 			Over.Frame(Icon.At.X, Icon.At.Y, Size, Size, FMath::Max(1.0f, 2.0f * U), CheeseStrikeHUD::DownColour);
-			Over.Rect(Icon.At.X, Icon.At.Y + Size, Size, 3.0f * U, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.3f));
-			Over.Rect(Icon.At.X, Icon.At.Y + Size, Size * Icon.Bleed, 3.0f * U, CheeseStrikeHUD::DownColour);
+			Over.Rect(Icon.At.X, Icon.At.Y + Size, Size, 3.0f * U, CheeseStrikeHUD::DownColour);
 		}
 		else if (Icon.Status != CheeseStrikeHUD::EStatus::Alive)
 		{

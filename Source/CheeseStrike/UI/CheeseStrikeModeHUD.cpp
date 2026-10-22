@@ -268,7 +268,7 @@ namespace
 			const bool bRevived = Theirs != nullptr && Theirs->GetWork() == CheeseStrikeModes::EInteract::Revive;
 			const FString Under = Theirs == nullptr ? FString(TEXT("only your pistol  ·  a teammate can revive you  ·  an enemy up close can finish you"))
 				: FString::Printf(TEXT("%s is %s you"), *By->DisplayName(), bRevived ? TEXT("reviving") : TEXT("finishing"));
-			ModeHudNotice(Canvas, Y, FString::Printf(TEXT("DOWN  ·  BLEEDING OUT IN %.0f"), FMath::CeilToFloat(Stand->SecondsToBleedOut())), HudDraw::Danger, Under);
+			ModeHudNotice(Canvas, Y, TEXT("DOWN"), HudDraw::Danger, Under);
 			if (Theirs != nullptr)
 			{
 				ModeHudBar(Canvas, Middle, Y + 70.0f * U, 240.0f * U, Theirs->WorkDone(), bRevived ? Side : HudDraw::Danger);
