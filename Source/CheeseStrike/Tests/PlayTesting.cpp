@@ -241,7 +241,9 @@ namespace PlayTesting
 		// A match starts at once, with no bots to get in the way, unless the test wants the lobby, which has them.
 		// No bots unless the test asks for them: the players are the only characters.
 		const FString NoBots = (Session.Options.Contains(TEXT("?Bots=")) ? FString() : FString(TEXT("?Bots=0"))) + (Session.Options.Contains(TEXT("?Mice=")) ? FString() : FString(TEXT("?Mice=0")));
-		const FString Options = Session.bLobby ? Session.Options : Session.Options + TEXT("?StartNow") + NoBots;
+		// No count before the match (or its rounds) unless the test asks for one, so that the tests are quick.
+		const FString NoCount = Session.Options.Contains(TEXT("?Countdown=")) ? FString() : FString(TEXT("?Countdown=0"));
+		const FString Options = Session.bLobby ? Session.Options + NoCount : Session.Options + TEXT("?StartNow") + NoBots + NoCount;
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
 		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 		Settings->SetPlayNumberOfClients(Session.Players);

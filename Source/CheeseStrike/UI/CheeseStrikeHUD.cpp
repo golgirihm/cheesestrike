@@ -355,6 +355,7 @@ void ACheeseStrikeHUD::DrawHUD()
 	if (!bOver)
 	{
 		DrawMice(Match);
+		DrawCountdown(Match);
 	}
 	if (bDead)
 	{

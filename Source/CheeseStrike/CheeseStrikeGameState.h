@@ -6,6 +6,7 @@
 #include "GameFramework/GameState.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Rules/CheeseStrikeStart.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "CheeseStrikeGameState.generated.h"
 
@@ -98,6 +99,18 @@ public:
 	int32 GetMapIndex() const { return MapIndex; }
 	void SetMapIndex(int32 Index) { MapIndex = Index; }
 
+	/**
+	 * The count before the match, and before each later round of a mode
+	 * played in rounds (CheeseStrikeStart): the server's time it ends (0 for
+	 * none), whether everyone is held by it now (nobody moves, fires, changes
+	 * weapons or calls in a streak; they may look round), and the seconds left.
+	 */
+	float GetGoAt() const { return GoAt; }
+	bool IsFrozen() const { return CheeseStrikeStart::IsFrozen(static_cast<float>(GetServerWorldTimeSeconds()), GoAt); }
+	float SecondsToGo() const { return IsFrozen() ? GoAt - static_cast<float>(GetServerWorldTimeSeconds()) : 0.0f; }
+	/** Server only. */
+	void SetGoAt(float At) { GoAt = At; }
+
 	/** The server's time the mice come (0 for none), for the countdown. */
 	float GetMiceAt() const { return MiceAt; }
 	void SetMiceAt(float At) { MiceAt = At; }
@@ -175,7 +188,7 @@ public:
 	/** Seconds until the next round, during a break; 0 otherwise. */
 	float SecondsToNextRound() const { return IsRoundBreak() ? FMath::Max(0.0f, RoundBreakUntil - static_cast<float>(GetServerWorldTimeSeconds())) : 0.0f; }
 	/** Seconds left in the round being played; 0 between rounds and outside Elimination. */
-	float SecondsLeftInRound() const { return RoundEndsAt > 0.0f && !IsRoundBreak() ? FMath::Max(0.0f, RoundEndsAt - static_cast<float>(GetServerWorldTimeSeconds())) : 0.0f; }
+	float SecondsLeftInRound() const { return !IsRoundBreak() ? CheeseStrikeStart::RoundLeft(static_cast<float>(GetServerWorldTimeSeconds()), GoAt, RoundEndsAt) : 0.0f; }
 	/** Who took the last round: a team, NoTeam for a draw; -2 before any has ended. */
 	int32 GetLastRoundWinner() const { return LastRoundWinner; }
 	/** Server only. */
@@ -232,6 +245,8 @@ protected:
 	float LobbyAt = 0.0f;
 	UPROPERTY(Replicated)
 	float MiceAt = 0.0f;
+	UPROPERTY(Replicated)
+	float GoAt = 0.0f;
 	UPROPERTY(Replicated)
 	int32 PlayersExpected = 0;
 	UPROPERTY(Replicated)

@@ -181,6 +181,8 @@ protected:
 	bool bMice = true;
 	float MiceAfter = 60.0f;
 	FTimerHandle MiceTimer;
+	/** Seconds counted before the match begins (`?Countdown=`; CheeseStrikeStart), and so before each later round. */
+	float StartCountdown = 3.0f;
 	/** How many players a match started by the lobby on another map waits for; 0 for a match not started that way. */
 	int32 PlayersExpected = 0;
 	FTimerHandle CountdownTimer;

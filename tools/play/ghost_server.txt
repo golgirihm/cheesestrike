@@ -1,0 +1,15 @@
+# The host of a pair, for the joiner's view of a ghostly host (tools/play/ghost_client.txt):
+#   tools/play.ps1 -Script tools/play/ghost_server.txt -ClientScript tools/play/ghost_client.txt -Tag ghostpair
+# Protects itself for long enough for the joiner to come and look (CheeseStrikeProtect),
+# then turns aside and fires, which ends the protection on every machine.
+cmd CheeseStrikeProtect 120
+wait 44
+state
+look 70 0
+hold Fire
+wait 0.3
+release Fire
+state
+wait 10
+state
+quit

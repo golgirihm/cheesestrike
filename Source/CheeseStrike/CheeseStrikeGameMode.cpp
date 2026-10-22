@@ -16,6 +16,7 @@
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Rules/CheeseStrikeStart.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeInventory.h"
@@ -55,6 +56,7 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	BotSkill = CheeseStrikeBots::SkillFrom(Options);
 	bMice = CheeseStrikeMice::HasMice(Options);
 	MiceAfter = CheeseStrikeMice::ArrivalFrom(Options);
+	StartCountdown = CheeseStrikeStart::CountdownFrom(Options);
 	// A match the lobby started on another map begins when everyone has come over (ReadyToStartMatch).
 	PlayersExpected = CheeseStrikeRules::PlayersFrom(Options);
 	if (PlayersExpected > 0)
@@ -306,6 +308,18 @@ void ACheeseStrikeGameMode::CancelStart()
 
 void ACheeseStrikeGameMode::HandleMatchHasStarted()
 {
+	// Everyone comes in held where they stand for the count (3, 2, 1, FIGHT): set before the players' characters come in
+	// (in the engine's HandleMatchHasStarted), whose protection is counted from its end.
+	float CountLeft = 0.0f;
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		CountLeft = StartCountdown;
+		State->SetGoAt(StartCountdown > 0.0f ? State->GetServerWorldTimeSeconds() + StartCountdown : 0.0f);
+		if (StartCountdown > 0.0f)
+		{
+			UE_LOG(LogCheeseStrike, Display, TEXT("The match counts %.0f s before it begins"), StartCountdown);
+		}
+	}
 	Super::HandleMatchHasStarted();
 	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 	{
@@ -316,15 +330,15 @@ void ACheeseStrikeGameMode::HandleMatchHasStarted()
 	{
 		StartRound(true);
 	}
-	// The mice come a minute in, when there is cheese for them.
+	// The mice come a minute in (counted from the end of the count), when there is cheese for them.
 	const int32 Blocks = ACheeseStrikeCheese::CountEdible(GetWorld());
 	if (bMice && CheeseStrikeMice::MiceFor(Blocks) > 0)
 	{
 		if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 		{
-			State->SetMiceAt(State->GetServerWorldTimeSeconds() + MiceAfter);
+			State->SetMiceAt(State->GetServerWorldTimeSeconds() + CountLeft + MiceAfter);
 		}
-		GetWorldTimerManager().SetTimer(MiceTimer, this, &ACheeseStrikeGameMode::SpawnMice, FMath::Max(0.01f, MiceAfter), false);
+		GetWorldTimerManager().SetTimer(MiceTimer, this, &ACheeseStrikeGameMode::SpawnMice, FMath::Max(0.01f, CountLeft + MiceAfter), false);
 	}
 }
 
@@ -671,7 +685,16 @@ void ACheeseStrikeGameMode::StartRound(bool bFirst)
 	}
 	const int32 Number = bFirst ? 1 : State->GetRound() + 1;
 	RoundStartedAt = World->GetTimeSeconds();
-	State->StartRound(Number, State->GetServerWorldTimeSeconds() + RoundTime);
+	// The first round's count is the match's, already running; each later one has a shorter count of its own, set before
+	// everyone comes back so that their protection is counted from its end. The round's clock runs from the count's end.
+	const float Now = State->GetServerWorldTimeSeconds();
+	if (!bFirst)
+	{
+		const float Count = CheeseStrikeStart::RoundCountdownFor(StartCountdown);
+		State->SetGoAt(Count > 0.0f ? Now + Count : 0.0f);
+	}
+	const float CountLeft = FMath::Max(0.0f, State->GetGoAt() - Now);
+	State->StartRound(Number, Now + CountLeft + RoundTime);
 	if (!bFirst)
 	{
 		// Everyone back at their side's starts with full health, the living too, and the fallen cleared away.
@@ -707,7 +730,7 @@ void ACheeseStrikeGameMode::StartRound(bool bFirst)
 			RestartPlayer(Each);
 		}
 	}
-	GetWorldTimerManager().SetTimer(RoundTimer, this, &ACheeseStrikeGameMode::RoundTimeUp, RoundTime, false);
+	GetWorldTimerManager().SetTimer(RoundTimer, this, &ACheeseStrikeGameMode::RoundTimeUp, CountLeft + RoundTime, false);
 	UE_LOG(LogCheeseStrike, Display, TEXT("Round %d: %s"), Number, *State->ScoreSummary());
 	if (!bFirst)
 	{
@@ -802,7 +825,7 @@ bool ACheeseStrikeGameMode::CallStreak(ACheeseStrikePlayerState* Caller, CheeseS
 	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
 	UWorld* World = GetWorld();
 	const ACheeseStrikeCharacter* Body = Caller != nullptr ? Caller->GetPawn<ACheeseStrikeCharacter>() : nullptr;
-	if (State == nullptr || World == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || Body == nullptr || !Body->IsAlive() || Caller->NextStreak() != Kind)
+	if (State == nullptr || World == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || State->IsFrozen() || Body == nullptr || !Body->IsAlive() || Caller->NextStreak() != Kind)
 	{
 		return false;
 	}
@@ -812,6 +835,11 @@ bool ACheeseStrikeGameMode::CallStreak(ACheeseStrikePlayerState* Caller, CheeseS
 		return false;
 	}
 	Caller->TakeStreak(Kind);
+	// Calling one in is an attack: it gives up the protection of a fresh spawn.
+	if (ACheeseStrikeCharacter* CallerBody = Caller->GetPawn<ACheeseStrikeCharacter>())
+	{
+		CallerBody->EndProtection();
+	}
 	const float Now = State->GetServerWorldTimeSeconds();
 	FActorSpawnParameters Parameters;
 	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

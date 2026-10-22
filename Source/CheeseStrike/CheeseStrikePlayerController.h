@@ -184,6 +184,8 @@ protected:
 	bool bReadySent = false;
 	/** The last whole second of the countdown sounded, for its tones (CheeseStrikeMenu::CountdownTone). */
 	int32 SecondSounded = INDEX_NONE;
+	/** The same for the count before the match and its rounds (ACheeseStrikeGameState::GetGoAt). */
+	int32 GoSounded = INDEX_NONE;
 	bool bScoreboardHeld = false;
 	bool bStartAtTaken = false;
 };

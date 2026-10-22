@@ -1178,3 +1178,16 @@ void ACheeseStrikeWeapon::FinishReload()
 	}
 	ReloadEndsAt = 0.0f;
 }
+
+void ACheeseStrikeWeapon::SetOverlay(UMaterialInterface* Overlay, UMaterialInterface* ViewOverlay)
+{
+	const TPair<UMeshComponent*, UMaterialInterface*> Parts[] = {
+		{FirstPersonMesh.Get(), ViewOverlay}, {FirstPersonModel.Get(), ViewOverlay}, {ThirdPersonMesh.Get(), Overlay}, {ThirdPersonModel.Get(), Overlay}};
+	for (const TPair<UMeshComponent*, UMaterialInterface*>& Part : Parts)
+	{
+		if (Part.Key != nullptr && Part.Key->GetOverlayMaterial() != Part.Value)
+		{
+			Part.Key->SetOverlayMaterial(Part.Value);
+		}
+	}
+}

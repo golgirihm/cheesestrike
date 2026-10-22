@@ -210,6 +210,11 @@ void ACheeseStrikeBotController::Tick(float DeltaSeconds)
 		{
 			LetGoOfTrigger();
 		}
+		// Held by the count before the match or its round: going nowhere either.
+		if (Me != nullptr && Me->IsFrozen())
+		{
+			StopMovement();
+		}
 		Super::Tick(DeltaSeconds);
 		return;
 	}
