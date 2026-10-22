@@ -191,6 +191,28 @@ bool FTheEdgesRedAsHealthFalls::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHealthShowsAsBlocksNotANumber, "CheeseStrike.HUD.HealthShowsAsBlocksNotANumber", HUDTests::Flags)
+
+bool FHealthShowsAsBlocksNotANumber::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	const auto Sum = [](const TArray<float>& Fills) { float Total = 0.0f; for (float Fill : Fills) { Total += Fill; } return Total; };
+	const TArray<float> Full = HealthFills(100.0f, 100.0f);
+	TestEqual(TEXT("a row of blocks"), Full.Num(), HealthSegments);
+	TestEqual(TEXT("at full health, every block full"), Sum(Full), static_cast<float>(HealthSegments));
+	const TArray<float> Hurt = HealthFills(65.0f, 100.0f);
+	TestTrue(TEXT("65 of 100: three full, the fourth a quarter, the last empty"), Hurt[2] == 1.0f && FMath::IsNearlyEqual(Hurt[3], 0.25f) && Hurt[4] == 0.0f);
+	TestTrue(TEXT("the blocks hold the share of health"), FMath::IsNearlyEqual(Sum(Hurt) / HealthSegments, 0.65f));
+	TestTrue(TEXT("filled from the left"), Hurt[0] >= Hurt[1] && Hurt[1] >= Hurt[2] && Hurt[2] >= Hurt[3] && Hurt[3] >= Hurt[4]);
+	TestTrue(TEXT("a sliver alive never looks empty"), HealthFills(1.0f, 100.0f)[0] > 0.05f);
+	TestEqual(TEXT("dead, empty"), Sum(HealthFills(0.0f, 100.0f)), 0.0f);
+	TestEqual(TEXT("over full is full"), Sum(HealthFills(150.0f, 100.0f)), static_cast<float>(HealthSegments));
+	TestTrue(TEXT("tough cheese fills by its share"), FMath::IsNearlyEqual(Sum(HealthFills(100.0f, 200.0f)), HealthSegments * 0.5f));
+	TestTrue(TEXT("low at a quarter, as the edges pulse"), IsHealthLow(VignettePulseUnder, 100.0f) && !IsHealthLow(VignettePulseUnder + 1.0f, 100.0f));
+	TestFalse(TEXT("dead isn't low"), IsHealthLow(0.0f, 100.0f));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThePlayersRowSaysWhoIsAlive, "CheeseStrike.HUD.ThePlayersRowSaysWhoIsAlive", HUDTests::Flags)
 
 bool FThePlayersRowSaysWhoIsAlive::RunTest(const FString& Parameters)

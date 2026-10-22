@@ -24,11 +24,12 @@ enum class EWeaponSlot : uint8;
  * accent, in the engine's bold condensed Roboto (CheeseStrikeHUDDraw).
  *
  * In a fight: a crosshair whose gap opens with the weapon's spread, a mark
- * when a shot hits (longer ticks for the head), health at the lower left,
- * the weapon at the lower right (its name, the magazine and the reserve, a
- * pip a round, the reload), red edges as health falls, and an arc at the
- * edge of the view for each hit, pointing at whoever made it. Always: the
- * minimap at the top left (CheeseStrikeMinimap), turned with the view, the
+ * when a shot hits (longer ticks for the head), health at the lower left
+ * as a row of blocks (never a number), the weapon at the lower right (its
+ * name, the magazine and the reserve, a pip a round, the reload), red
+ * edges as health falls, and an arc at the edge of the view for each hit,
+ * pointing at whoever made it. Always: the minimap at the top left
+ * (CheeseStrikeMinimap), turned with the view, the
  * player's side and the cheese on it; every player along the top, grouped
  * by side, with their Steam pictures and whether they are alive, coming
  * back or out; the last few kills at the top right; the score at the
@@ -181,6 +182,11 @@ protected:
 	float RevealedUntil = -1.0f;
 	/** When the reload under way began, for its bar (the world's time; -1 for none). */
 	float ReloadBegan = -1.0f;
+	/** The health bar's trail: the health just lost shows a moment longer, then runs down to what is left (-1 before the first frame). */
+	float HealthTrail = -1.0f;
+	/** When the health last fell (the world's time), for how long the trail holds, and the health the frame before. */
+	float HealthFellAt = -1.0f;
+	float HealthBefore = -1.0f;
 	/** Where each kill in the feed happened (the map's name for the place the body fell), by the killed and the time. */
 	TMap<FString, FString> KillPlaces;
 	/** The place of `Kill`: found once, from the body where it lies, and kept while the kill is in the feed. */
