@@ -16,6 +16,8 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "UI/CheeseStrikeCredits.h"
+#include "Settings/CheeseStrikeSettings.h"
+#include "Sound/SoundClass.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -145,3 +147,16 @@ bool FTheCreditsNameEveryone::RunTest(const FString& Parameters)
 }
 
 #endif
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheVolumesKeepTheSoundClassesTheySet, "CheeseStrike.Project.TheVolumesKeepTheSoundClassesTheySet", ProjectTests::Flags)
+
+bool FTheVolumesKeepTheSoundClassesTheySet::RunTest(const FString& Parameters)
+{
+	// A sound class that goes with a level, as the classes the effects volume set did: the audio device kept pointing at
+	// them after they were unloaded, and the game crashed as the next match began.
+	TWeakObjectPtr<USoundClass> Passing = NewObject<USoundClass>(GetTransientPackage(), MakeUniqueObjectName(GetTransientPackage(), USoundClass::StaticClass(), TEXT("PassingSounds")));
+	UCheeseStrikeSettings::ApplySound();
+	CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+	TestTrue(TEXT("a sound class the volumes were put on is still there after the level's things are let go"), Passing.IsValid());
+	return true;
+}

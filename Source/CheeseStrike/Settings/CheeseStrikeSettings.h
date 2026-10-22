@@ -84,7 +84,7 @@ public:
 
 	/** The field of view top to bottom the camera has now, from the settings if there are any. */
 	static float FieldOfViewNow();
-	/** Puts the volumes on the sound: the master volume on everything, the effects volume on every sound but the menu's (MenuSoundClass). */
+	/** Puts the volumes on the sound: the master volume on everything, the effects volume on every sound but the menu's (MenuSoundClass). Every sound class it sets is kept loaded from then on, as the audio device keeps pointing at it. */
 	static void ApplySound();
 	/** The sound class the menu's sounds play in, which the effects volume leaves alone. */
 	static USoundClass* MenuSoundClass();

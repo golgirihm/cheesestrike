@@ -7,6 +7,8 @@
 #include "Engine/World.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
+#include "UObject/StrongObjectPtr.h"
+#include "UObject/UObjectIterator.h"
 #include "UObject/UObjectIterator.h"
 
 namespace CheeseStrikeSettings
@@ -140,12 +142,6 @@ void UCheeseStrikeSettings::ApplySound()
 	const UCheeseStrikeSettings* Settings = Get();
 	const float Master = Settings != nullptr ? Settings->MasterVolume : CheeseStrikeSettings::DefaultVolume;
 	const float Effects = Settings != nullptr ? Settings->EffectsVolume : CheeseStrikeSettings::DefaultVolume;
-	FAudioDeviceManager* Devices = GEngine != nullptr ? GEngine->GetAudioDeviceManager() : nullptr;
-	if (Devices == nullptr)
-	{
-		// No sound at all (-nosound, or a server without it).
-		return;
-	}
 	// One mix, made once and kept active, which sets every sound class but the menu's to the effects volume; a class
 	// loaded since the last time (a new level's) gets it now, so this runs again after every level loads.
 	static USoundMix* EffectsMix = nullptr;
@@ -158,10 +154,27 @@ void UCheeseStrikeSettings::ApplySound()
 	TArray<USoundClass*> Classes;
 	for (TObjectIterator<USoundClass> It; It; ++It)
 	{
-		if (*It != Menu && !It->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+		if (*It != Menu && !It->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject) && IsValid(*It))
 		{
 			Classes.Add(*It);
 		}
+	}
+	// Every class the mix sets is kept for good: the audio device holds the mix's settings by the class's address and
+	// never lets go of them, so a class unloaded with a level would leave it reading freed memory every frame (and
+	// crash, as it did when a match began after the classes of the level before were gone).
+	static TArray<TStrongObjectPtr<USoundClass>> Kept;
+	for (USoundClass* Class : Classes)
+	{
+		if (!Kept.ContainsByPredicate([Class](const TStrongObjectPtr<USoundClass>& Each) { return Each.Get() == Class; }))
+		{
+			Kept.Emplace(Class);
+		}
+	}
+	FAudioDeviceManager* Devices = GEngine != nullptr ? GEngine->GetAudioDeviceManager() : nullptr;
+	if (Devices == nullptr)
+	{
+		// No sound at all (-nosound, or a server without it).
+		return;
 	}
 	Devices->IterateOverAllDevices([Master, Effects, &Classes](Audio::FDeviceId, FAudioDevice* Device)
 	{
