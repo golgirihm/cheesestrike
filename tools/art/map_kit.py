@@ -449,6 +449,46 @@ def cheese_wall(name, structure, start, end, bottom, courses, thickness=50, colu
     return made
 
 
+def pillar_deck(name, structure, low, high, slab=400, thickness=40, pillar=160, edge=0, edge_height=100, edible=True):
+    """A floor of cheese slabs on pillars of cheese, from corner `low` (x, y, z: z the level below, where the pillars
+    stand) to corner `high` (x, y, z: z the deck's top): slabs about `slab` cm square and `thickness` thick, each on one
+    round pillar `pillar` across under its middle. Eaten at its foot, a pillar is gone and the slab on it falls, whole,
+    onto the level below (CheeseStrikeMice::IsHeld: nothing under its middle holds it), with whoever stands on it.
+    One pillar a slab, never more: a slab on two falls when either goes, and would come down through the one left.
+    Keep the level below clear under the slabs (nothing there but their pillars), or a slab falling past what it can't
+    rest on comes to rest through it. `edge`: a low wall of cheese, `edge_height` high and 50 thick, along that side of
+    the deck ("N", "S", "E" or "W"), each block on one slab: crouching cover, which falls with its slab.
+    Returns the slabs' footprints ((x0, y0), (x1, y1)), for what else stands on them."""
+    x0, y0, bottom = low
+    x1, y1, top = high
+    nx = max(1, int(round((x1 - x0) / float(slab))))
+    ny = max(1, int(round((y1 - y0) / float(slab))))
+    sx, sy = (x1 - x0) / nx, (y1 - y0) / ny
+    under = top - thickness
+    slabs = []
+    for i in range(nx):
+        for j in range(ny):
+            a = (x0 + i * sx, y0 + j * sy)
+            b = (a[0] + sx, a[1] + sy)
+            cx, cy = (a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0
+            wheel(f"Cheese_{name}_Pillar_{i}_{j}", structure, cx, cy, bottom, pillar, under - bottom, edible)
+            cheese_box(f"Cheese_{name}_Slab_{i}_{j}", structure, (a[0], a[1], under), (b[0], b[1], top), edible)
+            slabs.append((a, b))
+            # The edge: two blocks along each slab on that side, on the slab only.
+            on_edge = {"N": j == ny - 1, "S": j == 0, "E": i == nx - 1, "W": i == 0}.get(edge, False) if edge else False
+            if on_edge:
+                for k in range(2):
+                    if edge in "NS":
+                        ey = b[1] - 50 if edge == "N" else a[1]
+                        lo, hi = (a[0] + k * sx / 2.0, ey, top), (a[0] + (k + 1) * sx / 2.0, ey + 50, top + edge_height)
+                    else:
+                        ex = b[0] - 50 if edge == "E" else a[0]
+                        lo, hi = (ex, a[1] + k * sy / 2.0, top), (ex + 50, a[1] + (k + 1) * sy / 2.0, top + edge_height)
+                    cheese_box(f"Cheese_{name}_Edge_{i}_{j}_{k}", structure, lo, hi, edible)
+    count("pillar decks")
+    return slabs
+
+
 def cheese_floor(name, structure, low, high, tile=(200, 200), edible=True, holes=()):
     """A floor of cheese tiles from `low` to `high` (corners; its thickness is high's z less low's): each tile must
     stand on something, so lay it on the ground, on beams (frame) or on walls. Tiles whose middle is in a hole
