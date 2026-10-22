@@ -8,6 +8,8 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/Paths.h"
@@ -30,6 +32,7 @@
 #include "CheeseStrikeGameState.h"
 #include "GameFramework/GameMode.h"
 #include "CheeseStrikePlayerController.h"
+#include "Input/CheeseStrikeInput.h"
 #include "Rules/CheeseStrikeBots.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Settings/CheeseStrikeSettings.h"
@@ -103,6 +106,62 @@ namespace CheeseStrikeMenu
 		return bChanged && (!bDropdownOpen || bStatusChanged);
 	}
 
+	int32 FocusAfterRedraw(const TArray<FString>& Names, const FString& Name, int32 Index)
+	{
+		if (Names.Num() == 0)
+		{
+			return INDEX_NONE;
+		}
+		const int32 Found = Name.IsEmpty() ? INDEX_NONE : Names.IndexOfByKey(Name);
+		return Found != INDEX_NONE ? Found : FMath::Clamp(Index, 0, Names.Num() - 1);
+	}
+
+	int32 NextInDirection(const FSlateRect& From, const TArray<FSlateRect>& Others, EUINavigation Way)
+	{
+		const bool bAcross = Way == EUINavigation::Left || Way == EUINavigation::Right;
+		const bool bForward = Way == EUINavigation::Down || Way == EUINavigation::Right;
+		if (!bAcross && Way != EUINavigation::Up && Way != EUINavigation::Down)
+		{
+			return INDEX_NONE;
+		}
+		// How far apart two spans are along an axis: nothing if they overlap.
+		const auto Apart = [](double LowA, double HighA, double LowB, double HighB) { return FMath::Max(0.0, FMath::Max(LowB - HighA, LowA - HighB)); };
+		constexpr double Slack = 2.0;
+		int32 Best = INDEX_NONE;
+		double BestScore = 0.0;
+		for (int32 Index = 0; Index < Others.Num(); ++Index)
+		{
+			const FSlateRect& Other = Others[Index];
+			if (Other == From)
+			{
+				continue;
+			}
+			double Along = 0.0;
+			double Aside = 0.0;
+			if (bAcross)
+			{
+				Along = bForward ? Other.Left - From.Right : From.Left - Other.Right;
+				Aside = Apart(From.Top, From.Bottom, Other.Top, Other.Bottom);
+			}
+			else
+			{
+				Along = bForward ? Other.Top - From.Bottom : From.Top - Other.Bottom;
+				Aside = Apart(From.Left, From.Right, Other.Left, Other.Right);
+			}
+			if (Along < -Slack)
+			{
+				continue;
+			}
+			const double Score = FMath::Max(0.0, Along) + Aside * 3.0;
+			if (Best == INDEX_NONE || Score < BestScore)
+			{
+				Best = Index;
+				BestScore = Score;
+			}
+		}
+		return Best;
+	}
+
 	ELobbyStatus LobbyStatus(bool bHaveMatch, bool bTravelling, bool bCounting, float SecondsLeft, bool bHost)
 	{
 		if (bTravelling)
@@ -158,6 +217,8 @@ namespace
 		/** A dropdown's list, and a rule's value as a joiner sees it (nothing to press). */
 		FSlateRoundedBoxBrush DropdownList;
 		FSlateRoundedBoxBrush ReadOnlyValue;
+		/** The ring round the item that has the focus, for a gamepad or the keyboard. */
+		FSlateRoundedBoxBrush FocusRing;
 		FSliderStyle Slider;
 		TUniquePtr<FSlateDynamicImageBrush> PlayerIcon;
 		TUniquePtr<FSlateDynamicImageBrush> BotIcon;
@@ -193,6 +254,7 @@ namespace
 			, PrimaryFace(FLinearColor(0.1f, 0.42f, 0.9f), CheeseStrikeMenu::Rounding)
 			, DropdownList(FLinearColor(0.025f, 0.025f, 0.028f, 1.0f), CheeseStrikeMenu::Rounding, FLinearColor(0.22f, 0.22f, 0.24f), 1.0f)
 			, ReadOnlyValue(FLinearColor(0.12f, 0.12f, 0.13f, 0.9f), CheeseStrikeMenu::Rounding)
+			, FocusRing(FLinearColor::Transparent, CheeseStrikeMenu::Rounding, Cheese, 3.0f)
 		{
 			const auto Make = [](FButtonStyle& Style, const FLinearColor& Rest, const FLinearColor& Hover, const FLinearColor& Press)
 			{
@@ -259,6 +321,83 @@ namespace
 
 	private:
 		TAttribute<bool> Open;
+	};
+
+	/** Whether the item with the focus is ringed: not while the player uses the mouse, which has its hover. */
+	bool MenuFocusRingsShown = true;
+
+	/** The menu's button: Slate's, ringed in cheese when it has the focus from a gamepad or the keyboard. */
+	class SCheeseStrikeButton : public SButton
+	{
+	public:
+		virtual const FSlateBrush* GetFocusBrush() const override
+		{
+			return MenuFocusRingsShown ? &Looks().FocusRing : nullptr;
+		}
+	};
+
+	/** The menu's slider, likewise. */
+	class SCheeseStrikeSlider : public SSlider
+	{
+	public:
+		virtual const FSlateBrush* GetFocusBrush() const override
+		{
+			return MenuFocusRingsShown ? &Looks().FocusRing : nullptr;
+		}
+	};
+
+	/**
+	 * A dropdown's open list: up and down move along its items (and stop at
+	 * its ends), nothing leaves it sideways, and B or Escape shut it.
+	 */
+	class SCheeseStrikeDropList : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SCheeseStrikeDropList) {}
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+			SLATE_ARGUMENT(TArray<TSharedPtr<SWidget>>, Items)
+			SLATE_EVENT(FSimpleDelegate, OnClose)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			Items = InArgs._Items;
+			OnClose = InArgs._OnClose;
+			ChildSlot [ InArgs._Content.Widget ];
+		}
+
+		virtual FNavigationReply OnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent) override
+		{
+			const EUINavigation Way = InNavigationEvent.GetNavigationType();
+			if (Way == EUINavigation::Up || Way == EUINavigation::Down)
+			{
+				int32 At = INDEX_NONE;
+				for (int32 Index = 0; Index < Items.Num(); ++Index)
+				{
+					At = Items[Index].IsValid() && Items[Index]->HasUserFocus(InNavigationEvent.GetUserIndex()).IsSet() ? Index : At;
+				}
+				const int32 To = FMath::Clamp(At + (Way == EUINavigation::Down ? 1 : -1), 0, Items.Num() - 1);
+				if (Items.IsValidIndex(To) && To != At)
+				{
+					return FNavigationReply::Explicit(Items[To]);
+				}
+			}
+			return FNavigationReply::Stop();
+		}
+
+		virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override
+		{
+			if (InKeyEvent.GetKey() == EKeys::Escape || InKeyEvent.GetKey() == EKeys::Gamepad_FaceButton_Right)
+			{
+				OnClose.ExecuteIfBound();
+				return FReply::Handled();
+			}
+			return SCompoundWidget::OnKeyDown(MyGeometry, InKeyEvent);
+		}
+
+	private:
+		TArray<TSharedPtr<SWidget>> Items;
+		FSimpleDelegate OnClose;
 	};
 
 	UCheeseStrikeSessionSubsystem* SessionsOf(const ACheeseStrikePlayerController* Player)
@@ -365,6 +504,14 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 
 void SCheeseStrikeMenu::Show(EMenuPage InPage)
 {
+	// Each page comes back with the focus where it was left, or on its first item.
+	if (InPage != Page)
+	{
+		PageFocus.Add(static_cast<uint8>(Page), FocusName);
+		FocusName = PageFocus.FindRef(static_cast<uint8>(InPage));
+		FocusIndex = 0;
+	}
+	bFocusPending = true;
 	Page = InPage;
 	// Whatever was open of the last page is shut, and the page drawn afresh.
 	for (const TWeakPtr<SMenuAnchor>& Each : Dropdowns)
@@ -382,6 +529,7 @@ void SCheeseStrikeMenu::Show(EMenuPage InPage)
 
 void SCheeseStrikeMenu::Refresh()
 {
+	MenuFocusRingsShown = CheeseStrikeInput::DeviceOf(Controller.Get()) != CheeseStrikeInput::EDevice::Mouse;
 	const bool bLobby = Page == EMenuPage::Lobby;
 	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
 	// The credits and the options are wide: a wider panel, and the game's name out of their way.
@@ -420,6 +568,9 @@ void SCheeseStrikeMenu::Refresh()
 			ShownLobbyKey = Key;
 			ShownLobbyStatus = Status;
 			Dropdowns.Reset();
+			DropdownButtons.Reset();
+			Focusables.Reset();
+			bFocusPending = true;
 			LobbyContent->SetContent(MakeLobby());
 		}
 	}
@@ -431,9 +582,201 @@ void SCheeseStrikeMenu::Refresh()
 		if (Key != ShownPageKey)
 		{
 			ShownPageKey = Key;
+			Focusables.Reset();
+			bFocusPending = true;
 			Content->SetContent(MakePage());
 		}
 	}
+	KeepFocus();
+}
+
+int32 SCheeseStrikeMenu::UserIndex() const
+{
+	const ULocalPlayer* Local = Controller.IsValid() ? Controller->GetLocalPlayer() : nullptr;
+	const TSharedPtr<const FSlateUser> User = Local != nullptr ? Local->GetSlateUser() : nullptr;
+	return User.IsValid() ? User->GetUserIndex() : 0;
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::Focusable(const FString& Name, TSharedRef<SWidget> Widget)
+{
+	FString Unique = Name;
+	for (int32 Number = 2; Focusables.ContainsByPredicate([&Unique](const FFocusable& Each) { return Each.Name == Unique; }); ++Number)
+	{
+		Unique = FString::Printf(TEXT("%s #%d"), *Name, Number);
+	}
+	Focusables.Add({Unique, Widget});
+	return Widget;
+}
+
+TArray<FString> SCheeseStrikeMenu::GetFocusableNames() const
+{
+	TArray<FString> Names;
+	for (const FFocusable& Each : Focusables)
+	{
+		Names.Add(Each.Name);
+	}
+	return Names;
+}
+
+void SCheeseStrikeMenu::FocusItem(const FString& Name)
+{
+	const int32 Index = GetFocusableNames().IndexOfByKey(Name);
+	if (Index != INDEX_NONE)
+	{
+		FocusName = Name;
+		FocusIndex = Index;
+		bFocusPending = !GiveFocus(Focusables[Index].Widget.Pin());
+	}
+}
+
+bool SCheeseStrikeMenu::IsReallyEnabled(const TSharedPtr<SWidget>& Widget)
+{
+	for (TSharedPtr<SWidget> At = Widget; At.IsValid(); At = At->GetParentWidget())
+	{
+		if (!At->IsEnabled())
+		{
+			return false;
+		}
+	}
+	return Widget.IsValid();
+}
+
+bool SCheeseStrikeMenu::GiveFocus(const TSharedPtr<SWidget>& Widget)
+{
+	if (!Widget.IsValid() || !FSlateApplication::IsInitialized())
+	{
+		return false;
+	}
+	// As a move of the focus would (so that it is ringed), whatever the player last pressed.
+	const int32 User = UserIndex();
+	FSlateApplication::Get().SetUserFocus(User, Widget, EFocusCause::Navigation);
+	return Widget->HasUserFocus(User).IsSet();
+}
+
+void SCheeseStrikeMenu::KeepFocus()
+{
+	if (Page == EMenuPage::None)
+	{
+		return;
+	}
+	// A dropdown's list just opened: its chosen item takes the focus.
+	if (const TSharedPtr<SWidget> Drop = DropFocus.Pin())
+	{
+		if (GiveFocus(Drop) || !IsDropdownOpen())
+		{
+			DropFocus.Reset();
+		}
+		return;
+	}
+	if (IsDropdownOpen())
+	{
+		return;
+	}
+	// Which item has it, if one does.
+	const int32 User = UserIndex();
+	for (int32 Index = 0; Index < Focusables.Num(); ++Index)
+	{
+		const TSharedPtr<SWidget> Widget = Focusables[Index].Widget.Pin();
+		if (Widget.IsValid() && Widget->HasUserFocus(User).IsSet())
+		{
+			FocusName = Focusables[Index].Name;
+			FocusIndex = Index;
+			bFocusPending = false;
+			return;
+		}
+	}
+	// None has: the page was drawn again or just shown, or the focus was lost or left on the menu itself (a click on
+	// nothing). It goes to the same item, or the one in its place, or the first that can take it; but it is not taken from
+	// something else that has it, such as the console.
+	const TSharedPtr<SWidget> Focused = FSlateApplication::IsInitialized() ? FSlateApplication::Get().GetUserFocusedWidget(User) : nullptr;
+	if (!bFocusPending && Focused.IsValid() && Focused != AsShared())
+	{
+		return;
+	}
+	const int32 Chosen = CheeseStrikeMenu::FocusAfterRedraw(GetFocusableNames(), FocusName, FocusIndex);
+	for (int32 Step = 0; Chosen != INDEX_NONE && Step < Focusables.Num(); ++Step)
+	{
+		const int32 Index = (Chosen + Step) % Focusables.Num();
+		const TSharedPtr<SWidget> Widget = Focusables[Index].Widget.Pin();
+		if (IsReallyEnabled(Widget))
+		{
+			FocusName = Focusables[Index].Name;
+			FocusIndex = Index;
+			bFocusPending = !GiveFocus(Widget);
+			return;
+		}
+	}
+	bFocusPending = true;
+}
+
+bool SCheeseStrikeMenu::CloseDropdowns()
+{
+	bool bClosed = false;
+	for (int32 Index = 0; Index < Dropdowns.Num(); ++Index)
+	{
+		const TSharedPtr<SMenuAnchor> Anchor = Dropdowns[Index].Pin();
+		if (Anchor.IsValid() && Anchor->IsOpen())
+		{
+			Anchor->SetIsOpen(false);
+			bClosed = true;
+			if (DropdownButtons.IsValidIndex(Index))
+			{
+				GiveFocus(DropdownButtons[Index].Pin());
+			}
+		}
+	}
+	DropFocus.Reset();
+	return bClosed;
+}
+
+FNavigationReply SCheeseStrikeMenu::OnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent)
+{
+	const EUINavigation Way = InNavigationEvent.GetNavigationType();
+	// The credits have nothing to focus but Back: up and down scroll them.
+	if (Page == EMenuPage::Credits && (Way == EUINavigation::Up || Way == EUINavigation::Down))
+	{
+		if (const TSharedPtr<SScrollBox> Scroll = CreditsScroll.Pin())
+		{
+			Scroll->SetScrollOffset(FMath::Clamp(Scroll->GetScrollOffset() + (Way == EUINavigation::Down ? 90.0f : -90.0f), 0.0f, Scroll->GetScrollOffsetOfEnd()));
+		}
+		return FNavigationReply::Stop();
+	}
+	// With the focus on the menu itself (a click on nothing), a move puts it back on the page's item.
+	if (HasUserFocus(InNavigationEvent.GetUserIndex()).IsSet())
+	{
+		KeepFocus();
+		return FNavigationReply::Stop();
+	}
+	// From an item, to the nearest that way on the screen, the page's own way rather than Slate's (which doesn't look into
+	// the options' scrolling list), or along them in order for Tab.
+	int32 From = INDEX_NONE;
+	TArray<TSharedPtr<SWidget>> Widgets;
+	TArray<FSlateRect> Rects;
+	for (const FFocusable& Each : Focusables)
+	{
+		const TSharedPtr<SWidget> Widget = Each.Widget.Pin();
+		const bool bFrom = Widget.IsValid() && Widget->HasUserFocus(InNavigationEvent.GetUserIndex()).IsSet();
+		if (bFrom || (IsReallyEnabled(Widget) && Widget->GetVisibility().IsVisible()))
+		{
+			From = bFrom ? Widgets.Num() : From;
+			Widgets.Add(Widget);
+			Rects.Add(Widget->GetCachedGeometry().GetLayoutBoundingRect());
+		}
+	}
+	if (From == INDEX_NONE)
+	{
+		return SCompoundWidget::OnNavigation(MyGeometry, InNavigationEvent);
+	}
+	int32 To = INDEX_NONE;
+	if (Way == EUINavigation::Next || Way == EUINavigation::Previous)
+	{
+		To = (From + (Way == EUINavigation::Next ? 1 : Widgets.Num() - 1)) % Widgets.Num();
+	}
+	else
+	{
+		To = CheeseStrikeMenu::NextInDirection(Rects[From], Rects, Way);
+	}
+	return Widgets.IsValidIndex(To) && To != From ? FNavigationReply::Explicit(Widgets[To]) : FNavigationReply::Stop();
 }
 
 void SCheeseStrikeMenu::OpenDropdown(int32 Index)
@@ -454,8 +797,14 @@ bool SCheeseStrikeMenu::IsBlurringTheGame() const
 
 FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey() == EKeys::Escape || InKeyEvent.GetKey() == EKeys::Gamepad_Special_Right)
+	// Escape and B go back (closing an open dropdown first), and so does the gamepad's Menu button, as Escape in a match.
+	const FKey Key = InKeyEvent.GetKey();
+	if (Key == EKeys::Escape || Key == EKeys::Gamepad_FaceButton_Right || Key == EKeys::Gamepad_Special_Right)
 	{
+		if (Key != EKeys::Gamepad_Special_Right && CloseDropdowns())
+		{
+			return FReply::Handled();
+		}
 		if (Controller.IsValid())
 		{
 			Controller->MenuPressed();
@@ -517,14 +866,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeButton(const FString& Text, TFunction
 	}
 	return SNew(SBox).Padding(FMargin(0.0f, 4.0f))
 	[
-		SNew(SButton)
+		Focusable(Text, SNew(SCheeseStrikeButton)
 		.ButtonStyle(&ButtonStyle(Kind))
 		.ContentPadding(FMargin(18.0f, 10.0f))
 		.HAlign(HAlign_Left)
 		.OnClicked_Lambda([Do]() { Do(); return FReply::Handled(); })
 		[
 			Label
-		]
+		])
 	];
 }
 
@@ -535,14 +884,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoiceButtons(const TArray<FString>& 
 	{
 		Row->AddSlot().AutoWidth().Padding(FMargin(0.0f, 0.0f, 6.0f, 0.0f))
 		[
-			SNew(SButton)
+			Focusable(Choices[Index], SNew(SCheeseStrikeButton)
 			.ButtonStyle(&ButtonStyle(Index == Chosen ? EButtonKind::Primary : EButtonKind::Plain))
 			.IsEnabled(bCanPick)
 			.ContentPadding(FMargin(12.0f, 6.0f))
 			.OnClicked_Lambda([Pick, Index]() { Pick(Index); return FReply::Handled(); })
 			[
 				SNew(STextBlock).Text(FText::FromString(Choices[Index])).Font(Font(15, FName("Bold")))
-			]
+			])
 		];
 	}
 	return Row;
@@ -581,11 +930,15 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 	}
 	// The anchor is made after its list's buttons, which close it: they reach it through this.
 	const TSharedRef<TWeakPtr<SMenuAnchor>> Holder = MakeShared<TWeakPtr<SMenuAnchor>>();
-	const auto List = [this, Holder, Choices, Chosen, Pick, Pictures]() -> TSharedRef<SWidget>
+	// The list's chosen item, which takes the focus as it opens, and the dropdown's own button, which has it back as it shuts.
+	const TSharedRef<TWeakPtr<SWidget>> ChosenItem = MakeShared<TWeakPtr<SWidget>>();
+	const TSharedRef<TWeakPtr<SWidget>> Opener = MakeShared<TWeakPtr<SWidget>>();
+	const auto List = [this, Holder, ChosenItem, Opener, Choices, Chosen, Pick, Pictures]() -> TSharedRef<SWidget>
 	{
 		const TSharedPtr<SMenuAnchor> Anchor = Holder->Pin();
 		const float Width = Anchor.IsValid() ? static_cast<float>(Anchor->GetCachedGeometry().GetLocalSize().X) : 0.0f;
 		TSharedRef<SVerticalBox> Items = SNew(SVerticalBox);
+		TArray<TSharedPtr<SWidget>> Buttons;
 		for (int32 Index = 0; Index < Choices.Num(); ++Index)
 		{
 			TSharedRef<SHorizontalBox> Inside = SNew(SHorizontalBox);
@@ -600,9 +953,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 			[
 				SNew(STextBlock).Text(FText::FromString(Choices[Index])).Font(Font(18, FName("Bold")))
 			];
-			Items->AddSlot().AutoHeight().Padding(FMargin(0.0f, 1.0f))
-			[
-				SNew(SButton)
+			TSharedRef<SButton> Item = SNew(SCheeseStrikeButton)
 				.ButtonStyle(&ButtonStyle(Index == Chosen ? EButtonKind::Primary : EButtonKind::Quiet))
 				.ContentPadding(FMargin(12.0f, 7.0f))
 				.OnClicked_Lambda([Holder, Pick, Index]()
@@ -617,14 +968,32 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 				})
 				[
 					Inside
-				]
-			];
+				];
+			Buttons.Add(Item);
+			if (Index == Chosen || (Index == 0 && !Choices.IsValidIndex(Chosen)))
+			{
+				*ChosenItem = Item;
+			}
+			Items->AddSlot().AutoHeight().Padding(FMargin(0.0f, 1.0f)) [ Item ];
 		}
-		return SNew(SBox).MinDesiredWidth(Width)
+		return SNew(SCheeseStrikeDropList)
+			.Items(Buttons)
+			.OnClose_Lambda([this, Holder, Opener]()
+			{
+				if (const TSharedPtr<SMenuAnchor> Open = Holder->Pin())
+				{
+					Open->SetIsOpen(false);
+				}
+				DropFocus.Reset();
+				GiveFocus(Opener->Pin());
+			})
 			[
-				SNew(SBorder).BorderImage(&Looks().DropdownList).Padding(FMargin(4.0f))
+				SNew(SBox).MinDesiredWidth(Width)
 				[
-					Items
+					SNew(SBorder).BorderImage(&Looks().DropdownList).Padding(FMargin(4.0f))
+					[
+						Items
+					]
 				]
 			];
 	};
@@ -636,15 +1005,17 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 	*Holder = Anchor;
 	Dropdowns.Add(Anchor);
 	TWeakPtr<SMenuAnchor> Weak = Anchor;
-	Anchor->SetContent(
-		SNew(SButton)
+	TSharedRef<SButton> Button = SNew(SCheeseStrikeButton)
 		.ButtonStyle(&ButtonStyle(EButtonKind::Plain))
 		.ContentPadding(FMargin(16.0f, 10.0f))
-		.OnClicked_Lambda([Weak]()
+		.OnClicked_Lambda([this, Weak, ChosenItem]()
 		{
 			if (const TSharedPtr<SMenuAnchor> Open = Weak.Pin())
 			{
 				Open->SetIsOpen(!Open->IsOpen());
+				// Opened, its chosen item has the focus, for a gamepad to pick with.
+				DropFocus = Open->IsOpen() ? *ChosenItem : TWeakPtr<SWidget>();
+				KeepFocus();
 			}
 			return FReply::Handled();
 		})
@@ -658,7 +1029,10 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 			[
 				SNew(SCheeseStrikeDropArrow).Open_Lambda([Weak]() { const TSharedPtr<SMenuAnchor> Open = Weak.Pin(); return Open.IsValid() && Open->IsOpen(); })
 			]
-		]);
+		];
+	*Opener = Button;
+	DropdownButtons.Add(Button);
+	Anchor->SetContent(Focusable(FString::Printf(TEXT("Dropdown %d"), Dropdowns.Num()), Button));
 	return Anchor;
 }
 
@@ -720,10 +1094,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeCredits()
 		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 2.0f)) [ SNew(STextBlock).Text(FText::FromString(FString(Credit.Heading).ToUpper())).Font(Font(15, FName("Bold"))).ColorAndOpacity(Cheese) ];
 		List->AddSlot().AutoHeight() [ MakeLine(Credit.Text) ];
 	}
-	return SNew(SVerticalBox)
+	// Up and down scroll the list (OnNavigation).
+	TSharedPtr<SScrollBox> Scroll;
+	TSharedRef<SWidget> CreditsPage = SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("CREDITS")) ]
-		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ List ] ]
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SAssignNew(Scroll, SScrollBox) + SScrollBox::Slot() [ List ] ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); }) ];
+	CreditsScroll = Scroll;
+	return CreditsPage;
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
@@ -867,14 +1245,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const F
 {
 	const auto Button = [this, bCanPick](const FString& Text, TFunction<void()> Do)
 	{
-		return SNew(SButton)
+		return Focusable(Text, SNew(SCheeseStrikeButton)
 			.ButtonStyle(&ButtonStyle(EButtonKind::Plain))
 			.IsEnabled(bCanPick)
 			.ContentPadding(FMargin(14.0f, 6.0f))
 			.OnClicked_Lambda([Do]() { Do(); return FReply::Handled(); })
 			[
 				SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(15, FName("Bold")))
-			];
+			]);
 	};
 	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("-"), Less) ]
@@ -1073,7 +1451,7 @@ FString SCheeseStrikeMenu::PageKey() const
 		{
 			const FIntPoint Resolution = Settings->GetScreenResolution();
 			Key += FString::Printf(TEXT("|%d %d %dx%d %d %.0f %d"), Settings->GetOverallScalabilityLevel(), static_cast<int32>(Settings->GetFullscreenMode()), Resolution.X, Resolution.Y,
-				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0);
+				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0) + (Settings->IsAimAssistOn() ? TEXT(" assist") : TEXT(""));
 		}
 	}
 	return Key;
@@ -1113,6 +1491,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 	// The seconds count down by themselves, so that the lobby is drawn again only when something in it changes and the spinner turns on unbroken.
 	TWeakObjectPtr<const ACheeseStrikeGameState> Watched = Match;
 	const auto Seconds = [Watched]() { return FText::FromString(Watched.IsValid() ? FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Watched->SecondsToStart())) : FString()); };
+	// The rules first, so that their items come first in the focus's order (the page's first item is its first rule).
+	const TSharedRef<SWidget> Rules = MakeLobbyRules();
 
 	TSharedRef<SHorizontalBox> Bottom = SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ]
@@ -1188,7 +1568,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 			[
 				SNew(SBox).WidthOverride(CheeseStrikeMenu::MapPictureWidth)
 				[
-					MakeLobbyRules()
+					Rules
 				]
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f) [ MakeSeatColumns(bTeams) ]
@@ -1231,19 +1611,33 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSlider(float Min, float Max, float St
 			Settings->SaveSettings();
 		}
 	};
+	// Left and right move it a step at once, a gamepad's and the keyboard's, each kept as it is made; up and down go on to
+	// the next row. A drag with the mouse is kept when let go.
+	const TSharedRef<TWeakPtr<SSlider>> Made = MakeShared<TWeakPtr<SSlider>>();
+	TSharedRef<SSlider> Slider = SNew(SCheeseStrikeSlider)
+		.Style(&Looks().Slider)
+		.MinValue(Min)
+		.MaxValue(Max)
+		.StepSize(Step)
+		.MouseUsesStep(true)
+		.RequiresControllerLock(false)
+		.Value_Lambda([Get]() { return Get(); })
+		.OnValueChanged_Lambda([Set, Made, Keep](float Value)
+		{
+			Set(Value);
+			const TSharedPtr<SSlider> Moved = Made->Pin();
+			if (Moved.IsValid() && !Moved->HasMouseCapture())
+			{
+				Keep();
+			}
+		})
+		.OnMouseCaptureEnd_Lambda(Keep)
+		.OnControllerCaptureEnd_Lambda(Keep);
+	*Made = Slider;
 	return SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
-			SNew(SSlider)
-			.Style(&Looks().Slider)
-			.MinValue(Min)
-			.MaxValue(Max)
-			.StepSize(Step)
-			.MouseUsesStep(true)
-			.Value_Lambda([Get]() { return Get(); })
-			.OnValueChanged_Lambda([Set](float Value) { Set(Value); })
-			.OnMouseCaptureEnd_Lambda(Keep)
-			.OnControllerCaptureEnd_Lambda(Keep)
+			Focusable(TEXT("Slider"), Slider)
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(16.0f, 0.0f, 0.0f, 0.0f))
 		[
@@ -1269,7 +1663,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 				Refresh();
 			})
 		]
-		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ MakeOptionsTab() ] ]
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox).ScrollWhenFocusChanges(EScrollWhenFocusChanges::AnimatedScroll) + SScrollBox::Slot() [ MakeOptionsTab() ] ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f)) [ MakeLine(bInMatch ? TEXT("The match goes on; each change is made at once and kept.") : TEXT("Each change is made at once and kept."), true) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f)).HAlign(HAlign_Left)
 		[
@@ -1292,13 +1686,13 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 	switch (OptionsTab)
 	{
 	case EOptionsTab::Controls:
-		Add(MakeOptionRow(TEXT("Mouse sensitivity"), MakeSlider(CheeseStrikeSettings::MinSensitivity, CheeseStrikeSettings::MaxSensitivity, 0.05f,
+		Add(MakeOptionRow(TEXT("Look sensitivity"), MakeSlider(CheeseStrikeSettings::MinSensitivity, CheeseStrikeSettings::MaxSensitivity, 0.05f,
 			[Kept]() { return Kept.IsValid() ? Kept->GetMouseSensitivity() : CheeseStrikeSettings::DefaultSensitivity; },
 			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMouseSensitivity(Value); }, Times)));
 		Add(MakeOptionRow(TEXT("Aiming sensitivity"), MakeSlider(CheeseStrikeSettings::MinAimedSensitivity, CheeseStrikeSettings::MaxAimedSensitivity, 0.05f,
 			[Kept]() { return Kept.IsValid() ? Kept->GetAimedSensitivity() : CheeseStrikeSettings::DefaultAimedSensitivity; },
 			[Kept](float Value) { if (Kept.IsValid()) Kept->SetAimedSensitivity(Value); }, Times)));
-		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("While aiming down the sights, as a share of the mouse's."), true) ];
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("While aiming down the sights, as a share of the look's (the mouse's and a gamepad's stick)."), true) ];
 		Add(MakeOptionRow(TEXT("Invert look"), MakeChoiceButtons({TEXT("OFF"), TEXT("ON")}, Settings->IsLookInverted() ? 1 : 0, true, [this, Kept](int32 Index)
 		{
 			if (Kept.IsValid())
@@ -1308,6 +1702,16 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			}
 			Refresh();
 		})));
+		Add(MakeOptionRow(TEXT("Aim assist"), MakeChoiceButtons({TEXT("OFF"), TEXT("ON")}, Settings->IsAimAssistOn() ? 1 : 0, true, [this, Kept](int32 Index)
+		{
+			if (Kept.IsValid())
+			{
+				Kept->SetAimAssistOn(Index == 1);
+				Kept->SaveSettings();
+			}
+			Refresh();
+		})));
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("A gamepad's: the stick turns slower over an enemy, and a little toward them. Never the mouse."), true) ];
 		break;
 	case EOptionsTab::View:
 		Add(MakeOptionRow(TEXT("Field of view"), MakeSlider(CheeseStrikeSettings::MinFieldOfView, CheeseStrikeSettings::MaxFieldOfView, 1.0f,

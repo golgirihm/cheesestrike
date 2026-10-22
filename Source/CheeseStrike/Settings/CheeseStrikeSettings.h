@@ -75,6 +75,9 @@ public:
 	void SetAimedSensitivity(float Value);
 	bool IsLookInverted() const { return bInvertLook; }
 	void SetLookInverted(bool bValue) { bInvertLook = bValue; }
+	/** Whether a gamepad's look stick gets the aim assist (CheeseStrikeAimAssist). */
+	bool IsAimAssistOn() const { return bAimAssist; }
+	void SetAimAssistOn(bool bValue) { bAimAssist = bValue; }
 	float GetFieldOfView() const { return FieldOfView; }
 	void SetFieldOfView(float Value);
 	float GetMasterVolume() const { return MasterVolume; }
@@ -99,6 +102,8 @@ protected:
 	float AimedSensitivity = CheeseStrikeSettings::DefaultAimedSensitivity;
 	UPROPERTY(config)
 	bool bInvertLook = false;
+	UPROPERTY(config)
+	bool bAimAssist = true;
 	UPROPERTY(config)
 	float FieldOfView = CheeseStrikeSettings::DefaultFieldOfView;
 	UPROPERTY(config)

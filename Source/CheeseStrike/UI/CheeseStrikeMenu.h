@@ -3,11 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Layout/SlateRect.h"
+#include "Types/SlateEnums.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Rules/CheeseStrikeRules.h"
 
 class ACheeseStrikePlayerController;
 class SBox;
+class SScrollBox;
 struct FButtonStyle;
 struct FSlateBrush;
 
@@ -113,6 +116,21 @@ namespace CheeseStrikeMenu
 	constexpr float PauseDarkening = 0.4f;
 	/** How many columns a free-for-all's lobby lays its seats out in: as many seats to a column as a side has. */
 	constexpr int32 FreeForAllColumns = 2;
+	/**
+	 * Which of a page's items has the focus after it is drawn again:
+	 * `Names` being its items in order, the one called `Name` if it is
+	 * there, else the one at `Index` (or the last), and the first on a page
+	 * shown afresh (`Index` 0, `Name` empty). INDEX_NONE if it has none.
+	 */
+	int32 FocusAfterRedraw(const TArray<FString>& Names, const FString& Name, int32 Index);
+	/**
+	 * Where a move of the focus `Way` (up, down, left, right) goes from the
+	 * item at `From`, among items at `Others` (on the screen): the nearest
+	 * that way, its distance along the way counted once and how far it is
+	 * off to the side three times, so that a row or a column is kept to.
+	 * INDEX_NONE if there is none that way.
+	 */
+	int32 NextInDirection(const FSlateRect& From, const TArray<FSlateRect>& Others, EUINavigation Way);
 }
 
 /**
@@ -123,6 +141,15 @@ namespace CheeseStrikeMenu
  * The player controller shows it, tells it the page, and does what its
  * buttons ask (CheeseStrikePlayerController). Escape goes to the controller
  * too, so that a paused match resumes while only the menu takes input.
+ *
+ * A gamepad or the keyboard works it too: each page puts the focus on its
+ * first item (a button, a dropdown, a slider), the d-pad, the left stick
+ * and the arrows move it (Slate's navigation), A and Enter press, a slider
+ * moves with left and right, a dropdown opens with A and picks with A, and
+ * B and Escape close an open dropdown or go back (as Escape always did).
+ * The item focused is ringed in cheese, unless the player uses the mouse.
+ * Each item is registered by name as it is made (Focusable), so that a page
+ * drawn again (PageKey, LobbyKey) gives the focus back to the same item.
  */
 class SCheeseStrikeMenu : public SCompoundWidget
 {
@@ -148,6 +175,18 @@ public:
 
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FNavigationReply OnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent) override;
+
+	/** The page's items that can take the focus, by name, in the order they show. */
+	TArray<FString> GetFocusableNames() const;
+	/** The item that has the focus, or is to have it as soon as it can (a page just drawn has none for a frame). */
+	const FString& GetFocusName() const { return FocusName; }
+	/** Puts the focus on the item called `Name`. */
+	void FocusItem(const FString& Name);
+	/** Whether one of the lobby's dropdowns is open. */
+	bool HasDropdownOpen() const { return IsDropdownOpen(); }
+	/** Shuts any dropdown open, giving the focus back to its button; true if one was. */
+	bool CloseDropdowns();
 
 private:
 	enum class EButtonKind : uint8 { Plain, Primary, Danger, Quiet };
@@ -222,6 +261,41 @@ private:
 	TSharedPtr<SBox> Content;
 	TSharedPtr<SWidget> Lobby;
 	TSharedPtr<SBox> LobbyContent;
+	/**
+	 * Registers `Widget` as an item of the page that can take the focus,
+	 * called `Name` (made unique on the page by a number after it), and
+	 * returns it.
+	 */
+	TSharedRef<SWidget> Focusable(const FString& Name, TSharedRef<SWidget> Widget);
+	/** Notes which item has the focus, and puts it back on an item if none has (a page drawn again, a click outside). */
+	void KeepFocus();
+	/** Gives `Widget` the local player's focus, ringed; whether it took it. */
+	bool GiveFocus(const TSharedPtr<SWidget>& Widget);
+	/** Whether `Widget` and everything it is in are enabled, so that it can take the focus. */
+	static bool IsReallyEnabled(const TSharedPtr<SWidget>& Widget);
+	/** The local player's Slate user. */
+	int32 UserIndex() const;
+
+	struct FFocusable
+	{
+		FString Name;
+		TWeakPtr<SWidget> Widget;
+	};
+	/** The items of the page as last drawn. */
+	TArray<FFocusable> Focusables;
+	FString FocusName;
+	int32 FocusIndex = 0;
+	/** Whether the focus is still to be put on FocusName's item. */
+	bool bFocusPending = true;
+	/** The item each page had the focus on when last left, to come back to it. */
+	TMap<uint8, FString> PageFocus;
+	/** A dropdown's list just opened: its chosen item, to have the focus. */
+	TWeakPtr<SWidget> DropFocus;
+	/** The button of each dropdown, as Dropdowns, to give the focus back to when one shuts. */
+	TArray<TWeakPtr<SWidget>> DropdownButtons;
+	/** The credits' list, which up and down scroll (it has nothing to focus). */
+	TWeakPtr<SScrollBox> CreditsScroll;
+
 	EMenuPage Page = EMenuPage::None;
 	EOptionsTab OptionsTab = EOptionsTab::Controls;
 	FString ShownLobbyKey;

@@ -16,6 +16,7 @@
 #include "CheeseStrikePlayerState.h"
 #include "CheeseStrikeHUDDraw.h"
 #include "CheeseStrikeMenu.h"
+#include "Input/CheeseStrikeInput.h"
 #include "Rules/CheeseStrikeMice.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeModes.h"
@@ -245,7 +246,9 @@ CheeseStrikeHUD::FScoreSummary ACheeseStrikeHUD::ScoreSummary(const ACheeseStrik
 
 TArray<ACheeseStrikeHUD::FWeaponSlot> ACheeseStrikeHUD::WeaponSlots(const ACheeseStrikeCharacter* Character) const
 {
-	// The arsenal's slots in order, each taken out by its number: 1 the primary, 2 the sidearm, 3 the knife.
+	// The arsenal's slots in order, each taken out by its number: 1 the primary, 2 the sidearm, 3 the knife; on a gamepad, if
+	// the player last used one, the d-pad's up, left and right.
+	static TObjectPtr<UInputAction> UCheeseStrikeInputSet::* const SlotActions[] = {&UCheeseStrikeInputSet::DrawPrimary, &UCheeseStrikeInputSet::DrawSidearm, &UCheeseStrikeInputSet::DrawKnife};
 	TArray<FWeaponSlot> Slots;
 	const UCheeseStrikeInventory* Inventory = Character != nullptr ? Character->GetInventory() : nullptr;
 	if (Inventory == nullptr)
@@ -259,7 +262,8 @@ TArray<ACheeseStrikeHUD::FWeaponSlot> ACheeseStrikeHUD::WeaponSlots(const AChees
 		const EWeaponSlot Slot = static_cast<EWeaponSlot>(Index);
 		if (const ACheeseStrikeWeapon* Carried = Inventory->GetInSlot(Slot))
 		{
-			Slots.Add({Carried->GetWeaponId(), FString::FromInt(Index + 1), Carried->GetStats().DisplayName.ToString(), bHolding && Held == Slot, Inventory->CanDraw(Slot)});
+			const FString Key = Index < UE_ARRAY_COUNT(SlotActions) ? UCheeseStrikeInputSet::Prompt(PlayerOwner, SlotActions[Index]) : FString();
+			Slots.Add({Carried->GetWeaponId(), Key.IsEmpty() ? FString::FromInt(Index + 1) : Key, Carried->GetStats().DisplayName.ToString(), bHolding && Held == Slot, Inventory->CanDraw(Slot)});
 		}
 	}
 	return Slots;

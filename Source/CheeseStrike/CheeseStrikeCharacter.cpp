@@ -1116,6 +1116,7 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 		return;
 	}
 	EnhancedInputComponent->BindAction(Input->Move, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::MoveInput);
+	EnhancedInputComponent->BindAction(Input->Move, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::MoveEnded);
 	EnhancedInputComponent->BindAction(Input->MouseLook, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::MouseLookInput);
 	EnhancedInputComponent->BindAction(Input->StickLook, ETriggerEvent::Triggered, this, &ACheeseStrikeCharacter::StickLookInput);
 	EnhancedInputComponent->BindAction(Input->Jump, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::DoJumpStart);
@@ -1124,6 +1125,8 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	EnhancedInputComponent->BindAction(Input->Sprint, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::SprintEnded);
 	EnhancedInputComponent->BindAction(Input->Crouch, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::CrouchStarted);
 	EnhancedInputComponent->BindAction(Input->Crouch, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::CrouchEnded);
+	EnhancedInputComponent->BindAction(Input->SprintToggle, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::SprintToggled);
+	EnhancedInputComponent->BindAction(Input->CrouchToggle, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::CrouchToggled);
 	EnhancedInputComponent->BindAction(Input->Fire, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::FireStarted);
 	EnhancedInputComponent->BindAction(Input->Fire, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::FireEnded);
 	EnhancedInputComponent->BindAction(Input->Aim, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::AimStarted);
@@ -1178,10 +1181,19 @@ void ACheeseStrikeCharacter::MouseLookInput(const FInputActionValue& Value)
 
 void ACheeseStrikeCharacter::StickLookInput(const FInputActionValue& Value)
 {
-	// A stick turns at a rate, however many frames a second are drawn.
+	// A stick turns at a rate, however many frames a second are drawn, on a curve (CheeseStrikeInput::StickTurn).
 	const FVector2D Axis = Value.Get<FVector2D>();
 	const float Seconds = GetWorld() != nullptr ? GetWorld()->GetDeltaSeconds() : 0.0f;
-	DoAim(Axis.X * CheeseStrikeInput::StickYawDegreesPerSecond * Seconds, Axis.Y * CheeseStrikeInput::StickPitchDegreesPerSecond * Seconds);
+	const FVector2D Turn = CheeseStrikeInput::StickTurn(Axis, Seconds, StickEdgeSeconds);
+	// Slower over an enemy, and drawn a little toward one while turning: the stick's alone, never the mouse's or a bot's.
+	const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
+	AimAssist = TakesInput() && (Player == nullptr || !Player->IsPaused()) ? CheeseStrikeAimAssist::ForCharacter(this, !Turn.IsNearlyZero(), Seconds) : CheeseStrikeAimAssist::FAssist();
+	DoAim(Turn.X * AimAssist.TurnScale, Turn.Y * AimAssist.TurnScale);
+	if (AimAssist.PullYaw != 0.0f || AimAssist.PullPitch != 0.0f)
+	{
+		AddControllerYawInput(AimAssist.PullYaw);
+		AddControllerPitchInput(AimAssist.PullPitch);
+	}
 }
 
 void ACheeseStrikeCharacter::DoAim(float Yaw, float Pitch)
@@ -1361,6 +1373,7 @@ void ACheeseStrikeCharacter::LastWeaponStarted()
 
 void ACheeseStrikeCharacter::FireStarted()
 {
+	MoveEnded();
 	// Marking where a Cheese Strike goes, the shot marks it instead.
 	if (ACheeseStrikePlayerState* Player = GetPlayerState<ACheeseStrikePlayerState>(); Player != nullptr && Player->IsMarkingStrike() && TakesInput())
 	{
@@ -1377,6 +1390,8 @@ void ACheeseStrikeCharacter::FireEnded()
 
 void ACheeseStrikeCharacter::AimStarted()
 {
+	// Aiming ends a gamepad's sprint, as firing does.
+	MoveEnded();
 	DoAimDownSights(true);
 }
 
@@ -1393,6 +1408,28 @@ void ACheeseStrikeCharacter::ReloadStarted()
 void ACheeseStrikeCharacter::SprintStarted()
 {
 	DoSprint(true);
+}
+
+void ACheeseStrikeCharacter::SprintToggled()
+{
+	bSprintLatched = !bSprintLatched && TakesInput();
+	DoSprint(bSprintLatched);
+}
+
+void ACheeseStrikeCharacter::MoveEnded()
+{
+	// A gamepad's sprint goes on until the stick is let go.
+	if (bSprintLatched)
+	{
+		bSprintLatched = false;
+		DoSprint(false);
+	}
+}
+
+void ACheeseStrikeCharacter::CrouchToggled()
+{
+	// Crouches, or stands; at a sprint, a crouch slides.
+	DoCrouch(!bIsCrouched);
 }
 
 void ACheeseStrikeCharacter::SprintEnded()
