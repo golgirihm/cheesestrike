@@ -78,6 +78,7 @@ namespace CheeseStrikeRules
 		{TEXT("The Creamery"), TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery"), TEXT("creamery.png")},
 		{TEXT("The Labyrinth"), TEXT("/Game/CheeseStrike/Maps/Lvl_Labyrinth"), TEXT("labyrinth.png")},
 		{TEXT("Gruyère Grotto"), TEXT("/Game/CheeseStrike/Maps/Lvl_Grotto"), TEXT("grotto.png")},
+		{TEXT("Rind Market"), TEXT("/Game/CheeseStrike/Maps/Lvl_RindMarket"), TEXT("market.png")},
 		{TEXT("Proving Ground"), TEXT("/Game/Variant_Shooter/Lvl_Shooter"), TEXT("proving_ground.png")},
 	};
 
