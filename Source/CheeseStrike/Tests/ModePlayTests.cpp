@@ -176,8 +176,7 @@ bool FATeamWinsDeathmatchAtItsKillLimit::RunTest(const FString& Parameters)
 	});
 	PutAt(2, AsideSpot + FVector(300.0f, 0.0f, 0.0f), AsideYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
-	Play(1, Burst);
-	WaitUntil(TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	FireUntil(1, TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
 	Then([this]()
 	{
 		const ACheeseStrikeGameState* Match = GameState(0);
@@ -220,8 +219,7 @@ bool FAnEliminationRoundEndsWhenASideIsOut::RunTest(const FString& Parameters)
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
 	Wait(CheeseStrikeRules::SpawnProtection);
-	Play(1, Burst);
-	WaitUntil(TEXT("the host dying"), 5.0f, []() { return Dead(0); });
+	FireUntil(1, TEXT("the host dying"), 5.0f, []() { return Dead(0); });
 	Then([this]()
 	{
 		const ACheeseStrikeGameState* Match = GameState(0);
@@ -260,8 +258,7 @@ bool FAnEliminationRoundEndsWhenASideIsOut::RunTest(const FString& Parameters)
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
 	Wait(CheeseStrikeRules::SpawnProtection);
-	Play(1, Burst);
-	WaitUntil(TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	FireUntil(1, TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
 	Then([this]()
 	{
 		const ACheeseStrikeGameState* Match = GameState(0);
@@ -577,8 +574,7 @@ bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
 	Wait(CheeseStrikeRules::SpawnProtection);
-	Play(1, Burst);
-	WaitUntil(TEXT("the host dying"), 5.0f, []() { return Dead(0); });
+	FireUntil(1, TEXT("the host dying"), 5.0f, []() { return Dead(0); });
 	Wait(0.5f);
 	Then([this]()
 	{

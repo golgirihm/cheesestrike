@@ -192,6 +192,18 @@ namespace PlayTests
 
 	/** Remembered between steps. */
 	TWeakObjectPtr<ACheeseStrikeCharacter> FirstBody;
+	/** Whether the host, back after being killed, was protected when first seen back; unset until then. */
+	TOptional<bool> bBackProtected;
+
+	/** Notes how the host first comes back, which may be while the test waits for something else: protection lasts only a few seconds. */
+	void WatchTheHostComeBack()
+	{
+		const ACheeseStrikeCharacter* Host = PlayTesting::Character(0);
+		if (!bBackProtected.IsSet() && Host != nullptr && Host->IsAlive() && Host != FirstBody.Get())
+		{
+			bBackProtected = Host->IsProtected();
+		}
+	}
 	/** The first body as the other machine sees it. */
 	TWeakObjectPtr<const ACheeseStrikeCharacter> FirstBodySeen;
 	int32 ShotsBefore = 0;
@@ -405,7 +417,7 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 	StartPlaying({2, TEXT("?RespawnDelay=2")});
 	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
 	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
-	Then([]() { PlayTests::FirstBody = Character(0); });
+	Then([]() { PlayTests::FirstBody = Character(0); PlayTests::bBackProtected.Reset(); });
 	// Both have just arrived, and can't be hurt yet.
 	Wait(CheeseStrikeRules::SpawnProtection);
 	Then([this]()
@@ -424,8 +436,7 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 			}
 		}
 	});
-	Play(1, TEXT("hold Fire\nwait 1.2\nrelease Fire"));
-	WaitUntil(TEXT("the host dying"), 5.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && !Host->IsAlive(); });
+	FireUntil(1, TEXT("the host dying"), 5.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && !Host->IsAlive(); });
 	Then([this]()
 	{
 		ACheeseStrikeCharacter* Host = PlayTests::Pawn(0);
@@ -466,7 +477,7 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 		}
 		PlayTests::FirstBodySeen = HostAsSeen;
 	});
-	WaitUntil(TEXT("the fallen body coming to rest on both machines"), 6.0f, []() { return PlayTests::AtRest(PlayTests::FirstBody.Get()) && PlayTests::AtRest(PlayTests::FirstBodySeen.Get()); });
+	WaitUntil(TEXT("the fallen body coming to rest on both machines"), 6.0f, []() { PlayTests::WatchTheHostComeBack(); return PlayTests::AtRest(PlayTests::FirstBody.Get()) && PlayTests::AtRest(PlayTests::FirstBodySeen.Get()); });
 	Then([this]()
 	{
 		// It lies as a body does, on both machines: no joint bent or twisted further than its ragdoll lets a person's
@@ -481,13 +492,13 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("and its chest is not twisted round on its hips (%.0f degrees)"), Twist), Twist >= 0.0f && Twist < 35.0f);
 		}
 	});
-	WaitUntil(TEXT("the host coming back"), 2.0f + 5.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive() && Host != PlayTests::FirstBody.Get(); });
+	WaitUntil(TEXT("the host coming back"), 2.0f + 5.0f, []() { PlayTests::WatchTheHostComeBack(); return PlayTests::bBackProtected.IsSet(); });
 	Then([this]()
 	{
 		if (ACheeseStrikeCharacter* Host = PlayTests::Pawn(0))
 		{
 			TestEqual(TEXT("the host is back with full health"), Host->GetHealth(), CheeseStrikeWeapons::MaxHealth);
-			TestTrue(TEXT("protected for the moment"), Host->IsProtected());
+			TestTrue(TEXT("protected for the moment"), PlayTests::bBackProtected.Get(false));
 			TestTrue(TEXT("holding a weapon"), Host->GetWeapon() != nullptr);
 			TestTrue(FString::Printf(TEXT("at a player start (%.0f cm from one)"), PlayTests::FromNearestStart(World(0), Host->GetActorLocation())), PlayTests::FromNearestStart(World(0), Host->GetActorLocation()) < 150.0f);
 			TestTrue(TEXT("while the match goes on"), !GameState(0)->HasMatchEnded());
@@ -569,8 +580,7 @@ bool FTheMatchEndsAtTheKillLimit::RunTest(const FString& Parameters)
 	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
 	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
 	Wait(CheeseStrikeRules::SpawnProtection);
-	Play(1, TEXT("hold Fire\nwait 1.2\nrelease Fire"));
-	WaitUntil(TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	FireUntil(1, TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
@@ -758,8 +768,7 @@ bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
 	});
 	WaitUntil(TEXT("the host's pause menu going"), 2.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::None; });
 	// The joiner wins, and after the results everyone is back in the lobby of the same match.
-	Play(1, TEXT("hold Fire\nwait 1.2\nrelease Fire"));
-	WaitUntil(TEXT("the match ending"), 6.0f, []() { return GameState(0) != nullptr && GameState(0)->HasMatchEnded(); });
+	FireUntil(1, TEXT("the match ending"), 6.0f, []() { return GameState(0) != nullptr && GameState(0)->HasMatchEnded(); });
 	WaitUntil(TEXT("everyone being back in the lobby"), CheeseStrikeRules::ResultsTime + 15.0f, []()
 	{
 		const ACheeseStrikeGameState* Hosts = GameState(0);

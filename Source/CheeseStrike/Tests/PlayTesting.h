@@ -55,6 +55,12 @@ namespace PlayTesting
 	void Then(TFunction<void()> Do);
 	/** Queues: `Player` plays `Script` (see UCheeseStrikePlayScript) through to its end. */
 	void Play(int32 Player, const FString& Script, float Timeout = 30.0f);
+	/**
+	 * Queues: `Shooter` holds the trigger until `What` has happened, or `Timeout` seconds of play have passed, then lets go.
+	 * For a kill, rather than a burst of fixed length, which lands fewer shots on a busy PC: a weapon fires at most once a
+	 * frame, and a slow frame is several of its shots long.
+	 */
+	void FireUntil(int32 Shooter, const FString& What, float Timeout, TFunction<bool()> Done);
 	/** Queues: put `Player`'s character at `At`, facing `Yaw`, as the server and the player both see it. */
 	void PutAt(int32 Player, const FVector& At, float Yaw);
 
