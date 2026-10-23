@@ -60,6 +60,11 @@ void ACheeseStrikeHUD::BeginPlay()
 	{
 		GAreScreenMessagesEnabled = false;
 	}
+	// The countdown's pictures, loaded now rather than as the count begins: no hitch then, and (uncooked) time to build them.
+	for (const TCHAR* Word : {TEXT("3"), TEXT("2"), TEXT("1"), TEXT("FIGHT")})
+	{
+		CountdownPicture(Word);
+	}
 }
 
 void ACheeseStrikeHUD::NoteVideoMemory()
