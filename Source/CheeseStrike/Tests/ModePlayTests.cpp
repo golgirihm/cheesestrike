@@ -22,6 +22,7 @@
 #include "Streaks/CheeseStrikeBombs.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Rules/CheeseStrikeDowned.h"
+#include "Rules/CheeseStrikeExecution.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Camera/CameraComponent.h"
@@ -537,9 +538,43 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 	Play(1, TEXT("tap Reload\nwait 2.2"));
 	FireUntil(1, TEXT("the teammate going down"), 5.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && Mate->IsDowned(); });
 	PutAt(1, BesideSpot, 180.0f);
-	Play(1, TEXT("hold Interact"));
-	WaitUntil(TEXT("the teammate finished"), CheeseStrikeModes::ExecuteTime + 3.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && !Mate->IsAlive(); });
-	Play(1, TEXT("release Interact"));
+	// A single press executes: no holding.
+	Play(1, TEXT("tap Interact"));
+	WaitUntil(TEXT("the execution beginning"), 3.0f, []() { const ACheeseStrikeCharacter* Enemy = CharacterOf(1, 0); return Enemy != nullptr && Enemy->GetLastStand()->IsExecuting(); });
+	Wait(0.3f);
+	Then([this]()
+	{
+		ACheeseStrikeCharacter* Enemy = CharacterOf(1, 0);
+		ACheeseStrikeCharacter* Mate = CharacterOf(2, 0);
+		const UCheeseStrikeLastStand* Executing = Enemy->GetLastStand();
+		TestTrue(TEXT("the press let go at once, and it plays on"), Executing->IsExecuting() && Executing->GetExecution().Other == Mate);
+		TestTrue(TEXT("the one down is being executed"), Mate->IsAlive() && Mate->GetLastStand()->IsBeingExecuted());
+		TestTrue(TEXT("a stab or a stomp"), Executing->GetExecutionKind() != CheeseStrikeExecution::EKind::None);
+		// Every machine sees it: the two in it, the same kind.
+		for (int32 Seen = 0; Seen < 3; ++Seen)
+		{
+			const ACheeseStrikeCharacter* Dealing = CharacterOf(1, Seen);
+			const ACheeseStrikeCharacter* Dealt = CharacterOf(2, Seen);
+			TestTrue(FString::Printf(TEXT("player %d sees the execution"), Seen), Dealing != nullptr && Dealt != nullptr && Dealing->GetLastStand()->IsExecuting() && Dealt->GetLastStand()->IsBeingExecuted()
+				&& Dealing->GetLastStand()->GetExecutionKind() == Executing->GetExecutionKind());
+			const UCheeseStrikeAnimInstance* Animation = Dealing != nullptr ? Cast<UCheeseStrikeAnimInstance>(Dealing->GetMesh()->GetAnimInstance()) : nullptr;
+			TestTrue(FString::Printf(TEXT("and the executor's body plays it, as player %d sees it"), Seen), Animation != nullptr && Animation->ExecutionKind != 0 && Animation->bExecutor);
+		}
+		// The executor stands beside the one down, to deal the blow.
+		const float Apart = FVector::Dist2D(Enemy->GetActorLocation(), Mate->GetActorLocation());
+		TestTrue(FString::Printf(TEXT("the executor beside the one down (%.0f cm)"), Apart), Apart < 110.0f);
+		// The executor can't be hurt while it plays, whoever shoots, from however near.
+		const float Before = Enemy->GetHealth();
+		TestFalse(TEXT("a shot at the executor does nothing"), Enemy->TakeShot(500.0f, CharacterOf(0, 0), true));
+		TestEqual(TEXT("its health untouched"), Enemy->GetHealth(), Before);
+		TestTrue(TEXT("and it lives"), Enemy->IsAlive());
+		// Its own view is pulled out, to see it in third person; and nobody in it moves.
+		const ACheeseStrikePlayerController* Own = Controller(1);
+		TestTrue(TEXT("the executor's view is out of its eyes"), Own != nullptr && Own->GetViewTarget() != Character(1));
+		TestFalse(TEXT("the executor's body shows to its own player"), Character(1)->GetMesh()->bOwnerNoSee);
+		TestFalse(TEXT("nor does it take its player's input"), Character(1)->TakesInput());
+	});
+	WaitUntil(TEXT("the teammate executed"), CheeseStrikeExecution::StabSeconds + 2.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && !Mate->IsAlive(); });
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0);
@@ -547,6 +582,31 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 		TestEqual(TEXT("finished by the enemy"), Mate->GetKilledBy(), Enemy->DisplayName());
 		TestTrue(TEXT("and out"), StateOf(2, 0)->IsOut());
 		TestEqual(TEXT("whose kill it is"), StateOf(1, 0)->GetKills(), 1);
+		TestEqual(TEXT("the feed says it was an execution"), GameState(0)->GetKillFeed().Last().How, FString(TEXT("executed")));
+	});
+	WaitUntil(TEXT("every machine knowing the teammate was executed"), 3.0f, []()
+	{
+		for (int32 Seen = 0; Seen < 3; ++Seen)
+		{
+			const ACheeseStrikeCharacter* Mate = CharacterOf(2, Seen);
+			if (Mate == nullptr || Mate->IsAlive() || !Mate->GetLastStand()->WasExecuted())
+			{
+				return false;
+			}
+		}
+		return true;
+	});
+	// It ends, and the executor's view comes back to its eyes.
+	WaitUntil(TEXT("the execution over, the view back"), CheeseStrikeExecution::StabSeconds + 2.0f, []()
+	{
+		const ACheeseStrikeCharacter* Enemy = Character(1);
+		const ACheeseStrikePlayerController* Own = Controller(1);
+		return Enemy != nullptr && Own != nullptr && !Enemy->GetLastStand()->InExecution() && Own->GetViewTarget() == Enemy && Enemy->GetMesh()->bOwnerNoSee;
+	});
+	Then([this]()
+	{
+		TestTrue(TEXT("the executor takes input again"), Character(1)->TakesInput());
+		TestFalse(TEXT("and can be hurt again"), CharacterOf(1, 0)->GetLastStand()->InExecution());
 	});
 	// Down a second time in a life, the host dies; with nobody of theirs standing, the round and the match are the enemy's.
 	PutAt(0, HostSpot, HostYaw);
@@ -562,9 +622,9 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExecutionSideIsOutWhenAllAreDown, "CheeseStrike.Play.ExecutionSideIsOutWhenAllAreDown", ModePlayTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExecutionAllDownIsNotOut, "CheeseStrike.Play.ExecutionAllDownIsNotOut", ModePlayTests::Flags)
 
-bool FExecutionSideIsOutWhenAllAreDown::RunTest(const FString& Parameters)
+bool FExecutionAllDownIsNotOut::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
 	using namespace ModePlayTests;
@@ -574,7 +634,7 @@ bool FExecutionSideIsOutWhenAllAreDown::RunTest(const FString& Parameters)
 	PutAt(1, JoinerSpot, JoinerYaw);
 	PutAt(2, AsideSpot, AsideYaw);
 	Wait(CheeseStrikeRules::SpawnProtection);
-	// The joiner puts the host down; a teammate stands, so the round goes on, and stays on: there is no bleeding out.
+	// The joiner puts the host down; a teammate stands, so the round goes on.
 	Then([this]()
 	{
 		CharacterOf(0, 0)->GetLastStand()->GoDown(StateOf(1, 0));
@@ -602,6 +662,11 @@ bool FExecutionSideIsOutWhenAllAreDown::RunTest(const FString& Parameters)
 			const ACheeseStrikeWeapon* Theirs = Joiner->GetWeapon();
 			TestTrue(TEXT("while the enemy standing fires as usual"), Theirs != nullptr && Theirs->FiringStats().Damage == Theirs->GetStats().Damage);
 		}
+		// The host's own view is dark and blurred, and the countdown to getting up runs on its machine.
+		const ACheeseStrikeCharacter* Own = Character(0);
+		TestTrue(FString::Printf(TEXT("the host's view is the hurt one (weight %.2f)"), Own->GetFirstPersonCameraComponent()->PostProcessBlendWeight), Own->GetFirstPersonCameraComponent()->PostProcessBlendWeight > 0.9f);
+		const float Left = Own->GetLastStand()->SelfReviveLeft();
+		TestTrue(FString::Printf(TEXT("the host gets up by themself in %.1f s"), Left), Left > CheeseStrikeModes::SelfReviveTime - 3.0f && Left < CheeseStrikeModes::SelfReviveTime);
 		CharacterOf(1, 0)->EndProtection();
 	});
 	// The host shoots back from where it lies, across 4 m: what lands, lands at the downed's damage.
@@ -616,24 +681,56 @@ bool FExecutionSideIsOutWhenAllAreDown::RunTest(const FString& Parameters)
 		const ACheeseStrikeWeapon* Held = Character(0)->GetWeapon();
 		TestTrue(FString::Printf(TEXT("a hit is the downed's damage (%.1f)"), Held->LastHitDamage), Held->LastHitDamage == 0.0f || Held->LastHitDamage <= Worse.Damage * Worse.HeadMultiplier + 0.01f);
 	});
-	// The teammate goes down too, by the same enemy: nobody of theirs is up to revive them, so their side is out.
+	// The teammate goes down too: everyone of theirs is down, and still the side is in.
 	Then([this]()
 	{
 		CharacterOf(2, 0)->GetLastStand()->GoDown(StateOf(1, 0));
+	});
+	Wait(2.0f);
+	Then([this]()
+	{
+		TestFalse(TEXT("a side all down is not out: the round goes on"), GameState(0)->IsRoundBreak() || GameState(0)->HasMatchEnded());
+		for (const int32 Player : {0, 2})
+		{
+			const ACheeseStrikeCharacter* Body = CharacterOf(Player, 0);
+			TestTrue(FString::Printf(TEXT("player %d is down, alive"), Player), Body->IsAlive() && Body->IsDowned());
+			TestFalse(FString::Printf(TEXT("and not out")), StateOf(Player, 0)->IsOut());
+		}
+	});
+	// The enemy executes the teammate (from the console, as from anywhere): one of them gone, the host down still in.
+	Then([this]()
+	{
+		TestTrue(TEXT("the execution begins"), CharacterOf(1, 0)->GetLastStand()->Execute(CharacterOf(2, 0), CheeseStrikeExecution::EKind::Stomp));
+	});
+	WaitUntil(TEXT("the teammate executed"), CheeseStrikeExecution::StompSeconds + 2.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && !Mate->IsAlive(); });
+	Then([this]()
+	{
+		TestTrue(TEXT("their head burst, on the machine that sees it"), CharacterOf(2, 1) != nullptr && CharacterOf(2, 1)->GetMesh()->IsBoneHiddenByName(TEXT("head")));
+		TestFalse(TEXT("the host, down alone, keeps the round going"), GameState(0)->IsRoundBreak() || GameState(0)->HasMatchEnded());
+		TestTrue(TEXT("the host is down still"), CharacterOf(0, 0)->IsAlive() && CharacterOf(0, 0)->IsDowned());
+	});
+	// Left alone, the host gets up by themself 20 s after going down, hurt.
+	WaitUntil(TEXT("the host getting up by themself"), CheeseStrikeModes::SelfReviveTime, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 0); return Host != nullptr && Host->IsAlive() && !Host->IsDowned(); });
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		const float Since = Now(0) - Host->GetLastStand()->GetDownedAt();
+		TestTrue(FString::Printf(TEXT("up %.1f s after going down"), Since), Since >= CheeseStrikeModes::SelfReviveTime - 0.1f && Since < CheeseStrikeModes::SelfReviveTime + 1.0f);
+		TestEqual(TEXT("with little health"), Host->GetHealth(), CheeseStrikeModes::SelfReviveHealth);
+		TestTrue(TEXT("and the rifle to draw again"), Host->GetInventory()->CanDraw(EWeaponSlot::Primary));
+	});
+	// Their last stand used, the next hit kills: with nobody of theirs left in, the round and the match are the enemy's.
+	Then([this]()
+	{
+		CharacterOf(0, 0)->TakeShot(500.0f, CharacterOf(1, 0), false);
 	});
 	WaitUntil(TEXT("the match ending"), 4.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
 	Then([this]()
 	{
 		TestEqual(TEXT("the other side wins"), GameState(0)->GetWinningTeam(), 1);
-		const FString Enemy = CharacterOf(1, 0)->DisplayName();
-		for (const int32 Player : {0, 2})
-		{
-			const ACheeseStrikeCharacter* Body = CharacterOf(Player, 0);
-			TestFalse(FString::Printf(TEXT("player %d, down, is finished"), Player), Body->IsAlive());
-			TestEqual(FString::Printf(TEXT("as the kill of whoever put them down")), Body->GetKilledBy(), Enemy);
-			TestTrue(FString::Printf(TEXT("and out")), StateOf(Player, 0)->IsOut());
-		}
 		TestEqual(TEXT("the enemy scores both"), StateOf(1, 0)->GetKills(), 2);
+		TestTrue(TEXT("one executed"), CharacterOf(2, 0)->GetLastStand()->WasExecuted());
+		TestFalse(TEXT("the other not"), CharacterOf(0, 0)->GetLastStand()->WasExecuted());
 	});
 	StopPlaying();
 	return true;

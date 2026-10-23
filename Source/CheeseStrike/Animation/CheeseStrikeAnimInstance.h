@@ -11,6 +11,7 @@
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
 #include "AnimNodes/AnimNode_LayeredBoneBlend.h"
 #include "CheeseStrikeDownedPose.h"
+#include "CheeseStrikeExecutionPose.h"
 #include "CheeseStrikeGripIK.h"
 #include "AnimNodes/AnimNode_MultiWayBlend.h"
 #include "AnimNodes/AnimNode_Slot.h"
@@ -196,6 +197,13 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	float ScootBlend = 0.0f;
 	float ScootPhase = 0.0f;
 	float BreathPhase = 0.0f;
+	/** In an execution: which, whether dealing it, how far in, and (dealing it) where the blow lands and the near shoulder, in component space, and the side. */
+	uint8 ExecutionKind = 0;
+	bool bExecutor = false;
+	float ExecutionTime = 0.0f;
+	FVector ExecutionTarget = FVector::ZeroVector;
+	FVector ExecutionShoulder = FVector::ZeroVector;
+	float ExecutionSide = 1.0f;
 
 protected:
 	/** Puts the nodes together, once, the left hand's grip following `GripAnchor`. */
@@ -262,6 +270,8 @@ protected:
 	FCheeseStrikeGripIK LeftHand;
 	/** Down in Execution's last stand: on their back, propped on the elbow, the pistol out. */
 	FCheeseStrikeDownedPose Downed;
+	/** In an execution (CheeseStrikeExecution): the executor's blow, or the one down's last moments. */
+	FCheeseStrikeExecutionPose Executing;
 	FAnimNode_ConvertComponentToLocalSpace ToLocalSpace;
 	bool bLinked = false;
 	/** Bones the mesh's reference pose scales, kept at that scale whatever the animations say (Belica's faceAttach). */
@@ -320,6 +330,22 @@ public:
 	float TurnSpeed = 0.0f;
 	/** Whether this is the first-person body, its own player's. */
 	bool bFirstPersonBody = false;
+	/**
+	 * In an execution (UCheeseStrikeLastStand::GetExecution): which kind,
+	 * whether this body deals it, how far in (seconds), and for the executor
+	 * where the blow lands and the near shoulder of the one down (in the
+	 * frame the body is animated in, taken as it begins) and the side.
+	 */
+	uint8 ExecutionKind = 0;
+	bool bExecutor = false;
+	float ExecutionTime = 0.0f;
+	FVector ExecutionTarget = FVector::ZeroVector;
+	FVector ExecutionShoulder = FVector::ZeroVector;
+	float ExecutionSide = 1.0f;
+	/** The server's time the execution whose places were taken began, and those places in the world. */
+	float ExecutionTakenFor = -1.0f;
+	FVector ExecutionTargetWorld = FVector::ZeroVector;
+	FVector ExecutionShoulderWorld = FVector::ZeroVector;
 	/** The body's yaw last frame, for its turning. */
 	float LastYaw = 0.0f;
 	bool bLastYawKnown = false;

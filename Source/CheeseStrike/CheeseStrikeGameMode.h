@@ -51,7 +51,7 @@ public:
 	void SetMode(CheeseStrikeModes::EMode InMode);
 	/** The host sets the rounds to win, from the lobby. */
 	void SetRoundLimit(int32 Rounds);
-	/** Execution: `Victim` has gone down, put there by `By`; down still counts as in, while someone of their side is up to revive them. */
+	/** Execution: `Victim` has gone down, put there by `By`; down still counts as in, until executed (UCheeseStrikeLastStand). */
 	void Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By);
 	/** Gun Game: a character is given its player's step of the ladder (and nothing else), as it comes in. */
 	virtual void SetPlayerDefaults(APawn* PlayerPawn) override;
@@ -77,6 +77,9 @@ public:
 	/** The same, for looking at getting up: revives everyone down, or the player or bot named. */
 	UFUNCTION(Exec)
 	void CheeseStrikeRevive(const FString& Player = TEXT(""));
+	/** The same, for looking at an execution: the host (or the player or bot named) executes the nearest enemy down, wherever they are, by `Kind` (1 the stab, 2 the stomp, 0 either). */
+	UFUNCTION(Exec)
+	void CheeseStrikeExecute(int32 Kind = 0, const FString& Player = TEXT(""));
 	/** In Elimination a newcomer comes in only at a round's start; later, they are out until the next. */
 	virtual bool PlayerCanRestart_Implementation(APlayerController* Player) override;
 	/** Someone leaving may end a round of Elimination. */
@@ -171,8 +174,6 @@ protected:
 	/** The world's time the round being played began. */
 	float RoundStartedAt = 0.0f;
 	FTimerHandle RoundTimer;
-	/** Whether CheckRound is finishing a side's players down, whose deaths ask it again. */
-	bool bDecidingRound = false;
 	int32 BotsWanted = -1;
 	int32 MapIndex = INDEX_NONE;
 	int32 BotSeed = 0;

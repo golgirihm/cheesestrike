@@ -141,6 +141,11 @@ bool ACheeseStrikeCharacter::IsDowned() const
 	return LastStand != nullptr && LastStand->IsDowned();
 }
 
+bool ACheeseStrikeCharacter::InExecution() const
+{
+	return LastStand != nullptr && LastStand->InExecution();
+}
+
 float ACheeseStrikeCharacter::MeasureLegRoom() const
 {
 	using namespace CheeseStrikeDowned;
@@ -214,6 +219,11 @@ void ACheeseStrikeCharacter::MakeRoomToLieDown()
 
 void ACheeseStrikeCharacter::FaceRotation(FRotator NewControlRotation, float DeltaTime)
 {
+	// In an execution the body stays as it plays (the executor's facing the blow), whatever the view does.
+	if (InExecution() && IsAlive())
+	{
+		return;
+	}
 	const bool bDown = IsAlive() && IsDowned();
 	if (!IsAlive() || (!bDown && DownBlend <= 0.0f))
 	{
@@ -530,7 +540,7 @@ bool ACheeseStrikeCharacter::IsFrozen() const
 bool ACheeseStrikeCharacter::TakesInput() const
 {
 	const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
-	return CanAct() && (Player == nullptr || !Player->IsPaused());
+	return CanAct() && !InExecution() && (Player == nullptr || !Player->IsPaused());
 }
 
 bool ACheeseStrikeCharacter::IsProtected() const
@@ -815,15 +825,9 @@ void ACheeseStrikeCharacter::ServerProtect_Implementation(float Seconds)
 #endif
 }
 
-void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw, float Height, float Rise)
+void ACheeseStrikeCharacter::SeeOwnBody(bool bOutside)
 {
-	APlayerController* Player = Cast<APlayerController>(GetController());
-	if (Player == nullptr || GetWorld() == nullptr)
-	{
-		return;
-	}
-	const bool bOutside = Distance > 0.0f;
-	// The body and its rifle, seen as others see them, or kept from the player as in play.
+	// The body and its weapons, seen as others see them, or kept from the player as in play.
 	GetMesh()->SetOwnerNoSee(!bOutside);
 	GetMesh()->SetFirstPersonPrimitiveType(bOutside ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
 	FirstPersonMesh->SetVisibility(!bOutside, true);
@@ -834,6 +838,17 @@ void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw, floa
 			Carried->SetSeenFromOutside(bOutside);
 		}
 	}
+}
+
+void ACheeseStrikeCharacter::CheeseStrikeOutside(float Distance, float Yaw, float Height, float Rise)
+{
+	APlayerController* Player = Cast<APlayerController>(GetController());
+	if (Player == nullptr || GetWorld() == nullptr)
+	{
+		return;
+	}
+	const bool bOutside = Distance > 0.0f;
+	SeeOwnBody(bOutside);
 	if (OutsideCamera != nullptr)
 	{
 		OutsideCamera->Destroy();

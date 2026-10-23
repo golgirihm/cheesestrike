@@ -11,7 +11,7 @@ namespace CheeseStrikeModes
 		{EMode::FreeForAll, TEXT("Free-for-all"), TEXT("FreeForAll"), TEXT("Everyone for themself: the first to the kill limit wins."), false, EWinBy::PlayerKills, true, CheeseStrikeRules::KillLimit, false, true},
 		{EMode::Deathmatch, TEXT("Deathmatch"), TEXT("Deathmatch"), TEXT("Two teams: the first team to the kill limit wins."), true, EWinBy::TeamKills, true, 50, false, true},
 		{EMode::Elimination, TEXT("Elimination"), TEXT("Elimination"), TEXT("Two teams, one life a round: the side left standing takes the round."), true, EWinBy::Rounds, false, 0, false, true},
-		{EMode::Execution, TEXT("Execution"), TEXT("Execution"), TEXT("Two teams, one life a round; hurt enough, you go down with your pistol, to be finished up close or revived."), true, EWinBy::Rounds, false, 0, true, true},
+		{EMode::Execution, TEXT("Execution"), TEXT("Execution"), TEXT("Two teams, one life a round; hurt enough, you go down: executed up close, revived, or up again in 20 s."), true, EWinBy::Rounds, false, 0, true, true},
 		{EMode::GunGame, TEXT("Gun Game"), TEXT("GunGame"), TEXT("Everyone for themself: each kill moves you to the next weapon; a kill with the last, the knife, wins."), false, EWinBy::Ladder, true, 0, false, false},
 	};
 
@@ -90,7 +90,11 @@ namespace CheeseStrikeModes
 		{
 			return false;
 		}
-		if (First.Alive != Second.Alive)
+		if (First.Standing() != Second.Standing())
+		{
+			OutWinner = First.Standing() > Second.Standing() ? 0 : 1;
+		}
+		else if (First.Alive != Second.Alive)
 		{
 			OutWinner = First.Alive > Second.Alive ? 0 : 1;
 		}
@@ -218,11 +222,38 @@ namespace CheeseStrikeModes
 		{
 		case EInteract::Revive:
 			return ReviveTime;
-		case EInteract::Execute:
-			return ExecuteTime;
 		default:
+			// Executing is a press.
 			return 0.0f;
 		}
+	}
+
+	FString InteractPrompt(EInteract Kind, const FString& Key, const FString& Name)
+	{
+		if (Kind == EInteract::None)
+		{
+			return FString();
+		}
+		const bool bRevive = Kind == EInteract::Revive;
+		return FString::Printf(TEXT("%s %s  ·  %s %s"), bRevive ? TEXT("HOLD") : TEXT("PRESS"), *Key, bRevive ? TEXT("REVIVE") : TEXT("EXECUTE"), *Name.ToUpper());
+	}
+
+	int32 SelfReviveSeconds(float Left)
+	{
+		return FMath::Max(0, FMath::CeilToInt(Left - 0.001f));
+	}
+
+	float SelfReviveLeft(float DownedAt, float Now)
+	{
+		return FMath::Max(0.0f, DownedAt + SelfReviveTime - Now);
+	}
+
+	FRotator DownedSway(float Seconds)
+	{
+		// Two slow waves each way that never quite repeat, as a hurt arm and a heaving chest move the aim.
+		const float Yaw = 0.65f * FMath::Sin(Seconds * 1.9f) + 0.35f * FMath::Sin(Seconds * 4.3f + 1.1f);
+		const float Pitch = 0.6f * FMath::Sin(Seconds * 2.6f + 0.4f) + 0.4f * FMath::Sin(Seconds * 5.1f + 2.3f);
+		return FRotator(Pitch * DownedSwayPitch, Yaw * DownedSwayYaw, 0.0f);
 	}
 
 	FWeaponStats DownedWeapon(const FWeaponStats& Weapon)
@@ -234,6 +265,9 @@ namespace CheeseStrikeModes
 		Down.BurstInterval *= DownedFireInterval;
 		Down.HipSpreadDegrees *= DownedSpread;
 		Down.SpreadDegrees *= DownedSpread;
+		Down.RecoilUp *= DownedKick;
+		Down.RecoilSide *= DownedKick;
+		Down.RecoilCap *= DownedKick;
 		// Fully spread from the first shot: no steady first shot to tap out one at a time.
 		Down.BloomShots = 1;
 		return Down;

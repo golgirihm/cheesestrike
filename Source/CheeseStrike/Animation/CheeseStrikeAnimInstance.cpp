@@ -11,6 +11,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "CheeseStrikeBodies.h"
 #include "CheeseStrikeCharacter.h"
+#include "Modes/CheeseStrikeLastStand.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 namespace CheeseStrikeAnimation
@@ -230,6 +231,40 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		bLastYawKnown = true;
 		Hold = Weapon != nullptr ? Weapon->GetHold() : ECheeseStrikeHold::Rifle;
 		LeftHandShift = Weapon != nullptr ? Weapon->LeftHandShiftFor(GetSkelMeshComponent()) : FVector::ZeroVector;
+		// An execution: where the blow lands on the one down, taken as it begins, in the frame the body is animated in.
+		const UCheeseStrikeLastStand* Stand = Character->GetLastStand();
+		const FCheeseStrikeExecutionState* Execution = Stand != nullptr ? &Stand->GetExecution() : nullptr;
+		ExecutionKind = Execution != nullptr && Character->IsAlive() ? Execution->Kind : 0;
+		if (ExecutionKind != 0)
+		{
+			bExecutor = Execution->bExecutor;
+			ExecutionTime = Stand->ExecutionElapsed();
+			ExecutionSide = Execution->Side >= 0 ? 1.0f : -1.0f;
+			const ACheeseStrikeCharacter* Down = Execution->Other;
+			const USkeletalMeshComponent* Main = Character->GetMesh();
+			if (bExecutor && Down != nullptr && Main != nullptr && ExecutionTakenFor != Execution->StartedAt)
+			{
+				ExecutionTakenFor = Execution->StartedAt;
+				const bool bStomp = Execution->GetKind() == CheeseStrikeExecution::EKind::Stomp;
+				const FVector Hit = Down->GetMesh()->GetBoneLocation(bStomp ? TEXT("head") : TEXT("spine_03"));
+				const FVector Hips = Down->GetMesh()->GetBoneLocation(TEXT("pelvis"));
+				const FVector Shoulder = Down->GetMesh()->GetBoneLocation(ExecutionSide > 0.0f ? TEXT("upperarm_r") : TEXT("upperarm_l"));
+				// The knife goes in a little below the top of the chest.
+				ExecutionTargetWorld = bStomp ? Hit : FMath::Lerp(Hit, Hips, 0.2f);
+				ExecutionShoulderWorld = Shoulder;
+			}
+			if (Main != nullptr)
+			{
+				// Kept where they were in the world as the executor is put in its place.
+				ExecutionTarget = Main->GetComponentTransform().InverseTransformPosition(ExecutionTargetWorld);
+				ExecutionShoulder = Main->GetComponentTransform().InverseTransformPosition(ExecutionShoulderWorld);
+			}
+		}
+		else
+		{
+			bExecutor = false;
+			ExecutionTime = 0.0f;
+		}
 	}
 }
 
@@ -325,7 +360,8 @@ void FCheeseStrikeAnimProxy::Link(FName GripAnchor)
 	LeftHand.ComponentPose.SetLinkNode(&ToComponentSpace);
 	// Last, down: on the back, propped on the left elbow, the pistol out.
 	Downed.ComponentPose.SetLinkNode(&LeftHand);
-	ToLocalSpace.ComponentPose.SetLinkNode(&Downed);
+	Executing.ComponentPose.SetLinkNode(&Downed);
+	ToLocalSpace.ComponentPose.SetLinkNode(&Executing);
 	bLinked = true;
 }
 
@@ -392,6 +428,12 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		bFirstPersonBody = Instance->bFirstPersonBody;
 		Hold = Instance->Hold;
 		LeftHandShift = Instance->LeftHandShift;
+		ExecutionKind = Instance->ExecutionKind;
+		bExecutor = Instance->bExecutor;
+		ExecutionTime = Instance->ExecutionTime;
+		ExecutionTarget = Instance->ExecutionTarget;
+		ExecutionShoulder = Instance->ExecutionShoulder;
+		ExecutionSide = Instance->ExecutionSide;
 		// A change of weapon to one held another way: its animations on the same nodes, and the left hand's grip on it
 		// measured again once nothing else moves it.
 		if (bLinked && Hold != LinkedHold)
@@ -481,6 +523,14 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	Downed.Scoot = ScootBlend;
 	Downed.ScootPhase = ScootPhase;
 	Downed.bFirstPerson = bFirstPersonBody;
+	Executing.Kind = CheeseStrikeExecution::KindAt(ExecutionKind);
+	Executing.bExecutor = bExecutor;
+	Executing.Time = ExecutionTime;
+	Executing.Forward = BodyForward;
+	Executing.Origin = BodyOrigin;
+	Executing.Target = ExecutionTarget;
+	Executing.TargetShoulder = ExecutionShoulder;
+	Executing.Side = ExecutionSide;
 }
 
 void FCheeseStrikeAnimProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)

@@ -25,7 +25,7 @@ namespace CheeseStrikeModes
 		Deathmatch,
 		/** Two teams, one life a round; a round is won by the side left standing, the match by the first to the round limit. */
 		Elimination,
-		/** Elimination with a last stand: a player hurt enough goes down with only the sidearm, to be finished by an enemy up close or revived by a teammate. */
+		/** Elimination with a last stand: a player hurt enough goes down with only the sidearm, to be executed by an enemy up close, revived by a teammate or to get up alone. */
 		Execution,
 		/** Everyone for themself, each kill a step up a ladder of weapons; the first to a kill with the last, the knife, wins. */
 		GunGame,
@@ -104,17 +104,24 @@ namespace CheeseStrikeModes
 		float Health = 0.0f;
 		/** Of those still in, how many are down (Execution's last stand). */
 		int32 Down = 0;
-		/** Whether it is out: nobody left in, or (Execution) everyone left down, with nobody up to revive them. */
-		bool IsOut() const { return Alive - Down <= 0; }
+		/**
+		 * Whether it is out: nobody left in. Someone down is still in, even
+		 * with the whole side down (Execution): each must be executed, or
+		 * they get up by themselves (SelfReviveTime).
+		 */
+		bool IsOut() const { return Alive <= 0; }
+		/** How many are standing: in, and not down. */
+		int32 Standing() const { return Alive - Down; }
 	};
 	/**
 	 * Whether a round of Elimination is over, and who took it (`OutWinner`,
 	 * NoTeam for a draw). It is over once a side with players is out
-	 * (FSide::IsOut: none left standing, someone down not counting) while the other has players (nothing ends while a side is
+	 * (FSide::IsOut: none left in; someone down is in) while the other has players (nothing ends while a side is
 	 * empty: there is nobody to beat), and the other side takes it; both
 	 * gone at once is a draw. When its time is up (`bTimeUp`) it is over
-	 * whatever stands: the side with more left standing takes it, then the
-	 * one with more health left; level on both, a draw.
+	 * whatever stands: the side with more standing takes it, then the one
+	 * with more in (down or not), then the one with more health left; level
+	 * on all, a draw.
 	 */
 	bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner);
 
@@ -153,12 +160,23 @@ namespace CheeseStrikeModes
 
 	/** How near an enemy must be to finish a player down, by a shot or by Interact (cm): no further, from any weapon or streak, does them any harm. */
 	constexpr float FinishRange = 250.0f;
-	/** How near Interact reaches a player down (cm), and the seconds it is held to finish an enemy or revive a teammate. */
+	/**
+	 * How near Interact reaches a player down (cm). A press executes an
+	 * enemy at once (CheeseStrikeExecution: an animation of a couple of
+	 * seconds, the executor unhurt through it); reviving a teammate is held
+	 * for ReviveTime.
+	 */
 	constexpr float InteractRange = 220.0f;
-	constexpr float ExecuteTime = 1.0f;
 	constexpr float ReviveTime = 3.0f;
 	/** The health a revived player gets up with. */
 	constexpr float ReviveHealth = 50.0f;
+	/** Down and not executed, a player gets up by themself after SelfReviveTime, with SelfReviveHealth: low. */
+	constexpr float SelfReviveTime = 20.0f;
+	constexpr float SelfReviveHealth = 25.0f;
+	/** Seconds until someone down at `DownedAt` gets up by themself, at `Now` (0 once it is time). */
+	float SelfReviveLeft(float DownedAt, float Now);
+	/** The countdown to that shows to the player down, and to anyone within this of them (cm) who can see them. */
+	constexpr float SelfReviveShownWithin = 2000.0f;
 
 	/** What a hit does to a player in a mode with a last stand. */
 	enum class ELastStandHit : uint8
@@ -181,7 +199,7 @@ namespace CheeseStrikeModes
 	 */
 	ELastStandHit LastStandHit(bool bLastStand, bool bDowned, bool bLastStandUsed, float Health, float Damage, bool bEnemyClose);
 
-	/** What Interact does to a player down: a teammate's revives them, an enemy's finishes them; nothing to anyone else, out of reach, or standing. */
+	/** What Interact does to a player down: a teammate's revives them, an enemy's executes them; nothing to anyone else, out of reach, or standing. */
 	enum class EInteract : uint8
 	{
 		None,
@@ -189,20 +207,32 @@ namespace CheeseStrikeModes
 		Execute,
 	};
 	EInteract InteractWith(bool bTargetDowned, bool bSameSide, float Distance);
-	/** Seconds Interact is held for `Kind`. */
+	/** Seconds Interact is held for `Kind`: ReviveTime to revive; none (a press) to execute. */
 	float InteractTime(EInteract Kind);
+	/** What the HUD says over someone down in reach: "PRESS E  ·  EXECUTE BOB", "HOLD LB  ·  REVIVE ANN" (`Key` the Interact key's name). */
+	FString InteractPrompt(EInteract Kind, const FString& Key, const FString& Name);
+	/** The countdown to getting up, as the HUD shows it: whole seconds, rounded up ("20" to "1"). */
+	int32 SelfReviveSeconds(float Left);
 
 	/**
-	 * Down, a player fights worse: lying on their back, propped on an elbow,
-	 * the pistol held out one-handed. Their shots do DownedDamage of their
-	 * damage, come DownedFireInterval times further apart, and spread over
-	 * DownedSpread times the hip's cone from the first shot of a run (no
-	 * steady first shot); enough to see off one careless enemy up close, not
-	 * a squad. Bots down fight by the same weapon.
+	 * Down, a player barely fights: lying on their back, propped on an
+	 * elbow, hurt, the pistol held out one-handed. Their shots do
+	 * DownedDamage of their damage, come DownedFireInterval times further
+	 * apart, kick DownedKick times as hard, and spread over DownedSpread
+	 * times the hip's cone from the first shot of a run (no steady first
+	 * shot); the view sways heavily (DownedSway) and is dark and blurred
+	 * past arm's length. A pest to an enemy who takes their time, never a
+	 * threat to one who comes to execute them. Bots down fight by the same
+	 * weapon.
 	 */
-	constexpr float DownedDamage = 0.75f;
-	constexpr float DownedFireInterval = 1.4f;
-	constexpr float DownedSpread = 1.3f;
+	constexpr float DownedDamage = 0.25f;
+	constexpr float DownedFireInterval = 4.0f;
+	constexpr float DownedSpread = 2.0f;
+	constexpr float DownedKick = 2.5f;
+	/** The heavy sway of a hurt player's view: degrees of yaw and pitch at `Seconds` (both at most DownedSwayYaw and DownedSwayPitch). */
+	constexpr float DownedSwayYaw = 5.0f;
+	constexpr float DownedSwayPitch = 3.0f;
+	FRotator DownedSway(float Seconds);
 	/** `Weapon` as someone down fires it. */
 	FWeaponStats DownedWeapon(const FWeaponStats& Weapon);
 

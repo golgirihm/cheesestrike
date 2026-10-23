@@ -47,6 +47,11 @@ bool UCheeseStrikeMovementComponent::IsDownedHere() const
 FVector UCheeseStrikeMovementComponent::ConstrainInputAcceleration(const FVector& InputAcceleration) const
 {
 	const FVector Constrained = Super::ConstrainInputAcceleration(InputAcceleration);
+	// In an execution, either side of it, nobody moves.
+	if (const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(CharacterOwner); Body != nullptr && Body->InExecution())
+	{
+		return FVector::ZeroVector;
+	}
 	// Down, only along the body, toward the feet while the legs have room.
 	if (IsDownedHere())
 	{

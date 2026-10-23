@@ -88,6 +88,8 @@ public:
 	 */
 	UFUNCTION(Exec)
 	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f, float Height = 30.0f, float Rise = 20.0f);
+	/** Shows its player the body and its weapons as others see them, the first-person body hidden (`bOutside`), or as in play: for a view from outside it (an execution's, CheeseStrikeOutside's). */
+	void SeeOwnBody(bool bOutside);
 	/** For looking at a map (development): puts the view at X, Y, Z facing Pitch and Yaw, the character left where it is; CheeseStrikeOutside with no distance puts it back. */
 	UFUNCTION(Exec)
 	void CheeseStrikeViewFrom(float X, float Y, float Z, float Pitch, float Yaw);
@@ -155,6 +157,8 @@ public:
 	UCheeseStrikeLastStand* GetLastStand() const { return LastStand; }
 	/** Whether it is down in a last stand: on its back (crouched), with only its sidearm, finished only up close. */
 	bool IsDowned() const;
+	/** Whether it is in an execution still playing (UCheeseStrikeLastStand), dealing it or dealt it: it neither moves nor fires, and can't be hurt. */
+	bool InExecution() const;
 	/**
 	 * How far down it is, 0 standing to 1 lying, at an even pace as it goes
 	 * down (CheeseStrikeDowned::Seconds) and gets up (RiseSeconds), on every
@@ -190,7 +194,7 @@ public:
 	bool CanAct() const;
 	/** Whether the count before the match or its round holds it where it stands (ACheeseStrikeGameState::IsFrozen). */
 	bool IsFrozen() const;
-	/** Whether its player's input reaches it: it can act, and its player hasn't paused (a paused player looks at the menu, and the match goes on without them). */
+	/** Whether its player's input reaches it: it can act, it isn't in an execution (either side of it), and its player hasn't paused (a paused player looks at the menu, and the match goes on without them). */
 	bool TakesInput() const;
 	/** Whether it has just come back and can't yet be hurt (CheeseStrikeStart: a few seconds from the count's end, or until it attacks). */
 	bool IsProtected() const;
