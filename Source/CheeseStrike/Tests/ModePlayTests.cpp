@@ -380,8 +380,7 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 	PutAt(2, AsideSpot, AsideYaw);
 	Wait(CheeseStrikeRules::SpawnProtection);
 	// Shot down from four metres: down, not dead.
-	Play(1, Burst);
-	WaitUntil(TEXT("the host going down"), 5.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 0); return Host != nullptr && Host->IsDowned(); });
+	FireUntil(1, TEXT("the host going down"), 5.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 0); return Host != nullptr && Host->IsDowned(); });
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Host = Character(0);
@@ -490,7 +489,10 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 	// A teammate beside them holds Interact: back up.
 	Play(2, TEXT("release Crouch"));
 	PutAt(2, BesideSpot, 180.0f);
-	Play(2, FString::Printf(TEXT("hold Interact\nwait %.1f\nrelease Interact"), CheeseStrikeModes::ReviveTime + 0.6f));
+	// Held until the server has them up: on a busy PC the press reaches it a while after it is made.
+	Play(2, TEXT("hold Interact"));
+	WaitUntil(TEXT("the host revived"), CheeseStrikeModes::ReviveTime + 3.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 0); return Host != nullptr && !Host->IsDowned(); });
+	Play(2, TEXT("release Interact"));
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
@@ -532,11 +534,12 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 	PutAt(0, AsideSpot, AsideYaw);
 	PutAt(2, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
-	Play(1, FString(TEXT("tap Reload\nwait 2.2\n")) + Burst);
-	WaitUntil(TEXT("the teammate going down"), 5.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && Mate->IsDowned(); });
+	Play(1, TEXT("tap Reload\nwait 2.2"));
+	FireUntil(1, TEXT("the teammate going down"), 5.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && Mate->IsDowned(); });
 	PutAt(1, BesideSpot, 180.0f);
-	Play(1, FString::Printf(TEXT("hold Interact\nwait %.1f\nrelease Interact"), CheeseStrikeModes::ExecuteTime + 0.6f));
-	WaitUntil(TEXT("the teammate finished"), 3.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && !Mate->IsAlive(); });
+	Play(1, TEXT("hold Interact"));
+	WaitUntil(TEXT("the teammate finished"), CheeseStrikeModes::ExecuteTime + 3.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && !Mate->IsAlive(); });
+	Play(1, TEXT("release Interact"));
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0);
@@ -548,8 +551,8 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 	// Down a second time in a life, the host dies; with nobody of theirs standing, the round and the match are the enemy's.
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
-	Play(1, FString(TEXT("tap Reload\nwait 2.2\n")) + Burst);
-	WaitUntil(TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	Play(1, TEXT("tap Reload\nwait 2.2"));
+	FireUntil(1, TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
 	Then([this]()
 	{
 		TestFalse(TEXT("the host, once revived, isn't downed again but killed"), Character(0)->IsAlive());
