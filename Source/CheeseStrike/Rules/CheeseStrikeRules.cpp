@@ -196,57 +196,143 @@ namespace CheeseStrikeRules
 		return FMath::Max(0, SeatCount - Players);
 	}
 
-	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted)
+	TArray<FRosterEntry> Seats(const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted, const TArray<int32>& BotSides)
 	{
-		TArray<FRosterEntry> Column;
-		for (const FRosterEntry& Player : Players)
-		{
-			if (Player.Team == Team && Column.Num() < TeamSize)
-			{
-				Column.Add(Player);
-			}
-		}
-		// Every empty slot, or the bots asked for dealt one at a time to the side with fewer, so that the sides stay even.
+		TArray<FRosterEntry> Taken;
 		int32 Sizes[Teams] = {};
+		int32 BotsIn = 0;
 		for (const FRosterEntry& Player : Players)
 		{
+			Taken.Add(Player);
 			if (Player.Team >= 0 && Player.Team < Teams)
 			{
 				Sizes[Player.Team] = FMath::Min(Sizes[Player.Team] + 1, TeamSize);
 			}
+			BotsIn += Player.bBot ? 1 : 0;
 		}
-		int32 Shares[Teams] = {};
-		for (int32 Left = BotsWanted < 0 ? Teams * TeamSize : BotsWanted; Left > 0; --Left)
+		// The bots that will stand in, in the order they were added: each on the side the host put it on, or dealt to the
+		// side with fewer, so that the sides stay even; a full side passes it to the other.
+		const int32 Wanted = BotsWanted < 0 ? SeatCount : BotsWanted;
+		for (int32 Bot = BotsIn; Bot < Wanted && Bots.IsValidIndex(Bot); ++Bot)
 		{
-			int32 Smaller = INDEX_NONE;
-			for (int32 Side = 0; Side < Teams; ++Side)
+			int32 Side = BotSides.IsValidIndex(Bot) && BotSides[Bot] >= 0 && BotSides[Bot] < Teams ? BotSides[Bot] : INDEX_NONE;
+			if (Side == INDEX_NONE)
 			{
-				if (Sizes[Side] + Shares[Side] < TeamSize && (Smaller == INDEX_NONE || Sizes[Side] + Shares[Side] < Sizes[Smaller] + Shares[Smaller]))
-				{
-					Smaller = Side;
-				}
+				Side = Sizes[1] < Sizes[0] ? 1 : 0;
 			}
-			if (Smaller == INDEX_NONE)
+			if (Sizes[Side] >= TeamSize)
+			{
+				Side = 1 - Side;
+			}
+			if (Sizes[Side] >= TeamSize)
 			{
 				break;
 			}
-			++Shares[Smaller];
+			++Sizes[Side];
+			FRosterEntry Entry;
+			Entry.Name = Bots[Bot];
+			Entry.Team = Side;
+			Entry.bBot = true;
+			Entry.Bot = Bot;
+			Taken.Add(Entry);
 		}
-		const int32 Filling = Team >= 0 && Team < Teams ? Shares[Team] : 0;
-		for (int32 Index = 0; Index < Filling; ++Index)
+		return Taken;
+	}
+
+	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted, const TArray<int32>& BotSides)
+	{
+		TArray<FRosterEntry> Column;
+		for (const FRosterEntry& Seat : Seats(Players, Bots, BotsWanted, BotSides))
 		{
-			const int32 NameIndex = Team * TeamSize + Index;
-			if (!Bots.IsValidIndex(NameIndex))
+			if (Seat.Team == Team && Column.Num() < TeamSize)
 			{
-				break;
+				Column.Add(Seat);
 			}
-			FRosterEntry Bot;
-			Bot.Name = Bots[NameIndex];
-			Bot.Team = Team;
-			Bot.bBot = true;
-			Column.Add(Bot);
 		}
 		return Column;
+	}
+
+	int32 Taken(const TArray<FRosterEntry>& Seats, int32 Team)
+	{
+		int32 Count = 0;
+		for (const FRosterEntry& Seat : Seats)
+		{
+			Count += !Seat.bEmpty && (Team == INDEX_NONE || Seat.Team == Team) ? 1 : 0;
+		}
+		return Count;
+	}
+
+	bool HasRoomForAPlayer(const TArray<FRosterEntry>& Players, int32 Team)
+	{
+		if (Team < 0 || Team >= Teams)
+		{
+			return false;
+		}
+		int32 There = 0;
+		for (const FRosterEntry& Player : Players)
+		{
+			There += !Player.bBot && Player.Team == Team ? 1 : 0;
+		}
+		return There < TeamSize;
+	}
+
+	bool MoveBot(const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted, TArray<int32>& BotSides, int32 Bot)
+	{
+		const TArray<FRosterEntry> Now = Seats(Players, Bots, BotsWanted, BotSides);
+		const FRosterEntry* Moving = Now.FindByPredicate([Bot](const FRosterEntry& Seat) { return Seat.bBot && Seat.Bot == Bot; });
+		if (Moving == nullptr || Moving->Team < 0 || Moving->Team >= Teams || Taken(Now, 1 - Moving->Team) >= TeamSize)
+		{
+			return false;
+		}
+		int32 Count = 0;
+		for (const FRosterEntry& Seat : Now)
+		{
+			Count = Seat.bBot ? FMath::Max(Count, Seat.Bot + 1) : Count;
+		}
+		TArray<int32> Pinned;
+		Pinned.Init(INDEX_NONE, Count);
+		for (const FRosterEntry& Seat : Now)
+		{
+			if (Seat.bBot && Pinned.IsValidIndex(Seat.Bot))
+			{
+				Pinned[Seat.Bot] = Seat.Bot == Bot ? 1 - Seat.Team : Seat.Team;
+			}
+		}
+		BotSides = Pinned;
+		return true;
+	}
+
+	FString BotSidesOption(const TArray<int32>& BotSides)
+	{
+		FString Digits;
+		for (const int32 Side : BotSides)
+		{
+			Digits.AppendChar(Side >= 0 && Side < Teams ? TCHAR('0' + Side) : TCHAR('x'));
+		}
+		return Digits;
+	}
+
+	TArray<int32> BotSidesFrom(const FString& Options)
+	{
+		TArray<int32> Sides;
+		for (const TCHAR Each : UGameplayStatics::ParseOption(Options, TEXT("BotSides")))
+		{
+			Sides.Add(Each >= TEXT('0') && Each < TEXT('0') + Teams ? Each - TEXT('0') : INDEX_NONE);
+		}
+		return Sides;
+	}
+
+	FString WhyNotStart(const TArray<FRosterEntry>& Seats, bool bTeams)
+	{
+		if (Taken(Seats) < 2)
+		{
+			return TEXT("Add a bot or wait for a player");
+		}
+		if (bTeams && (Taken(Seats, 0) == 0 || Taken(Seats, 1) == 0))
+		{
+			return TEXT("Each side needs someone");
+		}
+		return FString();
 	}
 
 	TArray<FRosterEntry> WithEmptySeats(TArray<FRosterEntry> Column, int32 NumSeats, int32 Team)

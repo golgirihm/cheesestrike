@@ -70,7 +70,7 @@ bool FAMatchEndsAtTheKillLimit::RunTest(const FString& Parameters)
 	TestTrue(TEXT("or past it"), IsOver(21, 20));
 	TestFalse(TEXT("never without one"), IsOver(100, 0));
 	TestEqual(TEXT("the usual limit"), KillLimit, 20);
-	TestEqual(TEXT("the usual wait"), RespawnDelay, 3.0f);
+	TestEqual(TEXT("the usual wait"), RespawnDelay, 5.0f);
 	TestEqual(TEXT("and a fresh spawn's protection"), SpawnProtection, 3.0f);
 	return true;
 }
@@ -92,7 +92,7 @@ bool FTheHostSetsTheLimits::RunTest(const FString& Parameters)
 	TestFalse(TEXT("otherwise it waits in the lobby"), StartsAtOnce(TEXT("?listen?KillLimit=5")));
 	TestEqual(TEXT("the design's kill limits are offered"), static_cast<int32>(UE_ARRAY_COUNT(KillLimitChoices)), 5);
 	TestTrue(TEXT("with the usual one among them"), KillLimitChoices[2] == KillLimit);
-	TestTrue(TEXT("and the usual respawn delay among its choices"), RespawnDelayChoices[1] == RespawnDelay);
+	TestTrue(TEXT("and the usual respawn delay among its choices"), RespawnDelayChoices[2] == RespawnDelay);
 	TestEqual(TEXT("the countdown"), MatchCountdown, 5.0f);
 	return true;
 }
@@ -133,7 +133,8 @@ bool FTheSidesAreFilledWithBots::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the first side is full"), First.Num(), TeamSize);
 	TestEqual(TEXT("so is the second"), Second.Num(), TeamSize);
 	TestTrue(TEXT("players first"), First[0].Name == TEXT("Ash") && First[1].Name == TEXT("Cam") && !First[1].bBot);
-	TestTrue(TEXT("then bots, from the side's share of the names"), First[2].bBot && First[2].Name == Drawn[0] && Second[1].bBot && Second[1].Name == Drawn[TeamSize]);
+	// The first bot to the smaller side (the second), the next to the first, and so on, each named in the order they come.
+	TestTrue(TEXT("then bots, named in the order they were added"), First[2].bBot && First[2].Name == Drawn[1] && Second[1].bBot && Second[1].Name == Drawn[0]);
 	TestEqual(TEXT("asked for three bots, three in all"), TeamColumn(0, Players, Drawn, 3).Num() + TeamColumn(1, Players, Drawn, 3).Num(), Players.Num() + 3);
 	TestEqual(TEXT("asked for none, players only"), TeamColumn(1, Players, Drawn, 0).Num(), 1);
 	TestEqual(TEXT("three bots go to the smaller side first: one to the first"), TeamColumn(0, Players, Drawn, 3).Num(), 3);
@@ -187,6 +188,7 @@ bool FTheMenuFollowsTheMatch::RunTest(const FString& Parameters)
 	TestTrue(TEXT("and once it is over, nothing, whatever else"), PageFor(true, true, true, true, EMenuPage::Main) == EMenuPage::None);
 	TestTrue(TEXT("while the match goes to another level, the lobby, however it stands"), PageFor(true, true, true, false, EMenuPage::Main, true) == EMenuPage::Lobby);
 	TestTrue(TEXT("but alone, the front end"), PageFor(true, true, false, false, EMenuPage::Main, true) == EMenuPage::Main);
+	TestTrue(TEXT("and back to the lobby after the results, the results held up, never a lobby still being made"), PageFor(true, true, true, false, EMenuPage::Main, true, true) == EMenuPage::None);
 	return true;
 }
 

@@ -25,7 +25,15 @@
 #include "UI/CheeseStrikeCurtain.h"
 #include "UI/CheeseStrikeMenu.h"
 #include "UI/CheeseStrikeTones.h"
+#include "UI/CheeseStrikeMusic.h"
+#include "UI/CheeseStrikePostGame.h"
+#include "Sessions/CheeseStrikeSessions.h"
+#include "Sessions/CheeseStrikeSessionSubsystem.h"
+#include "Sound/SoundWave.h"
+#include "CheeseStrikePlayerState.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Engine/NetConnection.h"
+#include "Engine/NetDriver.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -99,6 +107,144 @@ bool FTheLobbyDealsItsSeats::RunTest(const FString& Parameters)
 	const FLinearColor Mozza = CheeseStrikeModes::TeamColour(1);
 	TestTrue(TEXT("the sides' colours differ"), !Gouda.Equals(Mozza, 0.1f) && !Gouda.Equals(CheeseStrikeModes::TeamColour(INDEX_NONE), 0.05f));
 	TestTrue(TEXT("and are bright enough to read on the dark tile"), Gouda.GetLuminance() > 0.25f && Mozza.GetLuminance() > 0.25f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheLobbySeatsInTheOrderTheyCame, "CheeseStrike.Rules.TheLobbySeatsInTheOrderTheyCame", LobbyTests::Flags)
+
+bool FTheLobbySeatsInTheOrderTheyCame::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeRules;
+	TestEqual(TEXT("the killed are back after five seconds unless the host says otherwise"), RespawnDelay, 5.0f);
+	TestEqual(TEXT("which is the default on the URL too"), RespawnDelayFrom(TEXT("?KillLimit=5")), 5.0f);
+
+	const TArray<FString> Names = BotNames(3, SeatCount);
+	TArray<FRosterEntry> Players;
+	Players.Add({TEXT("Host"), 0, false});
+	Players.Add({TEXT("Joiner"), 1, false});
+	// Every seat in the order it was taken: the players as they joined, then the bots as they were added.
+	const TArray<FRosterEntry> Three = Seats(Players, Names, 3);
+	TestEqual(TEXT("two players and three bots"), Three.Num(), 5);
+	TestTrue(TEXT("the players first, as they joined"), Three[0].Name == TEXT("Host") && Three[1].Name == TEXT("Joiner"));
+	TestTrue(TEXT("then the bots, as they were added"), Three[2].Bot == 0 && Three[3].Bot == 1 && Three[4].Bot == 2 && Three[2].Name == Names[0] && Three[4].Name == Names[2]);
+	// A bot added goes at the end, whichever side it is dealt to, and the others stay where they were.
+	const TArray<FRosterEntry> Four = Seats(Players, Names, 4);
+	bool bSame = Four.Num() == 6;
+	for (int32 Index = 0; bSame && Index < Three.Num(); ++Index)
+	{
+		bSame = Four[Index].Name == Three[Index].Name && Four[Index].Team == Three[Index].Team;
+	}
+	TestTrue(TEXT("a new bot comes last, the rest as they were"), bSame && Four[5].Bot == 3 && Four[5].Name == Names[3]);
+	TestTrue(TEXT("the sides dealt evenly, the first among equals first: the first, the second, the first"), Three[2].Team == 0 && Three[3].Team == 1 && Three[4].Team == 0);
+	// A side's column keeps that order.
+	const TArray<FRosterEntry> First = TeamColumn(0, Players, Names, 4);
+	TestTrue(TEXT("a side's column too: its player, then its bots as they came"), First.Num() == 3 && First[0].Name == TEXT("Host") && First[1].Bot == 0 && First[2].Bot == 2);
+
+	// Going over: a player may go to a side with fewer than eight players, the bots making way.
+	TArray<FRosterEntry> Full;
+	for (int32 Index = 0; Index < TeamSize; ++Index)
+	{
+		Full.Add({FString::Printf(TEXT("P%d"), Index), 0, false});
+	}
+	TestFalse(TEXT("not to a side of eight players"), HasRoomForAPlayer(Full, 0));
+	TestTrue(TEXT("but to one with bots in it"), HasRoomForAPlayer(Players, 1) && HasRoomForAPlayer(Players, 0));
+	TArray<FRosterEntry> Over = Players;
+	Over[1].Team = 0;
+	const TArray<FRosterEntry> AllBots = Seats(Over, Names, -1);
+	TestEqual(TEXT("with both players on the first side, every seat still filled"), Taken(AllBots), SeatCount);
+	TestEqual(TEXT("the first side's eight: the two and six bots"), Taken(AllBots, 0), TeamSize);
+
+	// The host moves a bot: it goes over, and the others keep their sides rather than being dealt again.
+	TArray<int32> Sides;
+	TestTrue(TEXT("the host moves the first bot to the second side"), MoveBot(Players, Names, 3, Sides, 0));
+	const TArray<FRosterEntry> Moved = Seats(Players, Names, 3, Sides);
+	TestTrue(TEXT("over it goes"), Moved[2].Bot == 0 && Moved[2].Team == 1);
+	TestTrue(TEXT("and the others stay where they were"), Moved[3].Team == 1 && Moved[4].Team == 0);
+	TestEqual(TEXT("one side of two, the other of three"), Taken(Moved, 0) * 10 + Taken(Moved, 1), 23);
+	const TArray<FRosterEntry> Added = Seats(Players, Names, 4, Sides);
+	TestTrue(TEXT("a bot added afterwards is dealt to the side with fewer"), Added[5].Team == 0);
+	TArray<int32> Kept = Sides;
+	TArray<FRosterEntry> Alone;
+	Alone.Add({TEXT("Host"), 0, false});
+	TArray<int32> FullSides;
+	TestFalse(TEXT("nothing moves to a side with no open seat"), MoveBot(Alone, Names, 15, FullSides, 0));
+	TestTrue(TEXT("and nothing is pinned for it"), FullSides.Num() == 0);
+	TestFalse(TEXT("nor a bot that isn't there"), MoveBot(Players, Names, 3, Kept, 7));
+	TestTrue(TEXT("the sides ride on the URL"), BotSidesFrom(TEXT("?Bots=3?BotSides=") + BotSidesOption(Sides)) == Sides && BotSidesOption(Sides) == TEXT("110"));
+	TestTrue(TEXT("and none is none"), BotSidesFrom(TEXT("?Bots=3")).Num() == 0);
+	// A player who is a bot (the match's own, once in) keeps their seat and takes a bot's place.
+	TArray<FRosterEntry> InMatch = Players;
+	InMatch.Add({Names[0], 0, true});
+	TestEqual(TEXT("bots already in count among those asked for"), Seats(InMatch, Names, 3).Num(), 5);
+
+	// Nobody plays alone, and a match of sides needs someone on each.
+	TestFalse(TEXT("the host alone can't start"), WhyNotStart(Seats(Alone, Names, 0), false).IsEmpty());
+	TestTrue(TEXT("the host and a bot can"), WhyNotStart(Seats(Alone, Names, 1), false).IsEmpty());
+	TestTrue(TEXT("two players can"), WhyNotStart(Seats(Players, Names, 0), false).IsEmpty());
+	TestFalse(TEXT("but not as sides with one empty"), WhyNotStart(Seats(Over, Names, 0), true).IsEmpty());
+	TestTrue(TEXT("which a bot fills"), WhyNotStart(Seats(Over, Names, 1), true).IsEmpty());
+
+	// A long name, Steam's 32 letters, is written smaller in its seat.
+	TestEqual(TEXT("a short name at the full size"), CheeseStrikeMenu::SeatNameSize(TEXT("Gorgon Zola")), 22);
+	TestTrue(TEXT("a longer one smaller"), CheeseStrikeMenu::SeatNameSize(TEXT("Count Roquefort the Magnificent")) < 22);
+	TestTrue(TEXT("and smaller still, never larger, as it grows"), CheeseStrikeMenu::SeatNameSize(FString::ChrN(CheeseStrikeMenu::LongestName, TEXT('W'))) <= CheeseStrikeMenu::SeatNameSize(FString::ChrN(24, TEXT('W'))));
+	TestEqual(TEXT("Steam's longest"), CheeseStrikeMenu::LongestName, 32);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAJoinerHearsWhyTheyWereLeftBehind, "CheeseStrike.Sessions.AJoinerHearsWhyTheyWereLeftBehind", LobbyTests::Flags)
+
+bool FAJoinerHearsWhyTheyWereLeftBehind::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeSessions;
+	TestTrue(TEXT("a connection that closes or times out is lost"), FarewellFor(ENetworkFailure::ConnectionLost) == EFarewell::ConnectionLost && FarewellFor(ENetworkFailure::ConnectionTimeout) == EFarewell::ConnectionLost);
+	TestTrue(TEXT("one that never came is a match not joined"), FarewellFor(ENetworkFailure::PendingConnectionFailure) == EFarewell::CouldNotJoin);
+	for (const EFarewell Each : {EFarewell::HostClosedTheLobby, EFarewell::HostLeftTheMatch, EFarewell::ConnectionLost, EFarewell::CouldNotJoin})
+	{
+		TestFalse(TEXT("each is said, with a title"), FarewellText(Each).IsEmpty() || FarewellTitle(Each).IsEmpty());
+	}
+	TestTrue(TEXT("and nothing is said for nothing"), FarewellText(EFarewell::None).IsEmpty());
+	// The host's word stands over the lost connection that follows it.
+	UCheeseStrikeSessionSubsystem* Sessions = NewObject<UCheeseStrikeSessionSubsystem>(NewObject<UGameInstance>(GetTransientPackage()));
+	Sessions->SayFarewell(EFarewell::HostClosedTheLobby);
+	Sessions->SayFarewell(EFarewell::ConnectionLost);
+	TestTrue(TEXT("the host closed the lobby, though the connection then closed"), Sessions->GetFarewell() == EFarewell::HostClosedTheLobby);
+	Sessions->DismissFarewell();
+	Sessions->SayFarewell(EFarewell::ConnectionLost);
+	TestTrue(TEXT("with no word, the connection was lost"), Sessions->GetFarewell() == EFarewell::ConnectionLost);
+	Sessions->DismissFarewell();
+	TestTrue(TEXT("until it is dismissed"), Sessions->GetFarewell() == EFarewell::None);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMenuHasItsMusic, "CheeseStrike.Rules.TheMenuHasItsMusic", LobbyTests::Flags)
+
+bool FTheMenuHasItsMusic::RunTest(const FString& Parameters)
+{
+	using CheeseStrikeMusic::IsWanted;
+	TestTrue(TEXT("the music plays under the front end"), IsWanted(EMenuPage::Main, false, false, false, false) && IsWanted(EMenuPage::Find, false, false, false, false) && IsWanted(EMenuPage::Credits, false, false, false, false));
+	TestTrue(TEXT("its options"), IsWanted(EMenuPage::Options, false, false, false, false));
+	TestTrue(TEXT("and the lobby"), IsWanted(EMenuPage::Lobby, false, false, false, false));
+	TestFalse(TEXT("but fades out over the countdown, into the match"), IsWanted(EMenuPage::Lobby, false, true, false, false));
+	TestFalse(TEXT("and is gone while the match leaves for its level"), IsWanted(EMenuPage::Lobby, false, false, true, false));
+	TestFalse(TEXT("over the match"), IsWanted(EMenuPage::None, false, false, false, false));
+	TestFalse(TEXT("its pause menu"), IsWanted(EMenuPage::Pause, true, false, false, false));
+	TestFalse(TEXT("and the options opened from it"), IsWanted(EMenuPage::Options, true, false, false, false));
+	TestFalse(TEXT("and while the results are held up on the way back"), IsWanted(EMenuPage::Lobby, false, false, false, true));
+	// The loop: the whole of an electric guitar track (tools/art/menu_music.py), looping.
+	const USoundWave* Loop = LoadObject<USoundWave>(nullptr, CheeseStrikeMusic::Track);
+	if (TestNotNull(TEXT("the music is there"), Loop))
+	{
+		TestTrue(TEXT("and loops"), Loop->bLooping);
+		TestTrue(FString::Printf(TEXT("all 65 bars of it at 172 a minute (%.2f s)"), Loop->Duration), FMath::IsNearlyEqual(Loop->Duration, 65.0f * 4.0f * 60.0f / 172.0f, 0.05f));
+	}
+	// Its volume is its own, kept with the others.
+	UCheeseStrikeSettings* Settings = NewObject<UCheeseStrikeSettings>(GetTransientPackage());
+	TestEqual(TEXT("under the sounds to begin with"), Settings->GetMusicVolume(), CheeseStrikeSettings::DefaultMusicVolume);
+	TestTrue(TEXT("which is quieter than they are"), CheeseStrikeSettings::DefaultMusicVolume < CheeseStrikeSettings::DefaultVolume);
+	Settings->SetMusicVolume(3.0f);
+	TestEqual(TEXT("and keeps to its range"), Settings->GetMusicVolume(), 1.0f);
+	TestTrue(TEXT("in a class of its own, which the effects volume leaves alone"), UCheeseStrikeSettings::MusicSoundClass() != nullptr && UCheeseStrikeSettings::MusicSoundClass() != UCheeseStrikeSettings::MenuSoundClass());
 	return true;
 }
 
@@ -470,6 +616,255 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 		const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(0));
 		Menu->Show(EMenuPage::Options);
 		TestFalse(TEXT("options not opened from a pause (the front end's) leave the view as it is"), Menu->IsBlurringTheGame());
+	});
+	StopPlaying();
+	return true;
+}
+
+namespace LobbyTests
+{
+	UCheeseStrikePostGameSubsystem* PostGameOf(int32 Player)
+	{
+		UWorld* Theirs = PlayTesting::World(Player);
+		return Theirs != nullptr && Theirs->GetGameInstance() != nullptr ? Theirs->GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>() : nullptr;
+	}
+
+	UCheeseStrikeSessionSubsystem* SessionsOf(int32 Player)
+	{
+		UWorld* Theirs = PlayTesting::World(Player);
+		return Theirs != nullptr && Theirs->GetGameInstance() != nullptr ? Theirs->GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+	}
+
+	/** The side the server has `Player` on, or INDEX_NONE. */
+	int32 SideOf(int32 Player)
+	{
+		const ACheeseStrikePlayerController* Local = PlayTesting::Controller(Player);
+		const ACheeseStrikeGameState* Server = PlayTesting::GameState(0);
+		if (Local == nullptr || Local->PlayerState == nullptr || Server == nullptr)
+		{
+			return INDEX_NONE;
+		}
+		for (const APlayerState* Each : Server->PlayerArray)
+		{
+			const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Each);
+			if (Ours != nullptr && Ours->GetPlayerName() == Local->PlayerState->GetPlayerName())
+			{
+				return Ours->GetTeam();
+			}
+		}
+		return INDEX_NONE;
+	}
+
+	/** Every text in `Menu`, joined. */
+	FString TextsOf(const TSharedRef<SWidget>& Menu)
+	{
+		TArray<TSharedRef<SWidget>> Widgets;
+		AllWidgets(Menu, Widgets);
+		FString All;
+		for (const TSharedRef<SWidget>& Widget : Widgets)
+		{
+			if (Widget->GetType() == FName(TEXT("STextBlock")))
+			{
+				All += StaticCastSharedRef<STextBlock>(Widget)->GetText().ToString() + TEXT("|");
+			}
+		}
+		return All;
+	}
+
+	/** What each player saw on the way back to the lobby after the results. */
+	struct FBack
+	{
+		bool bHeld[2] = {false, false};
+		bool bSawAMadeUpLobby[2] = {false, false};
+	};
+	FBack Back;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheLobbyKeepsItsSeatsAndTheResultsHoldUntilItIsBack, "CheeseStrike.Play.TheLobbyKeepsItsSeatsAndTheResultsHoldUntilItIsBack", LobbyTests::PlayFlags)
+
+bool FTheLobbyKeepsItsSeatsAndTheResultsHoldUntilItIsBack::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	// A host and a joiner in the lobby of a Deathmatch with two bots.
+	StartPlaying({2, TEXT("?Mode=Deathmatch?Bots=2"), false, true});
+	Then([this]()
+	{
+		const ACheeseStrikeGameState* Match = GameState(0);
+		if (!TestNotNull(TEXT("the match's state"), Match))
+		{
+			return;
+		}
+		const TArray<CheeseStrikeRules::FRosterEntry> Seats = Match->Seats();
+		TestEqual(TEXT("two players and two bots"), Seats.Num(), 4);
+		TestTrue(TEXT("the host first, then the joiner, in the order they came"), Seats.Num() == 4 && Seats[0].Name == Match->GetHostName() && !Seats[1].bBot && Seats[1].Name != Match->GetHostName());
+		TestTrue(TEXT("then the bots, in the order they were added"), Seats.Num() == 4 && Seats[2].Bot == 0 && Seats[3].Bot == 1);
+		TestEqual(TEXT("the joiner on the second side"), LobbyTests::SideOf(1), 1);
+		// The lobby's words: the host closes it, a joiner leaves it; either may go over to the other side.
+		const TSharedRef<SCheeseStrikeMenu> Hosts = SNew(SCheeseStrikeMenu).Controller(Controller(0));
+		Hosts->Show(EMenuPage::Lobby);
+		const FString HostSees = LobbyTests::TextsOf(Hosts);
+		TestTrue(TEXT("the host's Leave closes the lobby"), HostSees.Contains(TEXT("CLOSE LOBBY|")));
+		TestTrue(TEXT("and the host may join the other side"), HostSees.Contains(TEXT("JOIN MOZZA RADICALS|")));
+		TestTrue(TEXT("and start the match, there being four to play"), HostSees.Contains(TEXT("START THE MATCH|")) && !HostSees.Contains(TEXT("ADD A BOT")));
+		Controller(1)->SwitchSideFromMenu();
+	});
+	WaitUntil(TEXT("the joiner going over to the first side"), 5.0f, []() { return LobbyTests::SideOf(1) == 0; });
+	WaitUntil(TEXT("the joiner seeing it"), 5.0f, []() { return GameState(1) != nullptr && GameState(1)->TeamColumn(0).Num() == 2 && GameState(1)->TeamColumn(0)[1].Name == GameState(0)->TeamColumn(0)[1].Name; });
+	Then([this]()
+	{
+		const ACheeseStrikeGameState* Match = GameState(0);
+		const TArray<CheeseStrikeRules::FRosterEntry> First = Match->TeamColumn(0);
+		const TArray<CheeseStrikeRules::FRosterEntry> Second = Match->TeamColumn(1);
+		TestTrue(TEXT("the first side is the two players"), First.Num() == 2 && !First[0].bBot && !First[1].bBot);
+		TestTrue(TEXT("and the bots make the second"), Second.Num() == 2 && Second[0].bBot && Second[1].bBot);
+		const TSharedRef<SCheeseStrikeMenu> Joiners = SNew(SCheeseStrikeMenu).Controller(Controller(1));
+		Joiners->Show(EMenuPage::Lobby);
+		const FString JoinerSees = LobbyTests::TextsOf(Joiners);
+		TestTrue(TEXT("a joiner leaves the lobby"), JoinerSees.Contains(TEXT("LEAVE|")) && !JoinerSees.Contains(TEXT("CLOSE LOBBY")));
+		TestTrue(TEXT("and may go back"), JoinerSees.Contains(TEXT("JOIN MOZZA RADICALS|")));
+		// The host moves the second bot over to the first side.
+		Controller(0)->MoveBotFromMenu(1);
+		TestTrue(TEXT("the host moves a bot to the first side"), Match->TeamColumn(0).Num() == 3 && Match->TeamColumn(0)[2].Bot == 1);
+		TestTrue(TEXT("and the other bot stays"), Match->TeamColumn(1).Num() == 1 && Match->TeamColumn(1)[0].Bot == 0);
+		// Once the countdown starts, nothing in the lobby changes.
+		ACheeseStrikeGameMode* Mode = World(0)->GetAuthGameMode<ACheeseStrikeGameMode>();
+		Mode->AskToStart(false);
+		TestTrue(TEXT("the countdown runs"), Match->IsCountingDown());
+		Controller(0)->SetBotsFromMenu(5);
+		Controller(0)->SetRulesFromMenu(5, 1.0f);
+		Controller(0)->MoveBotFromMenu(0);
+		TestEqual(TEXT("the bots can't be changed during it"), Mode->GetBotsWanted(), 2);
+		TestTrue(TEXT("nor the rules"), Mode->GetKillLimit() != 5);
+		TestEqual(TEXT("nor the bots' sides"), Match->TeamColumn(1).Num(), 1);
+		const TSharedRef<SCheeseStrikeMenu> Counting = SNew(SCheeseStrikeMenu).Controller(Controller(0));
+		Counting->Show(EMenuPage::Lobby);
+		TestFalse(TEXT("the host's lobby offers no dropdown to change them"), Counting->GetFocusableNames().ContainsByPredicate([](const FString& Name) { return Name.StartsWith(TEXT("Dropdown")); }));
+		TestFalse(TEXT("nor another side"), LobbyTests::TextsOf(Counting).Contains(TEXT("JOIN ")));
+		Controller(1)->SwitchSideFromMenu();
+	});
+	Wait(1.0f);
+	Then([this]()
+	{
+		TestEqual(TEXT("nor may a joiner go over"), LobbyTests::SideOf(1), 0);
+		World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->CancelStart();
+		// The match on this level, at once, with the sides as the lobby has them.
+		World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->AskToStart(true);
+	});
+	WaitUntil(TEXT("the match on, with both players in"), 20.0f, []() { return GameState(0) != nullptr && GameState(0)->HasMatchStarted() && Character(0) != nullptr && Character(1) != nullptr; });
+	Then([this]()
+	{
+		TestEqual(TEXT("the joiner plays on the side they chose"), LobbyTests::SideOf(1), 0);
+		const FString Moved = GameState(0)->GetBotNames()[1];
+		int32 MovedSide = INDEX_NONE;
+		for (TActorIterator<ACheeseStrikeBotController> It(World(0)); It; ++It)
+		{
+			const ACheeseStrikePlayerState* Bot = It->GetPlayerState<ACheeseStrikePlayerState>();
+			MovedSide = Bot != nullptr && Bot->GetPlayerName() == Moved ? Bot->GetTeam() : MovedSide;
+			It->StopMovement();
+			It->SetActorTickEnabled(false);
+		}
+		TestEqual(TEXT("and the bot the host moved on the side it was moved to"), MovedSide, 0);
+		LobbyTests::Back = LobbyTests::FBack();
+		World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->EndMatch();
+	});
+	// After the results, back to the lobby: the results stay up until each player's lobby is there, never a lobby made up.
+	WaitUntil(TEXT("both players back in a lobby ready to play in"), CheeseStrikeRules::ResultsTime + 30.0f, []()
+	{
+		bool bBoth = true;
+		for (int32 Player = 0; Player < 2; ++Player)
+		{
+			const ACheeseStrikePlayerController* Local = Controller(Player);
+			const UCheeseStrikePostGameSubsystem* PostGame = LobbyTests::PostGameOf(Player);
+			const bool bHeld = PostGame != nullptr && PostGame->IsHeld();
+			LobbyTests::Back.bHeld[Player] |= bHeld;
+			if (Local != nullptr && Local->GetMenuPage() == EMenuPage::Lobby && !Local->IsLobbyReady() && !bHeld)
+			{
+				LobbyTests::Back.bSawAMadeUpLobby[Player] = true;
+			}
+			const ACheeseStrikeGameState* Match = GameState(Player);
+			bBoth &= Local != nullptr && Local->IsLobbyReady() && !bHeld && Match != nullptr && !Match->HasMatchStarted() && Match->PlayerArray.Num() == 2;
+		}
+		return bBoth;
+	});
+	Then([this]()
+	{
+		for (int32 Player = 0; Player < 2; ++Player)
+		{
+			const FString Who = Player == 0 ? TEXT("the host") : TEXT("the joiner");
+			TestTrue(FString::Printf(TEXT("%s's results were held up on the way back"), *Who), LobbyTests::Back.bHeld[Player]);
+			TestFalse(FString::Printf(TEXT("%s never saw a lobby still being made"), *Who), LobbyTests::Back.bSawAMadeUpLobby[Player]);
+		}
+		const ACheeseStrikeGameState* Match = GameState(0);
+		const TArray<CheeseStrikeRules::FRosterEntry> Seats = Match->Seats();
+		TestTrue(TEXT("back in the lobby, the host is first and the joiner second, as they came"), Seats.Num() == 4 && Seats[0].Name == Match->GetHostName() && !Seats[1].bBot);
+		TestEqual(TEXT("the joiner is still on the side they chose"), LobbyTests::SideOf(1), 0);
+		TestTrue(TEXT("and the bots on theirs"), Match->TeamColumn(0).Num() == 3 && Match->TeamColumn(1).Num() == 1);
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAJoinerIsToldWhenTheHostCloses, "CheeseStrike.Play.AJoinerIsToldWhenTheHostCloses", LobbyTests::PlayFlags)
+
+bool FAJoinerIsToldWhenTheHostCloses::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	// The engine logs the joiner's lost connection as an error.
+	AddExpectedError(TEXT("BroadcastNetworkFailure"), EAutomationExpectedErrorFlags::Contains, 0);
+	StartPlaying({2, TEXT("?Bots=0"), false, true});
+	Then([this]()
+	{
+		// Alone with nobody else, the host couldn't start; with a joiner, they can.
+		TestTrue(TEXT("a host and a joiner may start"), World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->WhyNotStart().IsEmpty());
+		Controller(0)->LeaveFromMenu();
+	});
+	WaitUntil(TEXT("the joiner back on the front end"), 20.0f, []()
+	{
+		const ACheeseStrikePlayerController* Joiner = Controller(1);
+		return Joiner != nullptr && Joiner->GetWorld()->GetNetMode() == NM_Standalone && Joiner->GetMenuPage() == EMenuPage::Main;
+	});
+	Then([this]()
+	{
+		const UCheeseStrikeSessionSubsystem* Sessions = LobbyTests::SessionsOf(1);
+		TestTrue(TEXT("told the host closed the lobby"), Sessions != nullptr && Sessions->GetFarewell() == CheeseStrikeSessions::EFarewell::HostClosedTheLobby);
+		const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(1));
+		Menu->Show(EMenuPage::Main);
+		TestTrue(TEXT("which the front end says"), LobbyTests::TextsOf(Menu).Contains(CheeseStrikeSessions::FarewellText(CheeseStrikeSessions::EFarewell::HostClosedTheLobby)));
+		const UCheeseStrikeSessionSubsystem* Hosts = LobbyTests::SessionsOf(0);
+		TestTrue(TEXT("and the host is told nothing"), Hosts != nullptr && Hosts->GetFarewell() == CheeseStrikeSessions::EFarewell::None);
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAJoinerIsToldWhenTheConnectionIsLost, "CheeseStrike.Play.AJoinerIsToldWhenTheConnectionIsLost", LobbyTests::PlayFlags)
+
+bool FAJoinerIsToldWhenTheConnectionIsLost::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	AddExpectedError(TEXT("BroadcastNetworkFailure"), EAutomationExpectedErrorFlags::Contains, 0);
+	StartPlaying({2, TEXT("?Bots=0"), false, true});
+	Then([this]()
+	{
+		// The host's end goes with no word: the connection simply closes.
+		UNetDriver* Driver = World(0)->GetNetDriver();
+		if (TestTrue(TEXT("the host has the joiner's connection"), Driver != nullptr && Driver->ClientConnections.Num() == 1))
+		{
+			Driver->ClientConnections[0]->Close();
+		}
+	});
+	WaitUntil(TEXT("the joiner back on the front end"), 30.0f, []()
+	{
+		const ACheeseStrikePlayerController* Joiner = Controller(1);
+		return Joiner != nullptr && Joiner->GetWorld()->GetNetMode() == NM_Standalone && Joiner->GetMenuPage() == EMenuPage::Main;
+	});
+	Then([this]()
+	{
+		const UCheeseStrikeSessionSubsystem* Sessions = LobbyTests::SessionsOf(1);
+		TestTrue(TEXT("told the connection was lost"), Sessions != nullptr && Sessions->GetFarewell() == CheeseStrikeSessions::EFarewell::ConnectionLost);
+		const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(1));
+		Menu->Show(EMenuPage::Main);
+		TestTrue(TEXT("which the front end says"), LobbyTests::TextsOf(Menu).Contains(CheeseStrikeSessions::FarewellText(CheeseStrikeSessions::EFarewell::ConnectionLost)));
 	});
 	StopPlaying();
 	return true;

@@ -5,6 +5,7 @@
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Engine/GameInstance.h"
 #include "GameFramework/GameSession.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
@@ -17,6 +18,7 @@
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStart.h"
+#include "Sessions/CheeseStrikeSeatMemory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeGrenades.h"
@@ -53,6 +55,7 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	// The match waits in the lobby for the host to start it, unless told not to.
 	bDelayedStart = !CheeseStrikeRules::StartsAtOnce(Options);
 	BotsWanted = CheeseStrikeRules::BotsFrom(Options);
+	BotSides = CheeseStrikeRules::BotSidesFrom(Options);
 	MapIndex = CheeseStrikeRules::MapFrom(Options, CurrentMapIndex());
 	BotSeed = CheeseStrikeRules::BotSeedFrom(Options, FMath::Rand());
 	BotSkill = CheeseStrikeBots::SkillFrom(Options);
@@ -120,11 +123,26 @@ FString ACheeseStrikeGameMode::RulesOptions() const
 	}
 	// Always, -1 too: a travel keeps whatever options of the last URL the new one doesn't name.
 	Options += FString::Printf(TEXT("?Bots=%d"), BotsWanted);
+	if (BotSides.Num() > 0)
+	{
+		Options += TEXT("?BotSides=") + CheeseStrikeRules::BotSidesOption(BotSides);
+	}
 	return Options;
 }
 
 void ACheeseStrikeGameMode::CountdownOver()
 {
+	// Someone left during the countdown, and the match can no longer be played: back to waiting.
+	const FString WhyNot = WhyNotStart();
+	if (!WhyNot.IsEmpty() && IsWaitingToStart())
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("The start is called off: %s"), *WhyNot);
+		if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+		{
+			State->SetCountdownEndsAt(0.0f);
+		}
+		return;
+	}
 	if (MapIndex < 0 || MapIndex == CurrentMapIndex() || GetWorld() == nullptr)
 	{
 		StartMatch();
@@ -134,7 +152,7 @@ void ACheeseStrikeGameMode::CountdownOver()
 	// level's with the map changed, so that the host listens where the players reconnect (the same port).
 	FURL Url = GetWorld()->URL;
 	Url.Map = CheeseStrikeRules::Maps[MapIndex].Level;
-	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("BotSkill"), TEXT("Bots"), TEXT("Players"), TEXT("StartNow"), TEXT("Mode"), TEXT("Rounds"), TEXT("RoundTime")})
+	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("BotSkill"), TEXT("Bots"), TEXT("BotSides"), TEXT("Players"), TEXT("StartNow"), TEXT("Mode"), TEXT("Rounds"), TEXT("RoundTime")})
 	{
 		Url.RemoveOption(Option);
 	}
@@ -190,7 +208,7 @@ void ACheeseStrikeGameMode::RestartGame()
 	// The engine's restart would travel by the URL the match was hosted with; this one carries the rules as the host left them,
 	// and goes back to the lobby on this map even if the match came here from another.
 	FURL Url = GetWorld()->URL;
-	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("BotSkill"), TEXT("Bots"), TEXT("Players"), TEXT("Mode"), TEXT("Rounds"), TEXT("RoundTime")})
+	for (const TCHAR* Option : {TEXT("KillLimit"), TEXT("RespawnDelay"), TEXT("Map"), TEXT("BotSeed"), TEXT("BotSkill"), TEXT("Bots"), TEXT("BotSides"), TEXT("Players"), TEXT("Mode"), TEXT("Rounds"), TEXT("RoundTime")})
 	{
 		Url.RemoveOption(Option);
 	}
@@ -223,7 +241,20 @@ void ACheeseStrikeGameMode::PostLogin(APlayerController* NewPlayer)
 			++Counts[Other->GetTeam()];
 		}
 	}
-	State->SetTeam(CheeseStrikeRules::TeamToJoin(Counts));
+	// Back from another of the match's levels, a player has the side and the place in the lobby's order they had;
+	// a newcomer joins the side with fewer, after everyone already in.
+	UCheeseStrikeSeatMemory* Memory = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeSeatMemory>() : nullptr;
+	const UCheeseStrikeSeatMemory::FSeat* Known = Memory != nullptr ? Memory->Find(State) : nullptr;
+	if (Known != nullptr)
+	{
+		State->SetTeam(Known->Team);
+		State->SetJoinOrder(Known->Order);
+	}
+	else
+	{
+		State->SetTeam(CheeseStrikeRules::TeamToJoin(Counts));
+		State->SetJoinOrder(Memory != nullptr ? Memory->Add(State, State->GetTeam()).Order : Match->PlayerArray.Num());
+	}
 	// The host is the player at the server's own keyboard; the lobby crowns them.
 	if (NewPlayer->IsLocalController())
 	{
@@ -269,6 +300,8 @@ void ACheeseStrikeGameMode::SpawnBots()
 			State->SetPlayerName(Entry.Name);
 			State->SetIsABot(true);
 			State->SetTeam(Entry.Team);
+			// After the players, in the order the lobby showed them.
+			State->SetJoinOrder(CheeseStrikeRules::SeatCount * 4 + Entry.Bot);
 		}
 		RestartPlayer(Bot);
 	}
@@ -291,9 +324,67 @@ void ACheeseStrikeGameMode::AskToStart(bool bAtOnce)
 		CountdownOver();
 		return;
 	}
+	const FString WhyNot = WhyNotStart();
+	if (!WhyNot.IsEmpty())
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("The match can't start: %s"), *WhyNot);
+		return;
+	}
 	State->SetCountdownEndsAt(State->GetServerWorldTimeSeconds() + CheeseStrikeRules::MatchCountdown);
 	UE_LOG(LogCheeseStrike, Display, TEXT("The match starts in %.0f s"), CheeseStrikeRules::MatchCountdown);
 	GetWorldTimerManager().SetTimer(CountdownTimer, this, &ACheeseStrikeGameMode::CountdownOver, CheeseStrikeRules::MatchCountdown, false);
+}
+
+FString ACheeseStrikeGameMode::WhyNotStart() const
+{
+	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	return State != nullptr ? CheeseStrikeRules::WhyNotStart(State->Seats(), CheeseStrikeModes::Info(Mode).bTeams) : FString();
+}
+
+bool ACheeseStrikeGameMode::CanChangeLobby() const
+{
+	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	return IsWaitingToStart() && State != nullptr && !State->IsCountingDown();
+}
+
+bool ACheeseStrikeGameMode::SwitchSide(APlayerController* Player)
+{
+	ACheeseStrikePlayerState* Mine = Player != nullptr ? Player->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (Mine == nullptr || State == nullptr || !CanChangeLobby() || !CheeseStrikeModes::Info(Mode).bTeams)
+	{
+		return false;
+	}
+	const int32 To = 1 - FMath::Clamp(Mine->GetTeam(), 0, 1);
+	if (!CheeseStrikeRules::HasRoomForAPlayer(State->Roster(), To))
+	{
+		return false;
+	}
+	Mine->SetTeam(To);
+	if (UCheeseStrikeSeatMemory* Memory = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeSeatMemory>() : nullptr)
+	{
+		Memory->SetTeam(Mine, To);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s goes over to %s"), *Mine->GetPlayerName(), CheeseStrikeRules::TeamNames[To]);
+	return true;
+}
+
+bool ACheeseStrikeGameMode::MoveBot(int32 Bot)
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr || !CanChangeLobby() || !CheeseStrikeModes::Info(Mode).bTeams)
+	{
+		return false;
+	}
+	TArray<int32> Sides = BotSides;
+	if (!CheeseStrikeRules::MoveBot(State->Roster(), State->GetBotNames(), BotsWanted, Sides, Bot))
+	{
+		return false;
+	}
+	BotSides = Sides;
+	State->SetBotSides(BotSides);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Bot %d goes over to %s"), Bot, CheeseStrikeRules::TeamNames[BotSides.IsValidIndex(Bot) ? FMath::Clamp(BotSides[Bot], 0, 1) : 0]);
+	return true;
 }
 
 void ACheeseStrikeGameMode::CancelStart()
@@ -458,6 +549,7 @@ void ACheeseStrikeGameMode::InitGameState()
 		State->SetRoundLimit(RoundLimit);
 		// The bots' names are drawn once, so that the lobby and the match agree on them.
 		State->SetBots(CheeseStrikeRules::BotNames(BotSeed, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize), BotsWanted);
+		State->SetBotSides(BotSides);
 		State->SetMapIndex(MapIndex);
 		State->SetBotSkill(BotSkill);
 		State->SetPlayersReady(0, PlayersExpected);
@@ -783,6 +875,12 @@ bool ACheeseStrikeGameMode::PlayerCanRestart_Implementation(APlayerController* P
 
 void ACheeseStrikeGameMode::Logout(AController* Exiting)
 {
+	// A player who leaves the match is forgotten; one leaving with everyone for the match's next level is not.
+	UCheeseStrikeSeatMemory* Memory = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeSeatMemory>() : nullptr;
+	if (Memory != nullptr && Exiting != nullptr && Exiting->PlayerState != nullptr && GetMatchState() != MatchState::LeavingMap && !Exiting->PlayerState->IsABot())
+	{
+		Memory->Forget(Exiting->PlayerState);
+	}
 	Super::Logout(Exiting);
 	if (CheeseStrikeModes::Info(Mode).WinBy == CheeseStrikeModes::EWinBy::Rounds && IsMatchInProgress())
 	{

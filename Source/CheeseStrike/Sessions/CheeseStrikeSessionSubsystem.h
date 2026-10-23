@@ -7,6 +7,7 @@
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "CheeseStrikeSessions.h"
 #include "CheeseStrikeSessionSubsystem.generated.h"
 
 class UNetDriver;
@@ -72,6 +73,23 @@ public:
 	/** Whether this game instance hosts or has joined a match. */
 	bool IsInAMatch() const;
 
+	/**
+	 * Why this player, a joiner, was last put out of a match (the host left
+	 * or quit, or the connection was lost), for the front end to say until
+	 * they dismiss it; None if nothing has.
+	 */
+	CheeseStrikeSessions::EFarewell GetFarewell() const { return Farewell; }
+	void DismissFarewell() { Farewell = CheeseStrikeSessions::EFarewell::None; }
+	/** A joiner is out of the match for `Why`; the host's word (left, closed) isn't overwritten by the lost connection that follows it. */
+	void SayFarewell(CheeseStrikeSessions::EFarewell Why);
+	/**
+	 * The host is leaving `World`'s match (the lobby's or a match's), or
+	 * quitting the game: every joiner is told why at once, before the
+	 * connection to them closes (ACheeseStrikePlayerController::ClientHostLeft).
+	 * Nothing for a joiner, or alone.
+	 */
+	void SayGoodbye(UWorld* World);
+
 protected:
 	IOnlineSessionPtr Sessions() const;
 	void Say(const FString& What);
@@ -90,6 +108,8 @@ protected:
 	void OnTravelFailed(UWorld* World, ETravelFailure::Type Failure, const FString& Error);
 	void OnNetworkFailed(UWorld* World, UNetDriver* Driver, ENetworkFailure::Type Failure, const FString& Error);
 	void SetPending(ESessionPending Now);
+	/** The game is closing (its window, Alt+F4, Quit): a host says goodbye first. */
+	void OnExit();
 
 	/** The last search, and the matches of ours it found. */
 	TSharedPtr<FOnlineSessionSearch> Search;
@@ -110,4 +130,8 @@ protected:
 	FDelegateHandle LoadedHandle;
 	FDelegateHandle TravelFailedHandle;
 	FDelegateHandle NetworkFailedHandle;
+	FDelegateHandle ExitHandle;
+	CheeseStrikeSessions::EFarewell Farewell = CheeseStrikeSessions::EFarewell::None;
+	/** When the host's word came (FPlatformTime), so that the failure it leads to keeps it. */
+	double FarewellAt = 0.0;
 };

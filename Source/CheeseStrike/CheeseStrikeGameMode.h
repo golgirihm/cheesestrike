@@ -106,6 +106,23 @@ public:
 	/** Stops the countdown, back to waiting in the lobby. */
 	void CancelStart();
 	/**
+	 * Why the match can't be started from the lobby now (CheeseStrikeRules::
+	 * WhyNotStart: one alone, or a side with nobody), or nothing. The
+	 * countdown asks it, and so does its end; starting at once (a script's,
+	 * a test's) doesn't.
+	 */
+	FString WhyNotStart() const;
+	/** Whether the host may still change the lobby's rules and seats: waiting, and not yet counting down to the start. */
+	bool CanChangeLobby() const;
+	/**
+	 * In a mode of sides, in the lobby: `Player` goes over to the other side,
+	 * if it has fewer than a side's seats of players (a bot makes way for
+	 * them). False if they can't.
+	 */
+	bool SwitchSide(APlayerController* Player);
+	/** The host moves the lobby's bot `Bot` (its number, CheeseStrikeRules::FRosterEntry::Bot) to the other side, if it has an open seat. */
+	bool MoveBot(int32 Bot);
+	/**
 	 * The map the match is to be played on (CheeseStrikeRules::Maps): the
 	 * one it is on, or another the host picked in the lobby, which the
 	 * match travels to when it starts, everyone with it.
@@ -184,6 +201,8 @@ protected:
 	float RoundStartedAt = 0.0f;
 	FTimerHandle RoundTimer;
 	int32 BotsWanted = -1;
+	/** The sides the host moved the lobby's bots to (CheeseStrikeRules::Seats), carried to the match's levels (`?BotSides=`). */
+	TArray<int32> BotSides;
 	int32 MapIndex = INDEX_NONE;
 	int32 BotSeed = 0;
 	int32 BotSkill = CheeseStrikeBots::DefaultSkill;

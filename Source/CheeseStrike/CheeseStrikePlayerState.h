@@ -37,6 +37,10 @@ public:
 	/** Server only: killed, which ends the run of kills. */
 	void AddDeath();
 	void SetTeam(int32 InTeam) { Team = InTeam; }
+	/** When this player first joined the match, against the others (0 the first; kept across its levels): the lobby seats them in this order. */
+	int32 GetJoinOrder() const { return JoinOrder; }
+	/** Server only. */
+	void SetJoinOrder(int32 Order) { JoinOrder = Order; }
 
 	/** In Gun Game, the step of the ladder this player is on (CheeseStrikeArsenal::GunGameLadder), 0 the first. */
 	int32 GetGunLevel() const { return GunLevel; }
@@ -111,6 +115,8 @@ protected:
 	int32 Deaths = 0;
 	UPROPERTY(Replicated)
 	int32 Team = 0;
+	UPROPERTY(Replicated)
+	int32 JoinOrder = 0;
 	UPROPERTY(Replicated)
 	int32 GunLevel = 0;
 	UPROPERTY(Replicated)

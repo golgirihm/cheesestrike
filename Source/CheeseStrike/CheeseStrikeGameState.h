@@ -85,8 +85,13 @@ public:
 	const TArray<FString>& GetBotNames() const { return BotNames; }
 	int32 GetBotsWanted() const { return BotsWanted; }
 	void SetBots(const TArray<FString>& Names, int32 Wanted) { BotNames = Names; BotsWanted = Wanted; }
-	/** The players as roster entries: name, side, and whether a bot. */
+	/** The sides the host moved the lobby's bots to (CheeseStrikeRules::Seats), a side a bot; empty while they are dealt evenly. */
+	const TArray<int32>& GetBotSides() const { return BotSides; }
+	void SetBotSides(const TArray<int32>& Sides) { BotSides = Sides; }
+	/** The players as roster entries, in the order they joined: name, side, and whether a bot. */
 	TArray<CheeseStrikeRules::FRosterEntry> Roster() const;
+	/** Every seat taken in the lobby, in the order it was taken: the players, then the bots that will fill in (CheeseStrikeRules::Seats). */
+	TArray<CheeseStrikeRules::FRosterEntry> Seats() const;
 	/** Team `Team`'s column in the lobby: its players, then the bots that will fill in. */
 	TArray<CheeseStrikeRules::FRosterEntry> TeamColumn(int32 Team) const;
 
@@ -236,6 +241,8 @@ protected:
 	TArray<FString> BotNames;
 	UPROPERTY(Replicated)
 	int32 BotsWanted = -1;
+	UPROPERTY(Replicated)
+	TArray<int32> BotSides;
 	UPROPERTY(Replicated)
 	FString HostName;
 	UPROPERTY(Replicated)

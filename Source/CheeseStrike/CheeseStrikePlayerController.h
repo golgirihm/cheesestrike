@@ -78,6 +78,14 @@ public:
 	bool HasSaidReady() const { return bSaidReady; }
 	/** Whether this player's machine is ready to say so: on the level, with the match's state and their own. */
 	bool CanSayReady() const;
+	/** Whether the lobby shows, with the host's match in it, ready to be played in (SCheeseStrikeMenu::IsLobbyReady). */
+	bool IsLobbyReady() const;
+	/**
+	 * Whether the results held up on the way back to the lobby can go
+	 * (UCheeseStrikePostGameSubsystem): the lobby is ready, or the player is
+	 * on the front end, out of the match.
+	 */
+	bool IsDoneWithTheResults() const;
 	/** Picks a page of the front end (main, find, credits, options), or the options from the pause menu. */
 	void ChooseMenu(EMenuPage Page);
 	/** Back from a page to the one it came from: the front end's main page, or the pause menu. */
@@ -92,6 +100,19 @@ public:
 	void SetModeFromMenu(int32 ModeIndex);
 	void SetRoundsFromMenu(int32 Rounds);
 	void SetBotsFromMenu(int32 Wanted);
+	/** In the lobby of a mode of sides: this player goes over to the other side, if it has room (ACheeseStrikeGameMode::SwitchSide). */
+	void SwitchSideFromMenu();
+	/** The host moves a bot of the lobby (its number) to the other side. */
+	void MoveBotFromMenu(int32 Bot);
+	UFUNCTION(Server, Reliable)
+	void ServerSwitchSide();
+	/**
+	 * A joiner: the host is leaving the lobby (or, `bInMatch`, the match)
+	 * or quitting the game (UCheeseStrikeSessionSubsystem::SayGoodbye). The
+	 * joiner goes back to the front end, which says so.
+	 */
+	UFUNCTION(Client, Reliable)
+	void ClientHostLeft(bool bInMatch);
 	/** Looks for matches, through the service or the local network without Steam. */
 	void FindFromMenu();
 	/** The host starts the match, after the countdown. */
@@ -119,6 +140,12 @@ public:
 	/** From the console or a play script: opens the lobby's nth dropdown (0 the map, then the mode and on down), for looking at it; -1 shuts it. */
 	UFUNCTION(Exec)
 	void CheeseStrikeDropdown(int32 Number = 0);
+	/** From the console or a play script: goes over to the other side in the lobby, as its button does. */
+	UFUNCTION(Exec)
+	void CheeseStrikeSwitchSide();
+	/** From the console or a play script: the host moves the lobby's nth bot (0 the first added) to the other side. */
+	UFUNCTION(Exec)
+	void CheeseStrikeMoveBot(int32 Bot = 0);
 
 	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
 	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */
@@ -162,6 +189,10 @@ protected:
 	bool IsInAMatch() const;
 	/** Plays the countdown's tones as the match's seconds go by (CheeseStrikeMenu::CountdownTone). */
 	void SoundCountdown();
+	/** The match is over and on its way back to the lobby: the results are held up until the lobby is there. */
+	void HoldTheResults();
+	/** The menu's music, as the page wants it (CheeseStrikeMusic::IsWanted). */
+	void PlayMusic();
 	void ShowMenuCamera();
 	void HideMenuCamera();
 

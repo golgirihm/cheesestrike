@@ -6,6 +6,47 @@
 
 namespace CheeseStrikeSessions
 {
+	EFarewell FarewellFor(ENetworkFailure::Type Failure)
+	{
+		switch (Failure)
+		{
+		case ENetworkFailure::PendingConnectionFailure:
+		case ENetworkFailure::OutdatedClient:
+		case ENetworkFailure::OutdatedServer:
+		case ENetworkFailure::NetDriverCreateFailure:
+		case ENetworkFailure::NetDriverListenFailure:
+			return EFarewell::CouldNotJoin;
+		case ENetworkFailure::NetDriverAlreadyExists:
+			return EFarewell::None;
+		default:
+			return EFarewell::ConnectionLost;
+		}
+	}
+
+	FString FarewellTitle(EFarewell Farewell)
+	{
+		switch (Farewell)
+		{
+		case EFarewell::HostClosedTheLobby: return TEXT("THE LOBBY WAS CLOSED");
+		case EFarewell::HostLeftTheMatch: return TEXT("THE HOST LEFT");
+		case EFarewell::ConnectionLost: return TEXT("DISCONNECTED");
+		case EFarewell::CouldNotJoin: return TEXT("COULDN'T JOIN");
+		default: return FString();
+		}
+	}
+
+	FString FarewellText(EFarewell Farewell)
+	{
+		switch (Farewell)
+		{
+		case EFarewell::HostClosedTheLobby: return TEXT("The host closed the lobby.");
+		case EFarewell::HostLeftTheMatch: return TEXT("The host left, and the match is over.");
+		case EFarewell::ConnectionLost: return TEXT("The connection to the host was lost.");
+		case EFarewell::CouldNotJoin: return TEXT("The host's match couldn't be reached.");
+		default: return FString();
+		}
+	}
+
 	const TCHAR* const Level = TEXT("/Game/Variant_Shooter/Lvl_Shooter");
 	const FName GameKey(TEXT("CHEESESTRIKE"));
 	const FName KillLimitKey(TEXT("KILLLIMIT"));

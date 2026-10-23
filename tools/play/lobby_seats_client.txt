@@ -1,0 +1,10 @@
+# Joins the host of lobby_seats_server.txt: the joiner's lobby, then over to
+# the host's side.
+cmd r.SetRes 1600x900w
+wait 2
+shot seats_joiner
+cmd CheeseStrikeSwitchSide
+wait 3
+shot seats_joiner_switched
+wait 150
+quit

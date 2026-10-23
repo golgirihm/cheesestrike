@@ -13,8 +13,8 @@
  */
 namespace CheeseStrikeRules
 {
-	/** Seconds a killed player waits before coming back. */
-	constexpr float RespawnDelay = 3.0f;
+	/** Seconds a killed player waits before coming back, unless the host says otherwise. */
+	constexpr float RespawnDelay = 5.0f;
 	/** Seconds a player just come back can't be hurt, unless they fire first. */
 	constexpr float SpawnProtection = 3.0f;
 	/** Kills that win a free-for-all unless the host says otherwise. */
@@ -130,14 +130,43 @@ namespace CheeseStrikeRules
 		bool bBot = false;
 		/** A seat nobody holds, drawn as a placeholder. */
 		bool bEmpty = false;
+		/** A bot that will stand in: its number, in the order the bots were added (0 the first); INDEX_NONE for a player. */
+		int32 Bot = INDEX_NONE;
 	};
 	/**
-	 * Team `Team`'s column: its players, then bots from `Bots` (the names
-	 * the match drew, the first TeamSize of them for the first team and so
-	 * on) until it is full; or, if `BotsWanted` (0 or more) says how many,
-	 * that many in all, dealt one at a time to whichever side has fewer.
+	 * Every seat taken, in the order it was taken: the `Players` in the
+	 * order they joined (as given), then the bots in the order they were
+	 * added, the nth named `Bots[n]`. How many bots: every seat the players
+	 * leave, or `BotsWanted` (0 or more), at most what is left. Each bot sits
+	 * on the side `BotSides` gives it (the host moved it there), or else is
+	 * dealt to whichever side has fewer, the first among equals; a side
+	 * that is full (TeamSize, players first) sends it to the other. A
+	 * player in `Players` who is a bot (the match's own, once in) keeps
+	 * their seat and takes one of the bots' places.
 	 */
-	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted);
+	TArray<FRosterEntry> Seats(const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted, const TArray<int32>& BotSides = {});
+	/** Team `Team`'s column: its seats of Seats, in the same order, at most TeamSize players. */
+	TArray<FRosterEntry> TeamColumn(int32 Team, const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted, const TArray<int32>& BotSides = {});
+	/** How many of `Seats` hold someone: players and bots. */
+	int32 Taken(const TArray<FRosterEntry>& Seats, int32 Team = INDEX_NONE);
+	/** Whether a player may go over to side `Team`: it has fewer than TeamSize players (bots make way for them). */
+	bool HasRoomForAPlayer(const TArray<FRosterEntry>& Players, int32 Team);
+	/**
+	 * The host moves bot `Bot` to the other side, if it has an open seat:
+	 * every bot keeps the side it has now (BotSides pins them all, so that
+	 * the dealing doesn't even the sides out again), and that one goes over.
+	 * False, and `BotSides` as it was, if it can't.
+	 */
+	bool MoveBot(const TArray<FRosterEntry>& Players, const TArray<FString>& Bots, int32 BotsWanted, TArray<int32>& BotSides, int32 Bot);
+	/** The sides the host moved the bots to, as a URL carries them (`?BotSides=0110`: a digit a bot), and back; empty for none. */
+	FString BotSidesOption(const TArray<int32>& BotSides);
+	TArray<int32> BotSidesFrom(const FString& Options);
+	/**
+	 * Why the host can't start the match with these `Seats` (Seats: players
+	 * and bots), or nothing if they can: one alone has nobody to play, and a
+	 * match of sides needs someone on each.
+	 */
+	FString WhyNotStart(const TArray<FRosterEntry>& Seats, bool bTeams);
 	/**
 	 * A lobby column's seats, as many as `NumSeats`: who is in `Column`
 	 * (players, then bots), then empty seats of `Team` to fill it. A team's
