@@ -6,7 +6,7 @@ The aging cellar under a fromagerie: an octagon about 70 m across under a vaulte
 
 Its walls, pillars and vault are dressed stone, its ceiling old red brick, its floor flagstones, its gallery, racks and doors old planks and studded oak: Poly Haven textures (CC0) that `tools/art/polyhaven.py` downloads and `tools/art/import_polyhaven.py` imports and makes into materials of `M_Surface`, drawn from world space on the map's blocks (`Content/LICENSES.md` names each). The cheese is wheels, not blocks: `tools/art/wheel_mesh.py` makes `SM_CheeseWheel`, a wheel as it is made, its sides a little rounded out and its edges rounded off, so that a stack of them reads as wheels and a wall of stacks as a wall of wheels; the kit's wheels take it as their `mesh`. The spines and the Mother Wheel are wheels in red wax (`M_CheeseWax`): what the mice never eat.
 
-The ceiling is overhead (`kit.overhead`): it blocks nothing, so the streaks' wheels fall through it, shots and sight pass it, and the minimap and the navigation mesh leave it out. It is tagged `Ceiling`, and `CheeseStrikeHideTagged Ceiling` (a console command, `Source/CheeseStrike/Map/CheeseStrikeMapCommands.cpp`) hides it, for looking at the map from above; `CheeseStrikeHideTagged Ceiling 0` brings it back.
+The ceiling is overhead (`kit.overhead`): it blocks nothing, so shots and sight pass it (the Unmanned Aerial Cheese flies under it, smaller, and a Cheese Strike's wheels burst through it onto the floor), and the minimap and the navigation mesh leave it out. It is tagged `Ceiling`, and `CheeseStrikeHideTagged Ceiling` (a console command, `Source/CheeseStrike/Map/CheeseStrikeMapCommands.cpp`) hides it, for looking at the map from above; `CheeseStrikeHideTagged Ceiling 0` brings it back.
 
 It is lit by its lamps, and by daylight down the vault's oculus: the sun (the `noon` rig, turned nearly overhead) falls through it onto the Mother Wheel, and its glow on the vault's dome shows over the maze's walls. Each part has a light of its own, so that a glance says where you are: warm over the north and south aisles, cool over the west and east, amber over the spines, the gutter's lamps dimmer and yellower; Gouda's stair is lit orange-warm with an orange band along its screen, Mozza's cold blue-white with a blue one; the Brine Room cold, the Smoke Room ember-orange. The stone pillars stand in lines along the rings, every 15 degrees in the outer ring, 22.5 in the middle and 45 in the inner, with ribs between them under the ceiling: they show which ring you are in, and stay when the walls go.
 
@@ -38,7 +38,7 @@ The mice come in at the drains, two in each side face, eight in all, and land 5 
 
 ## The cheese, and what the mice change
 
-About 680 blocks the mice can eat, and about 140 they can't (the spines, the Mother Wheel, the bridges' beams): the full ten mice. They keep to the mice's pace, so the maze is gone about four minutes after they come: the gutter first, then the outer ring, the middle, the inner, and last the gallery's parapet and bridges.
+About 680 blocks the mice can eat, and about 140 they can't (the spines, the Mother Wheel, the bridges' beams): the full twenty-four mice. They keep to the mice's pace, so the maze is gone about a minute and a quarter after they come: the gutter first, then the outer ring, the middle, the inner, and last the gallery's parapet and bridges.
 
 | Structure | Before | Eaten |
 |---|---|---|
