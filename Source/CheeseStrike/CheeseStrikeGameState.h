@@ -200,10 +200,11 @@ public:
 
 	/** Whether an Unmanned Aerial Cheese shows `Viewer` where the enemies are just now: their side's in a team mode, their own in free-for-all. */
 	bool IsRevealedTo(const APlayerState* Viewer) const;
-	/** The server's time that ends, or 0 if it isn't on. */
+	/** The server's time that ends, or 0 if it isn't on; and the time its sweeps began (a second drone adds its time to the first's). */
 	float RevealEndsFor(const APlayerState* Viewer) const;
-	/** Server only: the Unmanned Aerial Cheese `Caller` called in shows their side the enemy until `Until`. */
-	void RevealFor(ACheeseStrikePlayerState* Caller, float Until);
+	float RevealStartedFor(const APlayerState* Viewer) const;
+	/** Server only: the Unmanned Aerial Cheese `Caller` called in at `Now` shows their side the enemy for RevealTime more (CheeseStrikeStreaks::AddReveal); returns when it now ends. */
+	float RevealFor(ACheeseStrikePlayerState* Caller, float Now);
 
 	/** The last few announcements, as this machine heard them, oldest first. */
 	const TArray<FAnnouncement>& GetAnnouncements() const { return Announcements; }
@@ -269,8 +270,10 @@ protected:
 	float RoundBreakUntil = 0.0f;
 	UPROPERTY(Replicated)
 	int32 LastRoundWinner = -2;
-	/** Until when each team's Unmanned Aerial Cheese shows it the enemy, in the server's time. */
+	/** Until when each team's Unmanned Aerial Cheese shows it the enemy, and since when, in the server's time. */
 	UPROPERTY(Replicated)
 	TArray<float> TeamRevealUntil;
+	UPROPERTY(Replicated)
+	TArray<float> TeamRevealFrom;
 	TArray<FAnnouncement> Announcements;
 };

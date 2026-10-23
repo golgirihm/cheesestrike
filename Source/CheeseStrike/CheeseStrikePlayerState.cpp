@@ -24,6 +24,7 @@ void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	DOREPLIFETIME(ACheeseStrikePlayerState, LastEarnedAt);
 	DOREPLIFETIME(ACheeseStrikePlayerState, bOut);
 	DOREPLIFETIME(ACheeseStrikePlayerState, RevealUntil);
+	DOREPLIFETIME(ACheeseStrikePlayerState, RevealFrom);
 	DOREPLIFETIME(ACheeseStrikePlayerState, HillPoints);
 	DOREPLIFETIME(ACheeseStrikePlayerState, HillSeconds);
 }

@@ -1,0 +1,30 @@
+# Calls in an Unmanned Aerial Cheese on a map under a roof and watches for it
+# going round under the roof: a picture every three seconds along the way it
+# faces, then the other way. Run with tools/play.ps1 -Map <a roofed map>
+# -StartAt <a spot on the drone's circle, facing along it>, e.g. on The
+# Labyrinth the Ambulatory: -StartAt 0,-1150,60,0.
+wait 3
+cmd CheeseStrikeGiveStreak 1
+wait 0.5
+tap Streak
+wait 0.5
+look 0 15
+shot drone_1
+wait 3
+shot drone_2
+wait 3
+shot drone_3
+wait 3
+shot drone_4
+wait 3
+shot drone_5
+look 180 0
+wait 3
+shot drone_6
+wait 3
+shot drone_7
+wait 3
+shot drone_8
+wait 3
+shot drone_9
+quit

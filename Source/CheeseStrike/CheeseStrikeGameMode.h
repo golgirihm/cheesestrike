@@ -172,8 +172,6 @@ protected:
 	void CheckRoundNow() { CheckRound(false); }
 	/** Elimination: `Winner` (or nobody, NoTeam) takes the round; the match, at the round limit, or a pause before the next. */
 	void EndRound(int32 Winner);
-	/** Where an Unmanned Aerial Cheese circles: over the middle of the starts, high above the highest. */
-	void DroneCircle(FVector& OutCentre, float& OutRadius) const;
 	/** Gun Game: gives `Body` its player's step of the ladder, in hand at once, and nothing else. */
 	void ArmForGunGame(TWeakObjectPtr<ACheeseStrikeCharacter> Body);
 

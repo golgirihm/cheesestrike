@@ -19,6 +19,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Streaks/CheeseStrikeBombs.h"
+#include "Streaks/CheeseStrikeOverhead.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "UI/CheeseStrikeHUDDraw.h"
 #include "UI/CheeseStrikeHillHUD.h"
@@ -185,11 +186,13 @@ namespace
 			HudDraw::FShapes Shapes;
 			if (Mine->StrikeAim(Spot, Yaw))
 			{
-				// Each wheel where it will land: the first thing it meets coming down.
+				// Each wheel where it will land: the first thing it meets coming down, or indoors the floor under the roof.
+				const FCheeseStrikeOverhead& Overhead = FCheeseStrikeOverhead::Of(Hud->GetWorld());
 				for (const FVector& Wheel : CheeseStrikeStreaks::StrikeLine(Spot, Yaw))
 				{
 					FVector Impact;
-					if (ACheeseStrikeBombs::Landing(Hud->GetWorld(), Wheel, Impact))
+					float Roof = 0.0f;
+					if (ACheeseStrikeBombs::StrikeLanding(Hud->GetWorld(), Overhead, Wheel, Impact, Roof))
 					{
 						ModeHudRing(Hud, Shapes, Impact, 90.0f, HudDraw::Danger, 2.0f * U);
 					}
@@ -204,9 +207,11 @@ namespace
 	void ModeHudDrawReveal(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)
 	{
 		// The sweeps' marks are the HUD's (ACheeseStrikeHUD::UpdateSweep), which also puts them on the minimap.
+		// A second drone adds its time to the first's: the sweeps go on from the first, and the seconds and the bar show it all.
 		const float Until = Match->RevealEndsFor(Mine);
 		const float Now = Match->GetServerWorldTimeSeconds();
-		const CheeseStrikeHUD::FSweep Sweep = CheeseStrikeHUD::SweepAt(Now, Until, CheeseStrikeStreaks::RevealTime, CheeseStrikeStreaks::SweepPeriod);
+		const float Lasts = Until - Match->RevealStartedFor(Mine);
+		const CheeseStrikeHUD::FSweep Sweep = CheeseStrikeHUD::SweepAt(Now, Until, Lasts, CheeseStrikeStreaks::SweepPeriod);
 		if (Sweep.Index == INDEX_NONE)
 		{
 			return;
@@ -229,7 +234,7 @@ namespace
 		const float Left = ACheeseStrikeHUD::Margin * U;
 		const float Top = (ACheeseStrikeHUD::Margin + ACheeseStrikeHUD::MapSide + 40.0f) * U;
 		const float Width = ACheeseStrikeHUD::MapSide * U;
-		const float Remaining = FMath::Clamp((Until - Now) / CheeseStrikeStreaks::RevealTime, 0.0f, 1.0f);
+		const float Remaining = FMath::Clamp((Until - Now) / FMath::Max(Lasts, CheeseStrikeStreaks::RevealTime), 0.0f, 1.0f);
 		const FSlateFontInfo Label = HudDraw::Font(14.0f * U);
 		const float LabelHeight = HudDraw::Measure(TEXT("U"), Label).Y;
 		Shapes.Rect(Left, Top + LabelHeight + 4.0f * U, Width, 3.0f * U, HudDraw::Dim);
