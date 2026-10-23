@@ -31,6 +31,8 @@ enum class EMenuPage : uint8
 	Credits,
 	/** The player's options (UCheeseStrikeSettings): from the front end, or from the pause menu during a match. */
 	Options,
+	/** Every action's keys and buttons (CheeseStrikeControls): from the pause menu, or from the options. */
+	Controls,
 };
 
 /** The options page's tabs. */
@@ -114,6 +116,14 @@ namespace CheeseStrikeMenu
 	constexpr float LobbyGap = 44.0f;
 	/** The width of the names of the lobby's rules, left of their dropdowns. */
 	constexpr float RuleLabelWidth = 220.0f;
+	/** The smallest the game's window may be made (in a window), so that nothing in the menus is crowded out. */
+	constexpr int32 MinWindowWidth = 1280;
+	constexpr int32 MinWindowHeight = 720;
+	/**
+	 * How much a page that needs `Wants` is shrunk to fit `Room`: 1 when it
+	 * fits, less (the same both ways) when it would otherwise be clipped.
+	 */
+	float ShrinkToFit(const FVector2D& Wants, const FVector2D& Room);
 	/** The longest name a player may have (Steam's), which a seat in the lobby fits: smaller, and cut short with an ellipsis if it still doesn't. */
 	constexpr int32 LongestName = 32;
 	/** The size a seat writes `Name` at: smaller the longer it is. */
@@ -182,6 +192,9 @@ public:
 
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+	/** The space bar presses nothing in the menu (Slate takes it for Enter): only Enter, a click or a gamepad's A do. */
+	virtual FReply OnPreviewKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	virtual FNavigationReply OnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent) override;
 
 	/** The page's items that can take the focus, by name, in the order they show. */
@@ -194,6 +207,8 @@ public:
 	bool HasDropdownOpen() const { return IsDropdownOpen(); }
 	/** Whether the lobby shows the host's match, ready to be played in: not joining it, nor on the way to another level. */
 	bool IsLobbyReady() const;
+	/** The room the lobby needs, laid out in full with its margins: in less (a small window), it is shrunk to fit, never clipped. */
+	FVector2D LobbyWants() const;
 	/** Shuts any dropdown open, giving the focus back to its button; true if one was. */
 	bool CloseDropdowns();
 
@@ -209,6 +224,8 @@ private:
 	TSharedRef<SWidget> MakeCredits();
 	/** The options: a tab for each kind (EOptionsTab), each setting on a row, applied as it changes and kept. */
 	TSharedRef<SWidget> MakeOptions();
+	/** The controls: a row an action, its keys on the keyboard and mouse, and its buttons on an Xbox and a Nintendo pad (CheeseStrikeControls::Rows). */
+	TSharedRef<SWidget> MakeControls();
 	TSharedRef<SWidget> MakeOptionsTab();
 	/** A row of the options: its name on the left, then what sets it. */
 	TSharedRef<SWidget> MakeOptionRow(const FString& Label, TSharedRef<SWidget> Setter);

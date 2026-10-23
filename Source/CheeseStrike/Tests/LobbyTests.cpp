@@ -26,6 +26,9 @@
 #include "UI/CheeseStrikeMenu.h"
 #include "UI/CheeseStrikeTones.h"
 #include "UI/CheeseStrikeMusic.h"
+#include "UI/CheeseStrikeControls.h"
+#include "Input/CheeseStrikeInput.h"
+#include "InputAction.h"
 #include "UI/CheeseStrikePostGame.h"
 #include "Sessions/CheeseStrikeSessions.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
@@ -245,6 +248,76 @@ bool FTheMenuHasItsMusic::RunTest(const FString& Parameters)
 	Settings->SetMusicVolume(3.0f);
 	TestEqual(TEXT("and keeps to its range"), Settings->GetMusicVolume(), 1.0f);
 	TestTrue(TEXT("in a class of its own, which the effects volume leaves alone"), UCheeseStrikeSettings::MusicSoundClass() != nullptr && UCheeseStrikeSettings::MusicSoundClass() != UCheeseStrikeSettings::MenuSoundClass());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheControlsPageSaysWhatEveryKeyDoes, "CheeseStrike.Rules.TheControlsPageSaysWhatEveryKeyDoes", LobbyTests::Flags)
+
+bool FTheControlsPageSaysWhatEveryKeyDoes::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeControls;
+	const UCheeseStrikeInputSet* Set = UCheeseStrikeInputSet::Build(GetTransientPackage());
+	const TArray<FRow> Rows = CheeseStrikeControls::Rows(*Set);
+	// Every action with a key is on the page, once, with every key it has.
+	for (const UInputAction* Action : AllActions(*Set))
+	{
+		if (Set->KeysFor(Action).Num() == 0)
+		{
+			continue;
+		}
+		const int32 Showing = Rows.FilterByPredicate([Action](const FRow& Row) { return Row.Actions.Contains(Action); }).Num();
+		TestEqual(FString::Printf(TEXT("%s is on the page once"), *Action->GetName()), Showing, 1);
+		for (const FKey& Key : Set->KeysFor(Action))
+		{
+			const FRow* Row = Rows.FindByPredicate([Action](const FRow& Each) { return Each.Actions.Contains(Action); });
+			const bool bShown = Row != nullptr && (Key.IsGamepadKey() ? Row->Xbox.Contains(PadLabel(Key, EPad::Xbox)) && Row->Nintendo.Contains(PadLabel(Key, EPad::Nintendo)) : Row->Keyboard.Contains(KeyboardLabel(Key)));
+			TestTrue(FString::Printf(TEXT("%s's %s is shown"), *Action->GetName(), *Key.ToString()), bShown);
+		}
+	}
+	const auto Find = [&Rows](const UInputAction* Action) { const FRow* Row = Rows.FindByPredicate([Action](const FRow& Each) { return Each.Actions.Contains(Action); }); return Row != nullptr ? *Row : FRow(); };
+	TestEqual(TEXT("moving is WASD and the arrows"), Find(Set->Move).Keyboard, FString(TEXT("WASD / ↑←↓→")));
+	TestEqual(TEXT("and the left stick"), Find(Set->Move).Xbox, FString(TEXT("LEFT STICK")));
+	TestEqual(TEXT("looking, the mouse"), Find(Set->MouseLook).Keyboard, FString(TEXT("MOUSE")));
+	TestTrue(TEXT("or the right stick, on one row"), Find(Set->MouseLook).Xbox == TEXT("RIGHT STICK") && Find(Set->StickLook).Action == Find(Set->MouseLook).Action);
+	TestTrue(TEXT("jumping, the space bar, an Xbox pad's A, a Nintendo pad's B (the same button)"), Find(Set->Jump).Keyboard == TEXT("SPACE") && Find(Set->Jump).Xbox == TEXT("A") && Find(Set->Jump).Nintendo == TEXT("B"));
+	TestTrue(TEXT("firing, the left button, RT or ZR"), Find(Set->Fire).Keyboard == TEXT("LMB") && Find(Set->Fire).Xbox == TEXT("RT") && Find(Set->Fire).Nintendo == TEXT("ZR"));
+	TestTrue(TEXT("pausing, Escape, Menu or +"), Find(Set->Menu).Keyboard == TEXT("ESC") && Find(Set->Menu).Xbox == TEXT("MENU") && Find(Set->Menu).Nintendo == TEXT("+"));
+	TestTrue(TEXT("a held key and a pressed button on one row: sprinting"), Find(Set->Sprint).Action == Find(Set->SprintToggle).Action && Find(Set->Sprint).Keyboard == TEXT("SHIFT") && Find(Set->Sprint).Xbox == TEXT("PRESS LS"));
+	TestTrue(TEXT("the wheel is written as such"), Find(Set->NextWeapon).Keyboard.Contains(TEXT("WHEEL DOWN")));
+	TestEqual(TEXT("a Nintendo pad's face buttons are the Xbox's swapped round"), PadLabel(EKeys::Gamepad_FaceButton_Right, EPad::Nintendo) + PadLabel(EKeys::Gamepad_FaceButton_Left, EPad::Nintendo) + PadLabel(EKeys::Gamepad_FaceButton_Top, EPad::Nintendo), FString(TEXT("AYX")));
+	TestEqual(TEXT("its bumpers L and R"), PadLabel(EKeys::Gamepad_LeftShoulder, EPad::Nintendo) + PadLabel(EKeys::Gamepad_RightShoulder, EPad::Nintendo), FString(TEXT("LR")));
+
+	// The page opens from the front end's options, and from the pause menu.
+	using CheeseStrikeMenu::PageFor;
+	TestTrue(TEXT("the controls open from the front end"), PageFor(false, false, false, false, EMenuPage::Controls) == EMenuPage::Controls);
+	TestTrue(TEXT("and from the pause menu"), PageFor(true, false, true, true, EMenuPage::Controls) == EMenuPage::Controls);
+	TestTrue(TEXT("not over a match not paused"), PageFor(true, false, true, false, EMenuPage::Controls) == EMenuPage::None);
+
+	// The space bar presses nothing in the menu (Slate would take it for Enter); Enter still does.
+	const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu);
+	const FKeyEvent Space(EKeys::SpaceBar, FModifierKeysState(), 0, false, 0, 0);
+	const FKeyEvent Enter(EKeys::Enter, FModifierKeysState(), 0, false, 0, 0);
+	TestTrue(TEXT("the menu keeps the space bar from its buttons"), Menu->OnPreviewKeyDown(FGeometry(), Space).IsEventHandled() && Menu->OnKeyUp(FGeometry(), Space).IsEventHandled());
+	TestFalse(TEXT("but lets Enter through to them"), Menu->OnPreviewKeyDown(FGeometry(), Enter).IsEventHandled());
+
+	// A page that wouldn't fit is shrunk, the same both ways; one that fits is left as it is.
+	TestEqual(TEXT("a page that fits isn't shrunk"), CheeseStrikeMenu::ShrinkToFit(FVector2D(1600.0, 900.0), FVector2D(1920.0, 1080.0)), 1.0f);
+	TestEqual(TEXT("one too wide is, to the room's width"), CheeseStrikeMenu::ShrinkToFit(FVector2D(2000.0, 900.0), FVector2D(1600.0, 1080.0)), 0.8f);
+	TestEqual(TEXT("the smallest window is the lobby's smallest screen"), CheeseStrikeMenu::MinWindowWidth * 10000 + CheeseStrikeMenu::MinWindowHeight, 1280 * 10000 + 720);
+
+	// Full screen, a resolution picked is what the game is drawn at.
+	using CheeseStrikeSettings::ScreenPercentageFor;
+	TestTrue(TEXT("full screen at 1280 x 720 on a 1920 x 1080 screen, two thirds"), FMath::IsNearlyEqual(ScreenPercentageFor(FIntPoint(1280, 720), FIntPoint(1920, 1080)), 66.67f, 0.01f));
+	TestEqual(TEXT("the screen's own, all of it"), ScreenPercentageFor(FIntPoint(1920, 1080), FIntPoint(1920, 1080)), 100.0f);
+	TestEqual(TEXT("none picked, all of it"), ScreenPercentageFor(FIntPoint::ZeroValue, FIntPoint(1920, 1080)), 100.0f);
+	TestEqual(TEXT("never more than the screen"), ScreenPercentageFor(FIntPoint(3840, 2160), FIntPoint(1920, 1080)), 100.0f);
+	UCheeseStrikeSettings* Settings = NewObject<UCheeseStrikeSettings>(GetTransientPackage());
+	Settings->SetFullscreenMode(EWindowMode::Fullscreen);
+	Settings->SetFullscreenResolution(FIntPoint(1600, 900));
+	TestEqual(TEXT("full screen, the resolution shown is the one picked"), Settings->GetResolutionShown(), FIntPoint(1600, 900));
+	Settings->SetFullscreenMode(EWindowMode::Windowed);
+	Settings->SetScreenResolution(FIntPoint(1280, 720));
+	TestEqual(TEXT("in a window, the window's"), Settings->GetResolutionShown(), FIntPoint(1280, 720));
 	return true;
 }
 
@@ -508,15 +581,26 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 			const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(Each));
 			Menu->Show(EMenuPage::Lobby);
 			Menu->SlatePrepass(1.0f);
-			const FVector2D Wants = Menu->GetDesiredSize();
+			const FVector2D Wants = Menu->LobbyWants();
 			const FString Who = Each == 0 ? TEXT("the host's") : TEXT("the joiner's");
 			AddInfo(FString::Printf(TEXT("%s lobby wants %.0f x %.0f"), *Who, Wants.X, Wants.Y));
-			for (const FIntPoint Screen : {FIntPoint(1280, 720), FIntPoint(1600, 900), FIntPoint(1920, 1080)})
+			TestTrue(FString::Printf(TEXT("%s lobby has a size (%.0f x %.0f)"), *Who, Wants.X, Wants.Y), Wants.X > 1000.0 && Wants.Y > 600.0);
+			// The smallest window allowed first.
+			for (const FIntPoint Screen : {FIntPoint(CheeseStrikeMenu::MinWindowWidth, CheeseStrikeMenu::MinWindowHeight), FIntPoint(1600, 900), FIntPoint(1920, 1080), FIntPoint(2560, 1080)})
 			{
-				// The screen in the menu's own units: Slate scales the menu with the screen's height (the engine's DPI curve).
+				// The screen in the menu's own units: Slate scales the menu with the screen's shorter side (the engine's DPI curve).
 				const float Scale = GetDefault<UUserInterfaceSettings>()->GetDPIScaleBasedOnSize(Screen);
 				const FVector2D Room(Screen.X / Scale, Screen.Y / Scale);
 				TestTrue(FString::Printf(TEXT("%s lobby (%.0f x %.0f) fits %d x %d (%.0f x %.0f)"), *Who, Wants.X, Wants.Y, Screen.X, Screen.Y, Room.X, Room.Y), Wants.X <= Room.X + 1.0 && Wants.Y <= Room.Y + 1.0);
+			}
+			// A window of the smallest width but taller (squarer) has less room across than the lobby wants: it is shrunk
+			// to fit, not clipped, and stays readable.
+			for (const FIntPoint Screen : {FIntPoint(CheeseStrikeMenu::MinWindowWidth, 960), FIntPoint(CheeseStrikeMenu::MinWindowWidth, 1024)})
+			{
+				const float Scale = GetDefault<UUserInterfaceSettings>()->GetDPIScaleBasedOnSize(Screen);
+				const FVector2D Room(Screen.X / Scale, Screen.Y / Scale);
+				const float Shrink = CheeseStrikeMenu::ShrinkToFit(Wants, Room);
+				TestTrue(FString::Printf(TEXT("%s lobby is shrunk at %d x %d, by %.2f, not by much"), *Who, Screen.X, Screen.Y, Shrink), Shrink >= 0.8f && Wants.X * Shrink <= Room.X + 1.0);
 			}
 			TArray<TSharedRef<SWidget>> Widgets;
 			LobbyTests::AllWidgets(Menu, Widgets);

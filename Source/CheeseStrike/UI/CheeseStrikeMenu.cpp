@@ -37,6 +37,7 @@
 #include "Rules/CheeseStrikeHills.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Settings/CheeseStrikeSettings.h"
+#include "UI/CheeseStrikeControls.h"
 #include "UI/CheeseStrikeCredits.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
@@ -46,7 +47,7 @@ namespace CheeseStrikeMenu
 {
 	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling, bool bResultsHeld)
 	{
-		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options;
+		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options || Chosen == EMenuPage::Controls;
 		const EMenuPage FrontEnd = bFrontEndPage ? Chosen : EMenuPage::Main;
 		// Going to the map the host picked: the lobby, saying so. Back to the lobby after the results: the results, held up
 		// until the lobby is there.
@@ -60,8 +61,8 @@ namespace CheeseStrikeMenu
 		}
 		if (bMatchStarted)
 		{
-			// The options open from the pause menu, the match going on and the player still paused.
-			return bPaused ? (Chosen == EMenuPage::Options ? EMenuPage::Options : EMenuPage::Pause) : EMenuPage::None;
+			// The options and the controls open from the pause menu, the match going on and the player still paused.
+			return bPaused ? (Chosen == EMenuPage::Options || Chosen == EMenuPage::Controls ? Chosen : EMenuPage::Pause) : EMenuPage::None;
 		}
 		if (bInAMatch)
 		{
@@ -163,6 +164,15 @@ namespace CheeseStrikeMenu
 			}
 		}
 		return Best;
+	}
+
+	float ShrinkToFit(const FVector2D& Wants, const FVector2D& Room)
+	{
+		if (Wants.X <= 0.0 || Wants.Y <= 0.0)
+		{
+			return 1.0f;
+		}
+		return static_cast<float>(FMath::Clamp(FMath::Min(Room.X / Wants.X, Room.Y / Wants.Y), 0.1, 1.0));
 	}
 
 	int32 SeatNameSize(const FString& Name)
@@ -359,6 +369,47 @@ namespace
 		TAttribute<bool> Open;
 	};
 
+	/**
+	 * A page that fills the room it is given, as big as it needs at least:
+	 * given less than it needs (a small window), it is laid out at what it
+	 * needs and shrunk, the same both ways, to fit, so that nothing is ever
+	 * clipped or crowded (CheeseStrikeMenu::ShrinkToFit).
+	 */
+	class SCheeseStrikeFitBox : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SCheeseStrikeFitBox) {}
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			ChildSlot [ InArgs._Content.Widget ];
+		}
+
+		virtual void OnArrangeChildren(const FGeometry& AllottedGeometry, FArrangedChildren& ArrangedChildren) const override
+		{
+			const FVector2D Room = AllottedGeometry.GetLocalSize();
+			const FVector2D Wants = ChildSlot.GetWidget()->GetDesiredSize();
+			const float Scale = CheeseStrikeMenu::ShrinkToFit(Wants, Room);
+			// Laid out at the room it has, or at what it needs where that is more, then shrunk into the room.
+			const FVector2D Size(FMath::Max(Room.X, Wants.X * Scale) / Scale, FMath::Max(Room.Y, Wants.Y * Scale) / Scale);
+			ArrangedChildren.AddWidget(AllottedGeometry.MakeChild(ChildSlot.GetWidget(), FVector2f(Size), FSlateLayoutTransform(Scale)));
+		}
+
+		virtual FVector2D ComputeDesiredSize(float) const override
+		{
+			// Whatever it is given: it shrinks rather than asking for more.
+			return FVector2D::ZeroVector;
+		}
+
+		/** How much it shrinks its page now; 1 when it fits. */
+		float GetShrink() const
+		{
+			return CheeseStrikeMenu::ShrinkToFit(ChildSlot.GetWidget()->GetDesiredSize(), GetCachedGeometry().GetLocalSize());
+		}
+	};
+
 	/** Whether the item with the focus is ringed: not while the player uses the mouse, which has its hover. */
 	bool MenuFocusRingsShown = true;
 
@@ -419,6 +470,17 @@ namespace
 				}
 			}
 			return FNavigationReply::Stop();
+		}
+
+		virtual FReply OnPreviewKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override
+		{
+			// As in the menu: the space bar picks nothing.
+			return InKeyEvent.GetKey() == EKeys::SpaceBar ? FReply::Handled() : FReply::Unhandled();
+		}
+
+		virtual FReply OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override
+		{
+			return InKeyEvent.GetKey() == EKeys::SpaceBar ? FReply::Handled() : SCompoundWidget::OnKeyUp(MyGeometry, InKeyEvent);
 		}
 
 		virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override
@@ -506,7 +568,10 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 			]
 			+ SOverlay::Slot().Padding(FMargin(56.0f, 40.0f))
 			[
-				SAssignNew(LobbyContent, SBox).HAlign(HAlign_Fill).VAlign(VAlign_Fill)
+				SNew(SCheeseStrikeFitBox)
+				[
+					SAssignNew(LobbyContent, SBox).HAlign(HAlign_Fill).VAlign(VAlign_Fill)
+				]
 			]
 		]
 		// The game's name over the front end, at the top in the middle.
@@ -569,10 +634,10 @@ void SCheeseStrikeMenu::Refresh()
 	const bool bLobby = Page == EMenuPage::Lobby;
 	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
 	// The credits and the options are wide: a wider panel, and the game's name out of their way.
-	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options;
+	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options || Page == EMenuPage::Controls;
 	if (Content.IsValid())
 	{
-		Content->SetWidthOverride(Page == EMenuPage::Options ? 760.0f : (bWide ? 640.0f : 400.0f));
+		Content->SetWidthOverride(Page == EMenuPage::Controls ? 900.0f : (Page == EMenuPage::Options ? 760.0f : (bWide ? 640.0f : 400.0f)));
 		Content->SetVAlign(bWide ? VAlign_Fill : VAlign_Center);
 	}
 	if (Lobby.IsValid())
@@ -582,7 +647,7 @@ void SCheeseStrikeMenu::Refresh()
 	if (Blur.IsValid())
 	{
 		// The pause menu, and the options opened from it while still paused; not the front end's options.
-		const bool bPausedHere = Page == EMenuPage::Pause || (Page == EMenuPage::Options && Controller.IsValid() && Controller->IsPaused());
+		const bool bPausedHere = Page == EMenuPage::Pause || ((Page == EMenuPage::Options || Page == EMenuPage::Controls) && Controller.IsValid() && Controller->IsPaused());
 		Blur->SetVisibility(bPausedHere ? EVisibility::HitTestInvisible : EVisibility::Collapsed);
 	}
 	if (Masthead.IsValid())
@@ -768,8 +833,8 @@ bool SCheeseStrikeMenu::CloseDropdowns()
 FNavigationReply SCheeseStrikeMenu::OnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent)
 {
 	const EUINavigation Way = InNavigationEvent.GetNavigationType();
-	// The credits have nothing to focus but Back: up and down scroll them.
-	if (Page == EMenuPage::Credits && (Way == EUINavigation::Up || Way == EUINavigation::Down))
+	// The credits and the controls have nothing to focus but Back: up and down scroll them.
+	if ((Page == EMenuPage::Credits || Page == EMenuPage::Controls) && (Way == EUINavigation::Up || Way == EUINavigation::Down))
 	{
 		if (const TSharedPtr<SScrollBox> Scroll = CreditsScroll.Pin())
 		{
@@ -831,6 +896,22 @@ bool SCheeseStrikeMenu::IsBlurringTheGame() const
 	return Blur.IsValid() && Blur->GetVisibility() != EVisibility::Collapsed;
 }
 
+FReply SCheeseStrikeMenu::OnPreviewKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	// Slate takes the space bar as Enter on whatever has the focus, so that a jump pressed as the menu comes up, or in it,
+	// would press a button. Only Enter, a click or a gamepad's A press one here (the match's own Space is the game's).
+	if (InKeyEvent.GetKey() == EKeys::SpaceBar)
+	{
+		return FReply::Handled();
+	}
+	return SCompoundWidget::OnPreviewKeyDown(MyGeometry, InKeyEvent);
+}
+
+FReply SCheeseStrikeMenu::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+	return InKeyEvent.GetKey() == EKeys::SpaceBar ? FReply::Handled() : SCompoundWidget::OnKeyUp(MyGeometry, InKeyEvent);
+}
+
 FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
 	// Escape and B go back (closing an open dropdown first), and so does the gamepad's Menu button, as Escape in a match.
@@ -870,6 +951,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePage()
 	case EMenuPage::Pause: return MakePause();
 	case EMenuPage::Credits: return MakeCredits();
 	case EMenuPage::Options: return MakeOptions();
+	case EMenuPage::Controls: return MakeControls();
 	default: return SNullWidget::NullWidget;
 	}
 }
@@ -1570,7 +1652,8 @@ FString SCheeseStrikeMenu::PageKey() const
 		if (const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get())
 		{
 			const FIntPoint Resolution = Settings->GetScreenResolution();
-			Key += FString::Printf(TEXT("|%d %d %dx%d %d %.0f %d"), Settings->GetOverallScalabilityLevel(), static_cast<int32>(Settings->GetFullscreenMode()), Resolution.X, Resolution.Y,
+			const FIntPoint Drawn = Settings->GetResolutionShown();
+			Key += FString::Printf(TEXT("|%d %d %dx%d %dx%d %d %.0f %d"), Settings->GetOverallScalabilityLevel(), static_cast<int32>(Settings->GetFullscreenMode()), Resolution.X, Resolution.Y, Drawn.X, Drawn.Y,
 				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0) + (Settings->IsAimAssistOn() ? TEXT(" assist") : TEXT(""));
 		}
 	}
@@ -1592,6 +1675,12 @@ bool SCheeseStrikeMenu::HaveMatch() const
 	// A joiner has the host's match once it has come with the host in it and the joiner too: a lobby drawn before then
 	// would be a guess (every seat a bot, nobody crowned).
 	return Player->PlayerState != nullptr && Match->PlayerArray.Contains(Player->PlayerState) && Match->PlayerArray.Num() >= 2 && !Match->GetHostName().IsEmpty() && Match->GetBotNames().Num() > 0;
+}
+
+FVector2D SCheeseStrikeMenu::LobbyWants() const
+{
+	// The lobby's margins (Construct) round what it lays out.
+	return LobbyContent.IsValid() ? LobbyContent->GetDesiredSize() + FVector2D(2.0 * 56.0, 2.0 * 40.0) : FVector2D::ZeroVector;
 }
 
 bool SCheeseStrikeMenu::IsLobbyReady() const
@@ -1738,6 +1827,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePause()
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("The match goes on without you."), true) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("RESUME"), [Player]() { if (Player.IsValid()) Player->TogglePause(); }, EButtonKind::Primary) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("OPTIONS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CONTROLS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Controls); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("LEAVE THE MATCH"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ];
 }
@@ -1825,6 +1915,55 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 		];
 }
 
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeControls()
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	const UCheeseStrikeInputSet* Set = UCheeseStrikeInputSet::Get(Controller.Get());
+	// A table: the action, then its keys, then each pad's buttons, the column of what the player uses now lit.
+	const bool bPad = CheeseStrikeInput::IsUsingGamepad(Controller.Get());
+	const auto Cell = [](const FString& Text, const FSlateFontInfo& Look, const FLinearColor& Colour)
+	{
+		return SNew(STextBlock).Text(FText::FromString(Text)).Font(Look).ColorAndOpacity(Colour).AutoWrapText(true);
+	};
+	const auto Row = [&Cell](const FString& Action, const FString& Keys, const FString& Xbox, const FString& Nintendo, bool bHeading, bool bPadLit) -> TSharedRef<SWidget>
+	{
+		const FSlateFontInfo Look = bHeading ? Font(14, FName("Bold")) : Font(17);
+		const FSlateFontInfo KeyLook = bHeading ? Font(14, FName("Bold")) : Font(17, FName("Bold"));
+		const FLinearColor Name = bHeading ? Muted : Ink;
+		const FLinearColor KeysColour = bHeading ? Muted : (bPadLit ? Muted : Cheese);
+		const FLinearColor PadColour = bHeading ? Muted : (bPadLit ? Cheese : Muted);
+		return SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(0.36f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Action, Look, Name) ]
+			+ SHorizontalBox::Slot().FillWidth(0.26f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Keys, KeyLook, KeysColour) ]
+			+ SHorizontalBox::Slot().FillWidth(0.19f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Xbox, KeyLook, PadColour) ]
+			+ SHorizontalBox::Slot().FillWidth(0.19f).VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour) ];
+	};
+	TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
+	if (Set != nullptr)
+	{
+		for (const CheeseStrikeControls::FRow& Each : CheeseStrikeControls::Rows(*Set))
+		{
+			List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 5.0f)) [ Row(Each.Action, Each.Keyboard.IsEmpty() ? FString(TEXT("-")) : Each.Keyboard, Each.Xbox.IsEmpty() ? FString(TEXT("-")) : Each.Xbox, Each.Nintendo.IsEmpty() ? FString(TEXT("-")) : Each.Nintendo, false, bPad) ];
+		}
+	}
+	else
+	{
+		List->AddSlot().AutoHeight() [ MakeLine(TEXT("The controls aren't there to show."), true) ];
+	}
+	// Up and down scroll the list (OnNavigation), as the credits' do.
+	TSharedPtr<SScrollBox> Scroll;
+	TSharedRef<SWidget> ControlsPage = SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("CONTROLS")) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 6.0f)) [ Row(TEXT("ACTION"), TEXT("KEYBOARD AND MOUSE"), TEXT("XBOX"), TEXT("NINTENDO"), true, bPad) ]
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SAssignNew(Scroll, SScrollBox) + SScrollBox::Slot() [ List ] ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)).HAlign(HAlign_Left)
+		[
+			SNew(SBox).WidthOverride(304.0f) [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); }) ]
+		];
+	CreditsScroll = Scroll;
+	return ControlsPage;
+}
+
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 {
 	UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
@@ -1840,6 +1979,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 	switch (OptionsTab)
 	{
 	case EOptionsTab::Controls:
+		{
+			// Every key and button, on a page of its own.
+			TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+			Add(MakeOptionRow(TEXT("Keys and buttons"), SNew(SBox).HAlign(HAlign_Left)
+				[
+					MakeButton(TEXT("SEE THE CONTROLS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Controls); })
+				]));
+		}
 		Add(MakeOptionRow(TEXT("Look sensitivity"), MakeSlider(CheeseStrikeSettings::MinSensitivity, CheeseStrikeSettings::MaxSensitivity, 0.05f,
 			[Kept]() { return Kept.IsValid() ? Kept->GetMouseSensitivity() : CheeseStrikeSettings::DefaultSensitivity; },
 			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMouseSensitivity(Value); }, Times)));
@@ -1932,31 +2079,45 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			if (Kept.IsValid())
 			{
 				Kept->SetFullscreenMode(WindowModes[Index]);
-				// Borderless fills the screen at its own resolution.
-				if (WindowModes[Index] == EWindowMode::WindowedFullscreen)
+				// Full screen, the window is the screen's own size, and the resolution picked is what the game is drawn at.
+				if (WindowModes[Index] != EWindowMode::Windowed)
 				{
 					Kept->SetScreenResolution(Kept->GetDesktopResolution());
 				}
 				ApplyWindow(Kept.Get());
+				ApplyGraphics(Kept.Get());
 			}
 			Refresh();
 		})));
 		const TArray<FIntPoint> Resolutions = ResolutionsHere();
-		const int32 ResolutionChosen = CheeseStrikeSettings::ResolutionIndex(Resolutions, Settings->GetScreenResolution());
-		const FIntPoint Shown = Resolutions.IsValidIndex(ResolutionChosen) ? Resolutions[ResolutionChosen] : Settings->GetScreenResolution();
-		const bool bBorderless = Settings->GetFullscreenMode() == EWindowMode::WindowedFullscreen;
-		const auto PickResolution = [this, Kept, Resolutions](int32 Index)
+		const int32 ResolutionChosen = CheeseStrikeSettings::ResolutionIndex(Resolutions, Settings->GetResolutionShown());
+		const FIntPoint Shown = Resolutions.IsValidIndex(ResolutionChosen) ? Resolutions[ResolutionChosen] : Settings->GetResolutionShown();
+		const bool bFullScreen = Settings->GetFullscreenMode() != EWindowMode::Windowed;
+		const auto PickResolution = [this, Kept, Resolutions, bFullScreen](int32 Index)
 		{
 			if (Kept.IsValid() && Resolutions.IsValidIndex(Index))
 			{
-				Kept->SetScreenResolution(Resolutions[Index]);
-				ApplyWindow(Kept.Get());
+				// Full screen, what the game is drawn at; in a window, the window's size.
+				if (bFullScreen)
+				{
+					Kept->SetFullscreenResolution(Resolutions[Index]);
+					ApplyGraphics(Kept.Get());
+				}
+				else
+				{
+					Kept->SetScreenResolution(Resolutions[Index]);
+					ApplyWindow(Kept.Get());
+				}
 			}
 			Refresh();
 		};
-		Add(MakeOptionRow(TEXT("Resolution"), MakeStepper(FString(), FString::Printf(TEXT("%d x %d"), Shown.X, Shown.Y), !bBorderless && Resolutions.Num() > 1,
+		Add(MakeOptionRow(TEXT("Resolution"), MakeStepper(FString(), FString::Printf(TEXT("%d x %d"), Shown.X, Shown.Y), Resolutions.Num() > 1,
 			[PickResolution, ResolutionChosen]() { PickResolution(FMath::Max(0, ResolutionChosen - 1)); },
 			[PickResolution, ResolutionChosen, Resolutions]() { PickResolution(FMath::Min(Resolutions.Num() - 1, ResolutionChosen + 1)); })));
+		if (bFullScreen)
+		{
+			Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("Full screen, the game is drawn at this resolution and the menus at the screen's own."), true) ];
+		}
 		Add(MakeOptionRow(TEXT("VSync"), MakeChoiceButtons({TEXT("OFF"), TEXT("ON")}, Settings->IsVSyncEnabled() ? 1 : 0, true, [this, Kept](int32 Index)
 		{
 			if (Kept.IsValid())

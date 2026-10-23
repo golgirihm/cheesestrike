@@ -86,9 +86,9 @@ public:
 	 * on the front end, out of the match.
 	 */
 	bool IsDoneWithTheResults() const;
-	/** Picks a page of the front end (main, find, credits, options), or the options from the pause menu. */
+	/** Picks a page of the front end (main, find, credits, options, controls), or the options or the controls from the pause menu. */
 	void ChooseMenu(EMenuPage Page);
-	/** Back from a page to the one it came from: the front end's main page, or the pause menu. */
+	/** Back from a page to the one it came from: the front end's main page, the pause menu, or the options (from the controls). */
 	void BackFromMenu();
 	/** Hosts a match with the usual rules on the first map, through the online service, or the local network without Steam: straight into its lobby. */
 	void HostFromMenu();
@@ -134,7 +134,7 @@ public:
 	/** From the console or a play script: the host calls off the countdown. */
 	UFUNCTION(Exec)
 	void CheeseStrikeCancel();
-	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits or Options, which also opens from the pause menu), and of the options the tab named (Controls, View, Sound or Graphics). */
+	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits, Options or Controls, which also open from the pause menu), and of the options the tab named (Controls, View, Sound or Graphics). */
 	UFUNCTION(Exec)
 	void CheeseStrikePage(const FString& Page, const FString& Tab = TEXT(""));
 	/** From the console or a play script: opens the lobby's nth dropdown (0 the map, then the mode and on down), for looking at it; -1 shuts it. */
@@ -207,6 +207,8 @@ protected:
 	TSharedPtr<SCheeseStrikeMenu> Menu;
 	EMenuPage ShownPage = EMenuPage::None;
 	EMenuPage ChosenPage = EMenuPage::Main;
+	/** The page the controls were opened from, to go back to. */
+	EMenuPage ControlsFrom = EMenuPage::Main;
 	bool bPaused = false;
 	bool bLeaving = false;
 	int32 LeavingFor = INDEX_NONE;

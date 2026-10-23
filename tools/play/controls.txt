@@ -1,0 +1,29 @@
+# Looks at the controls page: from the front end's options, with the mouse
+# and then a gamepad, at two sizes; then from the pause menu in a match. Run
+# with tools/play.ps1 -Lobby (alone, on the front end).
+wait 8
+cmd r.SetRes 1600x900w
+wait 1
+cmd CheeseStrikePage Options Controls
+wait 1
+shot controls_options_tab
+cmd CheeseStrikePage Controls
+wait 1
+shot controls_page
+device gamepad
+wait 1
+shot controls_page_pad
+device mouse
+cmd r.SetRes 1280x720w
+wait 1
+shot controls_page_720
+cmd CheeseStrikePage Main
+cmd CheeseStrikeStart now
+wait 8
+tap Menu
+wait 1
+shot controls_pause
+cmd CheeseStrikePage Controls
+wait 1
+shot controls_from_pause
+quit

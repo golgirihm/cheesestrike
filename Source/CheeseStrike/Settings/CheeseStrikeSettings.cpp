@@ -5,6 +5,7 @@
 #include "AudioDeviceManager.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
 #include "UObject/StrongObjectPtr.h"
@@ -80,6 +81,17 @@ namespace CheeseStrikeSettings
 			}
 		}
 		return Best;
+	}
+
+	float ScreenPercentageFor(FIntPoint Resolution, FIntPoint Screen)
+	{
+		if (Resolution.X <= 0 || Resolution.Y <= 0 || Screen.X <= 0 || Screen.Y <= 0)
+		{
+			return 100.0f;
+		}
+		// By the shorter way, so that a picture of another shape still fills the screen.
+		const float Share = FMath::Min(static_cast<float>(Resolution.X) / Screen.X, static_cast<float>(Resolution.Y) / Screen.Y);
+		return FMath::Clamp(Share * 100.0f, 25.0f, 100.0f);
 	}
 }
 
@@ -223,10 +235,30 @@ void UCheeseStrikeSettings::SetToDefaults()
 	MasterVolume = CheeseStrikeSettings::DefaultVolume;
 	EffectsVolume = CheeseStrikeSettings::DefaultVolume;
 	MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
+	FullscreenResolution = FIntPoint::ZeroValue;
+}
+
+FIntPoint UCheeseStrikeSettings::GetResolutionShown() const
+{
+	if (GetFullscreenMode() == EWindowMode::Windowed)
+	{
+		return GetScreenResolution();
+	}
+	return FullscreenResolution.X > 0 && FullscreenResolution.Y > 0 ? FullscreenResolution : GetDesktopResolution();
 }
 
 void UCheeseStrikeSettings::ApplyNonResolutionSettings()
 {
 	Super::ApplyNonResolutionSettings();
 	ApplySound();
+	// Full screen, the game is drawn at the resolution picked, the window staying the screen's (UE's DirectX 12 has no
+	// fullscreen of another size); in a window, at the window's. Not in the editor, whose view isn't the game's.
+	if (!GIsEditor)
+	{
+		const float Percent = GetFullscreenMode() == EWindowMode::Windowed ? 100.0f : CheeseStrikeSettings::ScreenPercentageFor(FullscreenResolution, GetDesktopResolution());
+		if (IConsoleVariable* ScreenPercentage = IConsoleManager::Get().FindConsoleVariable(TEXT("r.ScreenPercentage")))
+		{
+			ScreenPercentage->Set(Percent, ECVF_SetByGameSetting);
+		}
+	}
 }
