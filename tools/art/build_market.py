@@ -847,6 +847,13 @@ def dusk():
             actor.set_editor_property("settings", settings)
 
 
+def hills():
+    """King of the Hill's spots, on the middle line or in twins: the square north of the tower (by its north door),
+    High Street west of the well house, the square south of the tower, and High Street east of it. Cobbles, never eaten."""
+    kit.hill_spots([("SquareNorth", 0, 760, 0, 320), ("HighStreetGouda", -1750, 3300, 0, 350), ("SquareSouth", 0, -760, 0, 320),
+                    ("HighStreetMozza", 1750, 3300, 0, 350)])
+
+
 def build():
     ground()
     clock_tower()
@@ -868,6 +875,7 @@ def build():
     free_starts()
     mouse_entries()
     places()
+    hills()
     kit.nav_bounds((-HALF_X - 100, -HALF_Y - 100, -100), (HALF_X + 100, HALF_Y + 100, 1150))
     dusk()
 

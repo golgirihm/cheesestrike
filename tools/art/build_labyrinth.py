@@ -654,6 +654,13 @@ def lamps():
         kit.point_lamp(f"Lamp_Vault_{int(a)}", "Vault", p[0], p[1], GALLERY_Z - 60, intensity=4.0, radius=700.0, temperature=4200.0, shadows=False)
 
 
+def hills():
+    """King of the Hill's spots: the vault round the Mother Wheel, then the middle ring at its north-west and its
+    south-east, a turn apart (each as far from both stairs, the map turning about its middle). Flagstones, never eaten."""
+    nw, se = polar(O, mid(AISLES[2]), 135.0), polar(O, mid(AISLES[2]), 315.0)
+    kit.hill_spots([("Vault", 0, 0, 0, 780), ("NorthWest2", nw[0], nw[1], 0, 300), ("SouthEast2", se[0], se[1], 0, 300)])
+
+
 def build():
     annex_openings()
     ground()
@@ -675,6 +682,7 @@ def build():
     free_starts()
     mouse_entries()
     places()
+    hills()
     lamps()
     kit.nav_bounds((-4900, -4900, -100), (4900, 4900, 800))
     kit.light_rig("noon", sun=(-72, 30))

@@ -488,6 +488,14 @@ def places():
     kit.place_name("Tank Row", (-5300, -HALF_Y, -10), (5300, CANAL_Y[0], 1000))
 
 
+def hills():
+    """King of the Hill's spots, on the middle line or in twins (the yards'): the press in the middle of the hall, the
+    west yard among the containers, Tank Row between the silos, the east yard, and the walkway between the tunnels.
+    Concrete and asphalt, never eaten."""
+    kit.hill_spots([("Press", 0, 0, 0, 520), ("YardGouda", -2150, 3800, 0, 330), ("TankRow", 0, -4200, 0, 350),
+                    ("YardMozza", 2150, 3800, 0, 330), ("Walkway", 0, -2350, 0, 350)])
+
+
 def build():
     ground()
     for s, side in ((-1, "West"), (1, "East")):
@@ -503,6 +511,7 @@ def build():
     free_starts()
     mouse_entries()
     places()
+    hills()
     # The navigation mesh's bounds: the playable ground, from the canal's floor to above the houses.
     kit.nav_bounds((-HALF_X - 200, -HALF_Y - 200, -CANAL_DEPTH - 110), (HALF_X + 200, HALF_Y + 200, 1490))
     kit.light_rig("day")

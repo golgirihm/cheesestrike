@@ -1,0 +1,25 @@
+# Every hill spot of a map, from above at an angle (under any roof, a ceiling hidden): the hill as it stands, then
+# moved on to each of the others in turn (CheeseStrikeMoveHill). Run with
+# -Map <level> -Extra "?Mode=KingOfTheHill" -Res 1280x720; five spots at most.
+wait 3
+cmd CheeseStrikeHideTagged Ceiling
+cmd CheeseStrikeViewHill 1100 225 35
+wait 1
+shot hillspot_0
+cmd CheeseStrikeMoveHill
+cmd CheeseStrikeViewHill 1100 225 35
+wait 1
+shot hillspot_1
+cmd CheeseStrikeMoveHill
+cmd CheeseStrikeViewHill 1100 225 35
+wait 1
+shot hillspot_2
+cmd CheeseStrikeMoveHill
+cmd CheeseStrikeViewHill 1100 225 35
+wait 1
+shot hillspot_3
+cmd CheeseStrikeMoveHill
+cmd CheeseStrikeViewHill 1100 225 35
+wait 1
+shot hillspot_4
+quit

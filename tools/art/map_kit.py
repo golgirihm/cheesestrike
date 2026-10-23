@@ -18,6 +18,7 @@ A map is a script in tools/art/ that builds its level from nothing, run in the e
         kit.team_starts("Gouda", [(-3600, y) for y in range(-1400, 1401, 400)], yaw=0)
         kit.team_starts("Mozza", [(3600, y) for y in range(-1400, 1401, 400)], yaw=180)
         kit.mouse_entries(-4000, -3000, 4000, 3000, 600, xs=(-2000, 0, 2000), ys=(0,))
+        kit.hill_spots([("Middle", 0, 0), ("HouseWest", -2000, -1500), ("South", 0, -2400), ("HouseEast", 2000, -1500)])
         kit.nav_bounds((-4000, -3000, -500), (4000, 3000, 1200))
         kit.light_rig("day")
 
@@ -1042,6 +1043,22 @@ def mouse_entry(x, y, z, yaw):
     count("mouse entries")
 
 
+def hill_spots(spots):
+    """Where King of the Hill's hill stands in turn (ACheeseStrikeHillSpot): ((name, x, y[, z[, radius]]) each, in the
+    order the hill goes round them, a minute at each), its middle on the floor at (x, y, z) and its radius (4 m unless
+    given). Three to five a map, each a clear spot on a floor the mice never eat (rock, concrete, wax, a floor that isn't
+    cheese), and fair to both sides: on the middle line of a mirrored map, or in twins, a side's spot and its mirror,
+    the round giving each the same time (the first on the middle line)."""
+    for order, spot in enumerate(spots):
+        name, x, y = spot[0], spot[1], spot[2]
+        z = spot[3] if len(spot) > 3 else 0
+        radius = spot[4] if len(spot) > 4 else 400
+        actor = place(unreal.CheeseStrikeHillSpot, f"Hill_{order}_{name}", "Hills", (x, y, z))
+        actor.set_editor_property("order", order)
+        actor.set_editor_property("radius", float(radius))
+        count("hill spots")
+
+
 def mouse_entries(x0, y0, x1, y1, top, xs=(), ys=()):
     """Mouse entries on the outer wall round (x0, y0)-(x1, y1), `top` high: at each x in `xs` on the north and south
     walls, and each y in `ys` on the west and east. Eight or more, spread round, so the mice don't all start at one end;
@@ -1227,6 +1244,8 @@ def build_level(level, build, report=None):
         lines.append(f"cheese blocks: {blocks}")
         if counts.get("starts", 0) < 16:
             lines.append(f"WARNING: {counts.get('starts', 0)} starts; a match has sixteen players")
+        if counts.get("hill spots", 0) < 3:
+            lines.append(f"WARNING: {counts.get('hill spots', 0)} hill spots; King of the Hill wants three to five")
         if blocks and counts.get("mouse entries", 0) == 0:
             lines.append("WARNING: cheese but no mouse entries: no mice will come")
     except Exception:

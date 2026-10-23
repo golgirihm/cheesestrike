@@ -50,6 +50,13 @@ Cheese the mice must leave is marked not edible (`ACheeseStrikeCheese::bEdible`,
 - A mouse reaches 2.6 m across from its middle and 4 m up from its feet, and eats standing beside a block, never on top of it. What is out of reach is eaten when what is under it is eaten and it comes down, or by a mouse that walks up to it (they climb ramps and stairs on the navigation mesh). Every edible block goes within about five minutes of the mice coming (`CheeseStrike.Play.AfterTheMice` checks every map): a block with nowhere to stand beside it that a mouse can walk to, it leaps to from as near as it can walk, and a block standing alone it leaps onto and eats from on top. Still, leave a mouse room (a metre and a half) round what it should eat: leaping is a last resort, and looks it.
 - Shooting a mouse (300 of damage) sends it off for six seconds: players can protect a structure for a while.
 
+King of the Hill wants three to five hill spots (`kit.hill_spots`), which its hill goes round, a minute at each:
+
+- On floors the mice never eat (ground, rock, concrete, wax, a table's top): a hill on cheese would sink into the fondue or hang over nothing once eaten. Cover round it may be cheese; it is the fight's to lose.
+- Clear and level round the middle for most of its radius (3 to 5 m, smaller in narrow aisles), with a way in from every side, not a dead end one side can lock.
+- Fair: the first on the middle line, as far from both sides' starts; the others on it too, or in twins (a side's spot and its mirror, one after the other in the round), so that over a round of spots neither side is nearer. Well away from the starts (at least 10 m), so that nobody spawns into it; the game mode brings players back at least 18 m from it where it can.
+- Somewhere worth fighting over that the map has already: a landmark (the press, the vault, the pulpit), a crossing of lanes, high ground with a way up from both sides. `CheeseStrike.Play.EveryMapHasFairHills` checks the floor, the level ground, the paths from both sides and the fairness.
+
 ### Drops that kill
 
 A map may have a drop that is death: a vat of fondue, a canyon. `kit.kill_below(z)` sets the level's kill height; whoever goes under it is killed by the fall (`Rules/CheeseStrikeFalls.h`), a kill for whoever hurt them in the five seconds before, else "fell into <the place it ends in>" in the feed (so name the drop's place with a common noun: The Fondue). On such a map the bots never walk off an edge, nor do the mice, which leap across a gap when they have eaten the floor round themselves; a mouse that falls in anyway comes back over the edge a while later, and cheese that comes to rest under the kill height is gone. Put the kill height where a falling player's feet reach the drop's surface, so that the view, which stays where the eyes were, stays above it. What is left once the mice have eaten must not be an easy walkway by accident: a ledge or beam a player can stand on (a player perches on anything under the edge of their 68 cm capsule) is a way across; the waxed paths should be the ways across. `kit.liquid` makes a pool's surface that blocks nothing.
@@ -144,7 +151,7 @@ A cellar or a cave has a ceiling: make it `kit.overhead` (`kit.ceiling` for a sl
 ## Starting a new map
 
 1. Lay it out on paper first: lanes, chokes, high ground, spawns, with distances and the seconds a sprint takes; the structures and what each does before and after the mice; the mice's ways in.
-2. Start the script `tools/art/build_<map>.py` from the example in `map_kit.py`'s notes: ground, boundary, starts, mouse entries, navigation bounds, light. Build it and walk it.
+2. Start the script `tools/art/build_<map>.py` from the example in `map_kit.py`'s notes: ground, boundary, starts, mouse entries, hill spots, navigation bounds, light. Build it and walk it.
 3. Add the structures with the kit. Mirror a symmetric map with `kit.mirrored` (x given from the middle, times s).
 4. Build, look, test, play, as above, until it plays as its notes say.
 5. Write its notes in `docs/unreal/maps/<map>.md`: its size, layout, places, the structures table, its tests.

@@ -606,6 +606,13 @@ def places():
     kit.place_name("The Rind Tunnel", (-TUNNEL_X, -HALF_Y, L1 - 50), (TUNNEL_X, WALK_Y[1], L1 + 350))
 
 
+def hills():
+    """King of the Hill's spots, on the middle line or in twins: the Pulpit, Gouda's pool, the landing and Mozza's pool.
+    Rock, never eaten (a pool's bed is rock under water that is walked through)."""
+    kit.hill_spots([("Pulpit", 0, 1800, L1, 380), ("PoolsGouda", -1700, 0, 0, 420), ("Landing", 0, -1800, L1, 380),
+                    ("PoolsMozza", 1700, 0, 0, 420)])
+
+
 def build():
     cave()
     for s, side in ((-1, "West"), (1, "East")):
@@ -622,6 +629,7 @@ def build():
     starts()
     mouse_entries()
     places()
+    hills()
     kit.nav_bounds((-HALF_X - 100, -HALF_Y - 100, -100), (HALF_X + 100, HALF_Y + 100, L2 + 400))
     kit.light_rig("cave")
     cave_air()

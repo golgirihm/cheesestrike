@@ -689,6 +689,13 @@ def places():
     kit.place_name("The Skirting", (-1500, Y_S, -50), (1500, TABLE_Y[0] - 200, CEILING))
 
 
+def hills():
+    """King of the Hill's spots, on the middle line or in twins: the crumbs between the wedge and the table, Gouda's
+    drawers, the table's top, and Mozza's drawers. The room's floor and the table's top, never eaten."""
+    kit.hill_spots([("Crumbs", 0, -200, 0, 400), ("DrawersGouda", -1500, 1300, 0, 380), ("Table", 0, -1100, TABLE_TOP, 380),
+                    ("DrawersMozza", 1500, 1300, 0, 380)])
+
+
 def build():
     room()
     counter()
@@ -704,6 +711,7 @@ def build():
     starts()
     mouse_entries()
     places()
+    hills()
     kit.nav_bounds((-HALF_X - 100, Y_S - 100, -60), (HALF_X + 100, Y_N + 100, 1000))
     # Day through the north window: the sun comes in over the sink, across the lanes, and falls on the wedge.
     kit.light_rig("day", sun=(-38, -90))
