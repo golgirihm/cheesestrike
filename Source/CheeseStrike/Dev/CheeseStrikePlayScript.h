@@ -22,7 +22,7 @@ class UInputAction;
  * One command a line, `#` for a comment:
  *   wait <seconds>              do nothing for so long
  *   hold <action> [x [y]]       hold an input from now on: Move x y, Look x y, or Jump, Sprint, Crouch, Fire, Aim, Reload, Scoreboard,
- *                               Primary, Sidearm, Knife, NextWeapon, PreviousWeapon, LastWeapon, Streak, Interact,
+ *                               Primary, Sidearm, Knife, NextWeapon, PreviousWeapon, LastWeapon, Streak, Interact, Grenade,
  *                               SprintToggle, CrouchToggle (a gamepad's left stick and B)
  *   release <action>            let it go
  *   tap <action> [x [y]]        hold it for a few frames

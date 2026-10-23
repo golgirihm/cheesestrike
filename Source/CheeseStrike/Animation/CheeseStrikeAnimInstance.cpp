@@ -140,6 +140,12 @@ FCheeseStrikeAnimSets UCheeseStrikeAnimInstance::FindSets(const FString& Rifles)
 	Knife = Pistol;
 	Knife.Stroke = Find<UAnimSequence>(Pistols, TEXT("MM_Pistol_Melee"));
 	Knife.Guard = Find<UAnimSequence>(Pistols, TEXT("MM_Unarmed_Idle_Ready"));
+	// A grenade is tossed the one way, whatever is in the other hand.
+	UAnimSequence* Toss = Find<UAnimSequence>(Animations + TEXT("Grenade/"), TEXT("MM_Rifle_GrenadeToss"));
+	for (FCheeseStrikeAnimSet& Set : Found.Holds)
+	{
+		Set.Throw = Toss;
+	}
 	return Found;
 }
 

@@ -19,6 +19,7 @@
 #include "Rules/CheeseStrikeStart.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeArsenal.h"
+#include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Map/CheeseStrikeCheese.h"
 #include "Map/CheeseStrikeMouse.h"
@@ -666,6 +667,11 @@ void ACheeseStrikeGameMode::ArmForGunGame(TWeakObjectPtr<ACheeseStrikeCharacter>
 		{
 			Weapon->MakeReserveEndless();
 		}
+	}
+	// The ladder is the guns': no grenades.
+	if (UCheeseStrikeGrenades* Grenades = Character->GetGrenades())
+	{
+		Grenades->SetCount(0);
 	}
 }
 

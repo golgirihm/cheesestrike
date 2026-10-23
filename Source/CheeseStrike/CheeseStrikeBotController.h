@@ -90,6 +90,15 @@ protected:
 	static constexpr float TendRange = 2500.0f;
 	/** Calls in its next streak, as a player would: the drone and the Overload soon after earning them, the Cheese Strike on an enemy it has just seen. */
 	void ThinkAboutStreaks();
+	/**
+	 * Once a second: whether to throw a grenade at its enemy, most likely at
+	 * one just gone behind cover (CheeseStrikeGrenades::BotShouldThrow), and
+	 * if so, the throw that lands nearest where they were, worked out along
+	 * the grenade's own arc; it turns to that and throws (AimAndFire).
+	 */
+	void ThinkAboutGrenades();
+	/** The way to throw from here for a grenade to come down near `Spot`, if one does (within CheeseStrikeGrenades::BotLandsWithin). */
+	bool AimToLandAt(const FVector& Spot, FVector& OutAim) const;
 	void ChooseWhereToGo();
 	/** Every frame: where it looks, whether it fires, and its side steps. */
 	void AimAndFire(float DeltaSeconds);
@@ -143,6 +152,11 @@ protected:
 	float NextThinkAt = 0.0f;
 	/** When it last changed weapons, so that it doesn't change back and forth. */
 	float ChangedWeaponAt = -1000.0f;
+	/** When it next thinks about a grenade, and a throw it has decided on: which way, and since when it has been turning to it. */
+	float NextGrenadeThoughtAt = 0.0f;
+	bool bThrowPending = false;
+	FVector ThrowAim = FVector::ForwardVector;
+	float ThrowPendingSince = 0.0f;
 	/** When it began holding the streak it has ready; -1 with none. */
 	float StreakHeldSince = -1.0f;
 	/** Whether it is tending someone down, and holding Interact. */

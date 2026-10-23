@@ -140,7 +140,7 @@ public:
 	TObjectPtr<UInputAction> Aim;
 	UPROPERTY()
 	TObjectPtr<UInputAction> Reload;
-	/** Changing weapons: to the primary (1), the sidearm (2), the knife (3), the next and the one before (the wheel), and back to the last (Q). */
+	/** Changing weapons: to the primary (1), the sidearm (2), the knife (3), the next and the one before (the wheel), and back to the last (Q; no gamepad button). */
 	UPROPERTY()
 	TObjectPtr<UInputAction> DrawPrimary;
 	UPROPERTY()
@@ -159,12 +159,15 @@ public:
 	/** Opens and closes the menu: the pause menu in a match, back out of a page otherwise. */
 	UPROPERTY()
 	TObjectPtr<UInputAction> Menu;
-	/** Calls in the next kill streak earned (4). */
+	/** Calls in the next kill streak earned (4, the d-pad's down). */
 	UPROPERTY()
 	TObjectPtr<UInputAction> Streak;
 	/** Interact (E), held: reviving a teammate or finishing an enemy down, in Execution. */
 	UPROPERTY()
 	TObjectPtr<UInputAction> Interact;
+	/** Throws a cheese grenade (G, the right bumper; UCheeseStrikeGrenades). */
+	UPROPERTY()
+	TObjectPtr<UInputAction> Grenade;
 	UPROPERTY()
 	TObjectPtr<UInputMappingContext> Context;
 };

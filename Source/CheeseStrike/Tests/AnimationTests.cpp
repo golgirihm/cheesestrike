@@ -108,9 +108,11 @@ bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("%s fires and reloads the shotgun its own way"), *Who), Shotgun.Fire != nullptr && Shotgun.Fire != Rifle.Fire && Shotgun.Reload != nullptr && Shotgun.Reload != Rifle.Reload);
 		const FCheeseStrikeAnimSet& Knife = Body.For(ECheeseStrikeHold::Knife);
 		TestTrue(FString::Printf(TEXT("%s strikes with the knife, the free arm on guard"), *Who), Knife.Stroke != nullptr && Knife.Guard != nullptr && Knife.Idle == Pistol.Idle);
+		TestTrue(FString::Printf(TEXT("%s throws a grenade with whatever it holds"), *Who), Rifle.Throw != nullptr && Pistol.Throw == Rifle.Throw && Shotgun.Throw == Rifle.Throw && Knife.Throw == Rifle.Throw);
 		for (const UAnimationAsset* Each : {static_cast<const UAnimationAsset*>(Pistol.Idle.Get()), static_cast<const UAnimationAsset*>(Pistol.AimHip.Get()),
 			static_cast<const UAnimationAsset*>(Pistol.Equip.Get()), static_cast<const UAnimationAsset*>(Rifle.Equip.Get()), static_cast<const UAnimationAsset*>(Shotgun.Fire.Get()),
-			static_cast<const UAnimationAsset*>(Shotgun.Reload.Get()), static_cast<const UAnimationAsset*>(Knife.Stroke.Get()), static_cast<const UAnimationAsset*>(Knife.Guard.Get())})
+			static_cast<const UAnimationAsset*>(Shotgun.Reload.Get()), static_cast<const UAnimationAsset*>(Knife.Stroke.Get()), static_cast<const UAnimationAsset*>(Knife.Guard.Get()),
+			static_cast<const UAnimationAsset*>(Rifle.Throw.Get())})
 		{
 			TestTrue(FString::Printf(TEXT("%s's are all on its skeleton"), *Who), Each != nullptr && Rifle.Idle != nullptr && Each->GetSkeleton() == Rifle.Idle->GetSkeleton());
 		}

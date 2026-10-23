@@ -28,6 +28,7 @@
 #include "Camera/CameraComponent.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Weapons/CheeseStrikeArsenal.h"
+#include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -752,6 +753,7 @@ bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
 		TestFalse(TEXT("no pistol"), Host->GetInventory()->CanDraw(EWeaponSlot::Sidearm));
 		TestTrue(TEXT("its rounds never run out"), Host->GetWeapon() != nullptr && Host->GetWeapon()->HasEndlessReserve());
 		TestTrue(TEXT("as its player's machine knows"), Character(0) != nullptr && Character(0)->GetWeapon() != nullptr && Character(0)->GetWeapon()->HasEndlessReserve());
+		TestEqual(TEXT("and no grenades"), Host->GetGrenades()->GetCount(), 0);
 	});
 	// Every way of changing weapons does nothing: there is nothing to change to, and the HUD lists only the one.
 	Play(0, TEXT("tap Knife\nwait 0.3\ntap Sidearm\nwait 0.3\ntap NextWeapon\nwait 0.3\ntap PreviousWeapon\nwait 0.3\ntap LastWeapon\nwait 0.3"));

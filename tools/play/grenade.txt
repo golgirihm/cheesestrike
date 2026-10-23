@@ -1,0 +1,47 @@
+# Throws a cheese grenade and watches it: the throw in the player's own view
+# (the round in the left hand, then let go), the round flying, bouncing and
+# its fuse sparking, then the burst; then the throw from outside, as others
+# see it. Run with tools/play.ps1 -StartAt 1150,-1450,100,117 (open ground on
+# the shooter level, a long clear run that way).
+wait 3
+shot grenade_1_ready
+look 0 -20
+tap Grenade
+wait 0.12
+shot grenade_2_windup
+wait 0.12
+shot grenade_3_release
+wait 0.2
+shot grenade_4_flying
+wait 0.6
+shot grenade_5_landed
+wait 0.8
+shot grenade_6_resting
+wait 0.85
+cmd slomo 0.2
+wait 0.08
+shot grenade_7_burst
+wait 0.04
+shot grenade_8_burst
+wait 0.04
+shot grenade_9_burst
+cmd slomo 1
+wait 1.5
+shot grenade_10_after
+look 0 20
+cmd CheeseStrikeOutside 260 100 20 10
+wait 0.5
+tap Grenade
+wait 0.15
+shot grenade_11_outside_windup
+wait 0.12
+shot grenade_12_outside_release
+wait 0.25
+shot grenade_13_outside_after
+wait 1.2
+state
+tap Grenade
+wait 0.5
+state
+wait 3
+quit

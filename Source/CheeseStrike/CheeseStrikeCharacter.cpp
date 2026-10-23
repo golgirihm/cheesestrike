@@ -43,6 +43,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Weapons/CheeseStrikeGunfire.h"
+#include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -134,6 +135,7 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 
 	Inventory = CreateDefaultSubobject<UCheeseStrikeInventory>(TEXT("Inventory"));
 	LastStand = CreateDefaultSubobject<UCheeseStrikeLastStand>(TEXT("LastStand"));
+	Grenades = CreateDefaultSubobject<UCheeseStrikeGrenades>(TEXT("Grenades"));
 }
 
 bool ACheeseStrikeCharacter::IsDowned() const
@@ -1209,7 +1211,7 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 	// Which way the weapon in view points, in the view's axes (forward, right, up).
 	const UPrimitiveComponent* InView = HeldWeapon != nullptr ? HeldWeapon->GetModel(true) : nullptr;
 	const FVector Along = InView != nullptr ? GetControlRotation().UnrotateVector(InView->GetComponentTransform().GetUnitAxis(EAxis::Y)) : FVector::ZeroVector;
-	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ghost %.2f frozen %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d weapon %s drawing %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f) hand in view (%.0f, %.0f, %.0f) weapon along (%.2f, %.2f, %.2f) down %.2f body yaw %.1f leg room %.0f"),
+	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ghost %.2f frozen %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d weapon %s drawing %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f) hand in view (%.0f, %.0f, %.0f) weapon along (%.2f, %.2f, %.2f) down %.2f body yaw %.1f leg room %.0f grenades %d throwing %d"),
 		At.X, At.Y, At.Z, GetVelocity().Size2D(), Eye.Z - (At.Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), FRotator::NormalizeAxis(GetControlRotation().Pitch), FRotator::NormalizeAxis(GetControlRotation().Yaw),
 		bIsCrouched ? 1 : 0, Movement != nullptr && Movement->IsSprinting() ? 1 : 0, Movement != nullptr && Movement->IsSliding() ? 1 : 0,
 		Movement != nullptr ? Movement->GetSlideElapsed() : -1.0f, Movement != nullptr && Movement->IsFalling() ? 1 : 0, bPressedJump ? 1 : 0, JumpCurrentCount,
@@ -1217,7 +1219,7 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 		FirstPersonCameraComponent->FieldOfView, HeldWeapon != nullptr ? HeldWeapon->ShotsFired : 0, HeldWeapon != nullptr ? HeldWeapon->HitsConfirmed : 0, HeldWeapon != nullptr && HeldWeapon->IsReloading() ? 1 : 0,
 		HeldWeapon != nullptr ? *HeldWeapon->GetWeaponId().ToString() : TEXT("none"), HeldWeapon != nullptr && HeldWeapon->IsDrawing() ? 1 : 0,
 		Body.X, Body.Y, Body.Z, GetMesh()->IsSimulatingPhysics() ? 1 : 0, Eye.X, Eye.Y, Eye.Z, HandInView.X, HandInView.Y, HandInView.Z, Along.X, Along.Y, Along.Z,
-		DownBlend, FRotator::NormalizeAxis(GetActorRotation().Yaw), DownLegRoom);
+		DownBlend, FRotator::NormalizeAxis(GetActorRotation().Yaw), DownLegRoom, Grenades != nullptr ? Grenades->GetCount() : -1, Grenades != nullptr && Grenades->IsThrowing() ? 1 : 0);
 	// Down: where the body's bones are in its frame (ahead toward the feet, right, up from the capsule's axis on the floor).
 	if (DownBlend > 0.0f)
 	{
@@ -1305,6 +1307,7 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	EnhancedInputComponent->BindAction(Input->PreviousWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::PreviousWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->LastWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::LastWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->Streak, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::StreakStarted);
+	EnhancedInputComponent->BindAction(Input->Grenade, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::GrenadeStarted);
 	EnhancedInputComponent->BindAction(Input->Interact, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::InteractStarted);
 	EnhancedInputComponent->BindAction(Input->Interact, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::InteractEnded);
 }
@@ -1322,6 +1325,25 @@ void ACheeseStrikeCharacter::InteractEnded()
 	if (LastStand != nullptr)
 	{
 		LastStand->SetInteracting(false);
+	}
+}
+
+void ACheeseStrikeCharacter::GrenadeStarted()
+{
+	// Marking where a Cheese Strike goes, the hands are busy with the marker.
+	const ACheeseStrikePlayerState* Player = GetPlayerState<ACheeseStrikePlayerState>();
+	if (Player == nullptr || !Player->IsMarkingStrike())
+	{
+		DoThrowGrenade();
+	}
+}
+
+void ACheeseStrikeCharacter::DoThrowGrenade()
+{
+	if (Grenades != nullptr && TakesInput())
+	{
+		MoveEnded();
+		Grenades->Throw(GetControlRotation().Vector());
 	}
 }
 
@@ -1432,7 +1454,8 @@ void ACheeseStrikeCharacter::DoFire(bool bHeld)
 	{
 		return;
 	}
-	if (bHeld && TakesInput())
+	// The hands busy with a throw, the trigger waits for it.
+	if (bHeld && TakesInput() && (Grenades == nullptr || !Grenades->IsThrowing()))
 	{
 		HeldWeapon->StartFiring();
 	}
@@ -1450,7 +1473,7 @@ void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 		return;
 	}
 	// Down, from the hip only.
-	if (bHeld && TakesInput() && !IsDowned())
+	if (bHeld && TakesInput() && !IsDowned() && (Grenades == nullptr || !Grenades->IsThrowing()))
 	{
 		HeldWeapon->StartAiming();
 	}

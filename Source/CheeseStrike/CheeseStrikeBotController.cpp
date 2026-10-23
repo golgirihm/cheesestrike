@@ -8,6 +8,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "CheeseStrike.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
@@ -16,6 +17,10 @@
 #include "HAL/IConsoleManager.h"
 #include "Rules/CheeseStrikeFalls.h"
 #include "Weapons/CheeseStrikeArsenal.h"
+#include "Kismet/GameplayStatics.h"
+#include "Weapons/CheeseStrikeGrenade.h"
+#include "Weapons/CheeseStrikeGrenadeRules.h"
+#include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -160,6 +165,7 @@ void ACheeseStrikeBotController::ForgetAll()
 	bRetreating = false;
 	Bursts = CheeseStrikeBots::FBursts();
 	bTriggerHeld = false;
+	bThrowPending = false;
 	MovedAt = Now();
 	MovedFrom = Body() != nullptr ? Body()->GetActorLocation() : FVector::ZeroVector;
 	Wobble = FMath::FRandRange(0.0f, 2.0f * PI);
@@ -429,6 +435,7 @@ void ACheeseStrikeBotController::Think()
 	}
 	ChooseWeapon();
 	ThinkAboutStreaks();
+	ThinkAboutGrenades();
 	ACheeseStrikeWeapon* Weapon = Me != nullptr ? Me->GetWeapon() : nullptr;
 	if (Weapon == nullptr)
 	{
@@ -793,6 +800,94 @@ bool ACheeseStrikeBotController::PickRetreatGoal(const FVector& From, FVector& O
 	return bFound;
 }
 
+void ACheeseStrikeBotController::ThinkAboutGrenades()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	const UCheeseStrikeGrenades* Grenades = Me != nullptr ? Me->GetGrenades() : nullptr;
+	if (Grenades == nullptr || bThrowPending || bTending || Now() < NextGrenadeThoughtAt)
+	{
+		return;
+	}
+	NextGrenadeThoughtAt = Now() + 1.0f;
+	if (!Target.IsValid() || !Target->IsAlive() || !Grenades->CanThrow())
+	{
+		return;
+	}
+	CheeseStrikeGrenades::FBotThrow Thought;
+	Thought.Carried = Grenades->GetCount();
+	const AGameStateBase* State = GetWorld()->GetGameState();
+	Thought.SinceLastThrow = (State != nullptr ? State->GetServerWorldTimeSeconds() : Now()) - Grenades->GetLastThrowAt();
+	Thought.SinceSeen = Now() - LastSeenAt;
+	Thought.Distance = FVector::Dist2D(LastSeenWhere, Me->GetActorLocation());
+	Thought.bSeesThem = bSeesTarget;
+	Thought.Roll = FMath::FRand();
+	if (!CheeseStrikeGrenades::BotShouldThrow(Thought))
+	{
+		return;
+	}
+	// Onto the floor where they were (or are).
+	const FVector Where = bSeesTarget ? Target->GetActorLocation() : LastSeenWhere;
+	FVector Spot = Where - FVector(0.0f, 0.0f, 88.0f);
+	FHitResult Floor;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeBotGrenadeFloor), false, Me);
+	Params.AddIgnoredActor(Target.Get());
+	if (GetWorld()->LineTraceSingleByChannel(Floor, Where, Where - FVector(0.0f, 0.0f, 400.0f), ECC_Visibility, Params))
+	{
+		Spot = Floor.ImpactPoint;
+	}
+	// Short of them, toward here, as it bounces and rolls on.
+	const FVector Toward = (Me->GetActorLocation() - Spot).GetSafeNormal2D();
+	const FVector Landing = Spot + Toward * CheeseStrikeGrenades::BotLandingShort(FVector::Dist2D(Spot, Me->GetActorLocation()));
+	FVector Aim;
+	if (AimToLandAt(Landing, Aim))
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Grenade: %s means one for %s at (%.0f, %.0f, %.0f), %.0f cm off"), *Me->DisplayName(), *Target->DisplayName(), Spot.X, Spot.Y, Spot.Z, FVector::Dist2D(Spot, Me->GetActorLocation()));
+		bThrowPending = true;
+		ThrowAim = Aim;
+		ThrowPendingSince = Now();
+		LetGoOfTrigger();
+	}
+}
+
+bool ACheeseStrikeBotController::AimToLandAt(const FVector& Spot, FVector& OutAim) const
+{
+	const ACheeseStrikeCharacter* Me = Body();
+	const UCheeseStrikeGrenades* Grenades = Me != nullptr ? Me->GetGrenades() : nullptr;
+	if (Grenades == nullptr)
+	{
+		return false;
+	}
+	// Tries the throws from low to high, along the grenade's own arc against the world, and keeps the one that comes
+	// down nearest the spot.
+	const float Yaw = (Spot - Me->GetActorLocation()).Rotation().Yaw;
+	float Best = CheeseStrikeGrenades::BotLandsWithin;
+	bool bFound = false;
+	for (float Pitch = -15.0f; Pitch <= 60.0f; Pitch += 2.5f)
+	{
+		const FVector Aim = FRotator(Pitch, Yaw, 0.0f).Vector();
+		FPredictProjectilePathParams Path(CheeseStrikeGrenades::CollisionRadius, Grenades->ReleasePoint(Aim), CheeseStrikeGrenades::LaunchVelocity(Aim, Me->GetVelocity()), CheeseStrikeGrenades::Fuse);
+		Path.bTraceWithCollision = true;
+		Path.bTraceWithChannel = false;
+		Path.ObjectTypes = {UEngineTypes::ConvertToObjectType(ECC_WorldStatic), UEngineTypes::ConvertToObjectType(ECC_WorldDynamic)};
+		Path.ActorsToIgnore.Add(const_cast<ACheeseStrikeCharacter*>(Me));
+		Path.SimFrequency = 15.0f;
+		Path.OverrideGravityZ = GetWorld()->GetGravityZ() * CheeseStrikeGrenades::GravityScale;
+		FPredictProjectilePathResult Result;
+		if (!UGameplayStatics::PredictProjectilePath(this, Path, Result) || !Result.HitResult.bBlockingHit)
+		{
+			continue;
+		}
+		const float Off = FVector::Dist(Result.HitResult.ImpactPoint, Spot);
+		if (Off < Best)
+		{
+			Best = Off;
+			OutAim = Aim;
+			bFound = true;
+		}
+	}
+	return bFound;
+}
+
 void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 {
 	ACheeseStrikeCharacter* Me = Body();
@@ -829,6 +924,21 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 	{
 		// Where it is going.
 		Wanted = FRotator(0.0f, Me->GetVelocity().Rotation().Yaw, 0.0f);
+	}
+	// A throw decided on: it turns to it, and lets go once it faces it (or has tried a moment).
+	if (bThrowPending && Me != nullptr)
+	{
+		Wanted = ThrowAim.Rotation();
+		const float Off = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(GetControlRotation().Vector(), ThrowAim), -1.0f, 1.0f)));
+		if (Off <= 4.0f || Time - ThrowPendingSince > 1.0f)
+		{
+			bThrowPending = false;
+			if (UCheeseStrikeGrenades* Grenades = Me->GetGrenades())
+			{
+				Grenades->Throw(ThrowAim);
+			}
+		}
+		bWantsToFire = false;
 	}
 	if (Me == nullptr || Weapon == nullptr)
 	{

@@ -89,13 +89,15 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Set->Menu = MakeAction(Set, TEXT("IA_Menu"), EInputActionValueType::Boolean);
 	Set->Streak = MakeAction(Set, TEXT("IA_Streak"), EInputActionValueType::Boolean);
 	Set->Interact = MakeAction(Set, TEXT("IA_Interact"), EInputActionValueType::Boolean);
+	Set->Grenade = MakeAction(Set, TEXT("IA_Grenade"), EInputActionValueType::Boolean);
 	UInputMappingContext* Context = NewObject<UInputMappingContext>(Set, TEXT("IMC_CheeseStrike"));
 	Set->Context = Context;
 
 	// The gamepad's, as consoles' shooters lay them out (Call of Duty's defaults): the left stick moves and, pressed,
 	// sprints; the right looks and, pressed, draws the knife; A jumps, B crouches, X reloads, Y changes to the next weapon;
-	// the left trigger aims, the right fires; the left bumper interacts, the right calls in a streak; the d-pad draws a
-	// weapon (up the primary, left the sidearm, right the knife, down the last); View shows the scoreboard, Menu pauses.
+	// the left trigger aims, the right fires; the left bumper interacts, the right throws a grenade; the d-pad draws a
+	// weapon (up the primary, left the sidearm, right the knife) and, down, calls in a streak; View shows the scoreboard,
+	// Menu pauses.
 	// Moving: WASD and the arrows, and the left stick.
 	MapForward(Context, Set->Move, EKeys::W, 1.0f);
 	MapForward(Context, Set->Move, EKeys::Up, 1.0f);
@@ -124,9 +126,9 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->Aim, EKeys::Gamepad_LeftTrigger);
 	Map(Context, Set->Reload, EKeys::R);
 	Map(Context, Set->Reload, EKeys::Gamepad_FaceButton_Left);
-	// Changing weapons: the number keys, the wheel (down for the next), Q for the last; on a gamepad, the d-pad for each and
-	// the last, the top face button for the next, and pressing the right stick for the knife (a console shooter's melee).
-	// With three weapons the d-pad reaches each at once, so the one before has no button of its own.
+	// Changing weapons: the number keys, the wheel (down for the next), Q for the last; on a gamepad, the d-pad for each,
+	// the top face button for the next, and pressing the right stick for the knife (a console shooter's melee). With three
+	// weapons the d-pad reaches each at once, so the one before and the last have no button of their own.
 	Map(Context, Set->DrawPrimary, EKeys::One);
 	Map(Context, Set->DrawPrimary, EKeys::Gamepad_DPad_Up);
 	Map(Context, Set->DrawSidearm, EKeys::Two);
@@ -138,14 +140,16 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->NextWeapon, EKeys::Gamepad_FaceButton_Top);
 	Map(Context, Set->PreviousWeapon, EKeys::MouseScrollUp);
 	Map(Context, Set->LastWeapon, EKeys::Q);
-	Map(Context, Set->LastWeapon, EKeys::Gamepad_DPad_Down);
 	Map(Context, Set->Scoreboard, EKeys::Tab);
 	Map(Context, Set->Scoreboard, EKeys::Gamepad_Special_Left);
 	Map(Context, Set->Menu, EKeys::Escape);
 	Map(Context, Set->Menu, EKeys::Gamepad_Special_Right);
-	// Kill streaks.
+	// Kill streaks: 4, and the d-pad's last way.
 	Map(Context, Set->Streak, EKeys::Four);
-	Map(Context, Set->Streak, EKeys::Gamepad_RightShoulder);
+	Map(Context, Set->Streak, EKeys::Gamepad_DPad_Down);
+	// Grenades: G, and the right bumper.
+	Map(Context, Set->Grenade, EKeys::G);
+	Map(Context, Set->Grenade, EKeys::Gamepad_RightShoulder);
 	// Interacting.
 	Map(Context, Set->Interact, EKeys::E);
 	Map(Context, Set->Interact, EKeys::Gamepad_LeftShoulder);
