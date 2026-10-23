@@ -865,7 +865,17 @@ bool FAJoinerIsToldWhenTheConnectionIsLost::RunTest(const FString& Parameters)
 		const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(1));
 		Menu->Show(EMenuPage::Main);
 		TestTrue(TEXT("which the front end says"), LobbyTests::TextsOf(Menu).Contains(CheeseStrikeSessions::FarewellText(CheeseStrikeSessions::EFarewell::ConnectionLost)));
+		// The host, alone now with no bots, can't start the match from the lobby; a script or a test still can, at once.
+		ACheeseStrikeGameMode* Mode = World(0)->GetAuthGameMode<ACheeseStrikeGameMode>();
+		TestFalse(TEXT("the host alone has nobody to play"), Mode->WhyNotStart().IsEmpty());
+		const TSharedRef<SCheeseStrikeMenu> Hosts = SNew(SCheeseStrikeMenu).Controller(Controller(0));
+		Hosts->Show(EMenuPage::Lobby);
+		TestTrue(TEXT("and the start button says so"), LobbyTests::TextsOf(Hosts).Contains(TEXT("ADD A BOT OR WAIT FOR A PLAYER")));
+		Mode->AskToStart(false);
+		TestFalse(TEXT("so the countdown doesn't start"), GameState(0)->IsCountingDown());
+		Mode->AskToStart(true);
 	});
+	WaitUntil(TEXT("the match started at once all the same"), 10.0f, []() { return GameState(0) != nullptr && GameState(0)->HasMatchStarted(); });
 	StopPlaying();
 	return true;
 }

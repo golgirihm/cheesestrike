@@ -170,6 +170,8 @@ protected:
 	void SpawnMice();
 	/** The countdown is over: the match starts here, or travels to the map the host picked and starts there. */
 	void CountdownOver();
+	/** The countdown's own end: called off if the match can no longer be played (someone left), else CountdownOver. */
+	void CountdownEnded();
 	/** The URL options that carry this match's rules to its next level. */
 	FString RulesOptions() const;
 	/** What ServerTravel is given for `Url`: its map and options, without its host and port. */
