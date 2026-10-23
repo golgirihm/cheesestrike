@@ -64,7 +64,7 @@ if (-not $SkipPackage) {
   $uat = Join-Path $engine "Engine\Build\BatchFiles\RunUAT.bat"
   $log = Join-Path $Out "package.log"
   New-Item -ItemType Directory -Force $Out | Out-Null
-  & $uat BuildCookRun "-project=$project" -platform=Win64 -clientconfig=Development -build -cook -stage -pak -prereqs -archive "-archivedirectory=$Out" -unattended -utf8output *> $log
+  & $uat BuildCookRun "-project=$project" -platform=Win64 -clientconfig=Development -build -cook -stage -pak -prereqs -archive "-archivedirectory=$Out" "-ubtargs=-NoHotReloadFromIDE" -unattended -utf8output *> $log
   if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exe)) {
     Get-Content $log | Select-String "error|BUILD FAILED" | Select-Object -Last 15 | ForEach-Object { $_.Line }
     Fail "packaging failed; the whole log is $log"
