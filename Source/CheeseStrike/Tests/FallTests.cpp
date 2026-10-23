@@ -59,6 +59,7 @@ namespace FallTests
 	/** Open floor on the shooter level, its ground about 100 cm under the capsule's middle. */
 	const FVector HostSpot(-231.0f, -300.0f, 100.0f);
 	const FVector JoinerSpot(-231.0f, -700.0f, 100.0f);
+	const FVector AsideSpot(1150.0f, -1450.0f, 100.0f);
 
 	/** The host comes down onto the floor as from a drop of `Drop` cm: set falling at the speed such a drop ends in. */
 	void Drop(float Drop)
@@ -183,8 +184,10 @@ bool FAFallPutsDownInExecution::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
 	using namespace FallTests;
-	StartPlaying({2, TEXT("?Mode=Execution?Rounds=1")});
+	// The host and the second joiner on one side (a side all down is out), the first joiner on the other.
+	StartPlaying({3, TEXT("?Mode=Execution?Rounds=1")});
 	PutAt(1, JoinerSpot, 90.0f);
+	PutAt(2, AsideSpot, 0.0f);
 	Wait(CheeseStrikeRules::SpawnProtection);
 	// A fall that would kill puts them down, as a shot would.
 	FallTests::Drop(CheeseStrikeFalls::DeadlyDrop + 200.0f);

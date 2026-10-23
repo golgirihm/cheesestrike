@@ -420,13 +420,10 @@ bool ACheeseStrikeMouse::FindWayOnto(const ACheeseStrikeCheese* Cheese)
 	{
 		return false;
 	}
-	// On it already (come down onto it with the block it ate on top of it).
+	// Never the one it stands on (on an island of floor, it leaps off instead: LeapOut).
 	if (StandsOn(Cheese))
 	{
-		EatsUnderfoot = const_cast<ACheeseStrikeCheese*>(Cheese);
-		LeapTo.Reset();
-		Path.Reset();
-		return true;
+		return false;
 	}
 	// Somewhere it can walk to, round it within a leap, the nearest first; then onto its top.
 	const FBox Box = Cheese->GetComponentsBoundingBox();
