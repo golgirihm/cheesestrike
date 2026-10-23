@@ -1,0 +1,41 @@
+# King of the Hill on The Creamery: the hill at the press, from across the
+# hall with the HUD's marker, the strip over the score and the minimap; walking
+# into it (captured, IN THE HILL); from above it; the scoreboard; and the
+# warning before it moves to the west yard, then the hill there. Run with
+# -Map /Game/CheeseStrike/Maps/Lvl_Creamery -StartAt "-1500,-800,100,28"
+# -Extra "?Mode=KingOfTheHill" (with -Bots -Extra "?Mode=KingOfTheHill?Bots=7"
+# for bots about it) -Res 1280x720 -TimeoutSeconds 150.
+wait 3
+shot hill_ahead
+look -70 0
+wait 0.5
+shot hill_aside
+look 70 0
+hold Move 0 1
+wait 3.6
+release Move
+wait 1.5
+shot hill_inside
+look 180 -20
+wait 0.5
+shot hill_inside_back
+cmd CheeseStrikeViewFrom -1300 -1100 650 -24 40
+wait 1
+shot hill_above
+cmd CheeseStrikeOutside
+hold Scoreboard
+wait 0.5
+shot hill_scoreboard
+release Scoreboard
+look 180 20
+wait 44
+shot hill_warning
+look 90 0
+wait 0.5
+shot hill_warning_north
+wait 6
+shot hill_moved
+cmd CheeseStrikeViewFrom -2150 2800 600 -30 90
+wait 1
+shot hill_yard
+quit

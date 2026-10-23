@@ -74,6 +74,18 @@ const TCHAR* ACheeseStrikeBotController::Doing() const
 	{
 		return TEXT("retreating");
 	}
+	if (bHill)
+	{
+		switch (HillPlan)
+		{
+		case CheeseStrikeHills::EBotPlan::HoldHill:
+			return TEXT("holding the hill");
+		case CheeseStrikeHills::EBotPlan::GoToNext:
+			return TEXT("going to the next hill");
+		default:
+			return TEXT("going to the hill");
+		}
+	}
 	if (bSeesTarget)
 	{
 		return TEXT("fighting");
@@ -620,6 +632,12 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 		{
 			GoTo(Elsewhere, false);
 		}
+		return;
+	}
+	// King of the Hill: the hill first, fighting on the way and from it.
+	bHill = ThinkAboutTheHill();
+	if (bHill)
+	{
 		return;
 	}
 

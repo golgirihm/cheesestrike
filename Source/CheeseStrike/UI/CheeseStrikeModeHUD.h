@@ -13,7 +13,9 @@ class UCanvas;
  * itself shows a team mode's scores, round and time in its score summary,
  * the teammates' names over their heads, and the Unmanned Aerial Cheese's
  * sweeps on its minimap): the last few announcements (a streak called in, a
- * round won), and the Overload's warning to those it falls on; the streak
+ * round won, the hill captured or moving), and the Overload's warning to
+ * those it falls on; King of the Hill's marker and strip
+ * (CheeseStrikeHillHUD); the streak
  * ready to call in, and word when one is earned; while marking a Cheese
  * Strike, where its wheels will land; during an Unmanned Aerial Cheese,
  * where its last sweep saw each enemy, and its time under the minimap; and,

@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
+#include "Map/CheeseStrikeHill.h"
 #include "Net/UnrealNetwork.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 
@@ -181,7 +182,8 @@ FString ACheeseStrikeGameState::ScoreSummary() const
 	}
 	if (!HasTeams())
 	{
-		const TArray<CheeseStrikeRules::FStanding> InOrder = Standings();
+		// Solo King of the Hill goes by the hill's points, the others by kills.
+		const TArray<CheeseStrikeRules::FStanding> InOrder = GetModeInfo().WinBy == CheeseStrikeModes::EWinBy::Hill ? ACheeseStrikeHill::SoloStandings(this) : Standings();
 		return InOrder.Num() > 0 ? FString::Printf(TEXT("%s leads with %d"), *InOrder[0].Name, InOrder[0].Kills) : FString();
 	}
 	FString Line = FString::Printf(TEXT("%s %d  ·  %d %s"), CheeseStrikeRules::TeamNames[0], GetTeamScore(0), GetTeamScore(1), CheeseStrikeRules::TeamNames[1]);

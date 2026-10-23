@@ -24,6 +24,14 @@ void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	DOREPLIFETIME(ACheeseStrikePlayerState, LastEarnedAt);
 	DOREPLIFETIME(ACheeseStrikePlayerState, bOut);
 	DOREPLIFETIME(ACheeseStrikePlayerState, RevealUntil);
+	DOREPLIFETIME(ACheeseStrikePlayerState, HillPoints);
+	DOREPLIFETIME(ACheeseStrikePlayerState, HillSeconds);
+}
+
+void ACheeseStrikePlayerState::AddHillTime(float Seconds)
+{
+	HillTime += FMath::Max(0.0f, Seconds);
+	HillSeconds = FMath::FloorToInt(HillTime);
 }
 
 CheeseStrikeRules::FStanding ACheeseStrikePlayerState::Standing() const

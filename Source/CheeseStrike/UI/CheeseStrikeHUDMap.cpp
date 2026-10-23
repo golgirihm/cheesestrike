@@ -15,6 +15,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikeHUDDraw.h"
+#include "CheeseStrikeHillHUD.h"
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Map/CheeseStrikePlace.h"
@@ -229,6 +230,9 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 			Shapes.Arc(Centre, Half * 0.95f * Ping, 2.0f * U, 0.0f, 360.0f, HudDraw::Faded(HudDraw::Danger, 0.55f * (1.0f - Ping)), false);
 		}
 	}
+
+	// King of the Hill: the hill, and where it goes next while it warns.
+	CheeseStrikeHillHUD::DrawOnMinimap(World, Me, Shapes, OnMap, Centre, Half, Scale, U);
 
 	// The player: a wedge of cheese in the middle, its point up, the way they face.
 	CheeseWedge(Shapes, Centre, U);
