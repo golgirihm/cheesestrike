@@ -130,7 +130,7 @@ FString ACheeseStrikeGameMode::RulesOptions() const
 	return Options;
 }
 
-void ACheeseStrikeGameMode::CountdownOver()
+void ACheeseStrikeGameMode::CountdownEnded()
 {
 	// Someone left during the countdown, and the match can no longer be played: back to waiting.
 	const FString WhyNot = WhyNotStart();
@@ -143,6 +143,11 @@ void ACheeseStrikeGameMode::CountdownOver()
 		}
 		return;
 	}
+	CountdownOver();
+}
+
+void ACheeseStrikeGameMode::CountdownOver()
+{
 	if (MapIndex < 0 || MapIndex == CurrentMapIndex() || GetWorld() == nullptr)
 	{
 		StartMatch();
@@ -332,7 +337,7 @@ void ACheeseStrikeGameMode::AskToStart(bool bAtOnce)
 	}
 	State->SetCountdownEndsAt(State->GetServerWorldTimeSeconds() + CheeseStrikeRules::MatchCountdown);
 	UE_LOG(LogCheeseStrike, Display, TEXT("The match starts in %.0f s"), CheeseStrikeRules::MatchCountdown);
-	GetWorldTimerManager().SetTimer(CountdownTimer, this, &ACheeseStrikeGameMode::CountdownOver, CheeseStrikeRules::MatchCountdown, false);
+	GetWorldTimerManager().SetTimer(CountdownTimer, this, &ACheeseStrikeGameMode::CountdownEnded, CheeseStrikeRules::MatchCountdown, false);
 }
 
 FString ACheeseStrikeGameMode::WhyNotStart() const
