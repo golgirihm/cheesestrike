@@ -109,7 +109,7 @@ bool FBotKeepsItsDistance::RunTest(const FString& Parameters)
 	const float Reach = CheeseStrikeWeapons::Knife().Reach;
 	TestTrue(TEXT("with the knife, closes in from 2 m"), MoveFor(200.0f, Reach, 100.0f, true) == EMove::Approach);
 	TestTrue(TEXT("strikes in reach"), WouldStrikeAt(120.0f, Reach));
-	TestFalse(TEXT("not out of it"), WouldStrikeAt(160.0f, Reach));
+	TestFalse(TEXT("not out of it"), WouldStrikeAt(Reach + 20.0f, Reach));
 	return true;
 }
 
