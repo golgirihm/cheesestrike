@@ -68,13 +68,13 @@ namespace
 		switch (Status)
 		{
 		case CheeseStrikeHUD::EStatus::Down:
-			Shapes.Rect(X, Y, Width, Height, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.9f));
+			Shapes.RoundedRect(X, Y, Width, Height, Height / 2.0f, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.9f));
 			break;
 		case CheeseStrikeHUD::EStatus::Out:
-			Shapes.Rect(X, Y, Width, Height, FLinearColor(1.0f, 1.0f, 1.0f, 0.1f));
+			Shapes.RoundedRect(X, Y, Width, Height, Height / 2.0f, FLinearColor(1.0f, 1.0f, 1.0f, 0.1f));
 			break;
 		case CheeseStrikeHUD::EStatus::Respawning:
-			Shapes.Frame(X, Y, Width, Height, FMath::Max(1.0f, 1.5f * U), HudDraw::Faded(HudDraw::Soft, 0.6f));
+			Shapes.RoundedFrame(X, Y, Width, Height, Height / 2.0f, FMath::Max(1.0f, 1.5f * U), HudDraw::Faded(HudDraw::Soft, 0.6f));
 			break;
 		default:
 			break;
@@ -185,8 +185,10 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	const FLinearColor OwnColour = HudDraw::Accent;
 
 	HudDraw::FShapes Shapes;
-	Shapes.Rect(Left, Top, PanelWidth, PanelHeight, FLinearColor(0.02f, 0.02f, 0.025f, 0.85f));
-	Shapes.Rect(Left, Top, PanelWidth, 2.0f * U, bOver ? HudDraw::Accent : HudDraw::Ink);
+	// A rounded panel, its top edge lit (clear of the rounding).
+	const float PanelRound = 12.0f * U;
+	Shapes.RoundedRect(Left, Top, PanelWidth, PanelHeight, PanelRound, FLinearColor(0.02f, 0.02f, 0.025f, 0.85f));
+	Shapes.RoundedRect(Left + PanelRound, Top, PanelWidth - 2.0f * PanelRound, 2.0f * U, U, bOver ? HudDraw::Accent : HudDraw::Ink);
 	Shapes.Rect(Left + 20.0f * U, Top + 104.0f * U, PanelWidth - 40.0f * U, U, HudDraw::Rule);
 	{
 		float Y = Top + 114.0f * U;
@@ -195,7 +197,7 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 			if (Section.Team != INDEX_NONE)
 			{
 				// A strip of the side's colour down the left of its rows.
-				Shapes.Rect(Left + 10.0f * U, Y + 6.0f * U, 3.0f * U, SectionHeight - 10.0f * U + RowHeight * Section.Lines.Num(), HudDraw::SideColour(Section.Team));
+				Shapes.RoundedRect(Left + 10.0f * U, Y + 6.0f * U, 3.0f * U, SectionHeight - 10.0f * U + RowHeight * Section.Lines.Num(), 1.5f * U, HudDraw::SideColour(Section.Team));
 				Y += SectionHeight;
 			}
 			for (const FLine& Line : Section.Lines)
@@ -211,7 +213,10 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	Shapes.Draw(Canvas);
 
 	const FString Title = bOver ? (Match->GetWinnerName().IsEmpty() ? TEXT("MATCH OVER") : FString::Printf(TEXT("%s %s"), *Match->GetWinnerName().ToUpper(), Match->HasTeams() ? TEXT("WIN") : TEXT("WINS"))) : CheeseStrikeModes::Title(Match->GetMode()).ToUpper();
-	HudDraw::Text(Canvas, Title, FVector2D(Width / 2.0f, Top + 16.0f * U), HudDraw::Font(30.0f * U), bOver ? HudDraw::Accent : HudDraw::Ink, 0.5f);
+	const FSlateFontInfo TitleFont = HudDraw::Font(30.0f * U);
+	// A winner's long name cut to leave the panel's edges clear.
+	const FString Fitted = CheeseStrikeHUD::FitNameIn(Title, Match->GetWinnerName().ToUpper(), PanelWidth - 140.0f * U, [&TitleFont](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, TitleFont).X); });
+	HudDraw::Text(Canvas, Fitted, FVector2D(Width / 2.0f, Top + 16.0f * U), TitleFont, bOver ? HudDraw::Accent : HudDraw::Ink, 0.5f);
 	const float ToLobby = Match->GetLobbyAt() > 0.0f ? FMath::Max(0.0f, Match->GetLobbyAt() - static_cast<float>(Match->GetServerWorldTimeSeconds())) : -1.0f;
 	const FString Under = bOver && ToLobby >= 0.0f ? FString::Printf(TEXT("%s  ·  back to the lobby in %.0f s"), *Match->GoalText(), FMath::CeilToFloat(ToLobby)) : Match->GoalText();
 	HudDraw::Text(Canvas, Under.ToUpper(), FVector2D(Width / 2.0f, Top + 58.0f * U), HudDraw::Font(14.0f * U), HudDraw::Soft, 0.5f);

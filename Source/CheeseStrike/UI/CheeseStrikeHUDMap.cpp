@@ -44,6 +44,47 @@ namespace
 			Shapes.Triangle(At + Way * (Radius + 5.0f) , At + Way * (Radius - 1.0f) + Across * (Radius * 0.8f), At + Way * (Radius - 1.0f) - Across * (Radius * 0.8f), Colour);
 		}
 	}
+
+	/**
+	 * The player on the minimap: a wedge of cheese seen from above, its point
+	 * the way they face (up), at `Centre`, `U` pixels a design pixel. A dark
+	 * outline, a body shaded from its point, the rind along its round back,
+	 * and a few holes.
+	 */
+	void CheeseWedge(HudDraw::FShapes& Shapes, const FVector2D& Centre, float U)
+	{
+		const float HalfAngle = FMath::DegreesToRadians(26.0f);
+		constexpr int32 Steps = 10;
+		const auto Wedge = [&](const FVector2D& Tip, float From, float To, const FLinearColor& Inner, const FLinearColor& Outer)
+		{
+			for (int32 Step = 0; Step < Steps; ++Step)
+			{
+				const float A = FMath::Lerp(-HalfAngle, HalfAngle, static_cast<float>(Step) / Steps);
+				const float B = FMath::Lerp(-HalfAngle, HalfAngle, static_cast<float>(Step + 1) / Steps);
+				const FVector2D WayA(FMath::Sin(A), FMath::Cos(A));
+				const FVector2D WayB(FMath::Sin(B), FMath::Cos(B));
+				if (From <= 0.0f)
+				{
+					Shapes.Triangle(Tip, Tip + WayA * To, Tip + WayB * To, Inner, Outer, Outer);
+				}
+				else
+				{
+					Shapes.Quad(Tip + WayA * From, Tip + WayB * From, Tip + WayB * To, Tip + WayA * To, Inner, Inner, Outer, Outer);
+				}
+			}
+		};
+		const FVector2D Tip = Centre + FVector2D(0.0f, -15.0f * U);
+		const float Length = 27.0f * U;
+		const float Rind = 4.5f * U;
+		Wedge(Tip + FVector2D(0.0f, -3.0f * U), 0.0f, Length + 4.5f * U, FLinearColor(0.0f, 0.0f, 0.0f, 0.8f), FLinearColor(0.0f, 0.0f, 0.0f, 0.8f));
+		Wedge(Tip, 0.0f, Length - Rind, FLinearColor(1.0f, 0.92f, 0.5f, 1.0f), FLinearColor(0.98f, 0.74f, 0.2f, 1.0f));
+		Wedge(Tip, Length - Rind, Length, FLinearColor(0.93f, 0.55f, 0.08f, 1.0f), FLinearColor(0.78f, 0.4f, 0.04f, 1.0f));
+		const FLinearColor Hole(0.8f, 0.48f, 0.06f, 1.0f);
+		Shapes.Disc(Centre + FVector2D(-3.0f * U, 2.4f * U), 2.4f * U, Hole, 12);
+		Shapes.Disc(Centre + FVector2D(2.6f * U, -2.6f * U), 1.8f * U, Hole, 12);
+		Shapes.Disc(Centre + FVector2D(1.8f * U, 5.2f * U), 1.6f * U, Hole, 12);
+		Shapes.Disc(Centre + FVector2D(-0.6f * U, -7.5f * U), 1.1f * U, Hole, 10);
+	}
 }
 
 void ACheeseStrikeHUD::LookForEnemies(const ACheeseStrikePlayerController* Controller)
@@ -112,9 +153,15 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 	const float Feet = Character != nullptr && Character->IsAlive() && Controller->GetViewTarget() == Character ? FeetOf(Character) : Eye.Z - 160.0f;
 	const auto OnMap = [&](const FVector& At) { return Centre + CheeseStrikeHUD::MapPoint(FVector2D(At.X, At.Y) - Middle, ViewYaw, Scale); };
 
+	// Rounded corners: the level is cut to them, and the marks held inside them.
+	const float Corner = CheeseStrikeHUD::MinimapCorner * U;
+	const FVector2D InsetMin = Min + FVector2D(6.0f * U, 6.0f * U);
+	const FVector2D InsetMax = Max - FVector2D(6.0f * U, 6.0f * U);
+	const float InsetCorner = FMath::Max(0.0f, Corner - 6.0f * U);
+
 	HudDraw::FShapes Shapes;
-	Shapes.Rect(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y, FLinearColor(0.008f, 0.008f, 0.01f, 0.72f));
-	Minimap.Draw(Shapes, Min, Max, Middle, ViewYaw, Feet, Scale);
+	Shapes.RoundedRect(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y, Corner, FLinearColor(0.008f, 0.008f, 0.01f, 0.72f));
+	Minimap.Draw(Shapes, Min, Max, Middle, ViewYaw, Feet, Scale, Corner);
 
 	// What the player can see: a faint cone up the map.
 	const float HalfCone = FMath::Min(80.0f, FieldOfView / 2.0f);
@@ -142,16 +189,14 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 		const float Facing = Other->GetActorRotation().Yaw - ViewYaw;
 		if (AreTeammates(Me, Their))
 		{
-			const FVector2D From = At - Centre;
-			const float Out = FMath::Max(FMath::Abs(From.X), FMath::Abs(From.Y));
-			const bool bBeyond = Out > Half - 6.0f * U;
+			const bool bBeyond = CheeseStrikeHUD::InsideRoundedRect(At, InsetMin, InsetMax, InsetCorner) < 0.0f;
 			if (bBeyond)
 			{
-				At = Centre + From * ((Half - 6.0f * U) / Out);
+				At = CheeseStrikeHUD::HoldInsideRoundedRect(At, InsetMin, InsetMax, InsetCorner);
 			}
 			MapDot(Shapes, At, (bBeyond ? 3.5f : 4.5f) * U, HudDraw::Faded(HudDraw::SideColour(Their != nullptr ? Their->GetTeam() : 0), bBeyond ? 0.7f : 1.0f), Facing, !bBeyond);
 		}
-		else if (ShowsOnMinimap(Other) && At.X > Min.X && At.Y > Min.Y && At.X < Max.X && At.Y < Max.Y)
+		else if (ShowsOnMinimap(Other) && CheeseStrikeHUD::InsideRoundedRect(At, Min, Max, Corner) > 0.0f)
 		{
 			const float* Seen = LastSeen.Find(Other);
 			const float Fade = AreEnemiesRevealed() || Seen == nullptr ? 1.0f : FMath::Clamp(1.0f - (World->GetTimeSeconds() - *Seen) / SeenLife, 0.0f, 1.0f) * 0.6f + 0.4f;
@@ -170,12 +215,10 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 			for (const FVector& Mark : Mine->SweepMarks)
 			{
 				FVector2D At = OnMap(Mark);
-				const FVector2D From = At - Centre;
-				const float Out = FMath::Max(FMath::Abs(From.X), FMath::Abs(From.Y));
-				const bool bBeyond = Out > Half - 6.0f * U;
+				const bool bBeyond = CheeseStrikeHUD::InsideRoundedRect(At, InsetMin, InsetMax, InsetCorner) < 0.0f;
 				if (bBeyond)
 				{
-					At = Centre + From * ((Half - 6.0f * U) / Out);
+					At = CheeseStrikeHUD::HoldInsideRoundedRect(At, InsetMin, InsetMax, InsetCorner);
 				}
 				MapDot(Shapes, At, (bBeyond ? 3.0f : 4.5f) * U, HudDraw::Faded(HudDraw::Danger, Sweep.Fade * (bBeyond ? 0.75f : 1.0f)), 0.0f, false);
 			}
@@ -187,18 +230,15 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 		}
 	}
 
-	// The player: an arrow in the middle, pointing up, the way they face.
-	const FVector2D Tip = Centre + FVector2D(0.0f, -9.0f * U);
-	const FVector2D Notch = Centre + FVector2D(0.0f, 3.5f * U);
-	Shapes.Triangle(Tip, Centre + FVector2D(7.0f * U, 8.0f * U), Notch, HudDraw::Ink);
-	Shapes.Triangle(Tip, Notch, Centre + FVector2D(-7.0f * U, 8.0f * U), HudDraw::Ink);
+	// The player: a wedge of cheese in the middle, its point up, the way they face.
+	CheeseWedge(Shapes, Centre, U);
 
 	// Where the player is, by the map's names for its places, under the minimap.
 	const FString Place = ACheeseStrikePlace::NameAt(World, Eye).ToUpper();
 
 	// The frame, and north riding it.
-	Shapes.Frame(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y, FMath::Max(1.0f, U), HudDraw::Rule);
-	const FVector2D North = Centre + CheeseStrikeHUD::NorthMark(ViewYaw, Half);
+	Shapes.RoundedFrame(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y, Corner, FMath::Max(1.0f, U), HudDraw::Rule);
+	const FVector2D North = CheeseStrikeHUD::HoldInsideRoundedRect(Centre + CheeseStrikeHUD::NorthMark(ViewYaw, Half), Min, Max, Corner);
 	Shapes.Disc(North, 10.0f * U, FLinearColor(0.02f, 0.02f, 0.025f, 0.9f), 20);
 	Shapes.Arc(North, 10.0f * U, 1.5f * U, 0.0f, 360.0f, HudDraw::Faded(HudDraw::Accent, 0.9f), false);
 	Shapes.Draw(Canvas);
@@ -277,8 +317,11 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 		return;
 	}
 
-	// The tiles: a picture, or the initials on the side's colour; a strip of the side's colour under; dimmed while coming back, darker and struck through when out;
-	// down, washed and framed in orange, slowly pulsing, the strip under it orange.
+	// The tiles, their corners rounded: a picture, or the initials on the side's colour, framed in the side's colour; dimmed
+	// and its frame faded while coming back, darker and struck through when out; down, washed and framed thicker in orange,
+	// slowly pulsing. The local player's own has a white ring round it.
+	const float Round = 8.0f * U;
+	const float Edge = FMath::Max(1.0f, 2.5f * U);
 	HudDraw::FShapes Under;
 	HudDraw::FShapes Over;
 	if (bTeams)
@@ -290,32 +333,32 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 		const FLinearColor Side = HudDraw::SideColour(bTeams ? Icon.Player->GetTeam() : INDEX_NONE);
 		if (Icon.Avatar == nullptr)
 		{
-			Under.Quad(Icon.At, Icon.At + FVector2D(Size, 0.0f), Icon.At + FVector2D(Size, Size), Icon.At + FVector2D(0.0f, Size),
-				Side * FLinearColor(0.55f, 0.55f, 0.55f, 0.92f), Side * FLinearColor(0.5f, 0.5f, 0.5f, 0.92f), Side * FLinearColor(0.32f, 0.32f, 0.32f, 0.92f), Side * FLinearColor(0.36f, 0.36f, 0.36f, 0.92f));
+			Under.RoundedRectDown(Icon.At.X, Icon.At.Y, Size, Size, Round, Side * FLinearColor(0.55f, 0.55f, 0.55f, 0.92f), Side * FLinearColor(0.32f, 0.32f, 0.32f, 0.92f));
 		}
 		if (Icon.Status == CheeseStrikeHUD::EStatus::Down)
 		{
 			const float Pulse = 0.5f + 0.5f * FMath::Sin(Now * 5.0f);
-			Over.Rect(Icon.At.X, Icon.At.Y, Size, Size, FLinearColor(0.0f, 0.0f, 0.0f, 0.3f));
-			Over.Rect(Icon.At.X, Icon.At.Y, Size, Size, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.2f + 0.2f * Pulse));
-			Over.Frame(Icon.At.X, Icon.At.Y, Size, Size, FMath::Max(1.0f, 2.0f * U), CheeseStrikeHUD::DownColour);
-			Over.Rect(Icon.At.X, Icon.At.Y + Size, Size, 3.0f * U, CheeseStrikeHUD::DownColour);
+			Over.RoundedRect(Icon.At.X, Icon.At.Y, Size, Size, Round, FLinearColor(0.0f, 0.0f, 0.0f, 0.3f));
+			Over.RoundedRect(Icon.At.X, Icon.At.Y, Size, Size, Round, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.2f + 0.2f * Pulse));
+			Over.RoundedFrame(Icon.At.X, Icon.At.Y, Size, Size, Round, FMath::Max(1.0f, 3.0f * U), CheeseStrikeHUD::DownColour);
 		}
-		else if (Icon.Status != CheeseStrikeHUD::EStatus::Alive)
+		else
 		{
-			Over.Rect(Icon.At.X, Icon.At.Y, Size, Size, FLinearColor(0.0f, 0.0f, 0.0f, Icon.Status == CheeseStrikeHUD::EStatus::Out ? 0.78f : 0.6f));
+			if (Icon.Status != CheeseStrikeHUD::EStatus::Alive)
+			{
+				Over.RoundedRect(Icon.At.X, Icon.At.Y, Size, Size, Round, FLinearColor(0.0f, 0.0f, 0.0f, Icon.Status == CheeseStrikeHUD::EStatus::Out ? 0.78f : 0.6f));
+			}
+			const float Solid = Icon.Status == CheeseStrikeHUD::EStatus::Alive ? 1.0f : Icon.Status == CheeseStrikeHUD::EStatus::Out ? 0.25f : 0.4f;
+			Over.RoundedFrame(Icon.At.X, Icon.At.Y, Size, Size, Round, Edge, HudDraw::Faded(Side, Solid));
 		}
 		if (Icon.Status == CheeseStrikeHUD::EStatus::Out)
 		{
-			Over.Line(Icon.At + FVector2D(6.0f * U, Size - 6.0f * U), Icon.At + FVector2D(Size - 6.0f * U, 6.0f * U), 2.0f * U, HudDraw::Faded(HudDraw::Danger, 0.8f));
-		}
-		if (Icon.Status != CheeseStrikeHUD::EStatus::Down)
-		{
-			Over.Rect(Icon.At.X, Icon.At.Y + Size, Size, 3.0f * U, Icon.Status == CheeseStrikeHUD::EStatus::Alive ? Side : HudDraw::Faded(Side, 0.35f));
+			Over.Line(Icon.At + FVector2D(8.0f * U, Size - 8.0f * U), Icon.At + FVector2D(Size - 8.0f * U, 8.0f * U), 2.0f * U, HudDraw::Faded(HudDraw::Danger, 0.8f));
 		}
 		if (Icon.Player == Me)
 		{
-			Over.Frame(Icon.At.X - 2.0f * U, Icon.At.Y - 2.0f * U, Size + 4.0f * U, Size + 7.0f * U, FMath::Max(1.0f, 1.5f * U), HudDraw::Ink);
+			const float Ring = 3.0f * U;
+			Over.RoundedFrame(Icon.At.X - Ring, Icon.At.Y - Ring, Size + 2.0f * Ring, Size + 2.0f * Ring, Round + Ring, FMath::Max(1.0f, 1.5f * U), HudDraw::Ink);
 		}
 	}
 	Under.Draw(Canvas);
@@ -341,10 +384,11 @@ void ACheeseStrikeHUD::DrawPlayers(const ACheeseStrikeGameState* Match)
 		}
 		else if (Icon.Status == CheeseStrikeHUD::EStatus::Down)
 		{
-			// The word across the foot of the tile, white on a band of the colour, so that it reads on any picture.
+			// The word across the foot of the tile, white on a band of the colour (the tile's rounded foot), so that it reads on any picture.
 			const FVector2D Word = HudDraw::Measure(TEXT("DOWN"), DownWord);
 			HudDraw::FShapes Band;
-			Band.Rect(Icon.At.X, Icon.At.Y + Size - Word.Y - 2.0f * U, Size, Word.Y + 2.0f * U, HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.9f));
+			Band.Polygon(CheeseStrikeHUD::ClipToRect(CheeseStrikeHUD::RoundedRect(Icon.At, Icon.At + FVector2D(Size, Size), Round), FVector2D(Icon.At.X, Icon.At.Y + Size - Word.Y - 2.0f * U), Icon.At + FVector2D(Size, Size)),
+				HudDraw::Faded(CheeseStrikeHUD::DownColour, 0.9f));
 			Band.Draw(Canvas);
 			HudDraw::Text(Canvas, TEXT("DOWN"), FVector2D(Icon.At.X + Size / 2.0f, Icon.At.Y + Size - Word.Y - 1.0f * U), DownWord, HudDraw::Ink, 0.5f, false);
 		}
@@ -396,6 +440,8 @@ void ACheeseStrikeHUD::DrawNameTags(const ACheeseStrikePlayerController* Control
 	for (const FTag& Tag : NameTags)
 	{
 		const FSlateFontInfo Name = HudDraw::Font(18.0f * U * Tag.Scale);
-		HudDraw::Text(Canvas, Tag.Name, FVector2D(Tag.At.X, Tag.At.Y - HudDraw::Measure(Tag.Name, Name).Y), Name, HudDraw::Faded(HudDraw::Ink, Tag.Alpha), 0.5f);
+		// A long name (Steam's run to 32 letters) cut with dots, so that a tag never spreads far across the view.
+		const FString Shown = CheeseStrikeHUD::FitName(Tag.Name, NameTagWidth * U * Tag.Scale, [&Name](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, Name).X); });
+		HudDraw::Text(Canvas, Shown, FVector2D(Tag.At.X, Tag.At.Y - HudDraw::Measure(Shown, Name).Y), Name, HudDraw::Faded(HudDraw::Ink, Tag.Alpha), 0.5f);
 	}
 }

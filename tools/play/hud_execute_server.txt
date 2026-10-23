@@ -1,0 +1,27 @@
+# Execution with long names, the host: puts the joiner down 4 m ahead (a bot
+# on each side keeps the sides from being out at once); then the
+# crosshair over them is the cancel sign (a shot from there does nothing);
+# walked up within reach, the usual lines; then finishes them, for the kill
+# feed's long names (the joiner can take a while to come in on a busy PC,
+# hence the long wait). With hud_execute_client.txt:
+#   tools/play.ps1 -Script tools/play/hud_execute_server.txt -ClientScript tools/play/hud_execute_client.txt
+#     -Lobby -Bots -Extra "?listen?Mode=Execution?Bots=2?BotSkill=0" -Name ReginaldCheddaringtonTheThirdEsq
+#     -ClientName GorgonzolaGwendolynVonMozzarella -ClientDelay 5 -TimeoutSeconds 450 -Tag execute
+wait 150
+cmd CheeseStrikeStart now
+wait 9
+cmd CheeseStrikeDown GorgonzolaGwendolynVonMozzarella
+wait 1.5
+shot execute_h1_far
+hold Move 0 1
+wait 0.55
+release Move
+wait 0.3
+shot execute_h2_near
+hold Interact
+wait 1.5
+release Interact
+wait 0.5
+shot execute_h3_feed
+wait 6
+quit

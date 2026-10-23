@@ -3,6 +3,7 @@
 #include "CheeseStrikeHUD.h"
 #include "Camera/PlayerCameraManager.h"
 #include "CanvasItem.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Texture2D.h"
@@ -332,8 +333,8 @@ void ACheeseStrikeHUD::DrawHUD()
 	const bool bOver = Match != nullptr && Match->HasMatchEnded() && Match->GetMatchState() != MatchState::LeavingMap;
 	const float FieldOfView = Controller->PlayerCameraManager != nullptr ? Controller->PlayerCameraManager->GetFOVAngle() : 90.0f;
 	const bool bAlive = Character != nullptr && Character->IsAlive() && !bOver;
-	// Out of the round (Elimination), the mode's HUD says so instead of the death screen.
-	const bool bDead = Character != nullptr && !Character->IsAlive() && !bOver && !CheeseStrikeModeHUD::IsOut(this);
+	// Out of the round (Elimination, or finished in Execution), the death screen shows a while, and then the mode's HUD says so.
+	const bool bDead = Character != nullptr && !Character->IsAlive() && !bOver;
 	if (!bOver)
 	{
 		DrawNameTags(Controller);
@@ -360,7 +361,7 @@ void ACheeseStrikeHUD::DrawHUD()
 	}
 	if (bDead)
 	{
-		DrawDeath(Character, Match);
+		DrawDeath(Character, Match, CheeseStrikeModeHUD::IsOut(this));
 	}
 	if (bOver || Controller->IsScoreboardShown())
 	{
@@ -402,7 +403,19 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	const float Spread = Weapon != nullptr ? Weapon->CurrentSpread() : 0.0f;
 	const float Gap = CrosshairGap + PixelsForDegrees(Spread, FieldOfView, Width);
 	const FLinearColor Cross(1.0f, 1.0f, 1.0f, 0.9f);
-	if (Weapon == nullptr || !Weapon->IsAimed())
+	if (CrosshairOver(Character) == CheeseStrikeHUD::ECrosshair::NoEffect)
+	{
+		// Over an enemy down whom a shot from here would not hurt (Execution): a cancel sign, a ring struck through.
+		const float Radius = 11.0f;
+		const float Slant = Radius * 0.7071f;
+		const FLinearColor Shadow(0.0f, 0.0f, 0.0f, 0.55f);
+		const FLinearColor Sign = HudDraw::Faded(HudDraw::Danger, 0.95f);
+		Shapes.Arc(Middle, Radius, CrosshairThickness + 2.5f, 0.0f, 360.0f, Shadow, false);
+		Shapes.Line(Middle + FVector2D(-Slant, -Slant), Middle + FVector2D(Slant, Slant), CrosshairThickness + 2.5f, Shadow);
+		Shapes.Arc(Middle, Radius, CrosshairThickness + 0.5f, 0.0f, 360.0f, Sign, false);
+		Shapes.Line(Middle + FVector2D(-Slant, -Slant), Middle + FVector2D(Slant, Slant), CrosshairThickness + 0.5f, Sign);
+	}
+	else if (Weapon == nullptr || !Weapon->IsAimed())
 	{
 		Shapes.Line(FVector2D(Middle.X - Gap - CrosshairLength, Middle.Y), FVector2D(Middle.X - Gap, Middle.Y), CrosshairThickness, Cross);
 		Shapes.Line(FVector2D(Middle.X + Gap, Middle.Y), FVector2D(Middle.X + Gap + CrosshairLength, Middle.Y), CrosshairThickness, Cross);
@@ -431,6 +444,50 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	DrawScope(Character);
 	DrawHealth(Character);
 	DrawWeapon(Character);
+}
+
+CheeseStrikeHUD::ECrosshair ACheeseStrikeHUD::CrosshairOver(const ACheeseStrikeCharacter* Character) const
+{
+	const APlayerController* Controller = GetOwningPlayerController();
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	if (Character == nullptr || Controller == nullptr || Controller->PlayerCameraManager == nullptr || Match == nullptr || !Match->GetModeInfo().bLastStand)
+	{
+		return CheeseStrikeHUD::ECrosshair::Usual;
+	}
+	const FVector Eye = Controller->PlayerCameraManager->GetCameraLocation();
+	const FVector Ahead = Controller->PlayerCameraManager->GetCameraRotation().Vector();
+	// The enemy down nearest the aim: their capsule (the raised head and shoulders) or the legs lying out ahead of it, within
+	// a hand's width of the line of the aim, with nothing between.
+	const ACheeseStrikeCharacter* Aimed = nullptr;
+	float Nearest = TNumericLimits<float>::Max();
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		const ACheeseStrikeCharacter* Other = *It;
+		if (Other == Character || !Other->IsAlive() || !Other->IsDowned() || !Match->AreEnemies(Character->GetPlayerState(), Other->GetPlayerState()))
+		{
+			continue;
+		}
+		const FVector Hips = Other->GetActorLocation();
+		const FVector Feet = Hips + Other->GetActorForwardVector() * 110.0f - FVector(0.0f, 0.0f, Other->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.6f);
+		FVector OnAim;
+		FVector OnBody;
+		FMath::SegmentDistToSegmentSafe(Eye, Eye + Ahead * 10000.0f, Hips + FVector(0.0f, 0.0f, Other->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.5f), Feet, OnAim, OnBody);
+		const float Off = FVector::Dist(OnAim, OnBody);
+		const float Along = FVector::Dist(Eye, OnAim);
+		if (Off > 35.0f || Along >= Nearest)
+		{
+			continue;
+		}
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(CheeseStrikeHUDAim), false, Character);
+		Query.AddIgnoredActor(Other);
+		if (GetWorld()->LineTraceTestByChannel(Eye, OnBody, ECC_Visibility, Query))
+		{
+			continue;
+		}
+		Aimed = Other;
+		Nearest = Along;
+	}
+	return Aimed != nullptr ? CheeseStrikeHUD::CrosshairFor(true, true, FVector::Dist(Character->GetActorLocation(), Aimed->GetActorLocation())) : CheeseStrikeHUD::ECrosshair::Usual;
 }
 
 UTexture2D* ACheeseStrikeHUD::WeaponIcon(FName Id)
@@ -922,16 +979,8 @@ void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 		if (!Block.Line->Name.IsEmpty())
 		{
 			// As much of the name as fits beside the score.
-			FString Shown = Block.Line->Name.ToUpper();
 			const float Room = BlockWidth - 2.0f * Pad - HudDraw::Measure(FString::FromInt(Block.Line->Score), Score).X - 8.0f * U;
-			if (HudDraw::Measure(Shown, Name).X > Room)
-			{
-				while (Shown.Len() > 1 && HudDraw::Measure(Shown + TEXT("..."), Name).X > Room)
-				{
-					Shown.LeftChopInline(1);
-				}
-				Shown = Shown.TrimEnd() + TEXT("...");
-			}
+			const FString Shown = CheeseStrikeHUD::FitName(Block.Line->Name.ToUpper(), Room, [&Name](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, Name).X); });
 			HudDraw::Text(Canvas, Shown, FVector2D(Block.X + Pad, Top + 27.0f * U), Name, HudDraw::Ink);
 		}
 		HudDraw::Text(Canvas, FString::FromInt(Block.Line->Score), FVector2D(Block.X + BlockWidth - Pad, Top + (BlockHeight - ScoreSize.Y) / 2.0f - 1.0f * U), Score, HudDraw::Ink, 1.0f);
@@ -985,17 +1034,19 @@ void ACheeseStrikeHUD::DrawKillFeed(const ACheeseStrikeGameState* Match)
 		const FString Place = Where.IsEmpty() ? FString() : FString::Printf(TEXT("  ·  %s"), *Where);
 		const float PlaceWidth = Place.IsEmpty() ? 0.0f : HudDraw::Measure(Place, Line).X;
 		// Killer, then "killed", then the killed, right to left from the edge; the player's own name in the accent.
-		const FString Killer = bNobody ? Kill.Victim : (Kill.Killer.IsEmpty() ? TEXT("nobody") : Kill.Killer);
+		// Names as long as Steam's (32 letters) are cut with dots, so that a line keeps to the right of the screen.
+		const auto Fit = [&Line, U](const FString& Name) { return CheeseStrikeHUD::FitName(Name, KillFeedNameWidth * U, [&Line](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, Line).X); }); };
+		const FString Killer = Fit(bNobody ? Kill.Victim : (Kill.Killer.IsEmpty() ? TEXT("nobody") : Kill.Killer));
 		// A streak's kill says which ("Cheese Strike") where the weapon's says "killed".
 		const FString Middle = bNobody ? FString() : !Kill.How.IsEmpty() ? FString::Printf(TEXT("  %s  "), *Kill.How) : Kill.bHead ? TEXT("  killed (head)  ") : TEXT("  killed  ");
-		const FString Victim = bNobody ? FString::Printf(TEXT("  %s"), *Kill.How) : Kill.Victim;
+		const FString Victim = bNobody ? FString::Printf(TEXT("  %s"), *Kill.How) : Fit(Kill.Victim);
 		const float VictimWidth = HudDraw::Measure(Victim, Line).X;
 		const float MiddleWidth = Middle.IsEmpty() ? 0.0f : HudDraw::Measure(Middle, Line).X;
 		const float KillerWidth = HudDraw::Measure(Killer, Line).X;
 		const float Height = HudDraw::Measure(TEXT("A"), Line).Y;
 		HudDraw::FShapes Shapes;
 		const float Total = PlaceWidth + VictimWidth + MiddleWidth + KillerWidth;
-		Shapes.Rect(Right - Total - 16.0f * U, Y - 2.0f * U, Total + 16.0f * U, Height + 4.0f * U, HudDraw::Panel);
+		Shapes.RoundedRect(Right - Total - 16.0f * U, Y - 2.0f * U, Total + 16.0f * U, Height + 4.0f * U, 5.0f * U, HudDraw::Panel);
 		Shapes.Draw(Canvas);
 		float X = Right - 8.0f * U;
 		if (!Place.IsEmpty())

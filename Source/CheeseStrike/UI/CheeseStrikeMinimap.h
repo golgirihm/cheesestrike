@@ -50,9 +50,10 @@ public:
 	/**
 	 * Adds to `Shapes` the level round `Middle` (world X and Y) as a player
 	 * facing `ViewYaw` with their feet at `Feet` sees it, on the screen's
-	 * square from `Min` to `Max`, at `Scale` pixels a cm.
+	 * square from `Min` to `Max`, its corners rounded to `Corner` pixels,
+	 * at `Scale` pixels a cm.
 	 */
-	void Draw(CheeseStrikeHUDDraw::FShapes& Shapes, const FVector2D& Min, const FVector2D& Max, const FVector2D& Middle, float ViewYaw, float Feet, float Scale);
+	void Draw(CheeseStrikeHUDDraw::FShapes& Shapes, const FVector2D& Min, const FVector2D& Max, const FVector2D& Middle, float ViewYaw, float Feet, float Scale, float Corner = 0.0f);
 
 	/** Adds the pieces of `Mesh`, placed at `ToWorld`, to `Out`. */
 	static void PiecesOf(const UStaticMesh* Mesh, const FTransform& ToWorld, TArray<FPiece>& Out);
@@ -73,4 +74,7 @@ private:
 	/** The doors, read as they are each frame: a door that opens shows open. */
 	TArray<TWeakObjectPtr<AActor>> Doors;
 	TWeakObjectPtr<UWorld> GatheredFor;
+	/** The edge of the square being drawn, its corners rounded: what a piece reaching past it is cut to. */
+	TArray<FVector2D> Edge;
+	float Corner = 0.0f;
 };

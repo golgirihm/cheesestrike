@@ -1,0 +1,4 @@
+# Execution with long names, the joiner: put down by the host and finished.
+# With hud_execute_server.txt.
+wait 360
+quit

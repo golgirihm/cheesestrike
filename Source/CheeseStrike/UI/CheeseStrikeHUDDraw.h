@@ -45,6 +45,8 @@ namespace CheeseStrikeHUDDraw
 	void Text(UCanvas* Canvas, const FString& Text, const FVector2D& At, const FSlateFontInfo& InFont, const FLinearColor& Colour, float Align = 0.0f, bool bShadow = true, const FVector2D& Stretch = FVector2D(1.0f, 1.0f));
 	/** Draws `Texture` over the rectangle at `At`, `Size` big, tinted `Colour`, blended by its alpha. */
 	void Picture(UCanvas* Canvas, UTexture2D* Texture, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour);
+	/** Draws `Texture` over the rectangle at `At`, `Size` big, its corners rounded to `Radius` (CheeseStrikeHUD::RoundedRect), tinted `Colour`. */
+	void RoundedPicture(UCanvas* Canvas, UTexture2D* Texture, const FVector2D& At, const FVector2D& Size, float Radius, const FLinearColor& Colour);
 	/** A texture made in code: `Width` by `Height` pixels of `Format` from `Pixels` (four bytes each). */
 	UTexture2D* MakeTexture(int32 Width, int32 Height, const TArray<uint8>& Pixels, EPixelFormat Format);
 
@@ -63,6 +65,12 @@ namespace CheeseStrikeHUDDraw
 		void RectAcross(float X, float Y, float Width, float Height, const FLinearColor& Left, const FLinearColor& Right);
 		/** The outline of a rectangle, `Thickness` wide, inside it. */
 		void Frame(float X, float Y, float Width, float Height, float Thickness, const FLinearColor& Colour);
+		/** A rectangle with its corners rounded to `Radius` (CheeseStrikeHUD::RoundedRect). */
+		void RoundedRect(float X, float Y, float Width, float Height, float Radius, const FLinearColor& Colour);
+		/** The same shaded from `Top` to `Bottom`. */
+		void RoundedRectDown(float X, float Y, float Width, float Height, float Radius, const FLinearColor& Top, const FLinearColor& Bottom);
+		/** The outline of a rounded rectangle, `Thickness` wide, inside it, its inner corners rounded to match. */
+		void RoundedFrame(float X, float Y, float Width, float Height, float Radius, float Thickness, const FLinearColor& Colour);
 		/** A convex polygon, its corners in order round. */
 		void Polygon(TConstArrayView<FVector2D> Corners, const FLinearColor& Colour);
 		void Disc(const FVector2D& Middle, float Radius, const FLinearColor& Colour, int32 Sides = 20);
@@ -75,6 +83,9 @@ namespace CheeseStrikeHUDDraw
 		 * towards both ends.
 		 */
 		void Arc(const FVector2D& Middle, float Radius, float Thickness, float From, float To, const FLinearColor& Colour, bool bFade);
+
+		/** Every shape so far `Alpha` as solid as it was. */
+		void Fade(float Alpha);
 
 		/** Draws them all, in the order they were added, and starts again. */
 		void Draw(UCanvas* Canvas);

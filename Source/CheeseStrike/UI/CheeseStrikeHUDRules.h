@@ -39,6 +39,10 @@ namespace CheeseStrikeHUD
 	TArray<FVector2D> ConvexHull(TArray<FVector2D> Points);
 	/** A convex `Polygon` cut to the rectangle from `Min` to `Max`; empty if none of it is inside. */
 	TArray<FVector2D> ClipToRect(const TArray<FVector2D>& Polygon, const FVector2D& Min, const FVector2D& Max);
+	/** A convex `Polygon` cut to the convex polygon `Clip` (its corners in order round, either way); empty if none of it is inside. */
+	TArray<FVector2D> ClipToConvex(const TArray<FVector2D>& Polygon, const TArray<FVector2D>& Clip);
+	/** How round the minimap's corners are, in design pixels (ACheeseStrikeHUD::Unit). */
+	constexpr float MinimapCorner = 18.0f;
 	/** How wide a convex `Polygon` is across its narrowest way: a wall's thickness, a slab of ground's width. */
 	float NarrowestWidth(const TArray<FVector2D>& Polygon);
 	/** Pieces at least this wide across (cm) are ground or platforms, not walls, when they rise over the player's head. */
@@ -83,6 +87,21 @@ namespace CheeseStrikeHUD
 		float Fade = 0.0f;
 	};
 	FSweep SweepAt(float Now, float Ends, float RevealTime, float Period);
+
+	// ---------------------------------------------------------------- rounded shapes
+
+	/**
+	 * The corners of the rectangle from `Min` to `Max` with its corners
+	 * rounded to `Radius` (held to half its shorter side; 0 for square
+	 * corners), each corner an arc of `Steps` segments: in order round,
+	 * clockwise on the screen, from the left end of the top left corner's arc.
+	 * The canvas has no rounded shapes; the HUD fills this as a polygon.
+	 */
+	TArray<FVector2D> RoundedRect(const FVector2D& Min, const FVector2D& Max, float Radius, int32 Steps = 6);
+	/** How far `Point` is inside that rounded rectangle's edge: negative outside. */
+	float InsideRoundedRect(const FVector2D& Point, const FVector2D& Min, const FVector2D& Max, float Radius);
+	/** `Point` held inside it: itself if it is inside, else the nearest point of its edge. */
+	FVector2D HoldInsideRoundedRect(const FVector2D& Point, const FVector2D& Min, const FVector2D& Max, float Radius);
 
 	// ---------------------------------------------------------------- damage
 
@@ -176,6 +195,13 @@ namespace CheeseStrikeHUD
 	FBoardRow BoardRow(const CheeseStrikeRules::FStanding& Line, EStatus Status, bool bIsABot, bool bMine);
 	/** `Name` as it fits `Width`: whole if it does, else cut and ended with "...", by `Measure` (its width as drawn). */
 	FString FitName(const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure);
+	/**
+	 * `Line` with the name `Name` in it cut to fit `Width` (FitName), the
+	 * rest of the line kept whole: an announcement or a death screen's line
+	 * naming a player, whose name may be as long as Steam's (32 letters,
+	 * with no spaces to break at).
+	 */
+	FString FitNameIn(const FString& Line, const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure);
 
 	// ---------------------------------------------------------------- the score summary
 
@@ -221,7 +247,35 @@ namespace CheeseStrikeHUD
 	};
 	FTagLook TagLook(float Distance);
 
+	// ---------------------------------------------------------------- the crosshair
+
+	/** What the crosshair shows: the usual lines, or a cancel sign where a shot would do nothing. */
+	enum class ECrosshair : uint8
+	{
+		Usual,
+		NoEffect
+	};
+	/**
+	 * The crosshair over a player in the way of the aim: in a mode with a
+	 * last stand (`bLastStand`), an enemy down (`bEnemyDown`) whom a shot
+	 * from `Distance` cm would not hurt (CheeseStrikeModes::LastStandHit:
+	 * only one within FinishRange finishes them) gets the cancel sign;
+	 * anything else, the usual lines.
+	 */
+	ECrosshair CrosshairFor(bool bLastStand, bool bEnemyDown, float Distance);
+
 	// ---------------------------------------------------------------- the death screen
+
+	/**
+	 * Whether the death screen shows `Seconds` after the local player was
+	 * killed: always while they wait to come back; out of the round
+	 * (Elimination, or finished in Execution) for OutDeathScreen seconds,
+	 * after which the mode's notice of being out has the screen.
+	 */
+	constexpr float OutDeathScreen = 4.0f;
+	bool ShowsDeathScreen(bool bOut, float Seconds);
+	/** How solid the death screen is then: whole, but fading over its last half second when out of the round. */
+	float DeathScreenAlpha(bool bOut, float Seconds);
 
 	/** Seconds the cheese takes to run down when the player is killed. */
 	constexpr float MeltTime = 1.6f;

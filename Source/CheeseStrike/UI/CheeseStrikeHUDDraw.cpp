@@ -11,6 +11,7 @@
 #include "Rendering/SlateRenderer.h"
 #include "Styling/CoreStyle.h"
 #include "Rules/CheeseStrikeModes.h"
+#include "CheeseStrikeHUDRules.h"
 #include "TextureResource.h"
 #include "UObject/Package.h"
 
@@ -88,6 +89,34 @@ namespace CheeseStrikeHUDDraw
 		Canvas->DrawItem(Tile);
 	}
 
+	void RoundedPicture(UCanvas* Canvas, UTexture2D* Texture, const FVector2D& At, const FVector2D& Size, float Radius, const FLinearColor& Colour)
+	{
+		if (Canvas == nullptr || Texture == nullptr || Texture->GetResource() == nullptr || Size.X <= 0.0f || Size.Y <= 0.0f)
+		{
+			return;
+		}
+		// A fan of triangles from the middle, each corner's place in the picture its share of the way across.
+		const TArray<FVector2D> Corners = CheeseStrikeHUD::RoundedRect(At, At + Size, Radius);
+		const FVector2D Middle = At + Size / 2.0f;
+		const auto Place = [&At, &Size](const FVector2D& Point) { return FVector2D((Point.X - At.X) / Size.X, (Point.Y - At.Y) / Size.Y); };
+		TArray<FCanvasUVTri> Triangles;
+		for (int32 Index = 0; Index < Corners.Num(); ++Index)
+		{
+			FCanvasUVTri& Tri = Triangles.AddDefaulted_GetRef();
+			Tri.V0_Pos = Middle;
+			Tri.V1_Pos = Corners[Index];
+			Tri.V2_Pos = Corners[(Index + 1) % Corners.Num()];
+			Tri.V0_UV = Place(Tri.V0_Pos);
+			Tri.V1_UV = Place(Tri.V1_Pos);
+			Tri.V2_UV = Place(Tri.V2_Pos);
+			Tri.V0_Color = Tri.V1_Color = Tri.V2_Color = Colour;
+		}
+		FCanvasTriangleItem Item(Triangles[0], Texture->GetResource());
+		Item.TriangleList = MoveTemp(Triangles);
+		Item.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(Item);
+	}
+
 	UTexture2D* MakeTexture(int32 Width, int32 Height, const TArray<uint8>& Pixels, EPixelFormat Format)
 	{
 		if (Width <= 0 || Height <= 0 || Pixels.Num() != Width * Height * 4)
@@ -153,6 +182,41 @@ namespace CheeseStrikeHUDDraw
 		Rect(X, Y + Height - Thickness, Width, Thickness, Colour);
 		Rect(X, Y + Thickness, Thickness, Height - 2.0f * Thickness, Colour);
 		Rect(X + Width - Thickness, Y + Thickness, Thickness, Height - 2.0f * Thickness, Colour);
+	}
+
+	void FShapes::RoundedRect(float X, float Y, float Width, float Height, float Radius, const FLinearColor& Colour)
+	{
+		Polygon(CheeseStrikeHUD::RoundedRect(FVector2D(X, Y), FVector2D(X + Width, Y + Height), Radius), Colour);
+	}
+
+	void FShapes::RoundedRectDown(float X, float Y, float Width, float Height, float Radius, const FLinearColor& Top, const FLinearColor& Bottom)
+	{
+		const TArray<FVector2D> Corners = CheeseStrikeHUD::RoundedRect(FVector2D(X, Y), FVector2D(X + Width, Y + Height), Radius);
+		const auto Shade = [&](const FVector2D& Point) { return FMath::Lerp(Top, Bottom, Height > 0.0f ? FMath::Clamp((Point.Y - Y) / Height, 0.0f, 1.0f) : 0.0f); };
+		const FVector2D Middle(X + Width / 2.0f, Y + Height / 2.0f);
+		for (int32 Index = 0; Index < Corners.Num(); ++Index)
+		{
+			const FVector2D& A = Corners[Index];
+			const FVector2D& B = Corners[(Index + 1) % Corners.Num()];
+			Triangle(Middle, A, B, Shade(Middle), Shade(A), Shade(B));
+		}
+	}
+
+	void FShapes::RoundedFrame(float X, float Y, float Width, float Height, float Radius, float Thickness, const FLinearColor& Colour)
+	{
+		// The outer outline and one inset by the thickness, its corners as much less round, joined corner to corner.
+		const TArray<FVector2D> Outer = CheeseStrikeHUD::RoundedRect(FVector2D(X, Y), FVector2D(X + Width, Y + Height), Radius);
+		const TArray<FVector2D> Inner = CheeseStrikeHUD::RoundedRect(FVector2D(X + Thickness, Y + Thickness), FVector2D(X + Width - Thickness, Y + Height - Thickness), FMath::Max(0.001f, Radius - Thickness));
+		if (Outer.Num() != Inner.Num())
+		{
+			Frame(X, Y, Width, Height, Thickness, Colour);
+			return;
+		}
+		for (int32 Index = 0; Index < Outer.Num(); ++Index)
+		{
+			const int32 Next = (Index + 1) % Outer.Num();
+			Quad(Outer[Index], Outer[Next], Inner[Next], Inner[Index], Colour);
+		}
 	}
 
 	void FShapes::Polygon(TConstArrayView<FVector2D> Corners, const FLinearColor& Colour)
@@ -225,6 +289,20 @@ namespace CheeseStrikeHUDDraw
 			const float DegreesA = FMath::Lerp(From, To, A);
 			const float DegreesB = FMath::Lerp(From, To, B);
 			Quad(Point(DegreesA, Inner), Point(DegreesB, Inner), Point(DegreesB, Outer), Point(DegreesA, Outer), Shade(A), Shade(B), Shade(B), Shade(A));
+		}
+	}
+
+	void FShapes::Fade(float Alpha)
+	{
+		if (Alpha >= 1.0f)
+		{
+			return;
+		}
+		for (FCanvasUVTri& Tri : Triangles)
+		{
+			Tri.V0_Color.A *= Alpha;
+			Tri.V1_Color.A *= Alpha;
+			Tri.V2_Color.A *= Alpha;
 		}
 	}
 
