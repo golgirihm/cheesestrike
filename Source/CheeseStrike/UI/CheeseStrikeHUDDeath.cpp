@@ -92,7 +92,7 @@ namespace
 	}
 }
 
-void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const ACheeseStrikeGameState* Match)
+void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const ACheeseStrikeGameState* Match, bool bOut)
 {
 	const float Width = Canvas->SizeX;
 	const float Height = Canvas->SizeY;
@@ -100,6 +100,12 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 	const float Now = Match != nullptr ? static_cast<float>(Match->GetServerWorldTimeSeconds()) : GetWorld()->GetTimeSeconds();
 	const float Seconds = CVarMeltAt.GetValueOnGameThread() >= 0.0f ? CVarMeltAt.GetValueOnGameThread()
 		: Character->GetDiedAt() >= 0.0f ? FMath::Max(0.0f, Now - Character->GetDiedAt()) : CheeseStrikeHUD::MeltTime;
+	// Out of the round, only a while: then the mode's notice of being out.
+	if (!CheeseStrikeHUD::ShowsDeathScreen(bOut, Seconds))
+	{
+		return;
+	}
+	const float Alpha = CheeseStrikeHUD::DeathScreenAlpha(bOut, Seconds);
 
 	// The view darkens a little, and the sheet comes down with its drips.
 	HudDraw::FShapes Shapes;
@@ -125,6 +131,7 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 			MeltDrip(Shapes, X, SheetEdge(X, Width, Depth) - 2.0f * U, Drip.Width * Height, Drip.Length * Height, U, false);
 		}
 	}
+	Shapes.Fade(Alpha);
 	Shapes.Draw(Canvas);
 
 	// The words, letter by letter: they come up a little large and settle, then sag, stretching down, and drip.
@@ -160,6 +167,7 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 	Band.Quad(FVector2D(0.0f, BandTop), FVector2D(Width, BandTop), FVector2D(Width, Soft1), FVector2D(0.0f, Soft1), Clear, Clear, Shade, Shade);
 	Band.Rect(0.0f, Soft1, Width, Soft2 - Soft1, Shade);
 	Band.Quad(FVector2D(0.0f, Soft2), FVector2D(Width, Soft2), FVector2D(Width, BandBottom), FVector2D(0.0f, BandBottom), Shade, Shade, Clear, Clear);
+	Band.Fade(Alpha);
 	Band.Draw(Canvas);
 
 	struct FLetter
@@ -196,8 +204,9 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 			MeltDrip(Fill, X, Bottom, DripWidth, Length, U, false);
 		}
 	}
+	Outline.Fade(Alpha);
 	Outline.Draw(Canvas);
-	const FLinearColor Fade(1.0f, 1.0f, 1.0f, Appear);
+	const FLinearColor Fade(1.0f, 1.0f, 1.0f, Appear * Alpha);
 	const float Edge = 2.6f * U * Drop;
 	for (const FLetter& Letter : Letters)
 	{
@@ -206,6 +215,7 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 			HudDraw::Text(Canvas, Letter.Glyph, Letter.At + Way * Edge, Big, MeltOutline * Fade, 0.0f, false, Letter.Stretch);
 		}
 	}
+	Fill.Fade(Alpha);
 	Fill.Draw(Canvas);
 	// Each letter a slab of cheese: its deeper underside, then its face.
 	for (const FLetter& Letter : Letters)
@@ -218,15 +228,18 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 	}
 
 	// Who did it, and the seconds until the player is back.
-	const float Under = FMath::Clamp((Seconds - 0.5f) / 0.3f, 0.0f, 1.0f);
+	const float Under = FMath::Clamp((Seconds - 0.5f) / 0.3f, 0.0f, 1.0f) * Alpha;
 	if (Under > 0.0f)
 	{
 		// Clear of the letters, however far they sag.
 		const float Below = Height * 0.33f + LineHeight * 1.3f + 16.0f * U;
 		const FString By = !Character->GetKilledBy().IsEmpty() ? FString::Printf(TEXT("KILLED BY %s"), *Character->GetKilledBy().ToUpper())
 			: (Character->GetDiedHow().IsEmpty() ? FString(TEXT("KILLED")) : Character->GetDiedHow().ToUpper());
-		HudDraw::Text(Canvas, By, FVector2D(Width / 2.0f, Below), HudDraw::Font(30.0f * U), HudDraw::Faded(HudDraw::Ink, Under), 0.5f);
-		if (Match != nullptr)
+		const FSlateFontInfo ByFont = HudDraw::Font(30.0f * U);
+		const FString Fitted = CheeseStrikeHUD::FitNameIn(By, Character->GetKilledBy().ToUpper(), 480.0f * U, [&ByFont](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, ByFont).X); });
+		HudDraw::Text(Canvas, Fitted, FVector2D(Width / 2.0f, Below), ByFont, HudDraw::Faded(HudDraw::Ink, Under), 0.5f);
+		// Out of the round there is no coming back until the next: the mode's notice says so.
+		if (Match != nullptr && !bOut)
 		{
 			const int32 Back = CheeseStrikeHUD::SecondsToComeBack(Match->GetRespawnDelay(), Now, Character->GetDiedAt());
 			HudDraw::Text(Canvas, FString::Printf(TEXT("BACK IN %d"), Back), FVector2D(Width / 2.0f, Below + 44.0f * U), HudDraw::Font(20.0f * U), HudDraw::Faded(HudDraw::Soft, Under), 0.5f);

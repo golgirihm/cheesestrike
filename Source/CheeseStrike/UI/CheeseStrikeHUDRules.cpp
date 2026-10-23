@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeHUDRules.h"
 #include "Math/RandomStream.h"
+#include "Rules/CheeseStrikeModes.h"
 
 namespace CheeseStrikeHUD
 {
@@ -99,6 +100,100 @@ namespace CheeseStrikeHUD
 			}
 		}
 		return Out.Num() >= 3 ? Out : TArray<FVector2D>();
+	}
+
+	TArray<FVector2D> ClipToConvex(const TArray<FVector2D>& Polygon, const TArray<FVector2D>& Clip)
+	{
+		if (Clip.Num() < 3)
+		{
+			return TArray<FVector2D>();
+		}
+		// Which side of each edge is in: the side the polygon winds towards.
+		float Area = 0.0f;
+		for (int32 Index = 0; Index < Clip.Num(); ++Index)
+		{
+			Area += FVector2D::CrossProduct(Clip[Index], Clip[(Index + 1) % Clip.Num()]);
+		}
+		const float Winding = Area >= 0.0f ? 1.0f : -1.0f;
+		// Sutherland and Hodgman, by each of the clip's edges in turn.
+		TArray<FVector2D> Out = Polygon;
+		for (int32 Edge = 0; Edge < Clip.Num() && Out.Num() > 0; ++Edge)
+		{
+			const FVector2D& EdgeFrom = Clip[Edge];
+			const FVector2D Along = Clip[(Edge + 1) % Clip.Num()] - EdgeFrom;
+			if (Along.IsNearlyZero())
+			{
+				continue;
+			}
+			const auto Inside = [&](const FVector2D& Point) { return Winding * FVector2D::CrossProduct(Along, Point - EdgeFrom); };
+			const TArray<FVector2D> In = MoveTemp(Out);
+			Out.Reset();
+			for (int32 Index = 0; Index < In.Num(); ++Index)
+			{
+				const FVector2D& From = In[Index];
+				const FVector2D& To = In[(Index + 1) % In.Num()];
+				const float A = Inside(From);
+				const float B = Inside(To);
+				if (A >= 0.0f)
+				{
+					Out.Add(From);
+				}
+				if ((A >= 0.0f) != (B >= 0.0f))
+				{
+					Out.Add(From + (To - From) * (A / (A - B)));
+				}
+			}
+		}
+		return Out.Num() >= 3 ? Out : TArray<FVector2D>();
+	}
+
+	TArray<FVector2D> RoundedRect(const FVector2D& Min, const FVector2D& Max, float Radius, int32 Steps)
+	{
+		const float R = FMath::Clamp(Radius, 0.0f, FMath::Min(Max.X - Min.X, Max.Y - Min.Y) / 2.0f);
+		TArray<FVector2D> Corners;
+		if (R <= KINDA_SMALL_NUMBER || Steps < 1)
+		{
+			Corners = {Min, FVector2D(Max.X, Min.Y), Max, FVector2D(Min.X, Max.Y)};
+			return Corners;
+		}
+		// Each corner's arc about its middle, a quarter turn each, going round clockwise on the screen (y down): the top
+		// left from pointing left to pointing up, then the top right, the bottom right and the bottom left.
+		const FVector2D Middles[4] = {FVector2D(Min.X + R, Min.Y + R), FVector2D(Max.X - R, Min.Y + R), FVector2D(Max.X - R, Max.Y - R), FVector2D(Min.X + R, Max.Y - R)};
+		Corners.Reserve(4 * (Steps + 1));
+		for (int32 Corner = 0; Corner < 4; ++Corner)
+		{
+			const float Start = UE_PI + Corner * UE_HALF_PI;
+			for (int32 Step = 0; Step <= Steps; ++Step)
+			{
+				const float Angle = Start + UE_HALF_PI * Step / Steps;
+				Corners.Add(Middles[Corner] + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * R);
+			}
+		}
+		return Corners;
+	}
+
+	float InsideRoundedRect(const FVector2D& Point, const FVector2D& Min, const FVector2D& Max, float Radius)
+	{
+		// From the rectangle shrunk by the radius, then the radius off: a rounded box's distance.
+		const float R = FMath::Clamp(Radius, 0.0f, FMath::Min(Max.X - Min.X, Max.Y - Min.Y) / 2.0f);
+		const FVector2D Middle = (Min + Max) / 2.0f;
+		const FVector2D Half = (Max - Min) / 2.0f - FVector2D(R, R);
+		const FVector2D Off(FMath::Abs(Point.X - Middle.X) - Half.X, FMath::Abs(Point.Y - Middle.Y) - Half.Y);
+		const float Outside = FVector2D(FMath::Max(Off.X, 0.0f), FMath::Max(Off.Y, 0.0f)).Size() + FMath::Min(FMath::Max(Off.X, Off.Y), 0.0f);
+		return R - Outside;
+	}
+
+	FVector2D HoldInsideRoundedRect(const FVector2D& Point, const FVector2D& Min, const FVector2D& Max, float Radius)
+	{
+		if (InsideRoundedRect(Point, Min, Max, Radius) >= 0.0f)
+		{
+			return Point;
+		}
+		const float R = FMath::Clamp(Radius, 0.0f, FMath::Min(Max.X - Min.X, Max.Y - Min.Y) / 2.0f);
+		// The nearest point of the inner rectangle, then out from it by the radius towards the point.
+		const FVector2D Inner(FMath::Clamp(Point.X, Min.X + R, Max.X - R), FMath::Clamp(Point.Y, Min.Y + R, Max.Y - R));
+		const FVector2D Out = Point - Inner;
+		return Out.IsNearlyZero() ? Inner : Inner + Out.GetSafeNormal() * R;
 	}
 
 	float NarrowestWidth(const TArray<FVector2D>& Polygon)
@@ -286,6 +381,39 @@ namespace CheeseStrikeHUD
 			--Keep;
 		}
 		return Name.Left(FMath::Max(1, Keep)).TrimEnd() + TEXT("...");
+	}
+
+	FString FitNameIn(const FString& Line, const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure)
+	{
+		const int32 At = Name.IsEmpty() ? INDEX_NONE : Line.Find(Name, ESearchCase::IgnoreCase);
+		if (At == INDEX_NONE)
+		{
+			return Line;
+		}
+		// Cut as it is written in the line (an announcement is drawn in capitals).
+		const FString Written = Line.Mid(At, Name.Len());
+		return Line.Left(At) + FitName(Written, Width, Measure) + Line.Mid(At + Name.Len());
+	}
+
+	ECrosshair CrosshairFor(bool bLastStand, bool bEnemyDown, float Distance)
+	{
+		if (!bEnemyDown)
+		{
+			return ECrosshair::Usual;
+		}
+		// A shot at them as the server takes it: only from within reach does it finish them.
+		const CheeseStrikeModes::ELastStandHit Hit = CheeseStrikeModes::LastStandHit(bLastStand, true, true, 1.0f, 1.0f, Distance <= CheeseStrikeModes::FinishRange);
+		return Hit == CheeseStrikeModes::ELastStandHit::Absorbed ? ECrosshair::NoEffect : ECrosshair::Usual;
+	}
+
+	bool ShowsDeathScreen(bool bOut, float Seconds)
+	{
+		return !bOut || Seconds < OutDeathScreen;
+	}
+
+	float DeathScreenAlpha(bool bOut, float Seconds)
+	{
+		return bOut ? FMath::Clamp((OutDeathScreen - Seconds) / 0.5f, 0.0f, 1.0f) : 1.0f;
 	}
 
 	uint64 SteamIdFrom(const FString& Type, const FString& Id)

@@ -56,6 +56,9 @@ public:
 	/** The margin from the screen's edges, and the minimap's side, in design pixels (Unit). */
 	static constexpr float Margin = 28.0f;
 	static constexpr float MapSide = 250.0f;
+	/** The widest a name may be (design pixels) over a teammate's head, and in the kill feed; a longer one is cut with dots (CheeseStrikeHUD::FitName). */
+	static constexpr float NameTagWidth = 220.0f;
+	static constexpr float KillFeedNameWidth = 190.0f;
 	/** The score summary's height, at the bottom in the middle: what the modes' HUD keeps clear of. */
 	static constexpr float ScoreHeight = 56.0f;
 
@@ -131,6 +134,8 @@ protected:
 	float Unit() const;
 
 	void DrawFight(const ACheeseStrikeCharacter* Character, float FieldOfView);
+	/** What the crosshair shows over what `Character`'s player aims at: the cancel sign over an enemy down whom a shot would not hurt (CheeseStrikeHUD::CrosshairFor). */
+	CheeseStrikeHUD::ECrosshair CrosshairOver(const ACheeseStrikeCharacter* Character) const;
 	void DrawHealth(const ACheeseStrikeCharacter* Character);
 	void DrawWeapon(const ACheeseStrikeCharacter* Character);
 	/** The outline of the weapon in `Slot` (a rifle, a pistol, a knife) in the box at `At`, `Size` big, facing left. */
@@ -141,7 +146,8 @@ protected:
 	void DrawPlayers(const ACheeseStrikeGameState* Match);
 	void DrawScoreSummary(const ACheeseStrikeGameState* Match);
 	void DrawNameTags(const ACheeseStrikePlayerController* Controller);
-	void DrawDeath(const ACheeseStrikeCharacter* Character, const ACheeseStrikeGameState* Match);
+	/** The death screen; out of the round (`bOut`), only for a few seconds (CheeseStrikeHUD::ShowsDeathScreen), and without the seconds to coming back. */
+	void DrawDeath(const ACheeseStrikeCharacter* Character, const ACheeseStrikeGameState* Match, bool bOut);
 	void DrawKillFeed(const ACheeseStrikeGameState* Match);
 	void DrawScoreboard(const ACheeseStrikeGameState* Match, bool bOver);
 	/** The mice's countdown, red, and word of their coming. */

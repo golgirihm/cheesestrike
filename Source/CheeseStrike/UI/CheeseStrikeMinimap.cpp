@@ -243,15 +243,24 @@ void FCheeseStrikeMinimap::DrawPiece(CheeseStrikeHUDDraw::FShapes& Shapes, const
 		Shapes.Polygon(Corners, Colour);
 		return;
 	}
-	Shapes.Polygon(CheeseStrikeHUD::ClipToRect(TArray<FVector2D>(Corners), Min, Max), Colour);
+	// Cut to the square, and then, only if some of it is left in a corner beyond the rounding, to the rounded edge.
+	TArray<FVector2D> Cut = CheeseStrikeHUD::ClipToRect(TArray<FVector2D>(Corners), Min, Max);
+	if (Edge.Num() > 4 && Cut.ContainsByPredicate([&](const FVector2D& Point) { return CheeseStrikeHUD::InsideRoundedRect(Point, Min, Max, Corner) < 0.0f; }))
+	{
+		Cut = CheeseStrikeHUD::ClipToConvex(Cut, Edge);
+	}
+	Shapes.Polygon(Cut, Colour);
 }
 
-void FCheeseStrikeMinimap::Draw(CheeseStrikeHUDDraw::FShapes& Shapes, const FVector2D& Min, const FVector2D& Max, const FVector2D& Middle, float ViewYaw, float Feet, float Scale)
+void FCheeseStrikeMinimap::Draw(CheeseStrikeHUDDraw::FShapes& Shapes, const FVector2D& Min, const FVector2D& Max, const FVector2D& Middle, float ViewYaw, float Feet, float Scale, float InCorner)
 {
 	if (Scale <= 0.0f)
 	{
 		return;
 	}
+	// Pieces wholly inside the circle the square holds need no cutting; the rest are cut to its rounded edge.
+	Corner = InCorner;
+	Edge = CheeseStrikeHUD::RoundedRect(Min, Max, Corner);
 	// As far as the square's corners reach.
 	const float Reach = FVector2D::Distance(Min, Max) / 2.0f / Scale;
 	for (const FPiece& Piece : Pieces)

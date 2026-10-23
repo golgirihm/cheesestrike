@@ -427,9 +427,15 @@ void ACheeseStrikeGameMode::HandleMatchHasEnded()
 FString ACheeseStrikeGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
 {
 	const FString Error = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
-	// The engine names a player after their machine (or, later, their Steam
-	// account) through the URL's own Name option; this one is theirs to pick.
-	const FString Nick = UGameplayStatics::ParseOption(Options, TEXT("Nick")).Left(20);
+	// The engine names a player after their machine (or their Steam account)
+	// through the URL's own Name option, cut to 20 letters; `?Nick=` is theirs
+	// to pick. Either is kept to Steam's 32 (CheeseStrikeRules::MaxNameLength).
+	FString Nick = UGameplayStatics::ParseOption(Options, TEXT("Nick")).Left(CheeseStrikeRules::MaxNameLength);
+	if (Nick.IsEmpty())
+	{
+		const FString Name = UGameplayStatics::ParseOption(Options, TEXT("Name")).Left(CheeseStrikeRules::MaxNameLength);
+		Nick = Name.Len() > 20 ? Name : FString();
+	}
 	if (!Nick.IsEmpty() && NewPlayerController != nullptr)
 	{
 		ChangeName(NewPlayerController, Nick, false);

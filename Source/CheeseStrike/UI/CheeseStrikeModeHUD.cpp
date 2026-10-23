@@ -93,7 +93,9 @@ namespace
 			// Fading out over its last second.
 			const float Fade = FMath::Clamp(ACheeseStrikeGameState::AnnouncementLife - Age, 0.0f, 1.0f);
 			const FSlateFontInfo Line = HudDraw::Font((bOverload ? 26.0f : 21.0f) * U);
-			HudDraw::Text(Canvas, Word.Text.ToUpper(), FVector2D(Canvas->SizeX / 2.0f, Y), Line, HudDraw::Faded(Colour, Fade), 0.5f);
+			// The name in it (as long as Steam's, 32 letters) cut with dots where it would spread too far.
+			const FString Text = CheeseStrikeHUD::FitNameIn(Word.Text.ToUpper(), Word.Who.ToUpper(), 360.0f * U, [&Line](const FString& Part) { return static_cast<float>(HudDraw::Measure(Part, Line).X); });
+			HudDraw::Text(Canvas, Text, FVector2D(Canvas->SizeX / 2.0f, Y), Line, HudDraw::Faded(Colour, Fade), 0.5f);
 			Y += HudDraw::Measure(Word.Text, Line).Y + 6.0f * U;
 			if (bAgainstMe && Age < CheeseStrikeStreaks::OverloadWarning + CheeseStrikeStreaks::OverloadRain)
 			{

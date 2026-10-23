@@ -2,12 +2,15 @@
 
 // The HUD's rules, without a world: how the minimap turns and what of the
 // level it shows, which way a damage arc points, how red the edges get, what
-// the row of players and the score summary say, how name tags shrink, and how
-// the death screen's cheese runs.
+// the row of players and the score summary say, how name tags shrink, how
+// the death screen's cheese runs and when it shows, how long names are cut,
+// the rounded shapes, and when the crosshair says a shot would do nothing.
 
 #include "Misc/AutomationTest.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "UI/CheeseStrikeHUDRules.h"
+#include "Rules/CheeseStrikeModes.h"
+#include "Algo/Reverse.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -275,6 +278,108 @@ bool FTheScoreboardShowsStatusAndWhoPlays::RunTest(const FString& Parameters)
 	TestEqual(TEXT("a long name is cut with dots, within the width"), FitName(TEXT("Sir Reginald Cheddarington"), 100.0f, Measure), FString(TEXT("Sir Reg...")));
 	TestEqual(TEXT("no space left before the dots"), FitName(TEXT("Sir Reginald"), 70.0f, Measure), FString(TEXT("Sir...")));
 	TestEqual(TEXT("never less than a letter"), FitName(TEXT("Cheddar"), 5.0f, Measure), FString(TEXT("C...")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FLongNamesAreCutWithDots, "CheeseStrike.HUD.LongNamesAreCutWithDots", HUDTests::Flags)
+bool FLongNamesAreCutWithDots::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	// As long as a Steam name may be, with no space to break at; measured as ten pixels a letter.
+	const FString Longest = TEXT("ReginaldCheddaringtonTheThirdEsq");
+	TestEqual(TEXT("the longest name a Steam account has"), Longest.Len(), CheeseStrikeRules::MaxNameLength);
+	const auto Measure = [](const FString& Text) { return 10.0f * Text.Len(); };
+	const FString Cut = FitName(Longest, 200.0f, Measure);
+	TestEqual(TEXT("cut with dots, with no space to cut at"), Cut, FString(TEXT("ReginaldCheddarin...")));
+	TestTrue(TEXT("within the width"), Measure(Cut) <= 200.0f);
+	TestEqual(TEXT("whole where it fits"), FitName(Longest, 320.0f, Measure), Longest);
+
+	// In a line, only the name is cut; the rest of the line is kept, whatever its case.
+	TestEqual(TEXT("an announcement's name cut"), FitNameIn(TEXT("REGINALDCHEDDARINGTONTHETHIRDESQ CALLS IN A CHEESE STRIKE"), Longest.ToUpper(), 100.0f, Measure),
+		FString(TEXT("REGINAL... CALLS IN A CHEESE STRIKE")));
+	TestEqual(TEXT("found as it is written"), FitNameIn(TEXT("KILLED BY REGINALDCHEDDARINGTONTHETHIRDESQ"), Longest, 100.0f, Measure), FString(TEXT("KILLED BY REGINAL...")));
+	TestEqual(TEXT("a short name untouched"), FitNameIn(TEXT("KILLED BY HOST"), TEXT("Host"), 100.0f, Measure), FString(TEXT("KILLED BY HOST")));
+	TestEqual(TEXT("a line without the name untouched"), FitNameIn(TEXT("ROUND 2"), Longest, 100.0f, Measure), FString(TEXT("ROUND 2")));
+	TestEqual(TEXT("no name, nothing cut"), FitNameIn(TEXT("ROUND 2"), FString(), 10.0f, Measure), FString(TEXT("ROUND 2")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRoundedShapesKeepToTheirCorners, "CheeseStrike.HUD.RoundedShapesKeepToTheirCorners", HUDTests::Flags)
+bool FRoundedShapesKeepToTheirCorners::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	const FVector2D Min(10.0f, 20.0f);
+	const FVector2D Max(110.0f, 80.0f);
+	const TArray<FVector2D> Outline = RoundedRect(Min, Max, 10.0f, 4);
+	TestEqual(TEXT("four corners of five points each"), Outline.Num(), 20);
+	TestTrue(TEXT("it starts at the left end of the top left corner's arc"), HUDTests::Near(Outline[0], FVector2D(10.0f, 30.0f)));
+	TestTrue(TEXT("and comes round to the top"), HUDTests::Near(Outline[4], FVector2D(20.0f, 20.0f)));
+	TestTrue(TEXT("the top right corner"), HUDTests::Near(Outline[5], FVector2D(100.0f, 20.0f)) && HUDTests::Near(Outline[9], FVector2D(110.0f, 30.0f)));
+	TestTrue(TEXT("the bottom left corner ends going up the left side"), HUDTests::Near(Outline[19], FVector2D(10.0f, 70.0f)));
+	bool bOnTheBox = true;
+	float Area = 0.0f;
+	for (int32 Index = 0; Index < Outline.Num(); ++Index)
+	{
+		bOnTheBox &= FMath::Abs(InsideRoundedRect(Outline[Index], Min, Max, 10.0f)) < 0.01f;
+		Area += FVector2D::CrossProduct(Outline[Index], Outline[(Index + 1) % Outline.Num()]);
+	}
+	TestTrue(TEXT("every point on its edge"), bOnTheBox);
+	TestTrue(TEXT("clockwise on the screen, y down"), Area > 0.0f);
+	TestEqual(TEXT("square corners at no radius"), RoundedRect(Min, Max, 0.0f).Num(), 4);
+	const TArray<FVector2D> Pill = RoundedRect(Min, Max, 500.0f, 4);
+	TestTrue(TEXT("the radius held to half the shorter side: a pill"), HUDTests::Near(Pill[0], FVector2D(10.0f, 50.0f)) && HUDTests::Near(Pill[4], FVector2D(40.0f, 20.0f)));
+
+	// Inside and outside: the middle, the middle of a side, a square corner (outside the rounding).
+	TestTrue(TEXT("the middle is inside"), InsideRoundedRect(FVector2D(60.0f, 50.0f), Min, Max, 10.0f) > 0.0f);
+	TestTrue(TEXT("a side's middle is on the edge"), FMath::IsNearlyZero(InsideRoundedRect(FVector2D(60.0f, 20.0f), Min, Max, 10.0f), 0.01f));
+	TestTrue(TEXT("the square's corner is outside it"), InsideRoundedRect(Min, Min, Max, 10.0f) < 0.0f);
+	TestTrue(TEXT("but on a square one's edge"), FMath::IsNearlyZero(InsideRoundedRect(Min, Min, Max, 0.0f), 0.01f));
+	// Held inside: a point beyond the corner comes to the arc, on the line to the corner's middle.
+	const FVector2D Held = HoldInsideRoundedRect(FVector2D(0.0f, 10.0f), Min, Max, 10.0f);
+	TestTrue(TEXT("held to the rounded corner"), HUDTests::Near(Held, FVector2D(20.0f, 30.0f) + FVector2D(-1.0f, -1.0f).GetSafeNormal() * 10.0f));
+	TestTrue(TEXT("held beyond a side, to the side"), HUDTests::Near(HoldInsideRoundedRect(FVector2D(60.0f, 0.0f), Min, Max, 10.0f), FVector2D(60.0f, 20.0f)));
+	TestTrue(TEXT("inside, left where it is"), HUDTests::Near(HoldInsideRoundedRect(FVector2D(60.0f, 50.0f), Min, Max, 10.0f), FVector2D(60.0f, 50.0f)));
+
+	// The minimap's pieces are cut to the rounded edge: a square over a corner loses the corner's tip.
+	const TArray<FVector2D> Piece = {FVector2D(0.0f, 10.0f), FVector2D(40.0f, 10.0f), FVector2D(40.0f, 50.0f), FVector2D(0.0f, 50.0f)};
+	const TArray<FVector2D> Cut = ClipToConvex(Piece, Outline);
+	bool bInside = Cut.Num() >= 3;
+	for (const FVector2D& Point : Cut)
+	{
+		bInside &= InsideRoundedRect(Point, Min, Max, 10.0f) > -0.5f;
+	}
+	TestTrue(TEXT("what is left is inside the rounded edge"), bInside);
+	TestTrue(TEXT("and reaches its sides"), Cut.ContainsByPredicate([](const FVector2D& Point) { return HUDTests::Near(Point, FVector2D(40.0f, 20.0f)); }));
+	TArray<FVector2D> Reversed = Outline;
+	Algo::Reverse(Reversed);
+	TestEqual(TEXT("the clip's winding either way"), ClipToConvex(Piece, Reversed).Num(), Cut.Num());
+	TestEqual(TEXT("nothing left of a piece outside"), ClipToConvex({FVector2D(200.0f, 200.0f), FVector2D(210.0f, 200.0f), FVector2D(210.0f, 210.0f)}, Outline).Num(), 0);
+	TestEqual(TEXT("a piece inside is whole"), ClipToConvex({FVector2D(50.0f, 40.0f), FVector2D(70.0f, 40.0f), FVector2D(60.0f, 60.0f)}, Outline).Num(), 3);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCrosshairSaysWhenAShotWouldDoNothing, "CheeseStrike.HUD.TheCrosshairSaysWhenAShotWouldDoNothing", HUDTests::Flags)
+bool FTheCrosshairSaysWhenAShotWouldDoNothing::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	TestEqual(TEXT("an enemy down out of reach: a shot does nothing"), CrosshairFor(true, true, 1000.0f), ECrosshair::NoEffect);
+	TestEqual(TEXT("just past reach"), CrosshairFor(true, true, CheeseStrikeModes::FinishRange + 1.0f), ECrosshair::NoEffect);
+	TestEqual(TEXT("within reach a shot finishes them"), CrosshairFor(true, true, CheeseStrikeModes::FinishRange - 1.0f), ECrosshair::Usual);
+	TestEqual(TEXT("an enemy standing"), CrosshairFor(true, false, 1000.0f), ECrosshair::Usual);
+	TestEqual(TEXT("no last stand in the mode: every hit hurts"), CrosshairFor(false, true, 1000.0f), ECrosshair::Usual);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheDeathScreenShowsForEveryDeath, "CheeseStrike.HUD.TheDeathScreenShowsForEveryDeath", HUDTests::Flags)
+bool FTheDeathScreenShowsForEveryDeath::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	TestTrue(TEXT("waiting to come back, it shows"), ShowsDeathScreen(false, 0.5f) && ShowsDeathScreen(false, 30.0f));
+	TestEqual(TEXT("whole"), DeathScreenAlpha(false, 30.0f), 1.0f);
+	TestTrue(TEXT("out of the round (finished in Execution), it shows too"), ShowsDeathScreen(true, 0.5f) && ShowsDeathScreen(true, OutDeathScreen - 0.1f));
+	TestEqual(TEXT("whole at first"), DeathScreenAlpha(true, 1.0f), 1.0f);
+	TestTrue(TEXT("fading at its end"), DeathScreenAlpha(true, OutDeathScreen - 0.25f) > 0.0f && DeathScreenAlpha(true, OutDeathScreen - 0.25f) < 1.0f);
+	TestFalse(TEXT("then the notice of being out has the screen"), ShowsDeathScreen(true, OutDeathScreen + 0.1f));
 	return true;
 }
 

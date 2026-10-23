@@ -22,6 +22,8 @@ namespace CheeseStrikeRules
 	/** Seconds a kill stays in the feed, and how many it shows at most. */
 	constexpr float KillFeedLife = 6.0f;
 	constexpr int32 KillFeedLength = 5;
+	/** The longest a player's name may be, in letters: as long as a Steam name. The HUD cuts a long one to fit, with dots. */
+	constexpr int32 MaxNameLength = 32;
 	/** Seconds from the host starting a match to its first shot, and seconds the results stay up before everyone is back in the lobby. */
 	constexpr float MatchCountdown = 5.0f;
 	constexpr float ResultsTime = 10.0f;
