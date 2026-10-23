@@ -8,6 +8,10 @@
 #include "GameFramework/PlayerController.h"
 #include "CheeseStrikeCharacter.h"
 #include "Settings/CheeseStrikeSettings.h"
+#include "Weapons/CheeseStrikeWeapon.h"
+#include "CheeseStrike.h"
+
+static TAutoConsoleVariable<int32> CVarTraceView(TEXT("CheeseStrike.TraceView"), 0, TEXT("Log, every frame, where the weapon in hand is in its player's view (2: and where the arms' bones are)."));
 
 ACheeseStrikeCameraManager::ACheeseStrikeCameraManager()
 {
@@ -35,4 +39,33 @@ void ACheeseStrikeCameraManager::UpdateViewTarget(FTViewTarget& OutVT, float Del
 	const float Usual = GetDefault<UCameraComponent>()->FieldOfView;
 	const float Wanted = CheeseStrikeSettings::HorizontalFieldOfView(UCheeseStrikeSettings::FieldOfViewNow(), Aspect);
 	OutVT.POV.FOV = FMath::Clamp(OutVT.POV.FOV * Wanted / FMath::Max(1.0f, Usual), 5.0f, 170.0f);
+	// Leaning into a slide.
+	ACheeseStrikeCharacter* Character = Cast<ACheeseStrikeCharacter>(OutVT.Target);
+	OutVT.POV.Rotation.Roll += Character->GetViewRoll();
+	// Where the weapon in hand is in the view, for how steadily it is held (and for the trace).
+	const UPrimitiveComponent* Model = Character->GetWeapon() != nullptr ? Character->GetWeapon()->GetModel(true) : nullptr;
+	if (Model == nullptr)
+	{
+		return;
+	}
+	const FTransform View(OutVT.POV.Rotation, OutVT.POV.Location);
+	const FTransform InView = Model->GetComponentTransform().GetRelativeTransform(View);
+	Character->NoteWeaponInView(InView);
+	if (CVarTraceView.GetValueOnGameThread() != 0)
+	{
+		const FVector Body = View.InverseTransformPosition(Character->GetFirstPersonMesh()->GetComponentLocation());
+		UE_LOG(LogCheeseStrike, Display, TEXT("View: weapon at (%.3f, %.3f, %.3f) turned (%.3f, %.3f, %.3f), body at (%.3f, %.3f, %.3f), eye (%.2f, %.2f, %.2f) dt %.4f"),
+			InView.GetLocation().X, InView.GetLocation().Y, InView.GetLocation().Z, InView.Rotator().Pitch, InView.Rotator().Yaw, InView.Rotator().Roll,
+			Body.X, Body.Y, Body.Z, OutVT.POV.Location.X, OutVT.POV.Location.Y, OutVT.POV.Location.Z, DeltaTime);
+		if (CVarTraceView.GetValueOnGameThread() > 1)
+		{
+			FString Bones;
+			for (const TCHAR* Name : {TEXT("clavicle_l"), TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"), TEXT("clavicle_r"), TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r"), TEXT("spine_03"), TEXT("neck_01"), TEXT("head")})
+			{
+				const FVector At = View.InverseTransformPosition(Character->GetFirstPersonMesh()->GetBoneLocation(Name));
+				Bones += FString::Printf(TEXT(" %s (%.1f, %.1f, %.1f)"), Name, At.X, At.Y, At.Z);
+			}
+			UE_LOG(LogCheeseStrike, Display, TEXT("View bones:%s"), *Bones);
+		}
+	}
 }

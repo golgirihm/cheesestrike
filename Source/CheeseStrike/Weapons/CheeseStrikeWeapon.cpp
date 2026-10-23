@@ -24,6 +24,7 @@
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "CheeseStrike.h"
+#include "Animation/CheeseStrikeArmsPose.h"
 #include "CheeseStrikeArsenal.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGunfire.h"
@@ -290,15 +291,6 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 	{
 		// The weapon in hand says how its carrier moves, through the moves they send.
 		Movement->SetCarryingHeavy(Stats->CarrySpeed < 1.0f);
-		if (Stats->IsMelee())
-		{
-			const bool bLunge = IsLunging() && Holder->CanAct();
-			Movement->SetLunging(bLunge);
-			if (bLunge)
-			{
-				Holder->AddMovementInput(Holder->GetActorForwardVector(), 1.0f);
-			}
-		}
 	}
 }
 
@@ -333,7 +325,6 @@ void ACheeseStrikeWeapon::FitToHands()
 		// The model's own size, turn and place in the grip, then the grip's in the hand.
 		Part.Key->SetRelativeTransform(Look->Model * Part.Key->GetRelativeTransform());
 	}
-	FirstPersonModelInHand = FirstPersonModel->GetRelativeTransform();
 	// The flash at the muzzle, the light just in front of it.
 	const FVector Muzzle = Look->Muzzle;
 	const float Size = FMath::Max(Look->FlashSize, 0.01f);
@@ -361,6 +352,11 @@ ECheeseStrikeHold ACheeseStrikeWeapon::GetHold() const
 	return Look != nullptr ? Look->Hold : ECheeseStrikeHold::Rifle;
 }
 
+FVector ACheeseStrikeWeapon::GetModelAlong() const
+{
+	return Look != nullptr ? Look->Along : FVector(0.0, 1.0, 0.0);
+}
+
 UPrimitiveComponent* ACheeseStrikeWeapon::GetModel(bool bFirstPerson) const
 {
 	const bool bPlain = Look != nullptr && Look->PlainModel != nullptr;
@@ -381,25 +377,16 @@ bool ACheeseStrikeWeapon::GetSight(FVector& Out) const
 	return true;
 }
 
-FVector ACheeseStrikeWeapon::LeftHandShiftFor(const USkeletalMeshComponent* Body) const
+bool ACheeseStrikeWeapon::LeftHandHoldFor(const USkeletalMeshComponent* Body, FVector& OutHold) const
 {
-	if (Look == nullptr || !Look->LeftHand.IsSet() || Holder == nullptr)
+	const UPrimitiveComponent* Model = Holder != nullptr ? GetModel(Body == Holder->GetFirstPersonMesh()) : nullptr;
+	if (Look == nullptr || !Look->LeftHand.IsSet() || Model == nullptr)
 	{
-		return FVector::ZeroVector;
+		return false;
 	}
-	// Where the free hand should be, against where the rifle's animations put it, in the rifle's frame in the hand; then
-	// in the space of the bone the weapon rides.
-	const FVector Wanted = Look->Model.TransformPosition(Look->LeftHand.GetValue());
-	const FVector RifleHand = CheeseStrikeWeaponLooks::RifleLeftHand;
-	const FVector Shift(Wanted.X, Wanted.Y - RifleHand.Y, Wanted.Z - RifleHand.Z);
-	const UPrimitiveComponent* Model = GetModel(Body == Holder->GetFirstPersonMesh());
-	if (Model == nullptr)
-	{
-		return FVector::ZeroVector;
-	}
-	// The model's place in its bone is the grip's, then the model's own: the grip's turn alone turns the shift.
-	const FTransform InBone = Look->Model.Inverse() * Model->GetRelativeTransform();
-	return InBone.TransformVectorNoScale(Shift);
+	// The model rides the bone the hand follows (hand_r, or the mannequin's weapon_r): from its space into the bone's.
+	OutHold = Model->GetRelativeTransform().TransformPosition(Look->LeftHand.GetValue());
+	return true;
 }
 
 void ACheeseStrikeWeapon::SetInHand(bool bIsInHand)
@@ -483,12 +470,11 @@ void ACheeseStrikeWeapon::PutAway()
 	BurstLeft = 0;
 	GetWorldTimerManager().ClearTimer(BurstTimer);
 	GetWorldTimerManager().ClearTimer(PendingShotTimer);
-	LungeEndsAt = 0.0f;
+	StrokeShownAt = -1000.0f;
 	if (Holder != nullptr && Holder->IsLocallyControlled())
 	{
 		if (UCheeseStrikeMovementComponent* Movement = Holder->GetCheeseStrikeMovement())
 		{
-			Movement->SetLunging(false);
 			Movement->SetCarryingHeavy(false);
 		}
 	}
@@ -632,9 +618,8 @@ void ACheeseStrikeWeapon::ShowShot()
 {
 	if (Stats->IsMelee())
 	{
-		// The knife's stroke, in the time a stroke takes, with a swoosh.
-		const float SwingTime = Stats->SwingTime;
-		PlayOnBodies(&FCheeseStrikeAnimSet::Stroke, [SwingTime](const UAnimSequence* Stroke) { return SwingTime > 0.0f && Stroke->GetPlayLength() > 0.0f ? FMath::Max(1.0f, Stroke->GetPlayLength() / (SwingTime * 2.0f)) : 1.0f; });
+		// The knife's swipe (the arms play it from SwipePhase), with a swoosh.
+		StrokeShownAt = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
 		USoundBase* Swoosh = AnyOf(FireSounds);
 		if (Holder != nullptr && Holder->IsLocallyControlled() && Holder->IsPlayerControlled())
 		{
@@ -748,9 +733,10 @@ bool ACheeseStrikeWeapon::IsDry() const
 	return Stats->UsesRounds() && Magazine <= 0 && Reserve == 0;
 }
 
-bool ACheeseStrikeWeapon::IsLunging() const
+float ACheeseStrikeWeapon::SwipePhase() const
 {
-	return Stats->IsMelee() && GetWorld() != nullptr && GetWorld()->GetTimeSeconds() < LungeEndsAt;
+	const float Since = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() - StrokeShownAt : 1000.0f;
+	return Stats->IsMelee() && Since < CheeseStrikeArms::SwipeSeconds ? Since / CheeseStrikeArms::SwipeSeconds : -1.0f;
 }
 
 int32 ACheeseStrikeWeapon::NextShotIndex() const
@@ -902,8 +888,6 @@ void ACheeseStrikeWeapon::Strike(float Now)
 	LastShotIndex = 0;
 	LastInBurst = 0;
 	++ShotsFired;
-	// The striker lunges as the stroke goes (Tick, through the movement's saved moves).
-	LungeEndsAt = GetWorld()->GetTimeSeconds() + Stats->SwingTime;
 	ShowShot();
 	ServerStrike(Origin, Aim, Now);
 }

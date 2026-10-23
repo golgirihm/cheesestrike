@@ -1,5 +1,6 @@
 # Measures where the hand holding each kind of weapon sits in view, standing and crouched, for each hero, with the
-# arms left where the animation puts them (CheeseStrike.HipHold 0): the numbers CheeseStrikeWeaponLooks::HipHand keeps.
+# arms left where the animation puts them (CheeseStrike.HipHold 0), against which FCheeseStrikeViewHold's hold in view
+# (CheeseStrikeWeaponLooks::HipFromAimed) can be judged.
 wait 2
 cmd CheeseStrike.HipHold 0
 cmd CheeseStrikeBody 0 1

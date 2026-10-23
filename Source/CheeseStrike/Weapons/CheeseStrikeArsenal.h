@@ -27,7 +27,7 @@ namespace CheeseStrikeWeapons
 	const FWeaponStats& Roquefort();
 	/** The Curd Pistol: the weak sidearm everyone carries, with rounds without end. */
 	const FWeaponStats& Pistol();
-	/** The Cheese Knife: a short stroke with a lunge, deadly in the back. */
+	/** The Cheese Knife: a short swipe across the aim, deadly in the back. */
 	const FWeaponStats& Knife();
 }
 

@@ -21,6 +21,7 @@
 #include "Misc/Parse.h"
 #include "CheeseStrike.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
+#include "Animation/CheeseStrikeArmsPose.h"
 #include "Animation/CheeseStrikeBodies.h"
 #include "Materials/MaterialInterface.h"
 #include "Input/CheeseStrikeInput.h"
@@ -50,7 +51,6 @@
 #include "Weapons/CheeseStrikeWeaponLooks.h"
 
 /** With this on, every character writes its state to the log four times a second, for watching a run from outside. */
-static TAutoConsoleVariable<int32> CVarHipHold(TEXT("CheeseStrike.HipHold"), 1, TEXT("Keep the weapon where its hold has it in view at the hip, however the body leans (0: where the animation puts it)."));
 static TAutoConsoleVariable<int32> CVarTraceState(TEXT("CheeseStrike.TraceState"), 0, TEXT("Log each character's state four times a second."));
 
 const FVector ACheeseStrikeCharacter::DefaultCameraAtHead(-2.8f, 5.89f, 0.0f);
@@ -1063,92 +1063,113 @@ FVector ACheeseStrikeCharacter::LeftHandOnRifle() const
 	return Rifle->GetComponentTransform().InverseTransformPosition(FirstPersonMesh->GetBoneLocation(TEXT("hand_l")));
 }
 
+void ACheeseStrikeCharacter::NoteWeaponInView(const FTransform& InView)
+{
+	if (WeaponInViewKnown >= 2)
+	{
+		// How it moved and turned this frame against the last: a shake turns one way, then the other.
+		const FVector Moved = InView.GetLocation() - WeaponInView[0].GetLocation();
+		const FVector MovedBefore = WeaponInView[0].GetLocation() - WeaponInView[1].GetLocation();
+		const FQuat Turned = InView.GetRotation() * WeaponInView[0].GetRotation().Inverse();
+		const FQuat TurnedBefore = WeaponInView[0].GetRotation() * WeaponInView[1].GetRotation().Inverse();
+		TrembleSum.X += (Moved - MovedBefore).Size();
+		TrembleSum.Y += FMath::RadiansToDegrees((Turned * TurnedBefore.Inverse()).GetNormalized().GetAngle());
+		++TrembleFrames;
+	}
+	WeaponInView[1] = WeaponInView[0];
+	WeaponInView[0] = InView;
+	WeaponInViewKnown = FMath::Min(WeaponInViewKnown + 1, 2);
+}
+
+FVector2D ACheeseStrikeCharacter::TakeViewTremble()
+{
+	const FVector2D Mean = TrembleFrames > 0 ? TrembleSum / TrembleFrames : FVector2D::ZeroVector;
+	TrembleSum = FVector2D::ZeroVector;
+	TrembleFrames = 0;
+	return Mean;
+}
+
 static TAutoConsoleVariable<float> CVarSightSide(TEXT("CheeseStrike.SightSide"), ACheeseStrikeCharacter::SightSide, TEXT("Where the rifle's sight line is across it, from its bounds' middle (cm)."));
 static TAutoConsoleVariable<float> CVarSightHeight(TEXT("CheeseStrike.SightHeight"), ACheeseStrikeCharacter::SightHeight, TEXT("Where the rifle's sight line is, down from its top (cm)."));
 static TAutoConsoleVariable<float> CVarSightBack(TEXT("CheeseStrike.SightBack"), ACheeseStrikeCharacter::SightBack, TEXT("How far along the rifle from its back end the eye is when aiming (cm)."));
 
-void ACheeseStrikeCharacter::BringRifleToEye(float DeltaSeconds)
+bool ACheeseStrikeCharacter::WeaponSight(FVector& OutSight) const
 {
 	const ACheeseStrikeWeapon* Held = GetWeapon();
-	// The weapon's model in view, skinned or plain, and the bounds of what it is made of.
-	const UPrimitiveComponent* Rifle = Held != nullptr ? Held->GetModel(true) : nullptr;
+	if (Held == nullptr)
+	{
+		return false;
+	}
+	if (Held->GetSight(OutSight))
+	{
+		return true;
+	}
+	// The rifle's: SightBack along it from its back end, behind the rear sight as a cheek on the stock puts it, a little
+	// down from its top (the rifle points a little under the view), across it from its middle.
+	const UPrimitiveComponent* Rifle = Held->GetModel(true);
 	const USkeletalMeshComponent* Skinned = Cast<USkeletalMeshComponent>(Rifle);
 	const UStaticMeshComponent* Plain = Cast<UStaticMeshComponent>(Rifle);
-	const bool bHasModel = (Skinned != nullptr && Skinned->GetSkeletalMeshAsset() != nullptr) || (Plain != nullptr && Plain->GetStaticMesh() != nullptr);
-	const USceneComponent* Parent = FirstPersonMesh->GetAttachParent();
+	if (Skinned != nullptr && Skinned->GetSkeletalMeshAsset() != nullptr)
+	{
+		const FBoxSphereBounds Bounds = Skinned->GetSkeletalMeshAsset()->GetBounds();
+		OutSight = FVector(Bounds.Origin.X + CVarSightSide.GetValueOnGameThread(), Bounds.Origin.Y - Bounds.BoxExtent.Y + CVarSightBack.GetValueOnGameThread(), Bounds.Origin.Z + Bounds.BoxExtent.Z - CVarSightHeight.GetValueOnGameThread());
+		return true;
+	}
+	if (Plain != nullptr && Plain->GetStaticMesh() != nullptr)
+	{
+		const FBoxSphereBounds Bounds = Plain->GetStaticMesh()->GetBounds();
+		OutSight = FVector(Bounds.Origin.X + CVarSightSide.GetValueOnGameThread(), Bounds.Origin.Y - Bounds.BoxExtent.Y + CVarSightBack.GetValueOnGameThread(), Bounds.Origin.Z + Bounds.BoxExtent.Z - CVarSightHeight.GetValueOnGameThread());
+		return true;
+	}
+	return false;
+}
+
+void ACheeseStrikeCharacter::PlaceView()
+{
 	// Only for its own player, alive, with the camera riding the arms (after a death it is left where the eyes were).
-	if (!IsLocallyControlled() || Parent == nullptr || !IsAlive() || FirstPersonCameraComponent->GetAttachParent() != FirstPersonMesh)
+	if (!IsLocallyControlled() || FirstPersonMesh->GetAttachParent() == nullptr || !IsAlive() || FirstPersonCameraComponent->GetAttachParent() != FirstPersonMesh)
 	{
 		return;
 	}
-	// Where the arms are without aiming, and the eye in them.
-	const FTransform Unaimed = FirstPersonBase * FirstPersonMesh->GetAttachParent()->GetSocketTransform(FirstPersonMesh->GetAttachSocketName());
-	// (Down, a little ahead of the face, out of the collar and the shoulders of a body lying propped up.)
-	const FVector Eye = (FirstPersonMesh->GetSocketTransform(FName("head"), RTS_Component) * Unaimed).TransformPosition(CameraAtHead)
-		+ GetControlRotation().Vector() * DownCameraAhead * DownInView;
-	// At the hip the weapon is kept about where its hold has it in view, pointing about the way it has it: crouching and
-	// the cycles lean the body and bring the arms up to the eyes, so the arms are turned about the hand holding it and
-	// moved by however far it has drifted from there, smoothed, which takes out the lasting lean and leaves the cycles' bob.
-	const FRotator View = GetControlRotation();
-	const FVector Hand = Unaimed.TransformPosition(FirstPersonMesh->GetSocketTransform(FName("hand_r"), RTS_Component).GetLocation());
-	const FVector HandNow = View.UnrotateVector(Hand - Eye);
-	const FVector AlongNow = Rifle != nullptr
-		? View.UnrotateVector((Rifle->GetComponentTransform().GetRelativeTransform(FirstPersonMesh->GetComponentTransform()) * Unaimed).GetUnitAxis(EAxis::Y))
-		: FVector::ForwardVector;
-	HandInView = bHandInViewKnown ? FMath::VInterpTo(HandInView, HandNow, DeltaSeconds, HipSettleRate) : HandNow;
-	AlongInView = bHandInViewKnown ? FMath::VInterpTo(AlongInView, AlongNow, DeltaSeconds, HipSettleRate).GetSafeNormal() : AlongNow;
-	bHandInViewKnown = true;
-	FTransform Hip = Unaimed;
-	if (Held != nullptr && CVarHipHold.GetValueOnGameThread() != 0)
+	// The body stays on the body others see: the animation places the arms in view, not the body.
+	if (!FirstPersonMesh->GetRelativeTransform().Equals(FirstPersonBase, 0.01f))
 	{
-		FVector Axis;
-		float Angle;
-		FQuat::FindBetweenNormals(AlongInView, CheeseStrikeWeaponLooks::HipAlong(Held->GetHold())).ToAxisAndAngle(Axis, Angle);
-		// Down, the pose holds the pistol out itself, and the arms stay on the body lying in view.
-		const float Hold = 1.0f - DownInView;
-		const FQuat Turn = View.Quaternion() * FQuat(Axis, FMath::Min(Angle, FMath::DegreesToRadians(MostHipTurn)) * Hold) * View.Quaternion().Inverse();
-		Hip.SetRotation(Turn * Hip.GetRotation());
-		Hip.SetLocation(Hand + Turn.RotateVector(Hip.GetLocation() - Hand));
-		const FVector Shift = (CheeseStrikeWeaponLooks::HipHand(Held->GetHold()) - HandInView).GetClampedToMaxSize(MostHipShift) * Hold;
-		Hip.AddToTranslation(View.RotateVector(Shift));
+		FirstPersonMesh->SetRelativeTransform(FirstPersonBase);
 	}
-	// A weapon just drawn comes up from below the view, the arms with it, the eye staying where it is.
-	const float Lowered = Held != nullptr ? FMath::Square(1.0f - Held->DrawnFraction()) : 0.0f;
-	if (Lowered > 0.001f)
+	// Just under the eyes; down, a little ahead of the face, out of the collar and the shoulders of a body lying propped up.
+	const FVector Ahead = FirstPersonMesh->GetSocketTransform(FName("head")).InverseTransformVectorNoScale(GetControlRotation().Vector());
+	FirstPersonCameraComponent->SetRelativeLocation(CameraAtHead + Ahead * DownCameraAhead * DownInView);
+	if (DownInView > 0.0f)
 	{
-		const FVector Down = -FRotationMatrix(GetControlRotation()).GetUnitAxis(EAxis::Z) * DrawDrop * Lowered;
-		FirstPersonMesh->SetWorldTransform(FTransform(Hip.GetRotation(), Hip.GetLocation() + Down, Hip.GetScale3D()));
-		FirstPersonCameraComponent->SetWorldLocation(Eye);
+		KeepDownViewClear();
+	}
+}
+
+void ACheeseStrikeCharacter::KeepDownViewClear()
+{
+	UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
 		return;
 	}
-	if (AimFraction < 0.001f || !bHasModel)
+	const FVector Wanted = FirstPersonCameraComponent->GetComponentLocation();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeDownView), false, this);
+	FVector At = Wanted;
+	FHitResult Hit;
+	// From the capsule's middle (which the body lies round, with room) out to where the head has the eyes.
+	if (World->SweepSingleByChannel(Hit, GetActorLocation(), Wanted, FQuat::Identity, ECC_Camera, FCollisionShape::MakeSphere(DownViewRoom), Params))
 	{
-		FirstPersonMesh->SetWorldTransform(Hip);
-		FirstPersonCameraComponent->SetWorldLocation(Eye);
-		return;
+		At = Hit.Location;
 	}
-	// The rifle as the arms hold it (its place in them, from their last pose), and where it should be: its length (its Y)
-	// along the view, its top (its Z) up the view, and its sight line (a little down from its top) through the eye, the
-	// eye SightBack along it from its back end, behind the rear sight as a cheek on the stock puts it.
-	const FTransform RifleInArms = Rifle->GetComponentTransform().GetRelativeTransform(FirstPersonMesh->GetComponentTransform());
-	const FMatrix ViewAxes = FRotationMatrix(View);
-	const FQuat Along = FRotationMatrix::MakeFromYZ(ViewAxes.GetUnitAxis(EAxis::X), ViewAxes.GetUnitAxis(EAxis::Z)).ToQuat();
-	// Where the weapon's look puts the eye, or, for the rifle, from its bounds by the sight variables.
-	FVector Sight;
-	if (!Held->GetSight(Sight))
+	// And high enough over what is under it.
+	if (World->LineTraceSingleByChannel(Hit, At + FVector(0.0f, 0.0f, DownViewRoom), At - FVector(0.0f, 0.0f, DownViewHeight), ECC_Camera, Params))
 	{
-		const FBoxSphereBounds Bounds = Skinned != nullptr ? Skinned->GetSkeletalMeshAsset()->GetBounds() : Plain->GetStaticMesh()->GetBounds();
-		Sight = FVector(Bounds.Origin.X + CVarSightSide.GetValueOnGameThread(), Bounds.Origin.Y - Bounds.BoxExtent.Y + CVarSightBack.GetValueOnGameThread(), Bounds.Origin.Z + Bounds.BoxExtent.Z - CVarSightHeight.GetValueOnGameThread());
+		At.Z = FMath::Max(At.Z, Hit.ImpactPoint.Z + DownViewHeight);
 	}
-	const FVector Scale = Rifle->GetComponentScale();
-	const FTransform RifleAimed(Along, Eye - Along.RotateVector(Sight * Scale), Scale);
-	// Child = its place in the parent * the parent; so the arms = the rifle's place in them, undone, * where the rifle is to be.
-	const FTransform ArmsAimed = RifleInArms.Inverse() * RifleAimed;
-	FTransform Arms;
-	Arms.Blend(Hip, ArmsAimed, AimFraction);
-	FirstPersonMesh->SetWorldTransform(Arms);
-	// The eye stays where the head had it, wherever the arms (which carry the camera on their head) have gone.
-	FirstPersonCameraComponent->SetWorldLocation(Eye);
+	if (!At.Equals(Wanted, 0.1f))
+	{
+		FirstPersonCameraComponent->SetWorldLocation(FMath::Lerp(Wanted, At, DownInView));
+	}
 }
 
 void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
@@ -1171,7 +1192,11 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	const float WantedFieldOfView = BaseFieldOfView * (bAimed ? GetWeapon()->GetStats().AimZoom : 1.0f);
 	FirstPersonCameraComponent->SetFieldOfView(FMath::FInterpTo(FirstPersonCameraComponent->FieldOfView, WantedFieldOfView, DeltaSeconds, 12.0f));
 	AimFraction = FMath::FInterpTo(AimFraction, bAimed ? 1.0f : 0.0f, DeltaSeconds, 12.0f);
-	BringRifleToEye(DeltaSeconds);
+	PlaceView();
+	// Sliding, its own player's view leans into it.
+	const UCheeseStrikeMovementComponent* Moving = GetCheeseStrikeMovement();
+	const bool bSliding = Moving != nullptr && Moving->IsSliding() && IsAlive();
+	ViewRoll = FMath::FInterpTo(ViewRoll, bSliding ? CheeseStrikeArms::SlideTilt * CheeseStrikeArms::SlideDepth(GetVelocity().Size2D()) : 0.0f, DeltaSeconds, CheeseStrikeArms::HoldBlendRate);
 	// Through a scope, the arms and the weapon are out of the view, and the HUD draws the scope over it.
 	const bool bScopeView = IsLocallyControlled() && IsAlive() && OutsideCamera == nullptr && bAimed && GetWeapon() != nullptr && GetWeapon()->GetStats().bScoped && AimFraction >= ScopeFrom;
 	if (bScopeView != bLookingThroughScope)
@@ -1230,7 +1255,9 @@ void ACheeseStrikeCharacter::CheeseStrikeState()
 	const ACheeseStrikeWeapon* HeldWeapon = GetWeapon();
 	// Which way the weapon in view points, in the view's axes (forward, right, up).
 	const UPrimitiveComponent* InView = HeldWeapon != nullptr ? HeldWeapon->GetModel(true) : nullptr;
-	const FVector Along = InView != nullptr ? GetControlRotation().UnrotateVector(InView->GetComponentTransform().GetUnitAxis(EAxis::Y)) : FVector::ZeroVector;
+	const FVector Along = InView != nullptr ? GetControlRotation().UnrotateVector(InView->GetComponentTransform().TransformVectorNoScale(HeldWeapon->GetModelAlong())) : FVector::ZeroVector;
+	// And where the hand holding it is (forward, right, up from the eye).
+	const FVector HandInView = GetControlRotation().UnrotateVector(FirstPersonMesh->GetBoneLocation(TEXT("hand_r")) - Eye);
 	UE_LOG(LogCheeseStrike, Display, TEXT("State: at (%.0f, %.0f, %.0f) speed %.0f eye %.0f above the floor pitch %.1f yaw %.1f crouched %d sprinting %d sliding %d (%.2f s) falling %d jump %d/%d health %.0f alive %d protected %d ghost %.2f frozen %d ammo %d/%d aimed %d fov %.0f shots %d hits %d reloading %d weapon %s drawing %d body (%.0f, %.0f, %.0f) fallen %d camera (%.0f, %.0f, %.0f) hand in view (%.0f, %.0f, %.0f) weapon along (%.2f, %.2f, %.2f) down %.2f body yaw %.1f leg room %.0f grenades %d throwing %d"),
 		At.X, At.Y, At.Z, GetVelocity().Size2D(), Eye.Z - (At.Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), FRotator::NormalizeAxis(GetControlRotation().Pitch), FRotator::NormalizeAxis(GetControlRotation().Yaw),
 		bIsCrouched ? 1 : 0, Movement != nullptr && Movement->IsSprinting() ? 1 : 0, Movement != nullptr && Movement->IsSliding() ? 1 : 0,

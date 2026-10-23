@@ -67,7 +67,7 @@ All hitscan unless a projectile is given. Damage falls off linearly from `fallof
 | Gouda Launcher (projectile) | power | 240 splash, 5 m radius, 9 knockback | | 0.9 | 2 | 2.4 | | 0 / 7 | | | 2 / 1 / 0 / 1 | 0.8 | wheel at 24 m/s, gravity 0.25 ×, bursts on touch or after 3 s |
 | Launcher, bouncing alt fire | | same | | | | | | | | | | | 20 m/s, gravity 0.6 ×, bounces (0.55), bursts after 2.2 s |
 | Wax Grenade (thrown) | thrown | 160 splash, 5.5 m, 8 knockback | | 0.8 | 2 carried | | | | | | | | 19 m/s, gravity 0.8 ×, bounces (0.42), fuse 2.6 s |
-| Cheese Knife (melee) | | 55; 500 from behind | | 0.75 | | | 4.5 m reach, 16° sweep | | | | | | lunge 7 m/s, 0.25 s swing |
+| Cheese Knife (melee) | | 55; 500 from behind | | 0.75 | | | 5.4 m reach, 45° sweep either side (a swipe) | | | | | | no lunge, 0.25 s swing |
 
 Reserves: each weapon carries two or three magazines' worth and holds at most about five; an ammunition crate refills a magazine's worth of every carried weapon. Shots penetrate up to 0.5 m of a wall for 0.6 × damage. Falloff and spread numbers are Godot metres and degrees.
 

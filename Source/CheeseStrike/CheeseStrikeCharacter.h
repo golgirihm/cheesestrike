@@ -145,12 +145,23 @@ public:
 	static constexpr float SightSide = 0.0f;
 	static constexpr float SightHeight = 2.0f;
 	static constexpr float SightBack = 14.0f;
-	/** How far below its place (cm) a weapon just drawn comes up from. */
-	static constexpr float DrawDrop = 25.0f;
-
 	/** How far the view has come down the sights, 0 to 1; from ScopeFrom, a scoped weapon is looked through (its model hidden, the HUD's scope drawn). */
 	float GetAimFraction() const { return AimFraction; }
 	static constexpr float ScopeFrom = 0.9f;
+	/** Where the eye goes to aim down the weapon in hand, in its model's own space: its look's, or for the rifle from its bounds by the sight variables. */
+	bool WeaponSight(FVector& OutSight) const;
+	/** Where the camera sits in the first-person body's head bone (FitFirstPersonBody). */
+	FVector GetCameraAtHead() const { return CameraAtHead; }
+	/**
+	 * Down, the view keeps out of whatever is round the head (a ball this big,
+	 * cm, swept from the capsule's middle) and this far over the floor or
+	 * whatever is under it (a slope, a step, a wall it lies against), however
+	 * the head is turned with the aim.
+	 */
+	static constexpr float DownViewRoom = 8.0f;
+	static constexpr float DownViewHeight = 22.0f;
+	/** How far its own player's view is rolled (degrees): leaning into a slide. */
+	float GetViewRoll() const { return ViewRoll; }
 
 	/** The weapon in hand, or null before one arrives. */
 	ACheeseStrikeWeapon* GetWeapon() const;
@@ -261,6 +272,15 @@ public:
 
 	/** Where the first-person left hand is in the first-person rifle's own space, for the trace and the tests: it should stay put whatever the aim. */
 	FVector LeftHandOnRifle() const;
+	/** Its own player's view: where the weapon in hand is in it this frame, as the camera has it (ACheeseStrikeCameraManager), for how steadily it is held. */
+	void NoteWeaponInView(const FTransform& InView);
+	/**
+	 * How much the weapon has trembled in view since this was last asked: the
+	 * mean change, frame to frame, of how it moves (cm) and turns (degrees)
+	 * from one frame to the next. Steady movement (the walk's bob, a turn)
+	 * adds little; a shake adds much.
+	 */
+	FVector2D TakeViewTremble();
 
 	/** Puts it at `At`, facing `Yaw` (on the server), for -StartAt and for tests. */
 	void StartAt(const FVector& At, float Yaw);
@@ -372,29 +392,28 @@ protected:
 	/** The arms' place on the body when not aiming. */
 	FTransform FirstPersonBase = FTransform::Identity;
 	/**
-	 * Places the arms, which carry the camera on their head, the eye staying
-	 * where the head has it (Tick): at the hip, so that the hand holding the
-	 * weapon stays about where its hold has it in view however the body leans
-	 * (CheeseStrikeWeaponLooks::HipHand); aiming, so that the weapon's sight
-	 * line runs down the view through the eye.
+	 * Keeps the first-person body on the body others see and the camera on its
+	 * head, just under the eyes (down, a little ahead of the face), whatever
+	 * the arms do: they are placed in view by the animation
+	 * (FCheeseStrikeViewHold): at the hip where the weapon's hold has them,
+	 * down the sights with the sight line through the eye.
 	 */
-	void BringRifleToEye(float DeltaSeconds);
-	/** Where the hand holding the weapon has been in view lately (forward, right, up from the eye, cm), and which way the weapon has pointed, smoothed. */
-	FVector HandInView = FVector::ZeroVector;
-	FVector AlongInView = FVector::ForwardVector;
-	bool bHandInViewKnown = false;
-	/** How fast that follows the hand (per second): slow enough that the cycles' bob still shows. */
-	static constexpr float HipSettleRate = 4.0f;
-	/** The most the arms are moved at the hip (cm). */
-	static constexpr float MostHipShift = 25.0f;
-	/** And turned, about the hand (degrees). */
-	static constexpr float MostHipTurn = 20.0f;
+	void PlaceView();
+	/** The view's roll now, eased in and out of a slide. */
+	float ViewRoll = 0.0f;
+	/** The weapon in view the last two frames, how many of those are known, and the tremble summed since last asked, over so many frames. */
+	FTransform WeaponInView[2];
+	int32 WeaponInViewKnown = 0;
+	FVector2D TrembleSum = FVector2D::ZeroVector;
+	int32 TrembleFrames = 0;
 	/** How far the first-person view is down (eased): the arms are then where the pose puts them, and the first-person body is drawn at the world's field of view, its legs lying on the floor in view. */
 	float DownInView = 0.0f;
 	/** Down, the view sits this far ahead of where the head has it (cm). */
 	static constexpr float DownCameraAhead = 9.0f;
+	/** Down: the camera, where the head has it, kept out of the floor and walls round it. */
+	void KeepDownViewClear();
 	/** The first-person body's own field of view, standing. */
-	float FirstPersonFieldOfViewUp = 70.0f;
+	float FirstPersonFieldOfViewUp = 76.0f;
 	/** GetDownBlend's, and the room for the legs. */
 	float DownBlend = 0.0f;
 	float DownLegRoom = CheeseStrikeDowned::LegLength;

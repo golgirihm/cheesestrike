@@ -31,12 +31,18 @@ struct FWeaponLook
 	FTransform Model = FTransform::Identity;
 	/** Its materials, slot by slot (none keeps the model's own). */
 	const TCHAR* Materials[3] = {nullptr, nullptr, nullptr};
+	/** Which way its business end points in the model's space: a gun's muzzle (+Y), a blade's tip. */
+	FVector Along = FVector(0.0f, 1.0f, 0.0f);
 	/** Where the eye goes down the sights, in the model's space; none for the rifle's own (from its bounds and the console's sight variables). */
 	TOptional<FVector> Sight;
 	/** Where the muzzle is, and how big its flash (1 the rifle's). */
 	FVector Muzzle = FVector(0.0f, 70.0f, 4.0f);
 	float FlashSize = 1.0f;
-	/** Where the free hand holds it, in the model's space; none for where the animation has it (the rifle's fore-end, 26 cm out). */
+	/**
+	 * Where the other hand closes round it (the middle of its closed fingers: FCheeseStrikeGripIK), in the model's
+	 * space: on a long gun's fore-end, under the barrel's line; on a pistol, round the hand on its grip. None for a
+	 * weapon held in one hand, the other free (the knife).
+	 */
 	TOptional<FVector> LeftHand;
 	/** Its sounds: shots (one at random), the dry click, a reload's three, and how loud and how high its shots are. */
 	const TCHAR* Shots[4] = {nullptr, nullptr, nullptr, nullptr};
@@ -50,17 +56,16 @@ namespace CheeseStrikeWeaponLooks
 {
 	/** The look of the weapon `Id`, or the Cheddar Blaster's. */
 	const FWeaponLook& For(FName Id);
-	/** Where the left hand holds the rifle in its animations, in its space: what LeftHand is measured from. */
-	const FVector RifleLeftHand(6.0f, 26.4f, 5.5f);
 	/**
-	 * Where the hand holding a weapon held `Hold`'s way sits in its player's
-	 * view at the hip (cm from the eye: forward, right, up), as the standing
-	 * idle has it: ACheeseStrikeCharacter keeps it about there however the
-	 * body leans (crouched, moving).
+	 * Where a weapon held `Hold`'s way sits in its player's view at the hip:
+	 * where it is aimed down its sights (its sight line through the eye),
+	 * moved (cm: forward, right, up in the view) and turned (about the eye),
+	 * so that every weapon of a hold sits alike whatever its shape
+	 * (FCheeseStrikeViewHold keeps it there however the body leans).
 	 */
-	FVector HipHand(ECheeseStrikeHold Hold);
-	/** And which way its model points there (its Y axis, in the view's axes), as a unit vector. */
-	FVector HipAlong(ECheeseStrikeHold Hold);
+	FTransform HipFromAimed(ECheeseStrikeHold Hold);
+	/** Where the knife hand is on guard in view (cm from the eye: forward, right, up). */
+	FVector KnifeHand();
 	/** The knife's swoosh, its stroke landing, and drawing a weapon. */
 	extern const TCHAR* const KnifeSwings[4];
 	extern const TCHAR* const KnifeHits[3];

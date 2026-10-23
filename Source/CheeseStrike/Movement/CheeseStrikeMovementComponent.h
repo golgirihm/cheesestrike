@@ -13,8 +13,7 @@
  *
  * Sprinting is held, like crouching, and goes to the server in each move's
  * flags, so that the server simulates the same speed the client predicted.
- * So do carrying a heavy weapon (slower) and a knife's lunge (a burst
- * forward), held by the weapon in hand.
+ * So does carrying a heavy weapon (slower), held by the weapon in hand.
  * A slide begins when the player crouches at a sprint and runs by itself:
  * what it holds (how far into it, from what speed, which way) is saved with
  * each move, so that a replay after a correction comes out the same.
@@ -35,11 +34,9 @@ public:
 	bool IsSliding() const { return SlideElapsed >= 0.0f; }
 	/** Seconds into the slide, or -1 for none. */
 	float GetSlideElapsed() const { return SlideElapsed; }
-	/** The weapon in hand is heavy (slowing its carrier), or is lunging them forward. */
+	/** The weapon in hand is heavy, slowing its carrier. */
 	void SetCarryingHeavy(bool bHeavy) { bCarryingHeavy = bHeavy; }
-	void SetLunging(bool bInLunge) { bLunging = bInLunge; }
 	bool IsCarryingHeavy() const { return bCarryingHeavy; }
-	bool IsLunging() const { return bLunging; }
 
 	//~ UCharacterMovementComponent
 	virtual float GetMaxSpeed() const override;
@@ -66,7 +63,6 @@ protected:
 	/** What the player holds. */
 	bool bWantsToSprint = false;
 	bool bCarryingHeavy = false;
-	bool bLunging = false;
 	/** Seconds into the slide, or -1 for none; the speed it began at; and which way it goes, flat. */
 	float SlideElapsed = -1.0f;
 	float SlideFrom = 0.0f;
@@ -93,7 +89,6 @@ public:
 
 	bool bSavedWantsToSprint = false;
 	bool bSavedCarryingHeavy = false;
-	bool bSavedLunging = false;
 	float SavedSlideElapsed = -1.0f;
 	float SavedSlideFrom = 0.0f;
 	FVector SavedSlideDirection = FVector::ForwardVector;

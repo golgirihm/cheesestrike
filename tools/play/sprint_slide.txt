@@ -1,0 +1,65 @@
+# Sprints and slides with the Cheddar Blaster, for looking at the weapon carried at a sprint and the slide in first
+# person (level and looking down at the legs) and from outside, the camera put by the body each time it is shot.
+# Run with tools/play.ps1 -Script tools/play/sprint_slide.txt -Tag slide (from the usual start; it turns round for
+# the slides, which need the room).
+wait 2
+cmd CheeseStrikeBody 0 1
+cmd CheeseStrikeArm blaster
+wait 1
+hold Sprint
+hold Move 0 1
+wait 1.2
+shot sp_fp_sprint
+look 0 -40
+wait 0.2
+shot sp_fp_sprint_down
+look 0 40
+release Move
+release Sprint
+wait 1
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 1.0
+hold Crouch
+wait 0.2
+shot sl_fp_1
+look 0 -30
+wait 0.05
+shot sl_fp_2_down
+look 0 30
+wait 0.2
+shot sl_fp_3
+release Crouch
+release Move
+release Sprint
+wait 1
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 1.0
+cmd CheeseStrikeOutside 260 -80 0
+wait 0.05
+shot sp_tp_sprint
+cmd CheeseStrikeOutside
+hold Crouch
+wait 0.15
+cmd CheeseStrikeOutside 260 80 -20
+wait 0.05
+shot sl_tp_1
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 260 30 -20
+wait 0.05
+shot sl_tp_2
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 260 -60 -20
+wait 0.05
+shot sl_tp_3
+cmd CheeseStrikeOutside
+release Crouch
+release Move
+release Sprint
+wait 0.5
+quit

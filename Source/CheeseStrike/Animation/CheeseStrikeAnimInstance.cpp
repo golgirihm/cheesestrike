@@ -12,7 +12,11 @@
 #include "CheeseStrikeBodies.h"
 #include "CheeseStrikeCharacter.h"
 #include "Modes/CheeseStrikeLastStand.h"
+#include "Movement/CheeseStrikeMovementComponent.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "Weapons/CheeseStrikeWeaponLooks.h"
+
+static TAutoConsoleVariable<int32> CVarHipHold(TEXT("CheeseStrike.HipHold"), 1, TEXT("Place the weapon hand in its player's view where its hold has it (0: where the animation puts it)."));
 
 namespace CheeseStrikeAnimation
 {
@@ -135,10 +139,10 @@ FCheeseStrikeAnimSets UCheeseStrikeAnimInstance::FindSets(const FString& Rifles)
 	Shotgun = Rifle;
 	Shotgun.Fire = Find<UAnimSequence>(Shotguns, TEXT("MM_Shotgun_Fire"));
 	Shotgun.Reload = Find<UAnimSequence>(Shotguns, TEXT("MM_Shotgun_Reload"));
-	// The knife in the pistol's stance, struck with the pistol's blow, the free arm up on guard as the unarmed stand ready.
+	// The knife in the pistol's stance (its hand placed and swiped in code: FCheeseStrikeKnifeHold), the free arm up on
+	// guard as the unarmed stand ready.
 	FCheeseStrikeAnimSet& Knife = Found.Of(ECheeseStrikeHold::Knife);
 	Knife = Pistol;
-	Knife.Stroke = Find<UAnimSequence>(Pistols, TEXT("MM_Pistol_Melee"));
 	Knife.Guard = Find<UAnimSequence>(Pistols, TEXT("MM_Unarmed_Idle_Ready"));
 	// A grenade is tossed the one way, whatever is in the other hand.
 	UAnimSequence* Toss = Find<UAnimSequence>(Animations + TEXT("Grenade/"), TEXT("MM_Rifle_GrenadeToss"));
@@ -236,7 +240,24 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		LastYaw = Yaw;
 		bLastYawKnown = true;
 		Hold = Weapon != nullptr ? Weapon->GetHold() : ECheeseStrikeHold::Rifle;
-		LeftHandShift = Weapon != nullptr ? Weapon->LeftHandShiftFor(GetSkelMeshComponent()) : FVector::ZeroVector;
+		bLeftHandHolds = Weapon != nullptr && Weapon->LeftHandHoldFor(GetSkelMeshComponent(), LeftHandHold);
+		// The weapon's model as this body holds it, and the knife's swipe.
+		const UPrimitiveComponent* Model = Weapon != nullptr ? Weapon->GetModel(bFirstPersonBody) : nullptr;
+		ModelInHand = Model != nullptr ? Model->GetRelativeTransform() : FTransform::Identity;
+		ModelAlong = Weapon != nullptr ? Weapon->GetModelAlong() : FVector(0.0, 1.0, 0.0);
+		SwipePhase = Weapon != nullptr ? Weapon->SwipePhase() : -1.0f;
+		// Its own player's body: the arms placed in view.
+		View.bPlace = bFirstPersonBody && Character->IsLocallyControlled() && Character->IsAlive() && Weapon != nullptr && CVarHipHold.GetValueOnGameThread() != 0;
+		if (View.bPlace)
+		{
+			View.Turn = GetSkelMeshComponent()->GetComponentQuat().Inverse() * Pawn->GetControlRotation().Quaternion();
+			View.CameraAtHead = Character->GetCameraAtHead();
+			View.bHasSight = Character->WeaponSight(View.Sight);
+			View.Aimed = Character->GetAimFraction();
+			View.Lowered = FMath::Square(1.0f - Weapon->DrawnFraction());
+			const UCheeseStrikeMovementComponent* Movement = Character->GetCheeseStrikeMovement();
+			View.bSprinting = Movement != nullptr && Movement->IsSprinting();
+		}
 		// An execution: where the blow lands on the one down, taken as it begins, in the frame the body is animated in.
 		const UCheeseStrikeLastStand* Stand = Character->GetLastStand();
 		const FCheeseStrikeExecutionState* Execution = Stand != nullptr ? &Stand->GetExecution() : nullptr;
@@ -298,6 +319,9 @@ void FCheeseStrikeAnimProxy::Assign(const FCheeseStrikeAnimSet& Set)
 	Loop(CrouchWalkRight, Set.CrouchWalkRight);
 	Loop(FallLoop, Set.FallLoop);
 	Loop(GuardPose, Set.Guard != nullptr ? Set.Guard.Get() : Set.Idle.Get());
+	// The left hand's grip on the weapon, measured afresh from this set's idle.
+	LeftHand.GripPose = Set.Idle;
+	LeftHand.bGripMeasured = false;
 	AimHip.SetBlendSpace(Set.AimHip);
 	AimAiming.SetBlendSpace(Set.AimAiming);
 	AimCrouch.SetBlendSpace(Set.AimCrouch);
@@ -357,13 +381,16 @@ void FCheeseStrikeAnimProxy::Link(FName GripAnchor)
 	Guarded.bMeshSpaceRotationBlend = true;
 	Guarded.BlendWeights[0] = 0.0f;
 
-	// The left hand keeps its grip on the rifle, which rides the weapon_r bone in the right hand.
+	// Posed in code: a slide's sprawl, the knife's fist, guard and swipe, and the weapon hand in its own player's view.
+	ToComponentSpace.LocalPose.SetLinkNode(&Guarded);
+	SlidePose.ComponentPose.SetLinkNode(&ToComponentSpace);
+	KnifeHold.ComponentPose.SetLinkNode(&SlidePose);
+	ViewHold.ComponentPose.SetLinkNode(&KnifeHold);
+	// The left hand keeps its grip on the weapon, which rides the anchor bone in the right hand.
 	LeftHand.IKBone = FBoneReference(FName(TEXT("hand_l")));
 	LeftHand.AnchorBone = FBoneReference(GripAnchor);
-	LeftHand.bAllowStretching = false;
 	LeftHand.Alpha = 1.0f;
-	ToComponentSpace.LocalPose.SetLinkNode(&Guarded);
-	LeftHand.ComponentPose.SetLinkNode(&ToComponentSpace);
+	LeftHand.ComponentPose.SetLinkNode(&ViewHold);
 	// Last, down: on the back, propped on the left elbow, the pistol out.
 	Downed.ComponentPose.SetLinkNode(&LeftHand);
 	Executing.ComponentPose.SetLinkNode(&Downed);
@@ -433,21 +460,24 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		TurnSpeed = Instance->TurnSpeed;
 		bFirstPersonBody = Instance->bFirstPersonBody;
 		Hold = Instance->Hold;
-		LeftHandShift = Instance->LeftHandShift;
 		ExecutionKind = Instance->ExecutionKind;
 		bExecutor = Instance->bExecutor;
 		ExecutionTime = Instance->ExecutionTime;
 		ExecutionTarget = Instance->ExecutionTarget;
 		ExecutionShoulder = Instance->ExecutionShoulder;
 		ExecutionSide = Instance->ExecutionSide;
-		// A change of weapon to one held another way: its animations on the same nodes, and the left hand's grip on it
-		// measured again once nothing else moves it.
+		bLeftHandHolds = Instance->bLeftHandHolds;
+		LeftHandHold = Instance->LeftHandHold;
+		ModelInHand = Instance->ModelInHand;
+		ModelAlong = Instance->ModelAlong;
+		SwipePhase = Instance->SwipePhase;
+		View = Instance->View;
+		// A change of weapon to one held another way: its animations on the same nodes (and the left hand's grip on it,
+		// measured from the new set's idle).
 		if (bLinked && Hold != LinkedHold)
 		{
 			Assign(Instance->GetSet(Hold));
 			LinkedHold = Hold;
-			LeftHand.bGripMeasured = false;
-			bGripPending = true;
 		}
 	}
 }
@@ -500,15 +530,14 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	float SourceWeight = 1.0f;
 	float TotalWeight = 0.0f;
 	GetSlotWeight(UCheeseStrikeAnimInstance::SlotName(), SlotWeight, SourceWeight, TotalWeight);
-	// The knife's free arm goes up on guard and lets go of the grip.
-	GuardBlend = FMath::FInterpTo(GuardBlend, Hold == ECheeseStrikeHold::Knife ? 1.0f : 0.0f, DeltaSeconds, BlendRate);
+	// The knife's free arm goes up on guard and lets go of the grip, as does a hand a weapon held in one hand leaves free.
+	const bool bKnife = Hold == ECheeseStrikeHold::Knife;
+	GuardBlend = FMath::FInterpTo(GuardBlend, bKnife ? 1.0f : 0.0f, DeltaSeconds, BlendRate);
 	Guarded.BlendWeights[0] = GuardBlend;
-	if (bGripPending && SourceWeight > 0.999f)
-	{
-		bGripPending = false;
-	}
-	LeftHand.Alpha = bGripPending ? 0.0f : SourceWeight * (1.0f - GuardBlend);
-	LeftHand.Shift = LeftHandShift;
+	TwoHandBlend = FMath::FInterpTo(TwoHandBlend, bLeftHandHolds ? 1.0f : 0.0f, DeltaSeconds, BlendRate);
+	LeftHand.Alpha = SourceWeight * (1.0f - GuardBlend) * TwoHandBlend;
+	LeftHand.bHasHold = bLeftHandHolds;
+	LeftHand.Hold = LeftHandHold;
 
 	// Down, the legs push in turn as the body scoots along or round (a push a stride, the phase running on as it goes
 	// toward the head, back as it goes toward the feet); the breath comes hard, all the while (so that it doesn't start
@@ -537,6 +566,42 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	Executing.Target = ExecutionTarget;
 	Executing.TargetShoulder = ExecutionShoulder;
 	Executing.Side = ExecutionSide;
+
+	// Sliding (crouched, faster than a crouched walk: any machine can tell), the body laid back with its legs out. None of
+	// what follows while down, nor in an execution, which poses the body itself.
+	const float Up = (1.0f - Downed.Alpha) * (ExecutionKind != 0 ? 0.0f : 1.0f);
+	const float SlideWanted = CheeseStrikeArms::LooksSliding(bCrouched, Speed) && !bFalling ? CheeseStrikeArms::SlideDepth(Speed) : 0.0f;
+	SlideBlend = FMath::FInterpTo(SlideBlend, SlideWanted, DeltaSeconds, CheeseStrikeArms::HoldBlendRate);
+	SlidePose.Alpha = SlideBlend * Up;
+	SlidePose.Forward = BodyForward;
+	SlidePose.Origin = BodyOrigin;
+	// The knife: the fist closed, and on the body others see, the hand on guard and swiping (a montage, the draw, has it first).
+	KnifeBlend = FMath::FInterpTo(KnifeBlend, bKnife ? 1.0f : 0.0f, DeltaSeconds, BlendRate * 2.0f);
+	KnifeHold.Alpha = (bKnife ? KnifeBlend : 0.0f) * Up * SourceWeight;
+	KnifeHold.bPlaceHand = !bFirstPersonBody;
+	KnifeHold.Forward = BodyForward;
+	KnifeHold.AimPitch = AimPitch;
+	KnifeHold.ModelInHand = ModelInHand;
+	KnifeHold.ModelAlong = ModelAlong;
+	KnifeHold.SwipePhase = SwipePhase;
+	// Its own player's arms, placed in view.
+	SprintBlend = FMath::FInterpTo(SprintBlend, View.bSprinting ? 1.0f : 0.0f, DeltaSeconds, CheeseStrikeArms::HoldBlendRate);
+	ViewHold.Alpha = View.bPlace ? Up : 0.0f;
+	ViewHold.View = View.Turn;
+	ViewHold.CameraAtHead = View.CameraAtHead;
+	ViewHold.ModelInHand = ModelInHand;
+	ViewHold.ModelAlong = ModelAlong;
+	ViewHold.Sight = View.Sight;
+	ViewHold.bHasSight = View.bHasSight;
+	ViewHold.HipFromAimed = CheeseStrikeWeaponLooks::HipFromAimed(Hold);
+	ViewHold.KnifeHand = CheeseStrikeWeaponLooks::KnifeHand();
+	ViewHold.Aimed = View.Aimed;
+	ViewHold.Lowered = View.Lowered;
+	ViewHold.Sprint = SprintBlend;
+	ViewHold.Slide = SlideBlend;
+	ViewHold.bKnife = bKnife;
+	ViewHold.SwipePhase = SwipePhase;
+	ViewHold.Montage = 1.0f - SourceWeight;
 }
 
 void FCheeseStrikeAnimProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)

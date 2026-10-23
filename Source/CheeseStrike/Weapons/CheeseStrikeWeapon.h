@@ -37,9 +37,9 @@ struct FWeaponLook;
  * and tells the shooter whether it hit. Ammunition is the server's count;
  * the shooter's own count runs ahead of it and is put right as it arrives.
  *
- * The knife strikes instead: a short stroke swept a little either side of
- * the aim, decided on the server in the same way, with a lunge forward
- * (through the movement's saved moves) as it goes.
+ * The knife strikes instead: a swipe swept across the aim, decided on the
+ * server in the same way; it is shown on both bodies by the arms
+ * (FCheeseStrikeKnifeHold, FCheeseStrikeViewHold), from SwipePhase.
  *
  * Its shots are heard from where they were fired, fading and growing duller
  * with distance (CheeseStrikeGunfire); its own player hears them whole.
@@ -82,8 +82,8 @@ public:
 	bool IsReady() const;
 	/** Whether it has nothing left: no round in the magazine or in reserve. The knife never has. */
 	bool IsDry() const;
-	/** Whether a stroke's lunge is under way, on its player's machine. */
-	bool IsLunging() const;
+	/** How far through its swipe the knife is, 0 to 1, as this machine shows it; below 0 when it isn't swiping. */
+	float SwipePhase() const;
 	/** Which shot of the run of fire the next would be. */
 	int32 NextShotIndex() const;
 	/** The most the next shot may go off the aim, in degrees: half its cone. */
@@ -100,8 +100,10 @@ public:
 
 	/** How it is held, which picks the body's animations. */
 	ECheeseStrikeHold GetHold() const;
-	/** Where the free hand reaches past the grip the body's animations give it, for `Body`'s hand on this weapon: in the space of the bone the weapon rides (cm). */
-	FVector LeftHandShiftFor(const USkeletalMeshComponent* Body) const;
+	/** Which way its business end (muzzle, blade) points in its model's own space. */
+	FVector GetModelAlong() const;
+	/** Where `Body`'s left hand closes round this weapon, in the space of the bone the weapon rides (cm); false if it is held in one hand. */
+	bool LeftHandHoldFor(const USkeletalMeshComponent* Body, FVector& OutHold) const;
 	/** The model drawn in its player's view, or on the body: the skinned or the plain one, whichever it has. */
 	UPrimitiveComponent* GetModel(bool bFirstPerson) const;
 	/** Where the eye goes down its sights, in its model's own space, if its look says (else the rifle's way, from its bounds). */
@@ -248,9 +250,8 @@ protected:
 	TObjectPtr<UStaticMeshComponent> ThirdPersonFlash;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPointLightComponent> FlashLight;
-	/** The look it has, and where its first-person plain model sits in the hand before a knife's stroke swings it. */
+	/** The look it has. */
 	const FWeaponLook* Look = nullptr;
-	FTransform FirstPersonModelInHand = FTransform::Identity;
 	/** When the flash goes out (world time). */
 	float FlashUntil = 0.0f;
 
@@ -304,8 +305,8 @@ protected:
 	int32 LastInBurst = 0;
 	/** Shots of the burst under way still to come. */
 	int32 BurstLeft = 0;
-	/** The world time a stroke's lunge ends, on its player's machine; and the server's time of its last stroke. */
-	float LungeEndsAt = 0.0f;
+	/** The world time this machine last showed a stroke, and the server's time of its last stroke. */
+	float StrokeShownAt = -1000.0f;
 	float ServerLastStrike = -1000.0f;
 	float LastHitAt = -1000.0f;
 	/** The server's side: when the shots it allowed were, for the rate, and the last of them. */
