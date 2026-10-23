@@ -5,6 +5,7 @@
 namespace CheeseStrikeGrenades
 {
 	const TCHAR* const Name = TEXT("Cheese Grenade");
+	const TCHAR* const OwnWords = TEXT("blew themself up");
 
 	float DamageAt(float Distance)
 	{
@@ -44,8 +45,9 @@ namespace CheeseStrikeGrenades
 
 	float BotLandingShort(float Distance)
 	{
-		// The faster it comes down, the further it goes on: a quarter of the way, at most four metres.
-		return FMath::Min(Distance * 0.25f, 400.0f);
+		// The faster it comes down, the further it goes on: a quarter of the way, at most four metres, and never so short
+		// that it comes down within reach of the bot itself, which its own grenade hurts.
+		return FMath::Clamp(FMath::Min(Distance * 0.25f, 400.0f), 0.0f, FMath::Max(0.0f, Distance - BotOwnMargin));
 	}
 
 	bool BotShouldThrow(const FBotThrow& Thought)

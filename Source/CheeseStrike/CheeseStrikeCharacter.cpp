@@ -782,6 +782,26 @@ bool ACheeseStrikeCharacter::TakeFall(float Damage)
 	return true;
 }
 
+bool ACheeseStrikeCharacter::TakeOwnBlast(float Damage, const FString& How)
+{
+	if (!HasAuthority() || !CanAct() || IsProtected() || Damage <= 0.0f)
+	{
+		return false;
+	}
+	ACheeseStrikeCharacter* Pusher = FallCreditedTo();
+	bool bHurt = false;
+	if (LastStand != nullptr && LastStand->Intercept(Damage, nullptr, Pusher != nullptr ? Pusher->GetPlayerState<ACheeseStrikePlayerState>() : nullptr, bHurt))
+	{
+		return bHurt;
+	}
+	Health = FMath::Max(0.0f, Health - Damage);
+	if (!IsAlive())
+	{
+		Die(Pusher, false, nullptr, Pusher != nullptr ? FString() : How);
+	}
+	return true;
+}
+
 void ACheeseStrikeCharacter::MulticastHardLanding_Implementation(float Damage)
 {
 	static TSoftObjectPtr<USoundBase> Thud(FSoftObjectPath(TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_02.Lyra_MeleeImpact_02")));

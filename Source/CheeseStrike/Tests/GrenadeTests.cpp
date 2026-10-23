@@ -96,7 +96,13 @@ bool FABotThrowsAGrenadeSensibly::RunTest(const FString& Parameters)
 	FBotThrow Forgotten = Hidden;
 	Forgotten.SinceSeen = 10.0f;
 	TestFalse(TEXT("nor at where someone was long ago"), BotShouldThrow(Forgotten));
-	TestTrue(TEXT("a bot's range reaches past the burst"), BotNearest > Radius);
+	TestTrue(TEXT("a bot's range reaches past the burst"), BotNearest > BotOwnMargin);
+	for (const float Distance : {BotNearest, 1000.0f, BotFarthest})
+	{
+		const float Short = BotLandingShort(Distance);
+		TestTrue(FString::Printf(TEXT("at %.0f cm it aims short (%.0f) but never within reach of itself"), Distance, Short), Short >= 0.0f && Distance - Short >= BotOwnMargin);
+	}
+	TestTrue(TEXT("farther off, it allows for more roll"), BotLandingShort(2000.0f) > BotLandingShort(1000.0f));
 	return true;
 }
 

@@ -276,7 +276,9 @@ void ACheeseStrikeGrenade::Burst()
 	{
 		float Distance = 0.0f;
 		const float Damage = HarmAt(World, At, Victim, Distance);
-		if (Damage > 0.0f && Victim->TakeBlast(Damage, By, CheeseStrikeGrenades::Name))
+		// Its thrower it hurts as it would anyone; a death by it is their own doing.
+		const bool bOwn = Victim->GetPlayerState() == By;
+		if (Damage > 0.0f && (bOwn ? Victim->TakeOwnBlast(Damage, CheeseStrikeGrenades::OwnWords) : Victim->TakeBlast(Damage, By, CheeseStrikeGrenades::Name)))
 		{
 			++Hits;
 			UE_LOG(LogCheeseStrike, Display, TEXT("Grenade: %s's hit %s at %.0f cm for %.0f (health %.0f)"), *By->GetPlayerName(), *Victim->DisplayName(), Distance, Damage, Victim->GetHealth());
