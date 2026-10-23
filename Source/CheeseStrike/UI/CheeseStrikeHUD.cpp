@@ -665,13 +665,13 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 		Shapes.Rect(Right - BarWidth, BarTop, BarWidth * Magazine / FMath::Max(1, Stats.MagazineSize), BarHeight, bLow ? HudDraw::Danger : HudDraw::Ink);
 	}
 
-	// Over it, the magazine large and the reserve beside it (none for rounds without end); the name over them; the weapon's
+	// Over it, the magazine large and the reserve beside it ("/ ∞" for rounds without end); the name over them; the weapon's
 	// outline to their left. The knife has its name where the rounds would be.
 	const FSlateFontInfo Big = HudDraw::Font(40.0f * U);
 	const FSlateFontInfo Small = HudDraw::Font(18.0f * U);
 	const FSlateFontInfo Label = HudDraw::Font(13.0f * U);
 	const FString Name = Stats.DisplayName.ToString().ToUpper();
-	const FString Reserve = bRounds && !Stats.HasEndlessReserve() ? FString::Printf(TEXT("/ %d"), Weapon->GetReserve()) : FString();
+	const FString Reserve = bRounds ? CheeseStrikeWeapons::ReserveLabel(Weapon->GetReserve()) : FString();
 	const FString Rounds = bRounds ? FString::FromInt(Magazine) : FString();
 	const FVector2D ReserveSize = Reserve.IsEmpty() ? FVector2D::ZeroVector : HudDraw::Measure(Reserve, Small);
 	const FVector2D Line = HudDraw::Measure(TEXT("0"), Big);

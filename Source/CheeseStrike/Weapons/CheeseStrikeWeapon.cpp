@@ -718,7 +718,7 @@ FString ACheeseStrikeWeapon::DescribeRounds() const
 	{
 		return FString();
 	}
-	if (Stats->HasEndlessReserve())
+	if (HasEndlessReserve())
 	{
 		return FString::Printf(TEXT("%d"), Magazine);
 	}
@@ -1150,9 +1150,17 @@ void ACheeseStrikeWeapon::StartReload()
 
 void ACheeseStrikeWeapon::AddReserve(int32 Rounds)
 {
-	if (HasAuthority() && Stats->UsesRounds() && !Stats->HasEndlessReserve())
+	if (HasAuthority() && Stats->UsesRounds() && !HasEndlessReserve())
 	{
 		Reserve = FMath::Clamp(Reserve + Rounds, 0, Stats->ReserveMax);
+	}
+}
+
+void ACheeseStrikeWeapon::MakeReserveEndless()
+{
+	if (HasAuthority() && Stats->UsesRounds())
+	{
+		Reserve = -1;
 	}
 }
 
@@ -1170,9 +1178,9 @@ void ACheeseStrikeWeapon::ServerReload_Implementation()
 void ACheeseStrikeWeapon::FinishReload()
 {
 	const int32 Wanted = Stats->MagazineSize - Magazine;
-	const int32 Taken = Stats->HasEndlessReserve() ? Wanted : FMath::Min(Wanted, Reserve);
+	const int32 Taken = HasEndlessReserve() ? Wanted : FMath::Min(Wanted, Reserve);
 	Magazine += Taken;
-	if (!Stats->HasEndlessReserve())
+	if (!HasEndlessReserve())
 	{
 		Reserve -= Taken;
 	}

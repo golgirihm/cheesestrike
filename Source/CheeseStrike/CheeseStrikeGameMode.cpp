@@ -657,8 +657,16 @@ void ACheeseStrikeGameMode::ArmForGunGame(TWeakObjectPtr<ACheeseStrikeCharacter>
 	{
 		return;
 	}
-	// The step's weapon and nothing else: no changing to a sidearm or the knife.
+	// The step's weapon and nothing else: no changing to a sidearm or the knife. It never runs dry (it still reloads), so
+	// that a step is never lost to an empty reserve.
 	Inventory->Give(FCheeseStrikeLoadout::Only(CheeseStrikeArsenal::GunGameWeapon(Player->GetGunLevel())));
+	for (int32 Slot = 0; Slot < NumWeaponSlots; ++Slot)
+	{
+		if (ACheeseStrikeWeapon* Weapon = Inventory->GetInSlot(static_cast<EWeaponSlot>(Slot)))
+		{
+			Weapon->MakeReserveEndless();
+		}
+	}
 }
 
 bool ACheeseStrikeGameMode::PlayerCanRestart_Implementation(APlayerController* Player)

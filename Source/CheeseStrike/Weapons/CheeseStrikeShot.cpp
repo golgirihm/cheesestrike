@@ -5,6 +5,11 @@
 
 namespace CheeseStrikeWeapons
 {
+	FString ReserveLabel(int32 Reserve)
+	{
+		return Reserve < 0 ? FString(TEXT("/ ∞")) : FString::Printf(TEXT("/ %d"), Reserve);
+	}
+
 	float DamageAt(const FWeaponStats& Weapon, float Distance, bool bHead)
 	{
 		float Share = 1.0f;

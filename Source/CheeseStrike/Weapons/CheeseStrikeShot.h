@@ -108,6 +108,9 @@ namespace CheeseStrikeWeapons
 	/** Seconds a shot may come early after a weapon is drawn, for the network's jitter: the server allows it so much sooner than the draw time. */
 	constexpr float DrawAllowance = 0.15f;
 
+	/** What the HUD shows of a reserve beside the magazine: "/ 72", or "/ ∞" for rounds without end (below zero). */
+	FString ReserveLabel(int32 Reserve);
+
 	/** How much of `Weapon`'s damage a hit at `Distance` does, before the head. */
 	float DamageAt(const FWeaponStats& Weapon, float Distance, bool bHead);
 
