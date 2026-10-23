@@ -34,6 +34,8 @@ The bots and the mice walk a navigation mesh built when the level starts, in the
 
 Light: day, the sun low through the north window, across the lanes, falling on the sink and the wedge; the lamps over the table, under the wall cupboards, in the cupboards and in the hollow.
 
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), clear of the hills (the crumbs, the drawers, the table's top): the Roquefort Rifle in the sink, in the middle of the worktop; a Munster Machine Gun in each half of the hollow through the wedge; a Cheddar Blaster on the worktop at the top of each side's cookbooks; and a Swiss Shotgun in each side's cupboard, inside its door. Seven in all, mirrored like the room.
+
 ## The cheese, and what the mice change
 
 There are 308 blocks the mice can eat, and 36 they can't (the wedge's rind). Twelve mice eat it all in about a minute and a quarter, at the mice's steady pace: the floor's cheese and the wedge first, the cupboards' too; the cheese up on the worktop and the table last, since the mice come to it last (it is high, and few of them come in up there). What each structure does before the mice, and what eating it does (`tools/play/kitchen_mice.txt` watches it happen):

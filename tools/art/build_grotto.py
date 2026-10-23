@@ -613,6 +613,17 @@ def hills():
                     ("PoolsMozza", 1700, 0, 0, 420)])
 
 
+def pickups():
+    """The weapons' stands (kit.pickup), on rock and floor the mice never eat, and clear of the hills (on the Pulpit's
+    middle, the landing and the pools): the Roquefort in the Spine's arch, between the bridges; a Munster at each end of
+    the Pulpit; a Cheddar Blaster at the top of each gallery's stairs and a Swiss Shotgun in each Cheese Store."""
+    kit.pickup("roquefort", 0, 0, L1, "Arch")
+    for s, side in ((-1, "West"), (1, "East")):
+        kit.pickup("munster", s * 850, 2050, L1, f"Pulpit{side}")
+        kit.pickup("blaster", s * 2100, 2450, L2, f"Gallery{side}")
+        kit.pickup("shotgun", s * 2000, -900, 0, f"Store{side}")
+
+
 def build():
     cave()
     for s, side in ((-1, "West"), (1, "East")):
@@ -630,6 +641,7 @@ def build():
     mouse_entries()
     places()
     hills()
+    pickups()
     kit.nav_bounds((-HALF_X - 100, -HALF_Y - 100, -100), (HALF_X + 100, HALF_Y + 100, L2 + 400))
     kit.light_rig("cave")
     cave_air()

@@ -436,6 +436,20 @@ def hills():
     kit.hill_spots([("Stirrer", 0, 0, 0, 380), ("PumpGouda", -1300, 1100, 0, 300), ("PumpMozza", 1300, 1100, 0, 300)])
 
 
+def pickups():
+    """The weapons' stands (kit.pickup), each on concrete, steel or wax the mice never eat, and clear of the hills (on
+    the Stirrer's island and the pumps'): the Roquefort on the gantry's platform, the high ground over everything; a
+    Munster on each side's middle path by the moat's plank; a Cheddar Blaster on each north path short of its pump; and a
+    Swiss Shotgun on each boiler's island, by the Rind Run."""
+    kit.pickup("roquefort", 0, 205, GANTRY, "Gantry")
+    for s, side in ((-1, "West"), (1, "East")):
+        x, y = centre(col(13, s), 9)
+        kit.pickup("munster", x, y, 0, f"Middle{side}")
+        x, y = centre(col(8, s), 14)
+        kit.pickup("blaster", x, y, 0, f"North{side}")
+        kit.pickup("shotgun", s * 1700, -1130, 0, f"Boiler{side}")
+
+
 def build():
     vat()
     floor()
@@ -448,6 +462,7 @@ def build():
     starts()
     places()
     hills()
+    pickups()
     # The navigation mesh: the floor and above it, never down in the vat.
     kit.nav_bounds((X0 - 100, Y0 - 100, -100), (X1 + 100, Y1 + 100, 800))
     kit.light_rig("overcast", sun=(-60, 70))

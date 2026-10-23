@@ -38,6 +38,8 @@ The mice come in by ten vents low in the walls (`MouseEntry`): four in each long
 
 The hall: walls of grey corrugated sheet over a concrete dado that goes down into the vat, steel columns every 6 m, a pipe run along each long wall, a roof of panels with strips of skylight, two rows of high-bay lamps, a lamp over each deck and the gantry; lit as an overcast day through the skylights (`kit.light_rig("overcast")`), and from below by the fondue wherever the floor is open.
 
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), all on concrete, steel or wax the mice never eat and clear of the hills (the Stirrer's island and the pumps'): the Roquefort Rifle on the gantry's platform, north of the motor; a Munster Machine Gun on each side's middle path, by the plank over the moat; a Cheddar Blaster on each north path, short of its pump; and a Swiss Shotgun on each boiler's island, north of the boiler, by the Rind Run. Seven in all, mirrored like the map.
+
 ## The cheese, and what the mice change
 
 668 blocks of cheese, 594 of them edible (twenty-four mice), 74 waxed.

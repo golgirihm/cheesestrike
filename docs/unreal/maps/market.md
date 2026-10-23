@@ -42,6 +42,8 @@ Free-for-all has fourteen more starts (tagged "Free"), seven a side: High Street
 
 The mice come in at ten points (`MouseEntry`, in the `Mice` folder): over the rooftops into the square (off the balcony houses, the Inns and the Bakeries) and over the outer houses into High Street and the alleys. Twenty-four come, two or three at each. Each lands 5 m in, on open ground: what is raised above head height and walked on by nobody (the awnings, the roofs, the carts' loads) is kept off the navigation mesh, so that no mouse lands on top of it.
 
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`): the Roquefort Rifle in the belfry, seen from every house round the square; the Munster Machine Gun in the Clock Passage, the choke between High Street and the square; a Cheddar Blaster on each side's gallery over the arcade; and a Swiss Shotgun in each side's store in the court. Six in all, mirrored like the map, none on a hill's spot (the belfry is above the square's).
+
 ## The cheese, and what the mice change
 
 There are 1,092 blocks of cheese, all of them edible; the full twenty-four mice come. They keep to the mice's pace (`tools/play/market_mice.txt`), so the square is bare about a minute and a quarter after they come: the stalls, the stores, the courts and the alleys' cheese in the first minute, then the arcade and balcony houses' walls, and the Inns and Bakeries last. What each structure does before the mice, and what eating it does:

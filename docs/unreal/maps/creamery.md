@@ -34,6 +34,8 @@ The bots walk a navigation mesh built when the level starts, in the bounds of it
 
 Beyond the outer wall, for a skyline and nothing else: two cold stores, a chimney, a battery of tall silos, offices.
 
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`): the Roquefort Rifle in the middle of the mezzanine, over the whole hall; the Munster Machine Gun in the Squeeze, between its crate stacks; a Cheddar Blaster in each half of the yard, between the containers and clear of the yard's hill; a Swiss Shotgun in each Rind Tunnel; and a Parmesan Grater in each Curing House, on the way through from the dock. Eight in all, mirrored like the map, none on a hill's spot.
+
 ## The cheese, and what the mice change
 
 Every block of cheese is an `ACheeseStrikeCheese` (`Source/CheeseStrike/Map/`) with the design's 400 of eating in it and the name of the structure it belongs to. There are 1,026 the mice can eat, and four they can't (the catwalks' waxed beams); one mouse to 25 blocks puts the full twenty-four mice on it. They eat at a pace that leaves the map bare about a minute and a quarter after they come (CheeseStrikeMice::Pace), spread out over it: the outside goes first, the middle last. What each structure does before the mice, and what eating it does:
