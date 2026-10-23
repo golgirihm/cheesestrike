@@ -244,6 +244,14 @@ public:
 	 * machine hears it land hard. False if it couldn't be hurt.
 	 */
 	bool TakeFall(float Damage);
+	/**
+	 * Takes `Damage` off the health from its own grenade (server only), as
+	 * a fall does: a kill goes to whoever hurt it in the seconds before
+	 * (CheeseStrikeFalls::CreditFor), else the feed says how it died (`How`,
+	 * "blew themself up") and nobody scores; in Execution a blast that would
+	 * kill puts it down. False if it couldn't be hurt.
+	 */
+	bool TakeOwnBlast(float Damage, const FString& How);
 	/** Server only: who last hurt it, and the server's time they did; a bot turns to whoever shoots it. */
 	ACheeseStrikeCharacter* GetLastHurtBy() const { return LastHurtBy.Get(); }
 	float GetLastHurtAt() const { return LastHurtAt; }

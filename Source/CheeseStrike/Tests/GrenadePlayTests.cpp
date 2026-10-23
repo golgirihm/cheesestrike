@@ -4,7 +4,7 @@
 // player comes in with grenades, throws one with its key over the network,
 // the count going down on the server and on the thrower's machine; the
 // grenade flies, bounces and bursts after its fuse, hurting the enemy near
-// it and never its thrower; and a wall between the burst and someone saves
+// it; one at its thrower's feet kills them, as nobody's kill; and a wall between the burst and someone saves
 // them.
 
 #include "Misc/AutomationTest.h"
@@ -30,10 +30,21 @@ namespace GrenadePlayTests
 	constexpr float HostYaw = -90.0f;
 	const FVector JoinerSpot(-231.0f, -700.0f, 100.0f);
 	constexpr float JoinerYaw = 90.0f;
+	/** Open ground well away from both. */
+	const FVector AsideSpot(1150.0f, -1450.0f, 100.0f);
 
 	/** Remembered between steps. */
 	TWeakObjectPtr<ACheeseStrikeGrenade> Thrown;
 	int32 MostBounces = 0;
+	int32 KillsBefore = 0;
+	int32 DeathsBefore = 0;
+
+	/** Player `Of`'s state, on the server. */
+	ACheeseStrikePlayerState* StateOf(int32 Of)
+	{
+		const ACheeseStrikeCharacter* Body = PlayTesting::CharacterOf(Of, 0);
+		return Body != nullptr ? Body->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+	}
 
 	/** The grenades flying in `Player`'s world. */
 	TArray<ACheeseStrikeGrenade*> Grenades(int32 Player)
@@ -63,7 +74,7 @@ bool FAGrenadeIsThrownAndBursts::RunTest(const FString& Parameters)
 	using namespace GrenadePlayTests;
 	Thrown = nullptr;
 	MostBounces = 0;
-	StartPlaying({2});
+	StartPlaying({2, TEXT("?RespawnDelay=1")});
 	Then([this]()
 	{
 		TestEqual(TEXT("the host comes in with its grenades"), CountOf(CharacterOf(0, 0)), CheeseStrikeGrenades::SpawnCount);
@@ -105,8 +116,30 @@ bool FAGrenadeIsThrownAndBursts::RunTest(const FString& Parameters)
 		TestFalse(TEXT("the thrower's hands are free again"), Character(1)->GetGrenades()->IsThrowing());
 		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
 		TestTrue(FString::Printf(TEXT("the burst hurt the host near it (health %.0f)"), Host->GetHealth()), Host->GetHealth() < CheeseStrikeWeapons::MaxHealth);
-		TestEqual(TEXT("and never its thrower"), CharacterOf(1, 0)->GetHealth(), CheeseStrikeWeapons::MaxHealth);
 	});
+	// The thrower is hurt by their own, as anyone: one at their feet kills them, as their own doing, nobody's kill. The
+	// host goes well out of the way.
+	PutAt(0, AsideSpot, 0.0f);
+	Then([]()
+	{
+		// Hurt already, so that wherever at their feet it comes to rest, it kills.
+		CharacterOf(1, 0)->SetHealth(30.0f);
+		KillsBefore = StateOf(0)->GetKills();
+		DeathsBefore = StateOf(1)->GetDeaths();
+	});
+	Play(1, TEXT("look 0 -60\ntap Grenade\nwait 0.5"));
+	WaitUntil(TEXT("the thrower dying by their own grenade"), 5.0f, []() { const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0); return Joiner == nullptr || !Joiner->IsAlive(); });
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		TestTrue(TEXT("their own grenade at their feet killed them"), Joiner != nullptr && !Joiner->IsAlive());
+		TestEqual(TEXT("as nobody's kill"), Joiner != nullptr ? Joiner->GetKilledBy() : FString(TEXT("?")), FString());
+		TestEqual(TEXT("saying how"), Joiner != nullptr ? Joiner->GetDiedHow() : FString(), FString(CheeseStrikeGrenades::OwnWords));
+		TestEqual(TEXT("a death for them"), StateOf(1)->GetDeaths(), DeathsBefore + 1);
+		TestEqual(TEXT("and no kill for anyone"), StateOf(0)->GetKills(), KillsBefore);
+	});
+	WaitUntil(TEXT("the joiner back"), 6.0f, []() { const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0); return Joiner != nullptr && Joiner->IsAlive(); });
+	PutAt(1, JoinerSpot, JoinerYaw);
 	// A wall between a burst and someone saves them; without it, it would have hurt them.
 	Then([this]()
 	{

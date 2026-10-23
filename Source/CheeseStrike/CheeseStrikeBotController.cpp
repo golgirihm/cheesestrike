@@ -877,8 +877,9 @@ bool ACheeseStrikeBotController::AimToLandAt(const FVector& Spot, FVector& OutAi
 		{
 			continue;
 		}
+		// Never one that comes down within reach of itself.
 		const float Off = FVector::Dist(Result.HitResult.ImpactPoint, Spot);
-		if (Off < Best)
+		if (Off < Best && FVector::Dist(Result.HitResult.ImpactPoint, Me->GetActorLocation()) > CheeseStrikeGrenades::BotOwnMargin)
 		{
 			Best = Off;
 			OutAim = Aim;

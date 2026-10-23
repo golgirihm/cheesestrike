@@ -13,15 +13,20 @@
  * seconds, speeds centimetres a second.
  *
  * Its harm follows the match's rules for who may hurt whom
- * (CheeseStrikeModes::CanHurt), as the streaks' do: never its thrower, never
- * a teammate in a mode with sides (friendly fire is off), nobody between
- * rounds. In Execution it puts an enemy down as any hit would, and, like a
- * streak, never finishes someone already down: that takes a hand up close.
+ * (CheeseStrikeModes::CanHurt), as the streaks' do: never a teammate in a
+ * mode with sides (friendly fire is off), nobody between rounds. In
+ * Execution it puts an enemy down as any hit would, and, like a streak,
+ * never finishes someone already down: that takes a hand up close. Its
+ * thrower it hurts as it would an enemy, a death by it counted as a fall
+ * is (ACheeseStrikeCharacter::TakeOwnBlast): nobody's kill, unless someone
+ * hurt them just before.
  */
 namespace CheeseStrikeGrenades
 {
 	/** What it is called, in the kill feed. */
 	extern const TCHAR* const Name;
+	/** How the feed and the death screen say someone died by their own: "blew themself up". */
+	extern const TCHAR* const OwnWords;
 
 	/** Grenades a player comes in with, and the most carried (the design's two). */
 	constexpr int32 SpawnCount = 2;
@@ -82,7 +87,7 @@ namespace CheeseStrikeGrenades
 	};
 	/** Seconds a bot waits between its throws, its range for throwing (cm), and how long after losing sight of someone it still throws at where they were. */
 	constexpr float BotInterval = 9.0f;
-	constexpr float BotNearest = 550.0f;
+	constexpr float BotNearest = 650.0f;
 	constexpr float BotFarthest = 2200.0f;
 	constexpr float BotMemory = 3.0f;
 	/** The chance, each second it could, that a bot throws one: at someone just gone behind cover, and at someone in sight. */
@@ -98,6 +103,8 @@ namespace CheeseStrikeGrenades
 	bool BotShouldThrow(const FBotThrow& Thought);
 	/** How near (cm) to where a bot means it to land a throw it works out must come down, or it doesn't throw. */
 	constexpr float BotLandsWithin = 220.0f;
-	/** Where a bot means a grenade to come down, to throw at someone `Distance` cm away: short of them, as it bounces and rolls on. */
+	/** How far from itself (cm) a bot keeps where its grenade comes down: its own burst hurts it. */
+	constexpr float BotOwnMargin = Radius + 150.0f;
+	/** Where a bot means a grenade to come down, to throw at someone `Distance` cm away: short of them, as it bounces and rolls on, but never within BotOwnMargin of itself. */
 	float BotLandingShort(float Distance);
 }

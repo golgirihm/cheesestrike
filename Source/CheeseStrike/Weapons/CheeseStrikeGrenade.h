@@ -28,7 +28,7 @@ class UStaticMeshComponent;
  * scorch, and the server harms whoever the burst can see within its radius
  * (a wall between them saves them), falling off with distance
  * (CheeseStrikeGrenades::DamageAt), as the thrower's kill, by the match's
- * rules for who may hurt whom.
+ * rules for who may hurt whom; its thrower too, as their own doing.
  */
 UCLASS(NotPlaceable)
 class CHEESESTRIKE_API ACheeseStrikeGrenade : public AActor
