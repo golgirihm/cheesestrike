@@ -289,6 +289,7 @@ const UInputAction* UCheeseStrikePlayScript::ActionNamed(const FString& Name) co
 	const FString Lower = Name.ToLower();
 	if (Lower == TEXT("move")) return Input->Move;
 	if (Lower == TEXT("look")) return Input->StickLook;
+	if (Lower == TEXT("mouselook")) return Input->MouseLook;
 	if (Lower == TEXT("jump")) return Input->Jump;
 	if (Lower == TEXT("sprint")) return Input->Sprint;
 	if (Lower == TEXT("crouch")) return Input->Crouch;

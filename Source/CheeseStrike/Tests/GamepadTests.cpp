@@ -325,6 +325,22 @@ bool FAGamepadPlays::RunTest(const FString& Parameters)
 		TestTrue(TEXT("looking away, nothing"), Host != nullptr && Host->GetAimAssist().Strength == 0.0f && Host->GetAimAssist().TurnScale == 1.0f);
 	});
 
+	// Up and down: the stick turns the view the other way to the mouse for the same sign of its value, as a pad's stick
+	// and the mouse report up oppositely; unturned, a pad's up looked down while the mouse's looked up.
+	TSharedRef<double> Pitch = MakeShared<double>(0.0);
+	TSharedRef<double> MouseTurn = MakeShared<double>(0.0);
+	const auto ReadPitch = [this]() { return Controller(0) != nullptr ? FRotator::NormalizeAxis(Controller(0)->GetControlRotation().Pitch) : 0.0; };
+	Then([Pitch, ReadPitch]() { *Pitch = ReadPitch(); });
+	Play(0, TEXT("hold MouseLook 0 1\nwait 0.1\nrelease MouseLook\nwait 0.1"));
+	Then([Pitch, MouseTurn, ReadPitch]() { *MouseTurn = ReadPitch() - *Pitch; *Pitch = ReadPitch(); });
+	Play(0, TEXT("hold Look 0 1\nwait 0.3\nrelease Look\nwait 0.1"));
+	Then([this, Pitch, MouseTurn, ReadPitch]()
+	{
+		const double StickTurn = ReadPitch() - *Pitch;
+		TestTrue(FString::Printf(TEXT("the mouse turned the view up or down (%.2f)"), *MouseTurn), FMath::Abs(*MouseTurn) > 0.01);
+		TestTrue(FString::Printf(TEXT("the stick turns it the other way for the same sign (%.2f against the mouse's %.2f)"), StickTurn, *MouseTurn), StickTurn * *MouseTurn < 0.0);
+	});
+
 	// A gamepad's sprint: pressed, it goes on while the stick is pushed, and stops when it is let go.
 	Play(0, TEXT("hold Move 0 1\ntap SprintToggle\nwait 0.4"));
 	Then([this]()
