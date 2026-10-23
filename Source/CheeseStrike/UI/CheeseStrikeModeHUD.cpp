@@ -236,7 +236,7 @@ namespace
 		HudDraw::Text(Canvas, FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Until - Now)), FVector2D(Left + Width, Top), Label, HudDraw::Accent, 1.0f);
 	}
 
-	/** Execution: down, the time left and who comes; standing, a mark over teammates down, the prompt over someone down, and the work under way. */
+	/** Execution: down, the time until getting up and who comes; standing, a mark over teammates down, the seconds over anyone down near, the prompt over someone down in reach, and the revive under way. */
 	void ModeHudDrawLastStand(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine, const ACheeseStrikeCharacter* Own)
 	{
 		const UCheeseStrikeLastStand* Stand = Own->GetLastStand();
@@ -248,51 +248,91 @@ namespace
 		const float Middle = Canvas->SizeX / 2.0f;
 		const float Y = Canvas->SizeY * 0.66f;
 		const FLinearColor Side = HudDraw::SideColour(Mine->GetTeam());
-		// Teammates down, wherever they are: a cross over them, for finding them.
+		const FVector Eye = Hud->PlayerOwner != nullptr && Hud->PlayerOwner->PlayerCameraManager != nullptr ? Hud->PlayerOwner->PlayerCameraManager->GetCameraLocation() : Own->GetActorLocation();
+		// Teammates down, wherever they are: a cross over them, for finding them. Anyone down near and in sight: the seconds
+		// until they get up by themselves.
 		HudDraw::FShapes Marks;
-		TArray<FVector2D> Down;
-		for (TActorIterator<ACheeseStrikeCharacter> It(Hud->GetWorld()); It; ++It)
+		struct FDownMark
 		{
 			FVector2D At;
-			if (*It != Own && It->IsAlive() && It->IsDowned() && Match->AreTeammates(Mine, It->GetPlayerState()) && ModeHudOnScreen(Hud, It->GetActorLocation() + FVector(0.0f, 0.0f, 110.0f), At))
+			bool bMate;
+			int32 Seconds;
+			bool bNear;
+		};
+		TArray<FDownMark> Down;
+		for (TActorIterator<ACheeseStrikeCharacter> It(Hud->GetWorld()); It; ++It)
+		{
+			const UCheeseStrikeLastStand* Theirs = It->GetLastStand();
+			if (*It == Own || !It->IsAlive() || !It->IsDowned() || Theirs == nullptr || Theirs->InExecution())
 			{
-				Marks.Line(At - FVector2D(9.0f * U, 0.0f), At + FVector2D(9.0f * U, 0.0f), 4.0f * U, Side);
-				Marks.Line(At - FVector2D(0.0f, 9.0f * U), At + FVector2D(0.0f, 9.0f * U), 4.0f * U, Side);
-				Down.Add(At);
+				continue;
+			}
+			const bool bMate = Match->AreTeammates(Mine, It->GetPlayerState());
+			const FVector Over = It->GetActorLocation() + FVector(0.0f, 0.0f, 80.0f);
+			bool bNear = FVector::Dist(Eye, Over) <= CheeseStrikeModes::SelfReviveShownWithin;
+			if (bNear)
+			{
+				FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeHudDown), false);
+				for (TActorIterator<ACheeseStrikeCharacter> Each(Hud->GetWorld()); Each; ++Each)
+				{
+					Params.AddIgnoredActor(*Each);
+				}
+				bNear = !Hud->GetWorld()->LineTraceTestByChannel(Eye, Over, ECC_Visibility, Params);
+			}
+			FVector2D At;
+			if ((bMate || bNear) && ModeHudOnScreen(Hud, Over + FVector(0.0f, 0.0f, 30.0f), At))
+			{
+				if (bMate)
+				{
+					Marks.Line(At - FVector2D(9.0f * U, 0.0f), At + FVector2D(9.0f * U, 0.0f), 4.0f * U, Side);
+					Marks.Line(At - FVector2D(0.0f, 9.0f * U), At + FVector2D(0.0f, 9.0f * U), 4.0f * U, Side);
+				}
+				Down.Add({At, bMate, CheeseStrikeModes::SelfReviveSeconds(Theirs->SelfReviveLeft()), bNear});
 			}
 		}
 		Marks.Draw(Canvas);
-		for (const FVector2D& At : Down)
+		for (const FDownMark& Mark : Down)
 		{
-			HudDraw::Text(Canvas, TEXT("DOWN"), FVector2D(At.X, At.Y - 32.0f * U), HudDraw::Font(14.0f * U), Side, 0.5f);
+			const FLinearColor Colour = Mark.bMate ? Side : HudDraw::Danger;
+			if (Mark.bMate)
+			{
+				HudDraw::Text(Canvas, TEXT("DOWN"), FVector2D(Mark.At.X, Mark.At.Y - 32.0f * U), HudDraw::Font(14.0f * U), Side, 0.5f);
+			}
+			if (Mark.bNear)
+			{
+				HudDraw::Text(Canvas, FString::Printf(TEXT("UP IN %d"), Mark.Seconds), FVector2D(Mark.At.X, Mark.At.Y + (Mark.bMate ? 14.0f : -10.0f) * U), HudDraw::Font(14.0f * U), Colour, 0.5f);
+			}
 		}
 		const FSlateFontInfo Line = HudDraw::Font(18.0f * U);
 		if (Stand->IsDowned())
 		{
 			const ACheeseStrikeCharacter* By = Stand->WorkedOnBy();
 			const UCheeseStrikeLastStand* Theirs = By != nullptr ? By->GetLastStand() : nullptr;
-			const bool bRevived = Theirs != nullptr && Theirs->GetWork() == CheeseStrikeModes::EInteract::Revive;
-			const FString Under = Theirs == nullptr ? FString(TEXT("only your pistol  ·  a teammate can revive you  ·  an enemy up close can finish you"))
-				: FString::Printf(TEXT("%s is %s you"), *By->DisplayName(), bRevived ? TEXT("reviving") : TEXT("finishing"));
+			const ACheeseStrikeCharacter* Executor = Stand->IsBeingExecuted() ? Stand->GetExecution().Other.Get() : nullptr;
+			const int32 Seconds = CheeseStrikeModes::SelfReviveSeconds(Stand->SelfReviveLeft());
+			const FString Under = Executor != nullptr ? FString::Printf(TEXT("%s is executing you"), *Executor->DisplayName())
+				: Theirs != nullptr ? FString::Printf(TEXT("%s is reviving you"), *By->DisplayName())
+				: FString::Printf(TEXT("getting up in %d  ·  a teammate can revive you sooner  ·  an enemy up close can execute you"), Seconds);
 			ModeHudNotice(Canvas, Y, TEXT("DOWN"), HudDraw::Danger, Under);
-			if (Theirs != nullptr)
+			if (Executor == nullptr)
 			{
-				ModeHudBar(Canvas, Middle, Y + 70.0f * U, 240.0f * U, Theirs->WorkDone(), bRevived ? Side : HudDraw::Danger);
+				// Reviving fills the bar in the side's colour; otherwise it fills toward getting up alone.
+				const float Done = Theirs != nullptr ? Theirs->WorkDone() : 1.0f - Stand->SelfReviveLeft() / CheeseStrikeModes::SelfReviveTime;
+				ModeHudBar(Canvas, Middle, Y + 70.0f * U, 240.0f * U, Done, Theirs != nullptr ? Side : HudDraw::Soft);
 			}
 			return;
 		}
 		if (const ACheeseStrikeCharacter* Working = Stand->GetWorkingOn())
 		{
-			const bool bRevive = Stand->GetWork() == CheeseStrikeModes::EInteract::Revive;
-			HudDraw::Text(Canvas, FString::Printf(TEXT("%s %s"), bRevive ? TEXT("REVIVING") : TEXT("FINISHING"), *Working->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, bRevive ? Side : HudDraw::Danger, 0.5f);
-			ModeHudBar(Canvas, Middle, Y + 30.0f * U, 240.0f * U, Stand->WorkDone(), bRevive ? Side : HudDraw::Danger);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("REVIVING %s"), *Working->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, Side, 0.5f);
+			ModeHudBar(Canvas, Middle, Y + 30.0f * U, 240.0f * U, Stand->WorkDone(), Side);
 			return;
 		}
 		CheeseStrikeModes::EInteract Kind = CheeseStrikeModes::EInteract::None;
 		if (const ACheeseStrikeCharacter* Near = Stand->InteractTarget(Kind))
 		{
 			const bool bRevive = Kind == CheeseStrikeModes::EInteract::Revive;
-			HudDraw::Text(Canvas, FString::Printf(TEXT("HOLD %s  ·  %s %s"), *UCheeseStrikeInputSet::Prompt(Hud->PlayerOwner, &UCheeseStrikeInputSet::Interact), bRevive ? TEXT("REVIVE") : TEXT("FINISH"), *Near->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, bRevive ? Side : HudDraw::Danger, 0.5f);
+			HudDraw::Text(Canvas, CheeseStrikeModes::InteractPrompt(Kind, UCheeseStrikeInputSet::Prompt(Hud->PlayerOwner, &UCheeseStrikeInputSet::Interact), Near->DisplayName()), FVector2D(Middle, Y), Line, bRevive ? Side : HudDraw::Danger, 0.5f);
 		}
 	}
 

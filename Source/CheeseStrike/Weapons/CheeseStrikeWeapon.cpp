@@ -822,7 +822,7 @@ void ACheeseStrikeWeapon::StopAiming()
 
 void ACheeseStrikeWeapon::FireOnce()
 {
-	if (Holder == nullptr || !Holder->IsLocallyControlled() || !Holder->CanAct() || !bInHand)
+	if (Holder == nullptr || !Holder->IsLocallyControlled() || !Holder->CanAct() || Holder->InExecution() || !bInHand)
 	{
 		return;
 	}
@@ -853,7 +853,7 @@ void ACheeseStrikeWeapon::FireOnce()
 
 void ACheeseStrikeWeapon::FireBurstShot()
 {
-	if (BurstLeft <= 0 || Holder == nullptr || !Holder->CanAct() || !bInHand || Magazine <= 0)
+	if (BurstLeft <= 0 || Holder == nullptr || !Holder->CanAct() || Holder->InExecution() || !bInHand || Magazine <= 0)
 	{
 		BurstLeft = 0;
 		return;

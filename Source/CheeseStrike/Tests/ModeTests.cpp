@@ -10,6 +10,7 @@
 #include "CheeseStrikeGameState.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeDowned.h"
+#include "Rules/CheeseStrikeExecution.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Weapons/CheeseStrikeArsenal.h"
@@ -125,18 +126,23 @@ bool FARoundGoesToTheSideLeftStanding::RunTest(const FString& Parameters)
 	TestTrue(TEXT("level on both: a draw"), RoundOver(Side(4, 2, 100), Side(4, 2, 100), true, Winner) && Winner == NoTeam);
 	TestTrue(TEXT("and a lone player, at the time, takes it"), RoundOver(Side(1, 1, 100), Side(0, 0, 0), true, Winner) && Winner == 0);
 	TestTrue(TEXT("rounds are short and the break shorter"), RoundTime >= 60.0f && RoundBreak > 0.0f && RoundBreak <= 10.0f);
-	// Execution: someone down is in while a teammate is up to revive them; a side all down is out.
+	// Execution: someone down is in until executed, even with everyone of their side down: nobody is out for being down.
 	FSide OneDown = Side(3, 2, 60);
 	OneDown.Down = 1;
 	TestFalse(TEXT("one down, one up: still in"), OneDown.IsOut() || RoundOver(OneDown, Side(3, 1, 100), false, Winner));
 	FSide AllDown = Side(3, 2, 0);
 	AllDown.Down = 2;
-	TestTrue(TEXT("everyone left down: out"), AllDown.IsOut());
-	TestTrue(TEXT("and the round is the other side's"), RoundOver(Side(3, 1, 40), AllDown, false, Winner) && Winner == 0);
+	TestFalse(TEXT("everyone left down: still in"), AllDown.IsOut());
+	TestFalse(TEXT("and the round goes on"), RoundOver(Side(3, 1, 40), AllDown, false, Winner));
 	FSide LoneDown = Side(1, 1, 0);
 	LoneDown.Down = 1;
-	TestTrue(TEXT("a side of one, down: out"), RoundOver(LoneDown, Side(1, 1, 100), false, Winner) && Winner == 1);
-	TestTrue(TEXT("both sides all down at once: a draw"), RoundOver(LoneDown, AllDown, false, Winner) && Winner == NoTeam);
+	TestFalse(TEXT("a side of one, down: still in"), RoundOver(LoneDown, Side(1, 1, 100), false, Winner));
+	TestFalse(TEXT("both sides all down at once: on, until someone is executed or gets up"), RoundOver(LoneDown, AllDown, false, Winner));
+	TestTrue(TEXT("once the last of them is executed, out"), Side(1, 0, 0).IsOut() && RoundOver(Side(1, 0, 0), Side(1, 1, 100), false, Winner) && Winner == 1);
+	TestTrue(TEXT("time up: the side with more standing takes it, however many are down"), RoundOver(Side(3, 1, 40), AllDown, true, Winner) && Winner == 0);
+	FSide TwoDown = Side(3, 3, 50);
+	TwoDown.Down = 2;
+	TestTrue(TEXT("as many standing: the one with more in, down or not"), RoundOver(TwoDown, Side(3, 1, 100), true, Winner) && Winner == 0);
 	return true;
 }
 
@@ -277,9 +283,77 @@ bool FALastStandTakesTheKillingHit::RunTest(const FString& Parameters)
 	TestTrue(TEXT("on an enemy down finishes"), InteractWith(true, false, 100.0f) == EInteract::Execute);
 	TestTrue(TEXT("on someone standing, nothing"), InteractWith(false, false, 100.0f) == EInteract::None);
 	TestTrue(TEXT("nor out of reach"), InteractWith(true, true, InteractRange + 1.0f) == EInteract::None);
-	TestTrue(TEXT("reviving takes longer than finishing"), InteractTime(EInteract::Revive) > InteractTime(EInteract::Execute) && InteractTime(EInteract::Execute) > 0.0f);
+	TestEqual(TEXT("executing is a press: it takes no holding"), InteractTime(EInteract::Execute), 0.0f);
+	TestTrue(TEXT("reviving is held for a while"), InteractTime(EInteract::Revive) >= 2.0f);
 	TestEqual(TEXT("nothing takes no time"), InteractTime(EInteract::None), 0.0f);
+	TestEqual(TEXT("the prompt says to press to execute"), InteractPrompt(EInteract::Execute, TEXT("E"), TEXT("Bob")), FString(TEXT("PRESS E  ·  EXECUTE BOB")));
+	TestEqual(TEXT("and to hold to revive"), InteractPrompt(EInteract::Revive, TEXT("LB"), TEXT("Ann")), FString(TEXT("HOLD LB  ·  REVIVE ANN")));
+	TestEqual(TEXT("and nothing for nothing"), InteractPrompt(EInteract::None, TEXT("E"), TEXT("Ann")), FString());
 	TestTrue(TEXT("revived with some health, not all"), ReviveHealth > 0.0f && ReviveHealth < 100.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheDownGetUpByThemselves, "CheeseStrike.Rules.TheDownGetUpByThemselves", ModeTests::Flags)
+
+bool FTheDownGetUpByThemselves::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeModes;
+	TestEqual(TEXT("left alone, up after 20 s"), SelfReviveTime, 20.0f);
+	TestTrue(FString::Printf(TEXT("hurt: up with %.0f health, less than a revive gives"), SelfReviveHealth), SelfReviveHealth > 0.0f && SelfReviveHealth < ReviveHealth && SelfReviveHealth <= 30.0f);
+	TestEqual(TEXT("just down: 20 s to go"), SelfReviveLeft(100.0f, 100.0f), 20.0f);
+	TestEqual(TEXT("halfway"), SelfReviveLeft(100.0f, 110.0f), 10.0f);
+	TestEqual(TEXT("then none"), SelfReviveLeft(100.0f, 125.0f), 0.0f);
+	TestEqual(TEXT("the countdown shows whole seconds, rounded up"), SelfReviveSeconds(19.2f), 20);
+	TestEqual(TEXT("down to 1"), SelfReviveSeconds(0.3f), 1);
+	TestEqual(TEXT("and 0 at the end"), SelfReviveSeconds(0.0f), 0);
+	TestTrue(TEXT("shown to those near enough to do something about it"), SelfReviveShownWithin >= InteractRange * 4.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExecutionsAreStabsAndStomps, "CheeseStrike.Rules.ExecutionsAreStabsAndStomps", ModeTests::Flags)
+
+bool FExecutionsAreStabsAndStomps::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeExecution;
+	// One or the other, as the dice fall, half the time each.
+	int32 Stabs = 0;
+	int32 Stomps = 0;
+	for (int32 Roll = 0; Roll < 100; ++Roll)
+	{
+		const EKind Kind = Pick(Roll);
+		Stabs += Kind == EKind::Stab ? 1 : 0;
+		Stomps += Kind == EKind::Stomp ? 1 : 0;
+	}
+	TestEqual(TEXT("half stabs"), Stabs, 50);
+	TestEqual(TEXT("half stomps"), Stomps, 50);
+	TestTrue(TEXT("as replicated and back"), KindAt(static_cast<int32>(EKind::Stomp)) == EKind::Stomp && KindAt(0) == EKind::None && KindAt(9) == EKind::None);
+	for (const EKind Kind : {EKind::Stab, EKind::Stomp})
+	{
+		const TCHAR* Called = Name(Kind);
+		TestTrue(FString::Printf(TEXT("the %s lasts 2 to 3 s (%.1f)"), Called, Seconds(Kind)), Seconds(Kind) >= 2.0f && Seconds(Kind) <= 3.0f);
+		TestTrue(FString::Printf(TEXT("the %s kills partway, before it ends"), Called), KillAt(Kind) > 0.5f && KillAt(Kind) < Seconds(Kind));
+		TestTrue(FString::Printf(TEXT("the %s plays from the press to its end"), Called), IsPlaying(Kind, 0.0f) && IsPlaying(Kind, Seconds(Kind) - 0.01f) && !IsPlaying(Kind, Seconds(Kind) + 0.01f));
+		for (const float Side : {1.0f, -1.0f})
+		{
+			// The executor stands beside the one down, on the side given, close enough to reach the blow, and faces it.
+			const FVector Spot = SpotInBody(Kind, Side);
+			const FVector Aim = AimPoint(Kind);
+			TestTrue(FString::Printf(TEXT("the %s's executor stands on side %.0f"), Called, Side), Spot.Y * Side > 30.0f && FMath::Abs(Spot.X - Aim.X) < 1.0f);
+			TestTrue(FString::Printf(TEXT("within reach of the blow (%.0f cm)"), FVector::Dist2D(Spot, Aim)), FVector::Dist2D(Spot, Aim) < CheeseStrikeModes::InteractRange * 0.4f);
+			TestTrue(TEXT("facing it"), FMath::IsNearlyEqual(FMath::Abs(FacingYaw(Spot, Aim)), 90.0f, 1.0f) && FacingYaw(Spot, Aim) * Side < 0.0f);
+			// The camera watches from the far side, up, off the floor.
+			const FVector Camera = CameraInBody(Kind, Side, 0.0f);
+			TestTrue(FString::Printf(TEXT("the %s's camera is on the far side, %.0f cm up"), Called, Camera.Z), Camera.Y * Side < 0.0f && Camera.Z > 100.0f);
+			TestTrue(TEXT("a couple of metres off"), FVector::Dist(Camera, LookAtInBody(Kind, Side)) > 200.0f && FVector::Dist(Camera, LookAtInBody(Kind, Side)) < 450.0f);
+			TestTrue(TEXT("and drifts round as it plays"), FVector::Dist(Camera, CameraInBody(Kind, Side, Seconds(Kind))) > 30.0f);
+		}
+	}
+	TestTrue(TEXT("the stab strikes twice, the kill after the second"), StabLands[0] < StabLands[1] && KillAt(EKind::Stab) > StabLands[1]);
+	TestEqual(TEXT("the stomp kills as the boot lands"), KillAt(EKind::Stomp), StompLands);
+	TestTrue(TEXT("the stab goes for the chest, the stomp the head"), AimPoint(EKind::Stab).Z < AimPoint(EKind::Stomp).Z && AimPoint(EKind::Stab).X > AimPoint(EKind::Stomp).X);
+	TestEqual(TEXT("an envelope is nothing before"), Envelope(0.0f, 1.0f, 2.0f, 3.0f, 4.0f), 0.0f);
+	TestEqual(TEXT("all between"), Envelope(2.5f, 1.0f, 2.0f, 3.0f, 4.0f), 1.0f);
+	TestEqual(TEXT("and nothing after"), Envelope(4.5f, 1.0f, 2.0f, 3.0f, 4.0f), 0.0f);
 	return true;
 }
 
@@ -290,16 +364,28 @@ bool FTheDownedFightWorse::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeModes;
 	const FWeaponStats& Pistol = CheeseStrikeWeapons::Pistol();
 	const FWeaponStats Down = DownedWeapon(Pistol);
-	TestTrue(FString::Printf(TEXT("down, the pistol hits softer (%.1f, standing %.1f)"), Down.Damage, Pistol.Damage), Down.Damage < Pistol.Damage && Down.Damage >= Pistol.Damage * 0.5f);
-	TestTrue(FString::Printf(TEXT("fires slower (%.2f s, standing %.2f s)"), Down.FireInterval, Pistol.FireInterval), Down.FireInterval > Pistol.FireInterval * 1.2f);
-	TestTrue(TEXT("spreads wider from the hip"), Down.HipSpreadDegrees > Pistol.HipSpreadDegrees);
+	TestTrue(FString::Printf(TEXT("down, the pistol barely hurts (%.1f, standing %.1f)"), Down.Damage, Pistol.Damage), Down.Damage <= Pistol.Damage * 0.3f && Down.Damage > 0.0f);
+	TestTrue(FString::Printf(TEXT("fires slowly (%.2f s, standing %.2f s)"), Down.FireInterval, Pistol.FireInterval), Down.FireInterval >= Pistol.FireInterval * 3.0f && Down.FireInterval >= 0.8f);
+	TestTrue(TEXT("spreads far wider from the hip"), Down.HipSpreadDegrees >= Pistol.HipSpreadDegrees * 1.8f);
+	TestTrue(TEXT("and kicks harder"), Down.RecoilUp > Pistol.RecoilUp * 2.0f);
 	TestEqual(TEXT("and its first shot spreads as much as any: no steady first shot"), CheeseStrikeWeapons::SpreadFor(Down, 0, false), Down.HipSpreadDegrees);
 	TestEqual(TEXT("standing, the first shot goes where it is aimed"), CheeseStrikeWeapons::SpreadFor(Pistol, 0, false), 0.0f);
-	// Every shot landing, down takes about twice as long to kill a full-health enemy: a threat to one careless enemy, not a squad.
+	// Every shot landing, down takes many times as long to kill a full-health enemy: never a threat to one who comes to execute them.
 	const float Standing = CheeseStrikeWeapons::TimeToKill(Pistol);
 	const float Lying = CheeseStrikeWeapons::TimeToKill(Down);
-	TestTrue(FString::Printf(TEXT("killing takes %.1f s down, %.1f s standing"), Lying, Standing), Lying > Standing * 1.7f && Lying < 8.0f);
+	TestTrue(FString::Printf(TEXT("killing takes %.1f s down, %.1f s standing"), Lying, Standing), Lying > Standing * 8.0f && Lying > SelfReviveTime);
 	TestEqual(TEXT("the same weapon, the same rounds"), Down.MagazineSize, Pistol.MagazineSize);
+	// The view sways heavily, both ways, and never further than its bounds.
+	float MostYaw = 0.0f;
+	float MostPitch = 0.0f;
+	for (float Second = 0.0f; Second < 20.0f; Second += 0.05f)
+	{
+		const FRotator Sway = DownedSway(Second);
+		MostYaw = FMath::Max(MostYaw, static_cast<float>(FMath::Abs(Sway.Yaw)));
+		MostPitch = FMath::Max(MostPitch, static_cast<float>(FMath::Abs(Sway.Pitch)));
+	}
+	TestTrue(FString::Printf(TEXT("the view sways %.1f degrees across"), MostYaw), MostYaw > DownedSwayYaw * 0.7f && MostYaw <= DownedSwayYaw + 0.01f);
+	TestTrue(FString::Printf(TEXT("and %.1f up and down"), MostPitch), MostPitch > DownedSwayPitch * 0.7f && MostPitch <= DownedSwayPitch + 0.01f);
 	return true;
 }
 

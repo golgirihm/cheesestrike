@@ -634,8 +634,8 @@ void ACheeseStrikeGameMode::SetRoundLimit(int32 Rounds)
 
 void ACheeseStrikeGameMode::Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By)
 {
-	// Down is not out while a teammate is up to revive them; if none is, the side is out. Decided once the hit that
-	// put them down is done with.
+	// Down is never out: someone down must be executed, or gets up by themself in the end, even with their whole side
+	// down. The round is looked at again once the hit that put them down is done with.
 	GetWorldTimerManager().SetTimerForNextTick(this, &ACheeseStrikeGameMode::CheckRoundNow);
 }
 
@@ -760,12 +760,11 @@ void ACheeseStrikeGameMode::StartRound(bool bFirst)
 void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 {
 	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
-	if (State == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || State->GetRound() == 0 || bDecidingRound)
+	if (State == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || State->GetRound() == 0)
 	{
 		return;
 	}
 	CheeseStrikeModes::FSide Sides[CheeseStrikeRules::Teams];
-	TArray<ACheeseStrikeCharacter*> Down[CheeseStrikeRules::Teams];
 	for (const APlayerState* Each : State->PlayerArray)
 	{
 		const ACheeseStrikePlayerState* Player = Cast<ACheeseStrikePlayerState>(Each);
@@ -776,8 +775,8 @@ void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 		CheeseStrikeModes::FSide& Side = Sides[Player->GetTeam()];
 		++Side.Members;
 		ACheeseStrikeCharacter* Body = Player->GetPawn<ACheeseStrikeCharacter>();
-		// Still in: alive, down or not (someone down fights on with the sidearm while a teammate is up to revive them);
-		// their health counts only standing, for the time's tie rule.
+		// Still in: alive, down or not (someone down is in until executed, and gets up by themself in the end); their
+		// health counts only standing, for the time's tie rule.
 		if (!Player->IsOut() && Body != nullptr && Body->IsAlive())
 		{
 			++Side.Alive;
@@ -785,7 +784,6 @@ void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 			if (Body->IsDowned())
 			{
 				++Side.Down;
-				Down[Player->GetTeam()].Add(Body);
 			}
 		}
 	}
@@ -794,23 +792,6 @@ void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 	{
 		return;
 	}
-	// A side out with players still down: nobody can revive them, so they are finished, each the kill of whoever put them down.
-	bDecidingRound = true;
-	for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
-	{
-		if (!Sides[Team].IsOut())
-		{
-			continue;
-		}
-		for (ACheeseStrikeCharacter* Body : Down[Team])
-		{
-			if (UCheeseStrikeLastStand* Stand = IsValid(Body) ? Body->GetLastStand() : nullptr)
-			{
-				Stand->GiveUp();
-			}
-		}
-	}
-	bDecidingRound = false;
 	EndRound(Winner);
 }
 
@@ -1008,6 +989,40 @@ void ACheeseStrikeGameMode::CheeseStrikeRevive(const FString& Player)
 		{
 			It->GetLastStand()->Revive();
 		}
+	}
+#endif
+}
+
+void ACheeseStrikeGameMode::CheeseStrikeExecute(int32 Kind, const FString& Player)
+{
+#if !UE_BUILD_SHIPPING
+	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	ACheeseStrikeCharacter* Executor = nullptr;
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		const APlayerController* Controller = Cast<APlayerController>(It->GetController());
+		const bool bWanted = Player.IsEmpty() ? Controller != nullptr && Controller->IsLocalController() : It->DisplayName().Equals(Player, ESearchCase::IgnoreCase);
+		if (bWanted && It->IsAlive() && !It->IsDowned())
+		{
+			Executor = *It;
+		}
+	}
+	if (Executor == nullptr || State == nullptr || Executor->GetLastStand() == nullptr)
+	{
+		return;
+	}
+	ACheeseStrikeCharacter* Nearest = nullptr;
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		if (*It != Executor && It->IsAlive() && It->IsDowned() && State->AreEnemies(Executor->GetPlayerState(), It->GetPlayerState())
+			&& (Nearest == nullptr || FVector::Dist(It->GetActorLocation(), Executor->GetActorLocation()) < FVector::Dist(Nearest->GetActorLocation(), Executor->GetActorLocation())))
+		{
+			Nearest = *It;
+		}
+	}
+	if (Nearest != nullptr)
+	{
+		Executor->GetLastStand()->Execute(Nearest, CheeseStrikeExecution::KindAt(Kind));
 	}
 #endif
 }

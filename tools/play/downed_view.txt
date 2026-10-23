@@ -1,0 +1,24 @@
+# The view of a player down in Execution: dark, washed out, blurred past
+# arm's length and swaying, with the countdown to getting up by themself;
+# then up again 20 s later. Alone:
+# tools/play.ps1 -Script tools/play/downed_view.txt -Extra "?Mode=Execution" -FixedFps 30
+wait 4
+shot downview_0_standing
+cmd CheeseStrikeDie
+wait 2
+shot downview_1_down
+wait 0.7
+shot downview_2_swaying
+look 30 0
+wait 0.7
+shot downview_3_aside
+tap Fire
+wait 0.1
+shot downview_4_firing
+wait 8
+shot downview_5_halfway
+wait 9.5
+shot downview_6_nearly
+wait 2
+shot downview_7_up
+quit

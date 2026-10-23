@@ -1,20 +1,145 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeLastStand.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "Sound/SoundBase.h"
 #include "CheeseStrike.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
+#include "Weapons/CheeseStrikeGunfire.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 using CheeseStrikeModes::EInteract;
+using CheeseStrikeExecution::EKind;
+
+namespace
+{
+	/** How the kill feed names a kill by execution. */
+	const TCHAR* const ExecutedWord = TEXT("executed");
+	/** The view down: dark, washed of colour and red, blurred past arm's length. */
+	constexpr float HurtViewRate = 2.5f;
+	constexpr float HurtFocus = 90.0f;
+	/** The blows' sounds, and the chunks' cheese. */
+	const TCHAR* const ExecutionWhooshPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeWhoosh_02.Lyra_MeleeWhoosh_02");
+	const TCHAR* const ExecutionImpactPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_03.Lyra_MeleeImpact_03");
+	const TCHAR* const ExecutionBurstPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_01.Lyra_MeleeImpact_01");
+	const TCHAR* const ChunkCheesePath = TEXT("/Game/CheeseStrike/Materials/M_Cheese.M_Cheese");
+	const TCHAR* const ChunkMeshPath = TEXT("/Engine/BasicShapes/Cube.Cube");
+
+	/** A beat of an execution: when, and whether it is the blow (else the swing before it). */
+	struct FExecutionBeat
+	{
+		float At;
+		bool bBlow;
+	};
+	TArray<FExecutionBeat> BeatsOf(EKind Kind)
+	{
+		using namespace CheeseStrikeExecution;
+		if (Kind == EKind::Stab)
+		{
+			return {{StabLands[0] - 0.15f, false}, {StabLands[0], true}, {StabLands[1] - 0.15f, false}, {StabLands[1], true}};
+		}
+		if (Kind == EKind::Stomp)
+		{
+			return {{StompLands - 0.15f, false}, {StompLands, true}};
+		}
+		return {};
+	}
+
+	/** Where a point in the body of `Down` (CheeseStrikeDowned's frame) is in the world. */
+	FVector InBodyOf(const ACheeseStrikeCharacter* Down, const FVector& InBody)
+	{
+		const FVector Floor = Down->GetActorLocation() - FVector(0.0f, 0.0f, Down->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+		return Floor + FRotator(0.0f, Down->GetActorRotation().Yaw, 0.0f).RotateVector(InBody);
+	}
+
+	/** Chunks of cheese flying from `At`: on this machine only, for show. */
+	void BurstIntoCheese(UWorld* World, const FVector& At)
+	{
+		UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, ChunkMeshPath);
+		UMaterialInterface* Cheese = LoadObject<UMaterialInterface>(nullptr, ChunkCheesePath);
+		if (World == nullptr || Cube == nullptr)
+		{
+			return;
+		}
+		UMaterialInstanceDynamic* Look = Cheese != nullptr ? UMaterialInstanceDynamic::Create(Cheese, World) : nullptr;
+		if (Look != nullptr)
+		{
+			// The holes are carved for blocks a metre across; a chunk is too small for them.
+			Look->SetScalarParameterValue(TEXT("Holes"), 0.0f);
+		}
+		FActorSpawnParameters Parameters;
+		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Parameters.ObjectFlags |= RF_Transient;
+		for (int32 Each = 0; Each < CheeseStrikeExecution::Chunks; ++Each)
+		{
+			// Out and up, mostly sideways off the floor the head lay on.
+			const FVector Way = FMath::VRandCone(FVector::UpVector, FMath::DegreesToRadians(75.0f));
+			AStaticMeshActor* Chunk = World->SpawnActor<AStaticMeshActor>(At + Way * 6.0f, FRotator(FMath::FRandRange(0.0f, 360.0f), FMath::FRandRange(0.0f, 360.0f), 0.0f), Parameters);
+			if (Chunk == nullptr)
+			{
+				continue;
+			}
+			Chunk->SetReplicates(false);
+			UStaticMeshComponent* Mesh = Chunk->GetStaticMeshComponent();
+			Mesh->SetMobility(EComponentMobility::Movable);
+			Mesh->SetStaticMesh(Cube);
+			if (Look != nullptr)
+			{
+				Mesh->SetMaterial(0, Look);
+			}
+			// Cubes 4 to 10 cm across, some flattened into crumbs.
+			const float Size = FMath::FRandRange(0.04f, 0.1f);
+			Mesh->SetWorldScale3D(FVector(Size, Size * FMath::FRandRange(0.6f, 1.2f), Size * FMath::FRandRange(0.4f, 1.0f)));
+			// They bounce off the level and nothing else: no blocking players or shots.
+			Mesh->SetCollisionObjectType(ECC_PhysicsBody);
+			Mesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+			Mesh->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+			Mesh->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+			Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			Mesh->SetCastShadow(false);
+			Mesh->SetSimulatePhysics(true);
+			Mesh->SetPhysicsLinearVelocity(Way * CheeseStrikeExecution::ChunkSpeed * FMath::FRandRange(0.4f, 1.2f));
+			Mesh->SetPhysicsAngularVelocityInDegrees(FMath::VRand() * FMath::FRandRange(200.0f, 900.0f));
+			Chunk->SetLifeSpan(CheeseStrikeExecution::ChunkLife * FMath::FRandRange(0.8f, 1.2f));
+		}
+	}
+
+	/** The look of a hurt player's view, put on the camera at a weight. */
+	void MakeHurtLook(FPostProcessSettings& Look)
+	{
+		Look.bOverride_VignetteIntensity = true;
+		Look.VignetteIntensity = 1.4f;
+		Look.bOverride_ColorSaturation = true;
+		Look.ColorSaturation = FVector4(0.35f, 0.35f, 0.35f, 1.0f);
+		Look.bOverride_ColorGain = true;
+		Look.ColorGain = FVector4(0.75f, 0.52f, 0.48f, 1.0f);
+		Look.bOverride_SceneFringeIntensity = true;
+		Look.SceneFringeIntensity = 4.0f;
+		Look.bOverride_DepthOfFieldFocalDistance = true;
+		Look.DepthOfFieldFocalDistance = HurtFocus;
+		Look.bOverride_DepthOfFieldFstop = true;
+		Look.DepthOfFieldFstop = 1.0f;
+		Look.bOverride_DepthOfFieldMinFstop = true;
+		Look.DepthOfFieldMinFstop = 1.0f;
+	}
+}
 
 UCheeseStrikeLastStand::UCheeseStrikeLastStand()
 {
@@ -26,9 +151,26 @@ void UCheeseStrikeLastStand::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UCheeseStrikeLastStand, bDowned);
+	DOREPLIFETIME(UCheeseStrikeLastStand, DownedAt);
 	DOREPLIFETIME(UCheeseStrikeLastStand, WorkingOn);
 	DOREPLIFETIME(UCheeseStrikeLastStand, Work);
 	DOREPLIFETIME(UCheeseStrikeLastStand, WorkStartedAt);
+	DOREPLIFETIME(UCheeseStrikeLastStand, Execution);
+	DOREPLIFETIME(UCheeseStrikeLastStand, bExecuted);
+}
+
+void UCheeseStrikeLastStand::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (ExecutionCamera != nullptr)
+	{
+		if (APlayerController* Player = ViewPlayer.Get(); Player != nullptr && Player->GetViewTarget() == ExecutionCamera)
+		{
+			Player->SetViewTarget(Player->GetPawn() != nullptr ? static_cast<AActor*>(Player->GetPawn()) : static_cast<AActor*>(Player));
+		}
+		ExecutionCamera->Destroy();
+		ExecutionCamera = nullptr;
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 ACheeseStrikeCharacter* UCheeseStrikeLastStand::Body() const
@@ -48,10 +190,25 @@ bool UCheeseStrikeLastStand::HasLastStand() const
 	return Match != nullptr && Match->GetModeInfo().bLastStand;
 }
 
+float UCheeseStrikeLastStand::SelfReviveLeft() const
+{
+	return bDowned ? CheeseStrikeModes::SelfReviveLeft(DownedAt, ServerNow()) : 0.0f;
+}
+
 float UCheeseStrikeLastStand::WorkDone() const
 {
 	const float Takes = CheeseStrikeModes::InteractTime(GetWork());
 	return WorkingOn != nullptr && Takes > 0.0f ? FMath::Clamp((ServerNow() - WorkStartedAt) / Takes, 0.0f, 1.0f) : 0.0f;
+}
+
+float UCheeseStrikeLastStand::ExecutionElapsed() const
+{
+	return Execution.Kind != 0 ? ServerNow() - Execution.StartedAt : 0.0f;
+}
+
+bool UCheeseStrikeLastStand::InExecution() const
+{
+	return Execution.Kind != 0 && CheeseStrikeExecution::IsPlaying(Execution.GetKind(), ExecutionElapsed());
 }
 
 ACheeseStrikeCharacter* UCheeseStrikeLastStand::WorkedOnBy() const
@@ -77,7 +234,7 @@ ACheeseStrikeCharacter* UCheeseStrikeLastStand::InteractTarget(EInteract& OutKin
 	OutKind = EInteract::None;
 	const ACheeseStrikeCharacter* Me = Body();
 	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-	if (Me == nullptr || Match == nullptr || !Me->IsAlive() || bDowned || !Match->GetModeInfo().bLastStand)
+	if (Me == nullptr || Match == nullptr || !Me->IsAlive() || bDowned || InExecution() || !Match->GetModeInfo().bLastStand)
 	{
 		return nullptr;
 	}
@@ -85,7 +242,8 @@ ACheeseStrikeCharacter* UCheeseStrikeLastStand::InteractTarget(EInteract& OutKin
 	float Nearest = TNumericLimits<float>::Max();
 	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
 	{
-		if (*It == Me || !It->IsAlive() || !It->IsDowned())
+		// Someone already being executed is past saving, and past executing again.
+		if (*It == Me || !It->IsAlive() || !It->IsDowned() || (It->GetLastStand() != nullptr && It->GetLastStand()->InExecution()))
 		{
 			continue;
 		}
@@ -108,6 +266,12 @@ bool UCheeseStrikeLastStand::Intercept(float& Damage, const ACheeseStrikeCharact
 	if (Me == nullptr || Match == nullptr || bFinishing || !Match->GetModeInfo().bLastStand)
 	{
 		return false;
+	}
+	// An execution plays out: nothing hurts the executor, nor takes the one executed from them.
+	if (InExecution())
+	{
+		bOutHurt = false;
+		return true;
 	}
 	// Only a hand up close finishes: a shot or a stroke from an enemy within reach, never a streak.
 	const bool bEnemyClose = From != nullptr && From != Me && Match->AreEnemies(From->GetPlayerState(), Me->GetPlayerState())
@@ -138,6 +302,7 @@ void UCheeseStrikeLastStand::GoDown(ACheeseStrikePlayerState* By)
 	}
 	bDowned = true;
 	bUsed = true;
+	DownedAt = ServerNow();
 	DownedBy = By;
 	bInteractHeld = false;
 	StopWork();
@@ -156,16 +321,16 @@ void UCheeseStrikeLastStand::GoDown(ACheeseStrikePlayerState* By)
 	}
 }
 
-void UCheeseStrikeLastStand::Revive()
+void UCheeseStrikeLastStand::Revive(float Health)
 {
 	ACheeseStrikeCharacter* Me = Body();
-	if (Me == nullptr || !Me->HasAuthority() || !bDowned || !Me->IsAlive())
+	if (Me == nullptr || !Me->HasAuthority() || !bDowned || !Me->IsAlive() || InExecution())
 	{
 		return;
 	}
 	bDowned = false;
 	DownedBy = nullptr;
-	Me->SetHealth(CheeseStrikeModes::ReviveHealth);
+	Me->SetHealth(Health);
 	if (UCheeseStrikeInventory* Inventory = Me->GetInventory())
 	{
 		Inventory->LiftRestriction();
@@ -174,19 +339,183 @@ void UCheeseStrikeLastStand::Revive()
 	UE_LOG(LogCheeseStrike, Display, TEXT("%s is back up"), *Me->DisplayName());
 }
 
-void UCheeseStrikeLastStand::GiveUp()
+bool UCheeseStrikeLastStand::Execute(ACheeseStrikeCharacter* Victim, EKind Kind)
 {
-	const ACheeseStrikeCharacter* Me = Body();
-	if (Me == nullptr || !Me->HasAuthority() || !bDowned || !Me->IsAlive())
+	ACheeseStrikeCharacter* Me = Body();
+	UWorld* World = GetWorld();
+	UCheeseStrikeLastStand* Theirs = Victim != nullptr ? Victim->GetLastStand() : nullptr;
+	if (Me == nullptr || World == nullptr || !Me->HasAuthority() || !Me->CanAct() || bDowned || InExecution()
+		|| Theirs == nullptr || !Victim->IsAlive() || !Theirs->IsDowned() || Theirs->InExecution())
+	{
+		return false;
+	}
+	if (Kind == EKind::None)
+	{
+		Kind = CheeseStrikeExecution::Pick(FMath::Rand());
+	}
+	// Beside the one down, on the side the executor came from if there is room there, else the other.
+	const FRotator Lying(0.0f, Victim->GetActorRotation().Yaw, 0.0f);
+	const float Across = FVector::DotProduct(Me->GetActorLocation() - Victim->GetActorLocation(), Lying.RotateVector(FVector::RightVector));
+	const float Came = Across >= 0.0f ? 1.0f : -1.0f;
+	const float HalfHeight = Me->GetDefaultHalfHeight();
+	const float Radius = Me->GetCapsuleComponent()->GetScaledCapsuleRadius();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeExecutionSpot), false);
+	Params.AddIgnoredActor(Me);
+	Params.AddIgnoredActor(Victim);
+	float Side = Came;
+	FVector Spot = Me->GetActorLocation();
+	bool bRoom = false;
+	for (const float Try : {Came, -Came})
+	{
+		const FVector Floor = InBodyOf(Victim, CheeseStrikeExecution::SpotInBody(Kind, Try));
+		const FVector Centre = Floor + FVector(0.0f, 0.0f, HalfHeight + 2.0f);
+		if (!World->OverlapBlockingTestByChannel(Centre, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(Radius, HalfHeight), Params))
+		{
+			Side = Try;
+			Spot = Centre;
+			bRoom = true;
+			break;
+		}
+	}
+	if (!bRoom)
+	{
+		// Hemmed in: from where it stands.
+		Spot.Z = Victim->GetActorLocation().Z - Victim->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + HalfHeight + 2.0f;
+	}
+	const float Now = ServerNow();
+	Execution = FCheeseStrikeExecutionState();
+	Execution.Other = Victim;
+	Execution.Kind = static_cast<uint8>(Kind);
+	Execution.bExecutor = true;
+	Execution.Side = static_cast<int8>(Side);
+	Execution.StartedAt = Now;
+	Execution.Spot = Spot;
+	Execution.Yaw = CheeseStrikeExecution::FacingYaw(Spot, InBodyOf(Victim, CheeseStrikeExecution::AimPoint(Kind)));
+	Theirs->Execution = FCheeseStrikeExecutionState();
+	Theirs->Execution.Other = Me;
+	Theirs->Execution.Kind = static_cast<uint8>(Kind);
+	Theirs->Execution.bExecutor = false;
+	Theirs->Execution.Side = static_cast<int8>(Side);
+	Theirs->Execution.StartedAt = Now;
+	Theirs->bInteractHeld = false;
+	Theirs->StopWork();
+	bExecutionKilled = false;
+	bInteractHeld = false;
+	StopWork();
+	// The knife out for a stab; the weapon in hand comes back after.
+	bSlotBefore = false;
+	if (UCheeseStrikeInventory* Inventory = Me->GetInventory())
+	{
+		EWeaponSlot Held;
+		if (Inventory->GetHeldSlot(Held))
+		{
+			SlotBefore = static_cast<uint8>(Held);
+			bSlotBefore = true;
+		}
+		if (Kind == EKind::Stab && Inventory->CanDraw(EWeaponSlot::Knife))
+		{
+			Inventory->HoldNow(EWeaponSlot::Knife);
+		}
+	}
+	if (ACheeseStrikeWeapon* Weapon = Me->GetWeapon())
+	{
+		Weapon->StopFiring();
+		Weapon->StopAiming();
+	}
+	// An execution is an attack: a fresh spawn's protection ends with it.
+	Me->EndProtection();
+	Me->GetCharacterMovement()->StopMovementImmediately();
+	if (Me->bIsCrouched && Me->IsLocallyControlled())
+	{
+		Me->UnCrouch();
+	}
+	HoldExecutionSpot();
+	if (Me->IsLocallyControlled() && Me->GetController() != nullptr)
+	{
+		Me->GetController()->SetControlRotation(FRotator(0.0f, Execution.Yaw, 0.0f));
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s executes %s: a %s, from (%.0f, %.0f) facing %.0f, on side %.0f of them at (%.0f, %.0f) facing %.0f"), *Me->DisplayName(), *Victim->DisplayName(), CheeseStrikeExecution::Name(Kind),
+		Spot.X, Spot.Y, Execution.Yaw, Side, Victim->GetActorLocation().X, Victim->GetActorLocation().Y, Victim->GetActorRotation().Yaw);
+	return true;
+}
+
+void UCheeseStrikeLastStand::HoldExecutionSpot()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	if (Me == nullptr || !Execution.bExecutor || !InExecution() || !Me->IsAlive())
 	{
 		return;
 	}
-	ACheeseStrikePlayerState* By = DownedBy.Get();
-	UE_LOG(LogCheeseStrike, Display, TEXT("%s has nobody up to revive them: finished, as %s's kill"), *Me->DisplayName(), By != nullptr ? *By->GetPlayerName() : TEXT("nobody"));
-	Finish(By);
+	const FRotator Facing(0.0f, Execution.Yaw, 0.0f);
+	if (FVector::DistSquared(Me->GetActorLocation(), Execution.Spot) > 1.0f || !Me->GetActorRotation().Equals(Facing, 0.5f))
+	{
+		Me->SetActorLocationAndRotation(Execution.Spot, Facing, false, nullptr, ETeleportType::TeleportPhysics);
+	}
 }
 
-void UCheeseStrikeLastStand::Finish(ACheeseStrikePlayerState* By)
+void UCheeseStrikeLastStand::RunExecution()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	if (Me == nullptr || Execution.Kind == 0)
+	{
+		return;
+	}
+	ACheeseStrikeCharacter* Other = Execution.Other;
+	const float Elapsed = ExecutionElapsed();
+	const EKind Kind = Execution.GetKind();
+	if (!Execution.bExecutor)
+	{
+		// The one executed: freed if the executor is gone before the blow kills (they left, or fell off the map).
+		const UCheeseStrikeLastStand* Theirs = IsValid(Other) ? Other->GetLastStand() : nullptr;
+		if (Me->IsAlive() && (Theirs == nullptr || !Other->IsAlive() || Theirs->Execution.Other != Me))
+		{
+			Execution = FCheeseStrikeExecutionState();
+		}
+		return;
+	}
+	if (!Me->IsAlive())
+	{
+		EndExecution();
+		return;
+	}
+	HoldExecutionSpot();
+	UCheeseStrikeLastStand* Theirs = IsValid(Other) ? Other->GetLastStand() : nullptr;
+	if (!bExecutionKilled && Theirs != nullptr && Other->IsAlive() && Elapsed >= CheeseStrikeExecution::KillAt(Kind))
+	{
+		bExecutionKilled = true;
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s is executed by %s"), *Other->DisplayName(), *Me->DisplayName());
+		Theirs->Finish(Me->GetPlayerState<ACheeseStrikePlayerState>(), true);
+	}
+	if (!CheeseStrikeExecution::IsPlaying(Kind, Elapsed) || (!bExecutionKilled && (Theirs == nullptr || !Other->IsAlive())))
+	{
+		EndExecution();
+	}
+}
+
+void UCheeseStrikeLastStand::EndExecution()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	if (Me == nullptr || !Execution.bExecutor)
+	{
+		return;
+	}
+	if (ACheeseStrikeCharacter* Other = Execution.Other; IsValid(Other) && Other->IsAlive())
+	{
+		// Never killed (a round that ended first): they stay down.
+		if (UCheeseStrikeLastStand* Theirs = Other->GetLastStand(); Theirs != nullptr && Theirs->Execution.Other == Me)
+		{
+			Theirs->Execution = FCheeseStrikeExecutionState();
+		}
+	}
+	Execution = FCheeseStrikeExecutionState();
+	if (UCheeseStrikeInventory* Inventory = Me->GetInventory(); Inventory != nullptr && bSlotBefore && Me->IsAlive() && Inventory->CanDraw(static_cast<EWeaponSlot>(SlotBefore)))
+	{
+		Inventory->HoldNow(static_cast<EWeaponSlot>(SlotBefore));
+	}
+	bSlotBefore = false;
+}
+
+void UCheeseStrikeLastStand::Finish(ACheeseStrikePlayerState* By, bool bByExecution)
 {
 	ACheeseStrikeCharacter* Me = Body();
 	if (Me == nullptr || !Me->HasAuthority() || !Me->IsAlive())
@@ -195,8 +524,16 @@ void UCheeseStrikeLastStand::Finish(ACheeseStrikePlayerState* By)
 	}
 	// The blow lands as the finisher's own (or, with them gone, as a kill of theirs from nowhere).
 	bFinishing = true;
+	if (bByExecution)
+	{
+		bExecuted = true;
+	}
 	ACheeseStrikeCharacter* From = By != nullptr ? By->GetPawn<ACheeseStrikeCharacter>() : nullptr;
-	if (From != nullptr && From->IsAlive())
+	if (bByExecution && By != nullptr)
+	{
+		Me->TakeBlast(Me->GetHealth() + 1000.0f, By, ExecutedWord);
+	}
+	else if (From != nullptr && From->IsAlive())
 	{
 		Me->TakeShot(Me->GetHealth() + 1000.0f, From, false);
 	}
@@ -207,6 +544,10 @@ void UCheeseStrikeLastStand::Finish(ACheeseStrikePlayerState* By)
 	else
 	{
 		Me->TakeShot(Me->GetHealth() + 1000.0f, nullptr, false);
+	}
+	if (Me->IsAlive())
+	{
+		bExecuted = false;
 	}
 	bFinishing = false;
 }
@@ -234,6 +575,15 @@ void UCheeseStrikeLastStand::ServerInteract_Implementation(bool bHeld)
 	if (!bHeld)
 	{
 		StopWork();
+		return;
+	}
+	// A press over an enemy down executes them at once; over a teammate, holding it revives them.
+	EInteract Kind = EInteract::None;
+	ACheeseStrikeCharacter* Target = InteractTarget(Kind);
+	const ACheeseStrikeCharacter* Me = Body();
+	if (Target != nullptr && Kind == EInteract::Execute && Me != nullptr && Me->CanAct())
+	{
+		Execute(Target);
 	}
 }
 
@@ -248,12 +598,13 @@ void UCheeseStrikeLastStand::DoWork(float DeltaTime)
 {
 	EInteract Kind = EInteract::None;
 	ACheeseStrikeCharacter* Target = InteractTarget(Kind);
-	if (Target == nullptr)
+	// Held over someone to execute does nothing more: the press did it, or they came into reach after it.
+	if (Target == nullptr || Kind != EInteract::Revive)
 	{
 		StopWork();
 		return;
 	}
-	// A new one, or another way: from the start.
+	// A new one: from the start.
 	if (Target != WorkingOn || static_cast<uint8>(Kind) != Work)
 	{
 		WorkingOn = Target;
@@ -267,32 +618,37 @@ void UCheeseStrikeLastStand::DoWork(float DeltaTime)
 	}
 	StopWork();
 	bInteractHeld = false;
-	UCheeseStrikeLastStand* Theirs = Target->GetLastStand();
-	if (Theirs == nullptr)
+	if (UCheeseStrikeLastStand* Theirs = Target->GetLastStand())
 	{
-		return;
-	}
-	const ACheeseStrikeCharacter* Me = Body();
-	UE_LOG(LogCheeseStrike, Display, TEXT("%s %s %s"), *Me->DisplayName(), Kind == EInteract::Revive ? TEXT("revives") : TEXT("finishes"), *Target->DisplayName());
-	if (Kind == EInteract::Revive)
-	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s revives %s"), *Body()->DisplayName(), *Target->DisplayName());
 		Theirs->Revive();
-	}
-	else
-	{
-		Theirs->Finish(Me->GetPlayerState<ACheeseStrikePlayerState>());
 	}
 }
 
 void UCheeseStrikeLastStand::KeepDown()
 {
 	ACheeseStrikeCharacter* Me = Body();
-	if (Me == nullptr || !bDowned || !Me->IsAlive())
+	// The machine that moves it: its player's, or the server's for a bot. Crouching there reaches the server with the moves.
+	if (Me == nullptr || !Me->IsAlive() || !Me->IsLocallyControlled())
 	{
 		return;
 	}
-	// The machine that moves it: its player's, or the server's for a bot. Crouching there reaches the server with the moves.
-	if (!Me->IsLocallyControlled())
+	UCheeseStrikeMovementComponent* Movement = Me->GetCheeseStrikeMovement();
+	// Executing, it stands to deal the blow, and stays put.
+	if (IsExecuting())
+	{
+		if (Movement != nullptr)
+		{
+			Movement->SetWantsToSprint(false);
+		}
+		if (Me->bIsCrouched || (Movement != nullptr && Movement->bWantsToCrouch))
+		{
+			Me->UnCrouch();
+		}
+		HoldExecutionSpot();
+		return;
+	}
+	if (!bDowned)
 	{
 		return;
 	}
@@ -301,7 +657,7 @@ void UCheeseStrikeLastStand::KeepDown()
 	{
 		Me->DoAimDownSights(false);
 	}
-	if (UCheeseStrikeMovementComponent* Movement = Me->GetCheeseStrikeMovement())
+	if (Movement != nullptr)
 	{
 		Movement->SetWantsToSprint(false);
 		if (!Movement->bWantsToCrouch)
@@ -328,6 +684,181 @@ void UCheeseStrikeLastStand::OnRep_Downed()
 	}
 }
 
+void UCheeseStrikeLastStand::OnRep_Execution()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	if (Me == nullptr || !Me->IsLocallyControlled() || !IsExecuting())
+	{
+		return;
+	}
+	// The executor's own machine puts it where the server has it, facing the blow, so that the moves agree.
+	Me->GetCharacterMovement()->StopMovementImmediately();
+	HoldExecutionSpot();
+	if (Me->GetController() != nullptr)
+	{
+		Me->GetController()->SetControlRotation(FRotator(0.0f, Execution.Yaw, 0.0f));
+	}
+}
+
+void UCheeseStrikeLastStand::UpdateBurst()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	UWorld* World = GetWorld();
+	if (Me == nullptr || World == nullptr || Execution.Kind == 0 || Execution.bExecutor || World->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	const EKind Kind = Execution.GetKind();
+	const float Elapsed = ExecutionElapsed();
+	const TArray<FExecutionBeat> Beats = BeatsOf(Kind);
+	const FVector Head = Me->GetMesh()->GetBoneLocation(TEXT("head"));
+	// The swings and the blows, heard by everyone near, from where they land. A machine that hears of it late skips what is past.
+	while (BeatsDone < Beats.Num() && Elapsed >= Beats[BeatsDone].At)
+	{
+		if (Elapsed - Beats[BeatsDone].At < 0.4f)
+		{
+			const bool bBlow = Beats[BeatsDone].bBlow;
+			const bool bBurstNow = bBlow && Kind == EKind::Stomp;
+			if (USoundBase* Sound = LoadObject<USoundBase>(nullptr, bBurstNow ? ExecutionBurstPath : (bBlow ? ExecutionImpactPath : ExecutionWhooshPath)))
+			{
+				const FVector Where = Kind == EKind::Stomp ? Head : InBodyOf(Me, CheeseStrikeExecution::AimPoint(Kind));
+				UGameplayStatics::PlaySoundAtLocation(this, Sound, Where, FRotator::ZeroRotator, bBlow ? 1.3f : 0.9f, bBurstNow ? 0.7f : 1.0f, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
+			}
+		}
+		++BeatsDone;
+	}
+	// The boot lands: the head bursts into cheese, and is gone.
+	if (Kind == EKind::Stomp && !bBurst && (Elapsed >= CheeseStrikeExecution::StompLands || (bExecuted && !Me->IsAlive())))
+	{
+		bBurst = true;
+		static const FName HeadBone(TEXT("head"));
+		for (USkeletalMeshComponent* Mesh : {Me->GetMesh(), Me->GetFirstPersonMesh()})
+		{
+			if (Mesh != nullptr && Mesh->GetBoneIndex(HeadBone) != INDEX_NONE)
+			{
+				Mesh->HideBoneByName(HeadBone, PBO_None);
+			}
+		}
+		BurstIntoCheese(World, Head + FVector(0.0f, 0.0f, 6.0f));
+	}
+}
+
+void UCheeseStrikeLastStand::UpdateView(float DeltaTime)
+{
+	ACheeseStrikeCharacter* Me = Body();
+	UWorld* World = GetWorld();
+	if (Me == nullptr || World == nullptr)
+	{
+		return;
+	}
+	APlayerController* Player = Cast<APlayerController>(Me->GetController());
+	if (Player != nullptr && !Player->IsLocalController())
+	{
+		Player = nullptr;
+	}
+	const float Time = World->GetTimeSeconds();
+	const bool bWatch = InExecution();
+	const ACheeseStrikeCharacter* Down = Execution.bExecutor ? Execution.Other.Get() : Me;
+	// Out, to watch it from a little way off: the body seen as others see it.
+	if (bWatch && !bViewOut && Player != nullptr && IsValid(Down))
+	{
+		FActorSpawnParameters Parameters;
+		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Parameters.ObjectFlags |= RF_Transient;
+		ExecutionCamera = World->SpawnActor<ACameraActor>(Player->PlayerCameraManager != nullptr ? Player->PlayerCameraManager->GetCameraLocation() : Me->GetActorLocation(), FRotator::ZeroRotator, Parameters);
+		if (ExecutionCamera != nullptr)
+		{
+			ExecutionCamera->GetCameraComponent()->SetFieldOfView(70.0f);
+			ExecutionCamera->GetCameraComponent()->bConstrainAspectRatio = false;
+			bViewOut = true;
+			ViewBackAt = -1.0f;
+			ViewPlayer = Player;
+			bViewToBlend = true;
+			ViewFloor = InBodyOf(Down, FVector::ZeroVector);
+			ViewYaw = Down->GetActorRotation().Yaw;
+		}
+	}
+	if (bViewOut && ExecutionCamera != nullptr && bWatch && IsValid(Down))
+	{
+		const EKind Kind = Execution.GetKind();
+		const float Side = Execution.Side;
+		const FRotator Lying(0.0f, ViewYaw, 0.0f);
+		const FVector Look = ViewFloor + Lying.RotateVector(CheeseStrikeExecution::LookAtInBody(Kind, Side));
+		FVector At = ViewFloor + Lying.RotateVector(CheeseStrikeExecution::CameraInBody(Kind, Side, ExecutionElapsed()));
+		// Not through a wall: as far out as there is room for.
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeExecutionView), false);
+		for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+		{
+			Params.AddIgnoredActor(*It);
+		}
+		FHitResult Hit;
+		if (World->SweepSingleByChannel(Hit, Look, At, FQuat::Identity, ECC_Camera, FCollisionShape::MakeSphere(15.0f), Params))
+		{
+			At = Hit.Location;
+		}
+		ExecutionCamera->SetActorLocationAndRotation(At, (Look - At).Rotation());
+		// Once placed, the view blends out to it.
+		if (APlayerController* Viewer = ViewPlayer.Get(); Viewer != nullptr && bViewToBlend)
+		{
+			bViewToBlend = false;
+			Viewer->SetViewTargetWithBlend(ExecutionCamera, CheeseStrikeExecution::ViewBlendOut, VTBlend_EaseInOut, 2.0f);
+			Me->SeeOwnBody(true);
+		}
+	}
+	// Over: back to the eyes (or, killed, to where the body lies, until the watching begins).
+	if (bViewOut && !bWatch && ViewBackAt < 0.0f)
+	{
+		APlayerController* Viewer = ViewPlayer.Get();
+		if (Viewer != nullptr && ExecutionCamera != nullptr && Viewer->GetViewTarget() == ExecutionCamera)
+		{
+			Viewer->SetViewTargetWithBlend(Me, Me->IsAlive() ? CheeseStrikeExecution::ViewBlendBack : 0.0f, VTBlend_EaseInOut, 2.0f);
+		}
+		ViewBackAt = Time + CheeseStrikeExecution::ViewBlendBack;
+	}
+	if (bViewOut && ViewBackAt >= 0.0f && Time >= ViewBackAt)
+	{
+		if (Me->IsAlive())
+		{
+			Me->SeeOwnBody(false);
+		}
+		if (ExecutionCamera != nullptr)
+		{
+			ExecutionCamera->Destroy();
+			ExecutionCamera = nullptr;
+		}
+		bViewOut = false;
+		ViewBackAt = -1.0f;
+	}
+
+	// Down: the view dark, washed out and blurred past arm's length, and swaying heavily, which the aim follows.
+	if (Player == nullptr || !Me->IsLocallyControlled())
+	{
+		return;
+	}
+	const bool bHurt = bDowned && Me->IsAlive() && !InExecution();
+	HurtView = FMath::FInterpConstantTo(HurtView, bHurt ? 1.0f : 0.0f, DeltaTime, HurtViewRate);
+	if (UCameraComponent* Camera = Me->GetFirstPersonCameraComponent())
+	{
+		if (HurtView > 0.0f && !Camera->PostProcessSettings.bOverride_DepthOfFieldFocalDistance)
+		{
+			MakeHurtLook(Camera->PostProcessSettings);
+		}
+		Camera->PostProcessBlendWeight = FMath::SmoothStep(0.0f, 1.0f, HurtView);
+	}
+	if (HurtView > 0.0f || !SwayShown.IsZero())
+	{
+		SwayClock += DeltaTime;
+		const FRotator Sway = CheeseStrikeModes::DownedSway(SwayClock) * HurtView;
+		const FRotator Step = Sway - SwayShown;
+		SwayShown = HurtView > 0.0f ? Sway : FRotator::ZeroRotator;
+		if (!Me->TakesInput())
+		{
+			return;
+		}
+		Player->SetControlRotation(Player->GetControlRotation() + Step);
+	}
+}
+
 void UCheeseStrikeLastStand::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -337,6 +868,8 @@ void UCheeseStrikeLastStand::TickComponent(float DeltaTime, ELevelTick TickType,
 		return;
 	}
 	KeepDown();
+	UpdateBurst();
+	UpdateView(DeltaTime);
 	if (!Me->HasAuthority())
 	{
 		return;
@@ -345,7 +878,14 @@ void UCheeseStrikeLastStand::TickComponent(float DeltaTime, ELevelTick TickType,
 	{
 		bDowned = false;
 	}
-	if (bInteractHeld && Me->CanAct() && !bDowned)
+	RunExecution();
+	// Left down and not executed, it gets up by itself in the end, hurt.
+	if (bDowned && Me->IsAlive() && !InExecution() && ServerNow() - DownedAt >= CheeseStrikeModes::SelfReviveTime)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s gets up by themself"), *Me->DisplayName());
+		Revive(CheeseStrikeModes::SelfReviveHealth);
+	}
+	if (bInteractHeld && Me->CanAct() && !bDowned && !InExecution())
 	{
 		DoWork(DeltaTime);
 	}
