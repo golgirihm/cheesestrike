@@ -324,7 +324,7 @@ protected:
 	void GrenadeStarted();
 	/** The Streak key: its player calls in their next streak (ACheeseStrikePlayerState::StreakPressed). */
 	void StreakStarted();
-	/** Interact (E), held and let go: reviving or finishing someone down (UCheeseStrikeLastStand). */
+	/** Interact (E), held and let go: reviving or finishing someone down (UCheeseStrikeLastStand); pressed, taking the weapon on a stand in reach (UCheeseStrikeInventory::PressForPickup). */
 	void InteractStarted();
 	void InteractEnded();
 

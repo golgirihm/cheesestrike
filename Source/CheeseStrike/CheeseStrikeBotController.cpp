@@ -22,10 +22,11 @@
 #include "Weapons/CheeseStrikeGrenadeRules.h"
 #include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
+#include "Weapons/CheeseStrikePickup.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 /** Every bot that comes in after this is set carries this primary, rather than one picked for its skill. */
-static TAutoConsoleVariable<FString> CVarBotPrimary(TEXT("CheeseStrike.BotPrimary"), TEXT(""), TEXT("The primary every bot coming in carries (blaster, carbine, grater, munster, shotgun, roquefort), or empty for one suited to its skill."));
+static TAutoConsoleVariable<FString> CVarBotPrimary(TEXT("CheeseStrike.BotPrimary"), TEXT(""), TEXT("The primary every bot coming in carries (blaster, carbine, grater, munster, shotgun, roquefort), or empty for the spawn primary everyone has."));
 
 namespace
 {
@@ -113,16 +114,14 @@ FString ACheeseStrikeBotController::Describe() const
 void ACheeseStrikeBotController::BeginPlay()
 {
 	Super::BeginPlay();
-	// Its primary, for every character it is given, chosen for the skill it plays at.
+	// It comes in with the spawn primary, as everyone does, and goes for better ones on the map's stands (ThinkAboutPickups);
+	// for watching one weapon in bots' hands, CheeseStrike.BotPrimary <weapon> gives them that instead.
 	UWorld* World = GetWorld();
 	UCheeseStrikeLoadouts* Loadouts = World != nullptr ? World->GetSubsystem<UCheeseStrikeLoadouts>() : nullptr;
-	const ACheeseStrikeGameMode* Mode = World != nullptr ? World->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
-	if (Loadouts != nullptr && !Loadouts->HasChosen(this))
+	const FWeaponStats* Forced = CheeseStrikeArsenal::Find(FName(*CVarBotPrimary.GetValueOnGameThread()));
+	if (Loadouts != nullptr && !Loadouts->HasChosen(this) && Forced != nullptr && Forced->Slot == EWeaponSlot::Primary)
 	{
-		// For watching one weapon in bots' hands: CheeseStrike.BotPrimary <weapon>.
-		const FWeaponStats* Forced = CheeseStrikeArsenal::Find(FName(*CVarBotPrimary.GetValueOnGameThread()));
-		FRandomStream Random(FMath::Rand());
-		Loadouts->Choose(this, Forced != nullptr && Forced->Slot == EWeaponSlot::Primary ? Forced->Id : CheeseStrikeBots::PrimaryFor(Mode != nullptr ? Mode->GetBotSkill() : SkillIndex, Random));
+		Loadouts->Choose(this, Forced->Id);
 	}
 }
 
@@ -690,6 +689,11 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 	{
 		return;
 	}
+	// A better weapon on a stand near it, with nobody in sight: there first.
+	if (ThinkAboutPickups())
+	{
+		return;
+	}
 	// Lost them: to where they were last seen, and look there.
 	if (Target.IsValid())
 	{
@@ -717,6 +721,64 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 			GoTo(Next, true);
 		}
 	}
+}
+
+bool ACheeseStrikeBotController::ThinkAboutPickups()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	UCheeseStrikeInventory* Inventory = Me != nullptr ? Me->GetInventory() : nullptr;
+	if (Inventory == nullptr || bSeesTarget || Me->IsDowned())
+	{
+		WantedPickup = nullptr;
+		return false;
+	}
+	const float Time = Now();
+	const FVector Here = Me->GetActorLocation();
+	const ACheeseStrikeWeapon* Carried = Inventory->GetInSlot(EWeaponSlot::Primary);
+	const FName Mine = Carried != nullptr ? Carried->GetWeaponId() : NAME_None;
+	ACheeseStrikePickup* Best = nullptr;
+	float BestWant = 0.0f;
+	for (TActorIterator<ACheeseStrikePickup> It(GetWorld()); It; ++It)
+	{
+		ACheeseStrikePickup* Pickup = *It;
+		if ((Pickup == GaveUpOn.Get() && Time < GaveUpUntil) || Pickup->HowFor(Me) == CheeseStrikePickups::ETake::None)
+		{
+			continue;
+		}
+		// The one it is going for is kept unless another is plainly better.
+		const float Want = CheeseStrikePickups::BotWants(Mine, Pickup->GetWeapon(), FVector::Dist(Here, Pickup->FloorAt())) * (Pickup == WantedPickup.Get() ? 1.25f : 1.0f);
+		if (Want > BestWant)
+		{
+			Best = Pickup;
+			BestWant = Want;
+		}
+	}
+	if (Best == nullptr)
+	{
+		WantedPickup = nullptr;
+		return false;
+	}
+	// There: a swap is pressed for (walking over the rest takes them).
+	if (Best->IsInReach(Me, CheeseStrikePickups::Reach) && Best->HowFor(Me) == CheeseStrikePickups::ETake::Press)
+	{
+		Inventory->TakePickup(Best, true);
+		WantedPickup = nullptr;
+		return false;
+	}
+	if (Best != WantedPickup.Get())
+	{
+		WantedPickup = Best;
+		WantedSince = Time;
+	}
+	// Getting nowhere near it, or no way there: something else for a while.
+	if (Time - WantedSince > PickupPatience || ((!bGoing || FVector::Dist(Goal, Best->FloorAt()) > 1.0f) && !GoTo(Best->FloorAt(), true, true)))
+	{
+		GaveUpOn = Best;
+		GaveUpUntil = Time + PickupPatience;
+		WantedPickup = nullptr;
+		return false;
+	}
+	return true;
 }
 
 bool ACheeseStrikeBotController::PickRoamGoal(FVector& Out) const

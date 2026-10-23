@@ -57,7 +57,7 @@ All hitscan unless a projectile is given. Damage falls off linearly from `fallof
 | Dual Burratas (two-round bursts) | side | 14 | 1.5 | 0.4, burst gap 0.06 | 24 | 2.2 | 80 | 1.4 / 7.5 | 18–45 (0.5) | 6 | 0.8 / 7 / 0.35 / 0.32 | 0.85 | 1.3 s |
 | Cheddar Blaster (automatic rifle) | main | 20 | 1.75 | 0.12 | 24 | 1.6 | 150 | 0.3 / 9 | 40–90 (0.6) | 8 | 0.45 / 9 / 0.35 / 0.3 | 0.6 | 0.5 s |
 | Blaster, charged alt fire | | 55 | 1.75 | 0.8 | 6 charged shots per magazine | | | 0.1 / 6 | | 1 | 2.5 / 2 / 0.3 / 0.8 | | |
-| Colby Carbine (three-round bursts) | main | 18 | 1.6 | 0.48, burst gap 0.07 | 27 | 1.7 | 140 | 0.25 / 7 | 35–80 (0.6) | 6 | 0.45 / 6 / 0.2 / 0.3 | 0.6 | 0.6 s |
+| Colby Carbine (three-round bursts; the spawn primary, softened from 18 damage and 81 rounds in reserve: the user's, October 2026) | main | 15 | 1.6 | 0.48, burst gap 0.07 | 27 | 1.7 | 140 | 0.25 / 7 | 35–80 (0.6) | 6 | 0.45 / 6 / 0.2 / 0.3 | 0.6 | 1.0 s |
 | Parmesan Grater (SMG) | main | 12 | 1.5 | 0.065 | 45 | 1.5 | 80 | 2.5 / 12 | 15–45 (0.4) | 12 | 0.28 / 12 / 0.5 / 0.25 | 0.75 | 0.5 s |
 | Munster Machine Gun (LMG) | main | 16 | 1.5 | 0.085 | 75 | 3.6 | 120 | 1.2 / 13 | 25–70 (0.5) | 14 | 0.4 / 14 / 0.6 / 0.3 | 0.75 | 0.5 s; 0.9 s to draw, 0.85 × speed carrying |
 | Swiss Shotgun (9 pellets) | main | 10 each | 1.5 | 0.85 | 6 | 2.2 | 40 | 14 / 32 | 8–25 (0.3) | 1 | 3 / 2 / 0.6 / 1.0 | 0.8 | two shots close |
@@ -131,6 +131,8 @@ The tuning is a guess that play has not yet settled: cover should be plainly goi
 ## Pickups, power-ups and the Overload
 
 **Pads** hold a cheese wedge (50 health; only for the hurt; back after 15 s), an ammunition crate (12 s), a rind (50 armour; 25 s), a weapon (20 s), or the power-up (one pad per arena, first at 30 s, back after 60 s). Reach is 1.3 m across and 2 m up. A pickup lying ready glows softly, visible across the arena but not through walls.
+
+**Weapons on stands** (the user's, October 2026, in place of the weapon pad above). A player carries three weapons: a primary, the Curd Pistol and the Cheese Knife, and comes in with the weakest primary, the Colby Carbine, so that a better one is worth finding. Each map has four to eight stands at fixed spots, each with one primary floating and turning over it, the better weapons at the riskier spots and both sides reaching them alike. A weapon taken replaces the primary carried, which is gone. Walking over a stand takes it from someone holding only the Carbine; anyone holding another presses Interact (E, LB) for it, told on the screen what they would swap to, so that nobody swaps by accident; walking over one's own weapon tops up its rounds. An empty stand shows a ghost of its weapon and the seconds until it is back, after 30 s. Gun Game has none. Bots go for a better weapon near them.
 
 **Power-ups** go round in turn, so nobody knows what the pad holds: double damage (12 s), speed (1.3 ×, 15 s), shield (hits do 0.4 ×, 12 s), sight (everyone seen through walls, 10 s). Taking one is announced to all; the holder is tinted in its colour.
 

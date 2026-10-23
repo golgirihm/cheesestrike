@@ -32,8 +32,9 @@ bool FEveryWeaponKillsInTheDesignsTime::RunTest(const FString& Parameters)
 		int32 Shots;
 		float Seconds;
 	};
-	// The design's TTK column (docs/unreal/design.md, "Weapons"): body shots, close, holding the trigger.
-	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 6, 0.62f}, FWanted{Grater(), 9, 0.52f},
+	// The design's TTK column (docs/unreal/design.md, "Weapons"): body shots, close, holding the trigger. The Colby
+	// Carbine, the spawn primary, is softened from it: three bursts to a kill.
+	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 9, 0.52f},
 		FWanted{Munster(), 7, 0.51f}, FWanted{Shotgun(), 2, 0.85f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}})
 	{
 		const FString Name = Wanted.Weapon.DisplayName.ToString();
@@ -207,7 +208,7 @@ bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 	TestNull(TEXT("and nothing that isn't one"), CheeseStrikeArsenal::Find(FName(TEXT("bazooka"))));
 	TestEqual(TEXT("six primaries"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Primary).Num(), 6);
 	TestEqual(TEXT("the Curd Pistol is the sidearm"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Sidearm), TArray<FName>{CheeseStrikeArsenal::Sidearm()});
-	TestEqual(TEXT("the Cheddar Blaster by default"), CheeseStrikeArsenal::DefaultPrimary(), CheeseStrikeWeapons::Blaster().Id);
+	TestEqual(TEXT("everyone comes in with the Colby Carbine"), CheeseStrikeArsenal::DefaultPrimary(), CheeseStrikeWeapons::Carbine().Id);
 
 	// Gun Game: through the guns a kill at a time, the knife last.
 	const TArray<FName>& Ladder = CheeseStrikeArsenal::GunGameLadder();

@@ -22,6 +22,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "UI/CheeseStrikeModeHUD.h"
+#include "UI/CheeseStrikePickupHUD.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
@@ -364,6 +365,8 @@ void ACheeseStrikeHUD::DrawHUD()
 	CheeseStrikeModeHUD::Draw(this, Canvas);
 	if (!bOver)
 	{
+		// The weapons' stands: the prompt to swap, the seconds over an empty one.
+		CheeseStrikePickupHUD::Draw(this, Canvas);
 		DrawMice(Match);
 		DrawCountdown(Match);
 	}

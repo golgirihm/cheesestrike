@@ -1071,6 +1071,22 @@ def mouse_entries(x0, y0, x1, y1, top, xs=(), ys=()):
         mouse_entry(x1 + 50, y, top, 180)
 
 
+def pickup(weapon, x, y, z=0, name=""):
+    """A weapon's stand (ACheeseStrikePickup): a low plinth at (x, y) on the floor at `z`, its weapon (a primary's id:
+    blaster, grater, munster, shotgun, roquefort; never the carbine everyone comes in with) floating over it, labelled
+    Pickup_<weapon>_<name>. Four to eight a map, the better weapons at the riskier spots (the roquefort the riskiest),
+    each side reaching them alike: on a mirrored map in pairs (x and -x) or on the middle line. It blocks nothing, so
+    put it on open floor with room round it (a metre and a half across, two metres up), off the lanes' choke points
+    unless that is the risk; the cheese under it is kept (keep()), so that the mice never eat its floor away."""
+    label = f"Pickup_{weapon.capitalize()}_{name or counts.get('pickups', 0)}"
+    actor = place(unreal.CheeseStrikePickup, label, "Pickups", (x, y, z))
+    actor.set_editor_property("weapon", weapon)
+    keep((x - 60, y - 60, z - 400), (x + 60, y + 60, z + 5))
+    count("pickups")
+    lines.append(f"pickup: {weapon} at ({x:.0f}, {y:.0f}, {z:.0f})")
+    return actor
+
+
 def nav_bounds(low, high):
     """The bounds of the navigation mesh the bots and mice walk: all the playable ground, from its lowest floor to above
     its highest. The mesh is built when the level starts and rebuilt where the cheese goes (Config/DefaultEngine.ini)."""
@@ -1246,6 +1262,8 @@ def build_level(level, build, report=None):
             lines.append(f"WARNING: {counts.get('starts', 0)} starts; a match has sixteen players")
         if counts.get("hill spots", 0) < 3:
             lines.append(f"WARNING: {counts.get('hill spots', 0)} hill spots; King of the Hill wants three to five")
+        if not 4 <= counts.get("pickups", 0) <= 8:
+            lines.append(f"WARNING: {counts.get('pickups', 0)} weapon stands; a map has four to eight (kit.pickup)")
         if blocks and counts.get("mouse entries", 0) == 0:
             lines.append("WARNING: cheese but no mouse entries: no mice will come")
     except Exception:

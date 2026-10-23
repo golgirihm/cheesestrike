@@ -15,7 +15,7 @@
 namespace CheeseStrikeWeapons
 {
 	/** Primaries. The Cheddar Blaster (Blaster(), in CheeseStrikeShot.h) is the automatic rifle. */
-	/** The Colby Carbine: three-round bursts, a click a burst. */
+	/** The Colby Carbine: three-round bursts, a click a burst; the weak primary everyone comes in with. */
 	const FWeaponStats& Carbine();
 	/** The Parmesan Grater: a submachine gun, fast and close. */
 	const FWeaponStats& Grater();
@@ -39,7 +39,7 @@ namespace CheeseStrikeArsenal
 	const FWeaponStats* Find(FName Id);
 	/** The ids of the weapons that go in `Slot`, in order. */
 	TArray<FName> InSlot(EWeaponSlot Slot);
-	/** The primary anyone has who hasn't chosen one, the sidearm and the knife. */
+	/** The primary everyone comes in with (the Colby Carbine, the weakest: the maps' stands hold the rest), the sidearm and the knife. */
 	FName DefaultPrimary();
 	FName Sidearm();
 	FName Knife();

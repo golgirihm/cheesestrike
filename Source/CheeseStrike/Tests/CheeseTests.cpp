@@ -20,6 +20,7 @@
 #include "Map/CheeseStrikeMouse.h"
 #include "Misc/App.h"
 #include "CheeseStrikeCharacter.h"
+#include "PickupChecks.h"
 #include "PlayTesting.h"
 #include "Rules/CheeseStrikeRules.h"
 
@@ -283,6 +284,8 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 			}
 		}
 		AddInfo(FString::Printf(TEXT("%d blocks to eat, %d kept"), Edible, Kept.Num()));
+		// Its weapons' stands, as the map has them.
+		PickupChecks::CheckStands(*this, World(0), false);
 	});
 	// The mice come, and eat all they may in about a minute and a quarter, steadily and spread out: played at a fixed
 	// step, as fast as the editor goes.
@@ -416,6 +419,7 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 	Then([this]()
 	{
 		UWorld* Here = World(0);
+		PickupChecks::CheckStands(*this, Here, true);
 		// What the map keeps stands where it stood.
 		for (const TPair<TWeakObjectPtr<ACheeseStrikeCheese>, FBox>& Each : Kept)
 		{

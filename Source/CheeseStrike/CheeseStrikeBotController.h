@@ -9,6 +9,7 @@
 #include "CheeseStrikeBotController.generated.h"
 
 class ACheeseStrikeCharacter;
+class ACheeseStrikePickup;
 
 /**
  * A bot: a player state with a cheese name and a side, a character like any
@@ -31,8 +32,9 @@ class ACheeseStrikeCharacter;
  * It moves its character as a player would: path following and movement
  * input for the feet, its control rotation for the view, and the
  * character's own Do* actions for the trigger, sights, sprint, reload and
- * changing weapons. It comes in with a primary suited to its skill, and
- * changes to the sidearm or the knife when they serve better
+ * changing weapons. It comes in with the spawn primary everyone has, goes
+ * for a better one on a stand near it when nobody is in sight
+ * (ThinkAboutPickups), and changes to the sidearm or the knife when they serve better
  * (CheeseStrikeBots::ChooseWeapon): someone close, the magazine empty.
  */
 UCLASS()
@@ -97,6 +99,15 @@ protected:
 	 * to fight as it would anywhere. True while the hill has its feet.
 	 */
 	bool ThinkAboutTheHill();
+	/**
+	 * With nobody in sight: goes to the stand near it with the weapon it
+	 * wants most (CheeseStrikePickups::BotWants: better than its own, and
+	 * not too far), and takes it, walking over it or pressing Interact
+	 * there. True while it is going for one.
+	 */
+	bool ThinkAboutPickups();
+	/** How long it goes for a stand before trying something else, and how long it leaves that stand alone then (s). */
+	static constexpr float PickupPatience = 20.0f;
 	/** Calls in its next streak, as a player would: the drone and the Overload soon after earning them, the Cheese Strike on an enemy it has just seen. */
 	void ThinkAboutStreaks();
 	/**
@@ -171,6 +182,11 @@ protected:
 	/** What it is doing about the hill (CheeseStrikeHills::EBotPlan), and whether the hill has its feet. */
 	CheeseStrikeHills::EBotPlan HillPlan = CheeseStrikeHills::EBotPlan::Fight;
 	bool bHill = false;
+	/** The stand it is going for, since when; and one it gave up on, until when. */
+	TWeakObjectPtr<ACheeseStrikePickup> WantedPickup;
+	float WantedSince = 0.0f;
+	TWeakObjectPtr<ACheeseStrikePickup> GaveUpOn;
+	float GaveUpUntil = 0.0f;
 	/** Whether it is tending someone down, and holding Interact. */
 	bool bTending = false;
 	bool bInteracting = false;

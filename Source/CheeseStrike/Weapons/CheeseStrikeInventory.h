@@ -10,6 +10,7 @@
 #include "CheeseStrikeInventory.generated.h"
 
 class ACheeseStrikeCharacter;
+class ACheeseStrikePickup;
 class ACheeseStrikeWeapon;
 class AController;
 
@@ -78,6 +79,23 @@ public:
 	void HoldNow(EWeaponSlot Slot);
 	/** Server: gives the usual loadout with the primary chosen for `Controller` (as the character is possessed). */
 	void GiveSpawnLoadout(AController* Controller);
+
+	// Weapon pickups (ACheeseStrikePickup, Rules/CheeseStrikePickups.h).
+
+	/**
+	 * Server: takes the weapon on `Pickup` if this character may, by walking
+	 * over it or, `bPressed`, by pressing Interact near it: the primary
+	 * carried is gone and the stand's weapon takes its place, in hand at once
+	 * (or, the same weapon, its rounds are topped up). True if taken.
+	 */
+	bool TakePickup(ACheeseStrikePickup* Pickup, bool bPressed);
+	/** Server: replaces the primary carried with a fresh `Weapon`, in hand at once. */
+	void SwapPrimary(FName Weapon);
+	/** The player's own machine: Interact was pressed; takes the weapon on the stand it offers (ACheeseStrikePickup::OfferedTo), if any. True if there was one. */
+	bool PressForPickup();
+
+	UFUNCTION(Server, Reliable)
+	void ServerTakePickup(ACheeseStrikePickup* Pickup);
 
 	// Reading, on any machine.
 
@@ -174,7 +192,7 @@ class CHEESESTRIKE_API UCheeseStrikeLoadouts : public UWorldSubsystem
 public:
 	/** Server: `Controller`'s player chose `Primary`. */
 	void Choose(const AController* Controller, FName Primary);
-	/** The primary `Controller` chose, or the default. */
+	/** The primary `Controller` chose, or the default (CheeseStrikeArsenal::DefaultPrimary, or CheeseStrike.SpawnPrimary's for the play tests). */
 	FName PrimaryFor(const AController* Controller) const;
 	bool HasChosen(const AController* Controller) const;
 
