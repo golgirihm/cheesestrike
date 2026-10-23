@@ -661,6 +661,21 @@ def hills():
     kit.hill_spots([("Vault", 0, 0, 0, 780), ("NorthWest2", nw[0], nw[1], 0, 300), ("SouthEast2", se[0], se[1], 0, 300)])
 
 
+def pickups():
+    """The weapons' stands (kit.pickup), turned half round for Mozza as the map is: the Roquefort on the Mother Wheel,
+    under the oculus, reached by the gallery's bridges; a Munster in each room, where the sides first meet; a Cheddar
+    Blaster in each side's ring 2 (West 2, East 2) and a Swiss Shotgun in each side's near gutter (West, East)."""
+    kit.pickup("roquefort", 0, 0, GALLERY_Z, "MotherWheel")
+    for half in (0, 1):
+        team = team_of(half)
+        room = at(rot(135.0, half), 0, APOTHEM + WALL + 300)
+        kit.pickup("munster", room[0], room[1], 0, "BrineRoom" if half == 0 else "SmokeRoom")
+        ring = polar(O, mid(AISLES[2]), rot(200.0, half))
+        kit.pickup("blaster", ring[0], ring[1], 0, f"Ring2{team}")
+        gutter = polar(O, 3150.0, rot(172.0, half))
+        kit.pickup("shotgun", gutter[0], gutter[1], 0, f"Gutter{team}")
+
+
 def build():
     annex_openings()
     ground()
@@ -683,6 +698,7 @@ def build():
     mouse_entries()
     places()
     hills()
+    pickups()
     lamps()
     kit.nav_bounds((-4900, -4900, -100), (4900, 4900, 800))
     kit.light_rig("noon", sun=(-72, 30))

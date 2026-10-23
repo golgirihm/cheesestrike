@@ -20,6 +20,8 @@
 #include "NavigationSystem.h"
 #include "CheeseStrikeBotController.h"
 #include "CheeseStrikeCharacter.h"
+#include "Map/CheeseStrikeHill.h"
+#include "Rules/CheeseStrikeHills.h"
 #include "GameFramework/PlayerStart.h"
 #include "NavigationPath.h"
 #include "PickupChecks.h"
@@ -178,6 +180,14 @@ void PickupChecks::CheckStands(FAutomationTestBase& Test, UWorld* World, bool bA
 			}
 		}
 		Test.TestTrue(FString::Printf(TEXT("room for a player over %s (%s)"), *Label.ToString(), Blocking.IsEmpty() ? TEXT("clear") : *Blocking), Blocking.IsEmpty());
+		// Clear of every hill's spot (King of the Hill): its plinth outside the hill's round and height.
+		for (TActorIterator<ACheeseStrikeHillSpot> Hill(World); Hill; ++Hill)
+		{
+			const FVector Spot = Hill->GetActorLocation();
+			const float Rise = Stand->FloorAt().Z - Spot.Z;
+			const bool bInside = FVector::Dist2D(Spot, Stand->FloorAt()) < Hill->GetRadius() + 55.0f && Rise > -CheeseStrikeHills::Below && Rise < CheeseStrikeHills::Above;
+			Test.TestFalse(FString::Printf(TEXT("%s is clear of the hill %s"), *Label.ToString(), *Hill->GetActorLabel()), bInside);
+		}
 		// A way to it from a side's start.
 		FNavLocation To;
 		const bool bOnMesh = Navigation != nullptr && Navigation->ProjectPointToNavigation(Stand->FloorAt(), To, FVector(60.0f, 60.0f, 150.0f));

@@ -37,7 +37,7 @@ Setup: Play in Editor on the shooter level, alone and then as a listen server wi
 
 ## Weapon pickups
 
-Setup: host a match on any map from the front end, alone with bots and then with a second player; then one in Gun Game. Why manual: how the stands look and read, the prompt on the screen, and how taking a weapon feels. The play tests cover the rules: what walking over a stand or pressing for it does by what is carried, the stand emptied and back on every machine, one's own weapon topping up, Gun Game having none, a bot going for a better weapon, and every map's stands (four to eight, fair to both sides, the better at the riskier spots, each with room and a way to it, on a floor the mice leave).
+Setup: host a match on any map from the front end, alone with bots and then with a second player; then one in Gun Game. Why manual: how the stands look and read, the prompt on the screen, and how taking a weapon feels. The play tests cover the rules: what walking over a stand or pressing for it does by what is carried, the stand emptied and back on every machine, one's own weapon topping up, Gun Game having none, a bot going for a better weapon, and every map's stands (four to eight, fair to both sides, the better at the riskier spots, none on a hill, each with room and a way to it, on a floor the mice leave).
 
 | ID | Test | Steps | Expected |
 |---|---|---|---|

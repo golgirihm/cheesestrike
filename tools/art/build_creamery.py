@@ -496,6 +496,18 @@ def hills():
                     ("YardMozza", 2150, 3800, 0, 330), ("Walkway", 0, -2350, 0, 350)])
 
 
+def pickups():
+    """The weapons' stands (kit.pickup), the better at the riskier spots: the Roquefort on the mezzanine's middle, over
+    the whole hall; the Munster in the Squeeze, the north lane's choke; a Cheddar Blaster in each half of the yard (off its hill), a
+    Swiss Shotgun in each Rind Tunnel and a Parmesan Grater in each Curing House, nearer a side's own dock."""
+    kit.pickup("roquefort", 0, -1580, 400, "Mezzanine")
+    kit.pickup("munster", 0, 2200, 0, "Squeeze")
+    for s, side in ((-1, "West"), (1, "East")):
+        kit.pickup("blaster", s * 1950, 3350, 0, f"Yard{side}")
+        kit.pickup("shotgun", s * 2300, TUNNEL_Y, 0, f"Tunnel{side}")
+        kit.pickup("grater", s * 4000, -1250, 0, f"House{side}")
+
+
 def build():
     ground()
     for s, side in ((-1, "West"), (1, "East")):
@@ -512,6 +524,7 @@ def build():
     mouse_entries()
     places()
     hills()
+    pickups()
     # The navigation mesh's bounds: the playable ground, from the canal's floor to above the houses.
     kit.nav_bounds((-HALF_X - 200, -HALF_Y - 200, -CANAL_DEPTH - 110), (HALF_X + 200, HALF_Y + 200, 1490))
     kit.light_rig("day")

@@ -696,6 +696,17 @@ def hills():
                     ("DrawersMozza", 1500, 1300, 0, 380)])
 
 
+def pickups():
+    """The weapons' stands (kit.pickup), clear of the hills (the crumbs, the drawers, the table's top): the Roquefort in
+    the sink, in the middle of the worktop; a Munster in each half of the hollow through the wedge; a Cheddar Blaster
+    on the worktop at the top of each side's cookbooks and a Swiss Shotgun in each side's cupboard."""
+    kit.pickup("roquefort", 0, (SINK_Y[0] + SINK_Y[1]) / 2.0, 390, "Sink")
+    for s, side in ((-1, "West"), (1, "East")):
+        kit.pickup("munster", s * 400, (HOLLOW[0] + HOLLOW[1]) / 2.0, 0, f"Hollow{side}")
+        kit.pickup("blaster", s * 2190, 2025, TOP, f"Worktop{side}")
+        kit.pickup("shotgun", s * 900, 2080, SHELF, f"Cupboard{side}")
+
+
 def build():
     room()
     counter()
@@ -712,6 +723,7 @@ def build():
     mouse_entries()
     places()
     hills()
+    pickups()
     kit.nav_bounds((-HALF_X - 100, Y_S - 100, -60), (HALF_X + 100, Y_N + 100, 1000))
     # Day through the north window: the sun comes in over the sink, across the lanes, and falls on the wedge.
     kit.light_rig("day", sun=(-38, -90))

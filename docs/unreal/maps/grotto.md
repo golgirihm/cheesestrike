@@ -34,6 +34,8 @@ Free-for-all has fourteen more starts (tagged "Free"), seven a side through ever
 
 The rock stops the lines that matter whatever the mice eat (`CheeseStrike.Play.TheGrottoHoldsTogether`): no start sees an enemy start; the Spine stops the floor's middle line and the line between the hollows' openings; the Curtain stops the line along the galleries; the buttress and the fin stop the one along the south walk.
 
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), on rock and floor the mice never eat and clear of the hills (the Pulpit's middle, the landing, the pools): the Roquefort Rifle in the Spine's arch, between the two bridges; a Munster Machine Gun at each end of the Pulpit; a Cheddar Blaster on each gallery walk at the top of its stairs from the Pulpit; and a Swiss Shotgun in each Cheese Store. Seven in all, mirrored like the map.
+
 ## The cheese, and what the mice change
 
 There are 356 blocks the mice can eat and four they can't (the bridges' waxed beams); one mouse to 25 blocks brings fourteen. They come out of ten holes in the rock: four at the floor's ends under the hollows and two in the Pulpit's face, onto the floor, and four in the south wall over the walk. None open onto the galleries: their decks come down as the mice on the floor eat their pillars, and the mice climb to what is left up there last. Keeping to the mice's pace, fourteen mice leave the cave bare of cheese about a minute and a quarter after they come: the floor's cover and the stores first, then the decks, side by side as the mice spread, and the tunnel and the bridges last (`tools/play/grotto_mice.txt`).

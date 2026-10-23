@@ -854,6 +854,17 @@ def hills():
                     ("HighStreetMozza", 1750, 3300, 0, 350)])
 
 
+def pickups():
+    """The weapons' stands (kit.pickup): the Roquefort in the belfry, seen from every house round the square; the
+    Munster in the Clock Passage, the choke between High Street and the square; a Cheddar Blaster on each side's gallery
+    over the arcade and a Swiss Shotgun in each side's store in the court."""
+    kit.pickup("roquefort", 0, -250, 700, "Belfry")
+    kit.pickup("munster", 0, 2350, 0, "ClockPassage")
+    for s, side in ((-1, "West"), (1, "East")):
+        kit.pickup("blaster", s * 1100, 1680, STOREY, f"Gallery{side}")
+        kit.pickup("shotgun", s * 2700, -2100, 0, f"Store{side}")
+
+
 def build():
     ground()
     clock_tower()
@@ -876,6 +887,7 @@ def build():
     mouse_entries()
     places()
     hills()
+    pickups()
     kit.nav_bounds((-HALF_X - 100, -HALF_Y - 100, -100), (HALF_X + 100, HALF_Y + 100, 1150))
     dusk()
 
