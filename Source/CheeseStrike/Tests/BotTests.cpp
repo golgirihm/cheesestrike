@@ -274,6 +274,25 @@ bool FBotsKeepOutOfTheDownedsAim::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBotsExecuteAndSpreadOut, "CheeseStrike.Bots.ExecuteAndSpreadOut", BotTests::Flags)
+
+bool FBotsExecuteAndSpreadOut::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeBots;
+	// Left down, an enemy gets up again: a bot goes to execute them from far off, and even mid-fight when near.
+	TestTrue(TEXT("nobody in sight: to an enemy down far off"), GoesToExecute(4000.0f, false, 0.0f));
+	TestFalse(TEXT("but not across the map"), GoesToExecute(ExecuteRange + 1.0f, false, 0.0f));
+	TestTrue(TEXT("in a fight, to one down nearer than the enemy it fights"), GoesToExecute(800.0f, true, 2000.0f));
+	TestFalse(TEXT("but not past the enemy it fights"), GoesToExecute(800.0f, true, 500.0f));
+	TestFalse(TEXT("nor far off mid-fight"), GoesToExecute(ExecuteWhileFighting + 1.0f, true, 5000.0f));
+	TestTrue(TEXT("further than it went to revive, before"), ExecuteRange > 2500.0f);
+	// Roaming, it keeps away from its teammates: a spot far from them beats a spot as far from here near them.
+	TestTrue(TEXT("alone beats with a teammate"), RoamScore(2000.0f, AloneAt) > RoamScore(2000.0f, 200.0f));
+	TestTrue(TEXT("being alone counts for more than going further"), RoamScore(1000.0f, AloneAt) > RoamScore(RoamFar, 300.0f));
+	TestEqual(TEXT("and further than far is no better"), RoamScore(RoamFar * 2.0f, AloneAt * 2.0f), RoamScore(RoamFar, AloneAt));
+	return true;
+}
+
 #endif
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
@@ -290,6 +309,7 @@ bool FBotsKeepOutOfTheDownedsAim::RunTest(const FString& Parameters)
 #include "PlayTesting.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Rules/CheeseStrikeModes.h"
+#include "Rules/CheeseStrikeExecution.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -422,8 +442,8 @@ bool FABotFinishesFromOutsideTheAim::RunTest(const FString& Parameters)
 		Body->EndProtection();
 		CharacterOf(0, 0)->GetLastStand()->GoDown(Bot->GetPlayerState<ACheeseStrikePlayerState>());
 	});
-	// It comes to finish them, keeping out of their aim when it is near.
-	WaitUntil(TEXT("the bot finishing the host"), 25.0f, [Down]()
+	// It comes to execute them, keeping out of their aim when it is near.
+	WaitUntil(TEXT("the bot executing the host"), 25.0f, [Down]()
 	{
 		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
 		const ACheeseStrikeCharacter* Body = Bots().Num() > 0 ? BodyOf(Bots()[0]) : nullptr;
@@ -458,7 +478,10 @@ bool FABotFinishesFromOutsideTheAim::RunTest(const FString& Parameters)
 		TestEqual(TEXT("by the bot"), Host->GetKilledBy(), BodyOf(Bot)->DisplayName());
 		TestTrue(FString::Printf(TEXT("it came close (%.0f cm)"), Nearest), Nearest <= CheeseStrikeModes::FinishRange);
 		TestTrue(FString::Printf(TEXT("from outside the host's aim: %.2f s in it within 4 m"), InAimNear), InAimNear < 0.5f);
+		TestTrue(TEXT("executed, with a press"), Host->GetLastStand()->WasExecuted());
 	});
+	// The execution plays out before it does anything else.
+	WaitUntil(TEXT("the bot done executing"), CheeseStrikeExecution::StabSeconds + 1.0f, []() { return Bots().Num() > 0 && !BodyOf(Bots()[0])->GetLastStand()->InExecution(); });
 	// Its own teammate (whichever joiner is on its side) goes down a few metres off: it goes and revives them.
 	static int32 Mate = 1;
 	Then([this, Down]()

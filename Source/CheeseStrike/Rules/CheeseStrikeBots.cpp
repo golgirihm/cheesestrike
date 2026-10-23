@@ -223,4 +223,18 @@ namespace CheeseStrikeBots
 		// The swerve dies down as the edge comes near, so as not to swing back into the aim.
 		return FVector(At.X, At.Y, Downed.Z) + Along * Ahead + Across * Swerve * ZigzagWidth * FMath::Min(1.0f, Left / ZigzagStep);
 	}
+
+	bool GoesToExecute(float DownedDistance, bool bSeesEnemy, float EnemyDistance)
+	{
+		if (!bSeesEnemy)
+		{
+			return DownedDistance <= ExecuteRange;
+		}
+		return DownedDistance <= ExecuteWhileFighting && DownedDistance < EnemyDistance;
+	}
+
+	float RoamScore(float FromHere, float NearestMate)
+	{
+		return FMath::Clamp(FromHere, 0.0f, RoamFar) + AloneWeight * FMath::Clamp(NearestMate, 0.0f, AloneAt);
+	}
 }

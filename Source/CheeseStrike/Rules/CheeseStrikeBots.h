@@ -166,4 +166,31 @@ namespace CheeseStrikeBots
 	 * way) by the further.
 	 */
 	FVector FinishApproach(const FVector& At, const FVector& Downed, float Yaw, float Now, float Way = 1.0f);
+
+	/**
+	 * Execution: someone left down gets up by themself before long, so a bot
+	 * executes whoever it can. With no enemy standing in sight it goes to an
+	 * enemy down within ExecuteRange; with one in sight, still to an enemy
+	 * down within ExecuteWhileFighting, if that one is nearer than the enemy
+	 * it fights (an execution can't be interrupted: it is safe while it
+	 * plays). `bSeesEnemy` and `EnemyDistance` are the fight's.
+	 */
+	constexpr float ExecuteRange = 4500.0f;
+	constexpr float ExecuteWhileFighting = 1200.0f;
+	bool GoesToExecute(float DownedDistance, bool bSeesEnemy, float EnemyDistance);
+
+	/**
+	 * Bots don't clump: roaming, a bot picks among a few spots the one that
+	 * scores best, for going somewhere new (as far as RoamFar) and for
+	 * being away from its teammates (as far as AloneAt from the nearest of
+	 * them and from where they are going), the latter counting for more,
+	 * so that a side spreads out over the map and its players are found,
+	 * and downed, alone.
+	 */
+	constexpr float RoamFar = 3000.0f;
+	constexpr float AloneAt = 2500.0f;
+	constexpr float AloneWeight = 1.5f;
+	float RoamScore(float FromHere, float NearestMate);
+	/** The chance a bot roaming goes toward an enemy rather than somewhere new. */
+	constexpr float HuntChance = 0.35f;
 }

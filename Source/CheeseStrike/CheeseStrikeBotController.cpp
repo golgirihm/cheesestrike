@@ -75,7 +75,7 @@ const TCHAR* ACheeseStrikeBotController::Doing() const
 	}
 	if (bTending)
 	{
-		return bInteracting ? TEXT("reviving or finishing") : TEXT("going to someone down");
+		return bInteracting ? TEXT("reviving") : TEXT("going to someone down");
 	}
 	return bSearching ? TEXT("searching") : TEXT("roaming");
 }
@@ -317,14 +317,21 @@ bool ACheeseStrikeBotController::ThinkAboutTheDown()
 		}
 		bInteracting = false;
 	};
-	if (Mine == nullptr || Match == nullptr || !Match->GetModeInfo().bLastStand || Me->IsDowned() || bSeesTarget)
+	if (Mine == nullptr || Match == nullptr || !Match->GetModeInfo().bLastStand || Me->IsDowned())
 	{
 		LetGo();
 		return false;
 	}
-	// In reach of someone down: hold Interact over them, still, looking at them.
+	// In an execution: it plays out.
+	if (Mine->InExecution())
+	{
+		LetGo();
+		return true;
+	}
+	// In reach of an enemy down: a press, and they are executed, whatever else is about. A teammate: held over them, still,
+	// looking at them, while nobody is in sight to shoot it.
 	CheeseStrikeModes::EInteract Kind = CheeseStrikeModes::EInteract::None;
-	if (const ACheeseStrikeCharacter* Over = Mine->InteractTarget(Kind))
+	if (const ACheeseStrikeCharacter* Over = Mine->InteractTarget(Kind); Over != nullptr && (Kind == CheeseStrikeModes::EInteract::Execute || !bSeesTarget))
 	{
 		if (bGoing)
 		{
@@ -332,6 +339,13 @@ bool ACheeseStrikeBotController::ThinkAboutTheDown()
 			bGoing = false;
 		}
 		Wanted = (Over->GetActorLocation() - EyesAt()).Rotation();
+		if (Kind == CheeseStrikeModes::EInteract::Execute)
+		{
+			LetGo();
+			Mine->SetInteracting(true);
+			Mine->SetInteracting(false);
+			return true;
+		}
 		if (!bInteracting)
 		{
 			Mine->SetInteracting(true);
@@ -340,16 +354,25 @@ bool ACheeseStrikeBotController::ThinkAboutTheDown()
 		return true;
 	}
 	LetGo();
-	// Someone down not far off, a teammate to revive or an enemy to finish: go to them.
+	// An enemy down to execute (even mid-fight, if near: left alone, they get up), else a teammate down near it, with
+	// nobody in sight, to revive.
+	const float Fighting = bSeesTarget && Target.IsValid() ? FVector::Dist(Target->GetActorLocation(), Me->GetActorLocation()) : TNumericLimits<float>::Max();
 	const ACheeseStrikeCharacter* Nearest = nullptr;
-	float NearestAt = TendRange;
+	float NearestAt = TNumericLimits<float>::Max();
 	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
 	{
+		if (*It == Me || !It->IsAlive() || !It->IsDowned() || (It->GetLastStand() != nullptr && It->GetLastStand()->InExecution()))
+		{
+			continue;
+		}
 		const float Distance = FVector::Dist(It->GetActorLocation(), Me->GetActorLocation());
-		if (*It != Me && It->IsAlive() && It->IsDowned() && Distance < NearestAt)
+		const bool bWanted = IsEnemy(*It) ? CheeseStrikeBots::GoesToExecute(Distance, bSeesTarget, Fighting) : !bSeesTarget && Distance < TendRange;
+		// Enemies first: an execution ends a player, a revive only saves one.
+		const float Rank = IsEnemy(*It) ? Distance : Distance + CheeseStrikeBots::ExecuteRange;
+		if (bWanted && Rank < NearestAt)
 		{
 			Nearest = *It;
-			NearestAt = Distance;
+			NearestAt = Rank;
 		}
 	}
 	if (Nearest == nullptr)
@@ -381,6 +404,16 @@ void ACheeseStrikeBotController::Think()
 	ACheeseStrikeCharacter* Me = Body();
 	Perceive();
 	bTending = ThinkAboutTheDown();
+	// In an execution, dealing it or dealt it: nothing to do but let it play.
+	if (Me != nullptr && Me->GetLastStand() != nullptr && Me->GetLastStand()->InExecution())
+	{
+		if (bGoing)
+		{
+			StopMovement();
+			bGoing = false;
+		}
+		return;
+	}
 	// Down, it stays where it lies and fights from there, turning round as its view takes it (its feet are no use for paths).
 	if (Me != nullptr && Me->IsDowned())
 	{
@@ -583,6 +616,11 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 		return;
 	}
 
+	// Tending someone down (ThinkAboutTheDown), even in a fight: its feet are taken care of.
+	if (bTending)
+	{
+		return;
+	}
 	if (bSeesTarget && Target.IsValid())
 	{
 		const float Distance = FVector::Dist(Here, Target->GetActorLocation());
@@ -620,11 +658,6 @@ void ACheeseStrikeBotController::ChooseWhereToGo()
 			}
 			break;
 		}
-		return;
-	}
-	// Tending someone down (ThinkAboutTheDown): its feet are taken care of.
-	if (bTending)
-	{
 		return;
 	}
 	bRetreating = bRetreating && bGoing;
@@ -670,43 +703,62 @@ bool ACheeseStrikeBotController::PickRoamGoal(FVector& Out) const
 		return false;
 	}
 	const FVector Here = Me->GetActorLocation();
-	// Sometimes toward someone else, as a player looks for a fight; their place on the mesh.
-	if (FMath::FRand() < 0.35f)
+	// Where its teammates are, and where those that are bots are going: it keeps away from both, so that a side spreads out.
+	TArray<FVector> Mates;
+	for (FConstControllerIterator It = GetWorld()->GetControllerIterator(); It; ++It)
 	{
-		TArray<const ACheeseStrikeCharacter*> Others;
+		const AController* Other = It->Get();
+		const ACheeseStrikeCharacter* Theirs = Other != nullptr && Other != this ? Cast<ACheeseStrikeCharacter>(Other->GetPawn()) : nullptr;
+		if (Theirs == nullptr || !Theirs->IsAlive() || IsEnemy(Theirs))
+		{
+			continue;
+		}
+		Mates.Add(Theirs->GetActorLocation());
+		if (const ACheeseStrikeBotController* Bot = Cast<ACheeseStrikeBotController>(Other); Bot != nullptr && Bot->bGoing)
+		{
+			Mates.Add(Bot->Goal);
+		}
+	}
+	const auto NearestMate = [&Mates](const FVector& Spot)
+	{
+		float Nearest = CheeseStrikeBots::AloneAt;
+		for (const FVector& Mate : Mates)
+		{
+			Nearest = FMath::Min(Nearest, static_cast<float>(FVector::Dist2D(Mate, Spot)));
+		}
+		return Nearest;
+	};
+	// Sometimes toward an enemy, as a player looks for a fight (their place on the mesh), else somewhere new; of a few
+	// spots, the one furthest from here and from its teammates (CheeseStrikeBots::RoamScore).
+	TArray<const ACheeseStrikeCharacter*> Enemies;
+	if (FMath::FRand() < CheeseStrikeBots::HuntChance)
+	{
 		for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
 		{
 			if (*It != Me && It->IsAlive() && IsEnemy(*It))
 			{
-				Others.Add(*It);
-			}
-		}
-		if (Others.Num() > 0)
-		{
-			FNavLocation Near;
-			const FVector Toward = Others[FMath::RandHelper(Others.Num())]->GetActorLocation();
-			if (Navigation->GetRandomReachablePointInRadius(Toward, 800.0f, Near))
-			{
-				Out = Near.Location;
-				return true;
+				Enemies.Add(*It);
 			}
 		}
 	}
-	// Else somewhere new: of a couple of spots anywhere on the mesh, the further from here.
 	bool bFound = false;
-	float Furthest = -1.0f;
-	for (int32 Try = 0; Try < 2; ++Try)
+	float Best = -1.0f;
+	for (int32 Try = 0; Try < 4; ++Try)
 	{
 		FNavLocation Spot;
-		if (Navigation->GetRandomReachablePointInRadius(Here, RoamRadius, Spot))
+		const bool bHunt = Enemies.Num() > 0;
+		const bool bGot = bHunt ? Navigation->GetRandomReachablePointInRadius(Enemies[FMath::RandHelper(Enemies.Num())]->GetActorLocation(), 800.0f, Spot)
+			: Navigation->GetRandomReachablePointInRadius(Here, RoamRadius, Spot);
+		if (!bGot)
 		{
-			const float Distance = FVector::Dist2D(Here, Spot.Location);
-			if (Distance > Furthest)
-			{
-				Furthest = Distance;
-				Out = Spot.Location;
-				bFound = true;
-			}
+			continue;
+		}
+		const float Score = CheeseStrikeBots::RoamScore(bHunt ? CheeseStrikeBots::RoamFar : FVector::Dist2D(Here, Spot.Location), NearestMate(Spot.Location));
+		if (Score > Best)
+		{
+			Best = Score;
+			Out = Spot.Location;
+			bFound = true;
 		}
 	}
 	return bFound;
