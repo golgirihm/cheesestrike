@@ -77,12 +77,16 @@ protected:
 	/** Whether `Other` is on the other side (anyone else in free-for-all): a bot fights, hears and hunts only its enemies. */
 	bool IsEnemy(const ACheeseStrikeCharacter* Other) const;
 	/**
-	 * In Execution, with no enemy in sight: goes to someone down near it
-	 * and holds Interact over them, reviving a teammate or finishing an
-	 * enemy. True while it is doing so.
+	 * In Execution: an enemy down in reach it executes at once, with a
+	 * press of Interact, whatever else is going on; it goes to execute one
+	 * further off as CheeseStrikeBots::GoesToExecute has it (even while
+	 * fighting, for one close), from outside their aim; and with no enemy in
+	 * sight it goes to a teammate down near it and holds Interact over them
+	 * to revive them. True while it is doing any of that, or is in an
+	 * execution.
 	 */
 	bool ThinkAboutTheDown();
-	/** How far it goes to someone down (cm). */
+	/** How far it goes to revive a teammate down (cm). */
 	static constexpr float TendRange = 2500.0f;
 	/** Calls in its next streak, as a player would: the drone and the Overload soon after earning them, the Cheese Strike on an enemy it has just seen. */
 	void ThinkAboutStreaks();
