@@ -154,6 +154,10 @@ protected:
 	void DrawMice(const ACheeseStrikeGameState* Match);
 	/** The count before the match and its rounds, big in the middle (UI/CheeseStrikeHUDCountdown.cpp). */
 	void DrawCountdown(const ACheeseStrikeGameState* Match);
+	/** The countdown's `Word` (3, 2, 1, FIGHT) in cheese, loaded as it is first shown; null where there is none. */
+	UTexture2D* CountdownPicture(const FString& Word);
+	UPROPERTY(Transient)
+	TMap<FString, TObjectPtr<UTexture2D>> CountdownPictures;
 	/** The health the HUD shows: the character's, or CheeseStrike.HUD.Health's for judging the red edges (development). */
 	static float HealthShown(const ACheeseStrikeCharacter* Character);
 	/**

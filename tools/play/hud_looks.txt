@@ -1,0 +1,39 @@
+# The HUD's looks (rounded shapes, the minimap's cheese wedge, the countdown in
+# cheese, long names): the count before the match in 3D cheese, then, in
+# Execution with bots, a teammate and an enemy down in the row along the top,
+# the scoreboard, and the host going down. Run with
+#   tools/play.ps1 -Script tools/play/hud_looks.txt -Tag looks -Bots -Countdown
+#     -Name ReginaldCheddaringtonTheThirdEsq -Map /Game/CheeseStrike/Maps/Lvl_Creamery
+#     -StartAt "-1500,-800,100,60" -Extra "?Mode=Execution?Bots=7?BotSkill=0?Countdown=3"
+# (the name is 32 letters, as long as a Steam name may be).
+cmd r.SetRes 1920x1080w
+wait 0.4
+shot looks_count_a
+wait 0.6
+shot looks_count_b
+wait 0.8
+shot looks_count_c
+wait 0.2
+shot looks_count_d
+wait 0.2
+shot looks_count_e
+wait 0.2
+shot looks_count_f
+wait 0.2
+shot looks_count_g
+wait 1.5
+cmd CheeseStrikeDown mate
+cmd CheeseStrikeDown enemy
+wait 0.8
+shot looks_row
+look 90 0
+wait 0.5
+shot looks_minimap_turned
+hold Scoreboard
+wait 0.3
+shot looks_scoreboard
+release Scoreboard
+cmd CheeseStrikeDie
+wait 1.5
+shot looks_self_down
+quit

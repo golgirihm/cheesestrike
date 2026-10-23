@@ -11,7 +11,9 @@ wait 150
 cmd CheeseStrikeStart now
 wait 9
 cmd CheeseStrikeDown GorgonzolaGwendolynVonMozzarella
-wait 1.5
+wait 2.5
+look 0 -16
+wait 0.3
 shot execute_h1_far
 hold Move 0 1
 wait 0.55
