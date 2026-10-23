@@ -251,4 +251,14 @@ bool FAFarShotIsQuieterAndDuller::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheReserveShowsWithoutEnd, "CheeseStrike.Weapons.TheReserveShowsWithoutEnd", WeaponTests::Flags)
+
+bool FTheReserveShowsWithoutEnd::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("a reserve shows its rounds"), CheeseStrikeWeapons::ReserveLabel(72), FString(TEXT("/ 72")));
+	TestEqual(TEXT("an empty one shows none"), CheeseStrikeWeapons::ReserveLabel(0), FString(TEXT("/ 0")));
+	TestEqual(TEXT("one without end shows it"), CheeseStrikeWeapons::ReserveLabel(-1), FString(TEXT("/ ∞")));
+	return true;
+}
+
 #endif

@@ -66,6 +66,8 @@ public:
 	int32 GetMagazine() const { return Magazine; }
 	/** Rounds in reserve; below zero, there is no end to them. */
 	int32 GetReserve() const { return Reserve; }
+	/** Whether it never runs out of rounds to reload with: its stats say so (the Curd Pistol), or a mode made it so (Gun Game). */
+	bool HasEndlessReserve() const { return Reserve < 0; }
 	/** What the HUD shows of its rounds: "12 / 72", or "8" for one with rounds without end, or nothing for the knife. */
 	FString DescribeRounds() const;
 	bool IsReloading() const;
@@ -139,6 +141,8 @@ public:
 	void StartReload();
 	/** Server only: adds `Rounds` to the reserve, up to the most it can hold. */
 	void AddReserve(int32 Rounds);
+	/** Server only: gives it rounds without end to reload with (Gun Game's weapons); it still reloads. */
+	void MakeReserveEndless();
 
 	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
 	USkeletalMeshComponent* GetThirdPersonMesh() const { return ThirdPersonMesh; }

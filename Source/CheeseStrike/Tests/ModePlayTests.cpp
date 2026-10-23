@@ -750,6 +750,8 @@ bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
 		TestEqual(TEXT("everyone starts on the first weapon"), HeldId(Host), Ladder[0]);
 		TestFalse(TEXT("and nothing else: no knife"), Host->GetInventory()->CanDraw(EWeaponSlot::Knife));
 		TestFalse(TEXT("no pistol"), Host->GetInventory()->CanDraw(EWeaponSlot::Sidearm));
+		TestTrue(TEXT("its rounds never run out"), Host->GetWeapon() != nullptr && Host->GetWeapon()->HasEndlessReserve());
+		TestTrue(TEXT("as its player's machine knows"), Character(0) != nullptr && Character(0)->GetWeapon() != nullptr && Character(0)->GetWeapon()->HasEndlessReserve());
 	});
 	// Every way of changing weapons does nothing: there is nothing to change to, and the HUD lists only the one.
 	Play(0, TEXT("tap Knife\nwait 0.3\ntap Sidearm\nwait 0.3\ntap NextWeapon\nwait 0.3\ntap PreviousWeapon\nwait 0.3\ntap LastWeapon\nwait 0.3"));
@@ -777,6 +779,7 @@ bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
 		TestEqual(TEXT("and holds the next weapon at once"), HeldId(CharacterOf(1, 0)), Ladder[1]);
 		TestFalse(TEXT("and nothing else"), CharacterOf(1, 0)->GetInventory()->CanDraw(EWeaponSlot::Knife) || CharacterOf(1, 0)->GetInventory()->CanDraw(EWeaponSlot::Sidearm));
 		TestEqual(TEXT("on its own machine too"), HeldId(Character(1)), Ladder[1]);
+		TestTrue(TEXT("the next weapon's rounds never run out either"), CharacterOf(1, 0)->GetWeapon()->HasEndlessReserve());
 		TestEqual(TEXT("the host stays where it was"), StateOf(0, 0)->GetGunLevel(), 0);
 		TestFalse(TEXT("the joiner earns no streak"), StateOf(1, 0)->GetStreak() > 0);
 		// Up to the last step: the knife only.
