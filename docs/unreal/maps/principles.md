@@ -26,7 +26,7 @@ Counter-Strike's maps (Dust2, Mirage, Inferno, Nuke) have been played for twenty
 
 Design the closed map and the open map, and the way from one to the other. For each structure write down what it does before the mice and after them; each map's notes have that table (The Creamery's "The cheese, and what the mice change"). Good structures change the fight when they go: a wall of wheels that closes a lane and, eaten, opens a 130 m line; a seal on a door that, eaten, joins two lanes; a house that is a fortress and becomes an open deck. A structure that is eaten without changing anything is only clutter.
 
-Order the change. The mice eat what is nearest them and lowest first (below), and everything within about five minutes, so decide which structures should go in the first minute or two, which by the third and which last, and place them and the mice's ways in to suit.
+Order the change. The mice eat what is nearest them and lowest first (below), and everything within about a minute and a half, so decide which structures should go in the first half minute, which in the next and which last, and place them and the mice's ways in to suit.
 
 ### What the mice never eat
 
@@ -42,12 +42,12 @@ Cheese the mice must leave is marked not edible (`ACheeseStrikeCheese::bEdible`,
 
 ### How fast the mice eat
 
-- A block has 400 of eating in it, whatever its size; a mouse bites every half second, 40 at the usual pace (five seconds a block), more when the mice are behind a steady eating that leaves every map bare about five minutes after they come, less when ahead (`CheeseStrikeMice::Pace`). A 1 m cube and a 3 m slab go as fast.
-- One mouse comes for every 60 edible blocks, two at the least and ten at the most: a map with 570 blocks or more gets all ten.
-- So however much cheese a map has, it is gone about four to five minutes after the mice come (each map's `CheeseStrike.Play.AfterTheMice` checks it): about a sixth of it in the first minute, then steadily.
+- A block has 400 of eating in it, whatever its size; a mouse bites every half second, 100 at the usual pace (two seconds a block), more (up to the whole block at a bite) when the mice are behind a steady eating that leaves every map bare about a minute and a quarter after they come, less when ahead (`CheeseStrikeMice::Pace`). A 1 m cube and a 3 m slab go as fast.
+- One mouse comes for every 25 edible blocks, three at the least and twenty-four at the most: a map with 590 blocks or more gets all twenty-four.
+- So however much cheese a map has, it is gone a minute to a minute and a half after the mice come (each map's `CheeseStrike.Play.AfterTheMice` checks it): about a third of it in the first 25 seconds, then steadily. Until 23 Oct 2026 it was five minutes, which in a match looked like the mice barely eating: most matches were over, or the players had stopped looking, before half of it was gone.
 - The order matters, not the amount: what goes first is what is nearest the ways in and low down. A map that should keep its middle longest puts its cheese there high or far from the ways in.
-- A mouse goes for the cheapest block: its distance, plus four times its height above the mouse's feet, plus 13 m if another mouse has it. So the mice eat near where they come in, low down first, and spread out. Put the ways in (`kit.mouse_entries`, ten on The Creamery for eight mice) where you want the eating to start, mirrored on a mirrored map, and never on top of a spawn.
-- A mouse reaches 2.6 m across from its middle and 4 m up from its feet, and eats standing beside a block, never on top of it. What is out of reach is eaten when what is under it is eaten and it comes down, or by a mouse that walks up to it (they climb ramps and stairs on the navigation mesh). Every edible block goes within about five minutes of the mice coming (`CheeseStrike.Play.AfterTheMice` checks every map): a block with nowhere to stand beside it that a mouse can walk to, it leaps to from as near as it can walk, and a block standing alone it leaps onto and eats from on top. Still, leave a mouse room (a metre and a half) round what it should eat: leaping is a last resort, and looks it.
+- A mouse goes for the cheapest block: its distance, plus four times its height above the mouse's feet, plus 13 m if another mouse has it, plus up to 15 m for each other mouse near it and each other mouse's block near it, less the further off, none past 20 m (`CheeseStrikeMice::CrowdCost`). So the mice eat near where they come in, low down first, and spread out over the map rather than eat in a crowd. Put the ways in (`kit.mouse_entries`, ten on The Creamery for eight mice) where you want the eating to start, mirrored on a mirrored map, and never on top of a spawn.
+- A mouse reaches 2.6 m across from its middle and 4 m up from its feet, and eats standing beside a block, never on top of it. What is out of reach is eaten when what is under it is eaten and it comes down, or by a mouse that walks up to it (they climb ramps and stairs on the navigation mesh). Every edible block goes within about a minute and a half of the mice coming (`CheeseStrike.Play.AfterTheMice` checks every map): a block with nowhere to stand beside it that a mouse can walk to, it leaps to from as near as it can walk, and a block standing alone it leaps onto and eats from on top. Still, leave a mouse room (a metre and a half) round what it should eat: leaping is a last resort, and looks it.
 - Shooting a mouse (300 of damage) sends it off for six seconds: players can protect a structure for a while.
 
 King of the Hill wants three to five hill spots (`kit.hill_spots`), which its hill goes round, a minute at each:
@@ -114,7 +114,7 @@ Every part of a map a player would tell a teammate about has a name (`kit.place_
 
 ### A roof over a map
 
-A cellar or a cave has a ceiling: make it `kit.overhead` (`kit.ceiling` for a slab), so it blocks nothing: the streaks' wheels fall through it, shots and sight pass it, and the minimap and the navigation mesh leave it out; nobody can reach it anyway. It is tagged `Ceiling`, and `CheeseStrikeHideTagged Ceiling` hides it in the game for pictures from above (`tools/play/labyrinth_tour.txt`). Close it all round (walls up through it, its pieces overlapping), or daylight leaks in at its edges; an opening in it (The Labyrinth's oculus) brings in the sun.
+A cellar or a cave has a ceiling: make it `kit.overhead` (`kit.ceiling` for a slab), so it blocks nothing: shots and sight pass it, and the minimap and the navigation mesh leave it out; nobody can reach it anyway. The streaks find it by its bounds (`FCheeseStrikeOverhead`, as they find a roof that blocks by a trace): the Unmanned Aerial Cheese flies under it, and a Cheese Strike's wheels burst through it onto the floor. It is tagged `Ceiling`, and `CheeseStrikeHideTagged Ceiling` hides it in the game for pictures from above (`tools/play/labyrinth_tour.txt`). Close it all round (walls up through it, its pieces overlapping), or daylight leaks in at its edges; an opening in it (The Labyrinth's oculus) brings in the sun.
 
 ### Lighting for readability
 
