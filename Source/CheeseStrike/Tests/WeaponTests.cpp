@@ -99,20 +99,35 @@ bool FTheKnifeReachesAndStabsInTheBack::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeWeapons;
 	const FWeaponStats& Knife = CheeseStrikeWeapons::Knife();
 	TestTrue(TEXT("it is the knife's slot"), Knife.IsMelee() && Knife.Slot == EWeaponSlot::Knife);
-	TestTrue(FString::Printf(TEXT("it reaches 4.5 of the design's metres: 150 cm (%.0f)"), Knife.Reach), FMath::IsNearlyEqual(Knife.Reach, 150.0f, 0.5f));
+	TestTrue(FString::Printf(TEXT("it reaches the design's 4.5 metres and a step (it swipes rather than lunges): 180 cm (%.0f)"), Knife.Reach), FMath::IsNearlyEqual(Knife.Reach, 180.0f, 0.5f));
 	TestEqual(TEXT("55 from the front"), Knife.Damage, 55.0f);
 	TestFalse(TEXT("it fires no rounds"), Knife.UsesRounds());
 
 	const TArray<FVector> Fan = SweepDirections(Knife, FVector::ForwardVector);
-	TestEqual(TEXT("five ways: straight, and two either side"), Fan.Num(), 5);
 	TestTrue(TEXT("straight first"), Fan.Num() > 0 && Fan[0].Equals(FVector::ForwardVector, 0.001f));
-	float Widest = 0.0f;
+	// The swipe's ways, by how far round each is (right positive): out to the sweep either side, nearer ones first, none far apart.
+	TArray<float> Angles;
+	float Last = 0.0f;
+	bool bNearerFirst = true;
 	for (const FVector& Way : Fan)
 	{
-		Widest = FMath::Max(Widest, FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Way, FVector::ForwardVector), -1.0f, 1.0f))));
+		const float Angle = FMath::RadiansToDegrees(FMath::Atan2(Way.Y, Way.X));
+		bNearerFirst &= FMath::Abs(Angle) >= Last - 0.01f;
+		Last = FMath::Abs(Angle);
+		Angles.Add(Angle);
 		TestTrue(TEXT("flat"), FMath::IsNearlyZero(Way.Z, 0.001f));
 	}
-	TestTrue(FString::Printf(TEXT("sweeping 16 degrees either side (%.1f)"), Widest), FMath::IsNearlyEqual(Widest, 16.0f, 0.1f));
+	Angles.Sort();
+	TestTrue(TEXT("nearer ways are tried first"), bNearerFirst);
+	TestTrue(FString::Printf(TEXT("sweeping 45 degrees either side (%.1f to %.1f)"), Angles[0], Angles.Last()), FMath::IsNearlyEqual(Angles[0], -45.0f, 0.1f) && FMath::IsNearlyEqual(Angles.Last(), 45.0f, 0.1f));
+	float Gap = 0.0f;
+	for (int32 Each = 1; Each < Angles.Num(); ++Each)
+	{
+		Gap = FMath::Max(Gap, Angles[Each] - Angles[Each - 1]);
+	}
+	// At its reach, a gap no wider than a body (the capsule's 68 cm) between the ways tried.
+	const float Between = 2.0f * Knife.Reach * FMath::Sin(FMath::DegreesToRadians(Gap) * 0.5f);
+	TestTrue(FString::Printf(TEXT("with no gap a body could stand in (%.0f degrees, %.0f cm at its reach)"), Gap, Between), Between < 2.0f * CheeseStrikeMovement::CapsuleRadius);
 
 	// Someone facing +X, struck going +X, is struck in the back.
 	TestTrue(TEXT("a stroke the way they face is in the back"), FromBehind(FVector::ForwardVector, 0.0f));
@@ -122,7 +137,6 @@ bool FTheKnifeReachesAndStabsInTheBack::RunTest(const FString& Parameters)
 	TestTrue(TEXT("whichever way they face"), FromBehind(FVector::RightVector, 90.0f));
 	TestTrue(TEXT("in the back, it kills at a stroke"), StrokeDamage(Knife, FVector::ForwardVector, 0.0f) >= MaxHealth);
 	TestEqual(TEXT("from the front, two strokes"), StrokeDamage(Knife, FVector::BackwardVector, 0.0f), 55.0f);
-	TestTrue(TEXT("its stroke lunges at the design's 7 against its 6 m/s walk"), FMath::IsNearlyEqual(Knife.LungeSpeed, CheeseStrikeMovement::LungeSpeed) && FMath::IsNearlyEqual(Knife.LungeSpeed / CheeseStrikeMovement::WalkSpeed, 7.0f / 6.0f));
 	TestTrue(TEXT("in a quarter of a second"), FMath::IsNearlyEqual(Knife.SwingTime, 0.25f));
 	return true;
 }
@@ -160,9 +174,8 @@ bool FWeaponsAreLifeSizeAndComeUpInTime::RunTest(const FString& Parameters)
 	TestFalse(TEXT("but not much"), IsDrawn(Munster(), 10.0f, 10.7f, DrawAllowance));
 	TestTrue(TEXT("put in hand at once, it can fire at once"), IsDrawn(Munster(), -1000.0f, 0.0f));
 	// Carrying.
-	TestTrue(TEXT("a heavy weapon slows its carrier"), FMath::IsNearlyEqual(CheeseStrikeMovement::WithWeapon(450.0f, true, false), 450.0f * 0.85f));
-	TestTrue(TEXT("a lunge is quicker than a walk"), CheeseStrikeMovement::WithWeapon(CheeseStrikeMovement::WalkSpeed, false, true) > CheeseStrikeMovement::WalkSpeed);
-	TestEqual(TEXT("but never slows a sprint"), CheeseStrikeMovement::WithWeapon(675.0f, false, true), 675.0f);
+	TestTrue(TEXT("a heavy weapon slows its carrier"), FMath::IsNearlyEqual(CheeseStrikeMovement::WithWeapon(450.0f, true), 450.0f * 0.85f));
+	TestEqual(TEXT("another doesn't"), CheeseStrikeMovement::WithWeapon(675.0f, false), 675.0f);
 	// Rounds.
 	TestTrue(TEXT("the Curd Pistol's rounds never run out"), Pistol().HasEndlessReserve());
 	for (const FWeaponStats* Weapon : CheeseStrikeArsenal::All())

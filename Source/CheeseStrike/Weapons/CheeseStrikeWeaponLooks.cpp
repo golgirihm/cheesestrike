@@ -56,6 +56,7 @@ namespace
 			Look.ReloadAnimation = TEXT("/Game/Weapons/Rifle/Animations/Weap_Rifle_Reload.Weap_Rifle_Reload");
 			Look.Materials[0] = Material(TEXT("MI_Blaster"));
 			Look.Muzzle = FVector(0.0f, 69.0f, 4.0f);
+			Look.LeftHand = FVector(0.0f, 33.0f, 3.5f);
 			RifleSounds(Look, 1.0f, 1.0f);
 			Looks.Add(Look);
 		}
@@ -71,7 +72,7 @@ namespace
 			// Its scope is taken off (MI_CarbineScope): aimed along the rail, the HUD's dot the sight.
 			Look.Sight = FVector(0.0f, -17.0f, 8.0f);
 			Look.Muzzle = FVector(0.0f, 34.4f, 0.0f);
-			Look.LeftHand = FVector(0.0f, 17.0f, -1.0f);
+			Look.LeftHand = FVector(0.0f, 17.0f, 0.0f);
 			RifleSounds(Look, 0.95f, 1.08f);
 			Looks.Add(Look);
 		}
@@ -85,7 +86,7 @@ namespace
 			Look.Sight = FVector(-1.5f, -23.0f, 18.6f);
 			Look.Muzzle = FVector(-1.5f, 32.3f, 15.0f);
 			Look.FlashSize = 0.8f;
-			Look.LeftHand = FVector(-1.5f, 12.0f, 13.5f);
+			Look.LeftHand = FVector(-1.5f, 14.0f, 13.0f);
 			RifleSounds(Look, 0.85f, 1.22f);
 			Looks.Add(Look);
 		}
@@ -99,7 +100,7 @@ namespace
 			Look.Sight = FVector(8.7f, -14.0f, 23.6f);
 			Look.Muzzle = FVector(8.7f, 48.0f, 20.3f);
 			Look.FlashSize = 1.2f;
-			Look.LeftHand = FVector(8.7f, 2.0f, 18.5f);
+			Look.LeftHand = FVector(8.7f, 13.0f, 18.5f);
 			RifleSounds(Look, 1.1f, 0.85f);
 			Looks.Add(Look);
 		}
@@ -115,6 +116,7 @@ namespace
 			Look.Sight = FVector(0.0f, -12.0f, 15.5f);
 			Look.Muzzle = FVector(0.0f, 43.0f, 3.0f);
 			Look.FlashSize = 1.5f;
+			Look.LeftHand = FVector(0.0f, 32.0f, 3.0f);
 			Look.Shots[0] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Punch_01.Weapons_Shotgun_Punch_01");
 			Look.Shots[1] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Punch_02.Weapons_Shotgun_Punch_02");
 			Look.Shots[2] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Punch_03.Weapons_Shotgun_Punch_03");
@@ -135,7 +137,7 @@ namespace
 			Look.Sight = FVector(295.0f, -130.0f, 75.0f);
 			Look.Muzzle = FVector(295.0f, 671.0f, 50.0f);
 			Look.FlashSize = 1.4f;
-			Look.LeftHand = FVector(295.0f, 150.0f, 5.0f);
+			Look.LeftHand = FVector(295.0f, 200.0f, 12.0f);
 			RifleSounds(Look, 1.25f, 0.62f);
 			Looks.Add(Look);
 		}
@@ -151,6 +153,7 @@ namespace
 			Look.Sight = FVector(0.0f, -32.0f, 10.6f);
 			Look.Muzzle = FVector(0.0f, 19.0f, 7.5f);
 			Look.FlashSize = 0.6f;
+			Look.LeftHand = FVector(-3.0f, 9.5f, 1.5f);
 			Look.Shots[0] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_01.Weapons_Pistol_Punch-Close_01");
 			Look.Shots[1] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_02.Weapons_Pistol_Punch-Close_02");
 			Look.Shots[2] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_03.Weapons_Pistol_Punch-Close_03");
@@ -170,6 +173,8 @@ namespace
 			Look.PlainModel = TEXT("/Game/CheeseStrike/Weapons/Knife/SM_CheeseKnife.SM_CheeseKnife");
 			// Turned about its length so that its flat shows, tipped up out of the fist, and turned to point forward.
 			Look.Model = FTransform(FQuat(FRotator(0.0f, 180.0f, 0.0f)) * FQuat(FRotator(0.0f, 0.0f, 40.0f)) * FQuat(FRotator(60.0f, 0.0f, 0.0f)));
+			// It came in pointing back: its tip is along -Y.
+			Look.Along = FVector(0.0f, -1.0f, 0.0f);
 			Look.Materials[0] = Material(TEXT("MI_KnifeSteel"));
 			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
 			Look.FlashSize = 0.0f;
@@ -182,33 +187,21 @@ namespace
 
 namespace CheeseStrikeWeaponLooks
 {
-	FVector HipHand(ECheeseStrikeHold Hold)
+	FTransform HipFromAimed(ECheeseStrikeHold Hold)
 	{
-		// As Lt. Belica's standing idles have them (tools/play/hip_measure.txt measures every hero's). Crouched, Lyra's
-		// sets bring the hand 7 to 11 cm up the view, and the pistol's 8 to 13 cm nearer.
+		// Low on the right, the muzzle turned in a little toward the middle of the view and the top canted in.
 		switch (Hold)
 		{
 		case ECheeseStrikeHold::Pistol:
-			return FVector(32.0f, 8.0f, -15.0f);
-		case ECheeseStrikeHold::Knife:
-			return FVector(32.0f, 8.0f, -16.0f);
+			return FTransform(FRotator(2.0f, -2.0f, -8.0f), FVector(2.0f, 8.0f, -9.0f));
 		default:
-			return FVector(3.0f, 9.0f, -17.0f);
+			return FTransform(FRotator(0.0f, -2.0f, -10.0f), FVector(10.0f, 9.0f, -7.0f));
 		}
 	}
 
-	FVector HipAlong(ECheeseStrikeHold Hold)
+	FVector KnifeHand()
 	{
-		// Crouched, the rifle's and the shotgun's turn 9 degrees up and 9 in towards the middle of the view.
-		switch (Hold)
-		{
-		case ECheeseStrikeHold::Pistol:
-			return FVector(0.98f, 0.22f, 0.02f).GetSafeNormal();
-		case ECheeseStrikeHold::Knife:
-			return FVector(-0.72f, -0.25f, -0.65f).GetSafeNormal();
-		default:
-			return FVector(1.0f, 0.09f, 0.02f).GetSafeNormal();
-		}
+		return FVector(30.0f, 16.0f, -17.0f);
 	}
 
 	const TCHAR* const KnifeSwings[4] = {

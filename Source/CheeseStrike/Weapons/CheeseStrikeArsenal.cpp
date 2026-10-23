@@ -229,14 +229,13 @@ namespace CheeseStrikeWeapons
 			Weapon.Reserve = 0;
 			Weapon.ReserveMax = 0;
 			Weapon.ReloadTime = 0.0f;
-			Weapon.Reach = 4.5f * ArsenalGodotMetre;
+			// A swipe rather than the design's lunge: a little more reach (the design's 4.5 m and a step more) and a wide sweep.
+			Weapon.Reach = 5.4f * ArsenalGodotMetre;
 			Weapon.MaxRange = Weapon.Reach;
 			Weapon.FalloffStart = 0.0f;
 			Weapon.FalloffEnd = 0.0f;
-			Weapon.SweepDegrees = 16.0f;
+			Weapon.SweepDegrees = 45.0f;
 			Weapon.SwingTime = 0.25f;
-			// The design's 7 m/s against its 6 m/s walk: the same ratio over our walk.
-			Weapon.LungeSpeed = CheeseStrikeMovement::WalkSpeed * 7.0f / 6.0f;
 			Weapon.SpreadDegrees = 0.0f;
 			Weapon.HipSpreadDegrees = 0.0f;
 			Weapon.BloomShots = 1;

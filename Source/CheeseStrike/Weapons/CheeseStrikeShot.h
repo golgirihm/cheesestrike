@@ -80,12 +80,11 @@ struct FWeaponStats
 	float DrawTime = 0.35f;
 	float CarrySpeed = 1.0f;
 
-	/** The knife: how far from the eyes it reaches, how many degrees either side of the aim its stroke sweeps, the damage of a stroke in the back, the seconds a stroke takes, and how fast the striker lunges with it (cm/s). */
+	/** The knife: how far from the eyes it reaches, how many degrees either side of the aim its swipe sweeps, the damage of a stroke in the back, and the seconds a stroke takes. */
 	float Reach = 0.0f;
 	float SweepDegrees = 0.0f;
 	float BackstabDamage = 0.0f;
 	float SwingTime = 0.0f;
-	float LungeSpeed = 0.0f;
 
 	bool IsMelee() const { return Slot == EWeaponSlot::Knife; }
 	/** Whether it never runs out of rounds to reload with. */
@@ -107,6 +106,8 @@ namespace CheeseStrikeWeapons
 	constexpr float MaxHealth = 100.0f;
 	/** Seconds a shot may come early after a weapon is drawn, for the network's jitter: the server allows it so much sooner than the draw time. */
 	constexpr float DrawAllowance = 0.15f;
+	/** A knife's swipe is tried along the aim and then this many degrees further to each side at a time, out to its sweep. */
+	constexpr float SweepStep = 9.0f;
 
 	/** What the HUD shows of a reserve beside the magazine: "/ 72", or "/ ∞" for rounds without end (below zero). */
 	FString ReserveLabel(int32 Reserve);
@@ -132,7 +133,7 @@ namespace CheeseStrikeWeapons
 	/** Whether a weapon drawn at `DrawnAt` (server time) can fire at `Now`, allowing `Allowance` seconds early. */
 	bool IsDrawn(const FWeaponStats& Weapon, float DrawnAt, float Now, float Allowance = 0.0f);
 
-	/** The directions a knife stroke along `Direction` (normalized) is tried in: straight first, then fanned out to each side, halfway and all the way to the sweep. */
+	/** The directions a knife stroke along `Direction` (normalized) is tried in: straight first, then fanned out to each side, a step at a time (SweepStep), all the way to the sweep. */
 	TArray<FVector> SweepDirections(const FWeaponStats& Knife, const FVector& Direction);
 	/** Whether a stroke along `Direction` lands in the back of someone facing `Yaw` degrees: from within a quarter turn of straight behind. */
 	bool FromBehind(const FVector& Direction, float Yaw);

@@ -62,14 +62,14 @@ namespace CheeseStrikeWeapons
 	TArray<FVector> SweepDirections(const FWeaponStats& Knife, const FVector& Direction)
 	{
 		TArray<FVector> Fan = {Direction};
-		for (const float Degrees : {Knife.SweepDegrees / 2.0f, Knife.SweepDegrees})
+		// Out from the aim to each side, nearer first, the last at the sweep's edge.
+		const int32 Steps = FMath::CeilToInt(Knife.SweepDegrees / SweepStep - KINDA_SMALL_NUMBER);
+		for (int32 Step = 1; Step <= Steps; ++Step)
 		{
-			if (Degrees > 0.0f)
+			const float Degrees = FMath::Min(Step * SweepStep, Knife.SweepDegrees);
+			for (const float Side : {-1.0f, 1.0f})
 			{
-				for (const float Side : {-1.0f, 1.0f})
-				{
-					Fan.Add(Direction.RotateAngleAxis(Degrees * Side, FVector::UpVector));
-				}
+				Fan.Add(Direction.RotateAngleAxis(Degrees * Side, FVector::UpVector));
 			}
 		}
 		return Fan;

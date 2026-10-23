@@ -126,16 +126,18 @@ bool FItChangesWeapons::RunTest(const FString& Parameters)
 			Before = Character->GetActorLocation();
 		}
 	});
-	// 3 draws the knife; a stroke lunges forward.
-	Play(0, TEXT("tap Knife\nwait 0.4\ntap Fire\nwait 0.4"));
+	// 3 draws the knife; a stroke swipes, where the striker stands.
+	Play(0, TEXT("tap Knife\nwait 0.4\ntap Fire\nwait 0.15"));
 	Then([this]()
 	{
 		if (ACheeseStrikeCharacter* Character = Pawn(0))
 		{
 			TestEqual(TEXT("3 draws the knife"), HeldId(Character), CheeseStrikeWeapons::Knife().Id);
 			TestEqual(TEXT("which strikes"), Character->GetWeapon()->ShotsFired, 1);
-			const float Lunged = FVector::DotProduct(Character->GetActorLocation() - Before, FRotator(0.0f, JoinerYaw, 0.0f).Vector());
-			TestTrue(FString::Printf(TEXT("lunging forward (%.0f cm)"), Lunged), Lunged > 40.0f && Lunged < 250.0f);
+			const float Swipe = Character->GetWeapon()->SwipePhase();
+			TestTrue(FString::Printf(TEXT("swiping (%.2f of the way)"), Swipe), Swipe > 0.0f && Swipe < 1.0f);
+			const float Moved = FVector::Dist2D(Character->GetActorLocation(), Before);
+			TestTrue(FString::Printf(TEXT("without lunging (%.0f cm)"), Moved), Moved < 10.0f);
 			TestEqual(TEXT("it shows no rounds"), Character->GetWeapon()->DescribeRounds(), FString());
 			TestTrue(TEXT("and only the knife shows"), OnlyHeldShows(Character));
 		}

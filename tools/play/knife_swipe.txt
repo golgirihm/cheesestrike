@@ -1,0 +1,46 @@
+# Looks at the knife on guard and through a swipe, in first person and from outside (right, left, in front), for
+# Lt. Belica and then Murdock. Run with -FixedFps 30 so that the swipe's frames come out where they should:
+# tools/play.ps1 -Script tools/play/knife_swipe.txt -Tag knife -FixedFps 30.
+wait 2
+cmd CheeseStrikeBody 0 1
+tap Knife
+wait 1.5
+shot k_fp_guard
+tap Fire
+wait 0.06
+shot k_fp_s1
+wait 0.08
+shot k_fp_s2
+wait 0.08
+shot k_fp_s3
+wait 0.08
+shot k_fp_s4
+wait 0.6
+cmd CheeseStrikeOutside 180 70 20
+wait 0.6
+shot k_tp_guard_right
+cmd CheeseStrikeOutside 180 -70 20
+wait 0.6
+shot k_tp_guard_left
+cmd CheeseStrikeOutside 200 0 20
+wait 0.6
+shot k_tp_guard_front
+tap Fire
+wait 0.06
+shot k_tp_s1
+wait 0.08
+shot k_tp_s2
+wait 0.08
+shot k_tp_s3
+wait 0.08
+shot k_tp_s4
+wait 0.6
+cmd CheeseStrikeOutside
+cmd CheeseStrikeBody 1 0
+wait 1
+shot k_fp_guard_m
+cmd CheeseStrikeOutside 220 70 20
+wait 0.6
+shot k_tp_guard_right_m
+cmd CheeseStrikeOutside
+quit

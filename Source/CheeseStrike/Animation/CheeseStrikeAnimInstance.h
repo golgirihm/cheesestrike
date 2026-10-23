@@ -10,6 +10,7 @@
 #include "Animation/AnimNodeSpaceConversions.h"
 #include "AnimNodes/AnimNode_BlendSpacePlayer.h"
 #include "AnimNodes/AnimNode_LayeredBoneBlend.h"
+#include "CheeseStrikeArmsPose.h"
 #include "CheeseStrikeDownedPose.h"
 #include "CheeseStrikeExecutionPose.h"
 #include "CheeseStrikeGripIK.h"
@@ -111,11 +112,9 @@ struct FCheeseStrikeAnimSet
 	TObjectPtr<UAnimSequence> Fire;
 	UPROPERTY()
 	TObjectPtr<UAnimSequence> Reload;
-	/** Bringing the weapon up, a knife's stroke, and the free arm's guard (the knife's); each may be missing. */
+	/** Bringing the weapon up, and the free arm's guard (the knife's); each may be missing. */
 	UPROPERTY()
 	TObjectPtr<UAnimSequence> Equip;
-	UPROPERTY()
-	TObjectPtr<UAnimSequence> Stroke;
 	UPROPERTY()
 	TObjectPtr<UAnimSequence> Guard;
 	/** Throwing a grenade over the weapon held (Lyra's toss, the same for every way of holding); may be missing. */
@@ -141,16 +140,36 @@ struct FCheeseStrikeAnimSets
 	FCheeseStrikeAnimSet& Of(ECheeseStrikeHold Hold) { return Holds[static_cast<uint8>(Hold)]; }
 };
 
+/** What the arms in their own player's view are placed by (FCheeseStrikeViewHold), read from the character each frame. */
+struct FCheeseStrikeAnimInstanceView
+{
+	/** Whether to place them at all: its own player's body, alive (CheeseStrike.HipHold 0 leaves them to the animation). */
+	bool bPlace = false;
+	/** The view's turn in the body's component space, and the camera's place in its head bone's space. */
+	FQuat Turn = FQuat::Identity;
+	FVector CameraAtHead = FVector::ZeroVector;
+	/** Where the eye goes to aim down the weapon, in its model's own space. */
+	FVector Sight = FVector::ZeroVector;
+	bool bHasSight = false;
+	/** How far down the sights, how far still to come up as it is drawn, and whether sprinting. */
+	float Aimed = 0.0f;
+	float Lowered = 0.0f;
+	bool bSprinting = false;
+};
+
 /**
  * The body's animation, composed in code rather than in an animation
  * Blueprint, so that it can be read and changed as text and works for any
  * machine's copy of a character: standing, walking and jogging in four
  * directions, crouched still or walking in four, falling, aimed up and down
  * by the aim offsets (hip, down the sights, crouched), with a slot on top
- * for firing, reloading, drawing and striking, then for the knife the free
- * arm up on guard, and then the left hand held on the weapon
- * (FCheeseStrikeGripIK) except while a montage moves it, and last, for a
- * player down in Execution's last stand, the pose of one lying hurt on
+ * for firing, reloading and drawing, then for the knife the free arm up on
+ * guard; then, posed in code (CheeseStrikeArmsPose.h), a slide's sprawl
+ * (FCheeseStrikeSlidePose), the knife's fist, guard and swipe
+ * (FCheeseStrikeKnifeHold) and, for its own player's body, the weapon hand
+ * placed in view (FCheeseStrikeViewHold); then the left hand held on the
+ * weapon (FCheeseStrikeGripIK) except while a montage moves it; and last,
+ * for a player down in Execution's last stand, the pose of one lying hurt on
  * their back, propped up, the pistol out (FCheeseStrikeDownedPose), blended
  * in and out. The animations are
  * the set for how the weapon in hand is held (rifle, pistol, shotgun,
@@ -190,11 +209,21 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	float CrouchBlend = 0.0f;
 	float AirBlend = 0.0f;
 	float AimBlend = 0.0f;
-	/** How the weapon in hand is held, the set it plays now, and where the left hand reaches past its grip (cm, in the anchor's space). */
+	/** How the weapon in hand is held, the set it plays now, and where the left hand closes round it (cm, in the anchor's space), if it does. */
 	ECheeseStrikeHold Hold = ECheeseStrikeHold::Rifle;
 	ECheeseStrikeHold LinkedHold = ECheeseStrikeHold::Rifle;
-	FVector LeftHandShift = FVector::ZeroVector;
+	bool bLeftHandHolds = false;
+	FVector LeftHandHold = FVector::ZeroVector;
 	float GuardBlend = 0.0f;
+	float KnifeBlend = 0.0f;
+	float TwoHandBlend = 1.0f;
+	/** The weapon's model in the hand, which way it points, the knife's swipe and the arms in view (UCheeseStrikeAnimInstance's of the same names); the sprint's and the slide's blends. */
+	FTransform ModelInHand = FTransform::Identity;
+	FVector ModelAlong = FVector(0.0, 1.0, 0.0);
+	float SwipePhase = -1.0f;
+	FCheeseStrikeAnimInstanceView View;
+	float SprintBlend = 0.0f;
+	float SlideBlend = 0.0f;
 	/** Down: how far (0 to 1, at an even pace; the pose takes it smoothed), how much the legs scoot, where they are in their pushes and the breath's phase (radians). */
 	float DownLinear = 0.0f;
 	float ScootBlend = 0.0f;
@@ -213,8 +242,6 @@ protected:
 	void Link(FName GripAnchor);
 	/** Gives the nodes `Set`'s animations: at first, and when the way the weapon is held changes. */
 	void Assign(const FCheeseStrikeAnimSet& Set);
-	/** After a change of hold, the left hand's grip is measured afresh once nothing plays in the slot. */
-	bool bGripPending = false;
 
 	FAnimNode_SequencePlayer_Standalone Idle;
 	FAnimNode_SequencePlayer_Standalone IdleAiming;
@@ -270,6 +297,10 @@ protected:
 	 * it off; a montage (the reload) has the hand to itself.
 	 */
 	FAnimNode_ConvertLocalToComponentSpace ToComponentSpace;
+	/** Posed in code: sliding, the knife, and the weapon in its own player's view. */
+	FCheeseStrikeSlidePose SlidePose;
+	FCheeseStrikeKnifeHold KnifeHold;
+	FCheeseStrikeViewHold ViewHold;
 	FCheeseStrikeGripIK LeftHand;
 	/** Down in Execution's last stand: on their back, propped on the elbow, the pistol out. */
 	FCheeseStrikeDownedPose Downed;
@@ -352,9 +383,17 @@ public:
 	/** The body's yaw last frame, for its turning. */
 	float LastYaw = 0.0f;
 	bool bLastYawKnown = false;
-	/** How the weapon in hand is held, and where the left hand reaches past its grip on it, in the anchor bone's space (cm). */
+	/** How the weapon in hand is held, and where the left hand closes round it, in the anchor bone's space (cm), if it does. */
 	ECheeseStrikeHold Hold = ECheeseStrikeHold::Rifle;
-	FVector LeftHandShift = FVector::ZeroVector;
+	bool bLeftHandHolds = false;
+	FVector LeftHandHold = FVector::ZeroVector;
+	/** The weapon's model in this body's hand bone's space, and which way its business end points in its own space. */
+	FTransform ModelInHand = FTransform::Identity;
+	FVector ModelAlong = FVector(0.0, 1.0, 0.0);
+	/** The knife's swipe (none below 0). */
+	float SwipePhase = -1.0f;
+	/** The arms in view, for its own player's body. */
+	FCheeseStrikeAnimInstanceView View;
 
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 

@@ -11,6 +11,10 @@
 #include "PhysicsEngine/PhysicsConstraintTemplate.h"
 #include "PhysicsEngine/SkeletalBodySetup.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
+#include "Animation/CheeseStrikeArmsPose.h"
+#include "Movement/CheeseStrikeMovement.h"
+#include "Weapons/CheeseStrikeArsenal.h"
+#include "Weapons/CheeseStrikeShot.h"
 #include "Animation/CheeseStrikeBodies.h"
 #include "Materials/MaterialInterface.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -93,7 +97,7 @@ bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 		}
 	}
 	// Every hero holds every weapon its own way: the pistol's set, the shotgun's firing and reloading, the knife's
-	// stroke and guard, and draws them; all retargeted to its own skeleton.
+	// guard, and draws them; all retargeted to its own skeleton.
 	for (int32 Index = 0; Index < Heroes->GetSets().Num(); ++Index)
 	{
 		const FCheeseStrikeAnimSets& Body = Heroes->GetSets()[Index];
@@ -107,11 +111,11 @@ bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the shotgun walks as the rifle does"), Shotgun.Idle == Rifle.Idle);
 		TestTrue(FString::Printf(TEXT("%s fires and reloads the shotgun its own way"), *Who), Shotgun.Fire != nullptr && Shotgun.Fire != Rifle.Fire && Shotgun.Reload != nullptr && Shotgun.Reload != Rifle.Reload);
 		const FCheeseStrikeAnimSet& Knife = Body.For(ECheeseStrikeHold::Knife);
-		TestTrue(FString::Printf(TEXT("%s strikes with the knife, the free arm on guard"), *Who), Knife.Stroke != nullptr && Knife.Guard != nullptr && Knife.Idle == Pistol.Idle);
+		TestTrue(FString::Printf(TEXT("%s holds the knife as the pistol, the free arm on guard"), *Who), Knife.Guard != nullptr && Knife.Idle == Pistol.Idle);
 		TestTrue(FString::Printf(TEXT("%s throws a grenade with whatever it holds"), *Who), Rifle.Throw != nullptr && Pistol.Throw == Rifle.Throw && Shotgun.Throw == Rifle.Throw && Knife.Throw == Rifle.Throw);
 		for (const UAnimationAsset* Each : {static_cast<const UAnimationAsset*>(Pistol.Idle.Get()), static_cast<const UAnimationAsset*>(Pistol.AimHip.Get()),
 			static_cast<const UAnimationAsset*>(Pistol.Equip.Get()), static_cast<const UAnimationAsset*>(Rifle.Equip.Get()), static_cast<const UAnimationAsset*>(Shotgun.Fire.Get()),
-			static_cast<const UAnimationAsset*>(Shotgun.Reload.Get()), static_cast<const UAnimationAsset*>(Knife.Stroke.Get()), static_cast<const UAnimationAsset*>(Knife.Guard.Get()),
+			static_cast<const UAnimationAsset*>(Shotgun.Reload.Get()), static_cast<const UAnimationAsset*>(Knife.Guard.Get()),
 			static_cast<const UAnimationAsset*>(Rifle.Throw.Get())})
 		{
 			TestTrue(FString::Printf(TEXT("%s's are all on its skeleton"), *Who), Each != nullptr && Rifle.Idle != nullptr && Each->GetSkeleton() == Rifle.Idle->GetSkeleton());
@@ -276,7 +280,7 @@ bool FTheRagdollBendsAsABodyDoes::RunTest(const FString& Parameters)
 	return true;
 }
 
-#endif
+
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FADownedPlayerBreathesHard, "CheeseStrike.Animation.ADownedPlayerBreathesHard", AnimationTests::Flags)
 
@@ -298,3 +302,63 @@ bool FADownedPlayerBreathesHard::RunTest(const FString& Parameters)
 	TestTrue(TEXT("a laboured breath: quicker than a resting one, slower than panting"), BreathsPerMinute > 16.0f && BreathsPerMinute < 40.0f);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheArmsKeepToTheirRules, "CheeseStrike.Animation.TheArmsKeepToTheirRules", AnimationTests::Flags)
+
+bool FTheArmsKeepToTheirRules::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeArms;
+	// Following is the same however the time is cut into frames.
+	const float Once = Follow(SteadyRate, 0.1f);
+	const float Twice = 1.0f - FMath::Square(1.0f - Follow(SteadyRate, 0.05f));
+	TestTrue(FString::Printf(TEXT("a follow goes as far in one frame as in two of half the time (%.4f, %.4f)"), Once, Twice), FMath::IsNearlyEqual(Once, Twice, 1.0e-4f));
+	TestTrue(TEXT("and never past where it follows"), Follow(SteadyRate, 10.0f) <= 1.0f && Follow(SteadyRate, 0.0f) == 0.0f);
+	TestTrue(TEXT("the steady follow takes out a 30 Hz shake but keeps a walk's bob"), SteadyRate < UE_TWO_PI * 30.0f / 5.0f && SteadyRate > UE_TWO_PI * 2.0f);
+
+	// The knife: on guard the blade points ahead and up, its spine up; a swipe starts and ends on guard.
+	const FKnifeAt Guard = KnifeGuard();
+	TestTrue(TEXT("on guard the blade points ahead and up"), Guard.Blade.X > 0.7f && Guard.Blade.Z > 0.2f);
+	TestTrue(TEXT("its spine is across the blade"), FMath::Abs(FVector::DotProduct(Guard.Blade, Guard.Spine)) < 1.0e-3f && Guard.Spine.Z > 0.5f);
+	for (const float Phase : {0.0f, 1.0f})
+	{
+		const FKnifeAt At = KnifeSwipe(Phase);
+		TestTrue(FString::Printf(TEXT("at %.0f of the swipe the knife is on guard"), Phase), At.Hand.IsNearlyZero(0.01f) && At.Blade.Equals(Guard.Blade, 0.01f) && At.Spine.Equals(Guard.Spine, 0.01f));
+	}
+	// Raised by the right shoulder, then swept down across to the left, the blade sweeping round with it.
+	const FKnifeAt Raised = KnifeSwipe(0.2f);
+	const FKnifeAt Across = KnifeSwipe(0.58f);
+	TestTrue(FString::Printf(TEXT("the swipe draws back up on the right (%.0f, %.0f, %.0f)"), Raised.Hand.X, Raised.Hand.Y, Raised.Hand.Z), Raised.Hand.Y > 8.0f && Raised.Hand.Z > 8.0f);
+	TestTrue(FString::Printf(TEXT("and goes down across to the left (%.0f, %.0f, %.0f)"), Across.Hand.X, Across.Hand.Y, Across.Hand.Z), Across.Hand.Y < -20.0f && Across.Hand.Z < Raised.Hand.Z);
+	TestTrue(TEXT("the blade points right as it draws back, left as it ends"), Raised.Blade.Y > 0.5f && Across.Blade.Y < -0.5f);
+	float LastRight = 1000.0f;
+	bool bAcross = true;
+	for (float Phase = 0.2f; Phase <= 0.58f; Phase += 0.02f)
+	{
+		const FKnifeAt At = KnifeSwipe(Phase);
+		bAcross &= At.Hand.Y <= LastRight + 0.01f && FMath::IsNearlyEqual(At.Blade.Size(), 1.0f, 1.0e-3f);
+		LastRight = At.Hand.Y;
+	}
+	TestTrue(TEXT("sweeping steadily from right to left"), bAcross);
+	TestTrue(TEXT("smaller in view, as asked"), KnifeSwipe(0.58f, 0.5f).Hand.Equals(Across.Hand * 0.5f, 0.01f));
+	TestTrue(TEXT("a swipe is over well before the next stroke may come"), SwipeSeconds < CheeseStrikeWeapons::Knife().FireInterval);
+
+	// Sliding, as any machine can tell: crouched and faster than a crouched walk.
+	const float Crouched = CheeseStrikeMovement::WalkSpeed * CheeseStrikeMovement::CrouchFactor;
+	TestFalse(TEXT("a crouched walk is no slide"), LooksSliding(true, Crouched));
+	TestTrue(TEXT("crouched at a sprint is"), LooksSliding(true, CheeseStrikeMovement::WalkSpeed * CheeseStrikeMovement::SprintFactor));
+	TestFalse(TEXT("standing at a sprint isn't"), LooksSliding(false, CheeseStrikeMovement::WalkSpeed * CheeseStrikeMovement::SprintFactor));
+	TestTrue(TEXT("the slide lays the body all the way down at a sprint"), FMath::IsNearlyEqual(SlideDepth(CheeseStrikeMovement::WalkSpeed * CheeseStrikeMovement::SprintFactor), 1.0f));
+	TestTrue(TEXT("and none at a crouched walk"), FMath::IsNearlyZero(SlideDepth(Crouched)));
+	float Last = 0.0f;
+	bool bRising = true;
+	for (float Speed = 0.0f; Speed < 900.0f; Speed += 10.0f)
+	{
+		bRising &= SlideDepth(Speed) >= Last;
+		Last = SlideDepth(Speed);
+	}
+	TestTrue(TEXT("deeper the faster"), bRising);
+	TestTrue(TEXT("the view leans into a slide a little"), SlideTilt < 0.0f && SlideTilt > -12.0f);
+	return true;
+}
+
+#endif

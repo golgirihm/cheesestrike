@@ -132,18 +132,22 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEveryHoldHasAPlaceInView, "CheeseStrike.Weapon
 
 bool FEveryHoldHasAPlaceInView::RunTest(const FString& Parameters)
 {
-	// At the hip the hand holding the weapon is below the eye and to the right, never behind it, and the weapon points
-	// along the view: a pistol and a knife are held out in front, a rifle's hand is back by the cheek.
+	// At the hip every gun sits a little below where it is aimed and to its right, turned only a little, the same for
+	// every gun of a hold; the knife is held on guard in front, below the eye and to the right, within an arm's reach.
 	for (int32 Each = 0; Each < NumHolds; ++Each)
 	{
 		const ECheeseStrikeHold Hold = static_cast<ECheeseStrikeHold>(Each);
-		const FVector Hand = CheeseStrikeWeaponLooks::HipHand(Hold);
-		TestTrue(FString::Printf(TEXT("hold %d: the hand is below the eye, to the right"), Each), Hand.Z < -5.0f && Hand.Y > 0.0f && Hand.X >= 0.0f);
-		TestTrue(FString::Printf(TEXT("hold %d: within arm's reach"), Each), Hand.Size() < 60.0f);
-		TestTrue(FString::Printf(TEXT("hold %d: pointing a way"), Each), FMath::IsNearlyEqual(CheeseStrikeWeaponLooks::HipAlong(Hold).Size(), 1.0f, 1.0e-3f));
+		if (Hold == ECheeseStrikeHold::Knife)
+		{
+			continue;
+		}
+		const FTransform Hip = CheeseStrikeWeaponLooks::HipFromAimed(Hold);
+		const FVector Moved = Hip.GetLocation();
+		TestTrue(FString::Printf(TEXT("hold %d: lower and to the right than aimed (%.0f, %.0f, %.0f)"), Each, Moved.X, Moved.Y, Moved.Z), Moved.Z < -3.0f && Moved.Y > 3.0f && Moved.Size() < 25.0f);
+		TestTrue(FString::Printf(TEXT("hold %d: turned only a little (%.0f degrees)"), Each, FMath::RadiansToDegrees(Hip.GetRotation().GetAngle())), FMath::RadiansToDegrees(Hip.GetRotation().GetAngle()) < 15.0f);
 	}
-	TestTrue(TEXT("a pistol is held further out than a rifle"), CheeseStrikeWeaponLooks::HipHand(ECheeseStrikeHold::Pistol).X > CheeseStrikeWeaponLooks::HipHand(ECheeseStrikeHold::Rifle).X + 15.0f);
-	TestTrue(TEXT("guns point ahead"), CheeseStrikeWeaponLooks::HipAlong(ECheeseStrikeHold::Rifle).X > 0.9f && CheeseStrikeWeaponLooks::HipAlong(ECheeseStrikeHold::Pistol).X > 0.9f);
+	const FVector Knife = CheeseStrikeWeaponLooks::KnifeHand();
+	TestTrue(FString::Printf(TEXT("the knife is on guard in front, low on the right (%.0f, %.0f, %.0f)"), Knife.X, Knife.Y, Knife.Z), Knife.X > 10.0f && Knife.Y > 0.0f && Knife.Z < -5.0f && Knife.Size() < 60.0f);
 	return true;
 }
 
