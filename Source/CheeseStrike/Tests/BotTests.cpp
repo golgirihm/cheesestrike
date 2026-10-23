@@ -390,6 +390,14 @@ bool FABotFinishesFromOutsideTheAim::RunTest(const FString& Parameters)
 	constexpr float DownYaw = 117.0f;
 	StartPlaying({3, TEXT("?Mode=Execution?Rounds=1?Bots=1?BotSkill=2")});
 	WaitUntil(TEXT("a bot in the match"), 10.0f, []() { return Bots().Num() == 1 && BodyOf(Bots()[0]) != nullptr; });
+	// The joiners stay out of it: kept from the bot's fight by spawn protection. Their own runs out three seconds after
+	// they come in, which on a busy PC is before the bot is set going, and a bot fights anyone standing in sight before
+	// it tends someone down (it would shoot the enemy joiner down, leaving the host's side all down and out).
+	Then([]()
+	{
+		CharacterOf(1, 0)->CheeseStrikeProtect(300.0f);
+		CharacterOf(2, 0)->CheeseStrikeProtect(300.0f);
+	});
 	WaitUntil(TEXT("the navigation mesh"), 15.0f, []()
 	{
 		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World(0));

@@ -11,7 +11,9 @@
 #include "GameFramework/PlayerState.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/Crc.h"
+#include "Misc/PackageName.h"
 #include "Misc/Paths.h"
+#include "NavigationSystem.h"
 #include "Settings/LevelEditorPlaySettings.h"
 #include "Tests/AutomationCommon.h"
 #include "Tests/AutomationEditorCommon.h"
@@ -266,6 +268,18 @@ namespace PlayTesting
 			return true;
 		}));
 		WaitUntil(FString::Printf(TEXT("%d player(s) being in with their weapons"), Session.Players), 90.0f, &EveryoneIsIn);
+		// Playing the level the editor has open copies the editor's world, with its navigation mesh as it is then, and the
+		// copy builds only where something changes after. The editor builds its own a number of frames after opening the
+		// level, so a test that came first on a busy PC (few frames) got a mesh with holes, where its bots never went.
+		Then([Level]()
+		{
+			const UWorld* Editing = GEditor->GetEditorWorldContext().World();
+			UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World(0));
+			if (Editing != nullptr && Navigation != nullptr && Editing->GetOutermost()->GetName() == FPackageName::ObjectPathToPackageName(Level))
+			{
+				Navigation->Build();
+			}
+		});
 		if (PlayersTogether > 1)
 		{
 			// A joiner that has just come in hears nothing more from the server for a while (a second, or several on a busy PC),
