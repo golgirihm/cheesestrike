@@ -30,6 +30,8 @@ namespace CheeseStrikeSettings
 	constexpr float MaxFieldOfView = 110.0f;
 	/** Loudness, from 0 (silent) to 1. */
 	constexpr float DefaultVolume = 1.0f;
+	/** The music's, below the sounds' so that it sits under the menu's tones. */
+	constexpr float DefaultMusicVolume = 0.6f;
 
 	/** The field of view across a view `Aspect` (width over height) wide whose field of view top to bottom is `Vertical`: what the engine's camera takes. */
 	float HorizontalFieldOfView(float Vertical, float Aspect);
@@ -84,13 +86,18 @@ public:
 	void SetMasterVolume(float Value);
 	float GetEffectsVolume() const { return EffectsVolume; }
 	void SetEffectsVolume(float Value);
+	/** The menu's music (CheeseStrikeMusic). */
+	float GetMusicVolume() const { return MusicVolume; }
+	void SetMusicVolume(float Value);
 
 	/** The field of view top to bottom the camera has now, from the settings if there are any. */
 	static float FieldOfViewNow();
-	/** Puts the volumes on the sound: the master volume on everything, the effects volume on every sound but the menu's (MenuSoundClass). Every sound class it sets is kept loaded from then on, as the audio device keeps pointing at it. */
+	/** Puts the volumes on the sound: the master volume on everything, the music volume on the music (MusicSoundClass), the effects volume on every other sound but the menu's (MenuSoundClass). Every sound class it sets is kept loaded from then on, as the audio device keeps pointing at it. */
 	static void ApplySound();
 	/** The sound class the menu's sounds play in, which the effects volume leaves alone. */
 	static USoundClass* MenuSoundClass();
+	/** The sound class the menu's music plays in, which only the music volume sets. */
+	static USoundClass* MusicSoundClass();
 
 	virtual void SetToDefaults() override;
 	virtual void ApplyNonResolutionSettings() override;
@@ -110,4 +117,6 @@ protected:
 	float MasterVolume = CheeseStrikeSettings::DefaultVolume;
 	UPROPERTY(config)
 	float EffectsVolume = CheeseStrikeSettings::DefaultVolume;
+	UPROPERTY(config)
+	float MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
 };

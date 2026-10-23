@@ -109,6 +109,12 @@ void UCheeseStrikeSettings::SetMasterVolume(float Value)
 	ApplySound();
 }
 
+void UCheeseStrikeSettings::SetMusicVolume(float Value)
+{
+	MusicVolume = FMath::Clamp(Value, 0.0f, 1.0f);
+	ApplySound();
+}
+
 void UCheeseStrikeSettings::SetEffectsVolume(float Value)
 {
 	EffectsVolume = FMath::Clamp(Value, 0.0f, 1.0f);
@@ -137,11 +143,28 @@ USoundClass* UCheeseStrikeSettings::MenuSoundClass()
 	return Menu;
 }
 
+USoundClass* UCheeseStrikeSettings::MusicSoundClass()
+{
+	// The same: a class of its own, which the effects volume leaves alone.
+	static USoundClass* Music = nullptr;
+	if (Music == nullptr)
+	{
+		Music = NewObject<USoundClass>(GetTransientPackage(), TEXT("CheeseStrikeMusic"));
+		Music->AddToRoot();
+		if (FAudioDeviceManager* Devices = GEngine != nullptr ? GEngine->GetAudioDeviceManager() : nullptr)
+		{
+			Devices->RegisterSoundClass(Music);
+		}
+	}
+	return Music;
+}
+
 void UCheeseStrikeSettings::ApplySound()
 {
 	const UCheeseStrikeSettings* Settings = Get();
 	const float Master = Settings != nullptr ? Settings->MasterVolume : CheeseStrikeSettings::DefaultVolume;
 	const float Effects = Settings != nullptr ? Settings->EffectsVolume : CheeseStrikeSettings::DefaultVolume;
+	const float MusicVolume = Settings != nullptr ? Settings->MusicVolume : CheeseStrikeSettings::DefaultMusicVolume;
 	// One mix, made once and kept active, which sets every sound class but the menu's to the effects volume; a class
 	// loaded since the last time (a new level's) gets it now, so this runs again after every level loads.
 	static USoundMix* EffectsMix = nullptr;
@@ -151,10 +174,11 @@ void UCheeseStrikeSettings::ApplySound()
 		EffectsMix->AddToRoot();
 	}
 	USoundClass* Menu = MenuSoundClass();
+	USoundClass* Music = MusicSoundClass();
 	TArray<USoundClass*> Classes;
 	for (TObjectIterator<USoundClass> It; It; ++It)
 	{
-		if (*It != Menu && !It->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject) && IsValid(*It))
+		if (*It != Menu && *It != Music && !It->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject) && IsValid(*It))
 		{
 			Classes.Add(*It);
 		}
@@ -176,13 +200,14 @@ void UCheeseStrikeSettings::ApplySound()
 		// No sound at all (-nosound, or a server without it).
 		return;
 	}
-	Devices->IterateOverAllDevices([Master, Effects, &Classes](Audio::FDeviceId, FAudioDevice* Device)
+	Devices->IterateOverAllDevices([Master, Effects, MusicVolume, Music, &Classes](Audio::FDeviceId, FAudioDevice* Device)
 	{
 		Device->SetTransientPrimaryVolume(Master);
 		for (USoundClass* Class : Classes)
 		{
 			Device->SetSoundMixClassOverride(EffectsMix, Class, Effects, 1.0f, 0.0f, false);
 		}
+		Device->SetSoundMixClassOverride(EffectsMix, Music, MusicVolume, 1.0f, 0.0f, false);
 		Device->PushSoundMixModifier(EffectsMix);
 	});
 }
@@ -197,6 +222,7 @@ void UCheeseStrikeSettings::SetToDefaults()
 	FieldOfView = CheeseStrikeSettings::DefaultFieldOfView;
 	MasterVolume = CheeseStrikeSettings::DefaultVolume;
 	EffectsVolume = CheeseStrikeSettings::DefaultVolume;
+	MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
 }
 
 void UCheeseStrikeSettings::ApplyNonResolutionSettings()
