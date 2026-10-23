@@ -430,6 +430,12 @@ def places():
     kit.place_name("The Fondue", (X0, Y0, VAT - 200), (X1, Y1, -100))
 
 
+def hills():
+    """King of the Hill's spots: the Stirrer's island round its gearbox, then the pumps' islands round their housings,
+    Gouda's and Mozza's, twins. Concrete, never eaten."""
+    kit.hill_spots([("Stirrer", 0, 0, 0, 380), ("PumpGouda", -1300, 1100, 0, 300), ("PumpMozza", 1300, 1100, 0, 300)])
+
+
 def build():
     vat()
     floor()
@@ -441,6 +447,7 @@ def build():
     vents_and_mice()
     starts()
     places()
+    hills()
     # The navigation mesh: the floor and above it, never down in the vat.
     kit.nav_bounds((X0 - 100, Y0 - 100, -100), (X1 + 100, Y1 + 100, 800))
     kit.light_rig("overcast", sun=(-60, 70))

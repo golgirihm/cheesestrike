@@ -53,9 +53,13 @@ The decks are `kit.pillar_deck`: a slab on one pillar under its middle, never tw
 
 What never goes is rock: the floor, the walks, the shelf, the Pulpit, the landing, the hollows, every flight of stairs and the Spine, and the bridges' waxed beams. Every start stands on rock and every level stays joined to every other by stairs of rock (`CheeseStrike.Play.AfterTheMice.GruyèreGrotto`).
 
+## King of the Hill
+
+King of the Hill's hill goes round four spots (`hills()`, `ACheeseStrikeHillSpot`), a minute at each: **the Pulpit** (on the middle level), **Gouda's pool** on the floor, **the Landing** (the middle level, by the tunnel's door) and **Mozza's pool**. The Pulpit and the Landing are on the middle line; the pools are twins, a side's and its mirror; all are rock, the pools' beds under water that is walked through.
+
 ## Tests and tooling
 
-- `CheeseStrike.Play.TheGrottoHoldsTogether`: its starts (eight a side in its hollow, free-for-all ones on all three levels), its size, every structure whole, every slab on its pillar and held, the decks and the tunnel and the edges hiding what they should, the lines the rock stops whatever is eaten, every mouse hole landing on the navigation mesh (on the floor and the middle level, not the galleries), and a walk up or down every flight of stairs, over both bridges through the arch and through the tunnel's door.
+`CheeseStrike.Play.EveryMapHasFairHills` checks its hill spots: three to five, each on a floor the mice never eat, clear and level round its middle, on the navigation mesh and reached from both sides' starts, well away from them, the first as far from both and the round favouring neither. - `CheeseStrike.Play.TheGrottoHoldsTogether`: its starts (eight a side in its hollow, free-for-all ones on all three levels), its size, every structure whole, every slab on its pillar and held, the decks and the tunnel and the edges hiding what they should, the lines the rock stops whatever is eaten, every mouse hole landing on the navigation mesh (on the floor and the middle level, not the galleries), and a walk up or down every flight of stairs, over both bridges through the arch and through the tunnel's door.
 - `CheeseStrike.Play.AGrottoDeckFallsOntoTheLevelBelow`: a Ledge slab's pillar eaten with a player under it, and a gallery slab's with a player on it: each slab falls at once, whole and straight down onto the floor with its edge on it; the player under it is not left inside anything, the one on it comes down standing on it, and both walk away.
 - `CheeseStrike.Play.BotsPlayTheGrotto`: every level and place on it can be walked to from a hollow, and fifteen bots spread over all three levels, find each other and kill.
 - `CheeseStrike.Play.AfterTheMice.GruyèreGrotto`: all the cheese eaten at once, every start on rock and joined to every other.
