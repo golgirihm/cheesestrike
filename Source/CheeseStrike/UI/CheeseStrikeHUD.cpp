@@ -25,6 +25,7 @@
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
+#include "Map/CheeseStrikeHill.h"
 #include "Map/CheeseStrikePlace.h"
 #include "RHIGlobals.h"
 #include "CheeseStrike.h"
@@ -235,7 +236,9 @@ CheeseStrikeHUD::FScoreSummary ACheeseStrikeHUD::ScoreSummary(const ACheeseStrik
 	}
 	if (!Match->HasTeams())
 	{
-		return CheeseStrikeHUD::FreeForAll(Match->Standings(), Mine != nullptr ? Mine->GetPlayerName() : FString(), Match->GetKillLimit());
+		// Solo King of the Hill races to points of holding the hill, the others to kills.
+		const bool bHill = Match->GetModeInfo().WinBy == CheeseStrikeModes::EWinBy::Hill;
+		return CheeseStrikeHUD::FreeForAll(bHill ? ACheeseStrikeHill::SoloStandings(Match) : Match->Standings(), Mine != nullptr ? Mine->GetPlayerName() : FString(), Match->GetKillLimit());
 	}
 	// (Execution, like Elimination, is a mode of rounds: its sides' rounds won, and the round.)
 	// A team mode: the sides' scores (rounds won, in Elimination), and the round and its time while one is on.

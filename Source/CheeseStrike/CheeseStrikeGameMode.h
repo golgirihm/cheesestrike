@@ -13,6 +13,7 @@
 
 class ACheeseStrikeCharacter;
 class ACheeseStrikeGameState;
+class ACheeseStrikeHill;
 class ACheeseStrikePlayerState;
 
 /**
@@ -80,6 +81,16 @@ public:
 	/** The same, for looking at an execution: the host (or the player or bot named) executes the nearest enemy down, wherever they are, by `Kind` (1 the stab, 2 the stomp, 0 either). */
 	UFUNCTION(Exec)
 	void CheeseStrikeExecute(int32 Kind = 0, const FString& Player = TEXT(""));
+	/** King of the Hill: the hill has made `Team`'s points, or in the solo mode `Player`'s, reach the target: they win. */
+	void HillWon(int32 Team, ACheeseStrikePlayerState* Player);
+	/** King of the Hill's hill (ACheeseStrikeHill), once the match has begun; null in the other modes. */
+	ACheeseStrikeHill* GetHill() const { return Hill.Get(); }
+	/** From the host's console or a play script (not in shipping builds): moves the hill to its next spot at once. */
+	UFUNCTION(Exec)
+	void CheeseStrikeMoveHill();
+	/** For looking at the hill (development): puts the host's view `Distance` cm from it, `Yaw` degrees round from the west and `Pitch` down, looking at it; CheeseStrikeOutside with no distance puts it back. */
+	UFUNCTION(Exec)
+	void CheeseStrikeViewHill(float Distance = 1600.0f, float Yaw = 225.0f, float Pitch = 40.0f);
 	/** In Elimination a newcomer comes in only at a round's start; later, they are out until the next. */
 	virtual bool PlayerCanRestart_Implementation(APlayerController* Player) override;
 	/** Someone leaving may end a round of Elimination. */
@@ -193,4 +204,7 @@ protected:
 	int32 PlayersExpected = 0;
 	FTimerHandle CountdownTimer;
 	FTimerHandle ResultsTimer;
+	/** King of the Hill: the hill, put up as the match begins, its first minute counted from the end of the count. */
+	void StartHill(float CountLeft);
+	TWeakObjectPtr<ACheeseStrikeHill> Hill;
 };

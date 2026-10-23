@@ -37,7 +37,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheModesAreNamedAndPicked, "CheeseStrike.Rules
 bool FTheModesAreNamedAndPicked::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeModes;
-	TestEqual(TEXT("five modes"), NumModes, 5);
+	TestEqual(TEXT("seven modes"), NumModes, 7);
 	TestEqual(TEXT("free-for-all first"), FString(Info(EMode::FreeForAll).Name), FString(TEXT("Free-for-all")));
 	TestFalse(TEXT("on no teams"), Info(EMode::FreeForAll).bTeams);
 	TestTrue(TEXT("won by a player's kills"), Info(EMode::FreeForAll).WinBy == EWinBy::PlayerKills);

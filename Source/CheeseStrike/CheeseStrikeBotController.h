@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "AIController.h"
 #include "Rules/CheeseStrikeBots.h"
+#include "Rules/CheeseStrikeHills.h"
 #include "CheeseStrikeBotController.generated.h"
 
 class ACheeseStrikeCharacter;
@@ -88,6 +89,14 @@ protected:
 	bool ThinkAboutTheDown();
 	/** How far it goes to revive a teammate down (cm). */
 	static constexpr float TendRange = 2500.0f;
+	/**
+	 * In King of the Hill (CheeseStrikeHills::BotPlan): goes to the hill, or
+	 * where it is about to go, fighting on the way at whoever it sees, and
+	 * once there holds it, moving about inside it and fighting from it rather
+	 * than chasing anyone out of it; only an enemy close by turns it aside
+	 * to fight as it would anywhere. True while the hill has its feet.
+	 */
+	bool ThinkAboutTheHill();
 	/** Calls in its next streak, as a player would: the drone and the Overload soon after earning them, the Cheese Strike on an enemy it has just seen. */
 	void ThinkAboutStreaks();
 	/**
@@ -159,6 +168,9 @@ protected:
 	float ThrowPendingSince = 0.0f;
 	/** When it began holding the streak it has ready; -1 with none. */
 	float StreakHeldSince = -1.0f;
+	/** What it is doing about the hill (CheeseStrikeHills::EBotPlan), and whether the hill has its feet. */
+	CheeseStrikeHills::EBotPlan HillPlan = CheeseStrikeHills::EBotPlan::Fight;
+	bool bHill = false;
 	/** Whether it is tending someone down, and holding Interact. */
 	bool bTending = false;
 	bool bInteracting = false;

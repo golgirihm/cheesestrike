@@ -43,6 +43,13 @@ public:
 	/** Server only. */
 	void SetGunLevel(int32 Level) { GunLevel = Level; }
 
+	/** King of the Hill: the points this player has scored by holding the hill alone (the solo mode's score), and the whole seconds they have stood in it, held or contested. */
+	int32 GetHillPoints() const { return HillPoints; }
+	int32 GetHillSeconds() const { return HillSeconds; }
+	/** Server only. */
+	void AddHillPoints(int32 Points) { HillPoints += Points; }
+	void AddHillTime(float Seconds);
+
 	/** This player's line on the scoreboard. */
 	CheeseStrikeRules::FStanding Standing() const;
 
@@ -117,6 +124,12 @@ protected:
 	bool bOut = false;
 	UPROPERTY(Replicated)
 	float RevealUntil = 0.0f;
+	UPROPERTY(Replicated)
+	int32 HillPoints = 0;
+	UPROPERTY(Replicated)
+	int32 HillSeconds = 0;
+	/** The server's count of the time in the hill, to the part of a second. */
+	float HillTime = 0.0f;
 
 	/** The server's record of the run. */
 	CheeseStrikeStreaks::FRun Run;

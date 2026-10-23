@@ -34,6 +34,7 @@
 #include "CheeseStrikePlayerController.h"
 #include "Input/CheeseStrikeInput.h"
 #include "Rules/CheeseStrikeBots.h"
+#include "Rules/CheeseStrikeHills.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "UI/CheeseStrikeCredits.h"
@@ -1385,6 +1386,19 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	else if (ModeRules.WinBy == CheeseStrikeModes::EWinBy::Rounds)
 	{
 		Row(TEXT("Rounds to win"), MakeDropdown(RoundNames, RoundsChosen, bHost, [Player](int32 Index) { if (Player.IsValid()) Player->SetRoundsFromMenu(CheeseStrikeModes::RoundLimitChoices[Index]); }));
+	}
+	else if (ModeRules.WinBy == CheeseStrikeModes::EWinBy::Hill)
+	{
+		// King of the Hill plays to points, which the kill limit carries.
+		TArray<FString> Points;
+		int32 PointsChosen = INDEX_NONE;
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeHills::TargetChoices); ++Index)
+		{
+			Points.Add(FString::FromInt(CheeseStrikeHills::TargetChoices[Index]));
+			PointsChosen = CheeseStrikeHills::TargetChoices[Index] == KillLimit ? Index : PointsChosen;
+		}
+		Row(ModeRules.bTeams ? TEXT("Team points to win") : TEXT("Points to win"),
+			MakeDropdown(Points, PointsChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeHills::TargetChoices[Index], RespawnDelay); }));
 	}
 	if (ModeRules.bRespawns)
 	{

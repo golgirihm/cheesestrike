@@ -21,6 +21,7 @@
 #include "Streaks/CheeseStrikeBombs.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "UI/CheeseStrikeHUDDraw.h"
+#include "UI/CheeseStrikeHillHUD.h"
 
 /** The HUD's drawing, named through an alias rather than used as a whole: the packaged game's unity build would carry a using-directive into the files after this one. */
 namespace HudDraw = CheeseStrikeHUDDraw;
@@ -395,6 +396,8 @@ namespace CheeseStrikeModeHUD
 			return;
 		}
 		const ACheeseStrikeCharacter* Own = Cast<ACheeseStrikeCharacter>(Owner->GetPawn());
+		// King of the Hill: its marker, and the strip over the score saying who holds it.
+		const float OverScore = CheeseStrikeHillHUD::Draw(Hud, Canvas, ModeHudOverScore(Canvas));
 		if (Mine->IsOut())
 		{
 			ModeHudDrawOut(Canvas, Hud, Match);
@@ -402,7 +405,7 @@ namespace CheeseStrikeModeHUD
 		else if (Own != nullptr && Own->IsAlive())
 		{
 			ModeHudDrawReveal(Hud, Canvas, Match, Mine);
-			const float Bottom = ModeHudDrawGunGame(Canvas, Match, Mine, ModeHudOverScore(Canvas));
+			const float Bottom = ModeHudDrawGunGame(Canvas, Match, Mine, OverScore);
 			ModeHudDrawStreaks(Hud, Canvas, Match, Mine, Bottom);
 			ModeHudDrawLastStand(Hud, Canvas, Match, Mine, Own);
 		}

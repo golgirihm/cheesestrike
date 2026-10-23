@@ -22,6 +22,7 @@
 #include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Map/CheeseStrikeCheese.h"
+#include "Map/CheeseStrikeHill.h"
 #include "Map/CheeseStrikeMouse.h"
 #include "NavigationSystem.h"
 #include "Streaks/CheeseStrikeAerialCheese.h"
@@ -331,6 +332,10 @@ void ACheeseStrikeGameMode::HandleMatchHasStarted()
 	{
 		StartRound(true);
 	}
+	if (CheeseStrikeModes::Info(Mode).WinBy == CheeseStrikeModes::EWinBy::Hill)
+	{
+		StartHill(CountLeft);
+	}
 	// The mice come a minute in (counted from the end of the count), when there is cheese for them.
 	const int32 Blocks = ACheeseStrikeCheese::CountEdible(GetWorld());
 	if (bMice && CheeseStrikeMice::MiceFor(Blocks) > 0)
@@ -572,6 +577,9 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 			GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(this, &ACheeseStrikeGameMode::ArmForGunGame, TWeakObjectPtr<ACheeseStrikeCharacter>(KillerState->GetPawn<ACheeseStrikeCharacter>())));
 		}
 		break;
+	case CheeseStrikeModes::EWinBy::Hill:
+		// Won by the hill's points (ACheeseStrikeHill), not by kills.
+		break;
 	case CheeseStrikeModes::EWinBy::Rounds:
 		// One life a round: out until the next.
 		if (VictimState != nullptr)
@@ -600,6 +608,74 @@ void ACheeseStrikeGameMode::EndMatchFor(int32 Team)
 	State->SetWinnerName(CheeseStrikeRules::TeamNames[Team]);
 	UE_LOG(LogCheeseStrike, Display, TEXT("Match over: %s win, %s"), CheeseStrikeRules::TeamNames[Team], *State->ScoreSummary());
 	EndMatch();
+}
+
+void ACheeseStrikeGameMode::StartHill(float CountLeft)
+{
+	UWorld* World = GetWorld();
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (World == nullptr || State == nullptr)
+	{
+		return;
+	}
+	TArray<FVector> Spots;
+	TArray<float> Radii;
+	ACheeseStrikeHill::GatherSpots(World, Spots, Radii);
+	if (Spots.Num() == 0)
+	{
+		UE_LOG(LogCheeseStrike, Warning, TEXT("Hill: this level has no hill spots and no starts; no hill"));
+		return;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ACheeseStrikeHill* Made = World->SpawnActor<ACheeseStrikeHill>(ACheeseStrikeHill::StaticClass(), Spots[0], FRotator::ZeroRotator, Params);
+	if (Made != nullptr)
+	{
+		Made->Begin(Spots, Radii, State->GetServerWorldTimeSeconds() + CountLeft + CheeseStrikeHills::HillTime);
+		Hill = Made;
+	}
+}
+
+void ACheeseStrikeGameMode::HillWon(int32 Team, ACheeseStrikePlayerState* Player)
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr || !IsMatchInProgress())
+	{
+		return;
+	}
+	if (Player != nullptr)
+	{
+		State->SetWinnerName(Player->GetPlayerName());
+		UE_LOG(LogCheeseStrike, Display, TEXT("Match over: %s wins King of the Hill with %d points"), *Player->GetPlayerName(), Player->GetHillPoints());
+		EndMatch();
+		return;
+	}
+	EndMatchFor(Team);
+}
+
+void ACheeseStrikeGameMode::CheeseStrikeMoveHill()
+{
+#if !UE_BUILD_SHIPPING
+	if (ACheeseStrikeHill* Ours = Hill.Get())
+	{
+		Ours->MoveNow();
+	}
+#endif
+}
+
+void ACheeseStrikeGameMode::CheeseStrikeViewHill(float Distance, float Yaw, float Pitch)
+{
+#if !UE_BUILD_SHIPPING
+	const ACheeseStrikeHill* Ours = Hill.Get();
+	const APlayerController* Host = GetWorld() != nullptr ? GetWorld()->GetFirstPlayerController() : nullptr;
+	ACheeseStrikeCharacter* Body = Host != nullptr ? Cast<ACheeseStrikeCharacter>(Host->GetPawn()) : nullptr;
+	if (Ours != nullptr && Body != nullptr)
+	{
+		const FRotator Look(-Pitch, Yaw, 0.0f);
+		const FVector From = Ours->GetCentre() - Look.Vector() * Distance;
+		Body->CheeseStrikeViewFrom(From.X, From.Y, From.Z, -Pitch, Yaw);
+	}
+#endif
 }
 
 bool ACheeseStrikeGameMode::CanHurt(const ACheeseStrikePlayerState* Attacker, const ACheeseStrikePlayerState* Victim, bool bSelf) const
@@ -1110,6 +1186,21 @@ AActor* ACheeseStrikeGameMode::ChoosePlayerStart_Implementation(AController* Pla
 		{
 			Allowed.Add(Index);
 		}
+	}
+	// King of the Hill: away from the hill, and from where it is about to go.
+	if (const ACheeseStrikeHill* Ours = Hill.Get())
+	{
+		TArray<FVector> SideSpots;
+		for (const int32 Index : Allowed)
+		{
+			SideSpots.Add(Spots[Index]);
+		}
+		TArray<int32> Away;
+		for (const int32 Kept : CheeseStrikeHills::AwayFromHill(SideSpots, Ours->GetCentre(), CheeseStrikeHills::SpawnClear, Ours->IsWarning(), Ours->GetNextCentre()))
+		{
+			Away.Add(Allowed[Kept]);
+		}
+		Allowed = Away;
 	}
 	TArray<FVector> Choices;
 	for (const int32 Index : Allowed)

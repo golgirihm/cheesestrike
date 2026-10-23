@@ -29,8 +29,12 @@ namespace CheeseStrikeModes
 		Execution,
 		/** Everyone for themself, each kill a step up a ladder of weapons; the first to a kill with the last, the knife, wins. */
 		GunGame,
+		/** Two teams; a side scores while only its players stand in the hill, which moves every minute; the first to the points wins. */
+		KingOfTheHill,
+		/** King of the Hill, everyone for themself: a player scores while they stand in the hill alone. */
+		SoloKingOfTheHill,
 	};
-	constexpr int32 NumModes = 5;
+	constexpr int32 NumModes = 7;
 
 	/** How a mode is won. */
 	enum class EWinBy : uint8
@@ -43,6 +47,8 @@ namespace CheeseStrikeModes
 		Rounds,
 		/** A player makes a kill with the last weapon of Gun Game's ladder. */
 		Ladder,
+		/** A side (or in the solo mode, a player) reaches the points by holding the hill (CheeseStrikeHills); the kill limit is the points. */
+		Hill,
 	};
 
 	struct FModeInfo
@@ -59,7 +65,7 @@ namespace CheeseStrikeModes
 		EWinBy WinBy;
 		/** Whether the killed come back during play; in Elimination they are out until the next round. */
 		bool bRespawns;
-		/** The kill limit a host who names none plays to; 0 for a mode that has none. */
+		/** The kill limit a host who names none plays to (King of the Hill's points); 0 for a mode that has none. */
 		int32 DefaultKillLimit;
 		/** Whether a player hurt enough goes down into a last stand rather than dying (Execution). */
 		bool bLastStand;

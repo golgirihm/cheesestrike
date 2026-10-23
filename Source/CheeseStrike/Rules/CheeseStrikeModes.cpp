@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeModes.h"
 #include "Kismet/GameplayStatics.h"
+#include "CheeseStrikeHills.h"
 #include "CheeseStrikeRules.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 
@@ -13,6 +14,8 @@ namespace CheeseStrikeModes
 		{EMode::Elimination, TEXT("Elimination"), TEXT("Elimination"), TEXT("Two teams, one life a round: the side left standing takes the round."), true, EWinBy::Rounds, false, 0, false, true},
 		{EMode::Execution, TEXT("Execution"), TEXT("Execution"), TEXT("Two teams, one life a round; hurt enough, you go down: executed up close, revived, or up again in 20 s."), true, EWinBy::Rounds, false, 0, true, true},
 		{EMode::GunGame, TEXT("Gun Game"), TEXT("GunGame"), TEXT("Everyone for themself: each kill moves you to the next weapon; a kill with the last, the knife, wins."), false, EWinBy::Ladder, true, 0, false, false},
+		{EMode::KingOfTheHill, TEXT("King of the Hill"), TEXT("KingOfTheHill"), TEXT("Two teams: a point a second while only your side stands in the hill, which moves every minute."), true, EWinBy::Hill, true, CheeseStrikeHills::TeamTarget, false, true},
+		{EMode::SoloKingOfTheHill, TEXT("Solo King of the Hill"), TEXT("SoloKingOfTheHill"), TEXT("Everyone for themself: a point a second while you stand in the hill alone; it moves every minute."), false, EWinBy::Hill, true, CheeseStrikeHills::SoloTarget, false, true},
 	};
 
 	const FModeInfo& Info(EMode Mode)
@@ -315,6 +318,8 @@ namespace CheeseStrikeModes
 			return FString::Printf(TEXT("first to win %d round%s"), Rounds, Rounds == 1 ? TEXT("") : TEXT("s"));
 		case EWinBy::Ladder:
 			return FString::Printf(TEXT("first through all %d weapons"), CheeseStrikeArsenal::GunGameLadder().Num());
+		case EWinBy::Hill:
+			return FString::Printf(TEXT("first %sto %d points"), Info(Mode).bTeams ? TEXT("team ") : TEXT(""), KillLimit);
 		default:
 			return FString::Printf(TEXT("first to %d kills"), KillLimit);
 		}

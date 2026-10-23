@@ -1,0 +1,15 @@
+# The lobby with King of the Hill picked: its rules (the points to win, the
+# wait to come back) and the Mode dropdown open with every mode. Run with
+# tools/play.ps1 -Lobby -Extra "?Mode=KingOfTheHill" (or SoloKingOfTheHill).
+wait 12
+cmd r.SetRes 1280x720w
+wait 1
+shot hill_lobby
+cmd CheeseStrikeDropdown 1
+wait 1
+shot hill_lobby_modes
+cmd CheeseStrikeDropdown 2
+wait 1
+shot hill_lobby_points
+cmd CheeseStrikeDropdown -1
+quit
