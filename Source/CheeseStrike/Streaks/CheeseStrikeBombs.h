@@ -16,7 +16,7 @@ class USoundBase;
 class UStaticMesh;
 class UStaticMeshComponent;
 
-/** One wheel: where it lands, and the server's time it does. */
+/** One wheel: where it lands, the server's time it does, and how far over that the roof is that it bursts through (0 under open sky). */
 USTRUCT()
 struct FCheeseStrikeDrop
 {
@@ -26,13 +26,21 @@ struct FCheeseStrikeDrop
 	FVector_NetQuantize Impact = FVector::ZeroVector;
 	UPROPERTY()
 	float LandsAt = 0.0f;
+	UPROPERTY()
+	float Roof = 0.0f;
+
+	/** How far it falls, and how fast it starts: from the sky, or from under the roof it has come through (CheeseStrikeStreaks::RoofGap). */
+	float FallHeight() const;
+	float FallSpeed() const;
+	float FallTime() const;
 };
 
 /**
  * Gouda wheels falling from the sky: a Cheese Strike's run along a line,
  * or the Gouda Overload's rain on every enemy (CheeseStrikeStreaks). The
  * server plans each wheel (where it lands, the first thing it meets coming
- * straight down, and when) and every machine is told; each shows the wheel
+ * straight down, and when; indoors, a Cheese Strike's wheels come through
+ * the roof onto the floor under it) and every machine is told; each shows the wheel
  * falling, tumbling, then where it lands a flash, a thump, a shockwave
  * swelling to exactly where its harm stops, and a scorch, while the
  * server harms whoever the burst can see within its radius (a wall or a
@@ -65,6 +73,13 @@ public:
 
 	/** Where a wheel dropped over `Over` lands: the first thing it meets coming straight down from high above. False over nothing. */
 	static bool Landing(UWorld* World, const FVector& Over, FVector& OutImpact);
+	/**
+	 * Where a Cheese Strike's wheel for `Over` (a point of its line, at the
+	 * mark's height) lands: under a roof (FCheeseStrikeOverhead), on the floor
+	 * under that point, coming through the roof (OutRoof, its height over
+	 * where it lands); else as Landing has it, OutRoof 0.
+	 */
+	static bool StrikeLanding(UWorld* World, const class FCheeseStrikeOverhead& Overhead, const FVector& Over, FVector& OutImpact, float& OutRoof);
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -73,10 +88,12 @@ public:
 protected:
 	/** Server only: a wheel over `Over` that lands at `LandsAt`. */
 	void AddDrop(const FVector& Over, float LandsAt);
+	/** Every machine: a wheel bursting through the roof at `At`: a puff, a crack, and a scorch left on the roof's underside. */
+	void ShowThroughRoof(const FVector& At);
 	/** Server only: the harm a wheel does where it lands. */
 	void Burst(const FCheeseStrikeDrop& Drop);
-	/** Every machine: the flash and the thump. */
-	void ShowBurst(const FVector& At);
+	/** Every machine: the flash and the thump; `bIndoors` under a roof, where the eye has adjusted to the dark and a flash as bright as one in the sun would white the view out. */
+	void ShowBurst(const FVector& At, bool bIndoors = false);
 	/** Every machine: the warning, once, when its time comes. */
 	void ShowWarning();
 	float Now() const;
@@ -104,7 +121,8 @@ protected:
 	/** The server's time it is done with, once everything is planned. */
 	float DoneAt = 0.0f;
 
-	/** Each machine: how far it has shown each drop (0 not yet, 1 its whistle, 2 falling, 3 landed), and the falling wheels. */
+	/** Each machine: how far it has shown each drop (0 not yet, 1 its whistle, 2 falling, 3 landed), whether it has come through its roof, and the falling wheels. */
+	TArray<bool> Through;
 	TArray<uint8> Shown;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> Falling;
@@ -115,6 +133,9 @@ protected:
 		TWeakObjectPtr<UPointLightComponent> Light;
 		TWeakObjectPtr<UStaticMeshComponent> Ball;
 		float At = 0.0f;
+		/** How far its shockwave swells (cm), and how bright it starts. */
+		float Reach = 0.0f;
+		float Brightness = 0.0f;
 	};
 	TArray<FFlash> Flashes;
 

@@ -19,6 +19,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
+#include "Streaks/CheeseStrikeOverhead.h"
 #include "Streaks/CheeseStrikeSynth.h"
 
 namespace
@@ -41,6 +42,30 @@ namespace
 	/** The template explosion material's one parameter, which breaks its shell up from 0 to 1. */
 	const FName BombShellParameter(TEXT("Param"));
 	const TCHAR* BombCheesePath = TEXT("/Game/CheeseStrike/Materials/M_Cheese.M_Cheese");
+	/** How far above the mark's height a strike's wheel looks for a roof and down for the floor (cm): from about a player's middle. */
+	constexpr float BombLookFrom = 100.0f;
+	constexpr float BombFloorBelow = 1500.0f;
+	/** A burst through a roof: smaller and dimmer than a landing's, and its scorch. */
+	constexpr float BombRoofReach = 160.0f;
+	constexpr float BombRoofBrightness = 40.0f;
+	/** A landing's flash under a roof (candelas). */
+	constexpr float BombIndoorBrightness = 120.0f;
+	constexpr float BombRoofScorch = 150.0f;
+}
+
+float FCheeseStrikeDrop::FallHeight() const
+{
+	return Roof > 0.0f ? FMath::Max(0.0f, Roof - CheeseStrikeStreaks::RoofGap) : CheeseStrikeStreaks::DropHeight;
+}
+
+float FCheeseStrikeDrop::FallSpeed() const
+{
+	return Roof > 0.0f ? CheeseStrikeStreaks::IndoorDropSpeed : CheeseStrikeStreaks::DropSpeed;
+}
+
+float FCheeseStrikeDrop::FallTime() const
+{
+	return CheeseStrikeStreaks::FallTime(FallHeight(), FallSpeed());
 }
 
 ACheeseStrikeBombs::ACheeseStrikeBombs()
@@ -134,6 +159,32 @@ bool ACheeseStrikeBombs::Landing(UWorld* World, const FVector& Over, FVector& Ou
 	return true;
 }
 
+bool ACheeseStrikeBombs::StrikeLanding(UWorld* World, const FCheeseStrikeOverhead& Overhead, const FVector& Over, FVector& OutImpact, float& OutRoof)
+{
+	OutRoof = 0.0f;
+	if (World == nullptr)
+	{
+		return false;
+	}
+	const FVector From = Over + FVector(0.0f, 0.0f, BombLookFrom);
+	if (const TOptional<float> Roof = Overhead.RoofOver(From, CheeseStrikeStreaks::DropHeight))
+	{
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeFloor), false);
+		for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+		{
+			Params.AddIgnoredActor(*It);
+		}
+		FHitResult Hit;
+		if (World->LineTraceSingleByChannel(Hit, From, From - FVector(0.0f, 0.0f, BombFloorBelow), ECC_Visibility, Params) && Roof.GetValue() > Hit.ImpactPoint.Z)
+		{
+			OutImpact = Hit.ImpactPoint;
+			OutRoof = Roof.GetValue() - Hit.ImpactPoint.Z;
+			return true;
+		}
+	}
+	return Landing(World, Over, OutImpact);
+}
+
 void ACheeseStrikeBombs::AddDrop(const FVector& Over, float LandsAt)
 {
 	FVector Impact;
@@ -156,12 +207,25 @@ void ACheeseStrikeBombs::StartStrike(ACheeseStrikePlayerState* InCaller, const F
 	WarnAt = Start;
 	WarnWhere = Spot;
 	const TArray<FVector> Line = CheeseStrikeStreaks::StrikeLine(Spot, Yaw);
+	// Indoors, through the roof onto the floor under it, rather than onto the roof.
+	const FCheeseStrikeOverhead& Overhead = FCheeseStrikeOverhead::Of(GetWorld());
+	int32 ThroughRoofs = 0;
 	for (int32 Index = 0; Index < Line.Num(); ++Index)
 	{
-		AddDrop(Line[Index], Start + CheeseStrikeStreaks::StrikeWarning + Index * CheeseStrikeStreaks::StrikeInterval);
+		FCheeseStrikeDrop Drop;
+		FVector Impact;
+		if (!StrikeLanding(GetWorld(), Overhead, Line[Index], Impact, Drop.Roof))
+		{
+			continue;
+		}
+		Drop.Impact = Impact;
+		Drop.LandsAt = Start + CheeseStrikeStreaks::StrikeWarning + Index * CheeseStrikeStreaks::StrikeInterval;
+		Drops.Add(Drop);
+		ThroughRoofs += Drop.Roof > 0.0f ? 1 : 0;
+		DoneAt = FMath::Max(DoneAt, Drop.LandsAt + 2.0f);
 	}
 	DoneAt = FMath::Max(DoneAt, Start + CheeseStrikeStreaks::StrikeWarning + 2.0f);
-	UE_LOG(LogCheeseStrike, Display, TEXT("Cheese Strike from %s: %d wheels along %.0f degrees through (%.0f, %.0f, %.0f)"), InCaller != nullptr ? *InCaller->GetPlayerName() : TEXT("nobody"), Drops.Num(), Yaw, Spot.X, Spot.Y, Spot.Z);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Cheese Strike from %s: %d wheels along %.0f degrees through (%.0f, %.0f, %.0f), %d through a roof"), InCaller != nullptr ? *InCaller->GetPlayerName() : TEXT("nobody"), Drops.Num(), Yaw, Spot.X, Spot.Y, Spot.Z, ThroughRoofs);
 }
 
 void ACheeseStrikeBombs::StartOverload(ACheeseStrikePlayerState* InCaller)
@@ -251,7 +315,7 @@ void ACheeseStrikeBombs::ShowWarning()
 	}
 }
 
-void ACheeseStrikeBombs::ShowBurst(const FVector& At)
+void ACheeseStrikeBombs::ShowBurst(const FVector& At, bool bIndoors)
 {
 	if (GetNetMode() == NM_DedicatedServer)
 	{
@@ -267,10 +331,12 @@ void ACheeseStrikeBombs::ShowBurst(const FVector& At)
 	}
 	FFlash Flash;
 	Flash.At = Now();
+	Flash.Reach = (GetKind() == CheeseStrikeStreaks::EStreak::GoudaOverload ? CheeseStrikeStreaks::OverloadBlast : CheeseStrikeStreaks::StrikeBlast).Radius;
+	Flash.Brightness = bIndoors ? BombIndoorBrightness : BombFlashBrightness;
 	UPointLightComponent* Light = NewObject<UPointLightComponent>(this);
 	Light->SetMobility(EComponentMobility::Movable);
 	Light->SetIntensityUnits(ELightUnits::Candelas);
-	Light->SetIntensity(BombFlashBrightness);
+	Light->SetIntensity(Flash.Brightness);
 	Light->SetAttenuationRadius(BombFlashReach);
 	Light->SetLightColor(FLinearColor(1.0f, 0.62f, 0.25f));
 	Light->SetCastShadows(false);
@@ -308,6 +374,61 @@ void ACheeseStrikeBombs::ShowBurst(const FVector& At)
 	Flashes.Add(Flash);
 }
 
+void ACheeseStrikeBombs::ShowThroughRoof(const FVector& At)
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	// A crack, a puff of dust and fire hanging from the roof, and the hole's scorch on its underside.
+	if (Thumps.Num() > 0)
+	{
+		UGameplayStatics::SpawnSoundAtLocation(this, Thumps[FMath::RandHelper(Thumps.Num())], At, FRotator::ZeroRotator, 0.5f, FMath::FRandRange(1.2f, 1.4f), 0.0f, Attenuation);
+	}
+	FFlash Flash;
+	Flash.At = Now();
+	Flash.Reach = BombRoofReach;
+	Flash.Brightness = BombRoofBrightness;
+	UPointLightComponent* Light = NewObject<UPointLightComponent>(this);
+	Light->SetMobility(EComponentMobility::Movable);
+	Light->SetIntensityUnits(ELightUnits::Candelas);
+	Light->SetIntensity(BombRoofBrightness);
+	Light->SetAttenuationRadius(BombFlashReach * 0.5f);
+	Light->SetLightColor(FLinearColor(1.0f, 0.62f, 0.25f));
+	Light->SetCastShadows(false);
+	Light->SetupAttachment(RootComponent);
+	Light->RegisterComponent();
+	Light->SetWorldLocation(At - FVector(0.0f, 0.0f, 80.0f));
+	Flash.Light = Light;
+	if (BallMesh != nullptr)
+	{
+		UStaticMeshComponent* Ball = NewObject<UStaticMeshComponent>(this);
+		Ball->SetStaticMesh(BallMesh);
+		if (BallMaterial != nullptr)
+		{
+			UMaterialInstanceDynamic* Shell = UMaterialInstanceDynamic::Create(BallMaterial, this);
+			Shell->SetScalarParameterValue(BombShellParameter, 0.0f);
+			Ball->SetMaterial(0, Shell);
+		}
+		Ball->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Ball->SetCastShadow(false);
+		Ball->SetupAttachment(RootComponent);
+		Ball->RegisterComponent();
+		Ball->SetWorldLocation(At);
+		Ball->SetWorldScale3D(FVector(0.4f));
+		Flash.Ball = Ball;
+	}
+	if (ScorchMaterial != nullptr)
+	{
+		// Facing up onto the roof's underside.
+		if (UDecalComponent* Scorch = UGameplayStatics::SpawnDecalAtLocation(this, ScorchMaterial, FVector(80.0f, BombRoofScorch, BombRoofScorch), At, FRotator(90.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f), BombScorchLife))
+		{
+			Scorch->SetFadeOut(BombScorchLife - 2.0f, 2.0f, false);
+		}
+	}
+	Flashes.Add(Flash);
+}
+
 void ACheeseStrikeBombs::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -331,12 +452,13 @@ void ACheeseStrikeBombs::Tick(float DeltaSeconds)
 	}
 
 	ShowWarning();
-	const float Fall = CheeseStrikeStreaks::FallTime();
 	Shown.SetNumZeroed(Drops.Num());
+	Through.SetNumZeroed(Drops.Num());
 	Falling.SetNum(Drops.Num());
 	for (int32 Index = 0; Index < Drops.Num(); ++Index)
 	{
 		const FCheeseStrikeDrop& Drop = Drops[Index];
+		const float Fall = Drop.FallTime();
 		const float Left = Drop.LandsAt - Time;
 		if (Shown[Index] >= 3)
 		{
@@ -352,7 +474,7 @@ void ACheeseStrikeBombs::Tick(float DeltaSeconds)
 			}
 			if (-Left < BombTooLate)
 			{
-				ShowBurst(Drop.Impact);
+				ShowBurst(Drop.Impact, Drop.Roof > 0.0f);
 			}
 			if (bServer)
 			{
@@ -390,9 +512,14 @@ void ACheeseStrikeBombs::Tick(float DeltaSeconds)
 		}
 		if (UStaticMeshComponent* Wheel = Falling[Index])
 		{
-			// Tumbling as it comes, each wheel its own way.
+			// Tumbling as it comes, each wheel its own way; through a roof, from the burst under it.
+			if (Drop.Roof > 0.0f && !Through[Index])
+			{
+				Through[Index] = true;
+				ShowThroughRoof(FVector(Drop.Impact) + FVector(0.0f, 0.0f, Drop.Roof - 2.0f));
+			}
 			const float Spin = (Fall - Left) * 420.0f + Index * 47.0f;
-			Wheel->SetWorldLocationAndRotation(FVector(Drop.Impact) + FVector(0.0f, 0.0f, CheeseStrikeStreaks::HeightBefore(Left) + 40.0f), FRotator(Spin, Index * 61.0f, 70.0f));
+			Wheel->SetWorldLocationAndRotation(FVector(Drop.Impact) + FVector(0.0f, 0.0f, CheeseStrikeStreaks::HeightBefore(Left, Drop.FallHeight(), Drop.FallSpeed()) + 40.0f), FRotator(Spin, Index * 61.0f, 70.0f));
 		}
 	}
 
@@ -416,13 +543,13 @@ void ACheeseStrikeBombs::Tick(float DeltaSeconds)
 		}
 		if (UPointLightComponent* Light = Flash.Light.Get())
 		{
-			Light->SetIntensity(BombFlashBrightness * FMath::Square(1.0f - Along));
+			Light->SetIntensity(Flash.Brightness * FMath::Square(1.0f - Along));
 		}
 		if (UStaticMeshComponent* Ball = Flash.Ball.Get())
 		{
-			// A low dome swelling to exactly where the harm stops (the engine's sphere is 1 m across), breaking up as it goes.
-			const float Reach = (GetKind() == CheeseStrikeStreaks::EStreak::GoudaOverload ? CheeseStrikeStreaks::OverloadBlast : CheeseStrikeStreaks::StrikeBlast).Radius;
-			const float Across = FMath::Lerp(0.6f, Reach / 50.0f, FMath::Sqrt(Along));
+			// A low dome swelling to exactly where the harm stops (the engine's sphere is 1 m across), breaking up as it goes;
+			// through a roof, a smaller one under it.
+			const float Across = FMath::Lerp(0.4f, Flash.Reach / 50.0f, FMath::Sqrt(Along));
 			Ball->SetWorldScale3D(FVector(Across, Across, Across * 0.55f));
 			if (UMaterialInstanceDynamic* Shell = Cast<UMaterialInstanceDynamic>(Ball->GetMaterial(0)))
 			{

@@ -73,7 +73,9 @@ public:
 
 	/** In free-for-all, until when (the server's time) this player's own Unmanned Aerial Cheese shows them everyone; in team modes the game state keeps it for the side. */
 	float GetRevealUntil() const { return RevealUntil; }
-	void SetRevealUntil(float At) { RevealUntil = At; }
+	/** And since when its sweeps have run (a second drone adds its time to the first's). */
+	float GetRevealFrom() const { return RevealFrom; }
+	void SetReveal(float From, float Until) { RevealFrom = From; RevealUntil = Until; }
 
 	/** The Streak key, on this player's machine: calls in the next streak, or starts or stops marking where a Cheese Strike goes. */
 	void StreakPressed();
@@ -124,6 +126,8 @@ protected:
 	bool bOut = false;
 	UPROPERTY(Replicated)
 	float RevealUntil = 0.0f;
+	UPROPERTY(Replicated)
+	float RevealFrom = 0.0f;
 	UPROPERTY(Replicated)
 	int32 HillPoints = 0;
 	UPROPERTY(Replicated)

@@ -10,6 +10,7 @@ ACheeseStrikeGameState::ACheeseStrikeGameState()
 {
 	TeamScores.Init(0, CheeseStrikeRules::Teams);
 	TeamRevealUntil.Init(0.0f, CheeseStrikeRules::Teams);
+	TeamRevealFrom.Init(0.0f, CheeseStrikeRules::Teams);
 }
 
 void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -38,6 +39,7 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeGameState, RoundBreakUntil);
 	DOREPLIFETIME(ACheeseStrikeGameState, LastRoundWinner);
 	DOREPLIFETIME(ACheeseStrikeGameState, TeamRevealUntil);
+	DOREPLIFETIME(ACheeseStrikeGameState, TeamRevealFrom);
 }
 
 TArray<CheeseStrikeRules::FRosterEntry> ACheeseStrikeGameState::Roster() const
@@ -232,23 +234,42 @@ float ACheeseStrikeGameState::RevealEndsFor(const APlayerState* Viewer) const
 	return Until > GetServerWorldTimeSeconds() ? Until : 0.0f;
 }
 
-void ACheeseStrikeGameState::RevealFor(ACheeseStrikePlayerState* Caller, float Until)
+float ACheeseStrikeGameState::RevealStartedFor(const APlayerState* Viewer) const
 {
-	if (Caller == nullptr)
+	const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Viewer);
+	if (Ours == nullptr || RevealEndsFor(Viewer) <= 0.0f)
 	{
-		return;
+		return 0.0f;
 	}
 	if (HasTeams())
 	{
-		if (TeamRevealUntil.IsValidIndex(Caller->GetTeam()))
-		{
-			TeamRevealUntil[Caller->GetTeam()] = FMath::Max(TeamRevealUntil[Caller->GetTeam()], Until);
-		}
+		return TeamRevealFrom.IsValidIndex(Ours->GetTeam()) ? TeamRevealFrom[Ours->GetTeam()] : 0.0f;
 	}
-	else
+	return Ours->GetRevealFrom();
+}
+
+float ACheeseStrikeGameState::RevealFor(ACheeseStrikePlayerState* Caller, float Now)
+{
+	if (Caller == nullptr)
 	{
-		Caller->SetRevealUntil(FMath::Max(Caller->GetRevealUntil(), Until));
+		return 0.0f;
 	}
+	// A second drone while the first is up adds all its time to the first's.
+	if (HasTeams())
+	{
+		const int32 Team = Caller->GetTeam();
+		if (!TeamRevealUntil.IsValidIndex(Team) || !TeamRevealFrom.IsValidIndex(Team))
+		{
+			return 0.0f;
+		}
+		const CheeseStrikeStreaks::FReveal Reveal = CheeseStrikeStreaks::AddReveal({TeamRevealFrom[Team], TeamRevealUntil[Team]}, Now);
+		TeamRevealFrom[Team] = Reveal.From;
+		TeamRevealUntil[Team] = Reveal.Until;
+		return Reveal.Until;
+	}
+	const CheeseStrikeStreaks::FReveal Reveal = CheeseStrikeStreaks::AddReveal({Caller->GetRevealFrom(), Caller->GetRevealUntil()}, Now);
+	Caller->SetReveal(Reveal.From, Reveal.Until);
+	return Reveal.Until;
 }
 
 void ACheeseStrikeGameState::Announce(const FString& Text, CheeseStrikeStreaks::EStreak Streak, int32 Team, const FString& Who)

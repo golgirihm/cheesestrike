@@ -943,13 +943,11 @@ bool ACheeseStrikeGameMode::CallStreak(ACheeseStrikePlayerState* Caller, CheeseS
 	{
 	case CheeseStrikeStreaks::EStreak::AerialCheese:
 	{
-		State->RevealFor(Caller, Now + CheeseStrikeStreaks::RevealTime);
-		FVector Centre;
-		float Radius = 0.0f;
-		DroneCircle(Centre, Radius);
-		if (ACheeseStrikeAerialCheese* Drone = World->SpawnActor<ACheeseStrikeAerialCheese>(ACheeseStrikeAerialCheese::StaticClass(), FTransform(Centre), Parameters))
+		// A second one while the side's first is up adds its time to it; the new drone flies until the end of it all.
+		const float Until = State->RevealFor(Caller, Now);
+		if (ACheeseStrikeAerialCheese* Drone = World->SpawnActor<ACheeseStrikeAerialCheese>(ACheeseStrikeAerialCheese::StaticClass(), FTransform::Identity, Parameters))
 		{
-			Drone->Fly(Centre, Radius, Now, Now + CheeseStrikeStreaks::RevealTime);
+			Drone->FlyOver(Now, FMath::Max(Until, Now + CheeseStrikeStreaks::RevealTime));
 		}
 		break;
 	}
@@ -972,23 +970,6 @@ bool ACheeseStrikeGameMode::CallStreak(ACheeseStrikePlayerState* Caller, CheeseS
 	UE_LOG(LogCheeseStrike, Display, TEXT("Streak: %s"), *Word);
 	State->Announce(Word, Kind, State->HasTeams() ? Caller->GetTeam() : CheeseStrikeModes::NoTeam, Caller->GetPlayerName());
 	return true;
-}
-
-void ACheeseStrikeGameMode::DroneCircle(FVector& OutCentre, float& OutRadius) const
-{
-	FBox Starts(ForceInit);
-	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
-	{
-		Starts += It->GetActorLocation();
-	}
-	if (!Starts.IsValid)
-	{
-		OutCentre = FVector(0.0f, 0.0f, CheeseStrikeStreaks::DroneAltitude);
-		OutRadius = 2000.0f;
-		return;
-	}
-	OutCentre = FVector(Starts.GetCenter().X, Starts.GetCenter().Y, Starts.Max.Z + CheeseStrikeStreaks::DroneAltitude);
-	OutRadius = FMath::Clamp(static_cast<float>(Starts.GetExtent().Size2D()) * 0.5f, 1000.0f, 6000.0f);
 }
 
 void ACheeseStrikeGameMode::CheeseStrikeGiveStreak(int32 Kind, const FString& Player)

@@ -99,6 +99,15 @@ namespace CheeseStrikeStreaks
 		return true;
 	}
 
+	FReveal AddReveal(const FReveal& Running, float Now, float Seconds)
+	{
+		if (Running.Until > Now)
+		{
+			return {Running.From, Running.Until + Seconds};
+		}
+		return {Now, Now + Seconds};
+	}
+
 	TArray<FVector> StrikeLine(const FVector& Spot, float Yaw)
 	{
 		const FVector Along = FRotator(0.0f, Yaw, 0.0f).Vector();
@@ -120,17 +129,51 @@ namespace CheeseStrikeStreaks
 		return FMath::Lerp(Blast.Centre, Blast.Edge, FMath::Max(0.0f, Distance) / Blast.Radius);
 	}
 
-	float FallTime(float Height)
+	float FallTime(float Height, float Speed)
 	{
 		// Height = v t + g t² / 2, for t.
-		return (-DropSpeed + FMath::Sqrt(DropSpeed * DropSpeed + 2.0f * DropGravity * FMath::Max(0.0f, Height))) / DropGravity;
+		return (-Speed + FMath::Sqrt(Speed * Speed + 2.0f * DropGravity * FMath::Max(0.0f, Height))) / DropGravity;
 	}
 
-	float HeightBefore(float Left)
+	float HeightBefore(float Left, float Height, float Speed)
 	{
 		// Run backwards from landing: it was going v + g T there, and slower above.
-		const float Total = FallTime();
+		const float Total = FallTime(Height, Speed);
 		const float Since = FMath::Clamp(Total - Left, 0.0f, Total);
-		return FMath::Max(0.0f, DropHeight - (DropSpeed * Since + 0.5f * DropGravity * Since * Since));
+		return FMath::Max(0.0f, Height - (Speed * Since + 0.5f * DropGravity * Since * Since));
+	}
+
+	float DroneHeight(float Roof, float LowestStart, float HighestStart, float& OutScale)
+	{
+		if (Roof <= 0.0f)
+		{
+			OutScale = 1.0f;
+			return HighestStart + DroneAltitude;
+		}
+		OutScale = Roof - LowestStart < DroneLowRoof ? DroneIndoorScale : 1.0f;
+		return FMath::Max(Roof - DroneUnderRoof * OutScale, HighestStart + DroneAboveStarts * OutScale);
+	}
+
+	float DroneRoof(TArray<float> Roofs)
+	{
+		if (Roofs.Num() == 0)
+		{
+			return 0.0f;
+		}
+		Roofs.Sort();
+		return Roofs[Roofs.Num() / 2];
+	}
+
+	int32 ChooseDroneWay(TConstArrayView<FDroneWay> Ways)
+	{
+		int32 Best = INDEX_NONE;
+		for (int32 Index = 0; Index < Ways.Num(); ++Index)
+		{
+			if (Best == INDEX_NONE || Ways[Index].Blocked < Ways[Best].Blocked)
+			{
+				Best = Index;
+			}
+		}
+		return Best;
 	}
 }

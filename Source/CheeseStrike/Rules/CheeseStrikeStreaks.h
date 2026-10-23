@@ -79,9 +79,46 @@ namespace CheeseStrikeStreaks
 	/** Unmanned Aerial Cheese: how long the earner's side sees, and how often its sweep shows where the enemies are. */
 	constexpr float RevealTime = 25.0f;
 	constexpr float SweepPeriod = 2.0f;
+	/** A side's reveal: from when (the server's time) its sweeps began, until when they show the enemy. */
+	struct FReveal
+	{
+		float From = 0.0f;
+		float Until = 0.0f;
+	};
+	/** Another Unmanned Aerial Cheese called in at `Now`: one still up runs `Seconds` longer, its sweeps going on; else a new one from now. */
+	FReveal AddReveal(const FReveal& Running, float Now, float Seconds = RevealTime);
 	/** The drone circles this high over the starts, this far out, once in so many seconds. */
 	constexpr float DroneAltitude = 2500.0f;
 	constexpr float DroneCircle = 24.0f;
+	/**
+	 * Under a roof (a map whose starts are mostly under one: a cellar, a
+	 * cave, a hall, a kitchen), the drone flies under it, where it can be
+	 * seen: its middle DroneUnderRoof below the lowest of the roof over its
+	 * circle, shrunk to DroneIndoorScale where that is less than DroneLowRoof
+	 * over the lowest start (the floor), and never lower than
+	 * DroneAboveStarts over the highest. The roof over a circle is the
+	 * middle one of the roofs over its points (DroneRoof), so that a deck or
+	 * a tunnel's roof under part of it doesn't bring it down everywhere; a
+	 * point whose roof is lower than the drone counts as a stretch that runs
+	 * into something. Of the circles it could fly (FDroneWay: its radius, the
+	 * roof over it, or 0 for none, and how many stretches of it run into
+	 * something), it takes the one that runs into least, the first of those.
+	 */
+	constexpr float DroneUnderRoof = 250.0f;
+	constexpr float DroneIndoorScale = 0.5f;
+	constexpr float DroneLowRoof = 900.0f;
+	constexpr float DroneAboveStarts = 250.0f;
+	struct FDroneWay
+	{
+		float Radius = 0.0f;
+		float Roof = 0.0f;
+		int32 Blocked = 0;
+	};
+	/** How high the drone's middle flies, and how big it is, under `Roof` (0 for open sky) with the starts from `LowestStart` to `HighestStart`. */
+	float DroneHeight(float Roof, float LowestStart, float HighestStart, float& OutScale);
+	int32 ChooseDroneWay(TConstArrayView<FDroneWay> Ways);
+	/** The roof over a circle, from the roofs found over its points (those with none left out); 0 for none. */
+	float DroneRoof(TArray<float> Roofs);
 
 	/** Cheese Strike: how many wheels, how far apart along the line, how far a spot may be marked from the caller (cm). */
 	constexpr int32 StrikeWheels = 7;
@@ -115,8 +152,18 @@ namespace CheeseStrikeStreaks
 	constexpr float DropHeight = 3000.0f;
 	constexpr float DropSpeed = 1500.0f;
 	constexpr float DropGravity = 2400.0f;
-	/** Seconds a wheel takes to fall from `Height`. */
-	float FallTime(float Height = DropHeight);
-	/** How far above where it lands a wheel is, `Left` seconds before it lands. */
-	float HeightBefore(float Left);
+	/**
+	 * Indoors, a Cheese Strike comes through the roof: a wheel whose place
+	 * on the line has a roof over it within DropHeight lands on the floor
+	 * under it, at about the height of the mark, bursting through the roof
+	 * (a puff, and a scorch left on its underside) RoofGap over its middle
+	 * and falling the rest from IndoorDropSpeed, slower than from the sky,
+	 * so that it is seen falling.
+	 */
+	constexpr float RoofGap = 40.0f;
+	constexpr float IndoorDropSpeed = 300.0f;
+	/** Seconds a wheel takes to fall from `Height`, starting at `Speed`. */
+	float FallTime(float Height = DropHeight, float Speed = DropSpeed);
+	/** How far above where it lands a wheel falling from `Height` at `Speed` is, `Left` seconds before it lands. */
+	float HeightBefore(float Left, float Height = DropHeight, float Speed = DropSpeed);
 }

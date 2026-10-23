@@ -1,0 +1,37 @@
+# Calls in a Cheese Strike on a map under a roof and watches its wheels come
+# through the roof onto the floor: marks a spot ahead, then looks up a little
+# and slows the game to see them burst through and land. Run with
+# tools/play.ps1 -Map <a roofed map> -StartAt <a spot with room ahead>, e.g.
+# -Map /Game/CheeseStrike/Maps/Lvl_Kitchen.
+wait 3
+cmd CheeseStrikeGiveStreak 2
+wait 0.5
+tap Streak
+wait 0.3
+look 0 -12
+wait 0.3
+shot strikein_1_marking
+tap Fire
+wait 0.2
+look 0 22
+wait 1.2
+cmd slomo 0.2
+wait 0.5
+shot strikein_2_through
+wait 0.12
+shot strikein_3_falling
+wait 0.12
+shot strikein_4_falling
+wait 0.12
+shot strikein_5_lands
+wait 0.15
+shot strikein_6_bursts
+wait 0.2
+shot strikein_7_last
+cmd slomo 1
+wait 1.5
+shot strikein_8_scorched
+look 0 -22
+wait 0.2
+shot strikein_9_after
+quit
