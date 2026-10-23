@@ -704,9 +704,21 @@ bool FExecutionAllDownIsNotOut::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the execution begins"), CharacterOf(1, 0)->GetLastStand()->Execute(CharacterOf(2, 0), CheeseStrikeExecution::EKind::Stomp));
 	});
 	WaitUntil(TEXT("the teammate executed"), CheeseStrikeExecution::StompSeconds + 2.0f, []() { const ACheeseStrikeCharacter* Mate = CharacterOf(2, 0); return Mate != nullptr && !Mate->IsAlive(); });
+	// Their head bursts on every machine, a joiner's as soon as it hears of the blow (it may hear of the death first).
+	WaitUntil(TEXT("their head burst, on every machine"), 3.0f, []()
+	{
+		for (int32 Seen = 0; Seen < 3; ++Seen)
+		{
+			const ACheeseStrikeCharacter* Mate = CharacterOf(2, Seen);
+			if (Mate == nullptr || !Mate->GetMesh()->IsBoneHiddenByName(TEXT("head")))
+			{
+				return false;
+			}
+		}
+		return true;
+	});
 	Then([this]()
 	{
-		TestTrue(TEXT("their head burst, on the machine that sees it"), CharacterOf(2, 1) != nullptr && CharacterOf(2, 1)->GetMesh()->IsBoneHiddenByName(TEXT("head")));
 		TestFalse(TEXT("the host, down alone, keeps the round going"), GameState(0)->IsRoundBreak() || GameState(0)->HasMatchEnded());
 		TestTrue(TEXT("the host is down still"), CharacterOf(0, 0)->IsAlive() && CharacterOf(0, 0)->IsDowned());
 	});
