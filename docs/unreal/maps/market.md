@@ -40,11 +40,11 @@ Free-for-all has fourteen more starts (tagged "Free"), seven a side: High Street
 - **Timings.** From a gate start at a sprint: the square's edge down Main Street in about 5 s, the tower in about 7.5 s, the well house along High Street in about 8 s, the wash house through the alleys in about 9 s.
 - **The starts.** Behind the town wall, and inside each gate a wall that hides the yard; no line from the lanes in front of the gates, nor from the belfry, reaches a start (`CheeseStrike.Play.RindMarketHoldsTogether` checks it).
 
-The mice come in at ten points (`MouseEntry`, in the `Mice` folder): over the rooftops into the square (off the balcony houses, the Inns and the Bakeries) and over the outer houses into High Street and the alleys. Eight come, at eight of the ten. Each lands 5 m in, on open ground: what is raised above head height and walked on by nobody (the awnings, the roofs, the carts' loads) is kept off the navigation mesh, so that no mouse lands on top of it.
+The mice come in at ten points (`MouseEntry`, in the `Mice` folder): over the rooftops into the square (off the balcony houses, the Inns and the Bakeries) and over the outer houses into High Street and the alleys. Twenty-four come, two or three at each. Each lands 5 m in, on open ground: what is raised above head height and walked on by nobody (the awnings, the roofs, the carts' loads) is kept off the navigation mesh, so that no mouse lands on top of it.
 
 ## The cheese, and what the mice change
 
-There are 1,092 blocks of cheese, all of them edible; the full ten mice come. They keep to the mice's pace (`tools/play/market_mice.txt`), so the square is bare about four and a half minutes after they come: the stalls, the stores, the courts and the alleys' cheese in the first four minutes, then the arcade and balcony houses' walls, and the Inns and Bakeries last. What each structure does before the mice, and what eating it does:
+There are 1,092 blocks of cheese, all of them edible; the full twenty-four mice come. They keep to the mice's pace (`tools/play/market_mice.txt`), so the square is bare about a minute and a quarter after they come: the stalls, the stores, the courts and the alleys' cheese in the first minute, then the arcade and balcony houses' walls, and the Inns and Bakeries last. What each structure does before the mice, and what eating it does:
 
 | Structure | Blocks | Before | Eaten |
 |---|---|---|---|

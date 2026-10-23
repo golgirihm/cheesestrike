@@ -15,8 +15,8 @@ namespace CheeseStrikeCredits
 		{TEXT("Gruyère Grotto's rock and mine"), TEXT("Quixel Megascans (Fab): the Old Mine pack and two Quarry Cliffs.")},
 		{TEXT("Crumb Kitchen's things and surfaces"), TEXT("From Poly Haven (polyhaven.com), CC0.")},
 		{TEXT("The shipping container"), TEXT("\"Freight shipping container - Orange\" by Sousinho Games (Fab).")},
-		{TEXT("The mice"), TEXT("\"Black Rat\" by Nestaeric (Fab), licensed under Creative Commons Attribution 4.0 (CC BY 4.0): creativecommons.org/licenses/by/4.0")},
-		{TEXT("The mice's sounds"), TEXT("From OpenGameArt.org. \"Squeaky Rat\" by Iwan \"qubodup\" Gabovitch, CC0, from sounds by Zabuhailo and moneykube (freesound.org). \"Rat Monster Screams\" by Iwan \"qubodup\" Gabovitch, licensed under Creative Commons Attribution 3.0 (CC BY 3.0): creativecommons.org/licenses/by/3.0. \"Rabbit Eating\" by Voltiment555, CC0. \"7 Eating Crunches\" by StarNinjas, CC0.")},
+		{TEXT("The vermin"), TEXT("\"Black Rat\" by Nestaeric (Fab), licensed under Creative Commons Attribution 4.0 (CC BY 4.0): creativecommons.org/licenses/by/4.0")},
+		{TEXT("The vermin's sounds"), TEXT("From OpenGameArt.org. \"Squeaky Rat\" by Iwan \"qubodup\" Gabovitch, CC0, from sounds by Zabuhailo and moneykube (freesound.org). \"Rat Monster Screams\" by Iwan \"qubodup\" Gabovitch, licensed under Creative Commons Attribution 3.0 (CC BY 3.0): creativecommons.org/licenses/by/3.0. \"Rabbit Eating\" by Voltiment555, CC0. \"7 Eating Crunches\" by StarNinjas, CC0.")},
 		{TEXT("Rind Market's surfaces and props"), TEXT("From Poly Haven (polyhaven.com), CC0: textures by Rob Tuytel, Amal Kumar, Dario Barresi and Dimitrios Savva, colormass and Rico Cilliers; lamps, a barrel, a crate, a basket and a bench by Josh Dean, James Ray Cock, Kuutti Siitonen and Kirill Sannikov.")},
 		{TEXT("Online play"), TEXT("Steamworks, by Valve.")},
 	};

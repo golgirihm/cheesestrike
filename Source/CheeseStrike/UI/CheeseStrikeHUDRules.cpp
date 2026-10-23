@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeHUDRules.h"
 #include "Math/RandomStream.h"
+#include "Rules/CheeseStrikeMice.h"
 #include "Rules/CheeseStrikeModes.h"
 
 namespace CheeseStrikeHUD
@@ -527,5 +528,19 @@ namespace CheeseStrikeHUD
 		const float Amount = Random.FRandRange(0.3f, 1.0f);
 		const float Start = 0.45f + Random.FRandRange(0.0f, 0.3f);
 		return Amount * Ease((Seconds - Start) / 1.1f);
+	}
+
+	FString VerminWords(float ToGo)
+	{
+		if (ToGo > 0.0f && ToGo <= CheeseStrikeMice::Warning)
+		{
+			const int32 Seconds = FMath::CeilToInt(ToGo);
+			return FString::Printf(TEXT("VERMIN INVASION IN %d:%02d"), Seconds / 60, Seconds % 60);
+		}
+		if (ToGo <= 0.0f && ToGo > -VerminCameFor)
+		{
+			return TEXT("THE VERMIN HAVE COME");
+		}
+		return FString();
 	}
 }

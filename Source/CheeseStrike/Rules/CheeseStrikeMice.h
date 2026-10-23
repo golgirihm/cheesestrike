@@ -14,13 +14,13 @@
  */
 namespace CheeseStrikeMice
 {
-	/** Seconds into a match the mice come, and the seconds before that a red countdown shows. */
+	/** Seconds into a match the mice come, and the seconds before that a red countdown shows (the whole wait: "VERMIN INVASION IN 0:59"). */
 	constexpr float ArriveAfter = 60.0f;
-	constexpr float Warning = 10.0f;
+	constexpr float Warning = 60.0f;
 	/** One mouse for every BlocksPerMouse blocks of cheese, from MinMice to MaxMice; none on a map without cheese. */
-	constexpr int32 BlocksPerMouse = 60;
-	constexpr int32 MinMice = 2;
-	constexpr int32 MaxMice = 10;
+	constexpr int32 BlocksPerMouse = 25;
+	constexpr int32 MinMice = 3;
+	constexpr int32 MaxMice = 24;
 	int32 MiceFor(int32 Blocks);
 	/** Whether a match with these URL `Options` has mice (`?Mice=0` for none), and when they come (`?MiceAt=` seconds into it, else ArriveAfter). */
 	bool HasMice(const FString& Options);
@@ -36,12 +36,24 @@ namespace CheeseStrikeMice
 	constexpr float HeightCost = 4.0f;
 	constexpr float Claimed = 1333.0f;
 	float CheeseCost(float Distance, float Height, bool bClaimedByAnother);
+	/**
+	 * So that they spread over the map rather than eat in a crowd: a block
+	 * costs up to Crowded (cm) more for each other mouse near it, and as much
+	 * again for each other mouse's cheese near it, less the further off, none
+	 * past CrowdWithin. `Others` are the other mice and their cheese, from
+	 * above. The block a mouse is already going for costs it KeepGoing less,
+	 * so that it doesn't turn this way and that as the others move.
+	 */
+	constexpr float Crowded = 1500.0f;
+	constexpr float CrowdWithin = 2000.0f;
+	constexpr float KeepGoing = 600.0f;
+	float CrowdCost(const FVector2D& Block, TConstArrayView<FVector2D> Others);
 
 	/** How far a mouse reaches to eat: across (cm, from its middle to the block) and up (from its feet to the block's bottom). */
 	constexpr float ReachAcross = 260.0f;
 	constexpr float ReachUp = 400.0f;
-	/** Eating: a bite of Bite every BiteEvery seconds, at an even pace; a block's 400 takes ten bites, five seconds of one mouse. */
-	constexpr float Bite = 40.0f;
+	/** Eating: a bite of Bite every BiteEvery seconds, at an even pace; a block's 400 takes four bites, two seconds of one mouse. */
+	constexpr float Bite = 100.0f;
 	constexpr float BiteEvery = 0.5f;
 	/**
 	 * The pace: every map is eaten bare about EatenWithin seconds after the
@@ -50,13 +62,13 @@ namespace CheeseStrikeMice
 	 * PlannedWithin (a little before EatenWithin, for the walks to the last
 	 * few blocks). A mouse's bite is Bite times its Pace: the cube of the
 	 * share of the cheese left over the share planned, so that behind (a big
-	 * map, few mice, long walks) they bite bigger, up to MaxPace, and ahead
-	 * smaller, down to MinPace.
+	 * map, few mice, long walks) they bite bigger, up to MaxPace (a block at
+	 * a bite), and ahead smaller, down to MinPace.
 	 */
-	constexpr float EatenWithin = 300.0f;
-	constexpr float PlannedWithin = 220.0f;
+	constexpr float EatenWithin = 82.0f;
+	constexpr float PlannedWithin = 62.0f;
 	constexpr float MinPace = 0.25f;
-	constexpr float MaxPace = 10.0f;
+	constexpr float MaxPace = 4.0f;
 	float PlannedLeft(float SecondsIn);
 	float Pace(float ShareLeft, float SecondsIn);
 	/** A bite, `SecondsIn` after the mice came, with `ShareLeft` (0 to 1) of the edible cheese left. */
@@ -99,7 +111,7 @@ namespace CheeseStrikeMice
 	 * mice came, a mouse with nothing it can walk or leap to bounds straight
 	 * to the nearest such cheese, so that every map is eaten bare.
 	 */
-	constexpr float BoundAfter = 180.0f;
+	constexpr float BoundAfter = 40.0f;
 
 	/** Seconds a mouse takes to come over the edge of the map, from the top of its wall to the ground. */
 	constexpr float EnterTime = 1.8f;

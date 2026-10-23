@@ -65,7 +65,7 @@ namespace
 	/** An island it walks no further than this on (cm) is one it is cut off on. */
 	constexpr float MouseIslandAcross = 500.0f;
 	/** Not having eaten for this long, nor come nearer the cheese it is after for MouseStuckFor (seconds), it is stuck: it comes in again. */
-	constexpr float MouseStuckAfter = 25.0f;
+	constexpr float MouseStuckAfter = 15.0f;
 	constexpr float MouseStuckFor = 8.0f;
 
 	UAudioComponent* MakeSpeaker(AActor* Mouse, USceneComponent* Body, const TCHAR* Name)
@@ -701,15 +701,19 @@ void ACheeseStrikeMouse::ChooseCheese()
 	// What the other mice have.
 	TSet<const ACheeseStrikeCheese*> Taken;
 	TArray<const ACheeseStrikeMouse*> Others;
+	// Where the others are and what they go for, from above: it eats away from them (CheeseStrikeMice::CrowdCost).
+	TArray<FVector2D> Crowd;
 	for (TActorIterator<ACheeseStrikeMouse> It(GetWorld()); It; ++It)
 	{
 		if (*It != this && It->GetTarget() != nullptr)
 		{
 			Taken.Add(It->GetTarget());
+			Crowd.Add(FVector2D(It->GetTarget()->GetComponentsBoundingBox().GetCenter()));
 		}
 		if (*It != this && It->GetDoing() != EMouseDoing::Sinking)
 		{
 			Others.Add(*It);
+			Crowd.Add(FVector2D(It->GetActorLocation()));
 		}
 	}
 	// On its way to leap onto cheese it can't walk to: it goes on.
@@ -755,7 +759,8 @@ void ACheeseStrikeMouse::ChooseCheese()
 		}
 		// What another mouse stands on is as good as theirs: eaten, it would drop them in.
 		const bool bTheirs = Taken.Contains(Cheese) || Others.ContainsByPredicate([Cheese](const ACheeseStrikeMouse* Other) { return Other->StandsOn(Cheese); });
-		float Cost = CheeseStrikeMice::CheeseCost(FVector::Dist2D(Box.GetCenter(), Feet), Box.Min.Z - Feet.Z, bTheirs);
+		float Cost = CheeseStrikeMice::CheeseCost(FVector::Dist2D(Box.GetCenter(), Feet), Box.Min.Z - Feet.Z, bTheirs)
+			+ CheeseStrikeMice::CrowdCost(FVector2D(Box.GetCenter()), Crowd) - (Cheese == Target.Get() ? CheeseStrikeMice::KeepGoing : 0.0f);
 		if (bAvoiding)
 		{
 			Cost += CheeseStrikeMice::ScareCost(FVector2D(Box.GetCenter()), FVector2D(ScaredWhere), Middle);

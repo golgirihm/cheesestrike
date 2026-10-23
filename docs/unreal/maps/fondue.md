@@ -34,13 +34,13 @@ Three lanes join each spawn to the other: the Skim (long and zig-zagging, along 
 
 Free-for-all has fourteen more starts (tagged "Free"), seven a side: on the pump and the boiler, the middle path, the Skim, the Drain, the Stirrer's island and the north path, each on wax or concrete, never eaten.
 
-The mice come in by ten vents low in the walls (`MouseEntry`): four in each long wall near the middle, where the Skim and the Drain run close to it, and one in each end wall north of the decks. Ten mice come.
+The mice come in by ten vents low in the walls (`MouseEntry`): four in each long wall near the middle, where the Skim and the Drain run close to it, and one in each end wall north of the decks. Twenty-four mice come, three at most of the ten vents.
 
 The hall: walls of grey corrugated sheet over a concrete dado that goes down into the vat, steel columns every 6 m, a pipe run along each long wall, a roof of panels with strips of skylight, two rows of high-bay lamps, a lamp over each deck and the gantry; lit as an overcast day through the skylights (`kit.light_rig("overcast")`), and from below by the fondue wherever the floor is open.
 
 ## The cheese, and what the mice change
 
-668 blocks of cheese, 594 of them edible (ten mice), 74 waxed.
+668 blocks of cheese, 594 of them edible (twenty-four mice), 74 waxed.
 
 | Structure | Blocks | Before | Eaten |
 |---|---|---|---|
@@ -52,7 +52,7 @@ The hall: walls of grey corrugated sheet over a concrete dado that goes down int
 | **RindRunGouda**, **RindRunMozza** | 12 each | A dark tunnel over the south path: close fighting. | Its walls go (or sink with the tiles under them) and its roof planks come down onto the path; the south path lies open over the fondue. |
 | **GantryCheese** | 6 | Crouching cover at the edges of the gantry's platform. | The mice climb the stairs for it; the platform is bare. |
 
-The mice eat what is nearest them first: the floor and cover near the long walls' middles, where they come in, so the Skim and the Drain open first, then the field between the lanes, then round the decks and the Stirrer. A mouse eats a tile standing on the next one, so it leaves holes behind it as it goes; it never eats the tile it stands on, nor one another mouse stands on, and never walks off an edge (a hole opened ahead of it, it stops short and finds its way afresh). Cut off on a tile or two it ate the floor round, it leaps across the gap to floor that goes somewhere (`ACheeseStrikeMouse::LeapOut`); floor it can't walk to (an island of tiles, a tile standing alone) it leaps to from the nearest edge, and a tile alone it eats from on top, going down with it. The whole floor is gone about five minutes after the mice come. A mouse that falls in anyway (another ate the floor from under it) screams, goes under, and comes back in at a vent eight seconds later (`EMouseDoing::Sinking`). Cheese that sinks below the kill height is gone.
+The mice eat what is nearest them first: the floor and cover near the long walls' middles, where they come in, so the Skim and the Drain open first, then the field between the lanes, then round the decks and the Stirrer. A mouse eats a tile standing on the next one, so it leaves holes behind it as it goes; it never eats the tile it stands on, nor one another mouse stands on, and never walks off an edge (a hole opened ahead of it, it stops short and finds its way afresh). Cut off on a tile or two it ate the floor round, it leaps across the gap to floor that goes somewhere (`ACheeseStrikeMouse::LeapOut`); floor it can't walk to (an island of tiles, a tile standing alone) it leaps to from the nearest edge, and a tile alone it eats from on top, going down with it. The whole floor is gone about a minute and a quarter after the mice come. A mouse that falls in anyway (another ate the floor from under it) screams, goes under, and comes back in at a vent eight seconds later (`EMouseDoing::Sinking`). Cheese that sinks below the kill height is gone.
 
 The bots walk the navigation mesh, which is rebuilt where the floor goes, and on a map with a kill height they never walk off an edge (`bCanWalkOffLedges`), nor step aside off a path in a fight: they fall in only when the floor under them is eaten, or they are shot off it.
 

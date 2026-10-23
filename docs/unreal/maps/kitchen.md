@@ -36,7 +36,7 @@ Light: day, the sun low through the north window, across the lanes, falling on t
 
 ## The cheese, and what the mice change
 
-There are 308 blocks the mice can eat, and 36 they can't (the wedge's rind). Five mice eat it all in about four minutes, at the mice's steady pace: the floor's cheese and the wedge first, the cupboards' too; the cheese up on the worktop and the table last, since the mice come to it last (it is high, and few of them come in up there). What each structure does before the mice, and what eating it does (`tools/play/kitchen_mice.txt` watches it happen):
+There are 308 blocks the mice can eat, and 36 they can't (the wedge's rind). Twelve mice eat it all in about a minute and a quarter, at the mice's steady pace: the floor's cheese and the wedge first, the cupboards' too; the cheese up on the worktop and the table last, since the mice come to it last (it is high, and few of them come in up there). What each structure does before the mice, and what eating it does (`tools/play/kitchen_mice.txt` watches it happen):
 
 | Structure | Blocks | Before | Eaten |
 |---|---|---|---|

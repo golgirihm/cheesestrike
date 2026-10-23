@@ -36,7 +36,7 @@ The rock stops the lines that matter whatever the mice eat (`CheeseStrike.Play.T
 
 ## The cheese, and what the mice change
 
-There are 356 blocks the mice can eat and four they can't (the bridges' waxed beams); one mouse to sixty blocks brings six. They come out of ten holes in the rock: four at the floor's ends under the hollows and two in the Pulpit's face, onto the floor, and four in the south wall over the walk. None open onto the galleries: their decks come down as the mice on the floor eat their pillars, and the mice climb to what is left up there last. Keeping to the mice's pace, six mice leave the cave bare of cheese about four minutes after they come: the floor's cover and the stores first, then the decks, side by side as the mice spread, and the tunnel and the bridges last (`tools/play/grotto_mice.txt`).
+There are 356 blocks the mice can eat and four they can't (the bridges' waxed beams); one mouse to 25 blocks brings fourteen. They come out of ten holes in the rock: four at the floor's ends under the hollows and two in the Pulpit's face, onto the floor, and four in the south wall over the walk. None open onto the galleries: their decks come down as the mice on the floor eat their pillars, and the mice climb to what is left up there last. Keeping to the mice's pace, fourteen mice leave the cave bare of cheese about a minute and a quarter after they come: the floor's cover and the stores first, then the decks, side by side as the mice spread, and the tunnel and the bridges last (`tools/play/grotto_mice.txt`).
 
 | Structure | Blocks | Before | Eaten |
 |---|---|---|---|

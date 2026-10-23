@@ -36,7 +36,7 @@ Beyond the outer wall, for a skyline and nothing else: two cold stores, a chimne
 
 ## The cheese, and what the mice change
 
-Every block of cheese is an `ACheeseStrikeCheese` (`Source/CheeseStrike/Map/`) with the design's 400 of eating in it and the name of the structure it belongs to. There are 1,026 the mice can eat, and four they can't (the catwalks' waxed beams); the design's one mouse to sixty blocks puts the full ten mice on it. They eat at a pace that leaves the map bare about four and a half minutes after they come (CheeseStrikeMice::Pace): the outside goes first, the middle last. What each structure does before the mice, and what eating it does:
+Every block of cheese is an `ACheeseStrikeCheese` (`Source/CheeseStrike/Map/`) with the design's 400 of eating in it and the name of the structure it belongs to. There are 1,026 the mice can eat, and four they can't (the catwalks' waxed beams); one mouse to 25 blocks puts the full twenty-four mice on it. They eat at a pace that leaves the map bare about a minute and a quarter after they come (CheeseStrikeMice::Pace), spread out over it: the outside goes first, the middle last. What each structure does before the mice, and what eating it does:
 
 | Structure | Blocks | Before | Eaten |
 |---|---|---|---|

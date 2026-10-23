@@ -30,6 +30,16 @@ namespace CheeseStrikeMice
 		return Distance + HeightCost * FMath::Max(0.0f, Height) + (bClaimedByAnother ? Claimed : 0.0f);
 	}
 
+	float CrowdCost(const FVector2D& Block, TConstArrayView<FVector2D> Others)
+	{
+		float Cost = 0.0f;
+		for (const FVector2D& Other : Others)
+		{
+			Cost += Crowded * FMath::Max(0.0f, 1.0f - static_cast<float>(FVector2D::Distance(Block, Other)) / CrowdWithin);
+		}
+		return Cost;
+	}
+
 	float PlannedLeft(float SecondsIn)
 	{
 		return FMath::Clamp(1.0f - SecondsIn / PlannedWithin, 0.0f, 1.0f);
