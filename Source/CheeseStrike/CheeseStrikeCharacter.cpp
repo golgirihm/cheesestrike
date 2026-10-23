@@ -1339,7 +1339,8 @@ void ACheeseStrikeCharacter::StickLookInput(const FInputActionValue& Value)
 	// Slower over an enemy, and drawn a little toward one while turning: the stick's alone, never the mouse's or a bot's.
 	const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
 	AimAssist = TakesInput() && (Player == nullptr || !Player->IsPaused()) ? CheeseStrikeAimAssist::ForCharacter(this, !Turn.IsNearlyZero(), Seconds) : CheeseStrikeAimAssist::FAssist();
-	DoAim(Turn.X * AimAssist.TurnScale, Turn.Y * AimAssist.TurnScale);
+	// A stick's up is the other way to the mouse's, which DoAim takes: unturned, pushing up looked down.
+	DoAim(Turn.X * AimAssist.TurnScale, -Turn.Y * AimAssist.TurnScale);
 	if (AimAssist.PullYaw != 0.0f || AimAssist.PullPitch != 0.0f)
 	{
 		AddControllerYawInput(AimAssist.PullYaw);
