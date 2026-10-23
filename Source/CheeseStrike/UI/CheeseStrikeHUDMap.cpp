@@ -16,6 +16,7 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikeHUDDraw.h"
 #include "CheeseStrikeHillHUD.h"
+#include "CheeseStrikePickupHUD.h"
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Map/CheeseStrikePlace.h"
@@ -175,6 +176,9 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 		Shapes.Triangle(Centre, Centre + FVector2D(FMath::Sin(A), -FMath::Cos(A)) * Reach, Centre + FVector2D(FMath::Sin(B), -FMath::Cos(B)) * Reach,
 			FLinearColor(1.0f, 1.0f, 1.0f, 0.13f), FLinearColor(1.0f, 1.0f, 1.0f, 0.0f), FLinearColor(1.0f, 1.0f, 1.0f, 0.0f));
 	}
+
+	// The weapons' stands, under the players.
+	CheeseStrikePickupHUD::DrawOnMap(Shapes, World, OnMap, Min, Max, U);
 
 	// Teammates always, held to the edge when further than it reaches; enemies only when seen, or revealed.
 	const APlayerState* Me = Controller->PlayerState;

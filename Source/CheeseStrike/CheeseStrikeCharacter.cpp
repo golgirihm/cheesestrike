@@ -1361,7 +1361,17 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 
 void ACheeseStrikeCharacter::InteractStarted()
 {
-	if (LastStand != nullptr && TakesInput())
+	if (!TakesInput())
+	{
+		return;
+	}
+	// Someone down in reach comes first; else a weapon on a stand in reach, swapped for the primary.
+	CheeseStrikeModes::EInteract Kind = CheeseStrikeModes::EInteract::None;
+	if ((LastStand == nullptr || LastStand->InteractTarget(Kind) == nullptr) && Inventory != nullptr && Inventory->PressForPickup())
+	{
+		return;
+	}
+	if (LastStand != nullptr)
 	{
 		LastStand->SetInteracting(true);
 	}

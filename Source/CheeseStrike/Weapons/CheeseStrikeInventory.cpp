@@ -12,7 +12,15 @@
 #include "CheeseStrike.h"
 #include "CheeseStrikeArsenal.h"
 #include "CheeseStrikeCharacter.h"
+#include "CheeseStrikePickup.h"
 #include "CheeseStrikeWeapon.h"
+
+namespace
+{
+	TAutoConsoleVariable<FString> CVarSpawnPrimary(TEXT("CheeseStrike.SpawnPrimary"), TEXT(""),
+		TEXT("The primary everyone comes in with who hasn't chosen one, in place of the Colby Carbine (the play tests carry the Cheddar Blaster, as they were written); empty for the carbine."),
+		ECVF_Cheat);
+}
 
 FCheeseStrikeLoadout FCheeseStrikeLoadout::Usual(FName Primary)
 {
@@ -362,6 +370,98 @@ void UCheeseStrikeInventory::GiveSpawnLoadout(AController* Controller)
 	GiveInternal(FCheeseStrikeLoadout::Usual(Loadouts != nullptr ? Loadouts->PrimaryFor(Controller) : NAME_None), true);
 }
 
+bool UCheeseStrikeInventory::TakePickup(ACheeseStrikePickup* Pickup, bool bPressed)
+{
+	using CheeseStrikePickups::ETake;
+	ACheeseStrikeCharacter* Character = Holder();
+	if (Character == nullptr || Pickup == nullptr || !Character->HasAuthority()
+		|| !Pickup->IsInReach(Character, (bPressed ? CheeseStrikePickups::PressReach : CheeseStrikePickups::Reach) + CheeseStrikePickups::ServerSlack))
+	{
+		return false;
+	}
+	const ETake How = Pickup->HowFor(Character);
+	if (How == ETake::None || (How == ETake::Press && !bPressed))
+	{
+		return false;
+	}
+	ACheeseStrikeWeapon* Carried = At(static_cast<uint8>(EWeaponSlot::Primary));
+	if (How == ETake::TopUp && Carried != nullptr)
+	{
+		Carried->AddReserve(Carried->GetStats().Reserve);
+	}
+	else
+	{
+		SwapPrimary(Pickup->GetWeapon());
+	}
+	Pickup->Take();
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s takes the %s from %s%s"), *Character->DisplayName(), *Pickup->GetWeaponName().ToString(), *Pickup->GetName(), How == ETake::TopUp ? TEXT(", for its rounds") : TEXT(""));
+	return true;
+}
+
+void UCheeseStrikeInventory::SwapPrimary(FName Weapon)
+{
+	ACheeseStrikeCharacter* Character = Holder();
+	UWorld* World = GetWorld();
+	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
+	if (Character == nullptr || World == nullptr || !Character->HasAuthority() || Stats == nullptr || Stats->Slot != EWeaponSlot::Primary)
+	{
+		return;
+	}
+	const uint8 Slot = static_cast<uint8>(EWeaponSlot::Primary);
+	Weapons.SetNum(NumWeaponSlots);
+	// The one carried is gone, put away first if it was in hand, so that the new one is drawn.
+	if (ACheeseStrikeWeapon* Old = At(Slot))
+	{
+		if (ShownSlot == Slot)
+		{
+			Old->PutAway();
+			ShownSlot = NoSlot;
+		}
+		Old->Destroy();
+		Weapons[Slot] = nullptr;
+	}
+	const FTransform Where = Character->GetActorTransform();
+	ACheeseStrikeWeapon* Fresh = World->SpawnActorDeferred<ACheeseStrikeWeapon>(ACheeseStrikeWeapon::StaticClass(), Where, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Fresh == nullptr)
+	{
+		return;
+	}
+	Fresh->SetWeapon(Stats->Id);
+	UGameplayStatics::FinishSpawningActor(Fresh, Where);
+	Weapons[Slot] = Fresh;
+	bSpawnLoadout = false;
+	if (HeldSlot != Slot)
+	{
+		LastSlot = HeldSlot;
+	}
+	// In hand at once, here and on every machine (whose own copy of the slot has a new weapon in it, never drawn).
+	SetHeld(Slot, true);
+}
+
+bool UCheeseStrikeInventory::PressForPickup()
+{
+	ACheeseStrikeCharacter* Character = Holder();
+	ACheeseStrikePickup* Offered = Character != nullptr && Character->IsLocallyControlled() ? ACheeseStrikePickup::OfferedTo(Character) : nullptr;
+	if (Offered == nullptr)
+	{
+		return false;
+	}
+	if (Character->HasAuthority())
+	{
+		TakePickup(Offered, true);
+	}
+	else
+	{
+		ServerTakePickup(Offered);
+	}
+	return true;
+}
+
+void UCheeseStrikeInventory::ServerTakePickup_Implementation(ACheeseStrikePickup* Pickup)
+{
+	TakePickup(Pickup, true);
+}
+
 void UCheeseStrikeInventory::RestrictTo(EWeaponSlot Slot)
 {
 	if (GetOwner() == nullptr || !GetOwner()->HasAuthority())
@@ -482,7 +582,12 @@ void UCheeseStrikeLoadouts::Choose(const AController* Controller, FName Primary)
 FName UCheeseStrikeLoadouts::PrimaryFor(const AController* Controller) const
 {
 	const FName* Found = Controller != nullptr ? Chosen.Find(Controller) : nullptr;
-	return Found != nullptr ? *Found : CheeseStrikeArsenal::DefaultPrimary();
+	if (Found != nullptr)
+	{
+		return *Found;
+	}
+	const FWeaponStats* Instead = CheeseStrikeArsenal::Find(FName(*CVarSpawnPrimary.GetValueOnGameThread()));
+	return Instead != nullptr && Instead->Slot == EWeaponSlot::Primary ? Instead->Id : CheeseStrikeArsenal::DefaultPrimary();
 }
 
 bool UCheeseStrikeLoadouts::HasChosen(const AController* Controller) const

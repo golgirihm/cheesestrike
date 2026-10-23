@@ -41,6 +41,8 @@ namespace PlayTesting
 		bool bLobby = false;
 		/** The level's package, or the shooter level if empty. */
 		FString Level;
+		/** The primary everyone comes in with (CheeseStrike.SpawnPrimary): the Cheddar Blaster the tests were written for, or empty for the game's own, the Colby Carbine. */
+		FString SpawnPrimary = TEXT("blaster");
 	};
 
 	/** Queues: start playing as `Session` says, and wait until every player is in, with a character that has its weapon. */

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "PlayTesting.h"
+#include "HAL/IConsoleManager.h"
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
@@ -246,6 +247,10 @@ namespace PlayTesting
 		// No count before the match (or its rounds) unless the test asks for one, so that the tests are quick.
 		const FString NoCount = Session.Options.Contains(TEXT("?Countdown=")) ? FString() : FString(TEXT("?Countdown=0"));
 		const FString Options = Session.bLobby ? Session.Options + NoCount : Session.Options + TEXT("?StartNow") + NoBots + NoCount;
+		if (IConsoleVariable* SpawnPrimary = IConsoleManager::Get().FindConsoleVariable(TEXT("CheeseStrike.SpawnPrimary")))
+		{
+			SpawnPrimary->Set(*Session.SpawnPrimary);
+		}
 		Settings.Reset(DuplicateObject<ULevelEditorPlaySettings>(GetDefault<ULevelEditorPlaySettings>(), GetTransientPackage()));
 		Settings->SetPlayNetMode(Session.Players > 1 && !Session.bApart ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 		Settings->SetPlayNumberOfClients(Session.Players);
@@ -337,6 +342,10 @@ namespace PlayTesting
 		{
 			GEditor->UserEditedPlayWorldURL.Empty();
 			Settings.Reset();
+			if (IConsoleVariable* SpawnPrimary = IConsoleManager::Get().FindConsoleVariable(TEXT("CheeseStrike.SpawnPrimary")))
+			{
+				SpawnPrimary->Set(TEXT(""));
+			}
 		});
 	}
 

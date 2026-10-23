@@ -66,7 +66,9 @@ namespace CheeseStrikeWeapons
 		static const FWeaponStats Stats = []
 		{
 			FWeaponStats Weapon = MakeWeapon(TEXT("carbine"), NSLOCTEXT("CheeseStrike", "Carbine", "Colby Carbine"), EWeaponSlot::Primary);
-			Weapon.Damage = 18.0f;
+			// The spawn primary (the user's, October 2026): softer than the design's 18, three bursts to a kill rather than
+			// two, and two magazines in reserve, so that a weapon on a stand is worth going for.
+			Weapon.Damage = 15.0f;
 			Weapon.HeadMultiplier = 1.6f;
 			Weapon.FireInterval = 0.48f;
 			Weapon.bAutomatic = false;
@@ -74,7 +76,7 @@ namespace CheeseStrikeWeapons
 			Weapon.BurstInterval = 0.07f;
 			Weapon.MagazineSize = 27;
 			Weapon.ReloadTime = 1.7f;
-			Weapon.Reserve = 81;
+			Weapon.Reserve = 54;
 			Weapon.ReserveMax = 135;
 			SetReach(Weapon, 140.0f, 35.0f, 80.0f, 0.6f);
 			Weapon.SpreadDegrees = 0.25f;
@@ -285,7 +287,8 @@ namespace CheeseStrikeArsenal
 
 	FName DefaultPrimary()
 	{
-		return CheeseStrikeWeapons::Blaster().Id;
+		// The weakest primary, so that the stands' weapons are worth taking (Rules/CheeseStrikePickups.h).
+		return CheeseStrikeWeapons::Carbine().Id;
 	}
 
 	FName Sidearm()
