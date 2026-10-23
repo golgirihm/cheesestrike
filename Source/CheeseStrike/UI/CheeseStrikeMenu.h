@@ -48,10 +48,12 @@ namespace CheeseStrikeMenu
 	 * Which page shows, from where the match is: none once it is on (or the
 	 * pause menu, if the player paused, or the options from it), none once
 	 * it is over (the scoreboard is up), the lobby while a hosted or joined
-	 * match waits or goes to another level, and otherwise the page the
-	 * player chose among the front end's.
+	 * match waits or goes to another level (but none while the results are
+	 * held up on the way back to the lobby, `bResultsHeld`:
+	 * UCheeseStrikePostGameSubsystem), and otherwise the page the player
+	 * chose among the front end's.
 	 */
-	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling = false);
+	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling = false, bool bResultsHeld = false);
 
 	/** The tones of the lobby's countdown (CheeseStrikeTones). */
 	enum class ECountdownTone : uint8
@@ -107,10 +109,15 @@ namespace CheeseStrikeMenu
 	bool ShouldRedrawLobby(bool bChanged, bool bStatusChanged, bool bDropdownOpen);
 	/** Corners, in Slate units. */
 	constexpr float Rounding = 6.0f;
-	/** The lobby's picture of the map, wide (16:9), and its rules' column as wide. */
-	constexpr float MapPictureWidth = 600.0f;
+	/** The lobby's picture of the map, wide (16:9), and its rules' column as wide; the gap between it and the seats. */
+	constexpr float MapPictureWidth = 680.0f;
+	constexpr float LobbyGap = 44.0f;
 	/** The width of the names of the lobby's rules, left of their dropdowns. */
-	constexpr float RuleLabelWidth = 210.0f;
+	constexpr float RuleLabelWidth = 220.0f;
+	/** The longest name a player may have (Steam's), which a seat in the lobby fits: smaller, and cut short with an ellipsis if it still doesn't. */
+	constexpr int32 LongestName = 32;
+	/** The size a seat writes `Name` at: smaller the longer it is. */
+	int32 SeatNameSize(const FString& Name);
 	/** Paused, how much the game behind the menu is blurred (Slate's blur strength) and darkened (black's opacity over it). */
 	constexpr float PauseBlur = 12.0f;
 	constexpr float PauseDarkening = 0.4f;
@@ -185,6 +192,8 @@ public:
 	void FocusItem(const FString& Name);
 	/** Whether one of the lobby's dropdowns is open. */
 	bool HasDropdownOpen() const { return IsDropdownOpen(); }
+	/** Whether the lobby shows the host's match, ready to be played in: not joining it, nor on the way to another level. */
+	bool IsLobbyReady() const;
 	/** Shuts any dropdown open, giving the focus back to its button; true if one was. */
 	bool CloseDropdowns();
 
@@ -235,11 +244,18 @@ private:
 	 * the lobby of a team match (MakeSeatColumns); one with every seat, a
 	 * free-for-all's.
 	 */
-	TSharedRef<SWidget> MakeSeatColumn(const FString& Title, const FLinearColor& Colour, const TArray<CheeseStrikeRules::FRosterEntry>& Seats);
+	TSharedRef<SWidget> MakeSeatColumn(const FString& Title, const FLinearColor& Colour, const TArray<CheeseStrikeRules::FRosterEntry>& Seats, int32 Team = INDEX_NONE);
 	/** The lobby's columns: a team's column for each side when `bTeams`, or one column of every seat. */
 	TSharedRef<SWidget> MakeSeatColumns(bool bTeams);
-	/** One seat's chip: a player's (crowned if `bHost`), a bot's, or an empty seat, in `Colour`. */
-	TSharedRef<SWidget> MakeNameChip(const CheeseStrikeRules::FRosterEntry& Seat, bool bHost, const FLinearColor& Colour);
+	/**
+	 * One seat's chip: a player's (crowned if `bHost`, marked if `bMine`), a
+	 * bot's, or an empty seat, in `Colour`. With `Click`, it is a button: a
+	 * seat on the other side takes the player over to it, and the host's
+	 * click on a bot moves the bot.
+	 */
+	TSharedRef<SWidget> MakeNameChip(const CheeseStrikeRules::FRosterEntry& Seat, bool bHost, const FLinearColor& Colour, bool bMine = false, TFunction<void()> Click = nullptr);
+	/** The main page's word on why the player was put out of a match (the host left, the connection was lost), with OK to dismiss it. */
+	TSharedRef<SWidget> MakeFarewell();
 	/** A number with a button either side to make it less or more; with `bCanPick` off, the buttons can't be pressed. */
 	TSharedRef<SWidget> MakeStepper(const FString& Label, const FString& Value, bool bCanPick, TFunction<void()> Less, TFunction<void()> More);
 	/** The picture of map `MapIndex` (CheeseStrikeRules::Maps), its name across the bottom. */

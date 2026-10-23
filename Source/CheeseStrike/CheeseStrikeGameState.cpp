@@ -22,6 +22,7 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeGameState, CountdownEndsAt);
 	DOREPLIFETIME(ACheeseStrikeGameState, BotNames);
 	DOREPLIFETIME(ACheeseStrikeGameState, BotsWanted);
+	DOREPLIFETIME(ACheeseStrikeGameState, BotSides);
 	DOREPLIFETIME(ACheeseStrikeGameState, HostName);
 	DOREPLIFETIME(ACheeseStrikeGameState, MapIndex);
 	DOREPLIFETIME(ACheeseStrikeGameState, BotSkill);
@@ -44,24 +45,36 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 
 TArray<CheeseStrikeRules::FRosterEntry> ACheeseStrikeGameState::Roster() const
 {
-	TArray<CheeseStrikeRules::FRosterEntry> Entries;
+	// In the order they joined: a joiner's PlayerArray is in the order the player states happened to arrive.
+	TArray<const ACheeseStrikePlayerState*> Players;
 	for (const APlayerState* Player : PlayerArray)
 	{
 		if (const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Player))
 		{
-			CheeseStrikeRules::FRosterEntry Entry;
-			Entry.Name = Ours->GetPlayerName();
-			Entry.Team = Ours->GetTeam();
-			Entry.bBot = Ours->IsABot();
-			Entries.Add(Entry);
+			Players.Add(Ours);
 		}
+	}
+	Players.StableSort([](const ACheeseStrikePlayerState& A, const ACheeseStrikePlayerState& B) { return A.GetJoinOrder() < B.GetJoinOrder(); });
+	TArray<CheeseStrikeRules::FRosterEntry> Entries;
+	for (const ACheeseStrikePlayerState* Ours : Players)
+	{
+		CheeseStrikeRules::FRosterEntry Entry;
+		Entry.Name = Ours->GetPlayerName();
+		Entry.Team = Ours->GetTeam();
+		Entry.bBot = Ours->IsABot();
+		Entries.Add(Entry);
 	}
 	return Entries;
 }
 
+TArray<CheeseStrikeRules::FRosterEntry> ACheeseStrikeGameState::Seats() const
+{
+	return CheeseStrikeRules::Seats(Roster(), BotNames, BotsWanted, BotSides);
+}
+
 TArray<CheeseStrikeRules::FRosterEntry> ACheeseStrikeGameState::TeamColumn(int32 Team) const
 {
-	return CheeseStrikeRules::TeamColumn(Team, Roster(), BotNames, BotsWanted);
+	return CheeseStrikeRules::TeamColumn(Team, Roster(), BotNames, BotsWanted, BotSides);
 }
 
 TArray<CheeseStrikeRules::FStanding> ACheeseStrikeGameState::Standings() const

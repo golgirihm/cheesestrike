@@ -1,0 +1,25 @@
+# Hosts a lobby for looking at its seats: the joiner (of
+# lobby_seats_client.txt, with a long name) goes over to the host's side, the
+# host moves a bot, starts the countdown (the rules locked) and calls it off.
+# Run with tools/play.ps1 -Lobby -Bots, -ClientScript
+# tools/play/lobby_seats_client.txt and a long -ClientName, and -Extra
+# "?listen?Mode=Deathmatch" for sides or none for a free-for-all.
+wait 130
+cmd r.SetRes 1600x900w
+wait 1
+shot seats_host
+wait 4
+shot seats_host_switched
+cmd CheeseStrikeMoveBot 1
+wait 1
+shot seats_host_moved
+cmd CheeseStrikeStart
+wait 1.5
+shot seats_host_counting
+cmd CheeseStrikeCancel
+wait 1
+cmd r.SetRes 1280x720w
+wait 1
+shot seats_host_720
+wait 6
+quit

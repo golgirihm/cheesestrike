@@ -5,6 +5,12 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/GameStateBase.h"
+#include "GameDelegates.h"
+#include "Engine/NetConnection.h"
+#include "Engine/NetDriver.h"
+#include "CheeseStrikePlayerController.h"
+#include "CheeseStrikeSeatMemory.h"
 #include "UObject/UObjectGlobals.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
@@ -27,6 +33,7 @@ void UCheeseStrikeSessionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 		TravelFailedHandle = GEngine->OnTravelFailure().AddUObject(this, &UCheeseStrikeSessionSubsystem::OnTravelFailed);
 		NetworkFailedHandle = GEngine->OnNetworkFailure().AddUObject(this, &UCheeseStrikeSessionSubsystem::OnNetworkFailed);
 	}
+	ExitHandle = FGameDelegates::Get().GetExitCommandDelegate().AddUObject(this, &UCheeseStrikeSessionSubsystem::OnExit);
 	UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: through %s"), *ServiceName());
 	// The game's traffic goes through Steam's net driver only when Steam is
 	// the service; without it (the editor, -NOSTEAM, no Steam client) that
@@ -53,6 +60,7 @@ void UCheeseStrikeSessionSubsystem::Deinitialize()
 		Interface->ClearOnSessionUserInviteAcceptedDelegate_Handle(InviteHandle);
 	}
 	FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(LoadedHandle);
+	FGameDelegates::Get().GetExitCommandDelegate().Remove(ExitHandle);
 	if (GEngine != nullptr)
 	{
 		GEngine->OnTravelFailure().Remove(TravelFailedHandle);
@@ -118,9 +126,81 @@ void UCheeseStrikeSessionSubsystem::OnTravelFailed(UWorld* World, ETravelFailure
 
 void UCheeseStrikeSessionSubsystem::OnNetworkFailed(UWorld* World, UNetDriver* Driver, ENetworkFailure::Type Failure, const FString& Error)
 {
-	if (World == nullptr || World->GetGameInstance() == GetGameInstance())
+	if (World != nullptr && World->GetGameInstance() != GetGameInstance())
 	{
-		SetPending(ESessionPending::None);
+		return;
+	}
+	SetPending(ESessionPending::None);
+	// A joiner's connection to the host is gone: the engine takes them back to the level alone, where the front end says
+	// why. The match joined is over for them, so it is left too, or it would be in the way of the next.
+	if (Driver != nullptr && Driver->GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: out of the host's match (%s: %s)"), ENetworkFailure::ToString(Failure), *Error);
+		SayFarewell(CheeseStrikeSessions::FarewellFor(Failure));
+		if (IOnlineSessionPtr Interface = Sessions(); Interface.IsValid() && Interface->GetNamedSession(NAME_GameSession) != nullptr)
+		{
+			Interface->DestroySession(NAME_GameSession);
+		}
+		bBusy = false;
+	}
+}
+
+void UCheeseStrikeSessionSubsystem::SayFarewell(CheeseStrikeSessions::EFarewell Why)
+{
+	using CheeseStrikeSessions::EFarewell;
+	if (Why == EFarewell::None)
+	{
+		return;
+	}
+	// The host's own word stands over the lost connection that follows it.
+	const bool bHostSaid = Farewell == EFarewell::HostClosedTheLobby || Farewell == EFarewell::HostLeftTheMatch;
+	if (bHostSaid && Why == EFarewell::ConnectionLost && FPlatformTime::Seconds() - FarewellAt < 30.0)
+	{
+		return;
+	}
+	Farewell = Why;
+	FarewellAt = FPlatformTime::Seconds();
+	UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: %s"), *CheeseStrikeSessions::FarewellText(Why));
+}
+
+void UCheeseStrikeSessionSubsystem::SayGoodbye(UWorld* World)
+{
+	UNetDriver* Driver = World != nullptr ? World->GetNetDriver() : nullptr;
+	if (Driver == nullptr || World->GetNetMode() != NM_ListenServer)
+	{
+		return;
+	}
+	const AGameStateBase* State = World->GetGameState();
+	const bool bInMatch = State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded();
+	int32 Told = 0;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(It->Get());
+		if (Player != nullptr && !Player->IsLocalController() && Player->GetNetConnection() != nullptr)
+		{
+			Player->ClientHostLeft(bInMatch);
+			++Told;
+		}
+	}
+	// Sent now: the connections close as the host goes, before the next tick would have sent it.
+	for (UNetConnection* Connection : Driver->ClientConnections)
+	{
+		if (Connection != nullptr)
+		{
+			Connection->FlushNet(true);
+		}
+	}
+	if (Told > 0)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: told %d joiner(s) the host is leaving"), Told);
+	}
+}
+
+void UCheeseStrikeSessionSubsystem::OnExit()
+{
+	if (GetGameInstance() != nullptr)
+	{
+		SayGoodbye(GetGameInstance()->GetWorld());
 	}
 }
 
@@ -139,6 +219,12 @@ void UCheeseStrikeSessionSubsystem::Host(const FString& Options, bool bLan)
 	}
 	bBusy = true;
 	SetPending(ESessionPending::Hosting);
+	DismissFarewell();
+	// A match of its own: nobody has sat in it yet.
+	if (UCheeseStrikeSeatMemory* Memory = GetGameInstance()->GetSubsystem<UCheeseStrikeSeatMemory>())
+	{
+		Memory->Clear();
+	}
 	HostingOptions = CheeseStrikeSessions::NormalisedOptions(Options);
 	bHostingLan = bLan;
 	// A match already offered or joined is left first.
@@ -248,6 +334,7 @@ void UCheeseStrikeSessionSubsystem::Join(int32 Index)
 	}
 	bBusy = true;
 	SetPending(ESessionPending::Joining);
+	DismissFarewell();
 	Joining = Results[Index];
 	if (Sessions()->GetNamedSession(NAME_GameSession) != nullptr)
 	{

@@ -37,6 +37,8 @@
 #include "Sessions/CheeseStrikeSessions.h"
 #include "UI/CheeseStrikeMenu.h"
 #include "UI/CheeseStrikeMenuFigure.h"
+#include "UI/CheeseStrikeMusic.h"
+#include "UI/CheeseStrikePostGame.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 {
@@ -99,6 +101,12 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 		ServerReady();
 	}
 	SoundCountdown();
+	// The results stay up until the lobby they lead back to is there: a moment before the server takes everyone back.
+	if (const ACheeseStrikeGameState* Ended = GetWorld()->GetGameState<ACheeseStrikeGameState>();
+		Ended != nullptr && Ended->HasMatchEnded() && Ended->GetLobbyAt() > 0.0f && Ended->GetServerWorldTimeSeconds() >= Ended->GetLobbyAt() - 0.25f)
+	{
+		HoldTheResults();
+	}
 	// The menu follows where the match is. A joiner told to follow the host to another level is still in the match,
 	// though the connection to the level being left is closed while the next is reached: the lobby says where to.
 	const AGameStateBase* State = GetWorld()->GetGameState();
@@ -106,7 +114,9 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	const bool bEnded = State != nullptr && State->HasMatchEnded();
 	const AGameState* Match = Cast<AGameState>(State);
 	const bool bTravelling = (Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap) || bLeaving;
-	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch() || bLeaving, bPaused, ChosenPage, bTravelling);
+	const UCheeseStrikePostGameSubsystem* PostGame = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>() : nullptr;
+	const bool bResultsHeld = PostGame != nullptr && PostGame->IsHeld();
+	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch() || bLeaving, bPaused, ChosenPage, bTravelling, bResultsHeld);
 	if (Wanted != ShownPage)
 	{
 		ShowMenu(Wanted);
@@ -117,6 +127,7 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 		// each is drawn again in the frame it changes, and only then.
 		Menu->Refresh();
 	}
+	PlayMusic();
 	// And the level is watched from the menu camera, with the figure before it, until the match is on.
 	if (!bStarted || bTravelling)
 	{
@@ -136,6 +147,12 @@ void ACheeseStrikePlayerController::PreClientTravel(const FString& PendingURL, E
 	// one has loaded. Hosting, from a level of one's own, is not following a match: the front end says so meanwhile.
 	bLeaving = TravelType != TRAVEL_Absolute && IsInAMatch();
 	LeavingFor = bLeaving ? CheeseStrikeRules::MapIndexFor(FURL(nullptr, *PendingURL, TRAVEL_Absolute).Map) : INDEX_NONE;
+	// Back to the lobby after the results: they stay up until it is there.
+	const ACheeseStrikeGameState* Ended = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	if (bLeaving && Ended != nullptr && Ended->HasMatchEnded() && Ended->GetLobbyAt() > 0.0f)
+	{
+		HoldTheResults();
+	}
 	if (Menu.IsValid())
 	{
 		Menu->Refresh();
@@ -178,6 +195,42 @@ bool ACheeseStrikePlayerController::IsViewReady() const
 		return Match->HasMatchEnded() || (Match->HasMatchStarted() && bThroughCharacter);
 	}
 	return ShownPage != EMenuPage::None || bThroughCharacter;
+}
+
+bool ACheeseStrikePlayerController::IsLobbyReady() const
+{
+	return ShownPage == EMenuPage::Lobby && Menu.IsValid() && Menu->IsLobbyReady();
+}
+
+bool ACheeseStrikePlayerController::IsDoneWithTheResults() const
+{
+	const bool bFrontEnd = ShownPage == EMenuPage::Main || ShownPage == EMenuPage::Find || ShownPage == EMenuPage::Credits || ShownPage == EMenuPage::Options;
+	return IsLobbyReady() || (bFrontEnd && !IsInAMatch());
+}
+
+void ACheeseStrikePlayerController::HoldTheResults()
+{
+	UCheeseStrikePostGameSubsystem* PostGame = IsLocalController() && GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>() : nullptr;
+	if (PostGame != nullptr && !PostGame->IsHeld() && ShownPage == EMenuPage::None)
+	{
+		PostGame->HoldWhatIsShown();
+	}
+}
+
+void ACheeseStrikePlayerController::PlayMusic()
+{
+	UCheeseStrikeMusicSubsystem* Music = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeMusicSubsystem>() : nullptr;
+	if (Music == nullptr)
+	{
+		return;
+	}
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const bool bCounting = Match != nullptr && Match->IsCountingDown();
+	const bool bLeavingNow = bLeaving || (Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap);
+	const UCheeseStrikePostGameSubsystem* PostGame = GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>();
+	const bool bWanted = CheeseStrikeMusic::IsWanted(ShownPage, bPaused, bCounting, bLeavingNow, PostGame != nullptr && PostGame->IsHeld());
+	// Out over the countdown, into the match; otherwise quicker.
+	Music->Want(GetWorld(), bWanted, bCounting && Match != nullptr ? FMath::Max(Match->SecondsToStart(), 0.5f) : CheeseStrikeMusic::FadeOutSeconds);
 }
 
 bool ACheeseStrikePlayerController::CanSayReady() const
@@ -353,7 +406,7 @@ void ACheeseStrikePlayerController::HostFromMenu()
 void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map)
 {
 	ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
-	if (Mode == nullptr)
+	if (Mode == nullptr || !Mode->CanChangeLobby())
 	{
 		return;
 	}
@@ -372,7 +425,7 @@ void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float Resp
 void ACheeseStrikePlayerController::SetModeFromMenu(int32 ModeIndex)
 {
 	ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
-	if (Mode == nullptr)
+	if (Mode == nullptr || !Mode->CanChangeLobby())
 	{
 		return;
 	}
@@ -389,7 +442,7 @@ void ACheeseStrikePlayerController::SetModeFromMenu(int32 ModeIndex)
 
 void ACheeseStrikePlayerController::SetRoundsFromMenu(int32 Rounds)
 {
-	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr; Mode != nullptr && Mode->CanChangeLobby())
 	{
 		Mode->SetRoundLimit(Rounds);
 	}
@@ -401,7 +454,7 @@ void ACheeseStrikePlayerController::SetRoundsFromMenu(int32 Rounds)
 
 void ACheeseStrikePlayerController::SetBotsFromMenu(int32 Wanted)
 {
-	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr; Mode != nullptr && Mode->CanChangeLobby())
 	{
 		Mode->SetBotsWanted(Wanted);
 	}
@@ -413,7 +466,7 @@ void ACheeseStrikePlayerController::SetBotsFromMenu(int32 Wanted)
 
 void ACheeseStrikePlayerController::SetBotSkillFromMenu(int32 Skill)
 {
-	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr; Mode != nullptr && Mode->CanChangeLobby())
 	{
 		Mode->SetBotSkill(Skill);
 	}
@@ -421,6 +474,41 @@ void ACheeseStrikePlayerController::SetBotSkillFromMenu(int32 Skill)
 	{
 		Menu->Refresh();
 	}
+}
+
+void ACheeseStrikePlayerController::SwitchSideFromMenu()
+{
+	ServerSwitchSide();
+}
+
+void ACheeseStrikePlayerController::ServerSwitchSide_Implementation()
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->SwitchSide(this);
+	}
+}
+
+void ACheeseStrikePlayerController::MoveBotFromMenu(int32 Bot)
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
+	{
+		Mode->MoveBot(Bot);
+	}
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeSwitchSide()
+{
+	SwitchSideFromMenu();
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeMoveBot(int32 Bot)
+{
+	MoveBotFromMenu(Bot);
 }
 
 void ACheeseStrikePlayerController::CheeseStrikeBots()
@@ -528,7 +616,33 @@ void ACheeseStrikePlayerController::LeaveFromMenu()
 	bPaused = false;
 	ChosenPage = EMenuPage::Main;
 	UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>();
+	// The host takes the match with them: the joiners are told first.
+	if (Sessions != nullptr)
+	{
+		Sessions->SayGoodbye(GetWorld());
+	}
 	if (Sessions != nullptr && Sessions->IsInAMatch())
+	{
+		Sessions->Leave();
+	}
+	else
+	{
+		ClientTravel(CheeseStrikeSessions::Level, TRAVEL_Absolute);
+	}
+}
+
+void ACheeseStrikePlayerController::ClientHostLeft_Implementation(bool bInMatch)
+{
+	UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+	if (Sessions == nullptr || HasAuthority())
+	{
+		return;
+	}
+	Sessions->SayFarewell(bInMatch ? CheeseStrikeSessions::EFarewell::HostLeftTheMatch : CheeseStrikeSessions::EFarewell::HostClosedTheLobby);
+	// Back to the front end at once, rather than waiting for the connection to time out.
+	bPaused = false;
+	ChosenPage = EMenuPage::Main;
+	if (Sessions->IsInAMatch())
 	{
 		Sessions->Leave();
 	}

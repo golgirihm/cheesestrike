@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "OnlineSessionSettings.h"
+#include "Engine/EngineBaseTypes.h"
 
 /**
  * How a match is offered and found through the online service (Steam, or
@@ -42,4 +43,23 @@ namespace CheeseStrikeSessions
 
 	/** A found match in a line, for the player to pick: who hosts, how many are in, the rules, the ping. */
 	FString Describe(const FOnlineSessionSearchResult& Result);
+
+	/** Why a joiner is no longer in the host's match, as the front end tells them once they are back on it. */
+	enum class EFarewell : uint8
+	{
+		None,
+		/** The host left the lobby, or quit the game from it. */
+		HostClosedTheLobby,
+		/** The host left the match, or quit the game during it. */
+		HostLeftTheMatch,
+		/** The connection to the host was lost: it timed out or closed with no word from the host. */
+		ConnectionLost,
+		/** The host couldn't be reached on joining. */
+		CouldNotJoin,
+	};
+	/** What a joiner's network failure means for them; None for a failure that doesn't end their match. */
+	EFarewell FarewellFor(ENetworkFailure::Type Failure);
+	/** The title and the line the front end shows for `Farewell` (nothing for None). */
+	FString FarewellTitle(EFarewell Farewell);
+	FString FarewellText(EFarewell Farewell);
 }
