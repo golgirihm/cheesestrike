@@ -294,4 +294,13 @@ namespace CheeseStrikeHUD
 	float SheetDepth(float Seconds);
 	/** How far letter `Index` of the death screen's words has sagged `Seconds` after (0 standing, 1 sagged all it will). */
 	float LetterSag(int32 Index, float Seconds);
+
+	/**
+	 * What the HUD says of the mice (the vermin, to the players), `ToGo`
+	 * seconds before they come (less than 0 once they have): "VERMIN
+	 * INVASION IN 0:59" while the countdown shows (CheeseStrikeMice::Warning),
+	 * "THE VERMIN HAVE COME" for VerminCameFor seconds after, else nothing.
+	 */
+	constexpr float VerminCameFor = 4.0f;
+	FString VerminWords(float ToGo);
 }

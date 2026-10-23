@@ -26,10 +26,25 @@
 namespace CheeseTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
-	/** The mice in AfterTheMice: when they come, by when they have eaten everything, and the most of the blocks left a minute after they came (they do eat). */
+	/**
+	 * The mice in AfterTheMice: when they come, by when they have eaten
+	 * everything (about four times as fast as the five minutes they took
+	 * till 23 Oct 2026, which looked like barely eating in a match), when it
+	 * is seen that they eat steadily, and the most and the least of the
+	 * blocks left then.
+	 */
 	constexpr int32 MiceAt = 8;
-	constexpr float EatenBy = 330.0f;
-	constexpr float MostLeftAfterAMinute = 0.95f;
+	constexpr float EatenBy = 90.0f;
+	constexpr float SteadyAt = 25.0f;
+	constexpr float MostLeftThen = 0.95f;
+	constexpr float LeastLeftThen = 0.4f;
+	/**
+	 * How spread out they eat: the mean distance from each mouse eating to
+	 * the nearest other, as a share of what it would be were they scattered
+	 * at random over the cheese (half the square root of its area from above
+	 * over the mice), at least.
+	 */
+	constexpr float SpreadAtLeast = 0.8f;
 	const TCHAR* const Level = TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery");
 	/** A house of cheese in it, and a door. */
 	const FName House(TEXT("CuringHouseGouda"));
@@ -224,16 +239,23 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 	using namespace CheeseTests;
 	static TArray<TPair<TWeakObjectPtr<ACheeseStrikeCheese>, FBox>> Kept;
 	static int32 Edible = 0;
-	// How the mice got on: when they came, the share of the blocks left a minute after, and when the last went (or -1).
+	// How the mice got on: when they came, the share of the blocks left at SteadyAt, when the last went (or -1), and how
+	// far apart they ate (the sum of each eating mouse's distance to the nearest other, and how many were summed).
 	static float CameAt = 0.0f;
-	static float LeftAfterAMinute = 1.0f;
+	static float LeftThen = 1.0f;
 	static float GoneAfter = -1.0f;
 	static float LastSeen = 0.0f;
+	static double ApartSum = 0.0;
+	static int32 ApartCount = 0;
+	static FBox2D Spread(ForceInit);
 	Kept.Reset();
+	Spread = FBox2D(ForceInit);
 	CameAt = 0.0f;
-	LeftAfterAMinute = 1.0f;
+	LeftThen = 1.0f;
 	GoneAfter = -1.0f;
 	LastSeen = 0.0f;
+	ApartSum = 0.0;
+	ApartCount = 0;
 	FSession Session;
 	Session.Level = Parameters;
 	Session.Options = FString::Printf(TEXT("?Mice=1?MiceAt=%d"), MiceAt);
@@ -255,12 +277,15 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 			else
 			{
 				++Edible;
+				const FBox Box = Each->GetComponentsBoundingBox();
+				Spread += FVector2D(Box.Min);
+				Spread += FVector2D(Box.Max);
 			}
 		}
 		AddInfo(FString::Printf(TEXT("%d blocks to eat, %d kept"), Edible, Kept.Num()));
 	});
-	// The mice come, and eat all they may in about five minutes, steadily: played at a fixed step, as fast as the
-	// editor goes, so that five minutes of play take much less.
+	// The mice come, and eat all they may in about a minute and a quarter, steadily and spread out: played at a fixed
+	// step, as fast as the editor goes.
 	WaitUntil(TEXT("the mice coming"), 60.0f, []()
 	{
 		if (Edible == 0)
@@ -284,13 +309,38 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 		}
 		const float Since = World(0)->GetTimeSeconds() - CameAt;
 		const int32 Left = ACheeseStrikeCheese::CountEdible(World(0));
-		if (Since >= 60.0f && LastSeen < 60.0f)
+		if (Since >= SteadyAt && LastSeen < SteadyAt)
 		{
-			LeftAfterAMinute = static_cast<float>(Left) / Edible;
+			LeftThen = static_cast<float>(Left) / Edible;
 		}
-		if (FMath::FloorToInt(Since / 30.0f) != FMath::FloorToInt(LastSeen / 30.0f))
+		if (FMath::FloorToInt(Since / 10.0f) != FMath::FloorToInt(LastSeen / 10.0f))
 		{
 			Test()->AddInfo(FString::Printf(TEXT("%.0f s after the mice came: %d of %d blocks left"), Since, Left, Edible));
+		}
+		// Every two seconds, how far each mouse eating is from the nearest other.
+		if (FMath::FloorToInt(Since / 2.0f) != FMath::FloorToInt(LastSeen / 2.0f))
+		{
+			TArray<const ACheeseStrikeMouse*> Mice;
+			for (TActorIterator<ACheeseStrikeMouse> It(World(0)); It; ++It)
+			{
+				if (It->GetDoing() != EMouseDoing::Sinking && It->GetDoing() != EMouseDoing::Entering)
+				{
+					Mice.Add(*It);
+				}
+			}
+			for (const ACheeseStrikeMouse* Mouse : Mice)
+			{
+				float Nearest = TNumericLimits<float>::Max();
+				for (const ACheeseStrikeMouse* Other : Mice)
+				{
+					Nearest = Other == Mouse ? Nearest : FMath::Min(Nearest, static_cast<float>(FVector::Dist2D(Mouse->GetActorLocation(), Other->GetActorLocation())));
+				}
+				if (Mouse->GetDoing() == EMouseDoing::Eating && Nearest < TNumericLimits<float>::Max())
+				{
+					ApartSum += Nearest;
+					++ApartCount;
+				}
+			}
 		}
 		LastSeen = Since;
 		if (Left == 0)
@@ -307,7 +357,15 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 		{
 			return;
 		}
-		AddInfo(FString::Printf(TEXT("all %d blocks eaten %.0f s after the mice came; %.0f%% left after a minute"), Edible, GoneAfter, 100.0f * LeftAfterAMinute));
+		const float Apart = ApartCount > 0 ? static_cast<float>(ApartSum / ApartCount) : 0.0f;
+		int32 Mice = 0;
+		for (TActorIterator<ACheeseStrikeMouse> It(World(0)); It; ++It)
+		{
+			++Mice;
+		}
+		const float Scattered = 0.5f * FMath::Sqrt(static_cast<float>(Spread.GetArea()) / FMath::Max(1, Mice));
+		const float SpreadShare = Scattered > 0.0f ? Apart / Scattered : 0.0f;
+		AddInfo(FString::Printf(TEXT("all %d blocks eaten by %d mice %.0f s after they came; %.0f%% left after %.0f s; a mouse eating was %.0f cm from the nearest other, on average, %.2f of %.0f cm at random"), Edible, Mice, GoneAfter, 100.0f * LeftThen, SteadyAt, Apart, SpreadShare, Scattered));
 		if (GoneAfter < 0.0f)
 		{
 			// What is left, and what the mice are doing, to see why.
@@ -326,8 +384,9 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 			}
 		}
 		TestTrue(FString::Printf(TEXT("the mice eat everything within %.0f s of coming (%.0f s)"), EatenBy, GoneAfter), GoneAfter >= 0.0f && GoneAfter <= EatenBy);
-		TestTrue(FString::Printf(TEXT("the mice eat steadily: more than half the blocks left a minute after they came (%.0f%%)"), 100.0f * LeftAfterAMinute), LeftAfterAMinute > 0.5f);
-		TestTrue(FString::Printf(TEXT("the mice eat steadily: no more than %.0f%% of the blocks left a minute after they came (%.0f%%)"), 100.0f * MostLeftAfterAMinute, 100.0f * LeftAfterAMinute), LeftAfterAMinute <= MostLeftAfterAMinute);
+		TestTrue(FString::Printf(TEXT("the mice eat steadily: more than %.0f%% of the blocks left %.0f s after they came (%.0f%%)"), 100.0f * LeastLeftThen, SteadyAt, 100.0f * LeftThen), LeftThen > LeastLeftThen);
+		TestTrue(FString::Printf(TEXT("the mice eat steadily: no more than %.0f%% of the blocks left %.0f s after they came (%.0f%%)"), 100.0f * MostLeftThen, SteadyAt, 100.0f * LeftThen), LeftThen <= MostLeftThen);
+		TestTrue(FString::Printf(TEXT("the mice spread out: a mouse eating is %.2f as far from the nearest other as at random, at least %.2f"), SpreadShare, SpreadAtLeast), SpreadShare >= SpreadAtLeast);
 		// Whatever is left, eaten at once, for the checks of what the map keeps.
 		for (ACheeseStrikeCheese* Each : AllCheese())
 		{

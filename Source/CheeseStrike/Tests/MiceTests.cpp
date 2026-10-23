@@ -1,11 +1,13 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
-// The mice: their rules as plain functions (Rules/CheeseStrikeMice.h), and
+// The mice: their rules as plain functions (Rules/CheeseStrikeMice.h), what
+// the HUD calls them (vermin), and
 // mice coming into The Creamery in the editor and eating it (see PlayTesting.h).
 
 #include "Misc/AutomationTest.h"
 #include "Rules/CheeseStrikeMice.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "UI/CheeseStrikeHUDRules.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -20,13 +22,27 @@ bool FHowManyMiceComeAndWhen::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeMice;
 	TestEqual(TEXT("none for a map without cheese"), MiceFor(0), 0);
-	TestEqual(TEXT("two at the least"), MiceFor(30), 2);
-	TestEqual(TEXT("one for every sixty blocks"), MiceFor(240), 4);
-	TestEqual(TEXT("ten at the most: The Creamery's thousand blocks"), MiceFor(1000), 10);
+	TestEqual(TEXT("three at the least"), MiceFor(30), 3);
+	TestEqual(TEXT("one for every twenty-five blocks: Crumb Kitchen's 308"), MiceFor(308), 12);
+	TestEqual(TEXT("twenty-four at the most: The Creamery's thousand blocks"), MiceFor(1000), 24);
 	TestTrue(TEXT("a match has mice"), HasMice(TEXT("?listen")));
 	TestFalse(TEXT("unless told not to"), HasMice(TEXT("?Mice=0")));
 	TestEqual(TEXT("a minute in"), ArrivalFrom(TEXT("?listen")), 60.0f);
 	TestEqual(TEXT("or when the URL says"), ArrivalFrom(TEXT("?MiceAt=5")), 5.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheVerminAreAnnounced, "CheeseStrike.HUD.TheVerminAreAnnounced", MiceTests::Flags)
+
+bool FTheVerminAreAnnounced::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	TestEqual(TEXT("nothing before the countdown"), VerminWords(75.0f), FString());
+	TestEqual(TEXT("a minute to go"), VerminWords(60.0f), FString(TEXT("VERMIN INVASION IN 1:00")));
+	TestEqual(TEXT("counting down, in minutes and seconds"), VerminWords(58.4f), FString(TEXT("VERMIN INVASION IN 0:59")));
+	TestEqual(TEXT("to the last second"), VerminWords(0.2f), FString(TEXT("VERMIN INVASION IN 0:01")));
+	TestEqual(TEXT("then they have come"), VerminWords(-1.0f), FString(TEXT("THE VERMIN HAVE COME")));
+	TestEqual(TEXT("and then nothing"), VerminWords(-VerminCameFor - 0.1f), FString());
 	return true;
 }
 
@@ -43,14 +59,35 @@ bool FMiceGoForCheeseLowDown::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMiceSpreadOut, "CheeseStrike.Mice.SpreadOut", MiceTests::Flags)
+
+bool FMiceSpreadOut::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeMice;
+	// Another mouse at the origin, going for cheese 10 m east of it.
+	const TArray<FVector2D> Others = {FVector2D(0.0f, 0.0f), FVector2D(1000.0f, 0.0f)};
+	TestEqual(TEXT("nobody about: no cost"), CrowdCost(FVector2D(0.0f, 0.0f), {}), 0.0f);
+	TestEqual(TEXT("right by another mouse: all of it"), CrowdCost(FVector2D(0.0f, -5000.0f), {FVector2D(0.0f, -5000.0f)}), Crowded);
+	TestEqual(TEXT("far from them: none"), CrowdCost(FVector2D(0.0f, 5000.0f), Others), 0.0f);
+	TestTrue(TEXT("less the further off"), CrowdCost(FVector2D(-500.0f, 0.0f), Others) > CrowdCost(FVector2D(-1500.0f, 0.0f), Others));
+	TestTrue(TEXT("by its cheese as well as by it"), CrowdCost(FVector2D(1000.0f, 500.0f), Others) > CrowdCost(FVector2D(1000.0f, 500.0f), {Others[0]}));
+	// A mouse 5 m west of the other: cheese beside it, between it and the other mouse, or 9 m off the other way.
+	const FVector2D Mouse(-500.0f, 0.0f);
+	auto Cost = [&](const FVector2D& Block) { return CheeseCost(FVector2D::Distance(Block, Mouse), 0.0f, false) + CrowdCost(Block, Others); };
+	TestTrue(TEXT("it goes for cheese away from the others rather than the cheese between them"), Cost(FVector2D(-1400.0f, 0.0f)) < Cost(FVector2D(0.0f, 300.0f)));
+	TestTrue(TEXT("but not across the map to get away"), Cost(FVector2D(-500.0f, 200.0f)) < Cost(FVector2D(-6000.0f, 0.0f)));
+	TestTrue(TEXT("and keeps to the cheese it goes for, rather than turn for the same cost"), KeepGoing > 0.0f && KeepGoing < Crowded);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMiceEatBlocksInStages, "CheeseStrike.Mice.EatBlocksInStages", MiceTests::Flags)
 
 bool FMiceEatBlocksInStages::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeMice;
 	const float Full = CheeseStrikeRules::CheeseBlockHealth;
-	TestEqual(TEXT("a block takes ten bites"), FMath::CeilToInt(Full / Bite), 10);
-	TestEqual(TEXT("five seconds of one mouse"), FMath::CeilToInt(Full / Bite) * BiteEvery, 5.0f);
+	TestEqual(TEXT("a block takes four bites"), FMath::CeilToInt(Full / Bite), 4);
+	TestEqual(TEXT("two seconds of one mouse"), FMath::CeilToInt(Full / Bite) * BiteEvery, 2.0f);
 	TestEqual(TEXT("whole"), Stage(Full, Full), 0);
 	TestEqual(TEXT("bitten"), Stage(Full - Bite, Full), 1);
 	TestEqual(TEXT("a third gone"), Stage(Full * 0.6f, Full), 2);
@@ -66,17 +103,18 @@ bool FMiceEatAtAPace::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeMice;
 	TestEqual(TEXT("all the cheese planned to be left as they come"), PlannedLeft(0.0f), 1.0f);
 	TestEqual(TEXT("none some way before five minutes, for the walks to the last blocks"), PlannedLeft(PlannedWithin), 0.0f);
-	TestTrue(TEXT("which is before five minutes"), PlannedWithin < EatenWithin && EatenWithin == 300.0f);
+	TestTrue(TEXT("which is before a minute and a half"), PlannedWithin < EatenWithin && EatenWithin == 82.0f);
 	TestEqual(TEXT("on the plan, a bite is a bite"), BiteFor(0.5f, PlannedWithin / 2.0f), Bite);
 	TestTrue(TEXT("behind it, bigger"), BiteFor(0.8f, PlannedWithin / 2.0f) > Bite);
 	TestTrue(TEXT("ahead of it, smaller"), BiteFor(0.2f, PlannedWithin / 2.0f) < Bite);
 	TestEqual(TEXT("but no smaller than a quarter"), BiteFor(0.01f, PlannedWithin / 2.0f), Bite * MinPace);
-	TestEqual(TEXT("nor bigger than ten"), BiteFor(1.0f, PlannedWithin), Bite * MaxPace);
+	TestEqual(TEXT("nor bigger than four"), BiteFor(1.0f, PlannedWithin), Bite * MaxPace);
+	TestTrue(TEXT("which is a whole block at a bite"), FMath::IsNearlyEqual(Bite * MaxPace, CheeseStrikeRules::CheeseBlockHealth));
 
 	// Maps of every size, as the mice play them: so many blocks, so many mice, each block a walk away (seconds,
 	// half as long again by the end, the cheese sparse; a mouse mostly eats the block beside the one it ate) and
-	// then eaten bite by bite. Every one is eaten within five and a half
-	// minutes, and steadily: not most of it in the first minute.
+	// then eaten bite by bite. Every one is eaten within a minute and a
+	// half, and steadily: not most of it in the first third of that.
 	struct FMap { const TCHAR* Name; int32 Blocks; float Walk; };
 	const FMap Maps[] = {{TEXT("a small map"), 120, 2.0f}, {TEXT("Crumb Kitchen"), 308, 1.5f}, {TEXT("Gruyère Grotto"), 352, 1.5f}, {TEXT("The Labyrinth"), 680, 1.0f}, {TEXT("Rind Market"), 1092, 0.7f}};
 	for (const FMap& Map : Maps)
@@ -89,7 +127,7 @@ bool FMiceEatAtAPace::RunTest(const FString& Parameters)
 		WalkLeft.Init(0.0f, Mice);
 		float Health = Full;
 		int32 Whole = Map.Blocks;
-		float LeftAfterAMinute = 1.0f;
+		float LeftAfterAThird = 1.0f;
 		float GoneAt = -1.0f;
 		for (float Time = 0.0f; Time < 600.0f && GoneAt < 0.0f; Time += BiteEvery)
 		{
@@ -115,19 +153,19 @@ bool FMiceEatAtAPace::RunTest(const FString& Parameters)
 				Block[Mouse] -= Taken;
 				Health -= Taken;
 			}
-			if (Time <= 60.0f)
+			if (Time <= EatenWithin / 3.0f)
 			{
-				LeftAfterAMinute = Health / Full;
+				LeftAfterAThird = Health / Full;
 			}
 			if (Health <= 0.5f)
 			{
 				GoneAt = Time;
 			}
 		}
-		AddInfo(FString::Printf(TEXT("%s, %d mice: all eaten after %.0f s, %.0f%% left after a minute"), Map.Name, Mice, GoneAt, 100.0f * LeftAfterAMinute));
-		TestTrue(FString::Printf(TEXT("%s is eaten within five and a half minutes (%.0f s)"), Map.Name, GoneAt), GoneAt > 0.0f && GoneAt <= 330.0f);
-		TestTrue(FString::Printf(TEXT("%s is not eaten much before five minutes (%.0f s)"), Map.Name, GoneAt), GoneAt >= 210.0f);
-		TestTrue(FString::Printf(TEXT("%s is eaten steadily: most of it left after a minute (%.0f%%)"), Map.Name, 100.0f * LeftAfterAMinute), LeftAfterAMinute > 0.6f && LeftAfterAMinute < 0.95f);
+		AddInfo(FString::Printf(TEXT("%s, %d mice: all eaten after %.0f s, %.0f%% left after %.0f s"), Map.Name, Mice, GoneAt, 100.0f * LeftAfterAThird, EatenWithin / 3.0f));
+		TestTrue(FString::Printf(TEXT("%s is eaten within a minute and a half (%.0f s)"), Map.Name, GoneAt), GoneAt > 0.0f && GoneAt <= 90.0f);
+		TestTrue(FString::Printf(TEXT("%s is not eaten much before a minute (%.0f s)"), Map.Name, GoneAt), GoneAt >= 45.0f);
+		TestTrue(FString::Printf(TEXT("%s is eaten steadily: most of it left after a third of that (%.0f%%)"), Map.Name, 100.0f * LeftAfterAThird), LeftAfterAThird > 0.5f && LeftAfterAThird < 0.9f);
 	}
 	return true;
 }
@@ -270,7 +308,7 @@ bool FTheMiceEatTheCreamery::RunTest(const FString& Parameters)
 		BlocksAtFirst = All<ACheeseStrikeCheese>().Num();
 		TestTrue(TEXT("the countdown is set"), GameState(0)->GetMiceAt() > 0.0f);
 	});
-	WaitUntil(TEXT("ten mice over the edge"), 15.0f, []() { return All<ACheeseStrikeMouse>().Num() == 10; });
+	WaitUntil(TEXT("twenty-four mice over the edge"), 15.0f, []() { return All<ACheeseStrikeMouse>().Num() == CheeseStrikeMice::MaxMice; });
 	WaitUntil(TEXT("the mice eating"), 45.0f, []() { return All<ACheeseStrikeCheese>().Num() <= BlocksAtFirst - 12; });
 	Then([this]()
 	{

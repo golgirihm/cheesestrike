@@ -101,7 +101,7 @@ void ACheeseStrikeHUD::UpdateSweep(const ACheeseStrikePlayerController* Controll
 	ACheeseStrikePlayerState* Mine = Controller->GetPlayerState<ACheeseStrikePlayerState>();
 	const ACheeseStrikeGameState* Match = GetWorld()->GetGameState<ACheeseStrikeGameState>();
 	Sweep = Match != nullptr && Mine != nullptr
-		? CheeseStrikeHUD::SweepAt(Match->GetServerWorldTimeSeconds(), Match->RevealEndsFor(Mine), CheeseStrikeStreaks::RevealTime, CheeseStrikeStreaks::SweepPeriod)
+		? CheeseStrikeHUD::SweepAt(Match->GetServerWorldTimeSeconds(), Match->RevealEndsFor(Mine), Match->RevealEndsFor(Mine) - Match->RevealStartedFor(Mine), CheeseStrikeStreaks::SweepPeriod)
 		: CheeseStrikeHUD::FSweep();
 	if (Mine == nullptr)
 	{
@@ -383,18 +383,12 @@ void ACheeseStrikeHUD::DrawMice(const ACheeseStrikeGameState* Match)
 	{
 		return;
 	}
-	// The design's red countdown, then word that they are here.
-	const float ToGo = Match->GetMiceAt() - static_cast<float>(Match->GetServerWorldTimeSeconds());
-	const float U = Unit();
-	const FLinearColor Warning(1.0f, 0.18f, 0.12f);
-	const FVector2D At(Canvas->SizeX / 2.0f, Canvas->SizeY * 0.15f);
-	if (ToGo > 0.0f && ToGo <= CheeseStrikeMice::Warning)
+	// The design's red countdown, then word that they are here: to the players they are vermin.
+	const FString Words = CheeseStrikeHUD::VerminWords(Match->GetMiceAt() - static_cast<float>(Match->GetServerWorldTimeSeconds()));
+	if (!Words.IsEmpty())
 	{
-		HudDraw::Text(Canvas, FString::Printf(TEXT("THE MICE ARE COMING  %.0f"), FMath::CeilToFloat(ToGo)), At, HudDraw::Font(26.0f * U), Warning, 0.5f);
-	}
-	else if (ToGo <= 0.0f && ToGo > -4.0f)
-	{
-		HudDraw::Text(Canvas, TEXT("THE MICE ARE HERE"), At, HudDraw::Font(26.0f * U), Warning, 0.5f);
+		const FLinearColor Warning(1.0f, 0.18f, 0.12f);
+		HudDraw::Text(Canvas, Words, FVector2D(Canvas->SizeX / 2.0f, Canvas->SizeY * 0.15f), HudDraw::Font(26.0f * Unit()), Warning, 0.5f);
 	}
 }
 
