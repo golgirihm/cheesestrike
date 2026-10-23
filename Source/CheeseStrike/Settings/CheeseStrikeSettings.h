@@ -51,6 +51,14 @@ namespace CheeseStrikeSettings
 	TArray<FIntPoint> Resolutions(const TArray<FIntPoint>& Supported, FIntPoint Desktop);
 	/** Which of `Choices` is `Resolution`, or the biggest no bigger than it (the first if none). */
 	int32 ResolutionIndex(const TArray<FIntPoint>& Choices, FIntPoint Resolution);
+	/**
+	 * Full screen (Fullscreen or Borderless), the window is the screen's own
+	 * size, and a resolution picked is what the game is drawn at, the menus
+	 * and the HUD staying sharp: the share of the screen's (`Screen`) it is,
+	 * in percent (the engine's screen percentage), from 25 to 100. A
+	 * resolution of 0 is the screen's own.
+	 */
+	float ScreenPercentageFor(FIntPoint Resolution, FIntPoint Screen);
 }
 
 /**
@@ -86,6 +94,11 @@ public:
 	void SetMasterVolume(float Value);
 	float GetEffectsVolume() const { return EffectsVolume; }
 	void SetEffectsVolume(float Value);
+	/** Full screen, the resolution the game is drawn at (CheeseStrikeSettings::ScreenPercentageFor): 0 for the screen's own. */
+	FIntPoint GetFullscreenResolution() const { return FullscreenResolution; }
+	void SetFullscreenResolution(FIntPoint Resolution) { FullscreenResolution = Resolution; }
+	/** The resolution the game is drawn at now: in a window, the window's; full screen, the one picked, or the screen's own. */
+	FIntPoint GetResolutionShown() const;
 	/** The menu's music (CheeseStrikeMusic). */
 	float GetMusicVolume() const { return MusicVolume; }
 	void SetMusicVolume(float Value);
@@ -119,4 +132,6 @@ protected:
 	float EffectsVolume = CheeseStrikeSettings::DefaultVolume;
 	UPROPERTY(config)
 	float MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
+	UPROPERTY(config)
+	FIntPoint FullscreenResolution = FIntPoint::ZeroValue;
 };

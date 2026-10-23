@@ -15,6 +15,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
+#include "Widgets/SWindow.h"
 #include "Engine/World.h"
 #include "GameFramework/GameMode.h"
 #include "GameFramework/GameState.h"
@@ -58,6 +59,13 @@ void ACheeseStrikePlayerController::BeginPlay()
 		}
 		// The volumes, on the sounds of this level too.
 		UCheeseStrikeSettings::ApplySound();
+		// The game's window can't be made so small that the menus crowd (not the editor's, which isn't the game's).
+		UGameViewportClient* Viewport = GetLocalPlayer() != nullptr ? GetLocalPlayer()->ViewportClient : nullptr;
+		const TSharedPtr<SWindow> Window = Viewport != nullptr && !GIsEditor ? Viewport->GetWindow() : nullptr;
+		if (Window.IsValid())
+		{
+			Window->SetSizeLimits(FWindowSizeLimits().SetMinWidth(CheeseStrikeMenu::MinWindowWidth).SetMinHeight(CheeseStrikeMenu::MinWindowHeight));
+		}
 	}
 }
 
@@ -296,7 +304,7 @@ bool ACheeseStrikePlayerController::IsInAMatch() const
 
 void ACheeseStrikePlayerController::ShowMenu(EMenuPage Page)
 {
-	static const TCHAR* const PageNames[] = {TEXT("none"), TEXT("main"), TEXT("find"), TEXT("lobby"), TEXT("pause"), TEXT("credits"), TEXT("options")};
+	static const TCHAR* const PageNames[] = {TEXT("none"), TEXT("main"), TEXT("find"), TEXT("lobby"), TEXT("pause"), TEXT("credits"), TEXT("options"), TEXT("controls")};
 	const int32 PageIndex = static_cast<int32>(Page);
 	UE_LOG(LogCheeseStrike, Display, TEXT("Menu: %s"), PageIndex < UE_ARRAY_COUNT(PageNames) ? PageNames[PageIndex] : TEXT("?"));
 	ShownPage = Page;
@@ -382,6 +390,10 @@ void ACheeseStrikePlayerController::HideMenuCamera()
 
 void ACheeseStrikePlayerController::ChooseMenu(EMenuPage Page)
 {
+	if (Page == EMenuPage::Controls && ChosenPage != EMenuPage::Controls)
+	{
+		ControlsFrom = ChosenPage;
+	}
 	ChosenPage = Page;
 	if (Page == EMenuPage::Find)
 	{
@@ -391,8 +403,9 @@ void ACheeseStrikePlayerController::ChooseMenu(EMenuPage Page)
 
 void ACheeseStrikePlayerController::BackFromMenu()
 {
-	// To the front end's main page, or, during a match, to the pause menu, still paused.
-	ChosenPage = EMenuPage::Main;
+	// To the front end's main page, or, during a match, to the pause menu, still paused; from the controls, to where they
+	// were opened from (the options, the pause menu or the front end).
+	ChosenPage = ChosenPage == EMenuPage::Controls && ControlsFrom == EMenuPage::Options ? EMenuPage::Options : EMenuPage::Main;
 }
 
 void ACheeseStrikePlayerController::HostFromMenu()
@@ -579,6 +592,10 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 	{
 		Chosen = EMenuPage::Options;
 	}
+	else if (Page.Equals(TEXT("Controls"), ESearchCase::IgnoreCase))
+	{
+		Chosen = EMenuPage::Controls;
+	}
 	ChooseMenu(Chosen);
 	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("View"), TEXT("Sound"), TEXT("Graphics")};
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Tabs) && Menu.IsValid(); ++Index)
@@ -661,7 +678,7 @@ void ACheeseStrikePlayerController::TogglePause()
 {
 	bPaused = !bPaused;
 	// Paused, the pause menu shows first; resumed, nothing of it is left to come back to.
-	if (ChosenPage == EMenuPage::Options)
+	if (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Controls)
 	{
 		ChosenPage = EMenuPage::Main;
 	}
@@ -684,8 +701,8 @@ void ACheeseStrikePlayerController::MenuPressed()
 	}
 	if (State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded())
 	{
-		// From the options back to the pause menu, still paused; otherwise pause or resume.
-		if (bPaused && ChosenPage == EMenuPage::Options)
+		// From the options or the controls back a page, still paused; otherwise pause or resume.
+		if (bPaused && (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Controls))
 		{
 			BackFromMenu();
 		}
