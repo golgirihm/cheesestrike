@@ -22,6 +22,7 @@
 #include "Rules/CheeseStrikeModes.h"
 #include "UI/CheeseStrikeModeHUD.h"
 #include "Weapons/CheeseStrikeArsenal.h"
+#include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Map/CheeseStrikePlace.h"
 #include "RHIGlobals.h"
@@ -692,10 +693,31 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 	{
 		DrawWeaponIcon(Shapes, Stats.Slot, IconAt, IconSize, IconColour);
 	}
+	// The grenades carried, left of the weapon: a round of red wax each, its fuse up, and the key that throws one over them.
+	const UCheeseStrikeGrenades* Grenades = Character->GetGrenades();
+	const int32 GrenadeCount = Grenades != nullptr ? Grenades->GetCount() : 0;
+	const float GrenadeRadius = 8.0f * U;
+	const float GrenadeStep = GrenadeRadius * 2.0f + 5.0f * U;
+	const float GrenadesRight = IconAt.X - 14.0f * U;
+	const float GrenadeY = Baseline - GrenadeRadius - 2.0f * U;
+	for (int32 Index = 0; Index < GrenadeCount; ++Index)
+	{
+		const FVector2D Middle(GrenadesRight - GrenadeRadius - Index * GrenadeStep, GrenadeY);
+		Shapes.Line(Middle + FVector2D(0.0f, -GrenadeRadius * 0.6f), Middle + FVector2D(GrenadeRadius * 0.45f, -GrenadeRadius * 1.55f), FMath::Max(1.0f, 1.6f * U), HudDraw::Soft);
+		Shapes.Disc(Middle, GrenadeRadius, FLinearColor(0.72f, 0.1f, 0.07f, 0.95f));
+		Shapes.Disc(Middle + FVector2D(-GrenadeRadius * 0.3f, -GrenadeRadius * 0.3f), GrenadeRadius * 0.3f, FLinearColor(1.0f, 0.55f, 0.45f, 0.5f), 10);
+	}
 	Shapes.Draw(Canvas);
 	if (bPicture)
 	{
 		DrawWeaponPicture(Weapon->GetWeaponId(), IconAt, IconSize, IconColour);
+	}
+	if (GrenadeCount > 0)
+	{
+		const FString GrenadeKey = UCheeseStrikeInputSet::Prompt(PlayerOwner, &UCheeseStrikeInputSet::Grenade);
+		const float GrenadesMiddle = GrenadesRight - GrenadeRadius - (GrenadeCount - 1) * GrenadeStep * 0.5f;
+		const FVector2D KeySize = HudDraw::Measure(GrenadeKey, Label);
+		HudDraw::Text(Canvas, GrenadeKey, FVector2D(GrenadesMiddle, GrenadeY - GrenadeRadius * 1.7f - KeySize.Y), Label, HudDraw::Soft, 0.5f);
 	}
 
 	float SlotsBottom = NameTop;

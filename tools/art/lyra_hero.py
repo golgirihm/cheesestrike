@@ -16,7 +16,8 @@ import unreal, os, sys, traceback
 #   <hero>/Animations/Rifle, as Lt. Belica's was, with the other weapons'
 #   sets (WEAPON_SETS) beside it;
 # - with "weapons": only the other weapons' sets, through the retargeter
-#   "retarget" made, leaving the rig and the rifle set as they are;
+#   "retarget" made, leaving the rig and the rifle set as they are; with
+#   kinds of WEAPON_SETS after it ("weapons Grenade"), only those;
 # - the packages the game needs (the mesh, its animations, and everything
 #   they depend on), one a line after "# packages", for
 #   tools/art/copy_from_lyra.py to copy into the game's Content.
@@ -59,12 +60,16 @@ WEAPON_SETS = {
         U + "MM_Unarmed_Idle_Ready",
     ],
     "Shotgun": [A + "MM_Shotgun_Fire", A + "MM_Shotgun_Reload"],
+    # Throwing a grenade, over whatever weapon is in hand.
+    "Grenade": [A + "MM_Rifle_GrenadeToss"],
 }
 
 args = [a for a in sys.argv[1:] if a]
 hero = args[0] if args else "Murdock"
 retarget = "retarget" in args[1:]
 weapons = retarget or "weapons" in args[1:]
+# "weapons Grenade" does only the sets named after it.
+only = [a for a in args[1:] if a in WEAPON_SETS]
 OUT = unreal.Paths.project_saved_dir() + f"lyra_hero_{hero}.txt"
 lines = []
 def say(*parts):
@@ -137,6 +142,8 @@ try:
     if weapons:
         rtg = unreal.load_asset(f"{rig_folder}/RTG_Manny_{hero}")
         for kind, paths in WEAPON_SETS.items():
+            if only and kind not in only:
+                continue
             into = f"{animations}/{kind}"
             if kind == "Rifle":
                 # Beside the rifle set, which stays: only what this adds goes first.

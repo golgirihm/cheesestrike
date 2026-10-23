@@ -60,7 +60,9 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	TestTrue(TEXT("escape opens the menu"), InputTests::Has(Set->KeysFor(Set->Menu), EKeys::Escape));
 	TestTrue(TEXT("so does the gamepad's right special button"), InputTests::Has(Set->KeysFor(Set->Menu), EKeys::Gamepad_Special_Right));
 	TestTrue(TEXT("4 calls in a streak"), InputTests::Has(Set->KeysFor(Set->Streak), EKeys::Four));
-	TestTrue(TEXT("so does the right bumper"), InputTests::Has(Set->KeysFor(Set->Streak), EKeys::Gamepad_RightShoulder));
+	TestTrue(TEXT("so does the d-pad's down"), InputTests::Has(Set->KeysFor(Set->Streak), EKeys::Gamepad_DPad_Down));
+	TestTrue(TEXT("G throws a grenade"), InputTests::Has(Set->KeysFor(Set->Grenade), EKeys::G));
+	TestTrue(TEXT("so does the right bumper"), InputTests::Has(Set->KeysFor(Set->Grenade), EKeys::Gamepad_RightShoulder));
 	TestTrue(TEXT("E interacts"), InputTests::Has(Set->KeysFor(Set->Interact), EKeys::E));
 	TestTrue(TEXT("so does the left bumper"), InputTests::Has(Set->KeysFor(Set->Interact), EKeys::Gamepad_LeftShoulder));
 	TestTrue(TEXT("the left face button reloads"), InputTests::Has(Set->KeysFor(Set->Reload), EKeys::Gamepad_FaceButton_Left));
@@ -77,13 +79,13 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the d-pad up draws the primary"), InputTests::Has(Set->KeysFor(Set->DrawPrimary), EKeys::Gamepad_DPad_Up));
 	TestTrue(TEXT("left the sidearm"), InputTests::Has(Set->KeysFor(Set->DrawSidearm), EKeys::Gamepad_DPad_Left));
 	TestTrue(TEXT("right the knife"), InputTests::Has(Set->KeysFor(Set->DrawKnife), EKeys::Gamepad_DPad_Right));
-	TestTrue(TEXT("down the last"), InputTests::Has(Set->KeysFor(Set->LastWeapon), EKeys::Gamepad_DPad_Down));
+	TestEqual(TEXT("and the last has only Q"), Set->KeysFor(Set->LastWeapon).Num(), 1);
 
 	// No key does two things.
 	TArray<FKey> All;
 	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get(), Set->Fire.Get(), Set->Aim.Get(), Set->Reload.Get(), Set->Scoreboard.Get(), Set->Menu.Get(),
 		Set->DrawPrimary.Get(), Set->DrawSidearm.Get(), Set->DrawKnife.Get(), Set->NextWeapon.Get(), Set->PreviousWeapon.Get(), Set->LastWeapon.Get(), Set->Streak.Get(), Set->Interact.Get(),
-		Set->SprintToggle.Get(), Set->CrouchToggle.Get()})
+		Set->Grenade.Get(), Set->SprintToggle.Get(), Set->CrouchToggle.Get()})
 	{
 		for (const FKey& Key : Set->KeysFor(Action))
 		{

@@ -14,6 +14,7 @@ class ACheeseStrikePlayerState;
 class ACheeseStrikeWeapon;
 class UCameraComponent;
 class UMaterialInterface;
+class UCheeseStrikeGrenades;
 class UCheeseStrikeInventory;
 class UCheeseStrikeLastStand;
 class UCheeseStrikeMovementComponent;
@@ -137,6 +138,8 @@ public:
 	void DoDrawWeapon(EWeaponSlot Slot);
 	void DoNextWeapon(int32 Step);
 	void DoLastWeapon();
+	/** Throws a cheese grenade along the view, if it has one and its hands are free (UCheeseStrikeGrenades). */
+	void DoThrowGrenade();
 
 	/** Aiming: the rifle's sight line, across it from its bounds' middle and down from its top, and how far along it from its back end the eye is (cm). */
 	static constexpr float SightSide = 0.0f;
@@ -153,6 +156,8 @@ public:
 	ACheeseStrikeWeapon* GetWeapon() const;
 	/** What it carries: the weapons in their slots, and which is in hand. */
 	UCheeseStrikeInventory* GetInventory() const { return Inventory; }
+	/** Its cheese grenades: a count of their own, apart from the weapons' slots. */
+	UCheeseStrikeGrenades* GetGrenades() const { return Grenades; }
 	/** Its last stand, in Execution: whether it is down, and its player's Interact. */
 	UCheeseStrikeLastStand* GetLastStand() const { return LastStand; }
 	/** Whether it is down in a last stand: on its back (crouched), with only its sidearm, finished only up close. */
@@ -287,6 +292,8 @@ protected:
 	void NextWeaponStarted();
 	void PreviousWeaponStarted();
 	void LastWeaponStarted();
+	/** The Grenade key (G): throws one. */
+	void GrenadeStarted();
 	/** The Streak key: its player calls in their next streak (ACheeseStrikePlayerState::StreakPressed). */
 	void StreakStarted();
 	/** Interact (E), held and let go: reviving or finishing someone down (UCheeseStrikeLastStand). */
@@ -319,6 +326,8 @@ protected:
 	TObjectPtr<UCheeseStrikeInventory> Inventory;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCheeseStrikeLastStand> LastStand;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCheeseStrikeGrenades> Grenades;
 	UPROPERTY(ReplicatedUsing=OnRep_Health)
 	float Health = 100.0f;
 	/** Who killed it, and when, in the server's time; set by the server as it dies. */

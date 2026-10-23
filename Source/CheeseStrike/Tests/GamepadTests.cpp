@@ -48,9 +48,10 @@ bool FEveryActionHasAGamepadButton::RunTest(const FString& Parameters)
 	UCheeseStrikeInputSet* Set = UCheeseStrikeInputSet::Build(GetTransientPackage());
 	const TMap<FString, const UInputAction*> Actions = GamepadTests::Actions(Set);
 	TestTrue(TEXT("the set has its actions"), Actions.Num() >= 20);
-	// With three weapons the d-pad reaches each at once, so the one before has no button. What a key is held for, a gamepad
+	// With three weapons the d-pad reaches each at once, so the one before and the last have no button (the d-pad's down
+	// calls in a streak, the right bumper throws a grenade). What a key is held for, a gamepad
 	// has an action of its own for: the look stick, and the sprint and crouch that a press turns on and off.
-	const TSet<FString> KeyboardOnly = {TEXT("PreviousWeapon")};
+	const TSet<FString> KeyboardOnly = {TEXT("PreviousWeapon"), TEXT("LastWeapon")};
 	const TMap<FString, FString> GamepadsOwn = {{TEXT("MouseLook"), TEXT("StickLook")}, {TEXT("Sprint"), TEXT("SprintToggle")}, {TEXT("Crouch"), TEXT("CrouchToggle")}};
 	const auto Has = [Set](const UInputAction* Action, bool bGamepad)
 	{
@@ -82,7 +83,9 @@ bool FEveryActionHasAGamepadButton::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the left trigger aims"), Pad(Set->Aim), FString(TEXT("LT")));
 	TestEqual(TEXT("the right fires"), Pad(Set->Fire), FString(TEXT("RT")));
 	TestEqual(TEXT("the left bumper interacts"), Pad(Set->Interact), FString(TEXT("LB")));
-	TestEqual(TEXT("the right calls in a streak"), Pad(Set->Streak), FString(TEXT("RB")));
+	TestEqual(TEXT("the right throws a grenade"), Pad(Set->Grenade), FString(TEXT("RB")));
+	TestEqual(TEXT("the d-pad's down calls in a streak"), Pad(Set->Streak), FString(TEXT("↓")));
+	TestEqual(TEXT("and the last weapon has no button"), Pad(Set->LastWeapon), FString());
 	TestEqual(TEXT("the left stick sprints"), Pad(Set->SprintToggle), FString(TEXT("LS")));
 	TestEqual(TEXT("View shows the scoreboard"), Pad(Set->Scoreboard), FString(TEXT("VIEW")));
 	TestEqual(TEXT("Menu pauses"), Pad(Set->Menu), FString(TEXT("MENU")));
@@ -108,7 +111,9 @@ bool FThePromptsFollowTheDeviceInUse::RunTest(const FString& Parameters)
 	TestEqual(TEXT("hold E to revive"), Set->PromptFor(Set->Interact, false), FString(TEXT("E")));
 	TestEqual(TEXT("or hold LB"), Set->PromptFor(Set->Interact, true), FString(TEXT("LB")));
 	TestEqual(TEXT("press 4 for a streak"), Set->PromptFor(Set->Streak, false), FString(TEXT("4")));
-	TestEqual(TEXT("or RB"), Set->PromptFor(Set->Streak, true), FString(TEXT("RB")));
+	TestEqual(TEXT("or the d-pad's down"), Set->PromptFor(Set->Streak, true), FString(TEXT("↓")));
+	TestEqual(TEXT("press G for a grenade"), Set->PromptFor(Set->Grenade, false), FString(TEXT("G")));
+	TestEqual(TEXT("or RB"), Set->PromptFor(Set->Grenade, true), FString(TEXT("RB")));
 	TestEqual(TEXT("Escape calls a strike off"), Set->PromptFor(Set->Menu, false), FString(TEXT("ESC")));
 	TestEqual(TEXT("the weapons are 1"), Set->PromptFor(Set->DrawPrimary, false), FString(TEXT("1")));
 	TestEqual(TEXT("2"), Set->PromptFor(Set->DrawSidearm, false), FString(TEXT("2")));

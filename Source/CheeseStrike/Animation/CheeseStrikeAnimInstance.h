@@ -118,6 +118,9 @@ struct FCheeseStrikeAnimSet
 	TObjectPtr<UAnimSequence> Stroke;
 	UPROPERTY()
 	TObjectPtr<UAnimSequence> Guard;
+	/** Throwing a grenade over the weapon held (Lyra's toss, the same for every way of holding); may be missing. */
+	UPROPERTY()
+	TObjectPtr<UAnimSequence> Throw;
 
 	/** Whether every animation it can't do without was found. */
 	bool IsComplete() const;
