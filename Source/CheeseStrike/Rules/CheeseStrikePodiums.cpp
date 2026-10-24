@@ -28,8 +28,8 @@ namespace CheeseStrikePodiums
 				TEXT("/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Emote_Taunt_WatchingYou_T1.Emote_Taunt_WatchingYou_T1"),
 			},
 			{
-				TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/VictoryPose_1.VictoryPose_1"),
 				TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Emote_DoIt.Emote_DoIt"),
+				TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Level_Start.Level_Start"),
 				TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Emote_ThumbsDown.Emote_ThumbsDown"),
 			},
 			{
