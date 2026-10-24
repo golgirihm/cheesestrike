@@ -2,6 +2,8 @@
 
 #include "CheeseStrikeRules.h"
 #include "Kismet/GameplayStatics.h"
+#include "CheeseStrikeBots.h"
+#include "CheeseStrikeModes.h"
 
 namespace CheeseStrikeRules
 {
@@ -87,6 +89,17 @@ namespace CheeseStrikeRules
 	int32 NumMaps()
 	{
 		return UE_ARRAY_COUNT(Maps);
+	}
+
+	int32 DefaultMap()
+	{
+		return FMath::Max(0, MapIndexFor(TEXT("/Game/CheeseStrike/Maps/Lvl_Grotto")));
+	}
+
+	FString HostOptions()
+	{
+		const CheeseStrikeModes::FModeInfo& Mode = CheeseStrikeModes::Info(CheeseStrikeModes::EMode::Deathmatch);
+		return FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?Map=%d?Mode=%s?Bots=%d?BotSkill=%d"), Mode.DefaultKillLimit, RespawnDelay, DefaultMap(), Mode.Key, DefaultBots, CheeseStrikeBots::DefaultSkill);
 	}
 
 	int32 MapIndexFor(const FString& LevelPackage)

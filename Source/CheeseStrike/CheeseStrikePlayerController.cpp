@@ -453,7 +453,7 @@ bool ACheeseStrikePlayerController::IsInAMatch() const
 
 void ACheeseStrikePlayerController::ShowMenu(EMenuPage Page)
 {
-	static const TCHAR* const PageNames[] = {TEXT("none"), TEXT("main"), TEXT("find"), TEXT("lobby"), TEXT("pause"), TEXT("credits"), TEXT("options"), TEXT("controls")};
+	static const TCHAR* const PageNames[] = {TEXT("none"), TEXT("main"), TEXT("find"), TEXT("lobby"), TEXT("pause"), TEXT("credits"), TEXT("settings")};
 	const int32 PageIndex = static_cast<int32>(Page);
 	UE_LOG(LogCheeseStrike, Display, TEXT("Menu: %s"), PageIndex < UE_ARRAY_COUNT(PageNames) ? PageNames[PageIndex] : TEXT("?"));
 	ShownPage = Page;
@@ -539,10 +539,6 @@ void ACheeseStrikePlayerController::HideMenuCamera()
 
 void ACheeseStrikePlayerController::ChooseMenu(EMenuPage Page)
 {
-	if (Page == EMenuPage::Controls && ChosenPage != EMenuPage::Controls)
-	{
-		ControlsFrom = ChosenPage;
-	}
 	ChosenPage = Page;
 	if (Page == EMenuPage::Find)
 	{
@@ -552,16 +548,15 @@ void ACheeseStrikePlayerController::ChooseMenu(EMenuPage Page)
 
 void ACheeseStrikePlayerController::BackFromMenu()
 {
-	// To the front end's main page, or, during a match, to the pause menu, still paused; from the controls, to where they
-	// were opened from (the options, the pause menu or the front end).
-	ChosenPage = ChosenPage == EMenuPage::Controls && ControlsFrom == EMenuPage::Options ? EMenuPage::Options : EMenuPage::Main;
+	// To the front end's main page, or, during a match, to the pause menu, still paused.
+	ChosenPage = EMenuPage::Main;
 }
 
 void ACheeseStrikePlayerController::HostFromMenu()
 {
 	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
 	{
-		Sessions->Host(FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?Map=0"), CheeseStrikeRules::KillLimit, CheeseStrikeRules::RespawnDelay), Sessions->ServiceName() != TEXT("STEAM"));
+		Sessions->Host(CheeseStrikeRules::HostOptions(), Sessions->ServiceName() != TEXT("STEAM"));
 	}
 }
 
@@ -737,16 +732,23 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 	{
 		Chosen = EMenuPage::Find;
 	}
-	else if (Page.Equals(TEXT("Options"), ESearchCase::IgnoreCase))
+	else if (Page.Equals(TEXT("Settings"), ESearchCase::IgnoreCase) || Page.Equals(TEXT("Options"), ESearchCase::IgnoreCase))
 	{
 		Chosen = EMenuPage::Options;
 	}
-	else if (Page.Equals(TEXT("Controls"), ESearchCase::IgnoreCase))
+	else if (Page.Equals(TEXT("Pause"), ESearchCase::IgnoreCase))
 	{
-		Chosen = EMenuPage::Controls;
+		// The pause menu: during a match, paused (or still paused) on it; with `Tab` "Ask", the host's Back to Lobby asks.
+		Chosen = EMenuPage::Main;
+		bPaused = true;
 	}
 	ChooseMenu(Chosen);
-	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("View"), TEXT("Sound"), TEXT("Graphics")};
+	if (Page.Equals(TEXT("Pause"), ESearchCase::IgnoreCase) && Menu.IsValid())
+	{
+		ShowMenu(EMenuPage::Pause);
+		Menu->ConfirmBackToLobby(Tab.Equals(TEXT("Ask"), ESearchCase::IgnoreCase) && CanGoBackToLobby());
+	}
+	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("Aiming"), TEXT("View"), TEXT("Sound"), TEXT("Graphics")};
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Tabs) && Menu.IsValid(); ++Index)
 	{
 		if (Tab.Equals(Tabs[Index], ESearchCase::IgnoreCase))
@@ -775,6 +777,30 @@ void ACheeseStrikePlayerController::CheeseStrikeStart(const FString& AtOnce)
 void ACheeseStrikePlayerController::CheeseStrikeCancel()
 {
 	CancelStartFromMenu();
+}
+
+bool ACheeseStrikePlayerController::CanGoBackToLobby() const
+{
+	// The host of a match others can join, while it is played.
+	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
+	return HasAuthority() && IsLocalController() && GetNetMode() == NM_ListenServer && State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded();
+}
+
+void ACheeseStrikePlayerController::BackToLobbyFromMenu()
+{
+	ACheeseStrikeGameMode* Mode = CanGoBackToLobby() ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
+	if (Mode == nullptr)
+	{
+		return;
+	}
+	bPaused = false;
+	ChosenPage = EMenuPage::Main;
+	Mode->BackToLobbyMidMatch();
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeBackToLobby()
+{
+	BackToLobbyFromMenu();
 }
 
 void ACheeseStrikePlayerController::LeaveFromMenu()
@@ -827,7 +853,7 @@ void ACheeseStrikePlayerController::TogglePause()
 {
 	bPaused = !bPaused;
 	// Paused, the pause menu shows first; resumed, nothing of it is left to come back to.
-	if (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Controls)
+	if (ChosenPage == EMenuPage::Options)
 	{
 		ChosenPage = EMenuPage::Main;
 	}
@@ -850,8 +876,8 @@ void ACheeseStrikePlayerController::MenuPressed()
 	}
 	if (State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded())
 	{
-		// From the options or the controls back a page, still paused; otherwise pause or resume.
-		if (bPaused && (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Controls))
+		// From the settings back a page, still paused; otherwise pause or resume.
+		if (bPaused && ChosenPage == EMenuPage::Options)
 		{
 			BackFromMenu();
 		}

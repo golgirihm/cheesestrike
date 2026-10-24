@@ -18,6 +18,8 @@ namespace CheeseStrikeModes
 		{EMode::SoloKingOfTheHill, TEXT("Solo King of the Hill"), TEXT("SoloKingOfTheHill"), TEXT("Everyone for themself: a point a second while you stand in the hill alone; it moves every minute."), false, EWinBy::Hill, true, CheeseStrikeHills::SoloTarget, false, true},
 	};
 
+	const EMode LobbyOrder[NumModes] = {EMode::Deathmatch, EMode::Elimination, EMode::Execution, EMode::GunGame, EMode::KingOfTheHill, EMode::SoloKingOfTheHill, EMode::FreeForAll};
+
 	const FModeInfo& Info(EMode Mode)
 	{
 		return Modes[static_cast<int32>(ModeAt(static_cast<int32>(Mode)))];
@@ -127,6 +129,15 @@ namespace CheeseStrikeModes
 	}
 
 	const TCHAR* const TeamStartTags[2] = {TEXT("Gouda"), TEXT("Mozza")};
+
+	int32 StartSide(int32 Team, int32 Round, bool bRounds)
+	{
+		if (!bRounds || Team < 0 || Team > 1 || Round < 2)
+		{
+			return Team;
+		}
+		return (Round - 1) % 2 == 0 ? Team : 1 - Team;
+	}
 
 	TArray<int32> SidesOf(TArrayView<const FVector> Spots)
 	{
@@ -297,7 +308,7 @@ namespace CheeseStrikeModes
 		case 0:
 			return FLinearColor::FromSRGBColor(FColor(230, 159, 0));
 		case 1:
-			return FLinearColor::FromSRGBColor(FColor(86, 180, 233));
+			return FLinearColor::FromSRGBColor(FColor(240, 236, 224));
 		default:
 			return FLinearColor(0.96f, 0.72f, 0.2f);
 		}

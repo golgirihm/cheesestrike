@@ -545,6 +545,17 @@ void ACheeseStrikeGameMode::BackToLobbyNow()
 	GetWorldTimerManager().SetTimer(ResultsTimer, this, &AGameMode::RestartGame, CheeseStrikePodiums::SkipSeconds, false);
 }
 
+void ACheeseStrikeGameMode::BackToLobbyMidMatch()
+{
+	if (!IsMatchInProgress() || GetMatchState() == MatchState::LeavingMap)
+	{
+		return;
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("The host ends the match and takes everyone back to the lobby"));
+	GetWorldTimerManager().ClearTimer(ResultsTimer);
+	RestartGame();
+}
+
 FString ACheeseStrikeGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
 {
 	const FString Error = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
@@ -1287,11 +1298,14 @@ AActor* ACheeseStrikeGameMode::ChoosePlayerStart_Implementation(AController* Pla
 	}
 	const bool bTeams = CheeseStrikeModes::Info(Mode).bTeams;
 	const ACheeseStrikePlayerState* Mine = Player != nullptr ? Player->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
-	// In a team mode, the side's own starts: those the map marks for it, or without marks, its half of them.
+	// In a team mode, the side's own starts: those the map marks for it, or without marks, its half of them. In rounds,
+	// the sides swap ends each round.
 	TArray<int32> Allowed;
 	if (bTeams && Mine != nullptr && Mine->GetTeam() >= 0 && Mine->GetTeam() < CheeseStrikeRules::Teams)
 	{
-		const FName Tag(CheeseStrikeModes::TeamStartTags[Mine->GetTeam()]);
+		const ACheeseStrikeGameState* Match = GetGameState<ACheeseStrikeGameState>();
+		const int32 Side = CheeseStrikeModes::StartSide(Mine->GetTeam(), Match != nullptr ? Match->GetRound() : 0, CheeseStrikeModes::Info(Mode).WinBy == CheeseStrikeModes::EWinBy::Rounds);
+		const FName Tag(CheeseStrikeModes::TeamStartTags[Side]);
 		for (int32 Index = 0; Index < Starts.Num(); ++Index)
 		{
 			if (Starts[Index]->PlayerStartTag == Tag)
@@ -1304,7 +1318,7 @@ AActor* ACheeseStrikeGameMode::ChoosePlayerStart_Implementation(AController* Pla
 			const TArray<int32> Sides = CheeseStrikeModes::SidesOf(Spots);
 			for (int32 Index = 0; Index < Starts.Num(); ++Index)
 			{
-				if (Sides[Index] == Mine->GetTeam())
+				if (Sides[Index] == Side)
 				{
 					Allowed.Add(Index);
 				}

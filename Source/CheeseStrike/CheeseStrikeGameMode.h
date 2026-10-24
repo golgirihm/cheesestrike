@@ -144,6 +144,13 @@ public:
 	virtual void RestartGame() override;
 	/** The host, over the podium: back to the lobby in a moment (CheeseStrikePodiums::SkipSeconds, for every machine to keep the podium up), not at the end of its countdown. */
 	void BackToLobbyNow();
+	/**
+	 * The host, from the pause menu during a match: the match ends with no
+	 * results or podium, and everyone (joiners and bots) goes back to the
+	 * lobby on this map with the rules as they are, the session and the
+	 * sides kept, as after the results (RestartGame).
+	 */
+	void BackToLobbyMidMatch();
 
 	virtual void HandleMatchHasStarted() override;
 	/** The results stay up a while, then everyone is back in the lobby. */

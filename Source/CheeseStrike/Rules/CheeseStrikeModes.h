@@ -73,6 +73,8 @@ namespace CheeseStrikeModes
 		bool bStreaks;
 	};
 	extern const FModeInfo Modes[NumModes];
+	/** The modes in the order the lobby lists them: the teams' first, free-for-all last. */
+	extern const EMode LobbyOrder[NumModes];
 	const FModeInfo& Info(EMode Mode);
 	/** The mode with number `Index` (as replicated), or free-for-all for one there isn't. */
 	EMode ModeAt(int32 Index);
@@ -148,6 +150,12 @@ namespace CheeseStrikeModes
 	 * ("Free") is for free-for-all only, when a map marks sides at all.
 	 */
 	extern const TCHAR* const TeamStartTags[2];
+	/**
+	 * Whose starts side `Team` comes in at in round `Round` (1 the first, 0
+	 * before any): its own, but in a mode played in rounds (`bRounds`) the
+	 * other side's every second round, so that the sides swap ends each round.
+	 */
+	int32 StartSide(int32 Team, int32 Round, bool bRounds);
 	/**
 	 * For a map that marks no sides: which side each of `Spots` is for,
 	 * 0 or 1, by halves along the line between the two that are furthest
@@ -260,10 +268,11 @@ namespace CheeseStrikeModes
 
 	/**
 	 * A side's colour, the game's one, on the lobby's chips and columns, the
-	 * HUD and the announcements: The Gouda Guys' orange and the Mozza
-	 * Radicals' sky blue (Okabe and Ito's, which eyes that see colour
-	 * differently still tell apart), both clear on a dark ground; any other
-	 * team, as in a free-for-all, a cheese yellow.
+	 * HUD and the announcements: The Gouda Guys' orange (Okabe and Ito's)
+	 * and the Mozza Radicals' white, as mozzarella's (a warm off-white, which
+	 * any eye tells from the orange; the HUD edges it in dark where it could
+	 * meet a pale ground, HudDraw::Text); any other team, as in a
+	 * free-for-all, a cheese yellow.
 	 */
 	FLinearColor TeamColour(int32 Team);
 

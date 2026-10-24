@@ -287,11 +287,12 @@ bool FTheControlsPageSaysWhatEveryKeyDoes::RunTest(const FString& Parameters)
 	TestEqual(TEXT("a Nintendo pad's face buttons are the Xbox's swapped round"), PadLabel(EKeys::Gamepad_FaceButton_Right, EPad::Nintendo) + PadLabel(EKeys::Gamepad_FaceButton_Left, EPad::Nintendo) + PadLabel(EKeys::Gamepad_FaceButton_Top, EPad::Nintendo), FString(TEXT("AYX")));
 	TestEqual(TEXT("its bumpers L and R"), PadLabel(EKeys::Gamepad_LeftShoulder, EPad::Nintendo) + PadLabel(EKeys::Gamepad_RightShoulder, EPad::Nintendo), FString(TEXT("LR")));
 
-	// The page opens from the front end's options, and from the pause menu.
+	// The table is the settings' first tab, which open from the front end and from the pause menu.
 	using CheeseStrikeMenu::PageFor;
-	TestTrue(TEXT("the controls open from the front end"), PageFor(false, false, false, false, EMenuPage::Controls) == EMenuPage::Controls);
-	TestTrue(TEXT("and from the pause menu"), PageFor(true, false, true, true, EMenuPage::Controls) == EMenuPage::Controls);
-	TestTrue(TEXT("not over a match not paused"), PageFor(true, false, true, false, EMenuPage::Controls) == EMenuPage::None);
+	TestTrue(TEXT("the settings open from the front end"), PageFor(false, false, false, false, EMenuPage::Options) == EMenuPage::Options);
+	TestTrue(TEXT("and from the pause menu"), PageFor(true, false, true, true, EMenuPage::Options) == EMenuPage::Options);
+	TestTrue(TEXT("not over a match not paused"), PageFor(true, false, true, false, EMenuPage::Options) == EMenuPage::None);
+	TestEqual(TEXT("the controls are the settings' first tab"), static_cast<int32>(EOptionsTab::Controls), 0);
 
 	// The space bar presses nothing in the menu (Slate would take it for Enter); Enter still does.
 	const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu);

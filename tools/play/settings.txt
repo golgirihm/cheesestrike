@@ -1,29 +1,43 @@
-# Looks at the controls page: from the front end's options, with the mouse
-# and then a gamepad, at two sizes; then from the pause menu in a match. Run
-# with tools/play.ps1 -Lobby (alone, on the front end).
+# Looks at the front end and its pages: the main page over the menu's tile
+# of cheese, the credits, and each tab of the settings (the controls with the
+# mouse and a gamepad, and at the smallest window); then hosts a match from
+# the front end, as its button does, into the lobby's usual rules. Run with
+# tools/play.ps1 -Lobby (alone, on the front end).
 wait 8
 cmd r.SetRes 1600x900w
 wait 1
-cmd CheeseStrikePage Options Controls
+shot settings_main
+cmd CheeseStrikePage Credits
 wait 1
-shot controls_options_tab
-cmd CheeseStrikePage Controls
+shot settings_credits
+cmd CheeseStrikePage Settings Controls
 wait 1
-shot controls_page
+shot settings_controls
 device gamepad
 wait 1
-shot controls_page_pad
+shot settings_controls_pad
 device mouse
 cmd r.SetRes 1280x720w
 wait 1
-shot controls_page_720
+shot settings_controls_720
+cmd r.SetRes 1600x900w
+cmd CheeseStrikePage Settings Aiming
+wait 1
+shot settings_aiming
+cmd CheeseStrikePage Settings View
+wait 1
+shot settings_view
+cmd CheeseStrikePage Settings Sound
+wait 1
+shot settings_sound
+cmd CheeseStrikePage Settings Graphics
+wait 1
+shot settings_graphics
 cmd CheeseStrikePage Main
-cmd CheeseStrikeStart now
-wait 8
-tap Menu
 wait 1
-shot controls_pause
-cmd CheeseStrikePage Controls
+key Enter
 wait 1
-shot controls_from_pause
+shot settings_hosting
+wait 12
+shot settings_hosted_lobby
 quit
