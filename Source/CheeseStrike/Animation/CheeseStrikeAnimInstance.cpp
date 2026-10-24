@@ -259,7 +259,7 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			const UCheeseStrikeMovementComponent* Movement = Character->GetCheeseStrikeMovement();
 			View.bSprinting = Movement != nullptr && Movement->IsSprinting();
 		}
-		// An execution: where the blow lands on the one down, taken as it begins, in the frame the body is animated in.
+		// An execution: where the blow lands on the one down, in the frame the body is animated in.
 		const UCheeseStrikeLastStand* Stand = Character->GetLastStand();
 		const FCheeseStrikeExecutionState* Execution = Stand != nullptr ? &Stand->GetExecution() : nullptr;
 		ExecutionKind = Execution != nullptr && Character->IsAlive() ? Execution->Kind : 0;
@@ -270,7 +270,8 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			ExecutionSide = Execution->Side >= 0 ? 1.0f : -1.0f;
 			const ACheeseStrikeCharacter* Down = Execution->Other;
 			const USkeletalMeshComponent* Main = Character->GetMesh();
-			if (bExecutor && Down != nullptr && Main != nullptr && ExecutionTakenFor != Execution->StartedAt)
+			// Followed as the one down moves under it (pinned, jerking), until they die.
+			if (bExecutor && Down != nullptr && Main != nullptr && (ExecutionTakenFor != Execution->StartedAt || Down->IsAlive()))
 			{
 				ExecutionTakenFor = Execution->StartedAt;
 				const bool bStomp = Execution->GetKind() == CheeseStrikeExecution::EKind::Stomp;
@@ -576,6 +577,10 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	Executing.Target = ExecutionTarget;
 	Executing.TargetShoulder = ExecutionShoulder;
 	Executing.Side = ExecutionSide;
+	// The knife as the hand holds it, for driving its point into the chest.
+	Executing.bKnifeInHand = Hold == ECheeseStrikeHold::Knife;
+	Executing.ModelInHand = ModelInHand;
+	Executing.ModelAlong = ModelAlong;
 
 	// Sliding (crouched, faster than a crouched walk: any machine can tell), the body laid back with its legs out. None of
 	// what follows while down, nor in an execution, which poses the body itself.

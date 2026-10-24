@@ -252,7 +252,7 @@ CheeseStrikeHUD::FScoreSummary ACheeseStrikeHUD::ScoreSummary(const ACheeseStrik
 	{
 		const int32 Left = FMath::CeilToInt(Match->SecondsLeftInRound());
 		Goal = Match->IsRoundBreak() ? FString::Printf(TEXT("NEXT ROUND IN %d"), FMath::CeilToInt(Match->SecondsToNextRound()))
-			: FString::Printf(TEXT("ROUND %d  %d:%02d"), Match->GetRound(), Left / 60, Left % 60);
+			: Left <= 0 ? FString::Printf(TEXT("ROUND %d  OVERTIME"), Match->GetRound()) : FString::Printf(TEXT("ROUND %d  %d:%02d"), Match->GetRound(), Left / 60, Left % 60);
 	}
 	const int32 Scores[CheeseStrikeRules::Teams] = {Match->GetTeamScore(0), Match->GetTeamScore(1)};
 	return CheeseStrikeHUD::Teams(Scores, Mine != nullptr ? Mine->GetTeam() : INDEX_NONE, bRounds ? Match->GetRoundLimit() : Match->GetKillLimit(), Goal);
@@ -426,7 +426,11 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	const float Spread = Weapon != nullptr ? Weapon->CurrentSpread() : 0.0f;
 	const float Gap = CrosshairGap + PixelsForDegrees(Spread, FieldOfView, Width);
 	const FLinearColor Cross(1.0f, 1.0f, 1.0f, 0.9f);
-	if (CrosshairOver(Character) == CheeseStrikeHUD::ECrosshair::NoEffect)
+	if (Character->InExecution())
+	{
+		// In an execution the view is out of the eyes, watching it: no crosshair.
+	}
+	else if (CrosshairOver(Character) == CheeseStrikeHUD::ECrosshair::NoEffect)
 	{
 		// Over an enemy down whom a shot from here would not hurt (Execution): a cancel sign, a ring struck through.
 		const float Radius = 11.0f;

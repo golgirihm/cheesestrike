@@ -490,7 +490,7 @@ namespace CheeseStrikeHUD
 			return ECrosshair::Usual;
 		}
 		// A shot at them as the server takes it: only from within reach does it finish them.
-		const CheeseStrikeModes::ELastStandHit Hit = CheeseStrikeModes::LastStandHit(bLastStand, true, true, 1.0f, 1.0f, Distance <= CheeseStrikeModes::FinishRange);
+		const CheeseStrikeModes::ELastStandHit Hit = CheeseStrikeModes::LastStandHit(bLastStand, true, 1.0f, 1.0f, Distance <= CheeseStrikeModes::FinishRange);
 		return Hit == CheeseStrikeModes::ELastStandHit::Absorbed ? ECrosshair::NoEffect : ECrosshair::Usual;
 	}
 

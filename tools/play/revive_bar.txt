@@ -1,0 +1,21 @@
+# The revive bar, thick and green: the host goes down and its bar fills toward
+# getting up by itself; a teammate bot that comes by revives it, the same bar
+# filling faster. Bots on both sides, so a teammate is about:
+# tools/play.ps1 -Script tools/play/revive_bar.txt -Bots -Extra "?Mode=Execution?Bots=3?Rounds=5" -Res 1600x900
+wait 3
+cmd CheeseStrikeDown
+wait 2
+shot revive_bar_02
+wait 3
+shot revive_bar_05
+wait 3
+shot revive_bar_08
+wait 3
+shot revive_bar_11
+wait 3
+shot revive_bar_14
+wait 3
+shot revive_bar_17
+wait 4
+shot revive_bar_21
+quit

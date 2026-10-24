@@ -64,6 +64,31 @@ namespace CheeseStrikeModes
 		return FMath::Clamp(CheeseStrikeRules::Option(Options, TEXT("RoundTime"), RoundTime), 30.0f, 600.0f);
 	}
 
+	FString RoundWarning(float Left)
+	{
+		for (const float At : RoundWarnings)
+		{
+			if (FMath::Abs(Left - At) < 1.0f)
+			{
+				return FString::Printf(TEXT("%.0f seconds left in the round"), At);
+			}
+		}
+		return FString();
+	}
+
+	float NextRoundWarning(float Left, float Within)
+	{
+		for (const float At : RoundWarnings)
+		{
+			const float In = Left - At;
+			if (In >= FMath::Max(Within, 0.5f))
+			{
+				return In;
+			}
+		}
+		return 0.0f;
+	}
+
 	int32 TeamAtLimit(TArrayView<const int32> Scores, int32 Limit)
 	{
 		if (Limit <= 0)
@@ -80,7 +105,7 @@ namespace CheeseStrikeModes
 		return NoTeam;
 	}
 
-	bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner)
+	bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner, bool bOvertimeOver)
 	{
 		OutWinner = NoTeam;
 		const bool bBothHavePlayers = First.Members > 0 && Second.Members > 0;
@@ -91,17 +116,18 @@ namespace CheeseStrikeModes
 			OutWinner = bFirstGone && bSecondGone ? NoTeam : (bFirstGone ? 1 : 0);
 			return true;
 		}
-		if (!bTimeUp)
+		// Out of time, it ends once nobody is down (overtime), or at the end of the overtime.
+		if (!bTimeUp || ((First.Down > 0 || Second.Down > 0) && !bOvertimeOver))
 		{
 			return false;
 		}
-		if (First.Standing() != Second.Standing())
-		{
-			OutWinner = First.Standing() > Second.Standing() ? 0 : 1;
-		}
-		else if (First.Alive != Second.Alive)
+		if (First.Alive != Second.Alive)
 		{
 			OutWinner = First.Alive > Second.Alive ? 0 : 1;
+		}
+		else if (First.Standing() != Second.Standing())
+		{
+			OutWinner = First.Standing() > Second.Standing() ? 0 : 1;
 		}
 		else if (!FMath::IsNearlyEqual(First.Health, Second.Health, 0.5f))
 		{
@@ -208,7 +234,7 @@ namespace CheeseStrikeModes
 		return FreeIndex[CheeseStrikeRules::FurthestFrom(Free, Enemies)];
 	}
 
-	ELastStandHit LastStandHit(bool bLastStand, bool bDowned, bool bLastStandUsed, float Health, float Damage, bool bEnemyClose)
+	ELastStandHit LastStandHit(bool bLastStand, bool bDowned, float Health, float Damage, bool bEnemyClose)
 	{
 		if (!bLastStand)
 		{
@@ -218,7 +244,7 @@ namespace CheeseStrikeModes
 		{
 			return bEnemyClose ? ELastStandHit::Finish : ELastStandHit::Absorbed;
 		}
-		return Health - Damage <= 0.0f && !bLastStandUsed ? ELastStandHit::Down : ELastStandHit::Hurt;
+		return Health - Damage <= 0.0f ? ELastStandHit::Down : ELastStandHit::Hurt;
 	}
 
 	EInteract InteractWith(bool bTargetDowned, bool bSameSide, float Distance)

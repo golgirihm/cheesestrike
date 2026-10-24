@@ -46,7 +46,7 @@ namespace CheeseStrikeExecution
 		switch (Kind)
 		{
 		case EKind::Stab:
-			return StabLands[1] + 0.4f;
+			return StabOut + 0.1f;
 		case EKind::Stomp:
 			return StompLands;
 		default:
@@ -85,22 +85,25 @@ namespace CheeseStrikeExecution
 
 	FVector LookAtInBody(EKind Kind, float Side)
 	{
-		// Between the blow and the executor, a little up.
+		// Between the blow and the executor, a little up: the kneeling executor's chest, or the stamping one's knee.
 		const FVector Aim = AimPoint(Kind);
 		const FVector Spot = SpotInBody(Kind, Side);
-		return FVector(FMath::Lerp(Aim.X, Spot.X, 0.4f), FMath::Lerp(Aim.Y, Spot.Y, 0.4f), Kind == EKind::Stomp ? 70.0f : 55.0f);
+		return FVector(FMath::Lerp(Aim.X, Spot.X, 0.3f), FMath::Lerp(Aim.Y, Spot.Y, 0.3f), Kind == EKind::Stomp ? 80.0f : 45.0f);
 	}
 
 	FVector CameraInBody(EKind Kind, float Side, float Elapsed)
 	{
 		const float Way = Side >= 0.0f ? 1.0f : -1.0f;
 		const FVector Look = LookAtInBody(Kind, Side);
-		// From the far side of the one down, toward their feet and up, drifting round toward the feet as it plays.
-		const float Drift = FMath::DegreesToRadians(CameraDrift * FMath::Clamp(Elapsed / FMath::Max(Seconds(Kind), 0.1f), 0.0f, 1.0f));
-		const FVector2D Flat(CameraAlong, -Way * CameraBack);
+		// From the far side of the one down, toward their feet and up, easing in and round toward the feet as it plays.
+		const float Played = Ease(Elapsed, 0.0f, FMath::Max(Seconds(Kind), 0.1f));
+		const float Drift = FMath::DegreesToRadians(CameraDrift * Played);
+		const float Near = (1.0f - CameraPushIn * Played) * (Kind == EKind::Stomp ? StompCameraFurther : 1.0f);
+		const FVector2D Flat(CameraAlong * Near, -Way * CameraBack * Near);
 		const float Angle = Way * Drift;
 		const FVector2D Turned(Flat.X * FMath::Cos(Angle) - Flat.Y * FMath::Sin(Angle), Flat.X * FMath::Sin(Angle) + Flat.Y * FMath::Cos(Angle));
-		return FVector(Look.X + Turned.X, Look.Y + Turned.Y, CameraUp);
+		const float Up = Kind == EKind::Stomp ? StompCameraUp : StabCameraUp;
+		return FVector(Look.X + Turned.X, Look.Y + Turned.Y, Look.Z + (Up - Look.Z) * (1.0f - CameraPushIn * Played));
 	}
 
 	float Ease(float Time, float From, float To)

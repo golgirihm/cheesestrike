@@ -44,7 +44,8 @@ struct FCheeseStrikeExecutionState
 
 /**
  * A character's last stand, in Execution (CheeseStrikeModes): hurt enough
- * to die, once a life, it goes down instead. Down, it lies on its back,
+ * to die, it goes down instead (every time: up again, revived or by
+ * itself, it can go down again). Down, it lies on its back,
  * propped on an elbow (FCheeseStrikeDownedPose; its capsule crouched, its
  * legs out ahead of it), aims only in a cone toward its feet, scoots slowly
  * and turns round slowly (CheeseStrikeDowned), can't sprint, jump or aim
@@ -147,6 +148,8 @@ protected:
 	void UpdateView(float DeltaTime);
 	/** Every machine: the blows' sounds, and the stomp's burst of the head into cheese, once (played by the one executed's). */
 	void UpdateBurst();
+	/** Server, the executor: logs where its hands and knife are in the body of the one down (CheeseStrike.TraceExecution). */
+	void TraceExecution() const;
 	/** The executor (on the machine that moves it): where the execution has it stand. */
 	void HoldExecutionSpot();
 
@@ -165,8 +168,7 @@ protected:
 	UPROPERTY(Replicated)
 	bool bExecuted = false;
 
-	/** Server: whether the last stand has been used this life, who put it down, whether Interact is held, whether a finishing blow is on its way, and whether the execution's kill is done. */
-	bool bUsed = false;
+	/** Server: who put it down, whether Interact is held, whether a finishing blow is on its way, and whether the execution's kill is done. */
 	TWeakObjectPtr<ACheeseStrikePlayerState> DownedBy;
 	bool bInteractHeld = false;
 	bool bFinishing = false;

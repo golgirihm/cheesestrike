@@ -54,6 +54,8 @@ public:
 	void SetRoundLimit(int32 Rounds);
 	/** Execution: `Victim` has gone down, put there by `By`; down still counts as in, until executed (UCheeseStrikeLastStand). */
 	void Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By);
+	/** Execution: `Body` is up again (revived, or by themself): a round in overtime may be over now. */
+	void GotUp(ACheeseStrikeCharacter* Body);
 	/** Gun Game: a character is given its player's step of the ladder (and nothing else), as it comes in. */
 	virtual void SetPlayerDefaults(APawn* PlayerPawn) override;
 	/** Elimination's rounds to win, and a round's length. */
@@ -78,9 +80,18 @@ public:
 	/** The same, for looking at getting up: revives everyone down, or the player or bot named. */
 	UFUNCTION(Exec)
 	void CheeseStrikeRevive(const FString& Player = TEXT(""));
-	/** The same, for looking at an execution: the host (or the player or bot named) executes the nearest enemy down, wherever they are, by `Kind` (1 the stab, 2 the stomp, 0 either). */
+	/** The same, for looking at an execution: the host (or the player or bot named, a teammate of the host's, "mate", or an enemy of theirs, "enemy") executes the nearest enemy down, wherever they are, by `Kind` (1 the stab, 2 the stomp, 0 either). */
 	UFUNCTION(Exec)
 	void CheeseStrikeExecute(int32 Kind = 0, const FString& Player = TEXT(""));
+	/**
+	 * The same, for looking at an execution from outside it: the host's view
+	 * from a fixed camera `Distance` cm from the one down (or being executed),
+	 * `Yaw` degrees round from the way they lie (0 from their feet, 90 from
+	 * their right), `Height` cm up, looking at their chest; until the host's
+	 * own `CheeseStrikeOutside 0`.
+	 */
+	UFUNCTION(Exec)
+	void CheeseStrikeWatchDown(float Yaw = 0.0f, float Distance = 250.0f, float Height = 120.0f);
 	/** King of the Hill: the hill has made `Team`'s points, or in the solo mode `Player`'s, reach the target: they win. */
 	void HillWon(int32 Team, ACheeseStrikePlayerState* Player);
 	/** King of the Hill's hill (ACheeseStrikeHill), once the match has begun; null in the other modes. */
@@ -198,11 +209,15 @@ protected:
 	void NextRound() { StartRound(false); }
 	/**
 	 * Elimination: ends the round if a side is gone, or whatever stands when
-	 * `bTimeUp`. In Execution a side whose players left in are all down is
-	 * gone too: each of them is finished first, as the kill of whoever put them down.
+	 * `bTimeUp` (CheeseStrikeModes::RoundOver). In Execution someone down is
+	 * still in (until executed, or up again by themself).
 	 */
 	void CheckRound(bool bTimeUp);
-	void RoundTimeUp() { CheckRound(true); }
+	/** Elimination: the round's time is up; in overtime (someone down, Execution) until they are up or out, or OvertimeMost. */
+	void RoundTimeUp();
+	void OvertimeOver();
+	/** Elimination: tells everyone how long the round has left as its end nears (CheeseStrikeModes::RoundWarnings), and sets the next warning. */
+	void WarnRoundTime();
 	void CheckRoundNow() { CheckRound(false); }
 	/** Elimination: `Winner` (or nobody, NoTeam) takes the round; the match, at the round limit, or a pause before the next. */
 	void EndRound(int32 Winner);
@@ -217,6 +232,10 @@ protected:
 	/** The world's time the round being played began. */
 	float RoundStartedAt = 0.0f;
 	FTimerHandle RoundTimer;
+	FTimerHandle RoundWarnTimer;
+	/** Whether the round's time is up (it may go on in overtime), and whether its overtime is over too. */
+	bool bRoundTimeUp = false;
+	bool bOvertimeOver = false;
 	int32 BotsWanted = -1;
 	/** The sides the host moved the lobby's bots to (CheeseStrikeRules::Seats), carried to the match's levels (`?BotSides=`). */
 	TArray<int32> BotSides;

@@ -1,0 +1,66 @@
+# The same, watched from outside, as anyone near sees it: the host executes
+# the bot, its view put on a camera off the bot's feet and to its left, facing
+# the executor (CheeseStrikeWatchDown), with no HUD:
+# tools/play.ps1 -Script tools/play/execution_watch.txt -Bots -Extra "?Mode=Execution?Bots=1?Rounds=5" -FixedFps 30 -Res 1600x900
+wait 4
+cmd CheeseStrikeProtect 60
+cmd ShowHUD
+cmd CheeseStrikeDown enemy
+wait 1.5
+cmd CheeseStrikeExecute 1
+wait 0.05
+cmd CheeseStrikeWatchDown -60 300 150
+wait 0.01
+shot exec_watch_stab_015
+wait 0.20
+shot exec_watch_stab_045
+wait 0.20
+shot exec_watch_stab_075
+wait 0.10
+shot exec_watch_stab_095
+wait 0.05
+shot exec_watch_stab_110
+wait 0.02
+shot exec_watch_stab_122
+wait 0.08
+shot exec_watch_stab_140
+wait 0.20
+shot exec_watch_stab_170
+wait 0.15
+shot exec_watch_stab_195
+wait 0.10
+shot exec_watch_stab_215
+wait 0.20
+shot exec_watch_stab_245
+wait 0.30
+shot exec_watch_stab_285
+wait 9
+cmd CheeseStrikeProtect 60
+cmd CheeseStrikeDown enemy
+wait 1.5
+cmd CheeseStrikeExecute 2
+wait 0.05
+cmd CheeseStrikeWatchDown -60 300 150
+wait 0.01
+shot exec_watch_stomp_015
+wait 0.20
+shot exec_watch_stomp_045
+wait 0.20
+shot exec_watch_stomp_075
+wait 0.10
+shot exec_watch_stomp_095
+wait 0.01
+shot exec_watch_stomp_105
+wait 0.01
+shot exec_watch_stomp_112
+wait 0.08
+shot exec_watch_stomp_130
+wait 0.20
+shot exec_watch_stomp_160
+wait 0.20
+shot exec_watch_stomp_190
+wait 0.40
+shot exec_watch_stomp_240
+wait 9
+cmd CheeseStrikeProtect 60
+quit
