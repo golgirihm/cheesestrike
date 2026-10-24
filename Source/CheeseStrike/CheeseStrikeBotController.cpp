@@ -5,7 +5,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/GameSession.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerState.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "CheeseStrike.h"
@@ -109,6 +111,16 @@ FString ACheeseStrikeBotController::Describe() const
 		Weapon != nullptr && Weapon->IsReloading() ? *(TEXT(" reloading, ") + Weapon->DescribeReload()) : TEXT(""), bTriggerHeld ? TEXT(" firing") : TEXT(""),
 		Me != nullptr ? Me->GetVelocity().Size2D() : 0.0f, Me != nullptr ? *Me->GetActorLocation().ToCompactString() : TEXT("-"),
 		Target.IsValid() ? *Target->DisplayName() : TEXT("none"), bSeesTarget ? TEXT(" (seen)") : TEXT(""));
+}
+
+void ACheeseStrikeBotController::InitPlayerState()
+{
+	Super::InitPlayerState();
+	const AGameModeBase* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode() : nullptr;
+	if (PlayerState != nullptr && Mode != nullptr && Mode->GameSession != nullptr)
+	{
+		PlayerState->SetPlayerId(Mode->GameSession->GetNextPlayerID());
+	}
 }
 
 void ACheeseStrikeBotController::BeginPlay()
