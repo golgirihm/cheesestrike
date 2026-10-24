@@ -30,7 +30,7 @@ struct FWeaponLook
 	/** How the model sits in the grip: its size, turn and place. */
 	FTransform Model = FTransform::Identity;
 	/** Its materials, slot by slot (none keeps the model's own). */
-	const TCHAR* Materials[3] = {nullptr, nullptr, nullptr};
+	const TCHAR* Materials[4] = {nullptr, nullptr, nullptr, nullptr};
 	/** Which way its business end points in the model's space: a gun's muzzle (+Y), a blade's tip. */
 	FVector Along = FVector(0.0f, 1.0f, 0.0f);
 	/** Where the eye goes down the sights, in the model's space; none for the rifle's own (from its bounds and the console's sight variables). */

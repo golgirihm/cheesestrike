@@ -84,9 +84,12 @@ bool FEveryWeaponHasItsOwnLook::RunTest(const FString& Parameters)
 			{
 				const FBox Near = Bounds.ExpandBy(Bounds.GetSize().GetMax() * 0.05f);
 				TestTrue(FString::Printf(TEXT("%s's muzzle is on its model"), *Name), Near.IsInside(Look.Muzzle));
-				TestTrue(FString::Printf(TEXT("%s's muzzle is at its front"), *Name), Look.Muzzle.Y > Bounds.Max.Y - Bounds.GetSize().Y * 0.15f);
+				// Forward is Y once the model is turned as its look turns it (one made along another axis).
+				const FQuat Turn = Look.Model.GetRotation();
+				const FBox Along = Bounds.TransformBy(FTransform(Turn));
+				TestTrue(FString::Printf(TEXT("%s's muzzle is at its front"), *Name), Turn.RotateVector(Look.Muzzle).Y > Along.Max.Y - Along.GetSize().Y * 0.15f);
 			}
-			TestTrue(FString::Printf(TEXT("%s's sights are behind its muzzle"), *Name), !Look.Sight.IsSet() || Look.Sight->Y < Look.Muzzle.Y);
+			TestTrue(FString::Printf(TEXT("%s's sights are behind its muzzle"), *Name), !Look.Sight.IsSet() || Look.Model.GetRotation().RotateVector(*Look.Sight).Y < Look.Model.GetRotation().RotateVector(Look.Muzzle).Y);
 			TestTrue(FString::Printf(TEXT("%s flashes"), *Name), Look.FlashSize > 0.0f);
 			TestNotNull(FString::Printf(TEXT("%s sounds as it fires"), *Name), Look.Shots[0]);
 			for (const TCHAR* Shot : Look.Shots)

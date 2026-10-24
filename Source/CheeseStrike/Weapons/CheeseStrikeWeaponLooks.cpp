@@ -165,6 +165,26 @@ namespace
 			Look.ShotVolume = 0.85f;
 			Looks.Add(Look);
 		}
+		// The Dual Burratas: a pair of Xeradev's M1911s, one in each hand, soft white burrata with creamy grips, at life size
+		// (turned along Y as it came in); the hand at the grip, a little behind and under the bore.
+		{
+			FWeaponLook Look = Looks.Last();
+			Look.Id = TEXT("burratas");
+			Look.SkinnedModel = nullptr;
+			Look.FireAnimation = nullptr;
+			Look.ReloadAnimation = nullptr;
+			Look.PlainModel = TEXT("/Game/Fab/Xeradev/M1911/SM_M1911.SM_M1911");
+			Look.Model = Gripped(FVector(0.0f, -3.4f, -3.5f), 1.0f);
+			Look.Materials[0] = Material(TEXT("MI_BurratasCream"));
+			Look.Materials[1] = Material(TEXT("MI_Burratas"));
+			Look.Materials[2] = Material(TEXT("MI_Burratas"));
+			Look.Materials[3] = Material(TEXT("MI_BurratasSteel"));
+			Look.Sight = FVector(0.0f, -35.0f, 7.2f);
+			Look.Muzzle = FVector(0.0f, 15.6f, 4.0f);
+			Look.ShotVolume = 0.8f;
+			Look.ShotPitch = 1.06f;
+			Looks.Add(Look);
+		}
 		// The Cheese Knife: our own (tools/art/weapon_models.py), its handle in red wax. It came in pointing back.
 		{
 			FWeaponLook Look;

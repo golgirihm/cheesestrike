@@ -35,7 +35,7 @@ bool FEveryWeaponKillsInTheDesignsTime::RunTest(const FString& Parameters)
 	// The design's TTK column (docs/unreal/design.md, "Weapons"): body shots, close, holding the trigger. The Colby
 	// Carbine, the spawn primary, is softened from it: three bursts to a kill.
 	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 9, 0.52f},
-		FWanted{Munster(), 7, 0.51f}, FWanted{Shotgun(), 2, 0.85f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}})
+		FWanted{Munster(), 7, 0.51f}, FWanted{Shotgun(), 2, 0.85f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}, FWanted{Burratas(), 7, 0.54f}})
 	{
 		const FString Name = Wanted.Weapon.DisplayName.ToString();
 		TestEqual(FString::Printf(TEXT("%s kills in %d"), *Name, Wanted.Shots), ShotsToKill(Wanted.Weapon), Wanted.Shots);
@@ -156,7 +156,7 @@ bool FWeaponsAreLifeSizeAndComeUpInTime::RunTest(const FString& Parameters)
 	};
 	// The design's Godot metres, a third of a metre each here.
 	for (const FReach& Wanted : {FReach{Pistol(), 90, 25, 60}, FReach{Blaster(), 150, 40, 90}, FReach{Carbine(), 140, 35, 80}, FReach{Grater(), 80, 15, 45},
-		FReach{Munster(), 120, 25, 70}, FReach{Shotgun(), 40, 8, 25}, FReach{Roquefort(), 250, 0, 0}})
+		FReach{Munster(), 120, 25, 70}, FReach{Shotgun(), 40, 8, 25}, FReach{Roquefort(), 250, 0, 0}, FReach{Burratas(), 90, 20, 55}})
 	{
 		const FString Name = Wanted.Weapon.DisplayName.ToString();
 		TestTrue(FString::Printf(TEXT("%s reaches %.0f m (%.0f cm)"), *Name, Wanted.Range / 3.0f, Wanted.Weapon.MaxRange), FMath::IsNearlyEqual(Wanted.Weapon.MaxRange, Wanted.Range * WeaponTests::Metre, 1.0f));
@@ -195,7 +195,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheArsenalIsListedAndFound, "CheeseStrike.Weap
 bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 {
 	const TArray<const FWeaponStats*>& All = CheeseStrikeArsenal::All();
-	TestEqual(TEXT("eight weapons"), All.Num(), 8);
+	TestEqual(TEXT("nine weapons"), All.Num(), 9);
 	TSet<FName> Ids;
 	for (const FWeaponStats* Weapon : All)
 	{
@@ -206,7 +206,7 @@ bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("found whatever the case"), CheeseStrikeArsenal::Find(FName(TEXT("ShotGun"))) == &CheeseStrikeWeapons::Shotgun());
 	TestNull(TEXT("and nothing that isn't one"), CheeseStrikeArsenal::Find(FName(TEXT("bazooka"))));
-	TestEqual(TEXT("six primaries"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Primary).Num(), 6);
+	TestEqual(TEXT("seven primaries"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Primary).Num(), 7);
 	TestEqual(TEXT("the Curd Pistol is the sidearm"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Sidearm), TArray<FName>{CheeseStrikeArsenal::Sidearm()});
 	TestEqual(TEXT("everyone comes in with the Colby Carbine"), CheeseStrikeArsenal::DefaultPrimary(), CheeseStrikeWeapons::Carbine().Id);
 
@@ -217,6 +217,7 @@ bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 	TestEqual(TEXT("to the Curd Pistol"), CheeseStrikeArsenal::GunGameWeapon(Ladder.Num() - 2), CheeseStrikeWeapons::Pistol().Id);
 	TestEqual(TEXT("and last the knife"), CheeseStrikeArsenal::GunGameWeapon(Ladder.Num() - 1), CheeseStrikeWeapons::Knife().Id);
 	TestEqual(TEXT("which it keeps"), CheeseStrikeArsenal::GunGameWeapon(100), CheeseStrikeWeapons::Knife().Id);
+	TestTrue(TEXT("the Dual Burratas are on it, after the Colby Carbine"), Ladder.IndexOfByKey(CheeseStrikeWeapons::Burratas().Id) == Ladder.IndexOfByKey(CheeseStrikeWeapons::Carbine().Id) + 1);
 	for (const FName& Id : Ladder)
 	{
 		TestNotNull(FString::Printf(TEXT("%s is a weapon"), *Id.ToString()), CheeseStrikeArsenal::Find(Id));
@@ -262,6 +263,34 @@ bool FAFarShotIsQuieterAndDuller::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the furthest giving way"), ConcurrencyAsset()->Concurrency.ResolutionRule == EMaxConcurrentResolutionRule::StopFarthestThenOldest);
 		TestTrue(TEXT("one and the same for every weapon"), AttenuationAsset() == AttenuationAsset() && ConcurrencyAsset() == ConcurrencyAsset());
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheDualBurratasFireInTurn, "CheeseStrike.Weapons.TheDualBurratasFireInTurn", WeaponTests::Flags)
+
+bool FTheDualBurratasFireInTurn::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	const FWeaponStats& Dual = Burratas();
+	TestTrue(TEXT("two guns"), Dual.bDual);
+	TestFalse(TEXT("which no other weapon has"), Blaster().bDual || Pistol().bDual || Grater().bDual);
+	TestEqual(TEXT("a primary"), Dual.Slot, EWeaponSlot::Primary);
+	// The right, then the left, in turn; one gun is always the right.
+	for (int32 Index = 0; Index < 6; ++Index)
+	{
+		TestEqual(FString::Printf(TEXT("shot %d from the %s"), Index, Index % 2 == 0 ? TEXT("right") : TEXT("left")), DualHand(Dual, Index), Index % 2);
+	}
+	TestEqual(TEXT("a pistol fires from the right"), DualHand(Pistol(), 1), 0);
+	// Each gun kicks to its own side.
+	TestTrue(TEXT("the right gun's kick goes right"), RecoilFor(Dual, 4, false).X > 0.0f);
+	TestTrue(TEXT("the left gun's left"), RecoilFor(Dual, 5, false).X < 0.0f);
+	TestTrue(TEXT("and both climb"), RecoilFor(Dual, 5, false).Y > RecoilFor(Dual, 4, false).Y);
+	// Fast, a long magazine, a long reload, middling damage.
+	TestTrue(TEXT("faster than the Cheddar Blaster"), ShotsPerSecond(Dual) > ShotsPerSecond(Blaster()));
+	TestEqual(TEXT("thirty rounds"), Dual.MagazineSize, 30);
+	TestTrue(TEXT("a longer magazine than the Cheddar Blaster's"), Dual.MagazineSize > Blaster().MagazineSize);
+	TestTrue(TEXT("a reload longer than any but the Munster's"), Dual.ReloadTime > Roquefort().ReloadTime && Dual.ReloadTime < Munster().ReloadTime);
+	TestTrue(TEXT("a hit between the pistol's and the Cheddar Blaster's"), Dual.Damage > Pistol().Damage && Dual.Damage < Blaster().Damage);
 	return true;
 }
 

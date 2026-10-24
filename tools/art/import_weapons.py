@@ -26,6 +26,9 @@ MODELS = [
     ("DP28", "/Game/Fab/Max3d/DP28", "Max3d_DP28/source/Dp28/dp28.FBX", [("DP28", True)]),
     ("SV98", "/Game/Fab/SpatialNeglect/SV98", "SpatialNeglect_SV98/source/sv 98.fbx", [("SV98", True), ("SV98Scope", False)]),
     ("ClassicM4", "/Game/Fab/SpatialNeglect/ClassicM4", "SpatialNeglect_ClassicM4/source/Classic M4.fbx", [("ClassicM4", False), ("ClassicM4Scope", False)]),
+    # The Dual Burratas' pistols: no maps of its own; weapon_materials.py makes it burrata and steel. Made along X,
+    # muzzle toward -X: turned as it comes in to lie along Y, muzzle forward, as the game's weapons do.
+    ("M1911", "/Game/Fab/Xeradev/M1911", "Xeradev_M1911/fbx/FBX/NonRigged/NonRigged_M1911.fbx", [], -90.0),
 ]
 OURS = [("CheeseKnife", "/Game/CheeseStrike/Weapons/Knife", os.path.join(WORK, "cheese_knife.obj")),
         ("MuzzleFlash", "/Game/CheeseStrike/Weapons/Flash", os.path.join(WORK, "muzzle_flash.obj"))]
@@ -74,7 +77,7 @@ def texture(path, destination, name, kind):
     return t
 
 
-def model(asset, path, destination):
+def model(asset, path, destination, yaw=0.0):
     """A static mesh, its parts combined, with its material slots; no Nanite, no collision."""
     if not REIMPORT and lib.does_asset_exist(f"{destination}/SM_{asset}"):
         return unreal.load_asset(f"{destination}/SM_{asset}")
@@ -92,6 +95,8 @@ def model(asset, path, destination):
     data.set_editor_property("auto_generate_collision", False)
     data.set_editor_property("build_nanite", False)
     data.set_editor_property("generate_lightmap_u_vs", False)
+    if yaw:
+        data.set_editor_property("import_rotation", unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw))
     imported = import_file(path, destination, "SM_" + asset, options)
     mesh = None
     names = [a.get_name() for a in imported if a is not None]
@@ -144,12 +149,12 @@ def icon(path, name):
 try:
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.OBJ False")
-    for asset, destination, path, sets in MODELS:
+    for asset, destination, path, sets, *turn in MODELS:
         lines.append(asset)
         for name, has_cheese in sets:
             for kind in ["Albedo", "Normal", "AORM"] + (["Cheese"] if has_cheese else []):
                 texture(os.path.join(WORK, f"T_{name}_{kind}.png"), destination, f"T_{name}_{kind}", kind)
-        mesh = model(asset, os.path.join(FAB, path), destination)
+        mesh = model(asset, os.path.join(FAB, path), destination, turn[0] if turn else 0.0)
         if mesh is not None:
             describe(asset, mesh)
     for asset, destination, path in OURS:

@@ -133,6 +133,13 @@ public:
 	 * the mannequin's weapon_r would be.
 	 */
 	static void PutInHand(USceneComponent* Rifle, USkeletalMeshComponent* Body);
+	/**
+	 * Where a thing held `InFromBone` in `Body`'s bone `FromBone` sits in its bone `ToBone` when held the mirror way
+	 * across the body (left for right), by the reference pose: the second gun's grip in the left hand.
+	 */
+	static FTransform MirroredGrip(const USkeletalMeshComponent* Body, FName FromBone, const FTransform& InFromBone, FName ToBone);
+	/** The second gun, in its player's view or on the body, if it has one in hand. */
+	UStaticMeshComponent* GetOffHandModel(bool bFirstPerson) const { return bFirstPerson ? FirstPersonOffHand : ThirdPersonOffHand; }
 	/** Hides any weapon a body's mesh was modelled holding (Belica's own guns), so only ours shows. */
 	static void HideBuiltInWeapons(USkeletalMeshComponent* Body);
 
@@ -243,6 +250,19 @@ protected:
 	TObjectPtr<UStaticMeshComponent> FirstPersonModel;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> ThirdPersonModel;
+	/**
+	 * The second gun of a weapon with two (the Dual Burratas, FWeaponStats::bDual): the same model in the left hand, in
+	 * its player's view and on the body, held as the right hand holds the first, mirrored across the body
+	 * (MirroredGrip). The two fire in turn, each flashing at its own muzzle.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> FirstPersonOffHand;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> ThirdPersonOffHand;
+	/** Shots shown on this machine: which of two guns fires the next (CheeseStrikeWeapons::DualHand). */
+	int32 ShotsShown = 0;
+	/** Puts the flash at the muzzle of the right gun or (`bLeft`) the left one. */
+	void PutFlashOn(bool bLeft);
 	/** The muzzle's flash, in its player's view and on the body, and its light. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> FirstPersonFlash;
