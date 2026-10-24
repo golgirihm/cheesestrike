@@ -1,7 +1,7 @@
 # Killed out of the round shows the death screen too, before the notice of
-# being out: in Execution alone, going down leaves the side with nobody up, so
-# the player is finished at once and out. Run with
-#   tools/play.ps1 -Script tools/play/hud_out_death.txt -Tag outdeath -Extra "?Mode=Execution"
+# being out, as after an execution: in Elimination, killed is out at once.
+# Run with
+#   tools/play.ps1 -Script tools/play/hud_out_death.txt -Tag outdeath -Bots -Extra "?Mode=Elimination?Bots=1?BotSkill=0"
 cmd r.SetRes 1920x1080w
 wait 3
 cmd CheeseStrikeDie
