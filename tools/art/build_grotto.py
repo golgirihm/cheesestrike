@@ -616,8 +616,10 @@ def hills():
 def pickups():
     """The weapons' stands (kit.pickup), on rock and floor the mice never eat, and clear of the hills (on the Pulpit's
     middle, the landing and the pools): the Roquefort in the Spine's arch, between the bridges; a Munster at each end of
-    the Pulpit; a Cheddar Blaster at the top of each gallery's stairs and a Swiss Shotgun in each Cheese Store."""
+    the Pulpit; a Cheddar Blaster at the top of each gallery's stairs and a Swiss Shotgun in each Cheese Store; the Dual
+    Burratas in the Rind Tunnel's middle, behind the landing."""
     kit.pickup("roquefort", 0, 0, L1, "Arch")
+    kit.pickup("burratas", 0, -2400, L1, "RindTunnel")
     for s, side in ((-1, "West"), (1, "East")):
         kit.pickup("munster", s * 850, 2050, L1, f"Pulpit{side}")
         kit.pickup("blaster", s * 2100, 2450, L2, f"Gallery{side}")

@@ -1073,7 +1073,7 @@ def mouse_entries(x0, y0, x1, y1, top, xs=(), ys=()):
 
 def pickup(weapon, x, y, z=0, name=""):
     """A weapon's stand (ACheeseStrikePickup): a low plinth at (x, y) on the floor at `z`, its weapon (a primary's id:
-    blaster, grater, munster, shotgun, roquefort; never the carbine everyone comes in with) floating over it, labelled
+    blaster, grater, munster, shotgun, burratas, roquefort; never the carbine everyone comes in with) floating over it, labelled
     Pickup_<weapon>_<name>. Four to eight a map, the better weapons at the riskier spots (the roquefort the riskiest),
     each side reaching them alike: on a mirrored map in pairs (x and -x) or on the middle line. It blocks nothing, so
     put it on open floor with room round it (a metre and a half across, two metres up), off the lanes' choke points

@@ -6,6 +6,7 @@
 // (loadouts, Gun Game's ladder), and how far a shot carries to the ear.
 
 #include "Misc/AutomationTest.h"
+#include "Animation/CheeseStrikeDualHold.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeGunfire.h"
@@ -291,6 +292,15 @@ bool FTheDualBurratasFireInTurn::RunTest(const FString& Parameters)
 	TestTrue(TEXT("a longer magazine than the Cheddar Blaster's"), Dual.MagazineSize > Blaster().MagazineSize);
 	TestTrue(TEXT("a reload longer than any but the Munster's"), Dual.ReloadTime > Roquefort().ReloadTime && Dual.ReloadTime < Munster().ReloadTime);
 	TestTrue(TEXT("a hit between the pistol's and the Cheddar Blaster's"), Dual.Damage > Pistol().Damage && Dual.Damage < Blaster().Damage);
+	// The left hand held the mirror way round: across the body's middle, a hand's frame still a hand's (its axes along
+	// and up mirrored, its axis across turned back), so the gun it holds keeps its handedness.
+	const FTransform Right(FRotator(10.0f, 30.0f, 5.0f), FVector(-20.0f, 40.0f, 130.0f));
+	const FTransform Left = CheeseStrikeDual::Mirrored(Right, FVector::ZeroVector, FVector::XAxisVector);
+	const auto Reflect = [](const FVector& V) { return FVector(-V.X, V.Y, V.Z); };
+	TestTrue(TEXT("the other side of the body"), Left.GetLocation().Equals(FVector(20.0f, 40.0f, 130.0f), 0.01f));
+	TestTrue(TEXT("its along and up mirrored"), Left.GetUnitAxis(EAxis::Y).Equals(Reflect(Right.GetUnitAxis(EAxis::Y)), 0.001f) && Left.GetUnitAxis(EAxis::Z).Equals(Reflect(Right.GetUnitAxis(EAxis::Z)), 0.001f));
+	TestTrue(TEXT("and still a turn, not a mirror"), Left.GetUnitAxis(EAxis::X).Equals(-Reflect(Right.GetUnitAxis(EAxis::X)), 0.001f));
+	TestTrue(TEXT("across a plane off the middle too"), CheeseStrikeDual::Mirrored(Right, FVector(10.0f, 0.0f, 0.0f), FVector::XAxisVector).GetLocation().Equals(FVector(40.0f, 40.0f, 130.0f), 0.01f));
 	return true;
 }
 

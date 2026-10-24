@@ -53,7 +53,7 @@ bool FEveryoneComesInWithTheWeakestPrimary::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("the Roquefort is worth the most"), Worth(CheeseStrikeWeapons::Roquefort().Id), 3);
 	TestTrue(TEXT("the Blaster and the Munster more than the Grater and the Shotgun"),
-		Worth(CheeseStrikeWeapons::Blaster().Id) == 2 && Worth(CheeseStrikeWeapons::Munster().Id) == 2 && Worth(CheeseStrikeWeapons::Grater().Id) == 1 && Worth(CheeseStrikeWeapons::Shotgun().Id) == 1);
+		Worth(CheeseStrikeWeapons::Blaster().Id) == 2 && Worth(CheeseStrikeWeapons::Munster().Id) == 2 && Worth(CheeseStrikeWeapons::Grater().Id) == 1 && Worth(CheeseStrikeWeapons::Shotgun().Id) == 1 && Worth(CheeseStrikeWeapons::Burratas().Id) == 1);
 	TestFalse(TEXT("no sidearm on a stand"), CanLieOnAStand(CheeseStrikeArsenal::Sidearm()));
 	TestFalse(TEXT("nor the knife"), CanLieOnAStand(CheeseStrikeArsenal::Knife()));
 	TestFalse(TEXT("nor anything that isn't a weapon"), CanLieOnAStand(TEXT("bazooka")));

@@ -181,8 +181,9 @@ namespace CheeseStrikeWeapons
 			Weapon.Reserve = 90;
 			Weapon.ReserveMax = 150;
 			SetReach(Weapon, 90.0f, 20.0f, 55.0f, 0.5f);
+			// No sights to aim down: from the hip only, a little tighter than a pistol's at full bloom.
 			Weapon.SpreadDegrees = 1.0f;
-			Weapon.HipSpreadDegrees = 8.0f;
+			Weapon.HipSpreadDegrees = 6.0f;
 			Weapon.BloomShots = 10;
 			SetKick(Weapon, 0.5f, 7.0f, 0.45f, 0.3f);
 			Weapon.AimZoom = 0.8f;
