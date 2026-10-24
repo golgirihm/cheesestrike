@@ -44,9 +44,17 @@ namespace CheeseStrikeRules
 		const TCHAR* Level;
 		const TCHAR* Picture;
 	};
-	/** The maps, the first picked to begin with when hosting from the front end. */
+	/** The maps, in the order the lobby offers them. */
 	extern const FMapChoice Maps[];
 	int32 NumMaps();
+	/** The map a lobby hosted from the front end begins with (HostOptions): Gruyère Grotto. */
+	int32 DefaultMap();
+	/**
+	 * The URL options a match hosted from the front end begins its lobby
+	 * with, before the host changes anything: Gruyère Grotto, Deathmatch to
+	 * 50 team kills, back 5 s after a death, seven bots of normal skill.
+	 */
+	FString HostOptions();
 	/** Which of Maps a level's package (or its path with the object name) is, or INDEX_NONE. */
 	int32 MapIndexFor(const FString& LevelPackage);
 	/** The map a URL's `?Map=` picks, or `Otherwise` if it picks none of Maps. */

@@ -6,6 +6,9 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
 #include "Misc/Paths.h"
+#include "MoviePlayer.h"
+#include "Widgets/SLeafWidget.h"
+#include <atomic>
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectGlobals.h"
 #include "Widgets/Images/SImage.h"
@@ -18,6 +21,7 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Sessions/CheeseStrikeSessionSubsystem.h"
 
 namespace
 {
@@ -26,8 +30,54 @@ namespace
 
 	const FSlateBrush* Tile()
 	{
-		static FSlateDynamicImageBrush Brush(FName(*(FPaths::ProjectContentDir() / TEXT("UI") / TEXT("lobby_tile.png"))), FVector2D(256.0, 256.0), FLinearColor::White, ESlateBrushTileType::Both);
+		static FSlateDynamicImageBrush Brush(FName(*(FPaths::ProjectContentDir() / TEXT("UI") / TEXT("lobby_tile.png"))), FVector2D(512.0, 512.0), FLinearColor::White, ESlateBrushTileType::Both);
 		return &Brush;
+	}
+
+	/** How many times the loading screen has been drawn, on its own thread, since it went up: for the log. */
+	std::atomic<int32> LoadingScreenFrames{0};
+
+	/** Draws nothing; counts the frames it is drawn in (LoadingScreenFrames). */
+	class SCheeseStrikeFrameCounter : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SCheeseStrikeFrameCounter) {}
+		SLATE_END_ARGS()
+		void Construct(const FArguments&) {}
+		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D::ZeroVector; }
+		virtual int32 OnPaint(const FPaintArgs&, const FGeometry&, const FSlateRect&, FSlateWindowElementList&, int32 LayerId, const FWidgetStyle&, bool) const override
+		{
+			++LoadingScreenFrames;
+			return LayerId;
+		}
+	};
+
+	/**
+	 * The cover's looks: the lobby's dark tile, a spinner and `Saying`. Made
+	 * of Slate alone, nothing of the game, so that the loading screen can draw
+	 * it on its own thread while the game's is busy loading a level.
+	 */
+	TSharedRef<SWidget> MakeCover(const TAttribute<FText>& Saying, bool bCountFrames = false)
+	{
+		return SNew(SOverlay)
+			+ SOverlay::Slot() [ bCountFrames ? StaticCastSharedRef<SWidget>(SNew(SCheeseStrikeFrameCounter)) : SNullWidget::NullWidget ]
+			+ SOverlay::Slot()
+			[
+				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.04f, 0.04f, 0.045f, 1.0f))
+			]
+			+ SOverlay::Slot() [ SNew(SImage).Image(Tile()) ]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(SCircularThrobber).Radius(12.0f).NumPieces(8).Period(1.0f).PieceImage(FCoreStyle::Get().GetBrush("Throbber.CircleChunk")).ColorAndOpacity(FLinearColor::White)
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14.0f, 0.0f, 0.0f, 0.0f))
+				[
+					SNew(STextBlock).Text(Saying).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
+				]
+			];
 	}
 }
 
@@ -35,13 +85,61 @@ void UCheeseStrikeCurtainSubsystem::Initialize(FSubsystemCollectionBase& Collect
 {
 	Super::Initialize(Collection);
 	LoadedHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UCheeseStrikeCurtainSubsystem::OnLevelLoaded);
+	LoadingHandle = FCoreUObjectDelegates::PreLoadMapWithContext.AddUObject(this, &UCheeseStrikeCurtainSubsystem::OnLevelLoading);
 }
 
 void UCheeseStrikeCurtainSubsystem::Deinitialize()
 {
 	FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(LoadedHandle);
+	FCoreUObjectDelegates::PreLoadMapWithContext.Remove(LoadingHandle);
 	Lift();
 	Super::Deinitialize();
+}
+
+FString UCheeseStrikeCurtainSubsystem::WhereTo(const FString& Level, const UWorld* From) const
+{
+	// Hosting or joining goes into the match's lobby, whatever level it waits on.
+	const UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+	if (Sessions != nullptr && Sessions->GetPending() != ESessionPending::None)
+	{
+		return TEXT("Going to the lobby");
+	}
+	// From a match the lobby sent everyone to, or one over, the level it goes to is its lobby: after the results, or the
+	// host's Back to Lobby.
+	const ACheeseStrikeGameState* Match = From != nullptr ? From->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	// (Not by the match's state: leaving any level, the lobby too, counts as the match's end.)
+	if (Match != nullptr && (Match->GetPlayersExpected() > 0 || !Match->GetWinnerName().IsEmpty()))
+	{
+		return TEXT("Back to the lobby");
+	}
+	const int32 MapIndex = CheeseStrikeRules::MapIndexFor(Level);
+	return MapIndex >= 0 ? FString::Printf(TEXT("Going to %s"), CheeseStrikeRules::Maps[MapIndex].Name) : FString(TEXT("Loading"));
+}
+
+void UCheeseStrikeCurtainSubsystem::OnLevelLoading(const FWorldContext& Context, const FString& Level)
+{
+	// Loading a level stops the game's thread, and with it the menu's spinner, for seconds (hosting, travelling): the engine's
+	// loading screen draws the cover on a thread of its own meanwhile, turning, until the level has loaded and the cover
+	// proper (OnLevelLoaded) goes up in its place. Not in the editor, which has no loading screen.
+	if (Context.OwningGameInstance != GetGameInstance())
+	{
+		return;
+	}
+	LoadingTo = WhereTo(Level, Context.World());
+	if (!IsMoviePlayerEnabled() || GetMoviePlayer() == nullptr)
+	{
+		return;
+	}
+	FLoadingScreenAttributes Screen;
+	Screen.bAutoCompleteWhenLoadingCompletes = true;
+	Screen.bMoviesAreSkippable = false;
+	Screen.bWaitForManualStop = false;
+	Screen.MinimumLoadingScreenDisplayTime = -1.0f;
+	Screen.WidgetLoadingScreen = MakeCover(FText::FromString(LoadingTo), true);
+	LoadingScreenFrames = 0;
+	LoadingSince = FPlatformTime::Seconds();
+	GetMoviePlayer()->SetupLoadingScreen(Screen);
+	UE_LOG(LogCheeseStrike, Display, TEXT("The loading screen is up: %s"), *LoadingTo);
 }
 
 void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
@@ -52,28 +150,16 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 		return;
 	}
 	Lift();
-	// Where to, if it is one of the game's maps; then, on a level the lobby sent everyone to, how many are ready.
-	const int32 MapIndex = CheeseStrikeRules::MapIndexFor(World->GetOutermost()->GetName());
-	const FString Where = MapIndex >= 0 ? FString::Printf(TEXT("Going to %s"), CheeseStrikeRules::Maps[MapIndex].Name) : FString(TEXT("Loading"));
+	if (!LoadingTo.IsEmpty() && LoadingSince > 0.0)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("The loading screen was drawn %d times over the %.1f s the level took to load"), LoadingScreenFrames.load(), FPlatformTime::Seconds() - LoadingSince);
+	}
+	// Where to (as the loading screen said it, if there was one), then, on a level the lobby sent everyone to, how many are ready.
+	const FString Where = !LoadingTo.IsEmpty() ? LoadingTo : WhereTo(World->GetOutermost()->GetName(), nullptr);
+	LoadingTo.Reset();
+	LoadingSince = 0.0;
 	TWeakObjectPtr<UWorld> Watched = World;
-	Curtain = SNew(SOverlay)
-		+ SOverlay::Slot()
-		[
-			SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.04f, 0.04f, 0.045f, 1.0f))
-		]
-		+ SOverlay::Slot() [ SNew(SImage).Image(Tile()) ]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-			[
-				SNew(SCircularThrobber).Radius(12.0f).NumPieces(8).Period(1.0f).PieceImage(FCoreStyle::Get().GetBrush("Throbber.CircleChunk")).ColorAndOpacity(FLinearColor::White)
-			]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14.0f, 0.0f, 0.0f, 0.0f))
-			[
-				SNew(STextBlock).Text_Lambda([Watched, Where]() { return FText::FromString(SayingFor(Watched.Get(), Where)); }).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
-			]
-		];
+	Curtain = MakeCover(TAttribute<FText>::CreateLambda([Watched, Where]() { return FText::FromString(SayingFor(Watched.Get(), Where)); }));
 	Viewport->AddViewportWidgetContent(Curtain.ToSharedRef(), CurtainOrder);
 	GoingTo = Where;
 	CoveredWorld = World;

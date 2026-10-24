@@ -1,0 +1,29 @@
+# The host of a lobby with a joiner (back_to_lobby_client.txt) and bots, for
+# looking at: the lobby and its Mozza Radicals, the match's HUD and
+# scoreboard, the host's pause menu and its question, then Back to Lobby,
+# which takes everyone back to it. Run with tools/play.ps1 -Lobby -Bots -ClientDelay 15
+# -Extra "?listen?Mode=Deathmatch?KillLimit=50?Map=2?Bots=7" and that client script.
+wait 75
+cmd r.SetRes 1600x900w
+wait 1
+shot btl_lobby_host
+cmd CheeseStrikeStart now
+wait 14
+shot btl_match_host
+hold Scoreboard
+wait 1
+shot btl_scoreboard_host
+release Scoreboard
+cmd CheeseStrikePage Pause
+wait 1
+shot btl_pause_host
+cmd CheeseStrikePage Pause Ask
+wait 1
+shot btl_pause_host_ask
+cmd CheeseStrikeBackToLobby
+wait 4
+shot btl_travelling_host
+wait 12
+shot btl_back_in_lobby_host
+wait 4
+quit

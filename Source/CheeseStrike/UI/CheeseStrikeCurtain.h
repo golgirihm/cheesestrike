@@ -8,9 +8,12 @@
 #include "CheeseStrikeCurtain.generated.h"
 
 class SWidget;
+struct FWorldContext;
 
 /**
- * The loading cover: when a level has loaded, a cover in the lobby's looks
+ * The loading cover: while a level loads (the game's thread busy, in the
+ * game but not the editor), the engine's loading screen shows it, its
+ * spinner turning; when a level has loaded, a cover in the lobby's looks
  * (its dark tile, a spinner, and where the player is going) stays over the
  * view until what the player sees is ready, a page of the menu or the match
  * through their character (ACheeseStrikePlayerController::IsViewReady), or
@@ -41,6 +44,10 @@ private:
 	/** What the cover over `World` says: how many are ready while its match waits for them, or else `Otherwise`. */
 	static FString SayingFor(const UWorld* World, const FString& Otherwise);
 	void OnLevelLoaded(UWorld* World);
+	/** A level begins to load: the engine's loading screen shows the cover, turning, on its own thread while it does. */
+	void OnLevelLoading(const FWorldContext& Context, const FString& Level);
+	/** What the cover says going to `Level` from the level `From`: the lobby when hosting or joining, back to the lobby from a match, the map's name, or "Loading". */
+	FString WhereTo(const FString& Level, const UWorld* From) const;
 	bool Watch(float DeltaSeconds);
 	void Lift();
 
@@ -48,6 +55,10 @@ private:
 	TWeakObjectPtr<UWorld> CoveredWorld;
 	FTSTicker::FDelegateHandle Ticker;
 	FDelegateHandle LoadedHandle;
+	FDelegateHandle LoadingHandle;
+	/** What the loading screen said, for the cover after it to say the same. */
+	FString LoadingTo;
+	double LoadingSince = 0.0;
 	double UpSince = 0.0;
 	/** Where the covered level is, as the cover says it. */
 	FString GoingTo;

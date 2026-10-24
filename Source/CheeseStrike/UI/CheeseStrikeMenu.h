@@ -29,16 +29,17 @@ enum class EMenuPage : uint8
 	Pause,
 	/** Who made what the game is made of (CheeseStrikeCredits). */
 	Credits,
-	/** The player's options (UCheeseStrikeSettings): from the front end, or from the pause menu during a match. */
+	/** The player's settings (UCheeseStrikeSettings), each kind on a tab (EOptionsTab): from the front end, or from the pause menu during a match. */
 	Options,
-	/** Every action's keys and buttons (CheeseStrikeControls): from the pause menu, or from the options. */
-	Controls,
 };
 
-/** The options page's tabs. */
+/** The settings page's tabs. */
 enum class EOptionsTab : uint8
 {
+	/** Every action's keys and buttons (CheeseStrikeControls), as a table. */
 	Controls,
+	/** The look's sensitivity, aiming's share of it, inverting it, and the gamepad's aim assist. */
+	Aiming,
 	View,
 	Sound,
 	Graphics,
@@ -205,6 +206,11 @@ public:
 	void FocusItem(const FString& Name);
 	/** Whether one of the lobby's dropdowns is open. */
 	bool HasDropdownOpen() const { return IsDropdownOpen(); }
+	/** The host's pause menu asks whether to end the match and take everyone back to the lobby (`bAsk`), or stops asking. */
+	void ConfirmBackToLobby(bool bAsk);
+	bool IsConfirmingBackToLobby() const { return bConfirmingBackToLobby; }
+	/** How many times the lobby has been built afresh: not when a rule changes, which its rows show as they are. */
+	int32 GetLobbyBuilds() const { return LobbyBuilds; }
 	/** Whether the lobby shows the host's match, ready to be played in: not joining it, nor on the way to another level. */
 	bool IsLobbyReady() const;
 	/** The room the lobby needs, laid out in full with its margins: in less (a small window), it is shrunk to fit, never clipped. */
@@ -222,10 +228,12 @@ private:
 	TSharedRef<SWidget> MakeLobbyRules();
 	TSharedRef<SWidget> MakePause();
 	TSharedRef<SWidget> MakeCredits();
-	/** The options: a tab for each kind (EOptionsTab), each setting on a row, applied as it changes and kept. */
+	/** The settings: a tab for each kind (EOptionsTab), each setting on a row, applied as it changes and kept. */
 	TSharedRef<SWidget> MakeOptions();
-	/** The controls: a row an action, its keys on the keyboard and mouse, and its buttons on an Xbox and a Nintendo pad (CheeseStrikeControls::Rows). */
+	/** The settings' Controls tab: a row an action, its keys on the keyboard and mouse, and its buttons on an Xbox and a Nintendo pad (CheeseStrikeControls::Rows). */
 	TSharedRef<SWidget> MakeControls();
+	/** A row of the controls' table, or its heading. */
+	TSharedRef<SWidget> ControlsRow(const FString& Action, const FString& Keys, const FString& Xbox, const FString& Nintendo, bool bHeading) const;
 	TSharedRef<SWidget> MakeOptionsTab();
 	/** A row of the options: its name on the left, then what sets it. */
 	TSharedRef<SWidget> MakeOptionRow(const FString& Label, TSharedRef<SWidget> Setter);
@@ -236,19 +244,21 @@ private:
 	/** A spinner, turning once a second. */
 	TSharedRef<SWidget> MakeSpinner(float Radius = 10.0f) const;
 	TSharedRef<SWidget> MakeTitle(const FString& Text);
-	TSharedRef<SWidget> MakeLine(const FString& Text, bool bDim = false);
+	/** A line of text, wrapped at the width it was last given unless `bWrap` is off (in the lobby, which a frame of unwrapped words would shrink). */
+	TSharedRef<SWidget> MakeLine(const FString& Text, bool bDim = false, bool bWrap = true);
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain, TSharedPtr<SWidget> Inside = nullptr);
 	/**
-	 * A dropdown: the chosen one of `Choices` on a button that opens the
+	 * A dropdown: the chosen one of `Choices` (`GetChosen`, read as it is
+	 * drawn and as its list opens) on a button that opens the
 	 * list of them (each with its picture from `Pictures`, if any), the
 	 * chosen one lit, `Pick` called with the one clicked. With `bCanPick`
 	 * off (a joiner's lobby), only the chosen one, on nothing to press.
 	 * Kept in Dropdowns, so that the lobby isn't drawn again while one is
 	 * open.
 	 */
-	TSharedRef<SWidget> MakeDropdown(const TArray<FString>& Choices, int32 Chosen, bool bCanPick, TFunction<void(int32)> Pick, TArray<const FSlateBrush*> Pictures = {});
+	TSharedRef<SWidget> MakeDropdown(const TArray<FString>& Choices, TFunction<int32()> GetChosen, bool bCanPick, TFunction<void(int32)> Pick, TArray<const FSlateBrush*> Pictures = {});
 	/** A rule's value with nothing to press, as a joiner sees what the host chose. */
-	TSharedRef<SWidget> MakeReadOnly(const FString& Value);
+	TSharedRef<SWidget> MakeReadOnly(TAttribute<FText> Value);
 	/** A row of the lobby's rules: its name on the left, then what sets it. */
 	TSharedRef<SWidget> MakeRuleRow(const FString& Label, TSharedRef<SWidget> Setter);
 	/** Whether one of the lobby's dropdowns is open. */
@@ -275,9 +285,9 @@ private:
 	TSharedRef<SWidget> MakeFarewell();
 	/** A number with a button either side to make it less or more; with `bCanPick` off, the buttons can't be pressed. */
 	TSharedRef<SWidget> MakeStepper(const FString& Label, const FString& Value, bool bCanPick, TFunction<void()> Less, TFunction<void()> More);
-	/** The picture of map `MapIndex` (CheeseStrikeRules::Maps), its name across the bottom. */
-	TSharedRef<SWidget> MakeMapPicture(int32 MapIndex);
-	/** Everything the lobby shows but the seconds, as text: when it changes, the lobby is drawn again. */
+	/** The picture of the map `GetMap` says (CheeseStrikeRules::Maps), its name across the bottom, as it is now. */
+	TSharedRef<SWidget> MakeMapPicture(TFunction<int32()> GetMap);
+	/** What the lobby is made of, as text (not the seconds, nor the rules' values, which its rows show as they are): when it changes, the lobby is drawn again. */
 	FString LobbyKey() const;
 	/** The same for the other pages: the page, and on the Find page what was found. */
 	FString PageKey() const;
@@ -338,4 +348,7 @@ private:
 	/** The blur over the game behind the pause menu. */
 	TSharedPtr<SWidget> Blur;
 	FString ShownPageKey;
+	/** Whether the host's pause menu is asking to confirm Back to Lobby. */
+	bool bConfirmingBackToLobby = false;
+	int32 LobbyBuilds = 0;
 };

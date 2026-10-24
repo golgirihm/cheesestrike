@@ -55,6 +55,8 @@ public:
 	 * until the match starts.
 	 */
 	EMenuPage GetMenuPage() const { return ShownPage; }
+	/** The menu as this player sees it, for the tests. */
+	TSharedPtr<SCheeseStrikeMenu> GetMenu() const { return Menu; }
 	/** Whether this player has been told to follow the server to another level (and is waiting to): the lobby says where to. */
 	bool IsLeaving() const { return bLeaving; }
 	/** The map (CheeseStrikeRules::Maps) this player was told to follow the server to, or INDEX_NONE. */
@@ -111,11 +113,11 @@ public:
 	UFUNCTION(Exec)
 	void CheeseStrikePodiumBodies(int32 First = -2, int32 Second = -1, int32 Third = -1);
 	void SetPodiumBodies(TArray<int32> Bodies) { PodiumBodies = MoveTemp(Bodies); }
-	/** Picks a page of the front end (main, find, credits, options, controls), or the options or the controls from the pause menu. */
+	/** Picks a page of the front end (main, find, credits, settings), or the settings from the pause menu. */
 	void ChooseMenu(EMenuPage Page);
-	/** Back from a page to the one it came from: the front end's main page, the pause menu, or the options (from the controls). */
+	/** Back from a page to the one it came from: the front end's main page, or the pause menu. */
 	void BackFromMenu();
-	/** Hosts a match with the usual rules on the first map, through the online service, or the local network without Steam: straight into its lobby. */
+	/** Hosts a match with the lobby's usual rules (CheeseStrikeRules::HostOptions), through the online service, or the local network without Steam: straight into its lobby. */
 	void HostFromMenu();
 	/** The host sets the match's rules and map from the lobby (INDEX_NONE keeps the map); everyone in it sees them. */
 	void SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map = INDEX_NONE);
@@ -146,6 +148,13 @@ public:
 	void CancelStartFromMenu();
 	/** Leaves the match, or the lobby, back to the level alone and the front end. */
 	void LeaveFromMenu();
+	/** Whether this player's pause menu offers Back to Lobby rather than Leave the Match: the host of a match others can join, while it is played. */
+	bool CanGoBackToLobby() const;
+	/** The host ends the match and takes everyone, joiners and bots, back to its lobby, the group kept (ACheeseStrikeGameMode::BackToLobbyMidMatch). */
+	void BackToLobbyFromMenu();
+	/** The console's way to it, for play scripts: `CheeseStrikeBackToLobby`. */
+	UFUNCTION(Exec)
+	void CheeseStrikeBackToLobby();
 	void QuitFromMenu();
 	/** Opens or closes the pause menu during a match: while it is open, the character takes no input. */
 	void TogglePause();
@@ -159,7 +168,7 @@ public:
 	/** From the console or a play script: the host calls off the countdown. */
 	UFUNCTION(Exec)
 	void CheeseStrikeCancel();
-	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits, Options or Controls, which also open from the pause menu), and of the options the tab named (Controls, View, Sound or Graphics). */
+	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits or Settings, which also opens from the pause menu), and of the settings the tab named (Controls, Aiming, View, Sound or Graphics); or, in a match, the pause menu (Pause), with Ask the host's question whether to go back to the lobby. */
 	UFUNCTION(Exec)
 	void CheeseStrikePage(const FString& Page, const FString& Tab = TEXT(""));
 	/** From the console or a play script: opens the lobby's nth dropdown (0 the map, then the mode and on down), for looking at it; -1 shuts it. */
@@ -245,8 +254,6 @@ protected:
 	TSharedPtr<SCheeseStrikeMenu> Menu;
 	EMenuPage ShownPage = EMenuPage::None;
 	EMenuPage ChosenPage = EMenuPage::Main;
-	/** The page the controls were opened from, to go back to. */
-	EMenuPage ControlsFrom = EMenuPage::Main;
 	bool bPaused = false;
 	bool bLeaving = false;
 	int32 LeavingFor = INDEX_NONE;

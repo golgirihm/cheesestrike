@@ -14,7 +14,7 @@
 namespace
 {
 	const CheeseStrikeAimAssist::FTuning AimAssistDefaults;
-	TAutoConsoleVariable<int32> CVarAimAssist(TEXT("CheeseStrike.AimAssist"), 1, TEXT("The look stick's aim assist: on (1) or off (0). The options can turn it off too."));
+	TAutoConsoleVariable<int32> CVarAimAssist(TEXT("CheeseStrike.AimAssist"), 1, TEXT("The look stick's aim assist: on (1) or off (0). The settings can turn it off too."));
 	TAutoConsoleVariable<float> CVarAimAssistRange(TEXT("CheeseStrike.AimAssist.Range"), AimAssistDefaults.Range, TEXT("How far off an enemy the aim assist helps, in cm."));
 	TAutoConsoleVariable<float> CVarAimAssistRadius(TEXT("CheeseStrike.AimAssist.Radius"), AimAssistDefaults.Radius, TEXT("How far either side of an enemy's middle the crosshair gets the whole of the aim assist, in cm."));
 	TAutoConsoleVariable<float> CVarAimAssistFalloff(TEXT("CheeseStrike.AimAssist.Falloff"), AimAssistDefaults.Falloff, TEXT("Out to how many times that radius the aim assist fades to nothing."));

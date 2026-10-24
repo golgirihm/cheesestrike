@@ -1,0 +1,15 @@
+# Joins the host of back_to_lobby_server.txt: the joiner's lobby, its pause
+# menu in the match (Leave the Match, not Back to Lobby), then the lobby it is
+# taken back to.
+cmd r.SetRes 1600x900w
+wait 4
+shot btl_lobby_joiner
+wait 64
+tap Menu
+wait 1
+shot btl_pause_joiner
+tap Menu
+wait 16
+shot btl_back_in_lobby_joiner
+wait 8
+quit

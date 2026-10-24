@@ -232,11 +232,14 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	}
 	const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(nullptr);
 	Menu->Show(EMenuPage::Main);
-	TestEqual(TEXT("the front end's items"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("FIND A MATCH"), TEXT("OPTIONS"), TEXT("CREDITS"), TEXT("QUIT")}));
+	TestEqual(TEXT("the front end's items"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("QUIT")}));
 	TestEqual(TEXT("the first has the focus"), Menu->GetFocusName(), FString(TEXT("HOST A MATCH")));
-	Menu->FocusItem(TEXT("OPTIONS"));
+	Menu->FocusItem(TEXT("SETTINGS"));
 	Menu->Show(EMenuPage::Options);
-	TestEqual(TEXT("the options' first item is their first tab"), Menu->GetFocusName(), FString(TEXT("CONTROLS")));
+	TestEqual(TEXT("the settings' first item is their first tab"), Menu->GetFocusName(), FString(TEXT("CONTROLS")));
+	TestEqual(TEXT("the controls' tab has nothing to focus but the tabs and Back"), Menu->GetFocusableNames(), TArray<FString>({TEXT("CONTROLS"), TEXT("AIMING"), TEXT("VIEW"), TEXT("SOUND"), TEXT("GRAPHICS"), TEXT("BACK")}));
+	Menu->SetOptionsTab(EOptionsTab::Aiming);
+	Menu->Refresh();
 	const TArray<FString> Options = Menu->GetFocusableNames();
 	TestTrue(TEXT("the sliders, the choices and Back can all take it"), Options.Contains(TEXT("Slider")) && Options.Contains(TEXT("Slider #2")) && Options.Contains(TEXT("ON #2")) && Options.Last() == TEXT("BACK"));
 	// Picking the aim assist's choice draws the page again: the focus stays on the choice.
@@ -249,7 +252,7 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	Menu->Refresh();
 	// Back on the front end, the focus is where it was left.
 	Menu->Show(EMenuPage::Main);
-	TestEqual(TEXT("back on the front end, on Options again"), Menu->GetFocusName(), FString(TEXT("OPTIONS")));
+	TestEqual(TEXT("back on the front end, on Settings again"), Menu->GetFocusName(), FString(TEXT("SETTINGS")));
 	Menu->Show(EMenuPage::Credits);
 	TestEqual(TEXT("the credits' Back"), Menu->GetFocusName(), FString(TEXT("BACK")));
 	return true;
