@@ -27,6 +27,10 @@ enum class EMouseDoing : uint8
 	Fleeing,
 	/** Fallen below the map's kill height (into The Fondue Floor's fondue): gone a while, then back over the edge. */
 	Sinking,
+	/** The cheese all eaten: scurrying off to a way out. */
+	Leaving,
+	/** Going back over the edge of the map, and gone. */
+	Exiting,
 };
 
 /**
@@ -60,6 +64,10 @@ public:
 	float NextBite() const;
 
 	EMouseDoing GetDoing() const { return Doing; }
+	/** Whether it is leaving the map, the cheese all eaten (CheeseStrikeMice::ShouldLeave). */
+	bool IsLeaving() const { return Doing == EMouseDoing::Leaving || Doing == EMouseDoing::Exiting; }
+	/** Server only: with no cheese left, it sets off for the way out it can walk to soonest (or, with none, leaps for the nearest). */
+	void Leave();
 	ACheeseStrikeCheese* GetTarget() const { return Target.Get(); }
 	float GetFear() const { return Fear; }
 	/** How many blocks it has finished. */
@@ -206,6 +214,15 @@ protected:
 	float LastBiteAt = 0.0f;
 	float NextStrandedCheck = 0.0f;
 	int32 Leaps = 0;
+	/** Leaving: the top of the way out it goes for, the ground inside it, which way is out from there, when it set off, and where it went over the edge from and for how long. */
+	FVector ExitTop = FVector::ZeroVector;
+	FVector ExitGround = FVector::ZeroVector;
+	FVector ExitOutward = FVector::ZeroVector;
+	float LeftAt = 0.0f;
+	FVector ExitFrom = FVector::ZeroVector;
+	float ExitingFor = 0.0f;
+	/** Server only: over the edge from where it is, to ExitTop. */
+	void GoOverTheEdge();
 	/** When the mice came, and the edible cheese's health then (0: no schedule). */
 	float ScheduleFrom = 0.0f;
 	float ScheduleHealth = 0.0f;

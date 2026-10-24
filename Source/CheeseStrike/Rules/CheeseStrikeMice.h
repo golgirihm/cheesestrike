@@ -14,9 +14,16 @@
  */
 namespace CheeseStrikeMice
 {
-	/** Seconds into a match the mice come, and the seconds before that a red countdown shows (the whole wait: "VERMIN INVASION IN 0:59"). */
+	/**
+	 * Seconds into a match the mice come, and the seconds before that a red
+	 * countdown shows: nothing for the first half minute, then "VERMIN
+	 * INVASION IN 0:30" counting down (the user's, 24 Oct 2026; it showed
+	 * the whole minute before).
+	 */
 	constexpr float ArriveAfter = 60.0f;
-	constexpr float Warning = 60.0f;
+	constexpr float Warning = 30.0f;
+	/** Seconds into a match the countdown shows, for the mice coming `Arrival` seconds in: at once if that is no more than Warning. */
+	float CountdownFrom(float Arrival);
 	/** One mouse for every BlocksPerMouse blocks of cheese, from MinMice to MaxMice; none on a map without cheese. */
 	constexpr int32 BlocksPerMouse = 25;
 	constexpr int32 MinMice = 3;
@@ -115,6 +122,31 @@ namespace CheeseStrikeMice
 
 	/** Seconds a mouse takes to come over the edge of the map, from the top of its wall to the ground. */
 	constexpr float EnterTime = 1.8f;
+
+	/**
+	 * Once no edible cheese is left on the map, the mice leave (the user's,
+	 * 24 Oct 2026): each scurries at LeaveSpeed to the way in it can walk to
+	 * soonest, climbs up onto the wall in ClimbOutTime and drops out of sight
+	 * behind it in DropOutTime, then is gone. One that finds no way out
+	 * within LeaveWithin seconds leaps for the nearest way out from where it
+	 * is.
+	 */
+	constexpr float LeaveSpeed = 450.0f;
+	constexpr float ClimbOutTime = 1.8f;
+	constexpr float DropOutTime = 0.9f;
+	constexpr float LeaveWithin = 25.0f;
+	/** How far past the wall's top, outward, and below it a mouse drops out of sight (cm). */
+	constexpr float DropOutward = 450.0f;
+	constexpr float DropBelow = 700.0f;
+	/** Whether the mice leave, with `EdibleLeft` blocks of cheese on the map they may eat. */
+	bool ShouldLeave(int32 EdibleLeft);
+	/**
+	 * Where a leaving mouse's feet are `Seconds` after it set off over the
+	 * edge from `From` (its feet, inside), to the wall's top at `Top`, then
+	 * out along `Outward` (flat, away from the map) and down out of sight;
+	 * unset once it is gone.
+	 */
+	TOptional<FVector> OverTheEdge(const FVector& From, const FVector& Top, const FVector& Outward, float Seconds);
 
 	/**
 	 * Whether a mouse may go for a block: one still there and not falling, and
