@@ -2,7 +2,7 @@
 
 // Tests that play the Dual Burratas in the editor (see PlayTesting.h): a gun
 // in each hand, on both bodies, side by side and pointing the same way, the
-// two firing in turn; and no sights to aim down.
+// two firing in turn, a shot a pull; and no sights to aim down.
 
 #include "Misc/AutomationTest.h"
 #include "Components/StaticMeshComponent.h"
@@ -75,11 +75,19 @@ bool FTheDualBurrataHoldsAGunInEachHand::RunTest(const FString& Parameters)
 	{
 		TestFalse(TEXT("two guns aren't aimed down one's sights"), Character(0)->GetWeapon()->IsAimed() || Character(0)->GetAimFraction() > 0.01f);
 	});
-	Play(0, TEXT("hold Fire\nwait 0.5\nrelease Fire\nrelease Aim"));
+	// A shot a pull: held, the trigger fires once; pulled again and again, once each time.
+	Play(0, TEXT("hold Fire\nwait 0.6\nrelease Fire\nrelease Aim\nwait 0.2"));
 	Then([this]()
 	{
 		const ACheeseStrikeWeapon* Weapon = Character(0)->GetWeapon();
-		TestTrue(FString::Printf(TEXT("they fire (%d shots)"), Weapon->ShotsFired - ShotsBefore), Weapon->ShotsFired - ShotsBefore >= 3);
+		TestEqual(TEXT("held down, they fire one shot: not automatic"), Weapon->ShotsFired - ShotsBefore, 1);
+		ShotsBefore = Weapon->ShotsFired;
+	});
+	Play(0, TEXT("tap Fire\nwait 0.18\ntap Fire\nwait 0.18\ntap Fire\nwait 0.18\ntap Fire\nwait 0.3"));
+	Then([this]()
+	{
+		const ACheeseStrikeWeapon* Weapon = Character(0)->GetWeapon();
+		TestEqual(TEXT("four pulls, four shots"), Weapon->ShotsFired - ShotsBefore, 4);
 	});
 	StopPlaying();
 	return true;

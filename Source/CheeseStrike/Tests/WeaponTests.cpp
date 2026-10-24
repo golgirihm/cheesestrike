@@ -36,7 +36,7 @@ bool FEveryWeaponKillsInTheDesignsTime::RunTest(const FString& Parameters)
 	// The design's TTK column (docs/unreal/design.md, "Weapons"): body shots, close, holding the trigger. The Colby
 	// Carbine, the spawn primary, is softened from it: three bursts to a kill.
 	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 9, 0.52f},
-		FWanted{Munster(), 7, 0.51f}, FWanted{Shotgun(), 2, 0.85f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}, FWanted{Burratas(), 7, 0.54f}})
+		FWanted{Munster(), 7, 0.51f}, FWanted{Shotgun(), 2, 0.85f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}, FWanted{Burratas(), 7, 0.6f}})
 	{
 		const FString Name = Wanted.Weapon.DisplayName.ToString();
 		TestEqual(FString::Printf(TEXT("%s kills in %d"), *Name, Wanted.Shots), ShotsToKill(Wanted.Weapon), Wanted.Shots);
@@ -286,7 +286,11 @@ bool FTheDualBurratasFireInTurn::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the right gun's kick goes right"), RecoilFor(Dual, 4, false).X > 0.0f);
 	TestTrue(TEXT("the left gun's left"), RecoilFor(Dual, 5, false).X < 0.0f);
 	TestTrue(TEXT("and both climb"), RecoilFor(Dual, 5, false).Y > RecoilFor(Dual, 4, false).Y);
-	// Fast, a long magazine, a long reload, middling damage.
+	// A shot a pull (as Counter-Strike's are), no more than ten a second however fast the pulls; a long magazine, a long
+	// reload, middling damage.
+	TestFalse(TEXT("not automatic: a shot a pull"), Dual.bAutomatic);
+	TestEqual(TEXT("one shot to a pull, no burst"), Dual.Burst, 1);
+	TestTrue(FString::Printf(TEXT("pulled as fast as can be, %.0f a second"), ShotsPerSecond(Dual)), ShotsPerSecond(Dual) <= 10.0f + KINDA_SMALL_NUMBER && ShotsPerSecond(Dual) >= 8.0f);
 	TestTrue(TEXT("faster than the Cheddar Blaster"), ShotsPerSecond(Dual) > ShotsPerSecond(Blaster()));
 	TestEqual(TEXT("thirty rounds"), Dual.MagazineSize, 30);
 	TestTrue(TEXT("a longer magazine than the Cheddar Blaster's"), Dual.MagazineSize > Blaster().MagazineSize);

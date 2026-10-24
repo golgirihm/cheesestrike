@@ -23,7 +23,7 @@ namespace CheeseStrikeWeapons
 	const FWeaponStats& Munster();
 	/** The Swiss Shotgun: nine pellets a shot. */
 	const FWeaponStats& Shotgun();
-	/** The Dual Burratas: two cheese pistols, one in each hand, firing in turn, fast; a long magazine and a long reload. */
+	/** The Dual Burratas: two cheese pistols, one in each hand, firing in turn, a shot a pull, fast; a long magazine and a long reload. */
 	const FWeaponStats& Burratas();
 	/** The Roquefort Rifle: a scoped rifle, a head shot a kill. */
 	const FWeaponStats& Roquefort();
