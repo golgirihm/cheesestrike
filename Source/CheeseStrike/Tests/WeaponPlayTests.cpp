@@ -278,7 +278,7 @@ bool FWeaponsWorkOverTheNetwork::RunTest(const FString& Parameters)
 		TestEqual(TEXT("and can't draw another"), HeldId(CharacterOf(1, 0)), CheeseStrikeWeapons::Pistol().Id);
 		if (ACheeseStrikeCharacter* OnServer = CharacterOf(1, 0))
 		{
-			OnServer->GetInventory()->GiveOnly(CheeseStrikeArsenal::GunGameWeapon(5));
+			OnServer->GetInventory()->GiveOnly(CheeseStrikeWeapons::Roquefort().Id);
 		}
 	});
 	Wait(0.5f);

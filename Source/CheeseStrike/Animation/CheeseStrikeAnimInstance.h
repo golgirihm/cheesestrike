@@ -12,6 +12,7 @@
 #include "AnimNodes/AnimNode_LayeredBoneBlend.h"
 #include "CheeseStrikeArmsPose.h"
 #include "CheeseStrikeDownedPose.h"
+#include "CheeseStrikeDualHold.h"
 #include "CheeseStrikeExecutionPose.h"
 #include "CheeseStrikeGripIK.h"
 #include "AnimNodes/AnimNode_MultiWayBlend.h"
@@ -212,6 +213,9 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	/** How the weapon in hand is held, the set it plays now, and where the left hand closes round it (cm, in the anchor's space), if it does. */
 	ECheeseStrikeHold Hold = ECheeseStrikeHold::Rifle;
 	ECheeseStrikeHold LinkedHold = ECheeseStrikeHold::Rifle;
+	/** Whether the weapon in hand is two guns, one in each hand (FCheeseStrikeDualHold), and how far it is held so. */
+	bool bDual = false;
+	float DualBlend = 0.0f;
 	bool bLeftHandHolds = false;
 	FVector LeftHandHold = FVector::ZeroVector;
 	float GuardBlend = 0.0f;
@@ -301,6 +305,8 @@ protected:
 	FCheeseStrikeSlidePose SlidePose;
 	FCheeseStrikeKnifeHold KnifeHold;
 	FCheeseStrikeViewHold ViewHold;
+	/** Two guns: the hands apart, the left the mirror of the right. */
+	FCheeseStrikeDualHold DualHold;
 	FCheeseStrikeGripIK LeftHand;
 	/** Down in Execution's last stand: on their back, propped on the elbow, the pistol out. */
 	FCheeseStrikeDownedPose Downed;
@@ -385,6 +391,8 @@ public:
 	bool bLastYawKnown = false;
 	/** How the weapon in hand is held, and where the left hand closes round it, in the anchor bone's space (cm), if it does. */
 	ECheeseStrikeHold Hold = ECheeseStrikeHold::Rifle;
+	/** Whether the weapon in hand is two guns, one in each hand. */
+	bool bDual = false;
 	bool bLeftHandHolds = false;
 	FVector LeftHandHold = FVector::ZeroVector;
 	/** The weapon's model in this body's hand bone's space, and which way its business end points in its own space. */

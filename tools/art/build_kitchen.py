@@ -699,8 +699,10 @@ def hills():
 def pickups():
     """The weapons' stands (kit.pickup), clear of the hills (the crumbs, the drawers, the table's top): the Roquefort in
     the sink, in the middle of the worktop; a Munster in each half of the hollow through the wedge; a Cheddar Blaster
-    on the worktop at the top of each side's cookbooks and a Swiss Shotgun in each side's cupboard."""
+    on the worktop at the top of each side's cookbooks and a Swiss Shotgun in each side's cupboard; the Dual Burratas
+    on the floor under the table, between its legs."""
     kit.pickup("roquefort", 0, (SINK_Y[0] + SINK_Y[1]) / 2.0, 390, "Sink")
+    kit.pickup("burratas", 0, -1700, 0, "UnderTheTable")
     for s, side in ((-1, "West"), (1, "East")):
         kit.pickup("munster", s * 400, (HOLLOW[0] + HOLLOW[1]) / 2.0, 0, f"Hollow{side}")
         kit.pickup("blaster", s * 2190, 2025, TOP, f"Worktop{side}")

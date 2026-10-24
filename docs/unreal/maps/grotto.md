@@ -34,7 +34,7 @@ Free-for-all has fourteen more starts (tagged "Free"), seven a side through ever
 
 The rock stops the lines that matter whatever the mice eat (`CheeseStrike.Play.TheGrottoHoldsTogether`): no start sees an enemy start; the Spine stops the floor's middle line and the line between the hollows' openings; the Curtain stops the line along the galleries; the buttress and the fin stop the one along the south walk.
 
-The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), on rock and floor the mice never eat and clear of the hills (the Pulpit's middle, the landing, the pools): the Roquefort Rifle in the Spine's arch, between the two bridges; a Munster Machine Gun at each end of the Pulpit; a Cheddar Blaster on each gallery walk at the top of its stairs from the Pulpit; and a Swiss Shotgun in each Cheese Store. Seven in all, mirrored like the map.
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), on rock and floor the mice never eat and clear of the hills (the Pulpit's middle, the landing, the pools): the Roquefort Rifle in the Spine's arch, between the two bridges; a Munster Machine Gun at each end of the Pulpit; a Cheddar Blaster on each gallery walk at the top of its stairs from the Pulpit; a Swiss Shotgun in each Cheese Store; and the Dual Burratas in the Rind Tunnel's middle, behind the landing. Eight in all, mirrored like the map (the Burratas on its middle line).
 
 ## The cheese, and what the mice change
 

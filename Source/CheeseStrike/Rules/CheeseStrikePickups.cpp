@@ -71,8 +71,8 @@ namespace CheeseStrikePickups
 		{
 			return 0;
 		}
-		// Made for one range: close, for the Grater and the Shotgun.
-		if (Stats->Id == W::Grater().Id || Stats->Id == W::Shotgun().Id)
+		// Made for one range: close, for the Grater, the Shotgun and the Dual Burratas.
+		if (Stats->Id == W::Grater().Id || Stats->Id == W::Shotgun().Id || Stats->Id == W::Burratas().Id)
 		{
 			return 1;
 		}

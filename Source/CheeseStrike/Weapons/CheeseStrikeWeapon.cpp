@@ -876,8 +876,8 @@ void ACheeseStrikeWeapon::StopFiring()
 
 void ACheeseStrikeWeapon::StartAiming()
 {
-	// A knife has no sights.
-	bAimed = !Stats->IsMelee();
+	// A knife has no sights, and two guns aren't aimed down one's (as Counter-Strike's Dual Berettas aren't).
+	bAimed = !Stats->IsMelee() && !Stats->bDual;
 }
 
 void ACheeseStrikeWeapon::StopAiming()

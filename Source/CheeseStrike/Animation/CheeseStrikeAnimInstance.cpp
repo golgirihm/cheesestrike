@@ -241,6 +241,7 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		bLastYawKnown = true;
 		Hold = Weapon != nullptr ? Weapon->GetHold() : ECheeseStrikeHold::Rifle;
 		bLeftHandHolds = Weapon != nullptr && Weapon->LeftHandHoldFor(GetSkelMeshComponent(), LeftHandHold);
+		bDual = Weapon != nullptr && Weapon->GetStats().bDual && !bDowned;
 		// The weapon's model as this body holds it, and the knife's swipe.
 		const UPrimitiveComponent* Model = Weapon != nullptr ? Weapon->GetModel(bFirstPersonBody) : nullptr;
 		ModelInHand = Model != nullptr ? Model->GetRelativeTransform() : FTransform::Identity;
@@ -390,7 +391,9 @@ void FCheeseStrikeAnimProxy::Link(FName GripAnchor)
 	LeftHand.IKBone = FBoneReference(FName(TEXT("hand_l")));
 	LeftHand.AnchorBone = FBoneReference(GripAnchor);
 	LeftHand.Alpha = 1.0f;
-	LeftHand.ComponentPose.SetLinkNode(&ViewHold);
+	// Two guns, one in each hand: the hands apart, the left the mirror of the right.
+	DualHold.ComponentPose.SetLinkNode(&ViewHold);
+	LeftHand.ComponentPose.SetLinkNode(&DualHold);
 	// Last, down: on the back, propped on the left elbow, the pistol out.
 	Downed.ComponentPose.SetLinkNode(&LeftHand);
 	Executing.ComponentPose.SetLinkNode(&Downed);
@@ -467,6 +470,7 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		ExecutionShoulder = Instance->ExecutionShoulder;
 		ExecutionSide = Instance->ExecutionSide;
 		bLeftHandHolds = Instance->bLeftHandHolds;
+		bDual = Instance->bDual;
 		LeftHandHold = Instance->LeftHandHold;
 		ModelInHand = Instance->ModelInHand;
 		ModelAlong = Instance->ModelAlong;
@@ -538,6 +542,12 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	LeftHand.Alpha = SourceWeight * (1.0f - GuardBlend) * TwoHandBlend;
 	LeftHand.bHasHold = bLeftHandHolds;
 	LeftHand.Hold = LeftHandHold;
+	// Two guns: held apart and mirrored, except while a montage (a reload) has the hands.
+	DualBlend = FMath::FInterpTo(DualBlend, bDual ? 1.0f : 0.0f, DeltaSeconds, BlendRate);
+	DualHold.Alpha = DualBlend * SourceWeight;
+	DualHold.Spread = bFirstPersonBody ? CheeseStrikeDual::ViewSpread : CheeseStrikeDual::Spread;
+	DualHold.Forward = BodyForward;
+	DualHold.Origin = BodyOrigin;
 
 	// Down, the legs push in turn as the body scoots along or round (a push a stride, the phase running on as it goes
 	// toward the head, back as it goes toward the feet); the breath comes hard, all the while (so that it doesn't start

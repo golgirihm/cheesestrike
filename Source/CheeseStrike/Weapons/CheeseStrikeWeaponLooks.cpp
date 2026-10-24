@@ -181,6 +181,8 @@ namespace
 			Look.Materials[3] = Material(TEXT("MI_BurratasSteel"));
 			Look.Sight = FVector(0.0f, -35.0f, 7.2f);
 			Look.Muzzle = FVector(0.0f, 15.6f, 4.0f);
+			// Each hand holds its own: the left hand isn't on the first gun (FCheeseStrikeDualHold places it).
+			Look.LeftHand.Reset();
 			Look.ShotVolume = 0.8f;
 			Look.ShotPitch = 1.06f;
 			Looks.Add(Look);
