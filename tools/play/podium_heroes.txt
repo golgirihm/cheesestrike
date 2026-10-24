@@ -1,0 +1,35 @@
+# Every hero on every place of the podium, and the end of it: play with bots (-Bots) a while, end the match, look at
+# the podium with its own heroes and then each hero on each place (CheeseStrikePodiumBodies), then the last moments
+# before the lobby, the frame held on the way, and the lobby coming under it.
+wait 20
+cmd CheeseStrikeEndMatch
+wait 4.5
+shot podium_own
+cmd CheeseStrikePodiumBodies 0 1 2
+wait 1.5
+shot podium_heroes_012
+cmd CheeseStrikePodiumBodies 3 0 1
+wait 1.5
+shot podium_heroes_301
+cmd CheeseStrikePodiumBodies 2 3 0
+wait 1.5
+shot podium_heroes_230
+cmd CheeseStrikePodiumBodies 1 2 3
+wait 1.5
+shot podium_heroes_123
+cmd CheeseStrikePodiumBodies
+wait 4.3
+shot podium_end_1
+wait 0.5
+shot podium_end_2
+wait 0.4
+shot podium_end_3
+wait 0.3
+shot podium_end_4
+wait 0.5
+shot podium_end_5
+wait 1
+shot podium_end_6
+wait 2
+shot podium_end_lobby
+quit

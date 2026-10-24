@@ -16,10 +16,7 @@ class USkeletalMeshComponent;
 class USpotLightComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
-class UCanvas;
-class USceneCaptureComponent2D;
 class UTexture2D;
-class UTextureRenderTarget2D;
 
 /** One who stands on the podium, as every machine works it out from the replicated player states. */
 struct FPodiumPlace
@@ -72,16 +69,8 @@ public:
 	/** Whether place `Place`'s hero is playing its emote. */
 	bool IsEmoting(int32 Place) const;
 
-	/**
-	 * The picture held on the way back to the lobby (UCheeseStrikePostGameSubsystem::Hold): the stage seen by its
-	 * camera, `Size` big, into a render target made in `Outer` (which keeps it once the level is gone), taken every
-	 * frame from StartPicture until FinishPicture, which draws `DrawWords` (the HUD's words over the stage) on the last.
-	 * The view's own pixels aren't to be had in every game (a viewport drawn straight to the screen, or offscreen).
-	 */
-	void StartPicture(UObject* Outer, const FIntPoint& Size);
-	UTextureRenderTarget2D* FinishPicture(TFunctionRef<void(UCanvas*, const FIntPoint&)> DrawWords);
-	/** Where `World` is in a picture `Size` big by the stage's camera; false if behind it. */
-	bool ProjectInPicture(const FVector& World, const FIntPoint& Size, FVector2D& Out) const;
+	/** Where a bone of place `Place`'s hero is now, in the mesh's own space (for telling that it moves); zero without one. */
+	FVector BoneOf(int32 Place, FName Bone) const;
 
 	/** The cheese glyph of a number, 1 to 9 (UI/Countdown), for the places. */
 	UTexture2D* Glyph(int32 Number) const;
@@ -96,10 +85,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<UCameraComponent> Camera;
-	UPROPERTY(VisibleAnywhere, Category="Components")
-	TObjectPtr<USceneCaptureComponent2D> Capture;
-	UPROPERTY()
-	TObjectPtr<UTextureRenderTarget2D> Picture;
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TArray<TObjectPtr<USkeletalMeshComponent>> Heroes;
 	UPROPERTY(VisibleAnywhere, Category="Components")

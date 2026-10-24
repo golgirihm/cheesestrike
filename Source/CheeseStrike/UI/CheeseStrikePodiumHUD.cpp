@@ -36,7 +36,13 @@ namespace CheeseStrikePodiumHUD
 
 	FString CountdownWords(int32 Seconds)
 	{
-		return Seconds > 0 ? FString::Printf(TEXT("BACK TO THE LOBBY IN %d"), Seconds) : FString(TEXT("BACK TO THE LOBBY"));
+		return Seconds > 0 ? FString::Printf(TEXT("BACK TO THE LOBBY IN %d"), Seconds) : FString();
+	}
+
+	float CountdownAlpha(float SecondsToLobby)
+	{
+		// Gone before the last frame is held (UCheeseStrikePostGameSubsystem, a quarter second before the lobby).
+		return FMath::Clamp((SecondsToLobby - CountdownGoneAt) / (CountdownFadeFrom - CountdownGoneAt), 0.0f, 1.0f);
 	}
 
 	bool Draw(AHUD* Hud, UCanvas* Canvas)
@@ -50,12 +56,13 @@ namespace CheeseStrikePodiumHUD
 		}
 		// The words come in as the stage does.
 		const float Alpha = FMath::Clamp((Hud->GetWorld()->GetRealTimeSeconds() - Controller->GetPodiumShownAt() - 0.3f) / 0.5f, 0.0f, 1.0f);
+		const float ToLobby = Match->GetLobbyAt() - Match->GetServerWorldTimeSeconds();
 		const int32 Seconds = CheeseStrikePodiums::SecondsLeft(Match->GetLobbyAt(), Match->GetServerWorldTimeSeconds());
-		DrawWords(Canvas, Podium, Match, Alpha, Seconds, [Controller](const FVector& World, FVector2D& Out) { return Controller->ProjectWorldLocationToScreen(World, Out, true); });
+		DrawWords(Canvas, Podium, Match, Alpha, Seconds, Alpha * CountdownAlpha(ToLobby), [Controller](const FVector& World, FVector2D& Out) { return Controller->ProjectWorldLocationToScreen(World, Out, true); });
 		return true;
 	}
 
-	void DrawWords(UCanvas* Canvas, const ACheeseStrikePodium* Podium, const ACheeseStrikeGameState* Match, float Alpha, int32 Seconds, TFunctionRef<bool(const FVector&, FVector2D&)> Project)
+	void DrawWords(UCanvas* Canvas, const ACheeseStrikePodium* Podium, const ACheeseStrikeGameState* Match, float Alpha, int32 Seconds, float CountAlpha, TFunctionRef<bool(const FVector&, FVector2D&)> Project)
 	{
 		const float U = HudDraw::Unit(Canvas);
 		const bool bTeams = Match->HasTeams();
@@ -84,6 +91,9 @@ namespace CheeseStrikePodiumHUD
 			FVector2D NameAt;
 			FVector2D ScoreAt;
 			FLinearColor Colour;
+			UTexture2D* Glyph = nullptr;
+			FVector2D GlyphAt;
+			FVector2D GlyphSize;
 		};
 		TArray<FWords> Words;
 		const FSlateFontInfo NameFont = HudDraw::Font(26.0f * U);
@@ -100,7 +110,12 @@ namespace CheeseStrikePodiumHUD
 			const FLinearColor Colour = Placed.Team >= 0 ? HudDraw::SideColour(Placed.Team) : HudDraw::Accent;
 			const float PlateWidth = 300.0f * U;
 			const float PlateHeight = NameHeight + ScoreHeight + 22.0f * U;
-			const float PlateTop = Foot.Y + 14.0f * U;
+			// The place's number on the pedestal's foot, and the plate under it, the name clear of the number.
+			UTexture2D* Glyph = Podium->Glyph(Placed.Place + 1);
+			const bool bGlyph = Glyph != nullptr && Glyph->GetResource() != nullptr && Glyph->GetSizeY() > 0;
+			const float GlyphHeight = (Placed.Place == 0 ? 120.0f : 96.0f) * U;
+			const float GlyphTop = Foot.Y + 14.0f * U - GlyphHeight * 0.78f;
+			const float PlateTop = bGlyph ? GlyphTop + GlyphHeight * PlateUnderGlyph : Foot.Y + 14.0f * U;
 			Shapes.RoundedRect(Foot.X - PlateWidth / 2.0f, PlateTop, PlateWidth, PlateHeight, 10.0f * U, HudDraw::Faded(FLinearColor(0.02f, 0.02f, 0.025f, 0.72f), Alpha));
 			Shapes.Rect(Foot.X - PlateWidth / 2.0f + 10.0f * U, PlateTop, PlateWidth - 20.0f * U, 3.0f * U, HudDraw::Faded(Colour, Alpha));
 			if (Placed.bMine)
@@ -113,17 +128,23 @@ namespace CheeseStrikePodiumHUD
 			Line.NameAt = FVector2D(Foot.X, PlateTop + 9.0f * U);
 			Line.ScoreAt = FVector2D(Foot.X, PlateTop + 11.0f * U + NameHeight);
 			Line.Colour = Colour;
-			// The place's number over the plate's top edge, on the pedestal's foot.
-			if (UTexture2D* Glyph = Podium->Glyph(Placed.Place + 1); Glyph != nullptr && Glyph->GetResource() != nullptr && Glyph->GetSizeY() > 0)
+			if (bGlyph)
 			{
-				const float Height = (Placed.Place == 0 ? 120.0f : 96.0f) * U;
-				const FVector2D GlyphSize(Height * Glyph->GetSizeX() / Glyph->GetSizeY(), Height);
-				const FVector2D At(Foot.X - GlyphSize.X / 2.0f, PlateTop - GlyphSize.Y * 0.78f);
-				HudDraw::Picture(Canvas, Glyph, At + FVector2D(4.0f, 6.0f) * U, GlyphSize, FLinearColor(0.0f, 0.0f, 0.0f, 0.4f * Alpha));
-				HudDraw::Picture(Canvas, Glyph, At, GlyphSize, FLinearColor(1.0f, 1.0f, 1.0f, Alpha));
+				Line.Glyph = Glyph;
+				Line.GlyphSize = FVector2D(GlyphHeight * Glyph->GetSizeX() / Glyph->GetSizeY(), GlyphHeight);
+				Line.GlyphAt = FVector2D(Foot.X - Line.GlyphSize.X / 2.0f, GlyphTop);
 			}
 		}
 		Shapes.Draw(Canvas);
+		// The numbers over the plates' top edges, the names under them.
+		for (const FWords& Line : Words)
+		{
+			if (Line.Glyph != nullptr)
+			{
+				HudDraw::Picture(Canvas, Line.Glyph, Line.GlyphAt + FVector2D(4.0f, 6.0f) * U, Line.GlyphSize, FLinearColor(0.0f, 0.0f, 0.0f, 0.4f * Alpha));
+				HudDraw::Picture(Canvas, Line.Glyph, Line.GlyphAt, Line.GlyphSize, FLinearColor(1.0f, 1.0f, 1.0f, Alpha));
+			}
+		}
 		for (const FWords& Line : Words)
 		{
 			HudDraw::Text(Canvas, Line.Name, Line.NameAt, NameFont, HudDraw::Faded(Line.Colour, Alpha), 0.5f);
@@ -131,33 +152,13 @@ namespace CheeseStrikePodiumHUD
 		}
 
 		// At the foot, how long until the lobby.
-		const FSlateFontInfo Foot = HudDraw::Font(22.0f * U);
-		HudDraw::Text(Canvas, CountdownWords(Seconds), FVector2D(Size.X / 2.0f, Size.Y - 48.0f * U), Foot, HudDraw::Faded(HudDraw::Soft, Alpha), 0.5f);
+		const FString Countdown = CountdownWords(Seconds);
+		if (!Countdown.IsEmpty() && CountAlpha > 0.0f)
+		{
+			const FSlateFontInfo Foot = HudDraw::Font(22.0f * U);
+			HudDraw::Text(Canvas, Countdown, FVector2D(Size.X / 2.0f, Size.Y - 48.0f * U), Foot, HudDraw::Faded(HudDraw::Soft, CountAlpha), 0.5f);
+		}
 	}
-
-	TSharedRef<SWidget> HeldPicture(UTexture* Picture)
-	{
-		return SNew(SCheeseStrikeHeldPicture).Picture(Picture);
-	}
-}
-
-void SCheeseStrikeHeldPicture::Construct(const FArguments& InArgs)
-{
-	Brush.SetResourceObject(InArgs._Picture);
-	if (const UTexture* Picture = InArgs._Picture)
-	{
-		Brush.ImageSize = FVector2D(Picture->GetSurfaceWidth(), Picture->GetSurfaceHeight());
-	}
-	Brush.DrawAs = ESlateBrushDrawType::Image;
-}
-
-int32 SCheeseStrikeHeldPicture::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
-{
-	if (Brush.GetResourceObject() != nullptr)
-	{
-		FSlateDrawElement::MakeBox(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), &Brush, ESlateDrawEffect::None, FLinearColor::White);
-	}
-	return LayerId;
 }
 
 void SCheeseStrikePodiumSkip::Construct(const FArguments& InArgs)

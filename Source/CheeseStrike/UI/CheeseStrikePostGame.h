@@ -12,18 +12,20 @@ class SWidget;
 
 /**
  * The post-game screen, held up on the way back to the lobby: when a match
- * is over and its results have been up for their time, everyone travels
- * back to the lobby's level, and a joiner then waits for the host's lobby to
- * come. Until the lobby is ready to show (ACheeseStrikePlayerController::
- * IsLobbyReady), the screen the results were last seen on stays over
- * everything, the loading cover included, with a spinner and "Back to the
- * lobby" in its corner; never a lobby still being made.
+ * is over and its results and podium have been up for their time, everyone
+ * travels back to the lobby's level, and a joiner then waits for the host's
+ * lobby to come. Until the lobby is ready to show (ACheeseStrikePlayerController::
+ * IsLobbyReady), the last frame the view drew stays over everything, the
+ * loading cover included, and then fades away over the lobby; never a lobby
+ * still being made.
  *
- * What is held is the results as they were last drawn (HoldWhatIsShown:
- * the view's own pixels, the HUD's scoreboard over the match), or a screen
- * of its own (Hold): the podium's last picture with its words over it
- * (ACheeseStrikePlayerController::HoldTheResults). Without pixels to read (a server with no renderer),
- * the cover is the lobby's tile.
+ * What is held is the next frame the view draws, as it is drawn (the scene
+ * at the view's own resolution and quality, the HUD's words over it, but no
+ * Slate), read as the engine's screenshots are, after the frame is drawn and
+ * before it is shown, which works in a window, full screen and offscreen
+ * alike. Until it comes the screen is left as it is; without one (a server
+ * with no renderer) the cover is the lobby's tile. A wait past a moment
+ * shows a spinner in the corner, and no words.
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikePostGameSubsystem : public UGameInstanceSubsystem
@@ -33,29 +35,43 @@ class CHEESESTRIKE_API UCheeseStrikePostGameSubsystem : public UGameInstanceSubs
 public:
 	/** The longest it is held, in seconds: a lobby that never comes doesn't keep the player under it. */
 	static constexpr float HoldFor = 45.0f;
+	/** How long it fades away over the lobby, in seconds. */
+	static constexpr float FadeFor = 0.4f;
+	/** How long it is held before the spinner shows, in seconds: the usual way back has none. */
+	static constexpr float SpinnerAfter = 1.5f;
+	/** How long the next frame is waited for before the tile is held instead, in seconds. */
+	static constexpr float FrameWait = 0.5f;
 
 	virtual void Deinitialize() override;
 
-	/** Holds the screen as it is now, until the lobby is ready; nothing if it is held already. */
+	/** Holds the next frame the view draws, until the lobby is ready; nothing if one is held (or coming) already. */
 	void HoldWhatIsShown();
-	/** Holds `Screen` until the lobby is ready, in place of anything held; and `Keep` (what it draws, a texture) as long. */
-	void Hold(TSharedRef<SWidget> Screen, UObject* Keep = nullptr);
-	/** Lets go: the lobby is ready, or the player is somewhere else. */
+	/** Lets go at once: the player is somewhere else. */
 	void Release();
-	bool IsHeld() const { return Cover.IsValid(); }
-	/** Whether what is held is the screen's own pixels (rather than the tile, without them). */
+	/** Whether the screen is held (or its frame on the way); not while it fades away over the ready lobby. */
+	bool IsHeld() const { return bWaiting || (Cover.IsValid() && FadingSince < 0.0); }
+	/** Whether what is held is the view's own frame (rather than the tile, without one). */
 	bool HasPicture() const { return Picture.IsValid(); }
+	/** The size of that frame; zero without one. */
+	FIntPoint GetPictureSize() const { return PictureSize; }
 
 private:
-	/** Puts `Screen` over the view, with the corner's spinner and words. */
+	/** Puts `Screen` over the view, with the corner's spinner. */
 	void Show(TSharedRef<SWidget> Screen);
 	bool Watch(float DeltaSeconds);
+	/** The engine's screenshot: ours, or a play script's that came while ours was asked for (saved as it asked). */
+	void OnFrame(int32 Width, int32 Height, const TArray<FColor>& Colours);
+	void StopListening();
 
 	TSharedPtr<SWidget> Cover;
-	UPROPERTY()
-	TObjectPtr<UObject> Kept;
 	TSharedPtr<FSlateDynamicImageBrush> Picture;
+	FIntPoint PictureSize = FIntPoint::ZeroValue;
 	FTSTicker::FDelegateHandle Ticker;
+	FDelegateHandle Listening;
 	double HeldSince = 0.0;
+	double FadingSince = -1.0;
+	/** How long it has been held, by the frames drawn since. */
+	float Waited = 0.0f;
+	bool bWaiting = false;
 	int32 Grabs = 0;
 };

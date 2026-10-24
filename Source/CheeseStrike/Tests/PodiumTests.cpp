@@ -109,7 +109,10 @@ bool FThePodiumComesAfterTheResultsAndCountsDown::RunTest(const FString& Paramet
 	TestEqual(TEXT("in whole seconds, up"), SecondsLeft(LobbyAt, LobbyAt - 4.5f), 5);
 	TestEqual(TEXT("to nothing just before the lobby"), SecondsLeft(LobbyAt, LobbyAt - 0.2f), 0);
 	TestEqual(TEXT("its words"), CheeseStrikePodiumHUD::CountdownWords(12), FString(TEXT("BACK TO THE LOBBY IN 12")));
-	TestEqual(TEXT("and at the end"), CheeseStrikePodiumHUD::CountdownWords(0), FString(TEXT("BACK TO THE LOBBY")));
+	TestEqual(TEXT("and none at the end"), CheeseStrikePodiumHUD::CountdownWords(0), FString());
+	TestEqual(TEXT("the countdown shows whole until the last second"), CheeseStrikePodiumHUD::CountdownAlpha(1.5f), 1.0f);
+	TestTrue(TEXT("then fades"), CheeseStrikePodiumHUD::CountdownAlpha(0.7f) > 0.0f && CheeseStrikePodiumHUD::CountdownAlpha(0.7f) < 1.0f);
+	TestEqual(TEXT("gone before the last frame is held, a quarter second before the lobby"), CheeseStrikePodiumHUD::CountdownAlpha(0.3f), 0.0f);
 	TestTrue(TEXT("a skip leaves a moment for everyone to hear of it"), SkipSeconds > 0.2f && SkipSeconds < 2.0f);
 	// The places: the first in the middle and highest, the second on the left, the third on the right.
 	TestEqual(TEXT("the first in the middle"), SlotOf(0), 1);
@@ -146,7 +149,8 @@ bool FEveryHeroHasItsOwnEmoteForEachPlace::RunTest(const FString& Parameters)
 			if (TestNotNull(*FString::Printf(TEXT("%s loads"), *What), Emote))
 			{
 				TestTrue(*FString::Printf(TEXT("%s is for its skeleton"), *What), Mesh != nullptr && Emote->GetSkeleton() == Mesh->GetSkeleton());
-				TestTrue(*FString::Printf(TEXT("%s has some length"), *What), Emote->GetPlayLength() > 0.0f);
+				// Not a held pose (Wraith's VictoryPose_1 is a single frame, and stood still).
+				TestTrue(*FString::Printf(TEXT("%s is a movement, not a pose"), *What), Emote->GetPlayLength() > 2.0f && Emote->GetNumberOfSampledKeys() > 30);
 			}
 		}
 	}
@@ -200,6 +204,34 @@ namespace PodiumTests
 			}
 		}
 		return true;
+	}
+
+	/** How far each place's hero's hands and head have gone since the first sample, at most, in centimetres. */
+	float Moved[3] = {0.0f, 0.0f, 0.0f};
+	FVector First[3][3];
+
+	/** Samples the joiner's podium's heroes' hands and head: the first of a round, or how far from it. */
+	void SamplePoses(bool bFirst)
+	{
+		const ACheeseStrikePlayerController* Local = PlayTesting::Controller(1);
+		const ACheeseStrikePodium* Podium = Local != nullptr ? Local->GetPodium() : nullptr;
+		static const FName Bones[3] = {TEXT("hand_r"), TEXT("hand_l"), TEXT("head")};
+		for (int32 Place = 0; Place < 3; ++Place)
+		{
+			for (int32 Bone = 0; Bone < 3; ++Bone)
+			{
+				const FVector Now = Podium != nullptr ? Podium->BoneOf(Place, Bones[Bone]) : FVector::ZeroVector;
+				if (bFirst)
+				{
+					First[Place][Bone] = Now;
+					Moved[Place] = 0.0f;
+				}
+				else
+				{
+					Moved[Place] = FMath::Max(Moved[Place], static_cast<float>(FVector::Dist(Now, First[Place][Bone])));
+				}
+			}
+		}
 	}
 
 	/** What the test saw: when the match ended, what the host's names were, and whether each held a picture of their own. */
@@ -273,6 +305,33 @@ bool FThePodiumShowsTheTopThreeAndGoesBackToTheLobby::RunTest(const FString& Par
 		Controller(1)->SkipPodium();
 		TestEqual(TEXT("nor does a joiner's skip do anything"), GameState(0)->GetLobbyAt(), LobbyAt);
 	});
+	// Every hero on every place moves: its bones somewhere else a moment later, never a held pose.
+	for (int32 Round = 0; Round < CheeseStrikeBodies::All().Num(); ++Round)
+	{
+		Then([Round]()
+		{
+			const int32 Count = CheeseStrikeBodies::All().Num();
+			Controller(1)->SetPodiumBodies({Round, (Round + 1) % Count, (Round + 2) % Count});
+		});
+		Wait(0.3f);
+		Then([]() { PodiumTests::SamplePoses(true); });
+		for (int32 Step = 0; Step < 4; ++Step)
+		{
+			Wait(0.25f);
+			Then([]() { PodiumTests::SamplePoses(false); });
+		}
+		Then([this]()
+		{
+			const ACheeseStrikePodium* Podium = Controller(1)->GetPodium();
+			for (int32 Place = 0; Podium != nullptr && Place < Podium->GetPlaces().Num(); ++Place)
+			{
+				const FString What = FString::Printf(TEXT("%s on place %d"), CheeseStrikeBodies::All()[Podium->GetPlaces()[Place].Body].Name, Place + 1);
+				TestTrue(*FString::Printf(TEXT("%s plays its emote"), *What), Podium->IsEmoting(Place));
+				TestTrue(*FString::Printf(TEXT("%s moves (%.1f cm)"), *What, PodiumTests::Moved[Place]), PodiumTests::Moved[Place] > 3.0f);
+			}
+		});
+	}
+	Then([]() { Controller(1)->SetPodiumBodies({}); });
 	// Its countdown runs out, and everyone is back in the lobby, the podium held up until then.
 	WaitUntil(TEXT("both players back in the lobby after the countdown"), CheeseStrikeRules::ResultsTime + 30.0f, []()
 	{

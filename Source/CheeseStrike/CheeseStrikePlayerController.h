@@ -11,6 +11,7 @@
 class ACameraActor;
 class ACheeseStrikeMenuFigure;
 class ACheeseStrikePodium;
+struct FPodiumPlace;
 class UCheeseStrikePlayScript;
 class UInputMappingContext;
 
@@ -84,7 +85,7 @@ public:
 	/**
 	 * Whether the results held up on the way back to the lobby can go
 	 * (UCheeseStrikePostGameSubsystem): the lobby is ready, or the player is
-	 * on the front end, out of the match.
+	 * on the front end, out of the match, or in a match that skipped the lobby.
 	 */
 	bool IsDoneWithTheResults() const;
 	/**
@@ -102,6 +103,14 @@ public:
 	/** The console's way to it, for play scripts: `CheeseStrikeSkipPodium`. */
 	UFUNCTION(Exec)
 	void CheeseStrikeSkipPodium();
+	/**
+	 * Puts heroes of `CheeseStrikeBodies::All` on this machine's podium in place of who has them, for looking at every
+	 * hero on every place: `CheeseStrikePodiumBodies 2 0 1` (first, second, third; -1 leaves a place's own); with none,
+	 * every place its own again.
+	 */
+	UFUNCTION(Exec)
+	void CheeseStrikePodiumBodies(int32 First = -2, int32 Second = -1, int32 Third = -1);
+	void SetPodiumBodies(TArray<int32> Bodies) { PodiumBodies = MoveTemp(Bodies); }
 	/** Picks a page of the front end (main, find, credits, options, controls), or the options or the controls from the pause menu. */
 	void ChooseMenu(EMenuPage Page);
 	/** Back from a page to the one it came from: the front end's main page, the pause menu, or the options (from the controls). */
@@ -229,6 +238,10 @@ protected:
 	/** The host's button over it. */
 	TSharedPtr<SWidget> PodiumSkip;
 	float PodiumShownAt = 0.0f;
+	/** CheeseStrikePodiumBodies' heroes by place (INDEX_NONE: the place's own). */
+	TArray<int32> PodiumBodies;
+	/** Who stands on the podium now, with CheeseStrikePodiumBodies' heroes. */
+	TArray<FPodiumPlace> PodiumPlaces() const;
 	TSharedPtr<SCheeseStrikeMenu> Menu;
 	EMenuPage ShownPage = EMenuPage::None;
 	EMenuPage ChosenPage = EMenuPage::Main;

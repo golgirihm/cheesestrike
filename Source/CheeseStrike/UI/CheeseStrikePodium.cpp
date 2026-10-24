@@ -5,7 +5,6 @@
 #include "Animation/AnimSingleNodeInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/PointLightComponent.h"
-#include "Components/SceneCaptureComponent2D.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -14,8 +13,6 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
-#include "Engine/TextureRenderTarget2D.h"
-#include "Kismet/KismetRenderingLibrary.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -227,16 +224,6 @@ ACheeseStrikePodium::ACheeseStrikePodium()
 	Look.bOverride_MotionBlurAmount = true;
 	Look.MotionBlurAmount = 0.0f;
 
-	// What takes the picture held on the way to the lobby: the camera's view, as the camera sees it, only when asked.
-	Capture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Picture"));
-	Capture->SetupAttachment(Camera);
-	Capture->bCaptureEveryFrame = false;
-	Capture->bCaptureOnMovement = false;
-	Capture->bAlwaysPersistRenderingState = true;
-	Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
-	Capture->PostProcessSettings = Camera->PostProcessSettings;
-	Capture->PostProcessBlendWeight = 1.0f;
-
 	// The places' numbers, in the countdown's cheese lettering.
 	for (int32 Number = 1; Number <= CheeseStrikePodiums::Places; ++Number)
 	{
@@ -384,55 +371,11 @@ FVector ACheeseStrikePodium::HeadOf(int32 Place) const
 	return GetActorTransform().TransformPosition(SlotAt(Place) + FVector(0.0f, 0.0f, PodiumHeroHeight));
 }
 
-void ACheeseStrikePodium::StartPicture(UObject* Outer, const FIntPoint& Size)
+FVector ACheeseStrikePodium::BoneOf(int32 Place, FName Bone) const
 {
-	if (Outer == nullptr || Size.X <= 0 || Size.Y <= 0 || Picture != nullptr)
-	{
-		return;
-	}
-	Picture = NewObject<UTextureRenderTarget2D>(Outer);
-	Picture->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8_SRGB;
-	Picture->ClearColor = FLinearColor::Black;
-	Picture->InitAutoFormat(Size.X, Size.Y);
-	Picture->UpdateResourceImmediate(true);
-	Capture->TextureTarget = Picture;
-	Capture->FOVAngle = Camera->FieldOfView;
-	// Every frame until it is finished, so that the light bounced about the room (Lumen) has settled in it.
-	Capture->bCaptureEveryFrame = true;
-}
-
-UTextureRenderTarget2D* ACheeseStrikePodium::FinishPicture(TFunctionRef<void(UCanvas*, const FIntPoint&)> DrawWords)
-{
-	if (Picture == nullptr)
-	{
-		return nullptr;
-	}
-	Capture->bCaptureEveryFrame = false;
-	Capture->FOVAngle = Camera->FieldOfView;
-	Capture->CaptureScene();
-	UCanvas* Canvas = nullptr;
-	FVector2D Size;
-	FDrawToRenderTargetContext Context;
-	UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(this, Picture, Canvas, Size, Context);
-	if (Canvas != nullptr)
-	{
-		DrawWords(Canvas, FIntPoint(Picture->SizeX, Picture->SizeY));
-	}
-	UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
-	return Picture;
-}
-
-bool ACheeseStrikePodium::ProjectInPicture(const FVector& World, const FIntPoint& Size, FVector2D& Out) const
-{
-	// A pinhole camera, its field of view across the picture's width.
-	const FVector Local = Camera->GetComponentTransform().InverseTransformPositionNoScale(World);
-	if (Local.X <= 1.0f || Size.X <= 0)
-	{
-		return false;
-	}
-	const float Focal = Size.X / 2.0f / FMath::Tan(FMath::DegreesToRadians(Camera->FieldOfView / 2.0f));
-	Out = FVector2D(Size.X / 2.0f + Local.Y / Local.X * Focal, Size.Y / 2.0f - Local.Z / Local.X * Focal);
-	return true;
+	const USkeletalMeshComponent* Hero = Heroes.IsValidIndex(Place) ? Heroes[Place].Get() : nullptr;
+	const int32 Index = Hero != nullptr ? Hero->GetBoneIndex(Bone) : INDEX_NONE;
+	return Index != INDEX_NONE ? Hero->GetBoneTransform(Index, FTransform::Identity).GetLocation() : FVector::ZeroVector;
 }
 
 UTexture2D* ACheeseStrikePodium::Glyph(int32 Number) const
