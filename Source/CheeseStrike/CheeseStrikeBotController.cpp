@@ -440,7 +440,7 @@ void ACheeseStrikeBotController::Think()
 			bGoing = false;
 		}
 	}
-	else
+	else if (!GetAwayFromGrenades())
 	{
 		ChooseWhereToGo();
 	}
@@ -878,6 +878,50 @@ bool ACheeseStrikeBotController::PickRetreatGoal(const FVector& From, FVector& O
 		}
 	}
 	return bFound;
+}
+
+bool ACheeseStrikeBotController::GetAwayFromGrenades()
+{
+	ACheeseStrikeCharacter* Me = Body();
+	UWorld* World = GetWorld();
+	const ACheeseStrikeGameState* Match = World != nullptr ? World->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	if (Me == nullptr || World == nullptr)
+	{
+		return false;
+	}
+	// The nearest grenade that can hurt it: its own, or an enemy's (a teammate's can't, friendly fire being off).
+	const ACheeseStrikeGrenade* Nearest = nullptr;
+	float NearestAt = TNumericLimits<float>::Max();
+	for (TActorIterator<ACheeseStrikeGrenade> It(World); It; ++It)
+	{
+		const ACheeseStrikePlayerState* Thrower = It->GetThrower();
+		const bool bCanHurt = Thrower == nullptr || Thrower == PlayerState || Match == nullptr || Match->AreEnemies(Thrower, PlayerState);
+		const float Distance = FVector::Dist(It->GetActorLocation(), Me->GetActorLocation());
+		if (CheeseStrikeGrenades::BotGetsAway(Distance, bCanHurt, It->HasBurst()) && Distance < NearestAt)
+		{
+			Nearest = *It;
+			NearestAt = Distance;
+		}
+	}
+	if (Nearest == nullptr)
+	{
+		bFleeingGrenade = false;
+		return false;
+	}
+	if (!bFleeingGrenade)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Grenade: %s runs from one %.0f cm off"), *Me->DisplayName(), NearestAt);
+	}
+	// Running, to somewhere out of its reach; a new way if the last one has ended.
+	FVector Away;
+	if ((!bFleeingGrenade || GetMoveStatus() != EPathFollowingStatus::Moving) && PickRetreatGoal(Nearest->GetActorLocation(), Away))
+	{
+		GoTo(Away, true);
+		bSearching = false;
+		bRetreating = false;
+	}
+	bFleeingGrenade = true;
+	return true;
 }
 
 void ACheeseStrikeBotController::ThinkAboutGrenades()

@@ -55,6 +55,7 @@ bool FFallsKill::RunTest(const FString& Parameters)
 #include "Map/CheeseStrikeMouse.h"
 #include "PlayTesting.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Weapons/CheeseStrikeGrenadeRules.h"
 
 namespace FondueTests
 {
@@ -449,8 +450,13 @@ bool FBotsKeepOutOfTheFondue::RunTest(const FString& Parameters)
 	static float StartedAt = 0.0f;
 	static TMap<FString, FVector> Spawned;
 	static TMap<FString, float> Furthest;
+	/** Every death the feed has shown, as it shows them (it keeps only the last few): the falls, and the bots blown up by their own grenades (no kill, but no fall either). */
+	static TSet<FString> Falls;
+	static TSet<FString> OwnBlasts;
 	Spawned.Reset();
 	Furthest.Reset();
+	Falls.Reset();
+	OwnBlasts.Reset();
 	FSession Session;
 	Session.Level = Level;
 	Session.Options = TEXT("?Bots=9?KillLimit=100");
@@ -495,12 +501,23 @@ bool FBotsKeepOutOfTheFondue::RunTest(const FString& Parameters)
 				Furthest.FindOrAdd(Name) = FMath::Max(Furthest.FindRef(Name), FVector::Dist2D(Spawned[Name], Body->GetActorLocation()));
 			}
 		}
+		for (const FKillFeedEntry& Kill : GameState(0)->GetKillFeed())
+		{
+			const FString Key = FString::Printf(TEXT("%s@%.2f"), *Kill.Victim, Kill.At);
+			if (Kill.How.StartsWith(TEXT("fell")))
+			{
+				Falls.Add(Key);
+			}
+			else if (Kill.Killer.IsEmpty() && Kill.How == CheeseStrikeGrenades::OwnWords)
+			{
+				OwnBlasts.Add(Key);
+			}
+		}
 		return Now(0) - StartedAt >= 40.0f;
 	});
 	Then([this]()
 	{
 		int32 Kills = 0;
-		int32 Falls = 0;
 		for (ACheeseStrikeBotController* Bot : All<ACheeseStrikeBotController>())
 		{
 			if (const ACheeseStrikePlayerState* State = Bot->GetPlayerState<ACheeseStrikePlayerState>())
@@ -508,10 +525,6 @@ bool FBotsKeepOutOfTheFondue::RunTest(const FString& Parameters)
 				Kills += State->GetKills();
 				AddInfo(FString::Printf(TEXT("%s: %d kills, %d deaths, went %.0f m"), *State->GetPlayerName(), State->GetKills(), State->GetDeaths(), Furthest.FindRef(State->GetPlayerName()) / 100.0f));
 			}
-		}
-		for (const FKillFeedEntry& Kill : GameState(0)->GetKillFeed())
-		{
-			Falls += Kill.How.StartsWith(TEXT("fell")) ? 1 : 0;
 		}
 		int32 Moved = 0;
 		for (const TPair<FString, float>& Each : Furthest)
@@ -527,9 +540,10 @@ bool FBotsKeepOutOfTheFondue::RunTest(const FString& Parameters)
 		const ACheeseStrikePlayerState* Mine = Character(0) != nullptr ? Character(0)->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
 		const int32 AllKills = Kills + (Mine != nullptr ? Mine->GetKills() : 0);
 		const int32 AllDeaths = Deaths + (Mine != nullptr ? Mine->GetDeaths() : 0);
-		AddInfo(FString::Printf(TEXT("%d kills, %d deaths"), AllKills, AllDeaths));
-		TestEqual(TEXT("no fall in the kill feed"), Falls, 0);
-		TestTrue(FString::Printf(TEXT("every death a kill: nobody walked into the fondue (%d deaths, %d kills)"), AllDeaths, AllKills), AllDeaths <= AllKills);
+		AddInfo(FString::Printf(TEXT("%d kills, %d deaths, %d by their own grenade"), AllKills, AllDeaths, OwnBlasts.Num()));
+		TestEqual(TEXT("no fall in the kill feed"), Falls.Num(), 0);
+		TestTrue(FString::Printf(TEXT("every death a kill or one's own grenade: nobody walked into the fondue (%d deaths, %d kills, %d own grenades)"), AllDeaths, AllKills, OwnBlasts.Num()),
+			AllDeaths <= AllKills + OwnBlasts.Num());
 		TestTrue(FString::Printf(TEXT("the bots got about over the holes (%d went 10 m or more)"), Moved), Moved >= 6);
 		TestTrue(FString::Printf(TEXT("and fought (%d kills)"), AllKills), AllKills >= 3);
 	});
