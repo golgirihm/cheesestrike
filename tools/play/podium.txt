@@ -1,0 +1,18 @@
+# The podium after a match: play with bots (-Bots) a while, end the match from the console, and look at the results,
+# the podium as it comes and as its emotes go on, and the picture of it held on the way back to the lobby.
+# -Extra "?Mode=Deathmatch" or "?Mode=GunGame" for another mode; -Res for the view's shape.
+wait 30
+cmd CheeseStrikeEndMatch
+wait 1.5
+shot podium_results
+wait 3
+shot podium_1
+wait 3
+shot podium_2
+wait 3
+shot podium_3
+wait 3
+shot podium_4
+wait 5
+shot podium_held
+quit

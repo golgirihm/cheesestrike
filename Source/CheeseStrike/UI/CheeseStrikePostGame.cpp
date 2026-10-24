@@ -68,9 +68,11 @@ void UCheeseStrikePostGameSubsystem::HoldWhatIsShown()
 	Show(Screen);
 }
 
-void UCheeseStrikePostGameSubsystem::Hold(TSharedRef<SWidget> Screen)
+void UCheeseStrikePostGameSubsystem::Hold(TSharedRef<SWidget> Screen, UObject* Keep)
 {
 	Release();
+	Kept = Keep;
+	UE_LOG(LogCheeseStrike, Display, TEXT("Post-game: a screen of its own held up until the lobby is ready"));
 	Show(Screen);
 }
 
@@ -139,4 +141,5 @@ void UCheeseStrikePostGameSubsystem::Release()
 		Cover.Reset();
 	}
 	Picture.Reset();
+	Kept = nullptr;
 }

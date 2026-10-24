@@ -15,6 +15,7 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
 #include "CheeseStrikeHUDDraw.h"
+#include "Rules/CheeseStrikePodiums.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Weapons/CheeseStrikeArsenal.h"
@@ -126,16 +127,12 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 		{
 			if (const ACheeseStrikePlayerState* Ours = Cast<ACheeseStrikePlayerState>(Player))
 			{
-				CheeseStrikeRules::FStanding Standing = Ours->Standing();
-				if (bLadder)
-				{
-					// Sorted by the step first: a step is worth more than any number of kills.
-					Standing.Kills += (Ours->GetGunLevel() + 1) * 100000;
-				}
-				if (bSoloHill)
-				{
-					Standing.Kills += Ours->GetHillPoints() * 100000;
-				}
+				// Gun Game by the step first, the solo hill by the points first; the podium orders them alike.
+				CheeseStrikePodiums::FContender Contender;
+				Contender.Standing = Ours->Standing();
+				Contender.GunLevel = Ours->GetGunLevel();
+				Contender.HillPoints = Ours->GetHillPoints();
+				const CheeseStrikeRules::FStanding Standing = CheeseStrikePodiums::RankedStanding(Contender, Match->GetModeInfo().WinBy, Match->HasTeams());
 				Players[Match->HasTeams() ? FMath::Clamp(Match->TeamOf(Ours), 0, CheeseStrikeRules::Teams - 1) : 0].Emplace(Standing, Ours);
 			}
 		}

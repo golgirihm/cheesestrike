@@ -17,6 +17,8 @@
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Rules/CheeseStrikePodiums.h"
+#include "UI/CheeseStrikePodium.h"
 #include "Rules/CheeseStrikeStart.h"
 #include "Sessions/CheeseStrikeSeatMemory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -525,6 +527,24 @@ void ACheeseStrikeGameMode::HandleMatchHasEnded()
 	}
 }
 
+void ACheeseStrikeGameMode::BackToLobbyNow()
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr || !HasMatchEnded() || GetMatchState() == MatchState::LeavingMap)
+	{
+		return;
+	}
+	const float At = State->GetServerWorldTimeSeconds() + CheeseStrikePodiums::SkipSeconds;
+	if (State->GetLobbyAt() <= At)
+	{
+		return;
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Podium: the host goes back to the lobby now, %.1f s early"), State->GetLobbyAt() - At);
+	State->SetLobbyAt(At);
+	State->ForceNetUpdate();
+	GetWorldTimerManager().SetTimer(ResultsTimer, this, &AGameMode::RestartGame, CheeseStrikePodiums::SkipSeconds, false);
+}
+
 FString ACheeseStrikeGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
 {
 	const FString Error = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
@@ -748,6 +768,33 @@ void ACheeseStrikeGameMode::HillWon(int32 Team, ACheeseStrikePlayerState* Player
 		return;
 	}
 	EndMatchFor(Team);
+}
+
+void ACheeseStrikeGameMode::CheeseStrikeEndMatch()
+{
+#if !UE_BUILD_SHIPPING
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr || !IsMatchInProgress())
+	{
+		return;
+	}
+	if (State->HasTeams())
+	{
+		const int32 First = State->GetTeamScore(0), Second = State->GetTeamScore(1);
+		if (First != Second)
+		{
+			EndMatchFor(First > Second ? 0 : 1);
+			return;
+		}
+	}
+	else
+	{
+		const TArray<FPodiumPlace> Places = ACheeseStrikePodium::PlacesFor(State, nullptr);
+		State->SetWinnerName(Places.IsEmpty() ? FString() : Places[0].Name);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Match over (from the console): %s, %s"), State->GetWinnerName().IsEmpty() ? TEXT("nobody wins") : *State->GetWinnerName(), *State->ScoreSummary());
+	EndMatch();
+#endif
 }
 
 void ACheeseStrikeGameMode::CheeseStrikeMoveHill()

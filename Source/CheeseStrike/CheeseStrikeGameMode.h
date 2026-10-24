@@ -85,6 +85,12 @@ public:
 	void HillWon(int32 Team, ACheeseStrikePlayerState* Player);
 	/** King of the Hill's hill (ACheeseStrikeHill), once the match has begun; null in the other modes. */
 	ACheeseStrikeHill* GetHill() const { return Hill.Get(); }
+	/**
+	 * From the host's console or a play script (not in shipping builds): ends the match now, won by whoever leads
+	 * (the side ahead, or the player first as the podium orders them), for looking at the results and the podium.
+	 */
+	UFUNCTION(Exec)
+	void CheeseStrikeEndMatch();
 	/** From the host's console or a play script (not in shipping builds): moves the hill to its next spot at once. */
 	UFUNCTION(Exec)
 	void CheeseStrikeMoveHill();
@@ -136,6 +142,8 @@ public:
 	void SetRules(int32 InKillLimit, float InRespawnDelay, int32 InMapIndex = INDEX_NONE);
 	/** Back to the lobby after the results, with the rules as they are now. */
 	virtual void RestartGame() override;
+	/** The host, over the podium: back to the lobby in a moment (CheeseStrikePodiums::SkipSeconds, for every machine to keep the podium up), not at the end of its countdown. */
+	void BackToLobbyNow();
 
 	virtual void HandleMatchHasStarted() override;
 	/** The results stay up a while, then everyone is back in the lobby. */
