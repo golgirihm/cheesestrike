@@ -26,17 +26,21 @@ namespace CheeseStrikePodiumHUD
 {
 	/** Draws the podium's words if this player's podium is up; true if it is (the HUD then draws nothing else). */
 	bool Draw(AHUD* Hud, UCanvas* Canvas);
-	/**
-	 * The words themselves, at `Alpha`, with `Seconds` left, each place found on the canvas by `Project`: the HUD's
-	 * over the view, and the same over the picture held on the way to the lobby (ACheeseStrikePodium::FinishPicture).
-	 */
-	void DrawWords(UCanvas* Canvas, const ACheeseStrikePodium* Podium, const ACheeseStrikeGameState* Match, float Alpha, int32 Seconds, TFunctionRef<bool(const FVector&, FVector2D&)> Project);
-	/** That picture, filling the screen, for UCheeseStrikePostGameSubsystem::Hold. */
-	TSharedRef<SWidget> HeldPicture(UTexture* Picture);
+	/** The words themselves, at `Alpha`, with `Seconds` left (the countdown at `CountAlpha`), each place found on the canvas by `Project`. */
+	void DrawWords(UCanvas* Canvas, const ACheeseStrikePodium* Podium, const ACheeseStrikeGameState* Match, float Alpha, int32 Seconds, float CountAlpha, TFunctionRef<bool(const FVector&, FVector2D&)> Project);
 	/** Who won, as the top says: "THE GOUDA GUYS WIN", "CHEDDAR WINS"; nothing for nobody. */
 	FString Heading(const FString& WinnerName, bool bTeams);
-	/** The foot's words with `Seconds` left: "BACK TO THE LOBBY IN 12", and once it is all but there, "BACK TO THE LOBBY". */
+	/** The foot's words with `Seconds` left: "BACK TO THE LOBBY IN 12", and once it is all but there, nothing. */
 	FString CountdownWords(int32 Seconds);
+	/**
+	 * How much of the countdown shows with `SecondsToLobby` left: all of it until the last second, then fading out, gone
+	 * before the last frame is held on the way to the lobby, which so holds the podium and its names but no countdown.
+	 */
+	float CountdownAlpha(float SecondsToLobby);
+	constexpr float CountdownFadeFrom = 1.0f;
+	constexpr float CountdownGoneAt = 0.4f;
+	/** How far down a place's cheese number its plate starts, in the number's height: the name is written under the number. */
+	constexpr float PlateUnderGlyph = 0.97f;
 }
 
 /**
@@ -59,20 +63,4 @@ public:
 private:
 	FReply Skip();
 	TWeakObjectPtr<ACheeseStrikePlayerController> Controller;
-};
-
-/** A picture (a texture, the podium's render target) stretched over all it is given. */
-class SCheeseStrikeHeldPicture : public SLeafWidget
-{
-public:
-	SLATE_BEGIN_ARGS(SCheeseStrikeHeldPicture) {}
-		SLATE_ARGUMENT(UTexture*, Picture)
-	SLATE_END_ARGS()
-
-	void Construct(const FArguments& InArgs);
-	virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
-	virtual FVector2D ComputeDesiredSize(float) const override { return Brush.ImageSize; }
-
-private:
-	FSlateBrush Brush;
 };

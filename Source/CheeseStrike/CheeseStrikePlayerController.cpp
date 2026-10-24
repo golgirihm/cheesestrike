@@ -43,7 +43,6 @@
 #include "Animation/CheeseStrikeBodies.h"
 #include "UI/CheeseStrikePodium.h"
 #include "UI/CheeseStrikePodiumHUD.h"
-#include "Engine/TextureRenderTarget2D.h"
 #include "Rules/CheeseStrikePodiums.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
@@ -220,7 +219,10 @@ bool ACheeseStrikePlayerController::IsLobbyReady() const
 bool ACheeseStrikePlayerController::IsDoneWithTheResults() const
 {
 	const bool bFrontEnd = ShownPage == EMenuPage::Main || ShownPage == EMenuPage::Find || ShownPage == EMenuPage::Credits || ShownPage == EMenuPage::Options;
-	return IsLobbyReady() || (bFrontEnd && !IsInAMatch());
+	// A level that skips the lobby (?StartNow, as the play scripts' do) goes straight into a match: the player's in it.
+	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
+	const bool bPlaying = State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded() && GetPawn() != nullptr && GetViewTarget() == GetPawn();
+	return IsLobbyReady() || (bFrontEnd && !IsInAMatch()) || bPlaying;
 }
 
 void ACheeseStrikePlayerController::HoldTheResults()
@@ -228,25 +230,12 @@ void ACheeseStrikePlayerController::HoldTheResults()
 	UCheeseStrikePostGameSubsystem* PostGame = IsLocalController() && GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>() : nullptr;
 	if (PostGame != nullptr && !PostGame->IsHeld() && ShownPage == EMenuPage::None)
 	{
-		if (Podium != nullptr)
+		// The podium (or the results) as last drawn, the HUD's words over it; the host's button, which can't be pressed any
+		// more, isn't in it, and goes.
+		if (PodiumSkip.IsValid() && GetLocalPlayer() != nullptr && GetLocalPlayer()->ViewportClient != nullptr)
 		{
-			// The podium as last drawn, the HUD's words over it (its button, which can't be pressed any more, left out).
-			if (PodiumSkip.IsValid() && GetLocalPlayer() != nullptr && GetLocalPlayer()->ViewportClient != nullptr)
-			{
-				GetLocalPlayer()->ViewportClient->RemoveViewportWidgetForPlayer(GetLocalPlayer(), PodiumSkip.ToSharedRef());
-				PodiumSkip.Reset();
-			}
-			const ACheeseStrikePodium* Shown = Podium;
-			const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-			UTextureRenderTarget2D* Picture = Podium->FinishPicture([Shown, Match](UCanvas* Canvas, const FIntPoint& Size)
-			{
-				CheeseStrikePodiumHUD::DrawWords(Canvas, Shown, Match, 1.0f, 0, [Shown, Size](const FVector& World, FVector2D& Out) { return Shown->ProjectInPicture(World, Size, Out); });
-			});
-			if (Picture != nullptr)
-			{
-				PostGame->Hold(CheeseStrikePodiumHUD::HeldPicture(Picture), Picture);
-				return;
-			}
+			GetLocalPlayer()->ViewportClient->RemoveViewportWidgetForPlayer(GetLocalPlayer(), PodiumSkip.ToSharedRef());
+			PodiumSkip.Reset();
 		}
 		PostGame->HoldWhatIsShown();
 	}
@@ -266,7 +255,7 @@ void ACheeseStrikePlayerController::UpdatePodium()
 		return;
 	}
 	// The player states may still be coming to a joiner; and nothing else (a death's camera, a respawn) takes the view.
-	const TArray<FPodiumPlace> Now = ACheeseStrikePodium::PlacesFor(Match, PlayerState);
+	const TArray<FPodiumPlace> Now = PodiumPlaces();
 	const TArray<FPodiumPlace>& Shown = Podium->GetPlaces();
 	bool bSame = Now.Num() == Shown.Num();
 	for (int32 Index = 0; bSame && Index < Now.Num(); ++Index)
@@ -285,7 +274,6 @@ void ACheeseStrikePlayerController::UpdatePodium()
 
 void ACheeseStrikePlayerController::ShowPodium()
 {
-	const ACheeseStrikeGameState* Match = GetWorld()->GetGameState<ACheeseStrikeGameState>();
 	FActorSpawnParameters Parameters;
 	Parameters.Owner = this;
 	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -294,17 +282,8 @@ void ACheeseStrikePlayerController::ShowPodium()
 	{
 		return;
 	}
-	Podium->Stage(ACheeseStrikePodium::PlacesFor(Match, PlayerState));
+	Podium->Stage(PodiumPlaces());
 	PodiumShownAt = GetWorld()->GetRealTimeSeconds();
-	// Its picture is taken as it goes, to be held on the way to the lobby (HoldTheResults), as big as the view.
-	FVector2D ViewSize(1280.0, 720.0);
-	if (GetLocalPlayer() != nullptr && GetLocalPlayer()->ViewportClient != nullptr)
-	{
-		GetLocalPlayer()->ViewportClient->GetViewportSize(ViewSize);
-	}
-	const float Shrink = FMath::Min(1.0f, 1920.0f / FMath::Max(1.0f, static_cast<float>(ViewSize.X)));
-	UCheeseStrikePostGameSubsystem* PostGame = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>() : nullptr;
-	Podium->StartPicture(PostGame, FIntPoint(FMath::Max(64, FMath::RoundToInt(ViewSize.X * Shrink)), FMath::Max(36, FMath::RoundToInt(ViewSize.Y * Shrink))));
 	SetViewTarget(Podium);
 	if (PlayerCameraManager != nullptr)
 	{
@@ -334,6 +313,28 @@ void ACheeseStrikePlayerController::ShowPodium()
 		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		SetInputMode(Mode);
 		SetShowMouseCursor(true);
+	}
+}
+
+TArray<FPodiumPlace> ACheeseStrikePlayerController::PodiumPlaces() const
+{
+	TArray<FPodiumPlace> Places = ACheeseStrikePodium::PlacesFor(GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr, PlayerState);
+	for (int32 Place = 0; Place < Places.Num() && Place < PodiumBodies.Num(); ++Place)
+	{
+		if (CheeseStrikeBodies::All().IsValidIndex(PodiumBodies[Place]))
+		{
+			Places[Place].Body = PodiumBodies[Place];
+		}
+	}
+	return Places;
+}
+
+void ACheeseStrikePlayerController::CheeseStrikePodiumBodies(int32 First, int32 Second, int32 Third)
+{
+	PodiumBodies.Reset();
+	if (First != -2)
+	{
+		PodiumBodies = {First, Second, Third};
 	}
 }
 
