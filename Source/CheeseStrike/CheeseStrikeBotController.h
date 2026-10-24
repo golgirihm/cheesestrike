@@ -65,6 +65,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	/** A player id of its own, as a person's (the engine gives one only to those who log in): bodies, sides' ranks and the hill go by them. */
+	virtual void InitPlayerState() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
