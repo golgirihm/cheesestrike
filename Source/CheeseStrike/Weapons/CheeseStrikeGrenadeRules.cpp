@@ -50,6 +50,11 @@ namespace CheeseStrikeGrenades
 		return FMath::Clamp(FMath::Min(Distance * 0.25f, 400.0f), 0.0f, FMath::Max(0.0f, Distance - BotOwnMargin));
 	}
 
+	bool BotGetsAway(float Distance, bool bCanHurt, bool bBurst)
+	{
+		return bCanHurt && !bBurst && Distance < BotKeepsAway;
+	}
+
 	bool BotShouldThrow(const FBotThrow& Thought)
 	{
 		if (Thought.Carried <= 0 || Thought.SinceLastThrow < BotInterval || Thought.SinceSeen > BotMemory)

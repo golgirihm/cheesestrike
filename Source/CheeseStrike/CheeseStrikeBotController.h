@@ -117,6 +117,13 @@ protected:
 	 * the grenade's own arc; it turns to that and throws (AimAndFire).
 	 */
 	void ThinkAboutGrenades();
+	/**
+	 * A grenade about to burst near it that can hurt it (its own, or an enemy's): it runs from it, out of its reach
+	 * (CheeseStrikeGrenades::BotGetsAway), before anything else it would go after. True while it is.
+	 */
+	bool GetAwayFromGrenades();
+	/** Whether it is running from a grenade. */
+	bool bFleeingGrenade = false;
 	/** The way to throw from here for a grenade to come down near `Spot`, if one does (within CheeseStrikeGrenades::BotLandsWithin). */
 	bool AimToLandAt(const FVector& Spot, FVector& OutAim) const;
 	void ChooseWhereToGo();

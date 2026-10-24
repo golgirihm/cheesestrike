@@ -103,6 +103,13 @@ bool FABotThrowsAGrenadeSensibly::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("at %.0f cm it aims short (%.0f) but never within reach of itself"), Distance, Short), Short >= 0.0f && Distance - Short >= BotOwnMargin);
 	}
 	TestTrue(TEXT("farther off, it allows for more roll"), BotLandingShort(2000.0f) > BotLandingShort(1000.0f));
+
+	// A grenade about to burst near it that can hurt it, it runs from: out of reach, and a little more.
+	TestTrue(TEXT("it runs from a grenade in reach"), BotGetsAway(Radius - 50.0f, true, false));
+	TestTrue(TEXT("and one just past it"), BotGetsAway(Radius + 50.0f, true, false));
+	TestFalse(TEXT("not from one well away"), BotGetsAway(BotKeepsAway + 10.0f, true, false));
+	TestFalse(TEXT("nor one that can't hurt it (a teammate's)"), BotGetsAway(100.0f, false, false));
+	TestFalse(TEXT("nor one already burst"), BotGetsAway(100.0f, true, true));
 	return true;
 }
 

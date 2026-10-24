@@ -105,6 +105,14 @@ namespace CheeseStrikeGrenades
 	constexpr float BotLandsWithin = 220.0f;
 	/** How far from itself (cm) a bot keeps where its grenade comes down: its own burst hurts it. */
 	constexpr float BotOwnMargin = Radius + 150.0f;
+	/** How far (cm) a bot keeps from a grenade about to burst that can hurt it (its own, or an enemy's): out of its reach, and a little more. */
+	constexpr float BotKeepsAway = Radius + 150.0f;
+	/**
+	 * Whether a bot `Distance` cm from a grenade whose burst can hurt it (`bCanHurt`) gets away from it: one that
+	 * hasn't burst, within BotKeepsAway, whoever threw it. A bot that goes after an enemy where its own grenade
+	 * landed would otherwise run into it.
+	 */
+	bool BotGetsAway(float Distance, bool bCanHurt, bool bBurst);
 	/** Where a bot means a grenade to come down, to throw at someone `Distance` cm away: short of them, as it bounces and rolls on, but never within BotOwnMargin of itself. */
 	float BotLandingShort(float Distance);
 }
