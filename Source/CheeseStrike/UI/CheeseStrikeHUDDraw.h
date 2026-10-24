@@ -25,7 +25,7 @@ namespace CheeseStrikeHUDDraw
 	inline const FLinearColor Panel(0.02f, 0.02f, 0.025f, 0.42f);
 	inline const FLinearColor Accent(0.98f, 0.76f, 0.22f, 1.0f);
 	inline const FLinearColor Danger(0.93f, 0.2f, 0.15f, 1.0f);
-	/** A side's colour, the game's one (CheeseStrikeModes::TeamColour): The Gouda Guys' orange, the Mozza Radicals' sky blue, the cheese's yellow for none. */
+	/** A side's colour, the game's one (CheeseStrikeModes::TeamColour): The Gouda Guys' orange, the Mozza Radicals' white, the cheese's yellow for none. */
 	FLinearColor SideColour(int32 Team);
 	/** `Colour` with its alpha times `Alpha`. */
 	FLinearColor Faded(const FLinearColor& Colour, float Alpha);

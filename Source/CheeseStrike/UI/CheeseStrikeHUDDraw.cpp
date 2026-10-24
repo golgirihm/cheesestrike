@@ -74,6 +74,12 @@ namespace CheeseStrikeHUDDraw
 		{
 			const float Offset = FMath::Max(1.0f, InFont.Size / 14.0f);
 			Item.EnableShadow(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f * Colour.A), FVector2D(Offset, Offset));
+			// The Mozza Radicals' white is edged in dark too, so that it reads over a pale ground.
+			if (FLinearColor(Colour.R, Colour.G, Colour.B, 1.0f).Equals(CheeseStrikeModes::TeamColour(1), 0.02f))
+			{
+				Item.bOutlined = true;
+				Item.OutlineColor = FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Colour.A);
+			}
 		}
 		Canvas->DrawItem(Item);
 	}

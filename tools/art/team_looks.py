@@ -9,8 +9,8 @@ import unreal, traceback
 # instance of the slot's own material, MI_<slot>_<side> in the hero's
 # Materials/Teams folder, with the colour parameters that paint its armour
 # (or coat, or metal) set to the side's colour, as the lobby and the HUD show
-# it (CheeseStrikeMenu::TeamColour): the Gouda Guys orange, the Mozza Radicals
-# sky blue. Only parameters change, so the instances share their parents'
+# it (CheeseStrikeModes::TeamColour): the Gouda Guys orange, the Mozza Radicals
+# mozzarella white. Only parameters change, so the instances share their parents'
 # shaders. CheeseStrikeBodies names the slots (TeamSlots), and
 # ACheeseStrikeCharacter puts the instances on.
 
@@ -18,7 +18,7 @@ def linear(r, g, b):
     return [((c / 255.0) / 12.92) if c / 255.0 <= 0.04045 else (((c / 255.0) + 0.055) / 1.055) ** 2.4 for c in (r, g, b)]
 
 # The sides' colours (CheeseStrikeMenu::TeamColour), as linear colours.
-SIDES = {"Gouda": linear(230, 159, 0), "Mozza": linear(86, 180, 233)}
+SIDES = {"Gouda": linear(230, 159, 0), "Mozza": linear(240, 236, 224)}
 
 # Each hero: its Materials folder, and for each slot, the colour parameters to
 # set and how bright (the side's colour times this: a parameter that paints a
@@ -46,6 +46,11 @@ LOOKS = {
     }),
 }
 
+# The Mozza Radicals' white is put on brighter than the brightness above
+# (tuned for darker colours) on the heroes whose armour would otherwise read
+# as a dull grey, so that it reads as mozzarella's white.
+WHITER = {"Mozza": {"Belica": 2.0, "Murdock": 1.45, "Twinblast": 1.6}}
+
 OUT = unreal.Paths.project_saved_dir() + "team_looks.txt"
 lines = []
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -66,6 +71,7 @@ try:
                 lib.set_material_instance_parent(instance, parent)
                 overrides = []
                 for parameter, brightness in parameters:
+                    brightness *= WHITER.get(side, {}).get(hero, 1.0)
                     value = unreal.LinearColor(colour[0] * brightness, colour[1] * brightness, colour[2] * brightness, 1.0)
                     info = unreal.MaterialParameterInfo(name=parameter, association=unreal.MaterialParameterAssociation.GLOBAL_PARAMETER, index=-1)
                     overrides.append(unreal.VectorParameterValue(parameter_info=info, parameter_value=value))
