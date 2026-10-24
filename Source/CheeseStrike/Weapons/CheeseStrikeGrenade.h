@@ -48,6 +48,8 @@ public:
 	/** Server only: whom its burst harmed, and how many times it has bounced. */
 	int32 GetHits() const { return Hits; }
 	int32 GetBounces() const { return Bounces; }
+	/** Server only: where it first came down (zero before). */
+	FVector GetFirstBounceAt() const { return FirstBounceAt; }
 	ACheeseStrikePlayerState* GetThrower() const { return Thrower.Get(); }
 
 	/** The harm its burst would do `Victim` from `At`, seen or not: none behind a wall (server only, for the burst and the tests). */
@@ -90,6 +92,7 @@ protected:
 	TWeakObjectPtr<ACheeseStrikePlayerState> Thrower;
 	int32 Hits = 0;
 	int32 Bounces = 0;
+	FVector FirstBounceAt = FVector::ZeroVector;
 	float LastKnockAt = -1.0f;
 	/** How it spins in flight (degrees a second, about each axis). */
 	FRotator Spin = FRotator::ZeroRotator;

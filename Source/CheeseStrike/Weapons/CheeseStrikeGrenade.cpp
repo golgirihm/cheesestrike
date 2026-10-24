@@ -199,7 +199,10 @@ void ACheeseStrikeGrenade::BeginPlay()
 
 void ACheeseStrikeGrenade::OnBounce(const FHitResult& Hit, const FVector& ImpactVelocity)
 {
-	++Bounces;
+	if (++Bounces == 1)
+	{
+		FirstBounceAt = Hit.ImpactPoint;
+	}
 	const float Into = FMath::Abs(FVector::DotProduct(ImpactVelocity, Hit.ImpactNormal));
 	const float Time = GetWorld()->GetTimeSeconds();
 	// Rolling to rest, it slows its spin to the speed it goes.

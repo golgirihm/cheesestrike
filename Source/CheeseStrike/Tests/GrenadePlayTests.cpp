@@ -226,14 +226,14 @@ bool FAHeldThrowShowsItsArcAndGoesOnRelease::RunTest(const FString& Parameters)
 		const ACheeseStrikeGrenade* Grenade = Thrown.Get();
 		if (Grenade != nullptr && Grenade->GetBounces() > 0)
 		{
-			FirstBounce = Grenade->GetActorLocation();
+			FirstBounce = Grenade->GetFirstBounceAt();
 			return true;
 		}
 		return Grenade == nullptr;
 	});
 	Then([this]()
 	{
-		TestTrue(FString::Printf(TEXT("it comes down where the arc said (%.0f cm off)"), FVector::Dist2D(FirstBounce, Predicted)), FVector::Dist2D(FirstBounce, Predicted) < 120.0f);
+		TestTrue(FString::Printf(TEXT("it comes down where the arc said (%.0f cm off: %s against %s)"), FVector::Dist2D(FirstBounce, Predicted), *FirstBounce.ToCompactString(), *Predicted.ToCompactString()), FVector::Dist2D(FirstBounce, Predicted) < 120.0f);
 	});
 	WaitUntil(TEXT("the grenade gone"), 6.0f, []() { return Grenades(0).Num() == 0; });
 	// Held, then a weapon drawn: put away, still carried, and letting go throws nothing.
