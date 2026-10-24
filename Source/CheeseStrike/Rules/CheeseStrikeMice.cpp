@@ -25,6 +25,36 @@ namespace CheeseStrikeMice
 		return Value.IsNumeric() ? FMath::Max(0.0f, FCString::Atof(*Value)) : ArriveAfter;
 	}
 
+	float CountdownFrom(float Arrival)
+	{
+		return FMath::Max(0.0f, Arrival - Warning);
+	}
+
+	bool ShouldLeave(int32 EdibleLeft)
+	{
+		return EdibleLeft <= 0;
+	}
+
+	TOptional<FVector> OverTheEdge(const FVector& From, const FVector& Top, const FVector& Outward, float Seconds)
+	{
+		if (Seconds < ClimbOutTime)
+		{
+			// Up onto the wall in an arc, as it came in (ACheeseStrikeMouse's Entering), the height gained early.
+			const float Through = FMath::Clamp(Seconds / ClimbOutTime, 0.0f, 1.0f);
+			const FVector Flat = FMath::Lerp(From, Top, Through);
+			const float Arc = FMath::Max(150.0f, 0.25f * static_cast<float>(FVector::Dist2D(From, Top)));
+			const float Rise = 1.0f - (1.0f - Through) * (1.0f - Through);
+			return FVector(Flat.X, Flat.Y, FMath::Lerp(From.Z, Top.Z, Rise) + Arc * FMath::Sin(Through * PI));
+		}
+		if (Seconds < ClimbOutTime + DropOutTime)
+		{
+			// And down the far side, falling faster as it goes.
+			const float Through = (Seconds - ClimbOutTime) / DropOutTime;
+			return Top + Outward.GetSafeNormal2D() * DropOutward * Through - FVector(0.0f, 0.0f, DropBelow * Through * Through);
+		}
+		return TOptional<FVector>();
+	}
+
 	float CheeseCost(float Distance, float Height, bool bClaimedByAnother)
 	{
 		return Distance + HeightCost * FMath::Max(0.0f, Height) + (bClaimedByAnother ? Claimed : 0.0f);

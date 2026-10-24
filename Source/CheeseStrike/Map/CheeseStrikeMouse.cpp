@@ -37,6 +37,8 @@ namespace
 	constexpr float MouseReachFrom = 220.0f;
 	/** A mouse's sounds are a rat's, pitched down by about this for its size, and heard this far (cm), at full loudness within the first. */
 	constexpr float MousePitch = 0.7f;
+	/** And all a little quieter than they were: about 5 dB down (the user's, 24 Oct 2026). */
+	constexpr float MouseLoudness = 0.56f;
 	constexpr float MouseHeardWithin = 600.0f;
 	constexpr float MouseHeardTo = 3500.0f;
 	/** Seconds between its squeaks, from and to; and between its crunches while it eats. */
@@ -67,6 +69,8 @@ namespace
 	/** Not having eaten for this long, nor come nearer the cheese it is after for MouseStuckFor (seconds), it is stuck: it comes in again. */
 	constexpr float MouseStuckAfter = 15.0f;
 	constexpr float MouseStuckFor = 8.0f;
+	/** Leaving, it goes over the edge once its way out ends within this of the way's top (cm): the ground inside it is 5 m in. */
+	constexpr float MouseOutFrom = 900.0f;
 
 	UAudioComponent* MakeSpeaker(AActor* Mouse, USceneComponent* Body, const TCHAR* Name)
 	{
@@ -230,7 +234,7 @@ void ACheeseStrikeMouse::ShowDoing()
 		if (Doing == EMouseDoing::Eating)
 		{
 			Gnawing->SetPitchMultiplier(MousePitch * FMath::FRandRange(0.95f, 1.1f));
-			Gnawing->SetVolumeMultiplier(0.6f);
+			Gnawing->SetVolumeMultiplier(0.6f * MouseLoudness);
 			Gnawing->Play(FMath::FRandRange(0.0f, 10.0f));
 			NextCrunchAt = Now() + FMath::FRandRange(0.0f, MouseCrunchFrom);
 		}
@@ -242,20 +246,25 @@ void ACheeseStrikeMouse::ShowDoing()
 		{
 			Say(Voice, Scream, 1.0f, MousePitch);
 		}
+		// A squeak as it sets off for home.
+		if (Doing == EMouseDoing::Leaving && !bFirst && Squeaks.Num() > 0)
+		{
+			Say(Voice, Squeaks[0], 0.8f, MousePitch);
+		}
 	}
 	UAnimSequence* Animation = Doing == EMouseDoing::Eating ? EatAnimation.Get() : (Doing == EMouseDoing::Walking ? WalkAnimation.Get() : RunAnimation.Get());
 	if (Animation != nullptr && Mesh != nullptr)
 	{
 		Mesh->PlayAnimation(Animation, true);
 		// A rat's stride at a mouse's size: slower than a rat's, its legs being longer.
-		Mesh->SetPlayRate(Doing == EMouseDoing::Fleeing ? 0.8f : (Doing == EMouseDoing::Walking ? 0.7f : 1.0f));
+		Mesh->SetPlayRate(Doing == EMouseDoing::Fleeing ? 0.8f : (Doing == EMouseDoing::Walking ? 0.7f : (Doing == EMouseDoing::Leaving ? 0.65f : 1.0f)));
 	}
 }
 
 float ACheeseStrikeMouse::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
 	const float Taken = Super::TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
-	if (!HasAuthority() || Doing == EMouseDoing::Entering || Doing == EMouseDoing::Sinking)
+	if (!HasAuthority() || Doing == EMouseDoing::Entering || Doing == EMouseDoing::Sinking || IsLeaving())
 	{
 		return Taken;
 	}
@@ -675,6 +684,91 @@ bool ACheeseStrikeMouse::ComeBack()
 	return false;
 }
 
+void ACheeseStrikeMouse::Leave()
+{
+	UWorld* World = GetWorld();
+	if (!HasAuthority() || World == nullptr || IsLeaving())
+	{
+		return;
+	}
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z);
+	Target = nullptr;
+	LeapTo.Reset();
+	EatsUnderfoot = nullptr;
+	GivenUp.Reset();
+	Path.Reset();
+	LeftAt = Now();
+	// Of the ways in, the one it can walk to soonest (to the ground inside it, as it came: ComeBack); with none, the nearest.
+	const AActor* Nearest = nullptr;
+	float NearestDistance = TNumericLimits<float>::Max();
+	const AActor* Best = nullptr;
+	float BestLength = TNumericLimits<float>::Max();
+	TArray<FVector> BestWay;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (!It->ActorHasTag(FName(TEXT("MouseEntry"))))
+		{
+			continue;
+		}
+		const FVector Top = It->GetActorLocation();
+		const float Distance = FVector::Dist(Top, Feet);
+		if (Distance < NearestDistance)
+		{
+			NearestDistance = Distance;
+			Nearest = *It;
+		}
+		FNavLocation Ground;
+		if (Navigation == nullptr || !Navigation->ProjectPointToNavigation(Top + It->GetActorForwardVector() * 500.0f - FVector(0.0f, 0.0f, 1000.0f), Ground, FVector(600.0f, 600.0f, 1000.0f))
+			|| CheeseStrikeFalls::IsBelowKillHeight(World, Ground.Location.Z))
+		{
+			continue;
+		}
+		UNavigationPath* Way = Navigation->FindPathToLocationSynchronously(World, Feet, Ground.Location, this);
+		if (Way != nullptr && Way->IsValid() && !Way->IsPartial() && Way->PathPoints.Num() > 0 && Way->GetPathLength() < BestLength)
+		{
+			BestLength = Way->GetPathLength();
+			BestWay = Way->PathPoints;
+			Best = *It;
+		}
+	}
+	const AActor* Exit = Best != nullptr ? Best : Nearest;
+	if (Exit == nullptr)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Mouse %s has no way out: it is gone"), *GetName());
+		Destroy();
+		return;
+	}
+	ExitTop = Exit->GetActorLocation();
+	ExitOutward = -Exit->GetActorForwardVector();
+	if (Best != nullptr)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Mouse %s leaves, the cheese all eaten: %.0f m to the way out at %s"), *GetName(), BestLength / 100.0f, *ExitTop.ToCompactString());
+		Path = BestWay;
+		ExitGround = BestWay.Last();
+		PathIndex = 0;
+		PathFoundAt = Now();
+		Doing = EMouseDoing::Leaving;
+		ShowDoing();
+	}
+	else
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Mouse %s leaves, the cheese all eaten, with no way out to walk: it leaps for the one at %s"), *GetName(), *ExitTop.ToCompactString());
+		GoOverTheEdge();
+	}
+}
+
+void ACheeseStrikeMouse::GoOverTheEdge()
+{
+	ExitFrom = GetActorLocation() - FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z);
+	ExitingFor = 0.0f;
+	Path.Reset();
+	FallSpeed = 0.0f;
+	SetActorEnableCollision(false);
+	Doing = EMouseDoing::Exiting;
+	ShowDoing();
+}
+
 FVector2D ACheeseStrikeMouse::GetMapMiddle()
 {
 	if (!MapMiddle.IsSet())
@@ -923,7 +1017,7 @@ void ACheeseStrikeMouse::Say(UAudioComponent* Speaker, USoundBase* Sound, float 
 		return;
 	}
 	Speaker->SetSound(Sound);
-	Speaker->SetVolumeMultiplier(Volume);
+	Speaker->SetVolumeMultiplier(Volume * MouseLoudness);
 	Speaker->SetPitchMultiplier(Around * FMath::FRandRange(0.9f, 1.15f));
 	Speaker->Play();
 }
@@ -981,7 +1075,7 @@ void ACheeseStrikeMouse::Tick(float DeltaSeconds)
 	const float Time = Now();
 	Fear = CheeseStrikeMice::FearAfter(Fear, DeltaSeconds);
 	// Below the map's kill height, it has fallen into the fondue: it screams and goes under, and comes back over the edge a while later.
-	if (Doing != EMouseDoing::Entering && Doing != EMouseDoing::Sinking && CheeseStrikeFalls::IsBelowKillHeight(GetWorld(), GetActorLocation().Z - Body->GetScaledBoxExtent().Z))
+	if (Doing != EMouseDoing::Entering && Doing != EMouseDoing::Sinking && Doing != EMouseDoing::Exiting && CheeseStrikeFalls::IsBelowKillHeight(GetWorld(), GetActorLocation().Z - Body->GetScaledBoxExtent().Z))
 	{
 		Doing = EMouseDoing::Sinking;
 		BackAt = Time + CheeseStrikeFalls::MouseGoneFor;
@@ -998,11 +1092,62 @@ void ACheeseStrikeMouse::Tick(float DeltaSeconds)
 		{
 			SetActorHiddenInGame(true);
 		}
+		// With nothing left to eat, it stays gone.
+		if (Time >= BackAt && CheeseStrikeMice::ShouldLeave(ACheeseStrikeCheese::CountEdible(GetWorld())))
+		{
+			UE_LOG(LogCheeseStrike, Display, TEXT("Mouse %s stays under, the cheese all eaten: it is gone"), *GetName());
+			Destroy();
+			return;
+		}
 		if (Time >= BackAt && !ComeBack())
 		{
 			BackAt = Time + 2.0f;
 		}
 		break;
+	case EMouseDoing::Leaving:
+	{
+		// Scurrying off to the way out; there, up onto the wall and over. Stopped short (at an edge, or its way old),
+		// it finds its way again, and with none, or taking too long, leaps for it from where it is.
+		if (FollowPath(CheeseStrikeMice::LeaveSpeed, DeltaSeconds))
+		{
+			const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z);
+			const bool bThere = Path.Num() > 0 || FVector::Dist2D(Feet, ExitTop) < MouseOutFrom;
+			// (Found again only a moment ago, and stopped short again: it leaps.)
+			if (bThere || Time - PathFoundAt < 1.0f || !FindWay(ExitGround))
+			{
+				GoOverTheEdge();
+			}
+		}
+		else if (Time - LeftAt > CheeseStrikeMice::LeaveWithin)
+		{
+			UE_LOG(LogCheeseStrike, Display, TEXT("Mouse %s is long getting out: it leaps for the way out at %s"), *GetName(), *ExitTop.ToCompactString());
+			GoOverTheEdge();
+		}
+		break;
+	}
+	case EMouseDoing::Exiting:
+	{
+		ExitingFor += DeltaSeconds;
+		const TOptional<FVector> At = CheeseStrikeMice::OverTheEdge(ExitFrom, ExitTop, ExitOutward, ExitingFor);
+		if (!At.IsSet())
+		{
+			int32 Others = 0;
+			for (TActorIterator<ACheeseStrikeMouse> It(GetWorld()); It; ++It)
+			{
+				Others += *It != this && !It->IsActorBeingDestroyed() ? 1 : 0;
+			}
+			UE_LOG(LogCheeseStrike, Display, TEXT("Mouse %s has gone over the edge at %s%s"), *GetName(), *ExitTop.ToCompactString(), Others == 0 ? TEXT(": the mice have all gone") : TEXT(""));
+			Destroy();
+			return;
+		}
+		SetActorLocation(At.GetValue() + FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z));
+		// Facing the wall and nose up as it springs up it, then nose down over it.
+		const bool bClimbing = ExitingFor < CheeseStrikeMice::ClimbOutTime;
+		const FVector Facing = bClimbing && FVector::Dist2D(ExitFrom, ExitTop) > 50.0f ? ExitTop - ExitFrom : ExitOutward;
+		const float Down = bClimbing ? 45.0f * FMath::Sin(PI * ExitingFor / CheeseStrikeMice::ClimbOutTime) : -40.0f * (ExitingFor - CheeseStrikeMice::ClimbOutTime) / CheeseStrikeMice::DropOutTime;
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(Down, Facing.Rotation().Yaw, 0.0f), DeltaSeconds, 8.0f));
+		break;
+	}
 	case EMouseDoing::Entering:
 	{
 		// Over the top of the wall and down to the ground, in an arc.
@@ -1045,6 +1190,12 @@ void ACheeseStrikeMouse::Tick(float DeltaSeconds)
 			NextChoiceAt = Time + MouseChooseEvery;
 			ChooseCheese();
 			Cheese = Target.Get();
+			// Nothing left on the map to eat: it goes home.
+			if (Cheese == nullptr && CheeseStrikeMice::ShouldLeave(ACheeseStrikeCheese::CountEdible(GetWorld())))
+			{
+				Leave();
+				break;
+			}
 			// Bounding off to cheese it can't walk to.
 			if (Doing == EMouseDoing::Entering)
 			{
@@ -1145,7 +1296,7 @@ void ACheeseStrikeMouse::Tick(float DeltaSeconds)
 		break;
 	}
 	}
-	if (Doing != EMouseDoing::Entering)
+	if (Doing != EMouseDoing::Entering && Doing != EMouseDoing::Exiting)
 	{
 		KeepOnGround(DeltaSeconds);
 	}

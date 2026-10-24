@@ -32,14 +32,76 @@ bool FHowManyMiceComeAndWhen::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheVerminCountdownWaits, "CheeseStrike.Mice.TheCountdownWaitsHalfAMinute", MiceTests::Flags)
+
+bool FTheVerminCountdownWaits::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeMice;
+	TestEqual(TEXT("the mice still come a minute in"), ArriveAfter, 60.0f);
+	TestEqual(TEXT("the countdown shows half a minute in"), CountdownFrom(ArriveAfter), 30.0f);
+	TestEqual(TEXT("and runs for half a minute"), Warning, 30.0f);
+	TestEqual(TEXT("mice coming sooner (?MiceAt=20) have it from the start"), CountdownFrom(ArrivalFrom(TEXT("?MiceAt=20"))), 0.0f);
+	// Second by second from the end of the start's count, as the HUD reads the game state.
+	const float Arrival = ArriveAfter;
+	int32 FirstShown = -1;
+	FString FirstWords;
+	for (int32 Second = 0; Second <= 60 && FirstShown < 0; ++Second)
+	{
+		const FString Words = CheeseStrikeHUD::VerminWords(Arrival - Second);
+		if (!Words.IsEmpty())
+		{
+			FirstShown = Second;
+			FirstWords = Words;
+		}
+	}
+	TestEqual(TEXT("in a match, the first second it shows"), FirstShown, 30);
+	TestEqual(TEXT("reading 0:30"), FirstWords, FString(TEXT("VERMIN INVASION IN 0:30")));
+	TestEqual(TEXT("a moment before, nothing"), CheeseStrikeHUD::VerminWords(Arrival - 29.9f), FString());
+	TestEqual(TEXT("a moment after, still 0:30"), CheeseStrikeHUD::VerminWords(Arrival - 30.2f), FString(TEXT("VERMIN INVASION IN 0:30")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMiceLeaveOverTheEdge, "CheeseStrike.Mice.LeaveOverTheEdge", MiceTests::Flags)
+
+bool FTheMiceLeaveOverTheEdge::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeMice;
+	TestFalse(TEXT("they stay while there is cheese"), ShouldLeave(1));
+	TestTrue(TEXT("and leave once it is all eaten"), ShouldLeave(0));
+	// Inside, 5 m in from a wall 3 m high, its way out to the west.
+	const FVector From(500.0f, 0.0f, 0.0f);
+	const FVector Top(0.0f, 0.0f, 300.0f);
+	const FVector Out(-1.0f, 0.0f, 0.0f);
+	TestTrue(TEXT("setting off from where it stands"), OverTheEdge(From, Top, Out, 0.0f).GetValue().Equals(From, 1.0));
+	const FVector Halfway = OverTheEdge(From, Top, Out, 0.5f * ClimbOutTime).GetValue();
+	TestTrue(FString::Printf(TEXT("leaping up, over the wall's top halfway (%.0f cm)"), Halfway.Z), Halfway.Z > Top.Z);
+	TestTrue(TEXT("on the wall's top as it climbs out"), OverTheEdge(From, Top, Out, ClimbOutTime).GetValue().Equals(Top, 1.0));
+	const FVector Last = OverTheEdge(From, Top, Out, ClimbOutTime + DropOutTime - 0.01f).GetValue();
+	TestTrue(FString::Printf(TEXT("then outside the wall (%.0f cm out)"), Top.X - Last.X), Top.X - Last.X > 0.9f * DropOutward);
+	TestTrue(FString::Printf(TEXT("and below its top, out of sight (%.0f cm)"), Top.Z - Last.Z), Top.Z - Last.Z > 0.9f * DropBelow);
+	// Never a jump in where it is: it moves no more than a leap's speed a frame.
+	FVector Was = From;
+	float Fastest = 0.0f;
+	for (float Seconds = 1.0f / 60.0f; Seconds < ClimbOutTime + DropOutTime; Seconds += 1.0f / 60.0f)
+	{
+		const FVector Is = OverTheEdge(From, Top, Out, Seconds).GetValue();
+		Fastest = FMath::Max(Fastest, static_cast<float>(FVector::Dist(Is, Was)) * 60.0f);
+		Was = Is;
+	}
+	TestTrue(FString::Printf(TEXT("smoothly, no faster than 20 m/s (%.0f cm/s)"), Fastest), Fastest < 2000.0f);
+	TestFalse(TEXT("and then it is gone"), OverTheEdge(From, Top, Out, ClimbOutTime + DropOutTime + 0.01f).IsSet());
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheVerminAreAnnounced, "CheeseStrike.HUD.TheVerminAreAnnounced", MiceTests::Flags)
 
 bool FTheVerminAreAnnounced::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeHUD;
-	TestEqual(TEXT("nothing before the countdown"), VerminWords(75.0f), FString());
-	TestEqual(TEXT("a minute to go"), VerminWords(60.0f), FString(TEXT("VERMIN INVASION IN 1:00")));
-	TestEqual(TEXT("counting down, in minutes and seconds"), VerminWords(58.4f), FString(TEXT("VERMIN INVASION IN 0:59")));
+	TestEqual(TEXT("nothing at the start, a minute before they come"), VerminWords(60.0f), FString());
+	TestEqual(TEXT("nor until half a minute is left"), VerminWords(30.1f), FString());
+	TestEqual(TEXT("then counting down from half a minute"), VerminWords(30.0f), FString(TEXT("VERMIN INVASION IN 0:30")));
+	TestEqual(TEXT("in minutes and seconds"), VerminWords(28.4f), FString(TEXT("VERMIN INVASION IN 0:29")));
 	TestEqual(TEXT("to the last second"), VerminWords(0.2f), FString(TEXT("VERMIN INVASION IN 0:01")));
 	TestEqual(TEXT("then they have come"), VerminWords(-1.0f), FString(TEXT("THE VERMIN HAVE COME")));
 	TestEqual(TEXT("and then nothing"), VerminWords(-VerminCameFor - 0.1f), FString());
@@ -376,6 +438,95 @@ bool FTheMiceEatTheCreamery::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("blocks show being eaten (%d)"), Bitten), Bitten > 0);
 		AddInfo(FString::Printf(TEXT("%d of %d blocks left"), All<ACheeseStrikeCheese>().Num(), BlocksAtFirst));
 	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMiceLeaveWhenTheCheeseIsGone, "CheeseStrike.Play.TheMiceLeaveWhenTheCheeseIsGone", MiceTests::Flags)
+
+bool FTheMiceLeaveWhenTheCheeseIsGone::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace MiceTests;
+	// Each mouse, and whether it was seen going home and going over the edge.
+	static TMap<TWeakObjectPtr<ACheeseStrikeMouse>, uint8> Seen;
+	static int32 Came = 0;
+	Seen.Reset();
+	Came = 0;
+	FSession Session;
+	Session.Level = TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery");
+	Session.Options = TEXT("?Mice=1?MiceAt=2");
+	StartPlaying(Session);
+	WaitUntil(TEXT("twenty-four mice over the edge"), 15.0f, []() { return All<ACheeseStrikeMouse>().Num() == CheeseStrikeMice::MaxMice; });
+	WaitUntil(TEXT("the mice in and eating"), 15.0f, []()
+	{
+		for (ACheeseStrikeMouse* Mouse : All<ACheeseStrikeMouse>())
+		{
+			if (Mouse->GetDoing() == EMouseDoing::Entering)
+			{
+				return false;
+			}
+		}
+		return true;
+	});
+	Wait(2.0f);
+	Then([this]()
+	{
+		for (ACheeseStrikeMouse* Mouse : All<ACheeseStrikeMouse>())
+		{
+			TestFalse(FString::Printf(TEXT("%s stays while there is cheese"), *Mouse->GetName()), Mouse->IsLeaving());
+			Seen.Add(Mouse, 0);
+		}
+		Came = Seen.Num();
+		// Everything they may eat, eaten at once.
+		int32 Eaten = 0;
+		for (ACheeseStrikeCheese* Cheese : All<ACheeseStrikeCheese>())
+		{
+			if (Cheese->IsEdible())
+			{
+				Cheese->Bite(CheeseStrikeRules::CheeseBlockHealth);
+				++Eaten;
+			}
+		}
+		AddInfo(FString::Printf(TEXT("%d mice; %d blocks eaten at once"), Came, Eaten));
+	});
+	// Within a couple of seconds every mouse sets off; then each goes over the edge, and they are all gone.
+	WaitUntil(TEXT("every mouse going home"), 5.0f, []()
+	{
+		bool bAll = true;
+		for (ACheeseStrikeMouse* Mouse : All<ACheeseStrikeMouse>())
+		{
+			bAll &= Mouse->IsLeaving();
+		}
+		return bAll;
+	});
+	WaitUntil(TEXT("the mice all gone"), 45.0f, []()
+	{
+		for (ACheeseStrikeMouse* Mouse : All<ACheeseStrikeMouse>())
+		{
+			if (uint8* Was = Seen.Find(Mouse))
+			{
+				*Was |= Mouse->IsLeaving() ? 1 : 0;
+				*Was |= Mouse->GetDoing() == EMouseDoing::Exiting ? 2 : 0;
+			}
+		}
+		return All<ACheeseStrikeMouse>().Num() == 0;
+	});
+	Then([this]()
+	{
+		int32 Home = 0;
+		int32 OverTheEdge = 0;
+		for (const TPair<TWeakObjectPtr<ACheeseStrikeMouse>, uint8>& Each : Seen)
+		{
+			Home += (Each.Value & 1) != 0 ? 1 : 0;
+			OverTheEdge += (Each.Value & 2) != 0 ? 1 : 0;
+		}
+		TestEqual(TEXT("no mouse is left"), All<ACheeseStrikeMouse>().Num(), 0);
+		TestEqual(TEXT("every mouse went home"), Home, Came);
+		TestEqual(TEXT("every mouse went over the edge, none vanishing where it stood"), OverTheEdge, Came);
+	});
+	Wait(5.0f);
+	Then([this]() { TestEqual(TEXT("and none comes back"), All<ACheeseStrikeMouse>().Num(), 0); });
 	StopPlaying();
 	return true;
 }
