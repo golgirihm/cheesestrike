@@ -188,7 +188,9 @@ bool FTheHUDShowsTheHill::RunTest(const FString& Parameters)
 	for (const FLinearColor& Held : {CheeseStrikeModes::TeamColour(0), CheeseStrikeModes::TeamColour(1), ACheeseStrikeHill::Own, ACheeseStrikeHill::Other})
 	{
 		const float Apart = FMath::Sqrt(FMath::Square(Held.R - Nobody.R) + FMath::Square(Held.G - Nobody.G) + FMath::Square(Held.B - Nobody.B));
-		TestTrue(FString::Printf(TEXT("and unlike a hold's colour (%.2f apart, and that one's saturation %.2f)"), Apart, Held.LinearRGBToHSV().G), Apart > 0.3f && Held.LinearRGBToHSV().G > 0.4f);
+		// A colour, or (the Mozza Radicals' white) far brighter.
+		const bool bOther = Held.LinearRGBToHSV().G > 0.4f || Held.LinearRGBToHSV().B - Nobody.LinearRGBToHSV().B > 0.3f;
+		TestTrue(FString::Printf(TEXT("and unlike a hold's colour (%.2f apart, and that one's saturation %.2f)"), Apart, Held.LinearRGBToHSV().G), Apart > 0.3f && bOther);
 	}
 
 	// The marker: where the hill is, on the screen; held to the edge of what the HUD leaves clear the way it lies, off it.
