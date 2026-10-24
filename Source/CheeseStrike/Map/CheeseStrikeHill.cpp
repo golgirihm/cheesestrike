@@ -35,7 +35,8 @@ namespace
 	}
 }
 
-const FLinearColor ACheeseStrikeHill::Neutral(1.0f, 0.7f, 0.12f, 1.0f);
+// Nobody's: a cool grey, apart from every side's colour and the solo mode's green and red.
+const FLinearColor ACheeseStrikeHill::Neutral(0.6f, 0.63f, 0.68f, 1.0f);
 const FLinearColor ACheeseStrikeHill::Own(0.3f, 0.92f, 0.42f, 1.0f);
 const FLinearColor ACheeseStrikeHill::Other(0.93f, 0.2f, 0.15f, 1.0f);
 

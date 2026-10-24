@@ -159,6 +159,29 @@ bool ACheeseStrikeBombs::Landing(UWorld* World, const FVector& Over, FVector& Ou
 	return true;
 }
 
+bool ACheeseStrikeBombs::GroundNear(UWorld* World, const FVector2D& Where, float Height, FVector& OutGround)
+{
+	if (World == nullptr)
+	{
+		return false;
+	}
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeGroundNear), false);
+	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+	{
+		Params.AddIgnoredActor(*It);
+	}
+	// Down from a head's height over the feet: the floor they are on, or the one under them there; where that begins
+	// inside something (a wall, a stack), or meets nothing, the first thing under the sky.
+	const FVector From(Where.X, Where.Y, Height + 250.0f);
+	FHitResult Hit;
+	if (World->LineTraceSingleByChannel(Hit, From, FVector(Where.X, Where.Y, Height - CheeseStrikeStreaks::DropHeight), ECC_Visibility, Params) && !Hit.bStartPenetrating && Hit.Distance > 1.0f)
+	{
+		OutGround = Hit.ImpactPoint;
+		return true;
+	}
+	return Landing(World, FVector(Where.X, Where.Y, Height), OutGround);
+}
+
 bool ACheeseStrikeBombs::StrikeLanding(UWorld* World, const FCheeseStrikeOverhead& Overhead, const FVector& Over, FVector& OutImpact, float& OutRoof)
 {
 	OutRoof = 0.0f;
@@ -206,7 +229,7 @@ void ACheeseStrikeBombs::StartStrike(ACheeseStrikePlayerState* InCaller, const F
 	const float Start = Now();
 	WarnAt = Start;
 	WarnWhere = Spot;
-	const TArray<FVector> Line = CheeseStrikeStreaks::StrikeLine(Spot, Yaw);
+	const TArray<FVector> Line = CheeseStrikeStreaks::StrikeArea(Spot, Yaw);
 	// Indoors, through the roof onto the floor under it, rather than onto the roof.
 	const FCheeseStrikeOverhead& Overhead = FCheeseStrikeOverhead::Of(GetWorld());
 	int32 ThroughRoofs = 0;
@@ -225,7 +248,7 @@ void ACheeseStrikeBombs::StartStrike(ACheeseStrikePlayerState* InCaller, const F
 		DoneAt = FMath::Max(DoneAt, Drop.LandsAt + 2.0f);
 	}
 	DoneAt = FMath::Max(DoneAt, Start + CheeseStrikeStreaks::StrikeWarning + 2.0f);
-	UE_LOG(LogCheeseStrike, Display, TEXT("Cheese Strike from %s: %d wheels along %.0f degrees through (%.0f, %.0f, %.0f), %d through a roof"), InCaller != nullptr ? *InCaller->GetPlayerName() : TEXT("nobody"), Drops.Num(), Yaw, Spot.X, Spot.Y, Spot.Z, ThroughRoofs);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Cheese Strike from %s: %d wheels over %.0f cm round (%.0f, %.0f, %.0f), %d through a roof"), InCaller != nullptr ? *InCaller->GetPlayerName() : TEXT("nobody"), Drops.Num(), CheeseStrikeStreaks::StrikeRadius, Spot.X, Spot.Y, Spot.Z, ThroughRoofs);
 }
 
 void ACheeseStrikeBombs::StartOverload(ACheeseStrikePlayerState* InCaller)

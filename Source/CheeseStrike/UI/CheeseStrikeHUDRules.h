@@ -3,7 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Rules/CheeseStrikeStreaks.h"
 
 /**
  * The HUD's rules, as plain functions that a test can call without a world
@@ -33,6 +35,18 @@ namespace CheeseStrikeHUD
 	 * middle. A point to the player's right is to the right.
 	 */
 	FVector2D MapPoint(const FVector2D& Offset, float ViewYaw, float Scale);
+	/** The other way to MapPoint: the world's offset (cm along X and Y) for a point `Screen` pixels right of and below a minimap's middle. */
+	FVector2D MapOffset(const FVector2D& Screen, float ViewYaw, float Scale);
+	/**
+	 * The strike map's middle (world X and Y) as it follows the strike's
+	 * `Mark`: kept where it is while the mark is within `Reach` cm of it
+	 * across and up and down the map (turned by `ViewYaw`), and moved just
+	 * far enough to bring it back within that when it strays.
+	 */
+	FVector2D FollowMark(const FVector2D& Middle, const FVector2D& Mark, float ViewYaw, float Reach);
+	/** How far the strike map reaches from its middle to its edge (cm), and the share of that the mark may go before the map follows it. */
+	constexpr float StrikeMapRange = 3500.0f;
+	constexpr float StrikeMapFollow = 0.6f;
 	/** Where the N mark rides the edge of a square minimap `HalfSize` pixels from its middle to its edge, from its middle. */
 	FVector2D NorthMark(float ViewYaw, float HalfSize);
 	/** The convex hull of `Points`, in order round it; fewer than three points come back as they are. */
@@ -95,9 +109,31 @@ namespace CheeseStrikeHUD
 	 * rounded to `Radius` (held to half its shorter side; 0 for square
 	 * corners), each corner an arc of `Steps` segments: in order round,
 	 * clockwise on the screen, from the left end of the top left corner's arc.
-	 * The canvas has no rounded shapes; the HUD fills this as a polygon.
+	 * The canvas has no rounded shapes; the HUD fills this as a polygon. By
+	 * default (`Steps` -1) each arc has as many segments as its radius needs
+	 * (CornerSteps).
 	 */
-	TArray<FVector2D> RoundedRect(const FVector2D& Min, const FVector2D& Max, float Radius, int32 Steps = 6);
+	TArray<FVector2D> RoundedRect(const FVector2D& Min, const FVector2D& Max, float Radius, int32 Steps = -1);
+	/** Segments enough for a quarter circle `Radius` pixels round to look round: its chords stray from the true arc by under CornerError of a pixel. */
+	constexpr float CornerError = 0.08f;
+	int32 CornerSteps(float Radius);
+	/**
+	 * How wide the soft edge of the HUD's shapes is, in the screen's pixels:
+	 * a shape is solid to half of it inside its outline and fades to clear
+	 * half of it outside, as a pixel the edge crosses is covered, so that a
+	 * rounded corner or a disc is smooth rather than stepped
+	 * (CheeseStrikeHUDDraw::FShapes).
+	 */
+	constexpr float SoftEdge = 1.0f;
+	/**
+	 * For each corner of a convex `Outline` (in order round, either way),
+	 * the way out from it that moves both its edges out by one: the sum of
+	 * their outward normals over one plus their dot product, held to
+	 * MostMiter long at a sharp corner. Corners that coincide (an arc of no
+	 * radius) take their way from the nearest corners apart from them.
+	 */
+	constexpr float MostMiter = 3.0f;
+	TArray<FVector2D> OutwardMiters(TConstArrayView<FVector2D> Outline);
 	/** How far `Point` is inside that rounded rectangle's edge: negative outside. */
 	float InsideRoundedRect(const FVector2D& Point, const FVector2D& Min, const FVector2D& Max, float Radius);
 	/** `Point` held inside it: itself if it is inside, else the nearest point of its edge. */
@@ -236,6 +272,56 @@ namespace CheeseStrikeHUD
 	FScoreSummary GunGame(const TArray<CheeseStrikeRules::FStanding>& SortedBySteps, const FString& Me, int32 Steps);
 	/** A team mode's summary: each side's score in its colour, `MyTeam`'s marked, racing to `Limit`, with `Goal` (the round, or what wins) between them. */
 	FScoreSummary Teams(const int32 (&Scores)[CheeseStrikeRules::Teams], int32 MyTeam, int32 Limit, const FString& Goal);
+	/**
+	 * A block of the score summary laid out in `Width` pixels with `Pad` at
+	 * either side and `Gap` between its words and its score: the score at
+	 * the right, shrunk (ScoreScale) if it would take more than
+	 * ScoreMostShare of the room, and the caption over the name at the left,
+	 * each cut with dots (FitName) to what the score leaves, so that a side's
+	 * long name or a player's never runs into a wide score, at any size of
+	 * the window. A caption that would be cut has the score shrunk for it
+	 * first, as far as ScoreLeastScale (a side's name over a hill's
+	 * three-figure points stays whole). The widths are each text's as drawn.
+	 */
+	constexpr float ScoreMostShare = 0.45f;
+	constexpr float ScoreLeastScale = 0.7f;
+	struct FScoreBlockText
+	{
+		FString Caption;
+		FString Name;
+		float ScoreScale = 1.0f;
+	};
+	FScoreBlockText FitScoreBlock(const FScoreLine& Line, float Width, float Pad, float Gap,
+		TFunctionRef<float(const FString&)> CaptionWidth, TFunctionRef<float(const FString&)> NameWidth, TFunctionRef<float(const FString&)> ScoreWidth);
+
+	// ---------------------------------------------------------------- the scoreboard's sides
+
+	/** What a side's score on the scoreboard counts, said beside it: "ROUNDS WON" in a mode of rounds, "POINTS" on the hill, else "KILLS". */
+	FString TeamScoreLabel(CheeseStrikeModes::EWinBy WinBy);
+
+	// ---------------------------------------------------------------- the kill streak
+
+	/** One pip of the kill-streak panel's track: whether its kill has been made, and the streak that kill earns (None for most). */
+	struct FStreakPip
+	{
+		bool bMade = false;
+		CheeseStrikeStreaks::EStreak Earns = CheeseStrikeStreaks::EStreak::None;
+	};
+	/** The track for a run of `Kills`: a pip for each kill up to the last streak's (the Gouda Overload's ten), the streaks' kills marked; a longer run has them all made. */
+	TArray<FStreakPip> StreakPips(int32 Kills);
+	/** What the panel says is next: "CHEESE STRIKE IN 2", one kill off "CHEESE STRIKE NEXT KILL"; past the last streak "EVERY STREAK EARNED". `bShort` names it as under its pip ("DRONE IN 3"). */
+	FString StreakNext(int32 Kills, bool bShort = false);
+	/** Seconds the count's pop takes after a kill. */
+	constexpr float StreakPopTime = 0.45f;
+	/** How big the count is drawn `Seconds` after a kill (1 at rest, and before 0): it springs up past 1.4 and settles back by StreakPopTime. */
+	float StreakPop(float Seconds);
+	/** Seconds a whole track of kills ended by a death takes to drain out of the panel. */
+	constexpr float StreakDrainTime = 0.6f;
+	/** A streak's word under its pip: "DRONE", "STRIKE", "OVERLOAD". */
+	FString StreakShortName(CheeseStrikeStreaks::EStreak Kind);
+	/** The pips shown filled for a run of `Kills`, from `Shown` (what was shown the frame before), `DeltaSeconds` on: rising StreakFillRate pips a second, and draining a run that has ended (a whole track in StreakDrainTime). */
+	constexpr float StreakFillRate = 9.0f;
+	float StreakFillToward(float Shown, int32 Kills, float DeltaSeconds);
 
 	// ---------------------------------------------------------------- name tags
 

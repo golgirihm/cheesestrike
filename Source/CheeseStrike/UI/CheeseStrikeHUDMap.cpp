@@ -59,6 +59,19 @@ namespace
 		constexpr int32 Steps = 10;
 		const auto Wedge = [&](const FVector2D& Tip, float From, float To, const FLinearColor& Inner, const FLinearColor& Outer)
 		{
+			if (From <= 0.0f)
+			{
+				// A whole wedge: one outline, its edge soft, shaded out from its point.
+				TArray<FVector2D, TInlineAllocator<Steps + 2>> Outline;
+				Outline.Add(Tip);
+				for (int32 Step = 0; Step <= Steps; ++Step)
+				{
+					const float Angle = FMath::Lerp(-HalfAngle, HalfAngle, static_cast<float>(Step) / Steps);
+					Outline.Add(Tip + FVector2D(FMath::Sin(Angle), FMath::Cos(Angle)) * To);
+				}
+				Shapes.SmoothFill(Outline, [&](const FVector2D& Point) { return FMath::Lerp(Inner, Outer, FMath::Clamp(FVector2D::Distance(Point, Tip) / To, 0.0f, 1.0f)); });
+				return;
+			}
 			for (int32 Step = 0; Step < Steps; ++Step)
 			{
 				const float A = FMath::Lerp(-HalfAngle, HalfAngle, static_cast<float>(Step) / Steps);
@@ -72,6 +85,8 @@ namespace
 				else
 				{
 					Shapes.Quad(Tip + WayA * From, Tip + WayB * From, Tip + WayB * To, Tip + WayA * To, Inner, Inner, Outer, Outer);
+					// The rind's round back soft, over the outline round it.
+					Shapes.Fringe(Tip + WayA * To, Tip + WayB * To, (WayA + WayB).GetSafeNormal() * CheeseStrikeHUD::SoftEdge, Outer);
 				}
 			}
 		};
@@ -140,34 +155,53 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 	{
 		return;
 	}
+	// At the top left, round the player, turned with the view.
+	const float U = Unit();
+	FMapFrame Frame;
+	Frame.Min = FVector2D(Margin * U, Margin * U);
+	Frame.Max = Frame.Min + FVector2D(MapSide * U, MapSide * U);
+	const FVector Eye = Controller->PlayerCameraManager->GetCameraLocation();
+	Frame.Middle = FVector2D(Eye.X, Eye.Y);
+	Frame.ViewYaw = Controller->PlayerCameraManager->GetCameraRotation().Yaw;
+	Frame.Scale = MapSide * U / 2.0f / CheeseStrikeHUD::MinimapRange;
+	Frame.Corner = CheeseStrikeHUD::MinimapCorner * U;
+	DrawMap(Controller, Character, FieldOfView, Frame);
+}
+
+void ACheeseStrikeHUD::DrawMap(const ACheeseStrikePlayerController* Controller, const ACheeseStrikeCharacter* Character, float FieldOfView, const FMapFrame& Frame)
+{
 	UWorld* World = GetWorld();
 	Minimap.Gather(World);
 	const float U = Unit();
-	const FVector2D Min(Margin * U, Margin * U);
-	const FVector2D Max = Min + FVector2D(MapSide * U, MapSide * U);
+	const FVector2D Min = Frame.Min;
+	const FVector2D Max = Frame.Max;
 	const FVector2D Centre = (Min + Max) / 2.0f;
-	const float Half = MapSide * U / 2.0f;
-	const float Scale = Half / CheeseStrikeHUD::MinimapRange;
+	const float Half = (Max.X - Min.X) / 2.0f;
+	const float Scale = Frame.Scale;
 	const FVector Eye = Controller->PlayerCameraManager->GetCameraLocation();
-	const float ViewYaw = Controller->PlayerCameraManager->GetCameraRotation().Yaw;
-	const FVector2D Middle(Eye.X, Eye.Y);
+	const float ViewYaw = Frame.ViewYaw;
+	const FVector2D Middle = Frame.Middle;
 	// Where the player stands; or, looking on from elsewhere (killed, from where their eyes were), as if standing there.
 	const float Feet = Character != nullptr && Character->IsAlive() && Controller->GetViewTarget() == Character ? FeetOf(Character) : Eye.Z - 160.0f;
 	const auto OnMap = [&](const FVector& At) { return Centre + CheeseStrikeHUD::MapPoint(FVector2D(At.X, At.Y) - Middle, ViewYaw, Scale); };
 
 	// Rounded corners: the level is cut to them, and the marks held inside them.
-	const float Corner = CheeseStrikeHUD::MinimapCorner * U;
+	const float Corner = Frame.Corner;
 	const FVector2D InsetMin = Min + FVector2D(6.0f * U, 6.0f * U);
 	const FVector2D InsetMax = Max - FVector2D(6.0f * U, 6.0f * U);
 	const float InsetCorner = FMath::Max(0.0f, Corner - 6.0f * U);
 
 	HudDraw::FShapes Shapes;
-	Shapes.RoundedRect(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y, Corner, FLinearColor(0.008f, 0.008f, 0.01f, 0.72f));
+	Shapes.RoundedRect(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y, Corner, FLinearColor(0.008f, 0.008f, 0.01f, Frame.bStrike ? 0.92f : 0.72f));
 	Minimap.Draw(Shapes, Min, Max, Middle, ViewYaw, Feet, Scale, Corner);
+
+	// Where the player is on it: the middle of the minimap, anywhere on the strike map.
+	const FVector2D PlayerAt = OnMap(Eye);
+	const bool bPlayerOn = CheeseStrikeHUD::InsideRoundedRect(PlayerAt, Min, Max, Corner) > 0.0f;
 
 	// What the player can see: a faint cone up the map.
 	const float HalfCone = FMath::Min(80.0f, FieldOfView / 2.0f);
-	const int32 Steps = 12;
+	const int32 Steps = Frame.bStrike ? 0 : 12;
 	for (int32 Step = 0; Step < Steps; ++Step)
 	{
 		const float A = FMath::DegreesToRadians(FMath::Lerp(-HalfCone, HalfCone, static_cast<float>(Step) / Steps));
@@ -231,7 +265,7 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 		const float Ping = Sweep.Since / 0.7f;
 		if (Ping < 1.0f && Half * 0.95f * Ping > 4.0f * U)
 		{
-			Shapes.Arc(Centre, Half * 0.95f * Ping, 2.0f * U, 0.0f, 360.0f, HudDraw::Faded(HudDraw::Danger, 0.55f * (1.0f - Ping)), false);
+			Shapes.Arc(PlayerAt, Half * 0.95f * Ping, 2.0f * U, 0.0f, 360.0f, HudDraw::Faded(HudDraw::Danger, 0.55f * (1.0f - Ping)), false);
 		}
 	}
 
@@ -239,10 +273,13 @@ void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controll
 	CheeseStrikeHillHUD::DrawOnMinimap(World, Me, Shapes, OnMap, Centre, Half, Scale, U);
 
 	// The player: a wedge of cheese in the middle, its point up, the way they face.
-	CheeseWedge(Shapes, Centre, U);
+	if (bPlayerOn)
+	{
+		CheeseWedge(Shapes, PlayerAt, U);
+	}
 
 	// Where the player is, by the map's names for its places, under the minimap.
-	const FString Place = ACheeseStrikePlace::NameAt(World, Eye).ToUpper();
+	const FString Place = Frame.bStrike ? FString() : ACheeseStrikePlace::NameAt(World, Eye).ToUpper();
 
 	// The frame, and north riding it.
 	Shapes.RoundedFrame(Min.X, Min.Y, Max.X - Min.X, Max.Y - Min.Y, Corner, FMath::Max(1.0f, U), HudDraw::Rule);

@@ -39,6 +39,7 @@ namespace HudDraw = CheeseStrikeHUDDraw;
 
 /** For judging the HUD from screenshots (development): the health it shows, and arcs held as they are. */
 static TAutoConsoleVariable<float> CVarHealthShown(TEXT("CheeseStrike.HUD.Health"), -1.0f, TEXT("Show this health on the HUD and its red edges instead of the character's (-1: the character's)."));
+static TAutoConsoleVariable<int32> CVarScoreShown(TEXT("CheeseStrike.HUD.Score"), -1, TEXT("Show this score in every block of the score summary, for judging how wide scores fit (-1: the real ones)."));
 static TAutoConsoleVariable<int32> CVarHoldArcs(TEXT("CheeseStrike.HUD.HoldArcs"), 0, TEXT("Hold the damage arcs as they are, neither fading nor going (1), for screenshots."));
 
 float ACheeseStrikeHUD::PixelsForDegrees(float Degrees, float FieldOfView, float Width)
@@ -362,12 +363,22 @@ void ACheeseStrikeHUD::DrawHUD()
 	}
 	if (!bOver)
 	{
-		DrawMinimap(Controller, Character, FieldOfView);
+		// Choosing where a Cheese Strike goes, the minimap is the strike map, big in the middle; killed, the choosing ends.
+		ACheeseStrikePlayerState* Mine = Controller->GetPlayerState<ACheeseStrikePlayerState>();
+		if (!bAlive && Mine != nullptr && Mine->IsMarkingStrike())
+		{
+			Mine->CancelStrike();
+		}
+		if (!bAlive || !DrawStrikeMap(Controller, Character, FieldOfView))
+		{
+			bStrikeMapShown = false;
+			DrawMinimap(Controller, Character, FieldOfView);
+		}
 		DrawPlayers(Match);
 		DrawScoreSummary(Match);
 	}
 	DrawKillFeed(Match);
-	// The mode's and the streaks' own: announcements, the streak to call in, the Cheese Strike's mark, being out of the round.
+	// The mode's and the streaks' own: announcements, the streak to call in, being out of the round.
 	CheeseStrikeModeHUD::Draw(this, Canvas);
 	if (!bOver)
 	{
@@ -454,6 +465,7 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 
 	DrawScope(Character);
 	DrawHealth(Character);
+	DrawStreak(Character);
 	DrawWeapon(Character);
 }
 
@@ -610,32 +622,35 @@ void ACheeseStrikeHUD::DrawHealth(const ACheeseStrikeCharacter* Character)
 	const float Block = (320.0f * U - Gap * (Count - 1)) / Count;
 
 	HudDraw::FShapes Shapes;
-	// The cross, centred on the bar.
+	// The cross, centred on the bar, its arms' ends a little rounded.
 	const float Arm = CrossSize / 3.0f;
 	const float CrossTop = Top + Height * 0.5f - CrossSize * 0.5f;
-	Shapes.Rect(Left - U, CrossTop + Arm - U, CrossSize + 2.0f * U, Arm + 2.0f * U, Backing);
-	Shapes.Rect(Left + Arm - U, CrossTop - U, Arm + 2.0f * U, CrossSize + 2.0f * U, Backing);
-	Shapes.Rect(Left, CrossTop + Arm, CrossSize, Arm, Fill);
-	Shapes.Rect(Left + Arm, CrossTop, Arm, CrossSize, Fill);
+	Shapes.RoundedRect(Left - U, CrossTop + Arm - U, CrossSize + 2.0f * U, Arm + 2.0f * U, 3.0f * U, Backing);
+	Shapes.RoundedRect(Left + Arm - U, CrossTop - U, Arm + 2.0f * U, CrossSize + 2.0f * U, 3.0f * U, Backing);
+	Shapes.RoundedRect(Left, CrossTop + Arm, CrossSize, Arm, 2.0f * U, Fill);
+	Shapes.RoundedRect(Left + Arm, CrossTop, Arm, CrossSize, 2.0f * U, Fill);
+	// The blocks, rounded, each over a dark backing a little bigger; what is lost and what is left fill each from its left, cut to its corners.
+	const float Round = 5.0f * U;
 	for (int32 Index = 0; Index < Count; ++Index)
 	{
 		const float X = BarLeft + Index * (Block + Gap);
-		Shapes.Rect(X - U, Top - U, Block + 2.0f * U, Height + 2.0f * U, Backing);
-		Shapes.Rect(X, Top, Block, Height, HudDraw::Dim);
+		Shapes.RoundedRect(X - U, Top - U, Block + 2.0f * U, Height + 2.0f * U, Round + U, Backing);
+		Shapes.RoundedRect(X, Top, Block, Height, Round, HudDraw::Dim);
+		const TArray<FVector2D> Outline = CheeseStrikeHUD::RoundedRect(FVector2D(X, Top), FVector2D(X + Block, Top + Height), Round);
 		if (Trails[Index] > Fills[Index])
 		{
-			Shapes.Rect(X, Top, Block * Trails[Index], Height, Lost);
+			Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(Outline, FVector2D(X, Top), FVector2D(X + Block * Trails[Index], Top + Height)), Lost);
 		}
 		if (Fills[Index] > 0.0f)
 		{
-			Shapes.Rect(X, Top, Block * Fills[Index], Height, Fill);
+			Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(Outline, FVector2D(X, Top), FVector2D(X + Block * Fills[Index], Top + Height)), Fill);
 		}
 	}
 	Shapes.Draw(Canvas);
 	if (Character->IsProtected())
 	{
 		const FSlateFontInfo Label = HudDraw::Font(12.0f * U);
-		HudDraw::Text(Canvas, TEXT("PROTECTED"), FVector2D(Left, CrossTop - 8.0f * U - HudDraw::Measure(TEXT("P"), Label).Y), Label, HudDraw::Accent);
+		HudDraw::Text(Canvas, TEXT("PROTECTED"), FVector2D(Left, StreakPanelTop() - 8.0f * U - HudDraw::Measure(TEXT("P"), Label).Y), Label, HudDraw::Accent);
 	}
 }
 
@@ -928,20 +943,30 @@ void ACheeseStrikeHUD::DrawDamageArcs(const ACheeseStrikeCharacter* Character)
 
 void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 {
-	const CheeseStrikeHUD::FScoreSummary Summary = ScoreSummary(Match);
+	CheeseStrikeHUD::FScoreSummary Summary = ScoreSummary(Match);
+	if (CVarScoreShown.GetValueOnGameThread() >= 0)
+	{
+		for (CheeseStrikeHUD::FScoreLine& Line : Summary.Lines)
+		{
+			Line.Score = CVarScoreShown.GetValueOnGameThread();
+		}
+	}
 	if (Summary.Lines.Num() == 0)
 	{
 		return;
 	}
 	const float U = Unit();
 	const float BlockWidth = 200.0f * U;
+	// Each block and the goal between them a rounded tile of its own, a little apart.
+	const float Apart = 4.0f * U;
+	const float Round = 9.0f * U;
 	// The goal between the blocks, as wide as its words need.
 	const FSlateFontInfo Goal = HudDraw::Font(13.0f * U);
 	const FString GoalText = Summary.Goal.ToUpper();
 	const float GoalWidth = FMath::Max(104.0f * U, HudDraw::Measure(GoalText, Goal).X + 28.0f * U);
 	const float BlockHeight = ScoreHeight * U;
 	const int32 OnLeft = (Summary.Lines.Num() + 1) / 2;
-	const float Total = Summary.Lines.Num() * BlockWidth + GoalWidth;
+	const float Total = Summary.Lines.Num() * (BlockWidth + Apart) + GoalWidth;
 	float X = (Canvas->SizeX - Total) / 2.0f;
 	const float Top = Canvas->SizeY - Margin * U - BlockHeight;
 	const FSlateFontInfo Caption = HudDraw::Font(12.0f * U);
@@ -949,6 +974,12 @@ void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 	const FSlateFontInfo Score = HudDraw::Font(32.0f * U);
 	const FVector2D ScoreSize = HudDraw::Measure(TEXT("0"), Score);
 	HudDraw::FShapes Shapes;
+	// A band across the tile from `From` to `To` down it, `Share` of the way across, cut to its rounded corners.
+	const auto Band = [&Shapes, Round, BlockHeight, Top](float Left, float Width, float From, float To, float Share, const FLinearColor& Colour)
+	{
+		const TArray<FVector2D> Tile = CheeseStrikeHUD::RoundedRect(FVector2D(Left, Top), FVector2D(Left + Width, Top + BlockHeight), Round);
+		Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(Tile, FVector2D(Left, Top + From), FVector2D(Left + Width * Share, Top + To)), Colour);
+	};
 	struct FPlaced
 	{
 		float X;
@@ -961,40 +992,44 @@ void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 		if (Index == OnLeft)
 		{
 			GoalX = X;
-			X += GoalWidth;
+			X += GoalWidth + Apart;
 		}
 		const CheeseStrikeHUD::FScoreLine& Line = Summary.Lines[Index];
 		const FLinearColor Mark = Line.Team != INDEX_NONE ? HudDraw::SideColour(Line.Team) : Line.bMine ? HudDraw::Accent : HudDraw::Ink;
-		Shapes.Rect(X, Top, BlockWidth, BlockHeight, HudDraw::Panel);
-		Shapes.Rect(X, Top, BlockWidth, 2.0f * U, Line.bMine ? Mark : HudDraw::Faded(Mark, 0.5f));
+		Shapes.RoundedRect(X, Top, BlockWidth, BlockHeight, Round, HudDraw::Panel);
+		Band(X, BlockWidth, 0.0f, 2.0f * U, 1.0f, Line.bMine ? Mark : HudDraw::Faded(Mark, 0.5f));
 		// How far to the limit, along the bottom.
 		if (Summary.Limit > 0)
 		{
 			const float Fraction = FMath::Clamp(static_cast<float>(Line.Score) / Summary.Limit, 0.0f, 1.0f);
-			Shapes.Rect(X, Top + BlockHeight - 3.0f * U, BlockWidth, 3.0f * U, HudDraw::Faded(HudDraw::Dim, 0.6f));
-			Shapes.Rect(X, Top + BlockHeight - 3.0f * U, BlockWidth * Fraction, 3.0f * U, HudDraw::Faded(Mark, 0.85f));
+			Band(X, BlockWidth, BlockHeight - 3.0f * U, BlockHeight, 1.0f, HudDraw::Faded(HudDraw::Dim, 0.6f));
+			if (Fraction > 0.0f)
+			{
+				Band(X, BlockWidth, BlockHeight - 3.0f * U, BlockHeight, Fraction, HudDraw::Faded(Mark, 0.85f));
+			}
 		}
 		Placed.Add({X, &Line});
-		X += BlockWidth;
+		X += BlockWidth + Apart;
 	}
 	if (OnLeft >= Summary.Lines.Num())
 	{
 		GoalX = X;
 	}
-	Shapes.Rect(GoalX, Top, GoalWidth, BlockHeight, HudDraw::Faded(HudDraw::Panel, 0.6f));
+	Shapes.RoundedRect(GoalX, Top, GoalWidth, BlockHeight, Round, HudDraw::Faded(HudDraw::Panel, 0.6f));
 	Shapes.Draw(Canvas);
+	const auto Width = [](const FSlateFontInfo& Font) { return [&Font](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, Font).X); }; };
 	for (const FPlaced& Block : Placed)
 	{
+		// The words cut to what the score leaves, and a score too wide for its block shrunk (CheeseStrikeHUD::FitScoreBlock).
 		const float Pad = 12.0f * U;
-		HudDraw::Text(Canvas, Block.Line->Caption.ToUpper(), FVector2D(Block.X + Pad, Top + 9.0f * U), Caption, Block.Line->bMine ? HudDraw::Accent : HudDraw::Soft);
-		if (!Block.Line->Name.IsEmpty())
+		const CheeseStrikeHUD::FScoreBlockText Fitted = CheeseStrikeHUD::FitScoreBlock(*Block.Line, BlockWidth, Pad, 8.0f * U, Width(Caption), Width(Name), Width(Score));
+		HudDraw::Text(Canvas, Fitted.Caption, FVector2D(Block.X + Pad, Top + 9.0f * U), Caption, Block.Line->bMine ? HudDraw::Accent : HudDraw::Soft);
+		if (!Fitted.Name.IsEmpty())
 		{
-			// As much of the name as fits beside the score.
-			const float Room = BlockWidth - 2.0f * Pad - HudDraw::Measure(FString::FromInt(Block.Line->Score), Score).X - 8.0f * U;
-			const FString Shown = CheeseStrikeHUD::FitName(Block.Line->Name.ToUpper(), Room, [&Name](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, Name).X); });
-			HudDraw::Text(Canvas, Shown, FVector2D(Block.X + Pad, Top + 27.0f * U), Name, HudDraw::Ink);
+			HudDraw::Text(Canvas, Fitted.Name, FVector2D(Block.X + Pad, Top + 27.0f * U), Name, HudDraw::Ink);
 		}
-		HudDraw::Text(Canvas, FString::FromInt(Block.Line->Score), FVector2D(Block.X + BlockWidth - Pad, Top + (BlockHeight - ScoreSize.Y) / 2.0f - 1.0f * U), Score, HudDraw::Ink, 1.0f);
+		const float ScoreHigh = ScoreSize.Y * Fitted.ScoreScale;
+		HudDraw::Text(Canvas, FString::FromInt(Block.Line->Score), FVector2D(Block.X + BlockWidth - Pad, Top + (BlockHeight - ScoreHigh) / 2.0f - 1.0f * U), Score, HudDraw::Ink, 1.0f, true, FVector2D(Fitted.ScoreScale, Fitted.ScoreScale));
 	}
 	HudDraw::Text(Canvas, GoalText, FVector2D(GoalX + GoalWidth / 2.0f, Top + (BlockHeight - HudDraw::Measure(TEXT("F"), Goal).Y) / 2.0f), Goal, HudDraw::Soft, 0.5f);
 }

@@ -95,21 +95,38 @@ namespace CheeseStrikeHUDDraw
 		{
 			return;
 		}
-		// A fan of triangles from the middle, each corner's place in the picture its share of the way across.
+		// A fan of triangles from the middle, each corner's place in the picture its share of the way across, inside a soft
+		// edge (CheeseStrikeHUD::SoftEdge) that fades the picture out over the pixels its outline crosses.
 		const TArray<FVector2D> Corners = CheeseStrikeHUD::RoundedRect(At, At + Size, Radius);
+		const TArray<FVector2D> Miters = CheeseStrikeHUD::OutwardMiters(Corners);
+		const float Half = CheeseStrikeHUD::SoftEdge / 2.0f;
 		const FVector2D Middle = At + Size / 2.0f;
 		const auto Place = [&At, &Size](const FVector2D& Point) { return FVector2D((Point.X - At.X) / Size.X, (Point.Y - At.Y) / Size.Y); };
+		const FLinearColor Clear = Faded(Colour, 0.0f);
 		TArray<FCanvasUVTri> Triangles;
-		for (int32 Index = 0; Index < Corners.Num(); ++Index)
+		const auto Add = [&Triangles, &Place](const FVector2D& A, const FVector2D& B, const FVector2D& C, const FLinearColor& ColourA, const FLinearColor& ColourB, const FLinearColor& ColourC)
 		{
 			FCanvasUVTri& Tri = Triangles.AddDefaulted_GetRef();
-			Tri.V0_Pos = Middle;
-			Tri.V1_Pos = Corners[Index];
-			Tri.V2_Pos = Corners[(Index + 1) % Corners.Num()];
-			Tri.V0_UV = Place(Tri.V0_Pos);
-			Tri.V1_UV = Place(Tri.V1_Pos);
-			Tri.V2_UV = Place(Tri.V2_Pos);
-			Tri.V0_Color = Tri.V1_Color = Tri.V2_Color = Colour;
+			Tri.V0_Pos = A;
+			Tri.V1_Pos = B;
+			Tri.V2_Pos = C;
+			Tri.V0_UV = Place(A);
+			Tri.V1_UV = Place(B);
+			Tri.V2_UV = Place(C);
+			Tri.V0_Color = ColourA;
+			Tri.V1_Color = ColourB;
+			Tri.V2_Color = ColourC;
+		};
+		for (int32 Index = 0; Index < Corners.Num(); ++Index)
+		{
+			const int32 Next = (Index + 1) % Corners.Num();
+			const FVector2D InA = Corners[Index] - Miters[Index] * Half;
+			const FVector2D InB = Corners[Next] - Miters[Next] * Half;
+			const FVector2D OutA = Corners[Index] + Miters[Index] * Half;
+			const FVector2D OutB = Corners[Next] + Miters[Next] * Half;
+			Add(Middle, InA, InB, Colour, Colour, Colour);
+			Add(InA, InB, OutB, Colour, Colour, Clear);
+			Add(InA, OutB, OutA, Colour, Clear, Clear);
 		}
 		FCanvasTriangleItem Item(Triangles[0], Texture->GetResource());
 		Item.TriangleList = MoveTemp(Triangles);
@@ -186,37 +203,34 @@ namespace CheeseStrikeHUDDraw
 
 	void FShapes::RoundedRect(float X, float Y, float Width, float Height, float Radius, const FLinearColor& Colour)
 	{
-		Polygon(CheeseStrikeHUD::RoundedRect(FVector2D(X, Y), FVector2D(X + Width, Y + Height), Radius), Colour);
+		SmoothPolygon(CheeseStrikeHUD::RoundedRect(FVector2D(X, Y), FVector2D(X + Width, Y + Height), Radius), Colour);
 	}
 
 	void FShapes::RoundedRectDown(float X, float Y, float Width, float Height, float Radius, const FLinearColor& Top, const FLinearColor& Bottom)
 	{
 		const TArray<FVector2D> Corners = CheeseStrikeHUD::RoundedRect(FVector2D(X, Y), FVector2D(X + Width, Y + Height), Radius);
-		const auto Shade = [&](const FVector2D& Point) { return FMath::Lerp(Top, Bottom, Height > 0.0f ? FMath::Clamp((Point.Y - Y) / Height, 0.0f, 1.0f) : 0.0f); };
-		const FVector2D Middle(X + Width / 2.0f, Y + Height / 2.0f);
-		for (int32 Index = 0; Index < Corners.Num(); ++Index)
-		{
-			const FVector2D& A = Corners[Index];
-			const FVector2D& B = Corners[(Index + 1) % Corners.Num()];
-			Triangle(Middle, A, B, Shade(Middle), Shade(A), Shade(B));
-		}
+		SmoothFill(Corners, [&](const FVector2D& Point) { return FMath::Lerp(Top, Bottom, Height > 0.0f ? FMath::Clamp((Point.Y - Y) / Height, 0.0f, 1.0f) : 0.0f); });
 	}
 
 	void FShapes::RoundedFrame(float X, float Y, float Width, float Height, float Radius, float Thickness, const FLinearColor& Colour)
 	{
-		// The outer outline and one inset by the thickness, its corners as much less round, joined corner to corner.
-		const TArray<FVector2D> Outer = CheeseStrikeHUD::RoundedRect(FVector2D(X, Y), FVector2D(X + Width, Y + Height), Radius);
-		const TArray<FVector2D> Inner = CheeseStrikeHUD::RoundedRect(FVector2D(X + Thickness, Y + Thickness), FVector2D(X + Width - Thickness, Y + Height - Thickness), FMath::Max(0.001f, Radius - Thickness));
+		// The outer outline and one inset by the thickness, its corners as much less round, with as many segments to its
+		// arcs, joined corner to corner; thinner than the soft edge, as wide as it and fainter.
+		const float Drawn = FMath::Max(Thickness, CheeseStrikeHUD::SoftEdge);
+		const float Grow = (Drawn - Thickness) / 2.0f;
+		const FLinearColor Shown = Faded(Colour, Thickness / Drawn);
+		const FVector2D Min(X - Grow, Y - Grow);
+		const FVector2D Max(X + Width + Grow, Y + Height + Grow);
+		const float Outside = Radius + Grow;
+		const int32 Steps = CheeseStrikeHUD::CornerSteps(FMath::Clamp(Outside, 0.0f, FMath::Min(Max.X - Min.X, Max.Y - Min.Y) / 2.0f));
+		const TArray<FVector2D> Outer = CheeseStrikeHUD::RoundedRect(Min, Max, FMath::Max(0.001f, Outside), Steps);
+		const TArray<FVector2D> Inner = CheeseStrikeHUD::RoundedRect(Min + FVector2D(Drawn, Drawn), Max - FVector2D(Drawn, Drawn), FMath::Max(0.001f, Outside - Drawn), Steps);
 		if (Outer.Num() != Inner.Num())
 		{
 			Frame(X, Y, Width, Height, Thickness, Colour);
 			return;
 		}
-		for (int32 Index = 0; Index < Outer.Num(); ++Index)
-		{
-			const int32 Next = (Index + 1) % Outer.Num();
-			Quad(Outer[Index], Outer[Next], Inner[Next], Inner[Index], Colour);
-		}
+		SmoothBand(Outer, Inner, Shown);
 	}
 
 	void FShapes::Polygon(TConstArrayView<FVector2D> Corners, const FLinearColor& Colour)
@@ -227,16 +241,81 @@ namespace CheeseStrikeHUDDraw
 		}
 	}
 
+	void FShapes::SmoothPolygon(TConstArrayView<FVector2D> Corners, const FLinearColor& Colour)
+	{
+		SmoothFill(Corners, [&Colour](const FVector2D&) { return Colour; });
+	}
+
+	void FShapes::SmoothFill(TConstArrayView<FVector2D> Corners, TFunctionRef<FLinearColor(const FVector2D&)> ColourAt)
+	{
+		const int32 Count = Corners.Num();
+		if (Count < 3)
+		{
+			return;
+		}
+		// Solid to half the soft edge inside the outline, then fading to clear half of it outside.
+		const TArray<FVector2D> Miters = CheeseStrikeHUD::OutwardMiters(Corners);
+		const float Half = CheeseStrikeHUD::SoftEdge / 2.0f;
+		TArray<FVector2D, TInlineAllocator<64>> Inner;
+		TArray<FLinearColor, TInlineAllocator<64>> Colours;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			Inner.Add(Corners[Index] - Miters[Index] * Half);
+			Colours.Add(ColourAt(Corners[Index]));
+		}
+		for (int32 Index = 2; Index < Count; ++Index)
+		{
+			Triangle(Inner[0], Inner[Index - 1], Inner[Index], Colours[0], Colours[Index - 1], Colours[Index]);
+		}
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const int32 Next = (Index + 1) % Count;
+			Quad(Inner[Index], Inner[Next], Corners[Next] + Miters[Next] * Half, Corners[Index] + Miters[Index] * Half,
+				Colours[Index], Colours[Next], Faded(Colours[Next], 0.0f), Faded(Colours[Index], 0.0f));
+		}
+	}
+
+	void FShapes::SmoothBand(TConstArrayView<FVector2D> Outer, TConstArrayView<FVector2D> Inner, const FLinearColor& Colour)
+	{
+		const int32 Count = Outer.Num();
+		if (Count < 3 || Inner.Num() != Count)
+		{
+			return;
+		}
+		// Solid between the two outlines each moved half the soft edge into the band, fading to clear half of it out of it.
+		const TArray<FVector2D> OuterWay = CheeseStrikeHUD::OutwardMiters(Outer);
+		const TArray<FVector2D> InnerWay = CheeseStrikeHUD::OutwardMiters(Inner);
+		const float Half = CheeseStrikeHUD::SoftEdge / 2.0f;
+		const FLinearColor Clear = Faded(Colour, 0.0f);
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const int32 Next = (Index + 1) % Count;
+			const FVector2D OuterInA = Outer[Index] - OuterWay[Index] * Half;
+			const FVector2D OuterInB = Outer[Next] - OuterWay[Next] * Half;
+			const FVector2D InnerOutA = Inner[Index] + InnerWay[Index] * Half;
+			const FVector2D InnerOutB = Inner[Next] + InnerWay[Next] * Half;
+			Quad(OuterInA, OuterInB, InnerOutB, InnerOutA, Colour);
+			Quad(OuterInA, OuterInB, Outer[Next] + OuterWay[Next] * Half, Outer[Index] + OuterWay[Index] * Half, Colour, Colour, Clear, Clear);
+			Quad(InnerOutA, InnerOutB, Inner[Next] - InnerWay[Next] * Half, Inner[Index] - InnerWay[Index] * Half, Colour, Colour, Clear, Clear);
+		}
+	}
+
+	void FShapes::Fringe(const FVector2D& A, const FVector2D& B, const FVector2D& Out, const FLinearColor& Colour)
+	{
+		Quad(A, B, B + Out, A + Out, Colour, Colour, Faded(Colour, 0.0f), Faded(Colour, 0.0f));
+	}
+
 	void FShapes::Disc(const FVector2D& Middle, float Radius, const FLinearColor& Colour, int32 Sides)
 	{
-		FVector2D Last = Middle + FVector2D(Radius, 0.0f);
-		for (int32 Side = 1; Side <= Sides; ++Side)
+		// At least as many sides as a circle that big needs to look round (four of its quarter arcs).
+		const int32 Round = FMath::Max(Sides, 4 * CheeseStrikeHUD::CornerSteps(Radius));
+		TArray<FVector2D, TInlineAllocator<64>> Rim;
+		for (int32 Side = 0; Side < Round; ++Side)
 		{
-			const float Angle = 2.0f * UE_PI * Side / Sides;
-			const FVector2D Next = Middle + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Radius;
-			Triangle(Middle, Last, Next, Colour);
-			Last = Next;
+			const float Angle = 2.0f * UE_PI * Side / Round;
+			Rim.Add(Middle + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Radius);
 		}
+		SmoothPolygon(Rim, Colour);
 	}
 
 	void FShapes::Bulb(const FVector2D& Middle, float Radius, float Depth, const FLinearColor& Inner, const FLinearColor& Outer, int32 Sides)
@@ -264,15 +343,22 @@ namespace CheeseStrikeHUDDraw
 
 	void FShapes::Arc(const FVector2D& Middle, float Radius, float Thickness, float From, float To, const FLinearColor& Colour, bool bFade)
 	{
-		const int32 Steps = FMath::Max(2, FMath::CeilToInt(FMath::Abs(To - From) / 3.0f));
+		// Short enough steps for the circle to look round, and a soft edge either side; thinner than the soft edge, as wide
+		// as it and fainter.
+		const float Drawn = FMath::Max(Thickness, CheeseStrikeHUD::SoftEdge);
+		const float Outer = Radius + Drawn / 2.0f;
+		const float Inner = FMath::Max(0.0f, Radius - Drawn / 2.0f);
+		const int32 Steps = FMath::Max3(2, FMath::CeilToInt(FMath::Abs(To - From) / 90.0f * CheeseStrikeHUD::CornerSteps(Outer + 0.5f)), FMath::CeilToInt(FMath::Abs(To - From) / 3.0f));
+		const float Half = CheeseStrikeHUD::SoftEdge / 2.0f;
+		const FLinearColor Base = Faded(Colour, Thickness / Drawn);
 		const auto Point = [&Middle](float Degrees, float AtRadius)
 		{
 			const float Radians = FMath::DegreesToRadians(Degrees);
-			return Middle + FVector2D(FMath::Sin(Radians), -FMath::Cos(Radians)) * AtRadius;
+			return Middle + FVector2D(FMath::Sin(Radians), -FMath::Cos(Radians)) * FMath::Max(0.0f, AtRadius);
 		};
-		const auto Shade = [&Colour, bFade](float Along)
+		const auto Shade = [&Base, bFade](float Along)
 		{
-			FLinearColor Shaded = Colour;
+			FLinearColor Shaded = Base;
 			if (bFade)
 			{
 				const float Edge = FMath::Clamp(FMath::Min(Along, 1.0f - Along) / 0.3f, 0.0f, 1.0f);
@@ -280,15 +366,22 @@ namespace CheeseStrikeHUDDraw
 			}
 			return Shaded;
 		};
-		const float Inner = Radius - Thickness / 2.0f;
-		const float Outer = Radius + Thickness / 2.0f;
 		for (int32 Step = 0; Step < Steps; ++Step)
 		{
 			const float A = static_cast<float>(Step) / Steps;
 			const float B = static_cast<float>(Step + 1) / Steps;
 			const float DegreesA = FMath::Lerp(From, To, A);
 			const float DegreesB = FMath::Lerp(From, To, B);
-			Quad(Point(DegreesA, Inner), Point(DegreesB, Inner), Point(DegreesB, Outer), Point(DegreesA, Outer), Shade(A), Shade(B), Shade(B), Shade(A));
+			const FLinearColor ShadeA = Shade(A);
+			const FLinearColor ShadeB = Shade(B);
+			const FLinearColor ClearA = Faded(ShadeA, 0.0f);
+			const FLinearColor ClearB = Faded(ShadeB, 0.0f);
+			Quad(Point(DegreesA, Inner + Half), Point(DegreesB, Inner + Half), Point(DegreesB, Outer - Half), Point(DegreesA, Outer - Half), ShadeA, ShadeB, ShadeB, ShadeA);
+			Quad(Point(DegreesA, Outer - Half), Point(DegreesB, Outer - Half), Point(DegreesB, Outer + Half), Point(DegreesA, Outer + Half), ShadeA, ShadeB, ClearB, ClearA);
+			if (Inner > 0.0f)
+			{
+				Quad(Point(DegreesA, Inner + Half), Point(DegreesB, Inner + Half), Point(DegreesB, Inner - Half), Point(DegreesA, Inner - Half), ShadeA, ShadeB, ClearB, ClearA);
+			}
 		}
 	}
 

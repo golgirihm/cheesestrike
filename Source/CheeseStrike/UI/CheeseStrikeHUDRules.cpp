@@ -36,6 +36,22 @@ namespace CheeseStrikeHUD
 		return FVector2D(FVector2D::DotProduct(Offset, Right), -FVector2D::DotProduct(Offset, Forward)) * Scale;
 	}
 
+	FVector2D MapOffset(const FVector2D& Screen, float ViewYaw, float Scale)
+	{
+		const float Radians = FMath::DegreesToRadians(ViewYaw);
+		const FVector2D Forward(FMath::Cos(Radians), FMath::Sin(Radians));
+		const FVector2D Right(-FMath::Sin(Radians), FMath::Cos(Radians));
+		return Scale > 0.0f ? (Right * Screen.X - Forward * Screen.Y) / Scale : FVector2D::ZeroVector;
+	}
+
+	FVector2D FollowMark(const FVector2D& Middle, const FVector2D& Mark, float ViewYaw, float Reach)
+	{
+		// On the map as it is turned, a centimetre a pixel: hold the mark's offset within the reach each way.
+		const FVector2D Off = MapPoint(Mark - Middle, ViewYaw, 1.0f);
+		const FVector2D Held(FMath::Clamp(Off.X, -Reach, Reach), FMath::Clamp(Off.Y, -Reach, Reach));
+		return Mark - MapOffset(Held, ViewYaw, 1.0f);
+	}
+
 	FVector2D NorthMark(float ViewYaw, float HalfSize)
 	{
 		const float North = FMath::DegreesToRadians(NorthYaw);
@@ -151,6 +167,10 @@ namespace CheeseStrikeHUD
 	TArray<FVector2D> RoundedRect(const FVector2D& Min, const FVector2D& Max, float Radius, int32 Steps)
 	{
 		const float R = FMath::Clamp(Radius, 0.0f, FMath::Min(Max.X - Min.X, Max.Y - Min.Y) / 2.0f);
+		if (Steps < 0)
+		{
+			Steps = CornerSteps(R);
+		}
 		TArray<FVector2D> Corners;
 		if (R <= KINDA_SMALL_NUMBER || Steps < 1)
 		{
@@ -171,6 +191,73 @@ namespace CheeseStrikeHUD
 			}
 		}
 		return Corners;
+	}
+
+	int32 CornerSteps(float Radius)
+	{
+		if (Radius <= CornerError)
+		{
+			return 1;
+		}
+		// A chord across `Angle` of the circle strays from it by Radius (1 - cos(Angle / 2)) at its middle.
+		const float Widest = 2.0f * FMath::Acos(FMath::Max(-1.0f, 1.0f - CornerError / Radius));
+		return FMath::Clamp(FMath::CeilToInt(UE_HALF_PI / FMath::Max(Widest, UE_KINDA_SMALL_NUMBER)), 1, 32);
+	}
+
+	TArray<FVector2D> OutwardMiters(TConstArrayView<FVector2D> Outline)
+	{
+		const int32 Count = Outline.Num();
+		TArray<FVector2D> Miters;
+		Miters.Init(FVector2D::ZeroVector, Count);
+		if (Count < 3)
+		{
+			return Miters;
+		}
+		// Which way round it goes: the outward normal of an edge is to its right one way round, its left the other.
+		float Area = 0.0f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const FVector2D& A = Outline[Index];
+			const FVector2D& B = Outline[(Index + 1) % Count];
+			Area += A.X * B.Y - B.X * A.Y;
+		}
+		const float Way = Area >= 0.0f ? 1.0f : -1.0f;
+		const auto Outward = [Way](const FVector2D& From, const FVector2D& To)
+		{
+			const FVector2D Along = (To - From).GetSafeNormal();
+			return FVector2D(Along.Y, -Along.X) * Way;
+		};
+		constexpr float Apart = 1e-3f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const FVector2D& Here = Outline[Index];
+			int32 Before = INDEX_NONE;
+			int32 After = INDEX_NONE;
+			for (int32 Step = 1; Step < Count && Before == INDEX_NONE; ++Step)
+			{
+				const int32 At = (Index - Step + Count) % Count;
+				Before = FVector2D::Distance(Outline[At], Here) > Apart ? At : INDEX_NONE;
+			}
+			for (int32 Step = 1; Step < Count && After == INDEX_NONE; ++Step)
+			{
+				const int32 At = (Index + Step) % Count;
+				After = FVector2D::Distance(Outline[At], Here) > Apart ? At : INDEX_NONE;
+			}
+			if (Before == INDEX_NONE || After == INDEX_NONE)
+			{
+				continue;
+			}
+			const FVector2D In = Outward(Outline[Before], Here);
+			const FVector2D Out = Outward(Here, Outline[After]);
+			const float Meet = 1.0f + FVector2D::DotProduct(In, Out);
+			FVector2D Miter = Meet > UE_KINDA_SMALL_NUMBER ? (In + Out) / Meet : In * MostMiter;
+			if (Miter.Size() > MostMiter)
+			{
+				Miter = Miter.GetSafeNormal() * MostMiter;
+			}
+			Miters[Index] = Miter;
+		}
+		return Miters;
 	}
 
 	float InsideRoundedRect(const FVector2D& Point, const FVector2D& Min, const FVector2D& Max, float Radius)
@@ -483,6 +570,105 @@ namespace CheeseStrikeHUD
 			Summary.Lines.Add({FString(CheeseStrikeRules::TeamNames[Team]), FString(), Scores[Team], Team, Team == MyTeam});
 		}
 		return Summary;
+	}
+
+	FScoreBlockText FitScoreBlock(const FScoreLine& Line, float Width, float Pad, float Gap,
+		TFunctionRef<float(const FString&)> CaptionWidth, TFunctionRef<float(const FString&)> NameWidth, TFunctionRef<float(const FString&)> ScoreWidth)
+	{
+		FScoreBlockText Text;
+		const float Inside = FMath::Max(0.0f, Width - 2.0f * Pad);
+		const float Score = ScoreWidth(FString::FromInt(Line.Score));
+		const float Most = Inside * ScoreMostShare;
+		Text.ScoreScale = Score > Most && Score > 0.0f ? Most / Score : 1.0f;
+		// A caption (a side's name) that would be cut has the score made smaller for it first, down to ScoreLeastScale.
+		const FString Caption = Line.Caption.ToUpper();
+		const float Wanted = Caption.IsEmpty() ? 0.0f : CaptionWidth(Caption);
+		if (Score > 0.0f && Inside - Score * Text.ScoreScale - Gap < Wanted)
+		{
+			Text.ScoreScale = FMath::Max(FMath::Min(Text.ScoreScale, ScoreLeastScale), (Inside - Gap - Wanted) / Score);
+		}
+		const float Room = FMath::Max(0.0f, Inside - Score * Text.ScoreScale - Gap);
+		Text.Caption = Caption.IsEmpty() ? FString() : FitName(Caption, Room, CaptionWidth);
+		Text.Name = Line.Name.IsEmpty() ? FString() : FitName(Line.Name.ToUpper(), Room, NameWidth);
+		return Text;
+	}
+
+	FString TeamScoreLabel(CheeseStrikeModes::EWinBy WinBy)
+	{
+		switch (WinBy)
+		{
+		case CheeseStrikeModes::EWinBy::Rounds:
+			return TEXT("ROUNDS WON");
+		case CheeseStrikeModes::EWinBy::Hill:
+			return TEXT("POINTS");
+		default:
+			return TEXT("KILLS");
+		}
+	}
+
+	TArray<FStreakPip> StreakPips(int32 Kills)
+	{
+		using namespace CheeseStrikeStreaks;
+		const int32 Last = Streaks[NumStreaks - 1].Kills;
+		TArray<FStreakPip> Pips;
+		for (int32 Kill = 1; Kill <= Last; ++Kill)
+		{
+			FStreakPip& Pip = Pips.AddDefaulted_GetRef();
+			Pip.bMade = Kill <= Kills;
+			Pip.Earns = EarnedAt(Kill);
+		}
+		return Pips;
+	}
+
+	FString StreakNext(int32 Kills, bool bShort)
+	{
+		using namespace CheeseStrikeStreaks;
+		const EStreak Next = NextAfter(FMath::Max(0, Kills));
+		if (Next == EStreak::None)
+		{
+			return TEXT("EVERY STREAK EARNED");
+		}
+		const FString Name = bShort ? StreakShortName(Next) : FString(Info(Next).Name).ToUpper();
+		const int32 ToGo = Info(Next).Kills - FMath::Max(0, Kills);
+		return ToGo <= 1 ? FString::Printf(TEXT("%s NEXT KILL"), *Name) : FString::Printf(TEXT("%s IN %d"), *Name, ToGo);
+	}
+
+	FString StreakShortName(CheeseStrikeStreaks::EStreak Kind)
+	{
+		switch (Kind)
+		{
+		case CheeseStrikeStreaks::EStreak::AerialCheese:
+			return TEXT("DRONE");
+		case CheeseStrikeStreaks::EStreak::CheeseStrike:
+			return TEXT("STRIKE");
+		case CheeseStrikeStreaks::EStreak::GoudaOverload:
+			return TEXT("OVERLOAD");
+		default:
+			return FString();
+		}
+	}
+
+	float StreakFillToward(float Shown, int32 Kills, float DeltaSeconds)
+	{
+		const float Target = static_cast<float>(FMath::Max(0, Kills));
+		if (Shown < Target)
+		{
+			return FMath::Min(Target, Shown + StreakFillRate * DeltaSeconds);
+		}
+		// Down (a death): a whole track drains in StreakDrainTime.
+		const float Rate = CheeseStrikeStreaks::Streaks[CheeseStrikeStreaks::NumStreaks - 1].Kills / StreakDrainTime;
+		return FMath::Max(Target, Shown - Rate * DeltaSeconds);
+	}
+
+	float StreakPop(float Seconds)
+	{
+		if (Seconds < 0.0f || Seconds >= StreakPopTime)
+		{
+			return 1.0f;
+		}
+		// Up at once, back through 1 a third of the way, a little under, and settled.
+		const float Along = Seconds / StreakPopTime;
+		return 1.0f + 0.5f * FMath::Square(1.0f - Along) * FMath::Cos(Along * UE_PI * 1.5f);
 	}
 
 	FTagLook TagLook(float Distance)

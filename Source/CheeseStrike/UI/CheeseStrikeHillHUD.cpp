@@ -11,6 +11,7 @@
 #include "CheeseStrikePlayerState.h"
 #include "Map/CheeseStrikeHill.h"
 #include "UI/CheeseStrikeHUDDraw.h"
+#include "UI/CheeseStrikeHUDRules.h"
 
 /** The HUD's drawing, named through an alias rather than used as a whole: the packaged game's unity build would carry a using-directive into the files after this one. */
 namespace HudDraw = CheeseStrikeHUDDraw;
@@ -196,11 +197,18 @@ namespace CheeseStrikeHillHUD
 		const float Left = (Canvas->SizeX - Width) / 2.0f;
 		const float Top = Bottom - Height - 4.0f * U;
 		HudDraw::FShapes Shapes;
-		Shapes.Rect(Left, Top, Width, Height, HudDraw::Panel);
-		Shapes.Rect(Left, Top, 5.0f * U, Height, Colour);
+		// A rounded tile as the score's are, its side's colour down its left and its time along its foot, cut to its corners.
+		const float Round = 8.0f * U;
+		const float Tall = Height + 3.0f * U;
+		const TArray<FVector2D> Tile = CheeseStrikeHUD::RoundedRect(FVector2D(Left, Top), FVector2D(Left + Width, Top + Tall), Round);
+		Shapes.SmoothPolygon(Tile, HudDraw::Panel);
+		Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(Tile, FVector2D(Left, Top), FVector2D(Left + 5.0f * U, Top + Height)), Colour);
 		const float Share = FMath::Clamp(Hill->SecondsToMove() / CheeseStrikeHills::HillTime, 0.0f, 1.0f);
-		Shapes.Rect(Left, Top + Height, Width, 3.0f * U, HudDraw::Faded(HudDraw::Dim, 0.6f));
-		Shapes.Rect(Left, Top + Height, Width * Share, 3.0f * U, Hill->IsWarning() ? HudDraw::Danger : HudDraw::Faded(Colour, 0.85f));
+		Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(Tile, FVector2D(Left, Top + Height), FVector2D(Left + Width, Top + Tall)), HudDraw::Faded(HudDraw::Dim, 0.6f));
+		if (Share > 0.0f)
+		{
+			Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(Tile, FVector2D(Left, Top + Height), FVector2D(Left + Width * Share, Top + Tall)), Hill->IsWarning() ? HudDraw::Danger : HudDraw::Faded(Colour, 0.85f));
+		}
 		HillCrown(Shapes, FVector2D(Left + 22.0f * U, Top + Height / 2.0f + 1.0f * U), 16.0f * U, Colour);
 		Shapes.Draw(Canvas);
 		const float TextTop = Top + (Height - HudDraw::Measure(TEXT("H"), Line).Y) / 2.0f;

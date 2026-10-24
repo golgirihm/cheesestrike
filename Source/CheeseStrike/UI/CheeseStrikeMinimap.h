@@ -44,6 +44,8 @@ public:
 	void Gather(UWorld* World);
 	bool IsGatheredFor(const UWorld* World) const { return World != nullptr && GatheredFor.Get() == World; }
 	const TArray<FPiece>& GetPieces() const { return Pieces; }
+	/** What the level's pieces cover, from above (world X and Y); not valid before they are gathered, or with none. */
+	const FBox2D& GetBounds() const { return Bounds; }
 	/** The blocks of cheese still there. */
 	int32 NumCheese() const;
 
@@ -70,6 +72,7 @@ private:
 
 	/** The level's pieces, lowest top first, so that higher ones are drawn over lower. */
 	TArray<FPiece> Pieces;
+	FBox2D Bounds = FBox2D(ForceInit);
 	TArray<FCheese> Cheese;
 	/** The doors, read as they are each frame: a door that opens shows open. */
 	TArray<TWeakObjectPtr<AActor>> Doors;

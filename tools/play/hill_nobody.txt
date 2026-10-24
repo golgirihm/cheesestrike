@@ -1,0 +1,12 @@
+# King of the Hill's hill with nobody holding it: grey on the floor, in its
+# column of light, on the HUD's marker, its strip and the minimap, apart
+# from both sides' colours. Run as tools/play/hill.txt is (The Creamery).
+wait 3
+cmd CheeseStrikeViewFrom -1300 -1100 650 -24 40
+wait 1
+shot hill_nobody_above
+cmd CheeseStrikeOutside
+look 0 0
+wait 0.5
+shot hill_nobody_hud
+quit

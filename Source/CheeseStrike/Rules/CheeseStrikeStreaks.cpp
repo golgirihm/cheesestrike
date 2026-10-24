@@ -108,16 +108,18 @@ namespace CheeseStrikeStreaks
 		return {Now, Now + Seconds};
 	}
 
-	TArray<FVector> StrikeLine(const FVector& Spot, float Yaw)
+	TArray<FVector> StrikeArea(const FVector& Spot, float Yaw)
 	{
-		const FVector Along = FRotator(0.0f, Yaw, 0.0f).Vector();
-		TArray<FVector> Line;
-		for (int32 Index = 0; Index < StrikeWheels; ++Index)
+		TArray<FVector> Area;
+		Area.Add(Spot);
+		const int32 Round = StrikeWheels - 1;
+		for (int32 Index = 0; Index < Round; ++Index)
 		{
-			const float Offset = (Index - (StrikeWheels - 1) / 2.0f) * StrikeSpacing;
-			Line.Add(Spot + Along * Offset);
+			// The yaw growing: clockwise seen from above.
+			const FVector Way = FRotator(0.0f, Yaw + 360.0f * Index / Round, 0.0f).Vector();
+			Area.Add(Spot + Way * (StrikeRadius * StrikeRing));
 		}
-		return Line;
+		return Area;
 	}
 
 	float BlastDamage(const FBlast& Blast, float Distance)

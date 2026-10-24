@@ -8,6 +8,7 @@
 #include "Misc/AutomationTest.h"
 #include "Rules/CheeseStrikeHills.h"
 #include "Rules/CheeseStrikeModes.h"
+#include "Map/CheeseStrikeHill.h"
 #include "UI/CheeseStrikeHillHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -181,6 +182,14 @@ bool FTheHUDShowsTheHill::RunTest(const FString& Parameters)
 	TestEqual(TEXT("and a minute off"), MoveWords(60.0f), FString(TEXT("MOVES IN 1:00")));
 	TestEqual(TEXT("as it warns"), MoveWords(4.2f), FString(TEXT("MOVING IN 5")));
 	TestEqual(TEXT("how far"), DistanceWords(4249.0f), FString(TEXT("42 M")));
+	// Nobody's hill is a grey, far from every colour of a hold: the sides', and the solo mode's own and other.
+	const FLinearColor Nobody = ACheeseStrikeHill::Neutral;
+	TestTrue(TEXT("nobody's is a grey"), Nobody.LinearRGBToHSV().G < 0.15f);
+	for (const FLinearColor& Held : {CheeseStrikeModes::TeamColour(0), CheeseStrikeModes::TeamColour(1), ACheeseStrikeHill::Own, ACheeseStrikeHill::Other})
+	{
+		const float Apart = FMath::Sqrt(FMath::Square(Held.R - Nobody.R) + FMath::Square(Held.G - Nobody.G) + FMath::Square(Held.B - Nobody.B));
+		TestTrue(FString::Printf(TEXT("and unlike a hold's colour (%.2f apart, and that one's saturation %.2f)"), Apart, Held.LinearRGBToHSV().G), Apart > 0.3f && Held.LinearRGBToHSV().G > 0.4f);
+	}
 
 	// The marker: where the hill is, on the screen; held to the edge of what the HUD leaves clear the way it lies, off it.
 	const FBox2D Area(FVector2D(70.0f, 120.0f), FVector2D(1850.0f, 900.0f));

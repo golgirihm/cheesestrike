@@ -61,6 +61,8 @@ public:
 	static constexpr float KillFeedNameWidth = 190.0f;
 	/** The score summary's height, at the bottom in the middle: what the modes' HUD keeps clear of. */
 	static constexpr float ScoreHeight = 56.0f;
+	/** The kill-streak panel's height, over the health at the bottom left (DrawStreak). */
+	static constexpr float StreakPanelHeight = 58.0f;
 
 	/** Pixels from the middle of a view `Width` pixels wide a line `Degrees` off the centre lands, at a field of view of `FieldOfView` degrees. */
 	static float PixelsForDegrees(float Degrees, float FieldOfView, float Width);
@@ -137,12 +139,41 @@ protected:
 	/** What the crosshair shows over what `Character`'s player aims at: the cancel sign over an enemy down whom a shot would not hurt (CheeseStrikeHUD::CrosshairFor). */
 	CheeseStrikeHUD::ECrosshair CrosshairOver(const ACheeseStrikeCharacter* Character) const;
 	void DrawHealth(const ACheeseStrikeCharacter* Character);
+	/** The kill-streak panel over the health (UI/CheeseStrikeHUDStreak.cpp): the run's count, popping at each kill, and its track to the streaks. */
+	void DrawStreak(const ACheeseStrikeCharacter* Character);
+	/** Where the kill-streak panel's top is, in the canvas's pixels. */
+	float StreakPanelTop() const;
 	void DrawWeapon(const ACheeseStrikeCharacter* Character);
 	/** The outline of the weapon in `Slot` (a rifle, a pistol, a knife) in the box at `At`, `Size` big, facing left. */
 	void DrawWeaponIcon(CheeseStrikeHUDDraw::FShapes& Shapes, EWeaponSlot Slot, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour) const;
 	void DrawVignette(const ACheeseStrikeCharacter* Character);
 	void DrawDamageArcs(const ACheeseStrikeCharacter* Character);
 	void DrawMinimap(const ACheeseStrikePlayerController* Controller, const ACheeseStrikeCharacter* Character, float FieldOfView);
+	/** Where a map of the level is drawn: the screen's square, the world's point (X and Y) at its middle, pixels a cm, its corners' rounding, the yaw it is turned by (up is that way), and whether it is the strike map. */
+	struct FMapFrame
+	{
+		FVector2D Min = FVector2D::ZeroVector;
+		FVector2D Max = FVector2D::ZeroVector;
+		FVector2D Middle = FVector2D::ZeroVector;
+		float Scale = 1.0f;
+		float Corner = 0.0f;
+		float ViewYaw = 0.0f;
+		bool bStrike = false;
+	};
+	/** The minimap's map, its players, the hill, the stands and the frame, in `Frame`: the minimap's (DrawMinimap), or the strike map's. */
+	void DrawMap(const ACheeseStrikePlayerController* Controller, const ACheeseStrikeCharacter* Character, float FieldOfView, const FMapFrame& Frame);
+	/**
+	 * Choosing where a Cheese Strike goes (ACheeseStrikePlayerState::IsMarkingStrike;
+	 * UI/CheeseStrikeHUDStrike.cpp): the minimap big in the middle of the
+	 * screen, turned as the view was, following the mark (the look moves
+	 * it), with the strike's area round it, where its wheels will land, and
+	 * the keys to call it in or off. Draws nothing and returns false when
+	 * not choosing.
+	 */
+	bool DrawStrikeMap(const ACheeseStrikePlayerController* Controller, const ACheeseStrikeCharacter* Character, float FieldOfView);
+	/** The strike map's middle (world X and Y), which follows the mark; whether it showed the frame before. */
+	FVector2D StrikeMapMiddle = FVector2D::ZeroVector;
+	bool bStrikeMapShown = false;
 	void DrawPlayers(const ACheeseStrikeGameState* Match);
 	void DrawScoreSummary(const ACheeseStrikeGameState* Match);
 	void DrawNameTags(const ACheeseStrikePlayerController* Controller);
@@ -199,6 +230,11 @@ protected:
 	/** When the health last fell (the world's time), for how long the trail holds, and the health the frame before. */
 	float HealthFellAt = -1.0f;
 	float HealthBefore = -1.0f;
+	/** The kill-streak panel's: the run last drawn, when it last grew and last earned a streak (the world's time), and how much of its track is filled now. */
+	int32 StreakSeen = 0;
+	float StreakChangedAt = -100.0f;
+	float StreakEarnedAt = -100.0f;
+	float StreakFill = 0.0f;
 	/** Where each kill in the feed happened (the map's name for the place the body fell), by the killed and the time. */
 	TMap<FString, FString> KillPlaces;
 	/** The place of `Kill`: found once, from the body where it lies, and kept while the kill is in the feed. */

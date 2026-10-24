@@ -2,6 +2,7 @@
 
 #include "CheeseStrikePlayerState.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameStateBase.h"
@@ -10,6 +11,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameMode.h"
 #include "Modes/CheeseStrikeWatchCamera.h"
+#include "Streaks/CheeseStrikeBombs.h"
 
 void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -177,9 +179,21 @@ void ACheeseStrikePlayerState::StreakPressed()
 	}
 	if (Next == CheeseStrikeStreaks::EStreak::CheeseStrike)
 	{
-		// First, where: the next shot marks it.
+		// First, where, on the strike map: the mark starts where the view meets the world (or ahead), and the next shot calls it in.
 		bMarkingStrike = true;
-		if (ACheeseStrikeCharacter* Body = GetPawn<ACheeseStrikeCharacter>())
+		ACheeseStrikeCharacter* Body = GetPawn<ACheeseStrikeCharacter>();
+		FVector Spot;
+		float Yaw = 0.0f;
+		const FVector At = Body != nullptr ? Body->GetActorLocation() : FVector::ZeroVector;
+		const bool bAimed = StrikeAim(Spot, Yaw);
+		if (!bAimed && GetPlayerController() != nullptr)
+		{
+			Yaw = GetPlayerController()->GetControlRotation().Yaw;
+		}
+		StrikeYaw = Yaw;
+		const float Ahead = bAimed ? FMath::Min(FVector::Dist2D(Spot, At), 3000.0f) : 1500.0f;
+		StrikeTarget = FVector2D(At) + FVector2D(FRotator(0.0f, Yaw, 0.0f).Vector()) * Ahead;
+		if (Body != nullptr)
 		{
 			Body->DoFire(false);
 		}
@@ -214,16 +228,43 @@ bool ACheeseStrikePlayerState::StrikeAim(FVector& OutSpot, float& OutYaw) const
 	return true;
 }
 
+void ACheeseStrikePlayerState::SetStrikeTarget(const FVector2D& Target)
+{
+	// Never further from the caller than the server takes.
+	const ACharacter* Body = GetPawn<ACharacter>();
+	const FVector2D At = Body != nullptr ? FVector2D(Body->GetActorLocation()) : Target;
+	const FVector2D Off = Target - At;
+	StrikeTarget = At + (Off.Size() > CheeseStrikeStreaks::StrikeRange ? Off.GetSafeNormal() * CheeseStrikeStreaks::StrikeRange : Off);
+}
+
+void ACheeseStrikePlayerState::MoveStrikeTarget(const FVector2D& Degrees)
+{
+	if (!bMarkingStrike)
+	{
+		return;
+	}
+	// Right on the map is right of the way the map is turned; up is ahead (CheeseStrikeHUD::MapPoint).
+	const FVector2D Forward(FRotator(0.0f, StrikeYaw, 0.0f).Vector());
+	const FVector2D Right(-Forward.Y, Forward.X);
+	SetStrikeTarget(StrikeTarget + (Right * Degrees.X + Forward * Degrees.Y) * CheeseStrikeStreaks::StrikeCursorPerDegree);
+}
+
+bool ACheeseStrikePlayerState::StrikeSpot(FVector& OutSpot) const
+{
+	const ACharacter* Body = GetPawn<ACharacter>();
+	const float Feet = Body != nullptr ? Body->GetActorLocation().Z - Body->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.0f;
+	return ACheeseStrikeBombs::GroundNear(GetWorld(), StrikeTarget, Feet, OutSpot);
+}
+
 void ACheeseStrikePlayerState::MarkStrike()
 {
 	FVector Spot;
-	float Yaw = 0.0f;
-	if (!bMarkingStrike || !StrikeAim(Spot, Yaw))
+	if (!bMarkingStrike || !StrikeSpot(Spot))
 	{
 		return;
 	}
 	bMarkingStrike = false;
-	ServerCallStreak(static_cast<uint8>(CheeseStrikeStreaks::EStreak::CheeseStrike), Spot, Yaw);
+	ServerCallStreak(static_cast<uint8>(CheeseStrikeStreaks::EStreak::CheeseStrike), Spot, StrikeYaw);
 }
 
 void ACheeseStrikePlayerState::CancelStrike()

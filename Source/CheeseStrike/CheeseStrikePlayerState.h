@@ -18,8 +18,8 @@ class ACheeseStrikeWatchCamera;
  *
  * It is also where the player calls in a streak, being theirs on their own
  * machine: the Streak key calls the next one in, or, for a Cheese Strike,
- * starts marking where it goes, which the next shot marks (or the key or
- * Escape calls off). An out player watches a teammate
+ * starts choosing where it goes on the HUD's strike map, which the next
+ * shot calls in (or the key or Escape calls off). An out player watches a teammate
  * (ACheeseStrikeWatchCamera).
  */
 UCLASS()
@@ -83,11 +83,24 @@ public:
 
 	/** The Streak key, on this player's machine: calls in the next streak, or starts or stops marking where a Cheese Strike goes. */
 	void StreakPressed();
-	/** Whether this player is marking where their Cheese Strike goes: then a shot marks it instead of firing. */
+	/**
+	 * Whether this player is choosing where their Cheese Strike goes, on the
+	 * HUD's strike map (the minimap, big in the middle): the look (the mouse
+	 * or the stick) moves the mark instead of the view, and a shot calls it
+	 * in instead of firing.
+	 */
 	bool IsMarkingStrike() const { return bMarkingStrike; }
-	/** Where the Cheese Strike would go now: where this player's view meets the world, and which way the run goes (their view's yaw). False if the view meets nothing near enough. */
+	/** Where this player's view meets the world, and its yaw; false if it meets nothing near enough. Where the mark starts. */
 	bool StrikeAim(FVector& OutSpot, float& OutYaw) const;
-	/** Marks the Cheese Strike where the view is (StrikeAim), and calls it in. */
+	/** While marking: the middle of the strike's area (world X and Y), and the view's yaw when marking began, which the strike map is turned by. */
+	FVector2D GetStrikeTarget() const { return StrikeTarget; }
+	float GetStrikeYaw() const { return StrikeYaw; }
+	void SetStrikeTarget(const FVector2D& Target);
+	/** Moves the mark by what the look would have turned the view (degrees: right, and up), on the map as it is turned (CheeseStrikeStreaks::StrikeCursorPerDegree), held within reach of the caller. */
+	void MoveStrikeTarget(const FVector2D& Degrees);
+	/** The spot the strike is marked on: the ground under the mark, the floor nearest the caller's feet (ACheeseStrikeBombs::GroundNear). */
+	bool StrikeSpot(FVector& OutSpot) const;
+	/** Calls the Cheese Strike in over the area at the mark (StrikeSpot). */
 	void MarkStrike();
 	/** Stops marking; the streak stays ready. */
 	void CancelStrike();
@@ -144,6 +157,8 @@ protected:
 	/** The server's record of the run. */
 	CheeseStrikeStreaks::FRun Run;
 	bool bMarkingStrike = false;
+	FVector2D StrikeTarget = FVector2D::ZeroVector;
+	float StrikeYaw = 0.0f;
 	UPROPERTY(Transient)
 	TObjectPtr<ACheeseStrikeWatchCamera> Watching;
 };

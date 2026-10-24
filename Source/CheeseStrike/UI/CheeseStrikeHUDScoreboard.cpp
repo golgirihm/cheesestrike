@@ -6,8 +6,10 @@
 // figure for who plays it (a person or a robot), the name, the status (blank
 // alive, DOWN, OUT or DEAD, as CheeseStrikeHUD::StatusWord has it), Gun
 // Game's step, or King of the Hill's time on the hill (and in the solo mode
-// the points, which it is ordered by), the kills and the deaths. What a row says is
-// CheeseStrikeHUD::BoardRow's.
+// the points, which it is ordered by), the kills and the deaths. In a mode of
+// sides each side's heading has its score beside its name, saying what it
+// counts (rounds won, points, kills: CheeseStrikeHUD::TeamScoreLabel). What
+// a row says is CheeseStrikeHUD::BoardRow's.
 
 #include "CheeseStrikeHUD.h"
 #include "Engine/Canvas.h"
@@ -253,9 +255,15 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	{
 		if (Section.Team != INDEX_NONE)
 		{
+			// The side's name, and beside it its score with what it counts ("3 ROUNDS WON"), clear of the players' columns.
 			const FLinearColor Colour = HudDraw::SideColour(Section.Team);
-			HudDraw::Text(Canvas, FString(CheeseStrikeRules::TeamNames[Section.Team]).ToUpper(), FVector2D(Left + 24.0f * U, Y + 6.0f * U), Side, Colour);
-			HudDraw::Text(Canvas, FString::FromInt(Match->GetTeamScore(Section.Team)), FVector2D(DeathsX, Y + 4.0f * U), Side, Colour, 1.0f);
+			const FString SideName = FString(CheeseStrikeRules::TeamNames[Section.Team]).ToUpper();
+			HudDraw::Text(Canvas, SideName, FVector2D(Left + 24.0f * U, Y + 6.0f * U), Side, Colour);
+			const float ScoreX = Left + 24.0f * U + HudDraw::Measure(SideName, Side).X + 16.0f * U;
+			const FString Score = FString::FromInt(Match->GetTeamScore(Section.Team));
+			HudDraw::Text(Canvas, Score, FVector2D(ScoreX, Y + 6.0f * U), Side, HudDraw::Ink);
+			const float LabelX = ScoreX + HudDraw::Measure(Score, Side).X + 6.0f * U;
+			HudDraw::Text(Canvas, CheeseStrikeHUD::TeamScoreLabel(Match->GetModeInfo().WinBy), FVector2D(LabelX, Y + 6.0f * U + HudDraw::Measure(TEXT("0"), Side).Y - HudDraw::Measure(TEXT("0"), Heading).Y - 2.0f * U), Heading, HudDraw::Soft);
 			Y += SectionHeight;
 		}
 		for (const FLine& Line : Section.Lines)

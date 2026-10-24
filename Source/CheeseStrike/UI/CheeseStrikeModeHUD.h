@@ -16,8 +16,9 @@ class UCanvas;
  * round won, the hill captured or moving), and the Overload's warning to
  * those it falls on; King of the Hill's marker and strip
  * (CheeseStrikeHillHUD); the streak
- * ready to call in, and word when one is earned; while marking a Cheese
- * Strike, where its wheels will land; during an Unmanned Aerial Cheese,
+ * ready to call in, and word when one is earned (the run of kills is the
+ * HUD's streak panel, and choosing a Cheese Strike's spot its strike map);
+ * during an Unmanned Aerial Cheese,
  * where its last sweep saw each enemy, and its time under the minimap; and,
  * out of a round, that the player waits for the next. A state a mode puts a
  * player in (a last stand) says so the way being out does (a notice in the

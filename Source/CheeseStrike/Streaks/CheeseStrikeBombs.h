@@ -36,7 +36,7 @@ struct FCheeseStrikeDrop
 };
 
 /**
- * Gouda wheels falling from the sky: a Cheese Strike's run along a line,
+ * Gouda wheels falling from the sky: a Cheese Strike's over an area,
  * or the Gouda Overload's rain on every enemy (CheeseStrikeStreaks). The
  * server plans each wheel (where it lands, the first thing it meets coming
  * straight down, and when; indoors, a Cheese Strike's wheels come through
@@ -57,7 +57,7 @@ class CHEESESTRIKE_API ACheeseStrikeBombs : public AActor
 public:
 	ACheeseStrikeBombs();
 
-	/** Server only: `Caller`'s Cheese Strike, along the line through `Spot` that `Yaw` faces. */
+	/** Server only: `Caller`'s Cheese Strike, over the area round `Spot` (CheeseStrikeStreaks::StrikeArea), its ring of wheels turned to `Yaw`. */
 	void StartStrike(ACheeseStrikePlayerState* Caller, const FVector& Spot, float Yaw);
 	/** Server only: `Caller`'s Gouda Overload: the warning, then the rain on their enemies. */
 	void StartOverload(ACheeseStrikePlayerState* Caller);
@@ -74,12 +74,22 @@ public:
 	/** Where a wheel dropped over `Over` lands: the first thing it meets coming straight down from high above. False over nothing. */
 	static bool Landing(UWorld* World, const FVector& Over, FVector& OutImpact);
 	/**
-	 * Where a Cheese Strike's wheel for `Over` (a point of its line, at the
+	 * Where a Cheese Strike's wheel for `Over` (a point of its area, at the
 	 * mark's height) lands: under a roof (FCheeseStrikeOverhead), on the floor
 	 * under that point, coming through the roof (OutRoof, its height over
 	 * where it lands); else as Landing has it, OutRoof 0.
 	 */
 	static bool StrikeLanding(UWorld* World, const class FCheeseStrikeOverhead& Overhead, const FVector& Over, FVector& OutImpact, float& OutRoof);
+	/**
+	 * The ground at `Where` (world X and Y) for feet at `Height`: the first
+	 * floor down from a head's height over them (the one they would stand
+	 * on there, under any roof or deck), or, where that starts inside
+	 * something or meets nothing, the first thing under the sky (Landing);
+	 * players left out; false over nothing. What a Cheese
+	 * Strike chosen on the minimap is marked on, at the chooser's feet's
+	 * height (the floor they see the map for).
+	 */
+	static bool GroundNear(UWorld* World, const FVector2D& Where, float Height, FVector& OutGround);
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;

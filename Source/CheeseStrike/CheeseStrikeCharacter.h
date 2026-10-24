@@ -307,6 +307,8 @@ protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	void MoveInput(const FInputActionValue& Value);
+	/** While its player chooses where a Cheese Strike goes, moves the mark by the look's degrees (right, up) instead of turning; false, doing nothing, otherwise. */
+	bool MoveStrikeMark(float Yaw, float Pitch);
 	void MouseLookInput(const FInputActionValue& Value);
 	void StickLookInput(const FInputActionValue& Value);
 	void SprintStarted();
