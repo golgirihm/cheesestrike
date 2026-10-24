@@ -89,13 +89,25 @@ namespace
 		}
 	}
 
-	/** A bar `Done` (0 to 1) full, `Width` wide, its middle at `X`. */
-	void ModeHudBar(UCanvas* Canvas, float X, float Y, float Width, float Done, const FLinearColor& Colour)
+	/** Getting someone up, by a teammate or by themself: green, whatever the side's colour. */
+	const FLinearColor ModeHudReviveGreen(0.22f, 0.86f, 0.32f, 1.0f);
+	constexpr float ModeHudReviveBarHeight = 14.0f;
+
+	/** A thick rounded bar `Width` across, its middle at X, filled `Done` (0 to 1) in green over a dark track: reviving, or getting up. */
+	void ModeHudReviveBar(UCanvas* Canvas, float X, float Y, float Width, float Done)
 	{
 		const float U = HudDraw::Unit(Canvas);
+		const float Height = ModeHudReviveBarHeight * U;
+		const float Radius = Height / 2.0f;
+		const float Left = X - Width / 2.0f;
 		HudDraw::FShapes Shapes;
-		Shapes.Rect(X - Width / 2.0f, Y, Width, 4.0f * U, HudDraw::Dim);
-		Shapes.Rect(X - Width / 2.0f, Y, Width * FMath::Clamp(Done, 0.0f, 1.0f), 4.0f * U, Colour);
+		Shapes.RoundedRect(Left - 2.0f * U, Y - 2.0f * U, Width + 4.0f * U, Height + 4.0f * U, Radius + 2.0f * U, HudDraw::Panel);
+		Shapes.RoundedRect(Left, Y, Width, Height, Radius, HudDraw::Faded(ModeHudReviveGreen, 0.22f));
+		const float Filled = Width * FMath::Clamp(Done, 0.0f, 1.0f);
+		if (Filled > 1.0f)
+		{
+			Shapes.RoundedRect(Left, Y, Filled, Height, FMath::Min(Radius, Filled / 2.0f), ModeHudReviveGreen);
+		}
 		Shapes.Draw(Canvas);
 	}
 
@@ -264,19 +276,20 @@ namespace
 			const FString Under = Executor != nullptr ? FString::Printf(TEXT("%s is executing you"), *Executor->DisplayName())
 				: Theirs != nullptr ? FString::Printf(TEXT("%s is reviving you"), *By->DisplayName())
 				: FString::Printf(TEXT("getting up in %d  ·  a teammate can revive you sooner  ·  an enemy up close can execute you"), Seconds);
-			ModeHudNotice(Canvas, Y, TEXT("DOWN"), HudDraw::Danger, Under);
+			// Being executed, the words go low, out of the way of the execution being watched.
+			ModeHudNotice(Canvas, Executor != nullptr ? Canvas->SizeY * 0.8f : Y, TEXT("DOWN"), HudDraw::Danger, Under);
 			if (Executor == nullptr)
 			{
-				// Reviving fills the bar in the side's colour; otherwise it fills toward getting up alone.
+				// Reviving fills the green bar; otherwise it fills toward getting up alone.
 				const float Done = Theirs != nullptr ? Theirs->WorkDone() : 1.0f - Stand->SelfReviveLeft() / CheeseStrikeModes::SelfReviveTime;
-				ModeHudBar(Canvas, Middle, Y + 70.0f * U, 240.0f * U, Done, Theirs != nullptr ? Side : HudDraw::Soft);
+				ModeHudReviveBar(Canvas, Middle, Y + 70.0f * U, 300.0f * U, Done);
 			}
 			return;
 		}
 		if (const ACheeseStrikeCharacter* Working = Stand->GetWorkingOn())
 		{
-			HudDraw::Text(Canvas, FString::Printf(TEXT("REVIVING %s"), *Working->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, Side, 0.5f);
-			ModeHudBar(Canvas, Middle, Y + 30.0f * U, 240.0f * U, Stand->WorkDone(), Side);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("REVIVING %s"), *Working->DisplayName().ToUpper()), FVector2D(Middle, Y), Line, ModeHudReviveGreen, 0.5f);
+			ModeHudReviveBar(Canvas, Middle, Y + 30.0f * U, 300.0f * U, Stand->WorkDone());
 			return;
 		}
 		CheeseStrikeModes::EInteract Kind = CheeseStrikeModes::EInteract::None;

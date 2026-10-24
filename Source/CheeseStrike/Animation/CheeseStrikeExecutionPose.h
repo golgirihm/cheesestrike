@@ -16,15 +16,23 @@
  * between a few places at set times, eased, and two-bone IK reaches it.
  *
  * The executor's stab: down on the right knee beside the chest, the left
- * foot planted ahead, leaning over; the left hand pins the near shoulder,
- * the right raises the knife overhead and drives it down into the chest,
- * twice, then pulls it out and stands. Their stomp: stood at the head, the
- * right knee comes up high, the boot over the face, and slams down on it,
+ * foot planted ahead, leaning over; the left hand pins the near shoulder
+ * while the right draws the knife back, its point on the chest, holds a
+ * beat, and thrusts it in once; the left hand comes onto the fist to push
+ * it home, both leaning on it a moment; then the left hand braces on the
+ * chest and the right pulls the knife out, and they stand. The knife's
+ * point is placed, not the hand: the hand is put where the knife it holds
+ * (ModelInHand, ModelAlong, as FCheeseStrikeKnifeHold has it) has its
+ * point where it should be and its blade along the thrust. Their stomp:
+ * stood at the head, the weight onto the left foot, the right knee comes
+ * up high, the boot hangs over the face a moment, and slams down on it,
  * the weight following through, grinds, and steps back.
  *
- * The one down: at each blow the chest jerks and the head is thrown back,
- * the pistol arm falling to the floor at the first; under the boot, the
- * pistol arm comes up to shield the face, too late.
+ * The one down: at the thrust the chest jerks and the head is thrown back,
+ * the pistol hand grabbing at the executor's wrist, and at the pull the
+ * body jolts and goes limp, the arm falling to the floor; under the boot,
+ * the pistol arm comes up to shield the face, too late, and the body is
+ * driven flat.
  */
 struct FCheeseStrikeExecutionPose : public FAnimNode_Base
 {
@@ -42,6 +50,12 @@ struct FCheeseStrikeExecutionPose : public FAnimNode_Base
 	FVector TargetShoulder = FVector::ZeroVector;
 	/** The one down: which side of them the executor is (1 right, -1 left). */
 	float Side = 1.0f;
+	/** The executor's knife, once it is in hand: its model as hand_r holds it, and which way its point is in the model. */
+	bool bKnifeInHand = false;
+	FTransform ModelInHand = FTransform::Identity;
+	FVector ModelAlong = FVector(0.0, 1.0, 0.0);
+	/** How far the knife's point is from its model's origin, the middle of the grip (cm, tools/art/weapon_models.py). */
+	static constexpr float KnifePoint = 21.0f;
 
 	bool HasBones() const { return bBones; }
 

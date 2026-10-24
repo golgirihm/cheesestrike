@@ -26,6 +26,9 @@
 #include "Weapons/CheeseStrikeWeapon.h"
 
 using CheeseStrikeModes::EInteract;
+
+static TAutoConsoleVariable<int32> CVarTraceExecution(TEXT("CheeseStrike.TraceExecution"), 0,
+	TEXT("1: logs, every frame of an execution on the server, where the executor's hands and knife point are in the body of the one down."));
 using CheeseStrikeExecution::EKind;
 
 namespace
@@ -35,17 +38,22 @@ namespace
 	/** The view down: dark, washed of colour and red, blurred past arm's length. */
 	constexpr float HurtViewRate = 2.5f;
 	constexpr float HurtFocus = 90.0f;
-	/** The blows' sounds, and the chunks' cheese. */
+	/** The blows' sounds (the knife's own, in and out, made by tools/art/stab_sound.py), and the chunks' cheese. */
 	const TCHAR* const ExecutionWhooshPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeWhoosh_02.Lyra_MeleeWhoosh_02");
-	const TCHAR* const ExecutionImpactPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_03.Lyra_MeleeImpact_03");
+	const TCHAR* const ExecutionStabInPath = TEXT("/Game/OpenGameArt/Stab/SW_KnifeStabIn.SW_KnifeStabIn");
+	const TCHAR* const ExecutionStabOutPath = TEXT("/Game/OpenGameArt/Stab/SW_KnifeStabOut.SW_KnifeStabOut");
+	const TCHAR* const ExecutionStompPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_03.Lyra_MeleeImpact_03");
 	const TCHAR* const ExecutionBurstPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_01.Lyra_MeleeImpact_01");
 	const TCHAR* const ChunkCheesePath = TEXT("/Game/CheeseStrike/Materials/M_Cheese.M_Cheese");
 	const TCHAR* const ChunkMeshPath = TEXT("/Engine/BasicShapes/Cube.Cube");
 
-	/** A beat of an execution: when, and whether it is the blow (else the swing before it). */
+	/** A beat of an execution: when, what is heard, how loud and at what pitch, and whether it is the blow. */
 	struct FExecutionBeat
 	{
 		float At;
+		const TCHAR* Sound;
+		float Volume;
+		float Pitch;
 		bool bBlow;
 	};
 	TArray<FExecutionBeat> BeatsOf(EKind Kind)
@@ -53,11 +61,12 @@ namespace
 		using namespace CheeseStrikeExecution;
 		if (Kind == EKind::Stab)
 		{
-			return {{StabLands[0] - 0.15f, false}, {StabLands[0], true}, {StabLands[1] - 0.15f, false}, {StabLands[1], true}};
+			// The thrust's swish, the blade going in, and drawn out again.
+			return {{StabThrust, ExecutionWhooshPath, 0.6f, 1.25f, false}, {StabLands - 0.02f, ExecutionStabInPath, 1.4f, 1.0f, true}, {StabOut, ExecutionStabOutPath, 1.1f, 1.0f, false}};
 		}
 		if (Kind == EKind::Stomp)
 		{
-			return {{StompLands - 0.15f, false}, {StompLands, true}};
+			return {{StompLands - 0.15f, ExecutionWhooshPath, 0.9f, 0.85f, false}, {StompLands, ExecutionStompPath, 1.3f, 0.8f, true}, {StompLands + 0.01f, ExecutionBurstPath, 1.1f, 0.7f, true}};
 		}
 		return {};
 	}
@@ -276,7 +285,7 @@ bool UCheeseStrikeLastStand::Intercept(float& Damage, const ACheeseStrikeCharact
 	// Only a hand up close finishes: a shot or a stroke from an enemy within reach, never a streak.
 	const bool bEnemyClose = From != nullptr && From != Me && Match->AreEnemies(From->GetPlayerState(), Me->GetPlayerState())
 		&& FVector::Dist(From->GetActorLocation(), Me->GetActorLocation()) <= CheeseStrikeModes::FinishRange;
-	switch (CheeseStrikeModes::LastStandHit(true, bDowned, bUsed, Me->GetHealth(), Damage, bEnemyClose))
+	switch (CheeseStrikeModes::LastStandHit(true, bDowned, Me->GetHealth(), Damage, bEnemyClose))
 	{
 	case CheeseStrikeModes::ELastStandHit::Finish:
 		Damage = Me->GetHealth() + 1000.0f;
@@ -301,7 +310,6 @@ void UCheeseStrikeLastStand::GoDown(ACheeseStrikePlayerState* By)
 		return;
 	}
 	bDowned = true;
-	bUsed = true;
 	DownedAt = ServerNow();
 	DownedBy = By;
 	bInteractHeld = false;
@@ -337,6 +345,10 @@ void UCheeseStrikeLastStand::Revive(float Health)
 	}
 	OnRep_Downed();
 	UE_LOG(LogCheeseStrike, Display, TEXT("%s is back up"), *Me->DisplayName());
+	if (ACheeseStrikeGameMode* Mode = GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>())
+	{
+		Mode->GotUp(Me);
+	}
 }
 
 bool UCheeseStrikeLastStand::Execute(ACheeseStrikeCharacter* Victim, EKind Kind)
@@ -353,10 +365,9 @@ bool UCheeseStrikeLastStand::Execute(ACheeseStrikeCharacter* Victim, EKind Kind)
 	{
 		Kind = CheeseStrikeExecution::Pick(FMath::Rand());
 	}
-	// Beside the one down, on the side the executor came from if there is room there, else the other.
-	const FRotator Lying(0.0f, Victim->GetActorRotation().Yaw, 0.0f);
-	const float Across = FVector::DotProduct(Me->GetActorLocation() - Victim->GetActorLocation(), Lying.RotateVector(FVector::RightVector));
-	const float Came = Across >= 0.0f ? 1.0f : -1.0f;
+	// Beside the one down, on their right if there is room there (the knife hand and the boot toward their feet, where the
+	// camera watches from), else their left.
+	const float Came = CheeseStrikeExecution::PreferredSide;
 	const float HalfHeight = Me->GetDefaultHalfHeight();
 	const float Radius = Me->GetCapsuleComponent()->GetScaledCapsuleRadius();
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeExecutionSpot), false);
@@ -717,12 +728,11 @@ void UCheeseStrikeLastStand::UpdateBurst()
 	{
 		if (Elapsed - Beats[BeatsDone].At < 0.4f)
 		{
-			const bool bBlow = Beats[BeatsDone].bBlow;
-			const bool bBurstNow = bBlow && Kind == EKind::Stomp;
-			if (USoundBase* Sound = LoadObject<USoundBase>(nullptr, bBurstNow ? ExecutionBurstPath : (bBlow ? ExecutionImpactPath : ExecutionWhooshPath)))
+			const FExecutionBeat& Beat = Beats[BeatsDone];
+			if (USoundBase* Sound = LoadObject<USoundBase>(nullptr, Beat.Sound))
 			{
 				const FVector Where = Kind == EKind::Stomp ? Head : InBodyOf(Me, CheeseStrikeExecution::AimPoint(Kind));
-				UGameplayStatics::PlaySoundAtLocation(this, Sound, Where, FRotator::ZeroRotator, bBlow ? 1.3f : 0.9f, bBurstNow ? 0.7f : 1.0f, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
+				UGameplayStatics::PlaySoundAtLocation(this, Sound, Where, FRotator::ZeroRotator, Beat.Volume, Beat.Pitch, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
 			}
 		}
 		++BeatsDone;
@@ -768,7 +778,7 @@ void UCheeseStrikeLastStand::UpdateView(float DeltaTime)
 		ExecutionCamera = World->SpawnActor<ACameraActor>(Player->PlayerCameraManager != nullptr ? Player->PlayerCameraManager->GetCameraLocation() : Me->GetActorLocation(), FRotator::ZeroRotator, Parameters);
 		if (ExecutionCamera != nullptr)
 		{
-			ExecutionCamera->GetCameraComponent()->SetFieldOfView(70.0f);
+			ExecutionCamera->GetCameraComponent()->SetFieldOfView(CheeseStrikeExecution::CameraFov);
 			ExecutionCamera->GetCameraComponent()->bConstrainAspectRatio = false;
 			bViewOut = true;
 			ViewBackAt = -1.0f;
@@ -859,6 +869,30 @@ void UCheeseStrikeLastStand::UpdateView(float DeltaTime)
 	}
 }
 
+void UCheeseStrikeLastStand::TraceExecution() const
+{
+	const ACheeseStrikeCharacter* Me = Body();
+	const ACheeseStrikeCharacter* Down = Execution.Other;
+	const USkeletalMeshComponent* Theirs = Down->GetMesh();
+	const USkeletalMeshComponent* Mine = Me->GetMesh();
+	const FVector Floor = Down->GetActorLocation() - FVector(0.0f, 0.0f, Down->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	const FRotator Lying(0.0f, Down->GetActorRotation().Yaw, 0.0f);
+	const auto InBody = [&](const FVector& World) { return Lying.UnrotateVector(World - Floor); };
+	const FVector Chest = InBody(FMath::Lerp(Theirs->GetBoneLocation(TEXT("spine_03")), Theirs->GetBoneLocation(TEXT("pelvis")), 0.2f));
+	FVector Point = FVector::ZeroVector;
+	if (const ACheeseStrikeWeapon* Weapon = Me->GetWeapon(); Weapon != nullptr && Weapon->GetModel(false) != nullptr)
+	{
+		Point = InBody(Weapon->GetModel(false)->GetComponentTransform().TransformPosition(Weapon->GetModelAlong() * 21.0f));
+	}
+	const FVector HandR = InBody(Mine->GetBoneLocation(TEXT("hand_r")));
+	const FVector HandL = InBody(Mine->GetBoneLocation(TEXT("hand_l")));
+	const FVector Head = InBody(Mine->GetBoneLocation(TEXT("upperarm_r")));
+	const FVector TheirHead = InBody(Theirs->GetBoneLocation(TEXT("head")));
+	UE_LOG(LogCheeseStrike, Display, TEXT("Execution %.2f s: point (%.0f, %.0f, %.0f) chest (%.0f, %.0f, %.0f) %.0f cm apart; hands (%.0f, %.0f, %.0f) (%.0f, %.0f, %.0f); shoulder (%.0f, %.0f, %.0f), their head (%.0f, %.0f, %.0f)"),
+		ExecutionElapsed(), Point.X, Point.Y, Point.Z, Chest.X, Chest.Y, Chest.Z, FVector::Dist(Point, Chest), HandR.X, HandR.Y, HandR.Z, HandL.X, HandL.Y, HandL.Z,
+		Head.X, Head.Y, Head.Z, TheirHead.X, TheirHead.Y, TheirHead.Z);
+}
+
 void UCheeseStrikeLastStand::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -873,6 +907,10 @@ void UCheeseStrikeLastStand::TickComponent(float DeltaTime, ELevelTick TickType,
 	if (!Me->HasAuthority())
 	{
 		return;
+	}
+	if (CVarTraceExecution.GetValueOnGameThread() != 0 && IsExecuting() && IsValid(Execution.Other))
+	{
+		TraceExecution();
 	}
 	if (bDowned && !Me->IsAlive())
 	{

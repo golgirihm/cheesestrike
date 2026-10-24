@@ -3,6 +3,7 @@
 
 #include "CheeseStrikeGameMode.h"
 #include "Modes/CheeseStrikeLastStand.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Engine/GameInstance.h"
@@ -1007,6 +1008,13 @@ void ACheeseStrikeGameMode::StartRound(bool bFirst)
 		}
 	}
 	GetWorldTimerManager().SetTimer(RoundTimer, this, &ACheeseStrikeGameMode::RoundTimeUp, CountLeft + RoundTime, false);
+	bRoundTimeUp = false;
+	bOvertimeOver = false;
+	GetWorldTimerManager().ClearTimer(RoundWarnTimer);
+	if (const float WarnIn = CheeseStrikeModes::NextRoundWarning(RoundTime + CountLeft, CountLeft); WarnIn > 0.0f)
+	{
+		GetWorldTimerManager().SetTimer(RoundWarnTimer, this, &ACheeseStrikeGameMode::WarnRoundTime, WarnIn, false);
+	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("Round %d: %s"), Number, *State->ScoreSummary());
 	if (!bFirst)
 	{
@@ -1014,8 +1022,58 @@ void ACheeseStrikeGameMode::StartRound(bool bFirst)
 	}
 }
 
+void ACheeseStrikeGameMode::WarnRoundTime()
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	if (State == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || State->GetRound() == 0)
+	{
+		return;
+	}
+	// The round's clock is on the score at the bottom all along; as its end nears, everyone is told in words too.
+	const float Left = State->SecondsLeftInRound();
+	const FString Word = CheeseStrikeModes::RoundWarning(Left);
+	if (!Word.IsEmpty())
+	{
+		State->Announce(Word);
+		UE_LOG(LogCheeseStrike, Display, TEXT("Round %d: %s"), State->GetRound(), *Word);
+	}
+	if (const float WarnIn = CheeseStrikeModes::NextRoundWarning(Left, 0.0f); WarnIn > 0.0f)
+	{
+		GetWorldTimerManager().SetTimer(RoundWarnTimer, this, &ACheeseStrikeGameMode::WarnRoundTime, WarnIn, false);
+	}
+}
+
+void ACheeseStrikeGameMode::RoundTimeUp()
+{
+	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	bRoundTimeUp = true;
+	CheckRound(true);
+	// Someone down: overtime, until they are up again or out, but no longer than OvertimeMost.
+	if (State != nullptr && IsMatchInProgress() && !State->IsRoundBreak() && State->GetRound() > 0 && !bOvertimeOver)
+	{
+		State->Announce(TEXT("Overtime"));
+		UE_LOG(LogCheeseStrike, Display, TEXT("Round %d: overtime, someone is down"), State->GetRound());
+		GetWorldTimerManager().SetTimer(RoundTimer, this, &ACheeseStrikeGameMode::OvertimeOver, CheeseStrikeModes::OvertimeMost, false);
+	}
+}
+
+void ACheeseStrikeGameMode::OvertimeOver()
+{
+	bOvertimeOver = true;
+	CheckRound(true);
+}
+
+void ACheeseStrikeGameMode::GotUp(ACheeseStrikeCharacter* Body)
+{
+	if (bRoundTimeUp)
+	{
+		GetWorldTimerManager().SetTimerForNextTick(this, &ACheeseStrikeGameMode::CheckRoundNow);
+	}
+}
+
 void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 {
+	bTimeUp = bTimeUp || bRoundTimeUp;
 	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
 	if (State == nullptr || !IsMatchInProgress() || State->IsRoundBreak() || State->GetRound() == 0)
 	{
@@ -1045,7 +1103,7 @@ void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 		}
 	}
 	int32 Winner = CheeseStrikeModes::NoTeam;
-	if (!CheeseStrikeModes::RoundOver(Sides[0], Sides[1], bTimeUp, Winner))
+	if (!CheeseStrikeModes::RoundOver(Sides[0], Sides[1], bTimeUp, Winner, bOvertimeOver))
 	{
 		return;
 	}
@@ -1060,6 +1118,9 @@ void ACheeseStrikeGameMode::EndRound(int32 Winner)
 		return;
 	}
 	GetWorldTimerManager().ClearTimer(RoundTimer);
+	GetWorldTimerManager().ClearTimer(RoundWarnTimer);
+	bRoundTimeUp = false;
+	bOvertimeOver = false;
 	if (Winner != CheeseStrikeModes::NoTeam)
 	{
 		State->AddTeamScore(Winner, 1);
@@ -1236,10 +1297,21 @@ void ACheeseStrikeGameMode::CheeseStrikeExecute(int32 Kind, const FString& Playe
 #if !UE_BUILD_SHIPPING
 	const ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
 	ACheeseStrikeCharacter* Executor = nullptr;
+	const ACheeseStrikeCharacter* Host = nullptr;
 	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
 	{
 		const APlayerController* Controller = Cast<APlayerController>(It->GetController());
-		const bool bWanted = Player.IsEmpty() ? Controller != nullptr && Controller->IsLocalController() : It->DisplayName().Equals(Player, ESearchCase::IgnoreCase);
+		if (Controller != nullptr && Controller->IsLocalController())
+		{
+			Host = *It;
+		}
+	}
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		const APlayerController* Controller = Cast<APlayerController>(It->GetController());
+		const bool bMate = Player.Equals(TEXT("mate"), ESearchCase::IgnoreCase) && Host != nullptr && *It != Host && State != nullptr && State->AreTeammates(Host->GetPlayerState(), It->GetPlayerState());
+		const bool bEnemy = Player.Equals(TEXT("enemy"), ESearchCase::IgnoreCase) && Host != nullptr && State != nullptr && State->AreEnemies(Host->GetPlayerState(), It->GetPlayerState());
+		const bool bWanted = bMate || bEnemy || (Player.IsEmpty() ? Controller != nullptr && Controller->IsLocalController() : It->DisplayName().Equals(Player, ESearchCase::IgnoreCase));
 		if (bWanted && It->IsAlive() && !It->IsDowned())
 		{
 			Executor = *It;
@@ -1262,6 +1334,36 @@ void ACheeseStrikeGameMode::CheeseStrikeExecute(int32 Kind, const FString& Playe
 	{
 		Executor->GetLastStand()->Execute(Nearest, CheeseStrikeExecution::KindAt(Kind));
 	}
+#endif
+}
+
+void ACheeseStrikeGameMode::CheeseStrikeWatchDown(float Yaw, float Distance, float Height)
+{
+#if !UE_BUILD_SHIPPING
+	ACheeseStrikeCharacter* Host = nullptr;
+	const ACheeseStrikeCharacter* Down = nullptr;
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		const APlayerController* Controller = Cast<APlayerController>(It->GetController());
+		if (Controller != nullptr && Controller->IsLocalController())
+		{
+			Host = *It;
+		}
+		const UCheeseStrikeLastStand* Theirs = It->GetLastStand();
+		if (It->IsAlive() && Theirs != nullptr && (Theirs->IsBeingExecuted() || (It->IsDowned() && Down == nullptr)))
+		{
+			Down = *It;
+		}
+	}
+	if (Host == nullptr || Down == nullptr)
+	{
+		return;
+	}
+	const FVector Floor = Down->GetActorLocation() - FVector(0.0f, 0.0f, Down->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	const FVector Chest = Floor + FVector(0.0f, 0.0f, 45.0f);
+	const FVector At = Floor + FRotator(0.0f, Down->GetActorRotation().Yaw + Yaw, 0.0f).Vector() * Distance + FVector(0.0f, 0.0f, Height);
+	const FRotator Look = (Chest - At).Rotation();
+	Host->CheeseStrikeViewFrom(At.X, At.Y, At.Z, Look.Pitch, Look.Yaw);
 #endif
 }
 

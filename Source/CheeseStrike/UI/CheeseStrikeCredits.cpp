@@ -19,6 +19,7 @@ namespace CheeseStrikeCredits
 		{TEXT("The vermin's sounds"), TEXT("From OpenGameArt.org. \"Squeaky Rat\" by Iwan \"qubodup\" Gabovitch, CC0, from sounds by Zabuhailo and moneykube (freesound.org). \"Rat Monster Screams\" by Iwan \"qubodup\" Gabovitch, licensed under Creative Commons Attribution 3.0 (CC BY 3.0): creativecommons.org/licenses/by/3.0. \"Rabbit Eating\" by Voltiment555, CC0. \"7 Eating Crunches\" by StarNinjas, CC0.")},
 		{TEXT("Rind Market's surfaces and props"), TEXT("From Poly Haven (polyhaven.com), CC0: textures by Rob Tuytel, Amal Kumar, Dario Barresi and Dimitrios Savva, colormass and Rico Cilliers; lamps, a barrel, a crate, a basket and a bench by Josh Dean, James Ray Cock, Kuutti Siitonen and Kirill Sannikov.")},
 		{TEXT("The menu's music"), TEXT("\"Bravery Beats\" by MintoDog, from OpenGameArt.org, CC0.")},
+		{TEXT("The knife's stab"), TEXT("From \"8 Wet Squish, Slurp Impacts\" by Independent.nu, from OpenGameArt.org, CC0.")},
 		{TEXT("Online play"), TEXT("Steamworks, by Valve.")},
 	};
 

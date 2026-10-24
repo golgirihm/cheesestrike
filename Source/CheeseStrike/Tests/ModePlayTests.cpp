@@ -718,14 +718,28 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the executor takes input again"), Character(1)->TakesInput());
 		TestFalse(TEXT("and can be hurt again"), CharacterOf(1, 0)->GetLastStand()->InExecution());
 	});
-	// Down a second time in a life, the host dies; with nobody of theirs standing, the round and the match are the enemy's.
+	// Revived, the host goes down again when shot down a second time, as the first: never killed outright for having been
+	// down before. Down alone (the teammate is out), they keep the round going.
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
 	Play(1, TEXT("tap Reload\nwait 2.2"));
-	FireUntil(1, TEXT("the match ending"), 6.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	FireUntil(1, TEXT("the host going down again"), 6.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 0); return Host == nullptr || !Host->IsAlive() || Host->IsDowned(); });
 	Then([this]()
 	{
-		TestFalse(TEXT("the host, once revived, isn't downed again but killed"), Character(0)->IsAlive());
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		TestTrue(TEXT("the host, revived, goes down again rather than dying"), Host != nullptr && Host->IsAlive() && Host->IsDowned());
+		TestEqual(TEXT("with only the pistol in hand again"), HeldId(Host), CheeseStrikeWeapons::Pistol().Id);
+		TestFalse(TEXT("and the round goes on: down is still in"), GameState(0)->IsRoundBreak() || GameState(0)->HasMatchEnded());
+	});
+	WaitUntil(TEXT("the host's own machine seeing them down again"), 3.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsDowned() && Host->bIsCrouched; });
+	// Executed now, the last of their side, the round and the match are the enemy's.
+	PutAt(1, BesideSpot, 180.0f);
+	Play(1, TEXT("tap Interact"));
+	WaitUntil(TEXT("the match ending"), CheeseStrikeExecution::StabSeconds + 4.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	Then([this]()
+	{
+		TestFalse(TEXT("the host is executed"), CharacterOf(0, 0)->IsAlive());
+		TestTrue(TEXT("by an execution"), CharacterOf(0, 0)->GetLastStand()->WasExecuted());
 		TestEqual(TEXT("the other side wins"), GameState(0)->GetWinningTeam(), 1);
 	});
 	StopPlaying();
@@ -841,18 +855,77 @@ bool FExecutionAllDownIsNotOut::RunTest(const FString& Parameters)
 		TestEqual(TEXT("with little health"), Host->GetHealth(), CheeseStrikeModes::SelfReviveHealth);
 		TestTrue(TEXT("and the rifle to draw again"), Host->GetInventory()->CanDraw(EWeaponSlot::Primary));
 	});
-	// Their last stand used, the next hit kills: with nobody of theirs left in, the round and the match are the enemy's.
+	// Up by themself, the next hit that would kill puts them down again, as the first did: never only once a life.
 	Then([this]()
 	{
 		CharacterOf(0, 0)->TakeShot(500.0f, CharacterOf(1, 0), false);
 	});
-	WaitUntil(TEXT("the match ending"), 4.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	Wait(0.5f);
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		TestTrue(TEXT("up by themself, the host goes down again"), Host->IsAlive() && Host->IsDowned());
+		TestFalse(TEXT("and the round goes on"), GameState(0)->IsRoundBreak() || GameState(0)->HasMatchEnded());
+		const float Left = Host->GetLastStand()->SelfReviveLeft();
+		TestTrue(FString::Printf(TEXT("their count to getting up begins again (%.1f s)"), Left), Left > CheeseStrikeModes::SelfReviveTime - 2.0f);
+		// Executed, with nobody of theirs left in, the round and the match are the enemy's.
+		TestTrue(TEXT("the execution begins"), CharacterOf(1, 0)->GetLastStand()->Execute(CharacterOf(0, 0), CheeseStrikeExecution::EKind::Stab));
+	});
+	WaitUntil(TEXT("the match ending"), CheeseStrikeExecution::StabSeconds + 3.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
 	Then([this]()
 	{
 		TestEqual(TEXT("the other side wins"), GameState(0)->GetWinningTeam(), 1);
 		TestEqual(TEXT("the enemy scores both"), StateOf(1, 0)->GetKills(), 2);
-		TestTrue(TEXT("one executed"), CharacterOf(2, 0)->GetLastStand()->WasExecuted());
-		TestFalse(TEXT("the other not"), CharacterOf(0, 0)->GetLastStand()->WasExecuted());
+		TestTrue(TEXT("both executed"), CharacterOf(2, 0)->GetLastStand()->WasExecuted() && CharacterOf(0, 0)->GetLastStand()->WasExecuted());
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExecutionOvertimeWaitsForTheDown, "CheeseStrike.Play.ExecutionOvertimeWaitsForTheDown", ModePlayTests::Flags)
+
+bool FExecutionOvertimeWaitsForTheDown::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace ModePlayTests;
+	// One a side, the shortest round there is.
+	StartPlaying({2, TEXT("?Mode=Execution?Rounds=1?RoundTime=30")});
+	PutAt(0, HostSpot, HostYaw);
+	PutAt(1, JoinerSpot, JoinerYaw);
+	// The round's time runs out while the host is down, getting up by themself.
+	WaitUntil(TEXT("the round's last 12 s"), 35.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->SecondsLeftInRound() <= 12.0f; });
+	Then([this]()
+	{
+		CharacterOf(0, 0)->GetLastStand()->GoDown(StateOf(1, 0));
+		bool bTold = false;
+		for (const FAnnouncement& Word : GameState(0)->GetAnnouncements())
+		{
+			bTold |= Word.Text.Contains(TEXT("seconds left"));
+		}
+		TestTrue(TEXT("everyone was told the round's time is running out"), bTold);
+	});
+	WaitUntil(TEXT("the round's time up"), 15.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->SecondsLeftInRound() <= 0.0f; });
+	Wait(1.0f);
+	Then([this]()
+	{
+		const ACheeseStrikeGameState* Match = GameState(0);
+		TestFalse(TEXT("out of time with the host down, the round goes on in overtime"), Match->IsRoundBreak() || Match->HasMatchEnded());
+		TestTrue(TEXT("the host is down, alive, getting up by themself"), CharacterOf(0, 0)->IsAlive() && CharacterOf(0, 0)->IsDowned() && CharacterOf(0, 0)->GetLastStand()->SelfReviveLeft() > 0.0f);
+		TestFalse(TEXT("and not out"), StateOf(0, 0)->IsOut());
+		bool bTold = false;
+		for (const FAnnouncement& Word : GameState(1)->GetAnnouncements())
+		{
+			bTold |= Word.Text.Equals(TEXT("Overtime"));
+		}
+		TestTrue(TEXT("everyone is told it is overtime"), bTold);
+	});
+	// Up again, the round is decided by whatever stands: one each, and the joiner, with more health, takes it.
+	WaitUntil(TEXT("the host up by themself"), CheeseStrikeModes::SelfReviveTime, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 0); return Host != nullptr && !Host->IsDowned(); });
+	WaitUntil(TEXT("the match ending"), 3.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
+	Then([this]()
+	{
+		TestTrue(TEXT("the host lived through it"), CharacterOf(0, 0)->IsAlive());
+		TestEqual(TEXT("the side with more health left takes it"), GameState(0)->GetWinningTeam(), StateOf(1, 0)->GetTeam());
 	});
 	StopPlaying();
 	return true;

@@ -374,7 +374,7 @@ public:
 	 * In an execution (UCheeseStrikeLastStand::GetExecution): which kind,
 	 * whether this body deals it, how far in (seconds), and for the executor
 	 * where the blow lands and the near shoulder of the one down (in the
-	 * frame the body is animated in, taken as it begins) and the side.
+	 * frame the body is animated in, followed while they live) and the side.
 	 */
 	uint8 ExecutionKind = 0;
 	bool bExecutor = false;

@@ -24,7 +24,7 @@ namespace CheeseStrikeExecution
 	enum class EKind : uint8
 	{
 		None,
-		/** Knelt beside the chest, the cheese knife driven down into it twice. */
+		/** Knelt beside the chest, the cheese knife thrust once into it, held there a moment, and pulled out. */
 		Stab,
 		/** Stood at the head, a boot raised high and brought down on it: the head bursts into chunks of cheese. */
 		Stomp,
@@ -38,13 +38,22 @@ namespace CheeseStrikeExecution
 	const TCHAR* Name(EKind Kind);
 
 	/** How long each lasts, start to the executor standing again. */
-	constexpr float StabSeconds = 2.6f;
-	constexpr float StompSeconds = 2.3f;
+	constexpr float StabSeconds = 2.8f;
+	constexpr float StompSeconds = 2.4f;
 	float Seconds(EKind Kind);
-	/** When the knife goes in (twice), and when the boot lands, the head bursting. */
-	constexpr float StabLands[2] = {1.0f, 1.6f};
-	constexpr float StompLands = 1.05f;
-	/** When the one down dies: as the knife comes out after the second blow; as the boot lands. */
+	/**
+	 * The stab: knelt and the knife drawn back by StabCocked, held back a
+	 * beat, thrust from StabThrust, in the chest at StabLands, pushed in and
+	 * held there, then pulled out from StabOut (out by StabFree). The stomp:
+	 * the boot lands, and the head bursts, at StompLands.
+	 */
+	constexpr float StabCocked = 0.6f;
+	constexpr float StabThrust = 1.05f;
+	constexpr float StabLands = 1.22f;
+	constexpr float StabOut = 1.85f;
+	constexpr float StabFree = 2.1f;
+	constexpr float StompLands = 1.1f;
+	/** When the one down dies: as the knife comes out; as the boot lands. */
 	float KillAt(EKind Kind);
 	/** Whether it is still playing `Elapsed` seconds in (the executor unhurt, nobody moving). */
 	bool IsPlaying(EKind Kind, float Elapsed);
@@ -53,9 +62,13 @@ namespace CheeseStrikeExecution
 	 * Where the executor stands, in the body: beside the chest, StabStandOff
 	 * out on side `Side` (1 right, -1 left), to kneel over it; beside the
 	 * head, StompStandOff out, to stamp on it. They face the point they
-	 * deal the blow to (AimPoint), across the body.
+	 * deal the blow to (AimPoint), across the body. The right side
+	 * (PreferredSide) is tried first: there the executor's right hand and
+	 * foot, the knife's and the boot's, are toward the feet of the one
+	 * down, where the camera watches from.
 	 */
-	constexpr float StabStandOff = 58.0f;
+	constexpr float PreferredSide = 1.0f;
+	constexpr float StabStandOff = 50.0f;
 	constexpr float StompStandOff = 48.0f;
 	FVector SpotInBody(EKind Kind, float Side);
 	/** What the executor faces and strikes, in the body: the chest for the knife, the head for the boot. */
@@ -65,14 +78,22 @@ namespace CheeseStrikeExecution
 
 	/**
 	 * Where the camera watching it is, in the body of the one down, `Elapsed`
-	 * in: on the far side from the executor, toward the feet and up, so that
-	 * the executor's face and the blow are in view, the one down in front;
-	 * drifting round a little as it plays. It looks at LookAt.
+	 * in: toward their feet and out on the far side from the executor, a
+	 * little over head height, so that the one down's face and chest, the
+	 * executor's face and right hand (the knife, the boot) and the blow are
+	 * all in view, the two of them side by side in the frame; easing in a
+	 * little and round toward the feet as it plays. It looks at LookAt.
 	 */
-	constexpr float CameraBack = 240.0f;
-	constexpr float CameraAlong = 220.0f;
-	constexpr float CameraUp = 195.0f;
-	constexpr float CameraDrift = 18.0f;
+	constexpr float CameraBack = 160.0f;
+	constexpr float CameraAlong = 200.0f;
+	constexpr float StabCameraUp = 140.0f;
+	/** The stomp, stood up, is watched from further off and higher, by StompCameraFurther. */
+	constexpr float StompCameraUp = 175.0f;
+	constexpr float StompCameraFurther = 1.3f;
+	constexpr float CameraDrift = 12.0f;
+	constexpr float CameraPushIn = 0.12f;
+	/** The camera's field of view (degrees across). */
+	constexpr float CameraFov = 62.0f;
 	FVector CameraInBody(EKind Kind, float Side, float Elapsed);
 	FVector LookAtInBody(EKind Kind, float Side);
 	/** The view blends out to it and back over these. */

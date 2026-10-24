@@ -90,6 +90,17 @@ namespace CheeseStrikeModes
 	/** Seconds a round lasts at most, and the pause between rounds (the Godot game's ROUND_BREAK). */
 	constexpr float RoundTime = 120.0f;
 	constexpr float RoundBreak = 6.0f;
+	/**
+	 * As a round's time runs out, everyone is told how long is left, at
+	 * these seconds left (the clock is on the score at the bottom all
+	 * along): RoundWarning says it ("30 SECONDS LEFT IN THE ROUND"; empty
+	 * away from them), NextRoundWarning is the seconds from now, with
+	 * `Left` left (and `Within` seconds that must pass first, a count
+	 * before the round), to the next warning; none (0) after the last.
+	 */
+	constexpr float RoundWarnings[] = {30.0f, 10.0f};
+	FString RoundWarning(float Left);
+	float NextRoundWarning(float Left, float Within);
 	/** How long into a round a newcomer may still come in; after it they are out until the next. */
 	constexpr float LateJoin = 10.0f;
 	/** The URL's `?Rounds=` (1 to 15) and `?RoundTime=` (30 to 600 s), or the usual. */
@@ -126,12 +137,17 @@ namespace CheeseStrikeModes
 	 * NoTeam for a draw). It is over once a side with players is out
 	 * (FSide::IsOut: none left in; someone down is in) while the other has players (nothing ends while a side is
 	 * empty: there is nobody to beat), and the other side takes it; both
-	 * gone at once is a draw. When its time is up (`bTimeUp`) it is over
-	 * whatever stands: the side with more standing takes it, then the one
-	 * with more in (down or not), then the one with more health left; level
-	 * on all, a draw.
+	 * gone at once is a draw. When its time is up (`bTimeUp`) and nobody
+	 * is down, it is over whatever stands: the side with more still in
+	 * takes it, then the one with more health left; level on both, a draw.
+	 * With anyone down (Execution) it goes on in overtime, until they are
+	 * up again (revived, or by themself) or out, or the overtime is over
+	 * too (`bOvertimeOver`, OvertimeMost after the time): then someone down
+	 * counts as in, and less than someone standing.
 	 */
-	bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner);
+	bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner, bool bOvertimeOver = false);
+	/** The longest a round goes on in overtime: long enough for someone just down to get up by themself and be executed. */
+	constexpr float OvertimeMost = 30.0f;
 
 	/**
 	 * Whether a player on `AttackerTeam` may hurt one on `VictimTeam`. Never
@@ -208,10 +224,11 @@ namespace CheeseStrikeModes
 	 * What a hit of `Damage` does to a player with `Health` left: down
 	 * (`bDowned`), only an enemy within FinishRange (`bEnemyClose`) can
 	 * harm them, and that finishes them; standing, a hit that would kill
-	 * puts them down instead, once a life (`bLastStandUsed`). Outside a
+	 * puts them down instead, every time: getting up again (revived, or by
+	 * themself) they can go down again, as often as it comes. Outside a
 	 * mode with a last stand (`bLastStand`), every hit hurts.
 	 */
-	ELastStandHit LastStandHit(bool bLastStand, bool bDowned, bool bLastStandUsed, float Health, float Damage, bool bEnemyClose);
+	ELastStandHit LastStandHit(bool bLastStand, bool bDowned, float Health, float Damage, bool bEnemyClose);
 
 	/** What Interact does to a player down: a teammate's revives them, an enemy's executes them; nothing to anyone else, out of reach, or standing. */
 	enum class EInteract : uint8
@@ -239,8 +256,8 @@ namespace CheeseStrikeModes
 	 * threat to one who comes to execute them. Bots down fight by the same
 	 * weapon.
 	 */
-	constexpr float DownedDamage = 0.25f;
-	constexpr float DownedFireInterval = 4.0f;
+	constexpr float DownedDamage = 0.35f;
+	constexpr float DownedFireInterval = 3.0f;
 	constexpr float DownedSpread = 2.0f;
 	constexpr float DownedKick = 2.5f;
 	/** The heavy sway of a hurt player's view: degrees of yaw and pitch at `Seconds` (both at most DownedSwayYaw and DownedSwayPitch). */

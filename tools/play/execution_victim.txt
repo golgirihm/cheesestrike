@@ -1,0 +1,57 @@
+# The same, from the view of the one executed: the host goes down and the
+# bot executes it at once (a stab, then a stomp the next round):
+# tools/play.ps1 -Script tools/play/execution_victim.txt -Bots -Extra "?Mode=Execution?Bots=1?Rounds=5" -FixedFps 30 -Res 1600x900
+wait 4
+cmd CheeseStrikeDown
+wait 0.1
+cmd CheeseStrikeExecute 1 enemy
+wait 0.05
+shot exec_victim_stab_015
+wait 0.20
+shot exec_victim_stab_045
+wait 0.20
+shot exec_victim_stab_075
+wait 0.10
+shot exec_victim_stab_095
+wait 0.05
+shot exec_victim_stab_110
+wait 0.02
+shot exec_victim_stab_122
+wait 0.08
+shot exec_victim_stab_140
+wait 0.20
+shot exec_victim_stab_170
+wait 0.15
+shot exec_victim_stab_195
+wait 0.10
+shot exec_victim_stab_215
+wait 0.20
+shot exec_victim_stab_245
+wait 0.30
+shot exec_victim_stab_285
+wait 9
+cmd CheeseStrikeDown
+wait 0.1
+cmd CheeseStrikeExecute 2 enemy
+wait 0.05
+shot exec_victim_stomp_015
+wait 0.20
+shot exec_victim_stomp_045
+wait 0.20
+shot exec_victim_stomp_075
+wait 0.10
+shot exec_victim_stomp_095
+wait 0.01
+shot exec_victim_stomp_105
+wait 0.01
+shot exec_victim_stomp_112
+wait 0.08
+shot exec_victim_stomp_130
+wait 0.20
+shot exec_victim_stomp_160
+wait 0.20
+shot exec_victim_stomp_190
+wait 0.40
+shot exec_victim_stomp_240
+wait 9
+quit
