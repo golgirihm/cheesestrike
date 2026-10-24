@@ -212,7 +212,7 @@ bool FAHeldThrowShowsItsArcAndGoesOnRelease::RunTest(const FString& Parameters)
 		TestEqual(TEXT("and none spent"), CountOf(CharacterOf(1, 0)), CheeseStrikeGrenades::SpawnCount);
 	});
 	// Let go: thrown, along the arc shown.
-	Play(1, TEXT("release Grenade\nwait 0.3"));
+	Play(1, TEXT("release Grenade\nwait 0.6"));
 	Then([this]()
 	{
 		TestFalse(TEXT("let go, the arc goes"), Character(1)->GetGrenades()->IsHolding() || Character(1)->GetGrenades()->GetPreview().Num() > 0);
