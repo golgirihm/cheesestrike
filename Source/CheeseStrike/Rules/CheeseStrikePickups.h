@@ -12,27 +12,29 @@
  * each map has four to eight stands at fixed spots, each holding one
  * primary floating over it, the better weapons at the riskier spots, both
  * sides reaching them alike. A pickup replaces the primary carried, which
- * is gone (never dropped); the sidearm and the knife stay. Taken, a stand
- * is empty for RespawnSeconds, showing a ghost of its weapon and the
- * seconds left, then its weapon is back. Gun Game has none.
+ * drops to the floor with its rounds (the spawn primary too), where anyone
+ * may take it as they would a stand's, for DroppedSeconds, at most
+ * MostDropped lying about at once (the design's twenty seconds and
+ * twelve); the sidearm and the knife stay. Taken, a stand is empty for
+ * RespawnSeconds, showing a ghost of its weapon and the seconds left, then
+ * its weapon is back; a weapon on the floor is gone. Gun Game has none.
  *
- * How a weapon is taken depends on what is carried (HowToTake): walking
- * over it takes it from someone holding only the spawn primary, since
- * nothing is lost; anyone holding a better one presses Interact (E, LB)
- * near it, told on the screen what they would swap to, so that nobody
- * swaps by walking past; walking over one's own weapon tops up its
- * rounds, if they aren't full.
+ * Nothing is ever taken by walking over it (the user's, October 2026):
+ * a weapon is taken by pressing Interact (E, LB) near it, the screen
+ * saying what it would be swapped for (HowToTake); pressed over one's own
+ * weapon, its rounds top up those carried, if they aren't full.
  *
- * ACheeseStrikePickup is the stand, owned by the server; the inventory
- * swaps the primary (UCheeseStrikeInventory::TakePickup); the HUD draws the
+ * ACheeseStrikePickup is the stand, or the weapon on the floor, owned by
+ * the server; the inventory swaps the primary for a press of Interact
+ * (UCheeseStrikeInventory::PressForPickup, TakePickup); the HUD draws the
  * prompt, the seconds and the stands on the minimap; bots go for a better
- * weapon near them (BotWants).
+ * weapon near them (BotWants) and press Interact there as players do.
  */
 namespace CheeseStrikePickups
 {
 	/** Seconds a stand stays empty once taken. */
 	constexpr float RespawnSeconds = 30.0f;
-	/** How near (cm, across) the feet must come to walk over it: the design's reach, 1.3 m across. */
+	/** How near (cm, across) a bot goes to a stand before pressing Interact for it. */
 	constexpr float Reach = 65.0f;
 	/** And how far above or below its floor (cm): 2 m up. */
 	constexpr float ReachUp = 200.0f;
@@ -48,14 +50,26 @@ namespace CheeseStrikePickups
 	constexpr float BotRange = 2500.0f;
 	constexpr float SecondsShownWithin = 2500.0f;
 
-	/** How a weapon on a stand is taken, by what is carried: not at all, by walking over it, by pressing Interact, or its rounds by walking over it. */
+	/** What pressing Interact over a weapon does, by what is carried: nothing, swaps the primary for it, or takes its rounds. */
 	enum class ETake : uint8
 	{
 		None,
-		WalkOver,
-		Press,
+		Swap,
 		TopUp,
 	};
+
+	/** Seconds a weapon dropped for another lies on the floor before it goes, and the most lying about at once (the oldest go first). */
+	constexpr float DroppedSeconds = 20.0f;
+	constexpr int32 MostDropped = 12;
+	/** In its last DroppedBlink seconds a weapon on the floor blinks, BlinksPerSecond times a second. */
+	constexpr float DroppedBlink = 3.0f;
+	constexpr float BlinksPerSecond = 4.0f;
+	/** Whether a weapon on the floor `Age` seconds is shown now: always, but for the off half of each blink near its end. */
+	bool DroppedShown(float Age);
+	/** How many of the `Lying` weapons on the floor go (the oldest) to make room for one more. */
+	int32 ToClearForDrop(int32 Lying);
+	/** Whether `Weapon` can be dropped for another: any primary, the spawn primary too. */
+	bool CanBeDropped(FName Weapon);
 
 	/** The primary everyone comes in with. */
 	FName SpawnPrimary();
@@ -65,13 +79,15 @@ namespace CheeseStrikePickups
 	bool CanLieOnAStand(FName Weapon);
 
 	/**
-	 * How `Offered` is taken by someone carrying `Carried` as their primary
-	 * (none for no primary), whose rounds for it are full or not: walking
-	 * over it with only the spawn primary or none; walking over one's own
-	 * weapon tops it up unless it is full; any other primary is swapped
-	 * by pressing Interact.
+	 * What pressing Interact over `Offered` (on a stand, or on the floor,
+	 * `bDropped`) does for someone carrying `Carried` as their primary (none
+	 * for no primary), whose rounds for it are full or not: one's own
+	 * weapon tops up its rounds unless they are full; any other primary is
+	 * swapped for it. A stand never holds the spawn primary; the floor may.
 	 */
-	ETake HowToTake(FName Carried, FName Offered, bool bRoundsFull);
+	ETake HowToTake(FName Carried, FName Offered, bool bRoundsFull, bool bDropped = false);
+	/** The rounds taken by topping up from a stand (its weapon's usual reserve, `StandReserve`) or from a weapon on the floor (all it has). */
+	int32 TopUpRounds(bool bDropped, int32 StandReserve, int32 DroppedMagazine, int32 DroppedReserve);
 	/** Whether someone may take anything now: alive, free to act (not held by a count), not down, and allowed their primary (Execution's last stand allows only the sidearm). */
 	bool MayTake(bool bAlive, bool bCanAct, bool bDowned, bool bPrimaryAllowed);
 	/** Whether feet at `Feet` are within `Across` (cm) of a stand whose floor is at `Stand`, and within ReachUp above or below it. */

@@ -1219,6 +1219,15 @@ void ACheeseStrikeWeapon::AddReserve(int32 Rounds)
 	}
 }
 
+void ACheeseStrikeWeapon::SetRounds(int32 InMagazine, int32 InReserve)
+{
+	if (HasAuthority() && Stats->UsesRounds())
+	{
+		Magazine = FMath::Clamp(InMagazine, 0, Stats->MagazineSize);
+		Reserve = FMath::Clamp(InReserve, 0, Stats->ReserveMax);
+	}
+}
+
 void ACheeseStrikeWeapon::MakeReserveEndless()
 {
 	if (HasAuthority() && Stats->UsesRounds())

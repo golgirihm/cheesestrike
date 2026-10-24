@@ -1,12 +1,13 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 // Tests that play the weapons' stands in the editor (see PlayTesting.h), on
-// the shooter level's long clear run with stands spawned on it: a weapon
-// walked over with the spawn primary is taken, on the server and the
-// player's machine, and the stand is seen empty by a joiner and comes back;
-// a better one is not swapped by walking over it but by pressing Interact,
-// with the prompt; one's own weapon tops up its rounds; Gun Game has none;
-// and a bot goes for a better weapon near it.
+// the shooter level's long clear run with stands spawned on it: nothing is
+// taken by walking over it, even with the spawn primary; Interact pressed
+// takes it, on the server and the player's machine, the weapon carried
+// dropping to the floor with its rounds, where another player takes it
+// again with the same press; the stand is seen empty by a joiner and
+// comes back; one's own weapon tops up its rounds; Gun Game has none; and
+// a bot goes for a better weapon near it, pressing for it.
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
@@ -20,6 +21,7 @@
 #include "NavigationSystem.h"
 #include "CheeseStrikeBotController.h"
 #include "CheeseStrikeCharacter.h"
+#include "CheeseStrikePlayerController.h"
 #include "Map/CheeseStrikeHill.h"
 #include "Rules/CheeseStrikeHills.h"
 #include "GameFramework/PlayerStart.h"
@@ -86,7 +88,7 @@ namespace PickupPlayTests
 		UWorld* World = PlayTesting::World(Player);
 		for (TActorIterator<ACheeseStrikePickup> It(World); World != nullptr && It; ++It)
 		{
-			if (It->GetWeapon() == Weapon)
+			if (!It->IsDropped() && It->GetWeapon() == Weapon)
 			{
 				return *It;
 			}
@@ -105,9 +107,25 @@ namespace PickupPlayTests
 		return Character != nullptr && Character->GetWeapon() != nullptr ? Character->GetWeapon()->GetWeaponId() : NAME_None;
 	}
 
+	/** `Player`'s world's copy of a weapon `Weapon` on the floor, or null. */
+	ACheeseStrikePickup* DroppedIn(int32 Player, FName Weapon)
+	{
+		UWorld* World = PlayTesting::World(Player);
+		for (TActorIterator<ACheeseStrikePickup> It(World); World != nullptr && It; ++It)
+		{
+			if (It->IsDropped() && !It->IsActorBeingDestroyed() && It->GetWeapon() == Weapon)
+			{
+				return *It;
+			}
+		}
+		return nullptr;
+	}
+
 	/** Remembered between steps. */
 	TWeakObjectPtr<ACheeseStrikeWeapon> Swapped;
 	int32 ReserveBefore = 0;
+	int32 MagazineBefore = 0;
+	FVector DroppedAt = FVector::ZeroVector;
 }
 
 void PickupChecks::CheckStands(FAutomationTestBase& Test, UWorld* World, bool bAfterTheMice)
@@ -120,7 +138,10 @@ void PickupChecks::CheckStands(FAutomationTestBase& Test, UWorld* World, bool bA
 	TArray<ACheeseStrikePickup*> Stands;
 	for (TActorIterator<ACheeseStrikePickup> It(World); It; ++It)
 	{
-		Stands.Add(*It);
+		if (!It->IsDropped())
+		{
+			Stands.Add(*It);
+		}
 	}
 	FCollisionQueryParams Params(FName(TEXT("PickupChecks")), false);
 	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
@@ -239,28 +260,38 @@ bool FAWeaponIsTakenFromItsStandAndComesBack::RunTest(const FString& Parameters)
 	{
 		const ACheeseStrikePickup* Stand = StandIn(0, Roquefort);
 		TestTrue(TEXT("3 m off, nothing is taken"), PrimaryOf(CharacterOf(0, 0)) == CheeseStrikeWeapons::Carbine().Id && Stand->IsThere());
-		TestTrue(TEXT("with only the spawn primary, it is taken by walking over it"), Stand->HowFor(CharacterOf(0, 0)) == CheeseStrikePickups::ETake::WalkOver);
-		TestNull(TEXT("and no prompt asks to press for it"), ACheeseStrikePickup::OfferedTo(Character(0)));
+		TestTrue(TEXT("with only the spawn primary, it is swapped for"), Stand->HowFor(CharacterOf(0, 0)) == CheeseStrikePickups::ETake::Swap);
+		TestNull(TEXT("and out of reach no prompt asks to press for it"), ACheeseStrikePickup::OfferedTo(Character(0)));
 	});
 
-	// Walked over: taken, in hand at once, and the stand empty everywhere.
+	// Walked over: never taken; Interact pressed, it is taken, the carbine dropped.
 	PutAt(0, OnTheRun(300.0f), RunYaw);
-	Wait(0.6f);
-	Then([this, Roquefort]()
+	Wait(0.8f);
+	Then([this, Roquefort, Carbine]()
 	{
-		TestEqual(TEXT("walking over the stand takes its Roquefort"), PrimaryOf(CharacterOf(0, 0)), Roquefort);
+		TestEqual(TEXT("walking over the stand takes nothing, even with the spawn primary"), PrimaryOf(CharacterOf(0, 0)), Carbine);
+		TestTrue(TEXT("the Roquefort stays on its stand"), StandIn(0, Roquefort)->IsThere());
+		TestTrue(TEXT("the host's machine offers it, to press for"), ACheeseStrikePickup::OfferedTo(Character(0)) == StandIn(0, Roquefort));
+	});
+	Play(0, TEXT("tap Interact\nwait 0.4"));
+	Then([this, Roquefort, Carbine]()
+	{
+		TestEqual(TEXT("pressed, Interact takes the Roquefort"), PrimaryOf(CharacterOf(0, 0)), Roquefort);
 		TestEqual(TEXT("in hand"), HeldId(CharacterOf(0, 0)), Roquefort);
 		TestFalse(TEXT("the stand is empty"), StandIn(0, Roquefort)->IsThere());
 		TestTrue(FString::Printf(TEXT("for its seconds (%.1f)"), StandIn(0, Roquefort)->SecondsLeft()), StandIn(0, Roquefort)->SecondsLeft() > TestSeconds - 1.5f);
+		const ACheeseStrikePickup* Dropped = DroppedIn(0, Carbine);
+		TestTrue(TEXT("the Colby Carbine lies on the floor"), Dropped != nullptr && Dropped->IsThere());
+		TestTrue(TEXT("near the stand"), Dropped != nullptr && FVector::Dist2D(Dropped->FloorAt(), OnTheRun(300.0f)) < 150.0f);
 	});
 	WaitUntil(TEXT("the host's own machine holding the Roquefort"), 3.0f, [Roquefort]() { return HeldId(Character(0)) == Roquefort; });
-	WaitUntil(TEXT("the joiner seeing the stand empty and the host holding it"), 3.0f, [Roquefort]()
+	WaitUntil(TEXT("the joiner seeing the stand empty, the host holding it and the carbine on the floor"), 3.0f, [Roquefort, Carbine]()
 	{
 		const ACheeseStrikePickup* Stand = StandIn(1, Roquefort);
-		return Stand != nullptr && !Stand->IsThere() && Stand->SecondsLeft() > 0.0f && HeldId(CharacterOf(0, 1)) == Roquefort;
+		return Stand != nullptr && !Stand->IsThere() && Stand->SecondsLeft() > 0.0f && HeldId(CharacterOf(0, 1)) == Roquefort && DroppedIn(1, Carbine) != nullptr;
 	});
 
-	// Over the Blaster's stand with the Roquefort: nothing by walking; a prompt; Interact swaps.
+	// Over the Blaster's stand with the Roquefort: nothing by walking; pressed, a swap, the Roquefort dropped with its rounds.
 	PutAt(0, OnTheRun(600.0f), RunYaw);
 	Wait(0.6f);
 	Then([this, Roquefort, Blaster]()
@@ -269,25 +300,63 @@ bool FAWeaponIsTakenFromItsStandAndComesBack::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the Blaster stays on its stand"), StandIn(0, Blaster)->IsThere());
 		TestTrue(TEXT("the host's machine offers it, to press for"), ACheeseStrikePickup::OfferedTo(Character(0)) == StandIn(0, Blaster));
 		Swapped = CharacterOf(0, 0)->GetInventory()->GetInSlot(EWeaponSlot::Primary);
+		MagazineBefore = Swapped.IsValid() ? Swapped->GetMagazine() - 1 : 0;
+		ReserveBefore = Swapped.IsValid() ? Swapped->GetReserve() : 0;
 	});
-	Play(0, TEXT("tap Interact\nwait 0.5"));
-	Then([this, Blaster]()
+	// One shot gone, so that its rounds are its own.
+	Play(0, TEXT("look 0 -30\ntap Fire\nwait 1.5\nlook 0 30\ntap Interact\nwait 0.4"));
+	Then([this, Roquefort, Blaster]()
 	{
-		TestEqual(TEXT("Interact swaps the Roquefort for the Blaster"), PrimaryOf(CharacterOf(0, 0)), Blaster);
+		TestEqual(TEXT("pressed, Interact swaps the Roquefort for the Blaster"), PrimaryOf(CharacterOf(0, 0)), Blaster);
 		TestEqual(TEXT("in hand"), HeldId(CharacterOf(0, 0)), Blaster);
-		TestFalse(TEXT("the Roquefort is gone, not dropped"), Swapped.IsValid() && !Swapped->IsActorBeingDestroyed());
+		TestFalse(TEXT("the Roquefort carried is gone"), Swapped.IsValid() && !Swapped->IsActorBeingDestroyed());
 		TestFalse(TEXT("and the Blaster's stand is empty"), StandIn(0, Blaster)->IsThere());
 		TestTrue(TEXT("the pistol and the knife are still carried"), CharacterOf(0, 0)->GetInventory()->CanDraw(EWeaponSlot::Sidearm) && CharacterOf(0, 0)->GetInventory()->CanDraw(EWeaponSlot::Knife));
+		const ACheeseStrikePickup* Dropped = DroppedIn(0, Roquefort);
+		if (TestNotNull(TEXT("the Roquefort lies on the floor"), Dropped))
+		{
+			TestEqual(TEXT("with the rounds in its magazine"), Dropped->GetDroppedMagazine(), MagazineBefore);
+			TestEqual(TEXT("and in reserve"), Dropped->GetDroppedReserve(), ReserveBefore);
+		}
 	});
 	WaitUntil(TEXT("the host's own machine holding the Blaster"), 3.0f, [Blaster]() { return HeldId(Character(0)) == Blaster; });
-	// Off the stands, so that coming back they give nothing yet.
+
+	// The dropped Roquefort taken again, by the joiner, with the same press: its rounds as they were.
 	PutAt(0, OnTheRun(0.0f), RunYaw);
+	Then([this, Roquefort]()
+	{
+		const ACheeseStrikePickup* Dropped = DroppedIn(0, Roquefort);
+		DroppedAt = Dropped != nullptr ? Dropped->FloorAt() : OnTheRun(650.0f);
+	});
+	WaitUntil(TEXT("the joiner seeing the Roquefort on the floor"), 3.0f, [Roquefort]() { return DroppedIn(1, Roquefort) != nullptr; });
+	Then([]()
+	{
+		// Where it lies, found only now: moved as PutAt moves a player.
+		CharacterOf(1, 0)->StartAt(DroppedAt + FRotator(0.0f, RunYaw, 0.0f).Vector() * 30.0f + FVector(0.0f, 0.0f, 100.0f), RunYaw + 180.0f);
+		Controller(1)->SetControlRotation(FRotator(0.0f, RunYaw + 180.0f, 0.0f));
+	});
+	Wait(0.5f);
+	Play(1, TEXT("tap Interact\nwait 0.4"));
+	Then([this, Roquefort]()
+	{
+		const ACheeseStrikeWeapon* Primary = CharacterOf(1, 0)->GetInventory()->GetInSlot(EWeaponSlot::Primary);
+		TestEqual(TEXT("the joiner takes the dropped Roquefort with a press"), PrimaryOf(CharacterOf(1, 0)), Roquefort);
+		TestTrue(FString::Printf(TEXT("its magazine as it was dropped (%d)"), Primary != nullptr ? Primary->GetMagazine() : -1), Primary != nullptr && Primary->GetMagazine() == MagazineBefore);
+		TestTrue(TEXT("and its reserve"), Primary != nullptr && Primary->GetReserve() == ReserveBefore);
+		TestNull(TEXT("it is gone from the floor"), DroppedIn(0, Roquefort));
+		TestNotNull(TEXT("and the joiner's carbine lies there in its place"), DroppedIn(0, CheeseStrikeWeapons::Carbine().Id));
+	});
+	WaitUntil(TEXT("the joiner's machine seeing it gone from the floor, and the Roquefort in hand"), 3.0f, [Roquefort]()
+	{
+		return DroppedIn(1, Roquefort) == nullptr && HeldId(Character(1)) == Roquefort;
+	});
+	PutAt(1, OnTheRun(1100.0f), RunYaw + 180.0f);
 
 	// Back after its seconds, on both machines.
 	WaitUntil(TEXT("the Roquefort back on its stand"), TestSeconds + 3.0f, [Roquefort]() { return StandIn(0, Roquefort)->IsThere(); });
 	WaitUntil(TEXT("the joiner seeing it back"), 3.0f, [Roquefort]() { return StandIn(1, Roquefort) != nullptr && StandIn(1, Roquefort)->IsThere(); });
 
-	// One's own weapon: walking over it tops up its rounds, the weapon kept.
+	// One's own weapon: pressed for, it tops up its rounds, the weapon kept.
 	WaitUntil(TEXT("the Blaster back on its stand"), TestSeconds + 3.0f, [Blaster]() { return StandIn(0, Blaster)->IsThere(); });
 	Then([this]()
 	{
@@ -299,10 +368,16 @@ bool FAWeaponIsTakenFromItsStandAndComesBack::RunTest(const FString& Parameters)
 	Wait(0.6f);
 	Then([this, Blaster]()
 	{
+		TestTrue(TEXT("walking over a Blaster with a Blaster takes nothing"), StandIn(0, Blaster)->IsThere());
+	});
+	Play(0, TEXT("tap Interact\nwait 0.4"));
+	Then([this, Blaster]()
+	{
 		const ACheeseStrikeWeapon* Primary = CharacterOf(0, 0)->GetInventory()->GetInSlot(EWeaponSlot::Primary);
-		TestTrue(TEXT("walking over a Blaster with a Blaster keeps the one carried"), Primary != nullptr && Primary == Swapped.Get());
+		TestTrue(TEXT("pressing for a Blaster with a Blaster keeps the one carried"), Primary != nullptr && Primary == Swapped.Get());
 		TestTrue(FString::Printf(TEXT("and tops up its rounds (%d to %d)"), ReserveBefore, Primary != nullptr ? Primary->GetReserve() : -1), Primary != nullptr && Primary->GetReserve() > ReserveBefore);
 		TestFalse(TEXT("taking the stand's"), StandIn(0, Blaster)->IsThere());
+		TestNull(TEXT("and dropping nothing"), DroppedIn(0, Blaster));
 		SetPickupSeconds(0.0f);
 	});
 	StopPlaying();
@@ -383,6 +458,7 @@ bool FABotGoesForABetterWeapon::RunTest(const FString& Parameters)
 	Then([this]()
 	{
 		TestFalse(TEXT("its stand is empty"), StandIn(0, CheeseStrikeWeapons::Munster().Id)->IsThere());
+		TestNotNull(TEXT("and its Colby Carbine lies on the floor"), DroppedIn(0, CheeseStrikeWeapons::Carbine().Id));
 	});
 	StopPlaying();
 	return true;

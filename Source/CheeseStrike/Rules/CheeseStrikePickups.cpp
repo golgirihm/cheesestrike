@@ -35,22 +35,44 @@ namespace CheeseStrikePickups
 		return Stats != nullptr && Stats->Slot == EWeaponSlot::Primary && Stats->Id != SpawnPrimary();
 	}
 
-	ETake HowToTake(FName Carried, FName Offered, bool bRoundsFull)
+	bool CanBeDropped(FName Weapon)
 	{
-		if (!CanLieOnAStand(Offered))
+		const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
+		return Stats != nullptr && Stats->Slot == EWeaponSlot::Primary;
+	}
+
+	ETake HowToTake(FName Carried, FName Offered, bool bRoundsFull, bool bDropped)
+	{
+		if (bDropped ? !CanBeDropped(Offered) : !CanLieOnAStand(Offered))
 		{
 			return ETake::None;
 		}
 		const FWeaponStats* Mine = CheeseStrikeArsenal::Find(Carried);
-		if (Mine == nullptr || Mine->Slot != EWeaponSlot::Primary || Mine->Id == SpawnPrimary())
-		{
-			return ETake::WalkOver;
-		}
-		if (Mine->Id == CheeseStrikeArsenal::Find(Offered)->Id)
+		if (Mine != nullptr && Mine->Slot == EWeaponSlot::Primary && Mine->Id == CheeseStrikeArsenal::Find(Offered)->Id)
 		{
 			return bRoundsFull ? ETake::None : ETake::TopUp;
 		}
-		return ETake::Press;
+		return ETake::Swap;
+	}
+
+	int32 TopUpRounds(bool bDropped, int32 StandReserve, int32 DroppedMagazine, int32 DroppedReserve)
+	{
+		return bDropped ? FMath::Max(0, DroppedMagazine) + FMath::Max(0, DroppedReserve) : FMath::Max(0, StandReserve);
+	}
+
+	bool DroppedShown(float Age)
+	{
+		const float Left = DroppedSeconds - Age;
+		if (Left > DroppedBlink)
+		{
+			return true;
+		}
+		return FMath::Frac(FMath::Max(0.0f, Left) * BlinksPerSecond) >= 0.35f;
+	}
+
+	int32 ToClearForDrop(int32 Lying)
+	{
+		return FMath::Max(0, Lying + 1 - MostDropped);
 	}
 
 	bool MayTake(bool bAlive, bool bCanAct, bool bDowned, bool bPrimaryAllowed)

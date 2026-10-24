@@ -1,11 +1,12 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 // Weapon pickups as plain rules (Rules/CheeseStrikePickups.h): the weak
-// primary everyone comes in with, how a weapon on a stand is taken by what
-// is carried (walked over, pressed for, its rounds topped up, or not at
-// all), who may take one, the reach, the seconds until a stand is back,
-// which modes have them, what bots go for, and how the stands are spread
-// over a map; and the HUD's prompt.
+// primary everyone comes in with, what pressing Interact over a weapon on a
+// stand or the floor does by what is carried (swaps it, tops up its rounds,
+// or nothing), who may take one, the reach, the seconds until a
+// stand is back, how long a dropped weapon lies and how many, which modes
+// have them, what bots go for, and how the stands are spread over a map;
+// and the HUD's prompt.
 
 #include "Misc/AutomationTest.h"
 #include "Rules/CheeseStrikeModes.h"
@@ -68,17 +69,40 @@ bool FAWeaponIsTakenByWhatIsCarried::RunTest(const FString& Parameters)
 	const FName Carbine = CheeseStrikeWeapons::Carbine().Id;
 	const FName Blaster = CheeseStrikeWeapons::Blaster().Id;
 	const FName Roquefort = CheeseStrikeWeapons::Roquefort().Id;
-	// The swap rules.
-	TestTrue(TEXT("with only the spawn primary, walking over a weapon takes it"), HowToTake(Carbine, Roquefort, false) == ETake::WalkOver);
-	TestTrue(TEXT("its rounds full or not"), HowToTake(Carbine, Roquefort, true) == ETake::WalkOver);
-	TestTrue(TEXT("with no primary at all, too"), HowToTake(NAME_None, Blaster, false) == ETake::WalkOver);
-	TestTrue(TEXT("with a better one, it is pressed for"), HowToTake(Blaster, Roquefort, false) == ETake::Press);
-	TestTrue(TEXT("and for a worse one: nobody swaps by walking past"), HowToTake(Roquefort, Blaster, false) == ETake::Press);
+	// The swap rules: every weapon is pressed for, whatever is carried (nothing is taken by walking over it).
+	TestTrue(TEXT("with only the spawn primary, a weapon is swapped for"), HowToTake(Carbine, Roquefort, false) == ETake::Swap);
+	TestTrue(TEXT("its rounds full or not"), HowToTake(Carbine, Roquefort, true) == ETake::Swap);
+	TestTrue(TEXT("with no primary at all, too"), HowToTake(NAME_None, Blaster, false) == ETake::Swap);
+	TestTrue(TEXT("with a better one"), HowToTake(Blaster, Roquefort, false) == ETake::Swap);
+	TestTrue(TEXT("and for a worse one"), HowToTake(Roquefort, Blaster, false) == ETake::Swap);
 	TestTrue(TEXT("one's own weapon tops up its rounds"), HowToTake(Blaster, Blaster, false) == ETake::TopUp);
 	TestTrue(TEXT("unless they are full"), HowToTake(Blaster, Blaster, true) == ETake::None);
 	TestTrue(TEXT("whatever the case of its name"), HowToTake(TEXT("BLASTER"), Blaster, false) == ETake::TopUp);
 	TestTrue(TEXT("a stand of the spawn primary offers nothing"), HowToTake(Blaster, Carbine, false) == ETake::None);
 	TestTrue(TEXT("nor one of a sidearm"), HowToTake(Carbine, CheeseStrikeArsenal::Sidearm(), false) == ETake::None);
+	// On the floor: the spawn primary too, as it was dropped.
+	TestTrue(TEXT("the spawn primary can be dropped"), CanBeDropped(Carbine));
+	TestTrue(TEXT("and any other primary"), CanBeDropped(Roquefort) && CanBeDropped(CheeseStrikeWeapons::Burratas().Id));
+	TestFalse(TEXT("but not the sidearm or the knife, which are kept"), CanBeDropped(CheeseStrikeArsenal::Sidearm()) || CanBeDropped(CheeseStrikeArsenal::Knife()));
+	TestTrue(TEXT("a Colby Carbine on the floor is swapped for"), HowToTake(Roquefort, Carbine, false, true) == ETake::Swap);
+	TestTrue(TEXT("or its rounds taken, by someone with one"), HowToTake(Carbine, Carbine, false, true) == ETake::TopUp);
+	TestTrue(TEXT("never a sidearm"), HowToTake(Carbine, CheeseStrikeArsenal::Sidearm(), false, true) == ETake::None);
+	TestEqual(TEXT("a stand tops up its weapon's reserve"), TopUpRounds(false, 40, 7, 9), 40);
+	TestEqual(TEXT("a weapon on the floor everything it has"), TopUpRounds(true, 40, 7, 9), 16);
+
+	// Dropped weapons: twenty seconds, at most twelve, blinking before they go.
+	TestEqual(TEXT("twenty seconds on the floor"), DroppedSeconds, 20.0f);
+	TestEqual(TEXT("at most twelve"), MostDropped, 12);
+	TestEqual(TEXT("none cleared with room"), ToClearForDrop(5), 0);
+	TestEqual(TEXT("the oldest goes for the thirteenth"), ToClearForDrop(12), 1);
+	TestEqual(TEXT("and as many as it takes past that"), ToClearForDrop(14), 3);
+	TestTrue(TEXT("shown while fresh"), DroppedShown(0.0f) && DroppedShown(DroppedSeconds - DroppedBlink - 0.1f));
+	int32 Hidden = 0;
+	for (float Age = DroppedSeconds - DroppedBlink; Age < DroppedSeconds; Age += 0.02f)
+	{
+		Hidden += DroppedShown(Age) ? 0 : 1;
+	}
+	TestTrue(FString::Printf(TEXT("blinking in its last seconds (%d of 150 frames hidden)"), Hidden), Hidden > 30 && Hidden < 90);
 
 	// Who may take one.
 	TestTrue(TEXT("anyone alive and free to act"), MayTake(true, true, false, true));
@@ -87,11 +111,11 @@ bool FAWeaponIsTakenByWhatIsCarried::RunTest(const FString& Parameters)
 	TestFalse(TEXT("not someone down"), MayTake(true, true, true, true));
 	TestFalse(TEXT("not someone kept to their sidearm"), MayTake(true, true, false, false));
 
-	// The reach: the design's 1.3 m across and 2 m up; pressing reaches further.
+	// The reach: a bot goes over it; pressing Interact reaches further.
 	const FVector Stand(1000.0f, 0.0f, 400.0f);
 	TestTrue(TEXT("over it"), InReach(Stand, Stand + FVector(30.0f, 30.0f, 0.0f), Reach));
 	TestFalse(TEXT("not a step off it"), InReach(Stand, Stand + FVector(Reach + 20.0f, 0.0f, 0.0f), Reach));
-	TestTrue(TEXT("but in reach to press"), InReach(Stand, Stand + FVector(Reach + 20.0f, 0.0f, 0.0f), PressReach));
+	TestTrue(TEXT("but in reach to press for"), InReach(Stand, Stand + FVector(Reach + 20.0f, 0.0f, 0.0f), PressReach));
 	TestFalse(TEXT("nor from the floor under it"), InReach(Stand, Stand - FVector(0.0f, 0.0f, ReachUp + 10.0f), Reach));
 	TestTrue(TEXT("a jump over it does"), InReach(Stand, Stand + FVector(0.0f, 0.0f, 60.0f), Reach));
 
@@ -113,6 +137,7 @@ bool FAWeaponIsTakenByWhatIsCarried::RunTest(const FString& Parameters)
 	// The prompt names the key and both weapons.
 	TestEqual(TEXT("the prompt"), CheeseStrikePickupHUD::PromptLine(TEXT("E"), TEXT("Roquefort Rifle")), FString(TEXT("PRESS E  ·  TAKE THE ROQUEFORT RIFLE")));
 	TestEqual(TEXT("and the pad's button"), CheeseStrikePickupHUD::PromptLine(TEXT("LB"), TEXT("Cheddar Blaster")), FString(TEXT("PRESS LB  ·  TAKE THE CHEDDAR BLASTER")));
+	TestEqual(TEXT("or the rounds of one's own"), CheeseStrikePickupHUD::PromptLine(TEXT("E"), TEXT("Cheddar Blaster"), true), FString(TEXT("PRESS E  ·  TAKE THE CHEDDAR BLASTER'S ROUNDS")));
 	TestEqual(TEXT("what it is swapped for"), CheeseStrikePickupHUD::PromptUnder(TEXT("Munster Machine Gun")), FString(TEXT("for your Munster Machine Gun")));
 	return true;
 }

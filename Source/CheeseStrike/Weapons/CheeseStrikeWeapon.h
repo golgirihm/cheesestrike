@@ -150,6 +150,8 @@ public:
 	void StartReload();
 	/** Server only: adds `Rounds` to the reserve, up to the most it can hold. */
 	void AddReserve(int32 Rounds);
+	/** Server only: its magazine and reserve as they are given (a weapon taken from the floor, with the rounds it lay with), each within what it can hold. */
+	void SetRounds(int32 InMagazine, int32 InReserve);
 	/** Server only: gives it rounds without end to reload with (Gun Game's weapons); it still reloads. */
 	void MakeReserveEndless();
 

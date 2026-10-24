@@ -20,9 +20,9 @@ namespace HudDraw = CheeseStrikeHUDDraw;
 
 namespace CheeseStrikePickupHUD
 {
-	FString PromptLine(const FString& Key, const FString& Offered)
+	FString PromptLine(const FString& Key, const FString& Offered, bool bRounds)
 	{
-		return FString::Printf(TEXT("PRESS %s  ·  TAKE THE %s"), *Key, *Offered.ToUpper());
+		return bRounds ? FString::Printf(TEXT("PRESS %s  ·  TAKE THE %s'S ROUNDS"), *Key, *Offered.ToUpper()) : FString::Printf(TEXT("PRESS %s  ·  TAKE THE %s"), *Key, *Offered.ToUpper());
 	}
 
 	FString PromptUnder(const FString& Carried)
@@ -52,7 +52,7 @@ namespace CheeseStrikePickupHUD
 			const float Left = Pickup->SecondsLeft();
 			const FVector Over = Pickup->FloorAt() + FVector(0.0f, 0.0f, CheeseStrikePickups::FloatHeight + 45.0f);
 			const float Distance = FVector::Dist(Eye, Over);
-			if (!Pickup->IsInPlay() || Left <= 0.0f || Distance > CheeseStrikePickups::SecondsShownWithin || FVector::DotProduct(Over - Eye, Ahead) <= 10.0f)
+			if (!Pickup->IsInPlay() || Pickup->IsDropped() || Left <= 0.0f || Distance > CheeseStrikePickups::SecondsShownWithin || FVector::DotProduct(Over - Eye, Ahead) <= 10.0f)
 			{
 				continue;
 			}
@@ -72,15 +72,17 @@ namespace CheeseStrikePickupHUD
 			HudDraw::Text(Canvas, Seconds, FVector2D(OnScreen.X, OnScreen.Y - HudDraw::Measure(Seconds, Font).Y / 2.0f), Font, Colour, 0.5f);
 		}
 
-		// In reach of a weapon to swap for: what pressing Interact does.
-		const ACheeseStrikePickup* Offered = bAlive ? ACheeseStrikePickup::OfferedTo(Character) : nullptr;
+		// In reach of a weapon to take: what pressing Interact does.
+		const UCheeseStrikeInventory* Inventory = Character != nullptr ? Character->GetInventory() : nullptr;
+		const ACheeseStrikePickup* Offered = bAlive && Inventory != nullptr ? ACheeseStrikePickup::OfferedTo(Character) : nullptr;
 		if (Offered == nullptr)
 		{
 			return;
 		}
-		const ACheeseStrikeWeapon* Carried = Character->GetInventory() != nullptr ? Character->GetInventory()->GetInSlot(EWeaponSlot::Primary) : nullptr;
-		const FString Line = PromptLine(UCheeseStrikeInputSet::Prompt(Player, &UCheeseStrikeInputSet::Interact), Offered->GetWeaponName().ToString());
-		const FString Under = PromptUnder(Carried != nullptr ? Carried->GetStats().DisplayName.ToString() : FString());
+		const ACheeseStrikeWeapon* Carried = Inventory->GetInSlot(EWeaponSlot::Primary);
+		const bool bRounds = Offered->HowFor(Character) == CheeseStrikePickups::ETake::TopUp;
+		const FString Line = PromptLine(UCheeseStrikeInputSet::Prompt(Player, &UCheeseStrikeInputSet::Interact), Offered->GetWeaponName().ToString(), bRounds);
+		const FString Under = bRounds ? FString() : PromptUnder(Carried != nullptr ? Carried->GetStats().DisplayName.ToString() : FString());
 		const float Middle = Canvas->SizeX / 2.0f;
 		const float Y = Canvas->SizeY * 0.64f;
 		const FSlateFontInfo Big = HudDraw::Font(24.0f * U);
@@ -88,7 +90,8 @@ namespace CheeseStrikePickupHUD
 		const FVector2D LineSize = HudDraw::Measure(Line, Big);
 		HudDraw::FShapes Shapes;
 		Shapes.Rect(Middle - LineSize.X / 2.0f - 14.0f * U, Y - 6.0f * U, LineSize.X + 28.0f * U, LineSize.Y + 30.0f * U, HudDraw::Panel);
-		Shapes.Rect(Middle - LineSize.X / 2.0f - 14.0f * U, Y - 6.0f * U, 4.0f * U, LineSize.Y + 30.0f * U, CheeseStrikePickups::WorthColour(CheeseStrikePickups::Worth(Offered->GetWeapon())));
+		const FLinearColor Worth = CheeseStrikePickups::WorthColour(CheeseStrikePickups::Worth(Offered->GetWeapon()));
+		Shapes.Rect(Middle - LineSize.X / 2.0f - 14.0f * U, Y - 6.0f * U, 4.0f * U, LineSize.Y + 30.0f * U, Worth);
 		Shapes.Draw(Canvas);
 		HudDraw::Text(Canvas, Line, FVector2D(Middle, Y), Big, HudDraw::Ink, 0.5f);
 		HudDraw::Text(Canvas, Under, FVector2D(Middle, Y + LineSize.Y + 2.0f * U), Small, HudDraw::Soft, 0.5f);
@@ -105,7 +108,7 @@ namespace CheeseStrikePickupHUD
 			const ACheeseStrikePickup* Pickup = *It;
 			const FVector2D At = OnMap(Pickup->FloorAt());
 			const float Size = 5.0f * U;
-			if (!Pickup->IsInPlay() || At.X - Size < Min.X || At.Y - Size < Min.Y || At.X + Size > Max.X || At.Y + Size > Max.Y)
+			if (!Pickup->IsInPlay() || Pickup->IsDropped() || At.X - Size < Min.X || At.Y - Size < Min.Y || At.X + Size > Max.X || At.Y + Size > Max.Y)
 			{
 				continue;
 			}

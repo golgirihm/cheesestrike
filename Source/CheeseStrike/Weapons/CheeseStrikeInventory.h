@@ -83,15 +83,17 @@ public:
 	// Weapon pickups (ACheeseStrikePickup, Rules/CheeseStrikePickups.h).
 
 	/**
-	 * Server: takes the weapon on `Pickup` if this character may, by walking
-	 * over it or, `bPressed`, by pressing Interact near it: the primary
-	 * carried is gone and the stand's weapon takes its place, in hand at once
-	 * (or, the same weapon, its rounds are topped up). True if taken.
+	 * Server: gives this character the weapon on `Pickup` (a stand's, or one
+	 * on the floor), if it is in reach and there is something to take: the
+	 * primary carried drops to the floor with its rounds and the weapon
+	 * taken takes its place, in hand at once (with the rounds it lay with,
+	 * from the floor); or, the same weapon, its rounds top up those carried.
+	 * True if taken. Asked for by a press of Interact (PressForPickup).
 	 */
-	bool TakePickup(ACheeseStrikePickup* Pickup, bool bPressed);
-	/** Server: replaces the primary carried with a fresh `Weapon`, in hand at once. */
+	bool TakePickup(ACheeseStrikePickup* Pickup);
+	/** Server: replaces the primary carried with a fresh `Weapon`, in hand at once; the one carried is gone. */
 	void SwapPrimary(FName Weapon);
-	/** The player's own machine: Interact was pressed; takes the weapon on the stand it offers (ACheeseStrikePickup::OfferedTo), if any. True if there was one. */
+	/** The player's own machine: Interact was pressed; takes the weapon it offers (ACheeseStrikePickup::OfferedTo), if any. True if there was one. */
 	bool PressForPickup();
 
 	UFUNCTION(Server, Reliable)
