@@ -1,52 +1,64 @@
-# Execution's executions, for looking at them: the host puts the bot down
-# and executes it with a stab, then, the next round, with a stomp, watched
-# through the host's own view, which is pulled out to third person while
-# each plays. One bot, rounds to spare, at a fixed step so that the frames
-# fall where they should:
-# tools/play.ps1 -Script tools/play/execution.txt -Bots -Extra "?Mode=Execution?Bots=1?Rounds=5" -FixedFps 30
-wait 5
+# Execution's executions, for looking at them, from the executor's own view
+# (pulled out to its camera while each plays): the host, protected so that
+# the bot leaves it be, puts the bot down and executes it with a stab, then,
+# the next round, with a stomp. Each shot is named by the seconds into the
+# execution it is meant for (a shot takes a frame or so of its own). One bot,
+# rounds to spare, at a fixed step so that the frames fall where they should:
+# tools/play.ps1 -Script tools/play/execution.txt -Bots -Extra "?Mode=Execution?Bots=1?Rounds=5" -FixedFps 30 -Res 1600x900
+wait 4
+cmd CheeseStrikeProtect 60
 cmd CheeseStrikeDown enemy
 wait 1.5
 cmd CheeseStrikeExecute 1
-wait 0.2
-shot exec_stab_00_out
-wait 0.3
-shot exec_stab_05_kneel
-wait 0.35
-shot exec_stab_08_raised
+wait 0.05
+shot exec_stab_015
+wait 0.20
+shot exec_stab_045
+wait 0.20
+shot exec_stab_075
+wait 0.10
+shot exec_stab_095
+wait 0.05
+shot exec_stab_110
+wait 0.02
+shot exec_stab_122
+wait 0.08
+shot exec_stab_140
+wait 0.20
+shot exec_stab_170
 wait 0.15
-shot exec_stab_10_blow
-wait 0.25
-shot exec_stab_12_in
-wait 0.2
-shot exec_stab_14_up_again
-wait 0.15
-shot exec_stab_16_blow
-wait 0.4
-shot exec_stab_20_out
-wait 0.3
-shot exec_stab_23_rising
-wait 0.4
-shot exec_stab_27_back
+shot exec_stab_195
+wait 0.10
+shot exec_stab_215
+wait 0.20
+shot exec_stab_245
+wait 0.30
+shot exec_stab_285
 wait 9
+cmd CheeseStrikeProtect 60
 cmd CheeseStrikeDown enemy
 wait 1.5
 cmd CheeseStrikeExecute 2
-wait 0.2
-shot exec_stomp_00_out
-wait 0.35
-shot exec_stomp_05_knee
-wait 0.35
-shot exec_stomp_09_over
-wait 0.12
-shot exec_stomp_10_slam
+wait 0.05
+shot exec_stomp_015
+wait 0.20
+shot exec_stomp_045
+wait 0.20
+shot exec_stomp_075
+wait 0.10
+shot exec_stomp_095
+wait 0.01
+shot exec_stomp_105
+wait 0.01
+shot exec_stomp_112
 wait 0.08
-shot exec_stomp_11_burst
-wait 0.3
-shot exec_stomp_14_grind
-wait 0.4
-shot exec_stomp_18_back
-wait 0.6
-shot exec_stomp_24_end
-wait 1
+shot exec_stomp_130
+wait 0.20
+shot exec_stomp_160
+wait 0.20
+shot exec_stomp_190
+wait 0.40
+shot exec_stomp_240
+wait 9
+cmd CheeseStrikeProtect 60
 quit
