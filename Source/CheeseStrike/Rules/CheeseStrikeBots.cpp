@@ -81,16 +81,16 @@ namespace CheeseStrikeBots
 	TArray<TPair<FName, float>> PrimaryWeights(int32 SkillIndex)
 	{
 		using namespace CheeseStrikeWeapons;
-		// Blaster, Carbine, Grater, Munster, Shotgun, Roquefort: an easy bot sprays, a hard one aims.
-		static const float Weights[NumSkills][6] = {
-			{3.0f, 1.0f, 3.0f, 2.0f, 2.0f, 0.0f},
-			{3.0f, 2.0f, 2.0f, 2.0f, 2.0f, 1.0f},
-			{2.0f, 3.0f, 2.0f, 1.0f, 2.0f, 2.0f},
+		// Blaster, Carbine, Grater, Munster, Shotgun, Burratas, Roquefort: an easy bot sprays, a hard one aims.
+		static const float Weights[NumSkills][7] = {
+			{3.0f, 1.0f, 3.0f, 2.0f, 2.0f, 2.0f, 0.0f},
+			{3.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 1.0f},
+			{2.0f, 3.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f},
 		};
-		const FWeaponStats* Order[] = {&Blaster(), &Carbine(), &Grater(), &Munster(), &Shotgun(), &Roquefort()};
+		const FWeaponStats* Order[] = {&Blaster(), &Carbine(), &Grater(), &Munster(), &Shotgun(), &Burratas(), &Roquefort()};
 		const int32 Row = FMath::Clamp(SkillIndex, 0, NumSkills - 1);
 		TArray<TPair<FName, float>> Out;
-		for (int32 Index = 0; Index < 6; ++Index)
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Order); ++Index)
 		{
 			Out.Add({Order[Index]->Id, Weights[Row][Index]});
 		}

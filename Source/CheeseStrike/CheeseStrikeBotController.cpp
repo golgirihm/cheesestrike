@@ -28,7 +28,7 @@
 #include "Weapons/CheeseStrikeWeapon.h"
 
 /** Every bot that comes in after this is set carries this primary, rather than one picked for its skill. */
-static TAutoConsoleVariable<FString> CVarBotPrimary(TEXT("CheeseStrike.BotPrimary"), TEXT(""), TEXT("The primary every bot coming in carries (blaster, carbine, grater, munster, shotgun, roquefort), or empty for the spawn primary everyone has."));
+static TAutoConsoleVariable<FString> CVarBotPrimary(TEXT("CheeseStrike.BotPrimary"), TEXT(""), TEXT("The primary every bot coming in carries (blaster, carbine, grater, munster, shotgun, burratas, roquefort), or empty for the spawn primary everyone has."));
 
 namespace
 {

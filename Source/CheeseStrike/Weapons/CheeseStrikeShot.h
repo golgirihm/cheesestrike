@@ -86,6 +86,9 @@ struct FWeaponStats
 	float BackstabDamage = 0.0f;
 	float SwingTime = 0.0f;
 
+	/** Two guns, one in each hand, firing in turn (the Dual Burratas): shot 0 from the right, 1 from the left, and so on (CheeseStrikeWeapons::DualHand). */
+	bool bDual = false;
+
 	bool IsMelee() const { return Slot == EWeaponSlot::Knife; }
 	/** Whether it never runs out of rounds to reload with. */
 	bool HasEndlessReserve() const { return Reserve < 0; }
@@ -147,6 +150,9 @@ namespace CheeseStrikeWeapons
 	 * and a wander from side to side along a pattern a player can learn.
 	 */
 	FVector2D RecoilFor(const FWeaponStats& Weapon, int32 Index, bool bAimed);
+
+	/** Which hand fires shot number `Index` of a run (0 the first) of a weapon with two guns: 0 the right, 1 the left, in turn; always the right for one gun. */
+	int32 DualHand(const FWeaponStats& Weapon, int32 Index);
 
 	/** Which shot of a run the next is, `SinceLast` seconds after one that was number `Last` (-1 for none). */
 	int32 NextInRun(const FWeaponStats& Weapon, int32 Last, float SinceLast);

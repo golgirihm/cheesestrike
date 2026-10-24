@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeWeapon.h"
 #include "Animation/AnimInstance.h"
+#include "AnimationRuntime.h"
 #include "Animation/AnimSequence.h"
 #include "Camera/CameraComponent.h"
 #include "Sound/SoundBase.h"
@@ -122,6 +123,20 @@ ACheeseStrikeWeapon::ACheeseStrikeWeapon()
 	ThirdPersonModel->bOwnerNoSee = true;
 	ThirdPersonModel->SetHiddenInGame(true);
 
+	// The second gun of two, in the left hand.
+	FirstPersonOffHand = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("First Person Off Hand"));
+	FirstPersonOffHand->SetupAttachment(RootComponent);
+	FirstPersonOffHand->SetCollisionProfileName(FName("NoCollision"));
+	FirstPersonOffHand->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
+	FirstPersonOffHand->bOnlyOwnerSee = true;
+	FirstPersonOffHand->SetHiddenInGame(true);
+	ThirdPersonOffHand = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Third Person Off Hand"));
+	ThirdPersonOffHand->SetupAttachment(RootComponent);
+	ThirdPersonOffHand->SetCollisionProfileName(FName("NoCollision"));
+	ThirdPersonOffHand->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::WorldSpaceRepresentation);
+	ThirdPersonOffHand->bOwnerNoSee = true;
+	ThirdPersonOffHand->SetHiddenInGame(true);
+
 	// The muzzle's flash: a star of light in its player's view and on the body, and a moment's light round it.
 	FirstPersonFlash = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("First Person Flash"));
 	FirstPersonFlash->SetupAttachment(RootComponent);
@@ -183,12 +198,17 @@ void ACheeseStrikeWeapon::ApplyWeapon()
 	{
 		Model->SetStaticMesh(Plain);
 	}
+	// Two guns: the second the same model.
+	for (UStaticMeshComponent* Model : {FirstPersonOffHand.Get(), ThirdPersonOffHand.Get()})
+	{
+		Model->SetStaticMesh(Stats->bDual ? Plain : nullptr);
+	}
 	// Its cheese, slot by slot.
 	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(Look->Materials); ++Slot)
 	{
 		if (UMaterialInterface* Material = LoadLook<UMaterialInterface>(Look->Materials[Slot]))
 		{
-			for (UPrimitiveComponent* Part : {GetModel(true), GetModel(false)})
+			for (UPrimitiveComponent* Part : {GetModel(true), GetModel(false), static_cast<UPrimitiveComponent*>(FirstPersonOffHand), static_cast<UPrimitiveComponent*>(ThirdPersonOffHand)})
 			{
 				if (Part != nullptr && Slot < Part->GetNumMaterials())
 				{
@@ -325,12 +345,37 @@ void ACheeseStrikeWeapon::FitToHands()
 		// The model's own size, turn and place in the grip, then the grip's in the hand.
 		Part.Key->SetRelativeTransform(Look->Model * Part.Key->GetRelativeTransform());
 	}
+	// The second gun of two, in the left hand as the first is in the right, mirrored across the body.
+	if (Stats->bDual)
+	{
+		static const FName LeftHand(TEXT("hand_l"));
+		for (const TPair<UStaticMeshComponent*, bool>& Off : {TPair<UStaticMeshComponent*, bool>(FirstPersonOffHand, true), TPair<UStaticMeshComponent*, bool>(ThirdPersonOffHand, false)})
+		{
+			USkeletalMeshComponent* Body = Off.Value ? Holder->GetFirstPersonMesh() : Holder->GetMesh();
+			const UPrimitiveComponent* First = GetModel(Off.Value);
+			if (Body == nullptr || First == nullptr || Body->GetBoneIndex(LeftHand) == INDEX_NONE)
+			{
+				continue;
+			}
+			Off.Key->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, LeftHand);
+			Off.Key->SetRelativeTransform(MirroredGrip(Body, First->GetAttachSocketName(), First->GetRelativeTransform(), LeftHand));
+		}
+	}
+	PutFlashOn(false);
+}
+
+void ACheeseStrikeWeapon::PutFlashOn(bool bLeft)
+{
+	if (Look == nullptr)
+	{
+		return;
+	}
 	// The flash at the muzzle, the light just in front of it.
 	const FVector Muzzle = Look->Muzzle;
 	const float Size = FMath::Max(Look->FlashSize, 0.01f);
 	for (const TPair<UStaticMeshComponent*, bool>& Star : {TPair<UStaticMeshComponent*, bool>(FirstPersonFlash, true), TPair<UStaticMeshComponent*, bool>(ThirdPersonFlash, false)})
 	{
-		UPrimitiveComponent* Model = GetModel(Star.Value);
+		UPrimitiveComponent* Model = bLeft ? GetOffHandModel(Star.Value) : GetModel(Star.Value);
 		if (Model != nullptr)
 		{
 			Star.Key->AttachToComponent(Model, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
@@ -340,7 +385,7 @@ void ACheeseStrikeWeapon::FitToHands()
 			Star.Key->SetRelativeScale3D(FVector(Size) / Scale.GetMax());
 		}
 	}
-	if (UPrimitiveComponent* Model = GetModel(false))
+	if (UPrimitiveComponent* Model = bLeft ? GetOffHandModel(false) : GetModel(false))
 	{
 		FlashLight->AttachToComponent(Model, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		FlashLight->SetRelativeLocation(Muzzle + FVector(0.0f, 10.0f, 0.0f) / Model->GetComponentScale().GetMax());
@@ -397,6 +442,9 @@ void ACheeseStrikeWeapon::SetInHand(bool bIsInHand)
 	ThirdPersonMesh->SetHiddenInGame(!bInHand || bPlain);
 	FirstPersonModel->SetHiddenInGame(!bInHand || !bPlain);
 	ThirdPersonModel->SetHiddenInGame(!bInHand || !bPlain);
+	const bool bTwo = Stats != nullptr && Stats->bDual && FirstPersonOffHand->GetStaticMesh() != nullptr;
+	FirstPersonOffHand->SetHiddenInGame(!bInHand || !bTwo);
+	ThirdPersonOffHand->SetHiddenInGame(!bInHand || !bTwo);
 	if (!bInHand)
 	{
 		FirstPersonFlash->SetHiddenInGame(true);
@@ -418,7 +466,7 @@ FString ACheeseStrikeWeapon::DescribeModel(const FVector& Eye) const
 
 void ACheeseStrikeWeapon::SetSeenFromOutside(bool bOutside)
 {
-	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel), static_cast<UPrimitiveComponent*>(ThirdPersonFlash)})
+	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel), static_cast<UPrimitiveComponent*>(ThirdPersonFlash), static_cast<UPrimitiveComponent*>(ThirdPersonOffHand)})
 	{
 		Part->SetOwnerNoSee(!bOutside);
 		Part->SetFirstPersonPrimitiveType(bOutside ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
@@ -451,6 +499,11 @@ void ACheeseStrikeWeapon::Flash()
 	if (Look == nullptr || Look->FlashSize <= 0.0f || GetWorld() == nullptr)
 	{
 		return;
+	}
+	// Two guns fire in turn, each from its own muzzle.
+	if (Stats->bDual)
+	{
+		PutFlashOn(CheeseStrikeWeapons::DualHand(*Stats, ShotsShown++) == 1);
 	}
 	// A different star each time: turned about the barrel at random (the flash's cards came in pointing back, so turned round).
 	const FQuat Turn = FQuat(FVector::YAxisVector, FMath::FRandRange(0.0f, 2.0f * PI)) * FQuat(FVector::ZAxisVector, PI);
@@ -533,6 +586,32 @@ void ACheeseStrikeWeapon::PutInHand(USceneComponent* Rifle, USkeletalMeshCompone
 	}
 	Rifle->AttachToComponent(Body, Snap, FName(TEXT("hand_r")));
 	Rifle->SetRelativeTransform(Hero != INDEX_NONE ? CheeseStrikeBodies::All()[Hero].HandGrip : HandGrip);
+}
+
+FTransform ACheeseStrikeWeapon::MirroredGrip(const USkeletalMeshComponent* Body, FName FromBone, const FTransform& InFromBone, FName ToBone)
+{
+	const USkeletalMesh* Mesh = Body != nullptr ? Body->GetSkeletalMeshAsset() : nullptr;
+	if (Mesh == nullptr)
+	{
+		return InFromBone;
+	}
+	const FReferenceSkeleton& Skeleton = Mesh->GetRefSkeleton();
+	const int32 From = Skeleton.FindBoneIndex(FromBone);
+	const int32 To = Skeleton.FindBoneIndex(ToBone);
+	if (From == INDEX_NONE || To == INDEX_NONE)
+	{
+		return InFromBone;
+	}
+	// In the reference pose, which stands the same both sides: where it is in the body's space, mirrored across the
+	// body's middle (its X is across), then taken into the other bone. A mirror on both sides of a turn is a turn again,
+	// so the thing held keeps its own handedness.
+	const FTransform FromInBody = FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, From);
+	const FTransform ToInBody = FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, To);
+	const FTransform HeldInBody = InFromBone * FromInBody;
+	const FMatrix Mirror = FScaleMatrix(FVector(-1.0, 1.0, 1.0));
+	FTransform Mirrored(Mirror * HeldInBody.ToMatrixNoScale() * Mirror);
+	Mirrored.SetScale3D(HeldInBody.GetScale3D());
+	return Mirrored.GetRelativeTransform(ToInBody);
 }
 
 void ACheeseStrikeWeapon::HideBuiltInWeapons(USkeletalMeshComponent* Body)
@@ -1174,7 +1253,8 @@ void ACheeseStrikeWeapon::FinishReload()
 void ACheeseStrikeWeapon::SetOverlay(UMaterialInterface* Overlay, UMaterialInterface* ViewOverlay)
 {
 	const TPair<UMeshComponent*, UMaterialInterface*> Parts[] = {
-		{FirstPersonMesh.Get(), ViewOverlay}, {FirstPersonModel.Get(), ViewOverlay}, {ThirdPersonMesh.Get(), Overlay}, {ThirdPersonModel.Get(), Overlay}};
+		{FirstPersonMesh.Get(), ViewOverlay}, {FirstPersonModel.Get(), ViewOverlay}, {ThirdPersonMesh.Get(), Overlay}, {ThirdPersonModel.Get(), Overlay},
+		{FirstPersonOffHand.Get(), ViewOverlay}, {ThirdPersonOffHand.Get(), Overlay}};
 	for (const TPair<UMeshComponent*, UMaterialInterface*>& Part : Parts)
 	{
 		if (Part.Key != nullptr && Part.Key->GetOverlayMaterial() != Part.Value)

@@ -9,7 +9,7 @@ namespace CheeseStrikeCredits
 		{TEXT("Engine"), TEXT("Made with Unreal Engine 5, by Epic Games. Begun from its First Person template.")},
 		{TEXT("The soldiers"), TEXT("Lt. Belica, Murdock, Twinblast and Wraith, from Paragon, by Epic Games (Fab).")},
 		{TEXT("Animations, the rifle, the pistol and the shotgun and their sounds, and the bursts of the streaks and the grenades"), TEXT("From Lyra Starter Game, by Epic Games.")},
-		{TEXT("The weapons"), TEXT("\"PPSH 41 Low-poly PBR\" and \"DP28 Light Machine Gun Low-poly PBR\" by Max3d (Fab). \"SV-98 Sniper Rifle\" and \"Classic M4\" by SpatialNeglect (Fab), licensed under Creative Commons Attribution 4.0 (CC BY 4.0): creativecommons.org/licenses/by/4.0; made into cheese for this game.")},
+		{TEXT("The weapons"), TEXT("\"PPSH 41 Low-poly PBR\" and \"DP28 Light Machine Gun Low-poly PBR\" by Max3d (Fab). \"M1911 (FREE)\" by Xeradev (Fab). \"SV-98 Sniper Rifle\" and \"Classic M4\" by SpatialNeglect (Fab), licensed under Creative Commons Attribution 4.0 (CC BY 4.0): creativecommons.org/licenses/by/4.0; made into cheese for this game.")},
 		{TEXT("Surfaces, props and decals"), TEXT("Quixel Megascans (Fab): the Warehouse pack, Industrial Concrete Floor, Shuttered Concrete Wall, Asphalt, Painted Corrugated Sheets, Scratched Painted Metal Sheet, Garage Door, Concrete Barrier and Oil Stain.")},
 		{TEXT("The Labyrinth's stone, brick and wood"), TEXT("From Poly Haven, CC0: \"Medieval Blocks 03\", \"Medieval Red Brick\", \"Old Planks 02\" and \"Medieval Wood\" by Rob Tuytel, and \"Monastery Stone Floor\" by Amal Kumar.")},
 		{TEXT("Gruyère Grotto's rock and mine"), TEXT("Quixel Megascans (Fab): the Old Mine pack and two Quarry Cliffs.")},

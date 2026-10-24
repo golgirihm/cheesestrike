@@ -164,6 +164,34 @@ namespace CheeseStrikeWeapons
 		return Stats;
 	}
 
+	const FWeaponStats& Burratas()
+	{
+		static const FWeaponStats Stats = []
+		{
+			// Counter-Strike's Dual Berettas in cheese: a pistol in each hand, firing in turn, quick and loose, with middling
+			// damage, a long magazine and a long reload; a primary here, for the loadout and the bots.
+			FWeaponStats Weapon = MakeWeapon(TEXT("burratas"), NSLOCTEXT("CheeseStrike", "Burratas", "Dual Burratas"), EWeaponSlot::Primary);
+			Weapon.bDual = true;
+			Weapon.Damage = 15.0f;
+			Weapon.HeadMultiplier = 1.5f;
+			Weapon.FireInterval = 0.09f;
+			Weapon.bAutomatic = true;
+			Weapon.MagazineSize = 30;
+			Weapon.ReloadTime = 3.0f;
+			Weapon.Reserve = 90;
+			Weapon.ReserveMax = 150;
+			SetReach(Weapon, 90.0f, 20.0f, 55.0f, 0.5f);
+			Weapon.SpreadDegrees = 1.0f;
+			Weapon.HipSpreadDegrees = 8.0f;
+			Weapon.BloomShots = 10;
+			SetKick(Weapon, 0.5f, 7.0f, 0.45f, 0.3f);
+			Weapon.AimZoom = 0.8f;
+			Weapon.DrawTime = 0.45f;
+			return Weapon;
+		}();
+		return Stats;
+	}
+
 	const FWeaponStats& Roquefort()
 	{
 		static const FWeaponStats Stats = []
@@ -255,7 +283,7 @@ namespace CheeseStrikeArsenal
 	const TArray<const FWeaponStats*>& All()
 	{
 		namespace W = CheeseStrikeWeapons;
-		static const TArray<const FWeaponStats*> Weapons = {&W::Blaster(), &W::Carbine(), &W::Grater(), &W::Munster(), &W::Shotgun(), &W::Roquefort(), &W::Pistol(), &W::Knife()};
+		static const TArray<const FWeaponStats*> Weapons = {&W::Blaster(), &W::Carbine(), &W::Grater(), &W::Munster(), &W::Shotgun(), &W::Burratas(), &W::Roquefort(), &W::Pistol(), &W::Knife()};
 		return Weapons;
 	}
 
@@ -314,7 +342,7 @@ namespace CheeseStrikeArsenal
 	const TArray<FName>& GunGameLadder()
 	{
 		namespace W = CheeseStrikeWeapons;
-		static const TArray<FName> Ladder = {W::Blaster().Id, W::Shotgun().Id, W::Carbine().Id, W::Grater().Id, W::Munster().Id, W::Roquefort().Id, W::Pistol().Id, W::Knife().Id};
+		static const TArray<FName> Ladder = {W::Blaster().Id, W::Shotgun().Id, W::Carbine().Id, W::Burratas().Id, W::Grater().Id, W::Munster().Id, W::Roquefort().Id, W::Pistol().Id, W::Knife().Id};
 		return Ladder;
 	}
 

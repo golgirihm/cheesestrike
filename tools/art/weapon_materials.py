@@ -1,4 +1,4 @@
-import traceback
+import sys, traceback
 import unreal
 
 # Run with the editor closed, after tools/art/import_weapons.py:
@@ -16,8 +16,12 @@ import unreal
 # within a box: the shotgun's shroud, the grater's jacket), veined (Roquefort), or rind and wax (the green of a mask:
 # the Munster's pan; or all of a slot: the knife's handle). Everything is in the model's own space, unscaled, so it
 # moves with the weapon, skinned or not.
+#
+# With instance names after the script ("py weapon_materials.py MI_Burratas MI_BurratasCream"), only those are made,
+# over the M_CheeseWeapon already there, and nothing else is touched.
 MATERIALS = "/Game/CheeseStrike/Weapons/Materials"
 OUT = unreal.Paths.project_saved_dir() + "weapon_materials.txt"
+ONLY = [a for a in sys.argv[1:] if a]
 
 CODE = r"""
 float3 p = LocalPos;
@@ -308,6 +312,8 @@ def texture(path):
 
 
 def weapon_instance(name, parent, textures=None, scalars=None, vectors=None, two_sided=False):
+    if ONLY and name not in ONLY:
+        return None
     mi = instance(name, parent)
     for key, path in (textures or {}).items():
         t = texture(path)
@@ -342,8 +348,11 @@ def fab(folder, name, cheese=True):
 LYRA_PANELS = {"CheeseChannel": (0.0, 0.0, 1.0, 0.0), "TextChannel": (1.0, 0.0, 0.0, 0.0), "RindChannel": (0.0, 0.0, 0.0, 0.0)}
 
 try:
-    parent = build_weapon_material()
-    build_flash_material()
+    if ONLY:
+        parent = unreal.load_asset(MATERIALS + "/M_CheeseWeapon")
+    else:
+        parent = build_weapon_material()
+        build_flash_material()
     # The Cheddar Blaster: Lyra's rifle, its painted panels a deep cheddar orange.
     weapon_instance("MI_Blaster", parent, lyra("Rifle/Textures", "Rifle", "T_Rifle_Masks"),
                     {"MottleScale": 2.5, "Marble": 1.5, "CheeseRoughness": 0.5},
@@ -378,6 +387,13 @@ try:
     weapon_instance("MI_Pistol", parent, lyra("Pistol/Textures", "Pistol", "T_Pistol_Masks"),
                     {"MottleScale": 0.5, "Marble": 2.5, "CheeseRoughness": 0.65},
                     dict(LYRA_PANELS, CheeseColor=(0.88, 0.78, 0.5, 1.0), CheeseColorB=(0.78, 0.66, 0.4, 1.0)))
+    # The Dual Burratas: Xeradev's M1911s, their slide and frame soft white burrata, glossy and faintly marbled, their
+    # grip panels its creamy stracciatella heart, the barrel steel.
+    weapon_instance("MI_Burratas", parent, None, {"UseTextures": 0.0, "CheeseAll": 1.0, "MottleScale": 1.6, "Marble": 1.2, "CheeseRoughness": 0.3},
+                    {"CheeseColor": (0.95, 0.94, 0.9, 1.0), "CheeseColorB": (0.86, 0.84, 0.78, 1.0)})
+    weapon_instance("MI_BurratasCream", parent, None, {"UseTextures": 0.0, "CheeseAll": 1.0, "MottleScale": 0.35, "Marble": 2.5, "CheeseRoughness": 0.55},
+                    {"CheeseColor": (0.93, 0.86, 0.66, 1.0), "CheeseColorB": (0.84, 0.74, 0.5, 1.0)})
+    weapon_instance("MI_BurratasSteel", parent, None, {"UseTextures": 0.0, "PlainRoughness": 0.3, "PlainMetallic": 1.0}, {"PlainColor": (0.5, 0.5, 0.52, 1.0)})
     # The Cheese Knife: bright steel, and a handle dipped in red wax.
     weapon_instance("MI_KnifeSteel", parent, None, {"UseTextures": 0.0, "PlainRoughness": 0.22, "PlainMetallic": 1.0}, {"PlainColor": (0.82, 0.82, 0.84, 1.0)})
     weapon_instance("MI_KnifeWax", parent, None, {"UseTextures": 0.0, "RindAll": 1.0, "RindRoughness": 0.28, "MottleScale": 0.8}, {"RindColor": (0.62, 0.03, 0.03, 1.0)})

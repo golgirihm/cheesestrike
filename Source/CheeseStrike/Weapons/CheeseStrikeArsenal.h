@@ -9,8 +9,8 @@
  * Every weapon in the game, as plain numbers (FWeaponStats), and the lists
  * the game is played by: what a loadout chooses from, and Gun Game's ladder.
  * The numbers are the design's table (docs/unreal/design.md, "Weapons"),
- * its lengths divided by three for life size; projectile weapons, the Twin
- * Curds and the Dual Burratas are still to come.
+ * its lengths divided by three for life size; projectile weapons and the
+ * Twin Curds are still to come.
  */
 namespace CheeseStrikeWeapons
 {
@@ -23,6 +23,8 @@ namespace CheeseStrikeWeapons
 	const FWeaponStats& Munster();
 	/** The Swiss Shotgun: nine pellets a shot. */
 	const FWeaponStats& Shotgun();
+	/** The Dual Burratas: two cheese pistols, one in each hand, firing in turn, fast; a long magazine and a long reload. */
+	const FWeaponStats& Burratas();
 	/** The Roquefort Rifle: a scoped rifle, a head shot a kill. */
 	const FWeaponStats& Roquefort();
 	/** The Curd Pistol: the weak sidearm everyone carries, with rounds without end. */

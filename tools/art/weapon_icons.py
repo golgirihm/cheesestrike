@@ -27,6 +27,8 @@ ICONS = {
     "shotgun": ("SM_Shotgun", 1.0),
     "roquefort": ("SM_SV98", 1.0),
     "pistol": ("SM_Pistol", 1.0),
+    # Two M1911s back to back, the one in each hand.
+    "burratas": ("SM_M1911", 1.0),
     "knife": ("SM_CheeseKnife", -1.0),
 }
 
@@ -44,23 +46,27 @@ def load(path):
     return vertices, faces
 
 
-def icon(path, forward):
+# Those drawn twice, back to back, for a weapon in each hand.
+DUAL = {"burratas"}
+
+
+def icon(path, forward, width=WIDTH):
     vertices, faces = load(path)
     # Side on: forward (Y) across, muzzle to the left; up (Z) up.
     points = [(-forward * v[2], v[1]) for v in vertices]
     xs = [p[0] for p in points]
     ys = [p[1] for p in points]
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
-    scale = min((WIDTH - 2 * MARGIN) / (x1 - x0), (HEIGHT - 2 * MARGIN) / (y1 - y0)) * SUPER
-    w, h = WIDTH * SUPER, HEIGHT * SUPER
+    scale = min((width - 2 * MARGIN) / (x1 - x0), (HEIGHT - 2 * MARGIN) / (y1 - y0)) * SUPER
+    w, h = width * SUPER, HEIGHT * SUPER
     ox = (w - (x1 - x0) * scale) / 2.0
     oy = (h - (y1 - y0) * scale) / 2.0
     mask = Image.new("L", (w, h), 0)
     draw = ImageDraw.Draw(mask)
     for face in faces:
         draw.polygon([(ox + (points[i][0] - x0) * scale, oy + (y1 - points[i][1]) * scale) for i in face], fill=255)
-    mask = mask.resize((WIDTH, HEIGHT), Image.LANCZOS)
-    out = Image.new("RGBA", (WIDTH, HEIGHT), (255, 255, 255, 0))
+    mask = mask.resize((width, HEIGHT), Image.LANCZOS)
+    out = Image.new("RGBA", (width, HEIGHT), (255, 255, 255, 0))
     out.putalpha(mask)
     return out
 
@@ -73,7 +79,15 @@ def main():
         if not os.path.exists(path):
             print(weapon, "has no model at", path)
             continue
-        icon(path, forward).save(os.path.join(target, f"T_Icon_{weapon}.png"))
+        if weapon in DUAL:
+            # The left hand's facing left, the right hand's its mirror, side by side.
+            half = icon(path, forward, WIDTH // 2)
+            both = Image.new("RGBA", (WIDTH, HEIGHT), (255, 255, 255, 0))
+            both.paste(half, (0, 0))
+            both.paste(half.transpose(Image.FLIP_LEFT_RIGHT), (WIDTH // 2, 0))
+            both.save(os.path.join(target, f"T_Icon_{weapon}.png"))
+        else:
+            icon(path, forward).save(os.path.join(target, f"T_Icon_{weapon}.png"))
         print(weapon, "drawn")
 
 

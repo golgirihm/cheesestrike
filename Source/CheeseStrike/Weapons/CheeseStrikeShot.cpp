@@ -108,8 +108,16 @@ namespace CheeseStrikeWeapons
 		// The climb slows as it goes, and never passes RecoilCap shots' worth.
 		const float Cap = FMath::Max(Weapon.RecoilCap, 1.0f);
 		const float Climb = Weapon.RecoilUp * Cap * (1.0f - FMath::Exp(-Index / Cap));
-		const float Wander = Weapon.RecoilSide * FMath::Sin(Index * 1.3f) * FMath::Min(Index / 3.0f, 1.0f);
+		// Two guns kick to their own sides in turn, the right gun's to the right; one wanders along a pattern.
+		const float Wander = Weapon.bDual
+			? Weapon.RecoilSide * (DualHand(Weapon, Index) == 0 ? 1.0f : -1.0f) * FMath::Min(Index / 3.0f, 1.0f)
+			: Weapon.RecoilSide * FMath::Sin(Index * 1.3f) * FMath::Min(Index / 3.0f, 1.0f);
 		return FVector2D(Wander, Climb) * Steady;
+	}
+
+	int32 DualHand(const FWeaponStats& Weapon, int32 Index)
+	{
+		return Weapon.bDual && Index % 2 != 0 ? 1 : 0;
 	}
 
 	int32 NextInRun(const FWeaponStats& Weapon, int32 Last, float SinceLast)
