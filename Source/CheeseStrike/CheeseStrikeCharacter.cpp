@@ -394,28 +394,37 @@ void ACheeseStrikeCharacter::UpdateBody()
 		{
 			return;
 		}
-		// A team mode's sides, or everyone for themself (CheeseStrikeModes).
-		const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-		const bool bTeams = Match == nullptr || Match->HasTeams();
-		const int32 Side = Match != nullptr ? Match->TeamOf(State) : State->GetTeam();
-		// Its rank: how many players come before it on its side (or in the match), by their ids, which every
-		// machine knows.
-		int32 Rank = 0;
-		for (const APlayerState* Other : Match != nullptr ? Match->PlayerArray : TArray<TObjectPtr<APlayerState>>())
-		{
-			const ACheeseStrikePlayerState* Player = Cast<ACheeseStrikePlayerState>(Other);
-			if (Player != nullptr && Player != State && (!bTeams || Match->TeamOf(Player) == Side) && Player->GetPlayerId() < State->GetPlayerId())
-			{
-				++Rank;
-			}
-		}
-		Team = bTeams ? Side : INDEX_NONE;
-		Wanted = CheeseStrikeBodies::For(bTeams, Side, Rank);
+		Wanted = BodyOf(GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr, State, Team);
 	}
 	if (Wanted != BodyIndex || Team != BodyTeam)
 	{
 		ApplyBody(Wanted, Team);
 	}
+}
+
+int32 ACheeseStrikeCharacter::BodyOf(const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* State, int32& OutTeam)
+{
+	OutTeam = INDEX_NONE;
+	if (State == nullptr)
+	{
+		return INDEX_NONE;
+	}
+	// A team mode's sides, or everyone for themself (CheeseStrikeModes).
+	const bool bTeams = Match == nullptr || Match->HasTeams();
+	const int32 Side = Match != nullptr ? Match->TeamOf(State) : State->GetTeam();
+	// Its rank: how many players come before it on its side (or in the match), by their ids, which every
+	// machine knows.
+	int32 Rank = 0;
+	for (const APlayerState* Other : Match != nullptr ? Match->PlayerArray : TArray<TObjectPtr<APlayerState>>())
+	{
+		const ACheeseStrikePlayerState* Player = Cast<ACheeseStrikePlayerState>(Other);
+		if (Player != nullptr && Player != State && (!bTeams || Match->TeamOf(Player) == Side) && Player->GetPlayerId() < State->GetPlayerId())
+		{
+			++Rank;
+		}
+	}
+	OutTeam = bTeams ? Side : INDEX_NONE;
+	return CheeseStrikeBodies::For(bTeams, Side, Rank);
 }
 
 void ACheeseStrikeCharacter::ApplyBody(int32 Index, int32 Team)

@@ -10,6 +10,7 @@
 
 class ACameraActor;
 class ACheeseStrikeMenuFigure;
+class ACheeseStrikePodium;
 class UCheeseStrikePlayScript;
 class UInputMappingContext;
 
@@ -86,6 +87,21 @@ public:
 	 * on the front end, out of the match.
 	 */
 	bool IsDoneWithTheResults() const;
+	/**
+	 * The podium after the match (ACheeseStrikePodium), made on this machine
+	 * once the results have been up a moment (CheeseStrikePodiums::IsShowing),
+	 * viewed until the match goes back to the lobby; null while it isn't up.
+	 */
+	const ACheeseStrikePodium* GetPodium() const { return Podium; }
+	/** When it came, by the world's real time. */
+	float GetPodiumShownAt() const { return PodiumShownAt; }
+	/** Whether this player may skip it: the host (or a player alone). */
+	bool CanSkipPodium() const;
+	/** The host, over the podium: everyone goes back to the lobby now (ACheeseStrikeGameMode::BackToLobbyNow). */
+	void SkipPodium();
+	/** The console's way to it, for play scripts: `CheeseStrikeSkipPodium`. */
+	UFUNCTION(Exec)
+	void CheeseStrikeSkipPodium();
 	/** Picks a page of the front end (main, find, credits, options, controls), or the options or the controls from the pause menu. */
 	void ChooseMenu(EMenuPage Page);
 	/** Back from a page to the one it came from: the front end's main page, the pause menu, or the options (from the controls). */
@@ -195,6 +211,10 @@ protected:
 	void PlayMusic();
 	void ShowMenuCamera();
 	void HideMenuCamera();
+	/** Puts the podium up when it is time, keeps the view on it, and takes it down. */
+	void UpdatePodium();
+	void ShowPodium();
+	void HidePodium();
 
 	/** The script playing the game in place of a person, if -PlayScript named one or a test gave one. */
 	UPROPERTY()
@@ -204,6 +224,11 @@ protected:
 	TObjectPtr<ACameraActor> MenuCamera;
 	UPROPERTY()
 	TObjectPtr<ACheeseStrikeMenuFigure> MenuFigure;
+	UPROPERTY()
+	TObjectPtr<ACheeseStrikePodium> Podium;
+	/** The host's button over it. */
+	TSharedPtr<SWidget> PodiumSkip;
+	float PodiumShownAt = 0.0f;
 	TSharedPtr<SCheeseStrikeMenu> Menu;
 	EMenuPage ShownPage = EMenuPage::None;
 	EMenuPage ChosenPage = EMenuPage::Main;

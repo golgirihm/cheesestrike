@@ -21,8 +21,8 @@ class SWidget;
  *
  * What is held is the results as they were last drawn (HoldWhatIsShown:
  * the view's own pixels, the HUD's scoreboard over the match), or a screen
- * of its own (Hold), which a post-game screen of its own, such as a podium,
- * would give instead. Without pixels to read (a server with no renderer),
+ * of its own (Hold): the podium's last picture with its words over it
+ * (ACheeseStrikePlayerController::HoldTheResults). Without pixels to read (a server with no renderer),
  * the cover is the lobby's tile.
  */
 UCLASS()
@@ -38,8 +38,8 @@ public:
 
 	/** Holds the screen as it is now, until the lobby is ready; nothing if it is held already. */
 	void HoldWhatIsShown();
-	/** Holds `Screen` until the lobby is ready, in place of anything held. */
-	void Hold(TSharedRef<SWidget> Screen);
+	/** Holds `Screen` until the lobby is ready, in place of anything held; and `Keep` (what it draws, a texture) as long. */
+	void Hold(TSharedRef<SWidget> Screen, UObject* Keep = nullptr);
 	/** Lets go: the lobby is ready, or the player is somewhere else. */
 	void Release();
 	bool IsHeld() const { return Cover.IsValid(); }
@@ -52,6 +52,8 @@ private:
 	bool Watch(float DeltaSeconds);
 
 	TSharedPtr<SWidget> Cover;
+	UPROPERTY()
+	TObjectPtr<UObject> Kept;
 	TSharedPtr<FSlateDynamicImageBrush> Picture;
 	FTSTicker::FDelegateHandle Ticker;
 	double HeldSince = 0.0;

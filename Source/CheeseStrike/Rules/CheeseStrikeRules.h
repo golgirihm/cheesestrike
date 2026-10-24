@@ -24,9 +24,12 @@ namespace CheeseStrikeRules
 	constexpr int32 KillFeedLength = 5;
 	/** The longest a player's name may be, in letters: as long as a Steam name. The HUD cuts a long one to fit, with dots. */
 	constexpr int32 MaxNameLength = 32;
-	/** Seconds from the host starting a match to its first shot, and seconds the results stay up before everyone is back in the lobby. */
+	/**
+	 * Seconds from the host starting a match to its first shot, and seconds from its end until everyone is back in the
+	 * lobby: the results a moment, then the podium (CheeseStrikePodiums::After and Seconds).
+	 */
 	constexpr float MatchCountdown = 5.0f;
-	constexpr float ResultsTime = 10.0f;
+	constexpr float ResultsTime = 18.0f;
 	/** What a host may pick (docs/unreal/design.md, "Modes"), and what is picked to begin with. */
 	constexpr int32 KillLimitChoices[] = {5, 10, 20, 30, 50};
 	constexpr float RespawnDelayChoices[] = {1.0f, 3.0f, 5.0f};

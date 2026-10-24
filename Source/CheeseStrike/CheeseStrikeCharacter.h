@@ -10,6 +10,7 @@
 #include "Input/CheeseStrikeAimAssist.h"
 #include "CheeseStrikeCharacter.generated.h"
 
+class ACheeseStrikeGameState;
 class ACheeseStrikePlayerState;
 class ACheeseStrikeWeapon;
 class UCameraComponent;
@@ -266,6 +267,13 @@ public:
 	/** Server only: who last hurt it, and the server's time they did; a bot turns to whoever shoots it. */
 	ACheeseStrikeCharacter* GetLastHurtBy() const { return LastHurtBy.Get(); }
 	float GetLastHurtAt() const { return LastHurtAt; }
+
+	/**
+	 * The body `State`'s player has in `Match` (CheeseStrikeBodies::For, by their rank by player id on their side, or in
+	 * the match without sides), and in `OutTeam` the side whose colours it wears (INDEX_NONE for its own): what their
+	 * character puts on, for anything else that shows them (the podium).
+	 */
+	static int32 BodyOf(const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* State, int32& OutTeam);
 
 	/** The bones of a body's two eyes (eyeball_l and _r, or L_eye and R_eye), if it has them. */
 	static bool FindEyes(const USkeletalMesh* Body, FName& Left, FName& Right);

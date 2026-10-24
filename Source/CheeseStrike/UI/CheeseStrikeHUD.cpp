@@ -15,6 +15,7 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
+#include "CheeseStrikePodiumHUD.h"
 #include "CheeseStrikeHUDDraw.h"
 #include "CheeseStrikeMenu.h"
 #include "Input/CheeseStrikeInput.h"
@@ -333,6 +334,11 @@ void ACheeseStrikeHUD::DrawHUD()
 	const ACheeseStrikePlayerController* Controller = Cast<ACheeseStrikePlayerController>(GetOwningPlayerController());
 	// Nothing under the front end, the lobby and their pages: only in a match, paused or not.
 	if (Canvas == nullptr || Controller == nullptr || (Controller->GetMenuPage() != EMenuPage::None && Controller->GetMenuPage() != EMenuPage::Pause))
+	{
+		return;
+	}
+	// After the match, the podium: its own words over it, and nothing else.
+	if (CheeseStrikePodiumHUD::Draw(this, Canvas))
 	{
 		return;
 	}

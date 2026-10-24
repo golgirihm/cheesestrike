@@ -1,0 +1,11 @@
+# The host's skip over the podium: Enter (A on a gamepad) takes everyone back to the lobby at once (-Bots).
+wait 10
+cmd CheeseStrikeEndMatch
+wait 6
+device gamepad
+wait 0.5
+shot podium_skip_pad
+key Gamepad_FaceButton_Bottom
+wait 1.5
+shot podium_skip_held
+quit
