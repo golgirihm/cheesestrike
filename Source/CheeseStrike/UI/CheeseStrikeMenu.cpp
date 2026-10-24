@@ -1504,7 +1504,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 			PointsChosen = CheeseStrikeHills::TargetChoices[Index] == KillLimit ? Index : PointsChosen;
 		}
 		Row(ModeRules.bTeams ? TEXT("Team points to win") : TEXT("Points to win"),
-			MakeDropdown(Points, PointsChosen, bHost, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeHills::TargetChoices[Index], RespawnDelay); }));
+			MakeDropdown(Points, PointsChosen, bCanPick, [Player, RespawnDelay](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(CheeseStrikeHills::TargetChoices[Index], RespawnDelay); }));
 	}
 	if (ModeRules.bRespawns)
 	{
