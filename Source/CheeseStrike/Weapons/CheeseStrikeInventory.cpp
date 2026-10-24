@@ -370,31 +370,41 @@ void UCheeseStrikeInventory::GiveSpawnLoadout(AController* Controller)
 	GiveInternal(FCheeseStrikeLoadout::Usual(Loadouts != nullptr ? Loadouts->PrimaryFor(Controller) : NAME_None), true);
 }
 
-bool UCheeseStrikeInventory::TakePickup(ACheeseStrikePickup* Pickup, bool bPressed)
+bool UCheeseStrikeInventory::TakePickup(ACheeseStrikePickup* Pickup)
 {
 	using CheeseStrikePickups::ETake;
 	ACheeseStrikeCharacter* Character = Holder();
-	if (Character == nullptr || Pickup == nullptr || !Character->HasAuthority()
-		|| !Pickup->IsInReach(Character, (bPressed ? CheeseStrikePickups::PressReach : CheeseStrikePickups::Reach) + CheeseStrikePickups::ServerSlack))
+	if (Character == nullptr || Pickup == nullptr || Pickup->IsActorBeingDestroyed() || !Character->HasAuthority()
+		|| !Pickup->IsInReach(Character, CheeseStrikePickups::PressReach + CheeseStrikePickups::ServerSlack))
 	{
 		return false;
 	}
 	const ETake How = Pickup->HowFor(Character);
-	if (How == ETake::None || (How == ETake::Press && !bPressed))
+	if (How == ETake::None)
 	{
 		return false;
 	}
 	ACheeseStrikeWeapon* Carried = At(static_cast<uint8>(EWeaponSlot::Primary));
 	if (How == ETake::TopUp && Carried != nullptr)
 	{
-		Carried->AddReserve(Carried->GetStats().Reserve);
+		Carried->AddReserve(CheeseStrikePickups::TopUpRounds(Pickup->IsDropped(), Carried->GetStats().Reserve, Pickup->GetDroppedMagazine(), Pickup->GetDroppedReserve()));
 	}
 	else
 	{
+		// The one carried goes down on the floor, its rounds with it, for anyone to take.
+		if (Carried != nullptr)
+		{
+			ACheeseStrikePickup::Drop(Character, Carried->GetWeaponId(), Carried->GetMagazine(), Carried->GetReserve());
+		}
 		SwapPrimary(Pickup->GetWeapon());
+		if (ACheeseStrikeWeapon* Fresh = At(static_cast<uint8>(EWeaponSlot::Primary)); Fresh != nullptr && Pickup->IsDropped())
+		{
+			Fresh->SetRounds(Pickup->GetDroppedMagazine(), Pickup->GetDroppedReserve());
+		}
 	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s takes the %s from %s%s"), *Character->DisplayName(), *Pickup->GetWeaponName().ToString(), Pickup->IsDropped() ? TEXT("the floor") : *Pickup->GetName(),
+		How == ETake::TopUp ? TEXT(", for its rounds") : TEXT(""));
 	Pickup->Take();
-	UE_LOG(LogCheeseStrike, Display, TEXT("%s takes the %s from %s%s"), *Character->DisplayName(), *Pickup->GetWeaponName().ToString(), *Pickup->GetName(), How == ETake::TopUp ? TEXT(", for its rounds") : TEXT(""));
 	return true;
 }
 
@@ -448,7 +458,7 @@ bool UCheeseStrikeInventory::PressForPickup()
 	}
 	if (Character->HasAuthority())
 	{
-		TakePickup(Offered, true);
+		TakePickup(Offered);
 	}
 	else
 	{
@@ -459,7 +469,7 @@ bool UCheeseStrikeInventory::PressForPickup()
 
 void UCheeseStrikeInventory::ServerTakePickup_Implementation(ACheeseStrikePickup* Pickup)
 {
-	TakePickup(Pickup, true);
+	TakePickup(Pickup);
 }
 
 void UCheeseStrikeInventory::RestrictTo(EWeaponSlot Slot)

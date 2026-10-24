@@ -104,8 +104,8 @@ protected:
 	/**
 	 * With nobody in sight: goes to the stand near it with the weapon it
 	 * wants most (CheeseStrikePickups::BotWants: better than its own, and
-	 * not too far), and takes it, walking over it or pressing Interact
-	 * there. True while it is going for one.
+	 * not too far), and takes it by pressing Interact over it, as a player
+	 * must. True while it is going for one.
 	 */
 	bool ThinkAboutPickups();
 	/** How long it goes for a stand before trying something else, and how long it leaves that stand alone then (s). */

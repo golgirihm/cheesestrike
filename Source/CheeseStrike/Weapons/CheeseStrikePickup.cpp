@@ -8,6 +8,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -42,8 +43,15 @@ namespace
 	/** Its light (lumens), there, and how far it reaches (cm). */
 	constexpr float PickupLight = 110.0f;
 	constexpr float PickupLightReach = 320.0f;
-	/** How often the server looks for anyone walking over it (s). */
-	constexpr float WalkOverEvery = 0.1f;
+	/** How often the server looks under a weapon on the floor for its floor (s). */
+	constexpr float FloorCheckEvery = 0.5f;
+	/** A weapon on the floor: how much bigger than in the hand, how far ahead of the one who dropped it (cm), and how high it falls from. */
+	constexpr float DroppedModelScale = 1.1f;
+	constexpr float DropAhead = 45.0f;
+	constexpr float DropFallFrom = 70.0f;
+	/** Two guns (the Dual Burratas): how far apart they float on a stand, and lie on the floor (cm, middle to middle). */
+	constexpr float PairApartOnStand = 10.0f;
+	constexpr float PairApartOnFloor = 9.0f;
 
 	TAutoConsoleVariable<float> CVarPickupSeconds(TEXT("CheeseStrike.PickupSeconds"), 0.0f,
 		TEXT("Seconds a weapon's stand stays empty once taken, in place of CheeseStrikePickups::RespawnSeconds (for the play tests); 0 for the usual."), ECVF_Cheat);
@@ -118,6 +126,8 @@ ACheeseStrikePickup::ACheeseStrikePickup()
 	SkinnedModel->SetCanEverAffectNavigation(false);
 	SkinnedModel->SetGenerateOverlapEvents(false);
 	PlainModel = MakePart(TEXT("PlainModel"), Spinner);
+	PairModel = MakePart(TEXT("PairModel"), Spinner);
+	PairModel->SetVisibility(false);
 }
 
 void ACheeseStrikePickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -125,6 +135,7 @@ void ACheeseStrikePickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(ACheeseStrikePickup, Weapon, COND_InitialOnly);
 	DOREPLIFETIME(ACheeseStrikePickup, BackAt);
+	DOREPLIFETIME_CONDITION(ACheeseStrikePickup, bDropped, COND_InitialOnly);
 }
 
 void ACheeseStrikePickup::SetWeapon(FName Id)
@@ -155,7 +166,7 @@ bool ACheeseStrikePickup::IsInPlay() const
 {
 	const UWorld* World = GetWorld();
 	const ACheeseStrikeGameState* Match = World != nullptr ? World->GetGameState<ACheeseStrikeGameState>() : nullptr;
-	return Match != nullptr && CheeseStrikePickups::InMode(Match->GetMode()) && CheeseStrikePickups::CanLieOnAStand(Weapon);
+	return Match != nullptr && CheeseStrikePickups::InMode(Match->GetMode()) && (bDropped ? CheeseStrikePickups::CanBeDropped(Weapon) : CheeseStrikePickups::CanLieOnAStand(Weapon));
 }
 
 bool ACheeseStrikePickup::IsThere() const
@@ -179,7 +190,12 @@ CheeseStrikePickups::ETake ACheeseStrikePickup::HowFor(const ACheeseStrikeCharac
 	}
 	const ACheeseStrikeWeapon* Carried = Inventory->GetInSlot(EWeaponSlot::Primary);
 	const bool bFull = Carried != nullptr && (Carried->GetStats().HasEndlessReserve() || Carried->GetReserve() >= Carried->GetStats().ReserveMax);
-	return CheeseStrikePickups::HowToTake(Carried != nullptr ? Carried->GetWeaponId() : NAME_None, Weapon, bFull);
+	return CheeseStrikePickups::HowToTake(Carried != nullptr ? Carried->GetWeaponId() : NAME_None, Weapon, bFull, bDropped);
+}
+
+bool ACheeseStrikePickup::IsOfferedTo(const ACheeseStrikeCharacter* Character) const
+{
+	return !IsActorBeingDestroyed() && IsInReach(Character, CheeseStrikePickups::PressReach) && HowFor(Character) != CheeseStrikePickups::ETake::None;
 }
 
 bool ACheeseStrikePickup::IsInReach(const ACheeseStrikeCharacter* Character, float Across) const
@@ -198,7 +214,7 @@ ACheeseStrikePickup* ACheeseStrikePickup::OfferedTo(const ACheeseStrikeCharacter
 	float NearestAt = TNumericLimits<float>::Max();
 	for (TActorIterator<ACheeseStrikePickup> It(World); It; ++It)
 	{
-		if (!It->IsInReach(Character, CheeseStrikePickups::PressReach) || It->HowFor(Character) != CheeseStrikePickups::ETake::Press)
+		if (!It->IsOfferedTo(Character))
 		{
 			continue;
 		}
@@ -216,6 +232,11 @@ void ACheeseStrikePickup::Take()
 {
 	if (!HasAuthority())
 	{
+		return;
+	}
+	if (bDropped)
+	{
+		Destroy();
 		return;
 	}
 	const float Seconds = CVarPickupSeconds.GetValueOnGameThread() > 0.0f ? CVarPickupSeconds.GetValueOnGameThread() : CheeseStrikePickups::RespawnSeconds;
@@ -286,32 +307,128 @@ void ACheeseStrikePickup::BeginPlay()
 	}
 }
 
+ACheeseStrikePickup* ACheeseStrikePickup::Drop(ACheeseStrikeCharacter* From, FName WeaponId, int32 Magazine, int32 Reserve)
+{
+	UWorld* World = From != nullptr ? From->GetWorld() : nullptr;
+	if (World == nullptr || !From->HasAuthority() || !CheeseStrikePickups::CanBeDropped(WeaponId))
+	{
+		return nullptr;
+	}
+	// Room for it: the oldest on the floor go first.
+	TArray<ACheeseStrikePickup*> Lying;
+	for (TActorIterator<ACheeseStrikePickup> It(World); It; ++It)
+	{
+		if (It->IsDropped() && !It->IsActorBeingDestroyed())
+		{
+			Lying.Add(*It);
+		}
+	}
+	Lying.Sort([](const ACheeseStrikePickup& A, const ACheeseStrikePickup& B) { return A.DroppedAt < B.DroppedAt; });
+	for (int32 Index = 0; Index < CheeseStrikePickups::ToClearForDrop(Lying.Num()) && Index < Lying.Num(); ++Index)
+	{
+		Lying[Index]->Destroy();
+	}
+	// A little ahead of them, short of a wall, on the floor under that (or at their feet, over a drop).
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeDrop), false);
+	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+	{
+		Params.AddIgnoredActor(*It);
+	}
+	FCollisionObjectQueryParams Solid;
+	Solid.AddObjectTypesToQuery(ECC_WorldStatic);
+	Solid.AddObjectTypesToQuery(ECC_WorldDynamic);
+	const FVector Middle = From->GetActorLocation();
+	const FVector Feet = PickupFeetOf(From);
+	const float Yaw = From->GetActorRotation().Yaw;
+	FVector Ahead = Middle + FRotator(0.0f, Yaw, 0.0f).Vector() * DropAhead;
+	FHitResult Hit;
+	if (World->SweepSingleByObjectType(Hit, Middle, Ahead, FQuat::Identity, Solid, FCollisionShape::MakeSphere(12.0f), Params))
+	{
+		Ahead = Hit.Location;
+	}
+	FVector Floor = Feet;
+	if (World->LineTraceSingleByObjectType(Hit, Ahead, Ahead - FVector(0.0f, 0.0f, 300.0f), Solid, Params) && Feet.Z - Hit.ImpactPoint.Z < CheeseStrikePickups::ReachUp)
+	{
+		Floor = Hit.ImpactPoint;
+	}
+	// Turned across the way they faced, a little at random.
+	const FTransform Where(FRotator(0.0f, Yaw + 90.0f + FMath::FRandRange(-25.0f, 25.0f), 0.0f), Floor);
+	ACheeseStrikePickup* Dropped = World->SpawnActorDeferred<ACheeseStrikePickup>(ACheeseStrikePickup::StaticClass(), Where, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Dropped == nullptr)
+	{
+		return nullptr;
+	}
+	Dropped->bDropped = true;
+	Dropped->DroppedMagazine = FMath::Max(0, Magazine);
+	Dropped->DroppedReserve = FMath::Max(0, Reserve);
+	Dropped->DroppedAt = Dropped->ServerNow();
+	Dropped->SetReplicatingMovement(true);
+	Dropped->SetNetUpdateFrequency(4.0f);
+	Dropped->SetWeapon(WeaponId);
+	UGameplayStatics::FinishSpawningActor(Dropped, Where);
+	Dropped->SetLifeSpan(CheeseStrikePickups::DroppedSeconds);
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s drops the %s (%d + %d rounds) at %s"), *From->DisplayName(), *Dropped->GetWeaponName().ToString(), Dropped->DroppedMagazine, Dropped->DroppedReserve,
+		*Floor.ToCompactString());
+	return Dropped;
+}
+
+TArray<UMeshComponent*, TInlineAllocator<2>> ACheeseStrikePickup::Models() const
+{
+	TArray<UMeshComponent*, TInlineAllocator<2>> Found;
+	if (SkinnedModel->GetSkinnedAsset() != nullptr)
+	{
+		Found.Add(SkinnedModel);
+	}
+	else if (PlainModel->GetStaticMesh() != nullptr)
+	{
+		Found.Add(PlainModel);
+	}
+	if (PairModel->GetStaticMesh() != nullptr)
+	{
+		Found.Add(PairModel);
+	}
+	return Found;
+}
+
 void ACheeseStrikePickup::ApplyLook()
 {
-	if (bLookApplied || !CheeseStrikePickups::CanLieOnAStand(Weapon))
+	if (bLookApplied || !(bDropped ? CheeseStrikePickups::CanBeDropped(Weapon) : CheeseStrikePickups::CanLieOnAStand(Weapon)))
 	{
 		return;
 	}
 	bLookApplied = true;
 	const FWeaponLook& Look = CheeseStrikeWeaponLooks::For(Weapon);
+	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
 	USkeletalMesh* Skinned = LoadPickupAsset<USkeletalMesh>(Look.SkinnedModel);
 	UStaticMesh* Plain = Skinned == nullptr ? LoadPickupAsset<UStaticMesh>(Look.PlainModel) : nullptr;
+	// Two guns show both (they are plain models).
+	const bool bPair = Stats != nullptr && Stats->bDual && Plain != nullptr;
 	SkinnedModel->SetSkeletalMeshAsset(Skinned);
 	PlainModel->SetStaticMesh(Plain);
+	PairModel->SetStaticMesh(bPair ? Plain : nullptr);
 	UMeshComponent* Model = Skinned != nullptr ? static_cast<UMeshComponent*>(SkinnedModel) : static_cast<UMeshComponent*>(PlainModel);
 	SkinnedModel->SetVisibility(Skinned != nullptr);
 	PlainModel->SetVisibility(Plain != nullptr);
+	PairModel->SetVisibility(bPair);
+	// On the floor: no stand under it.
+	for (USceneComponent* Part : {static_cast<USceneComponent*>(Plinth), static_cast<USceneComponent*>(Pad), static_cast<USceneComponent*>(Beam), static_cast<USceneComponent*>(Light)})
+	{
+		Part->SetVisibility(!bDropped);
+	}
 	if (Skinned == nullptr && Plain == nullptr)
 	{
 		return;
 	}
-	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(Look.Materials); ++Slot)
+	for (UMeshComponent* Each : Models())
 	{
-		if (UMaterialInterface* Material = LoadPickupAsset<UMaterialInterface>(Look.Materials[Slot]))
+		for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(Look.Materials); ++Slot)
 		{
-			if (Slot < Model->GetNumMaterials())
+			if (UMaterialInterface* Material = LoadPickupAsset<UMaterialInterface>(Look.Materials[Slot]))
 			{
-				Model->SetMaterial(Slot, Material);
+				if (Slot < Each->GetNumMaterials())
+				{
+					Each->SetMaterial(Slot, Material);
+				}
 			}
 		}
 	}
@@ -320,13 +437,35 @@ void ACheeseStrikePickup::ApplyLook()
 	{
 		OwnMaterials.Add(Model->GetMaterial(Slot));
 	}
-	// As the hand holds it (its grip frame), larger, its middle on the axis it turns about.
+	// As the hand holds it (its grip frame), larger, its middle on the axis it turns about; a pair side by side, across
+	// it on a stand, and on the floor (where it lies on its side, its own across now up) along the floor.
 	const FBoxSphereBounds Bounds = Skinned != nullptr ? Skinned->GetBounds() : Plain->GetBounds();
 	FTransform Placed = Look.Model;
-	Placed.SetScale3D(Placed.GetScale3D() * PickupModelScale);
+	Placed.SetScale3D(Placed.GetScale3D() * (bDropped ? DroppedModelScale : PickupModelScale));
 	Placed.SetLocation(FVector::ZeroVector);
 	Placed.SetLocation(-Placed.TransformPosition(Bounds.Origin));
+	const FVector Apart = bDropped ? FVector(0.0f, 0.0f, PairApartOnFloor / 2.0f) : FVector(PairApartOnStand / 2.0f, 0.0f, 0.0f);
+	if (bPair)
+	{
+		FTransform Second = Placed;
+		Second.AddToTranslation(Apart + FVector(0.0f, bDropped ? 3.0f : 0.0f, 0.0f));
+		PairModel->SetRelativeTransform(Second);
+		Placed.AddToTranslation(-Apart);
+	}
 	Model->SetRelativeTransform(Placed);
+	if (bDropped)
+	{
+		// On its side, its top toward the way it faces; how high its middle lies over the floor, from its bounds lying so.
+		Spinner->SetRelativeLocationAndRotation(FVector::ZeroVector, FQuat(FVector::YAxisVector, UE_HALF_PI));
+		float Lowest = TNumericLimits<float>::Max();
+		for (UMeshComponent* Each : Models())
+		{
+			Each->UpdateComponentToWorld();
+			Lowest = FMath::Min(Lowest, static_cast<float>(Each->Bounds.Origin.Z - Each->Bounds.BoxExtent.Z));
+		}
+		RestHeight = Lowest < TNumericLimits<float>::Max() ? GetActorLocation().Z - Lowest + 0.5f : 2.0f;
+		Spinner->SetRelativeLocation(FVector(0.0f, 0.0f, RestHeight));
+	}
 	if (PadGlow != nullptr)
 	{
 		PadGlow->SetVectorParameterValue(TEXT("Colour"), CheeseStrikePickups::WorthColour(CheeseStrikePickups::Worth(Weapon)));
@@ -355,19 +494,21 @@ void ACheeseStrikePickup::UpdateLook(bool bForce)
 	}
 	const bool bTaken = bShownThere && !bThere && !bForce;
 	bShownThere = bThere;
-	UMeshComponent* Model = SkinnedModel->GetSkinnedAsset() != nullptr ? static_cast<UMeshComponent*>(SkinnedModel) : static_cast<UMeshComponent*>(PlainModel);
-	for (int32 Slot = 0; Slot < Model->GetNumMaterials(); ++Slot)
+	for (UMeshComponent* Model : Models())
 	{
-		UMaterialInterface* Own = OwnMaterials.IsValidIndex(Slot) ? OwnMaterials[Slot].Get() : nullptr;
-		Model->SetMaterial(Slot, bThere || Ghost == nullptr ? Own : static_cast<UMaterialInterface*>(Ghost));
+		for (int32 Slot = 0; Slot < Model->GetNumMaterials(); ++Slot)
+		{
+			UMaterialInterface* Own = OwnMaterials.IsValidIndex(Slot) ? OwnMaterials[Slot].Get() : nullptr;
+			Model->SetMaterial(Slot, bThere || Ghost == nullptr ? Own : static_cast<UMaterialInterface*>(Ghost));
+		}
+		Model->SetCastShadow(bThere);
 	}
-	Model->SetCastShadow(bThere);
 	if (PadGlow != nullptr)
 	{
 		PadGlow->SetScalarParameterValue(TEXT("Strength"), bThere ? GlowThere : GlowEmpty);
 	}
 	Light->SetIntensity(bThere ? PickupLight : PickupLight * 0.15f);
-	Beam->SetVisibility(bThere);
+	Beam->SetVisibility(bThere && !bDropped);
 	if (bTaken && TakenSound != nullptr && GetNetMode() != NM_DedicatedServer)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, TakenSound, Spinner->GetComponentLocation(), 1.0f, 1.0f, 0.0f, TakenReach);
@@ -377,28 +518,36 @@ void ACheeseStrikePickup::UpdateLook(bool bForce)
 FString ACheeseStrikePickup::DescribeLook() const
 {
 	const UMeshComponent* Model = SkinnedModel->GetSkinnedAsset() != nullptr ? static_cast<const UMeshComponent*>(SkinnedModel) : static_cast<const UMeshComponent*>(PlainModel);
-	return FString::Printf(TEXT("hidden %d, plinth %s visible %d at %s, model %s visible %d at %s scale %s"), IsHidden(),
+	return FString::Printf(TEXT("%s, hidden %d, plinth %s visible %d at %s, model %s visible %d at %s scale %s%s"), bDropped ? TEXT("on the floor") : TEXT("a stand"), IsHidden(),
 		Plinth->GetStaticMesh() != nullptr ? *Plinth->GetStaticMesh()->GetName() : TEXT("none"), Plinth->IsVisible(), *Plinth->GetComponentLocation().ToCompactString(),
 		*GetNameSafe(SkinnedModel->GetSkinnedAsset() != nullptr ? static_cast<const UObject*>(SkinnedModel->GetSkinnedAsset()) : static_cast<const UObject*>(PlainModel->GetStaticMesh())),
-		Model->IsVisible(), *Model->GetComponentLocation().ToCompactString(), *Model->GetComponentScale().ToCompactString());
+		Model->IsVisible(), *Model->GetComponentLocation().ToCompactString(), *Model->GetComponentScale().ToCompactString(),
+		PairModel->GetStaticMesh() != nullptr ? *FString::Printf(TEXT(", its pair visible %d at %s"), PairModel->IsVisible(), *PairModel->GetComponentLocation().ToCompactString()) : TEXT(""));
 }
 
-void ACheeseStrikePickup::GiveToWhoeverWalksOver()
+void ACheeseStrikePickup::KeepOnTheFloor()
 {
-	using CheeseStrikePickups::ETake;
-	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It && IsThere(); ++It)
+	UWorld* World = GetWorld();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeDroppedFloor), false, this);
+	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
 	{
-		ACheeseStrikeCharacter* Character = *It;
-		if (!IsInReach(Character, CheeseStrikePickups::Reach))
-		{
-			continue;
-		}
-		const ETake How = HowFor(Character);
-		if ((How == ETake::WalkOver || How == ETake::TopUp) && Character->GetInventory() != nullptr)
-		{
-			Character->GetInventory()->TakePickup(this, false);
-		}
+		Params.AddIgnoredActor(*It);
 	}
+	FCollisionObjectQueryParams Solid;
+	Solid.AddObjectTypesToQuery(ECC_WorldStatic);
+	Solid.AddObjectTypesToQuery(ECC_WorldDynamic);
+	const FVector At = FloorAt();
+	FHitResult Hit;
+	if (World->LineTraceSingleByObjectType(Hit, At + FVector(0.0f, 0.0f, 10.0f), At - FVector(0.0f, 0.0f, 10.0f), Solid, Params))
+	{
+		return;
+	}
+	if (World->LineTraceSingleByObjectType(Hit, At, At - FVector(0.0f, 0.0f, 5000.0f), Solid, Params))
+	{
+		SetActorLocation(Hit.ImpactPoint);
+		return;
+	}
+	Destroy();
 }
 
 void ACheeseStrikePickup::Tick(float DeltaSeconds)
@@ -407,11 +556,16 @@ void ACheeseStrikePickup::Tick(float DeltaSeconds)
 	const float Now = ServerNow();
 	if (HasAuthority())
 	{
-		// A new round: every weapon back.
+		// A new round: every stand's weapon back, the floor cleared.
 		const ACheeseStrikeGameState* Match = GetWorld()->GetGameState<ACheeseStrikeGameState>();
 		const int32 Round = Match != nullptr ? Match->GetRound() : 0;
 		if (Round != SeenRound)
 		{
+			if (SeenRound >= 0 && bDropped)
+			{
+				Destroy();
+				return;
+			}
 			if (SeenRound >= 0 && BackAt > 0.0f)
 			{
 				PutBack();
@@ -422,15 +576,40 @@ void ACheeseStrikePickup::Tick(float DeltaSeconds)
 		{
 			PutBack();
 		}
-		if (Now >= NextCheckAt)
+		if (bDropped && Now >= NextCheckAt)
 		{
-			NextCheckAt = Now + WalkOverEvery;
-			GiveToWhoeverWalksOver();
+			NextCheckAt = Now + FloorCheckEvery;
+			KeepOnTheFloor();
 		}
 	}
 	UpdateLook();
 	if (GetNetMode() == NM_DedicatedServer || IsHidden())
 	{
+		return;
+	}
+	if (bDropped)
+	{
+		// It falls to the floor as it is dropped, lies still, and blinks before it goes.
+		const float Time = GetWorld()->GetTimeSeconds();
+		if (ShownSince < 0.0f)
+		{
+			ShownSince = Time;
+		}
+		const float Age = Time - ShownSince;
+		const float Fall = FMath::Max(0.0f, DropFallFrom - 0.5f * 980.0f * Age * Age);
+		Spinner->SetRelativeLocation(FVector(0.0f, 0.0f, RestHeight + Fall));
+		const bool bShown = CheeseStrikePickups::DroppedShown(Age);
+		if (Spinner->IsVisible() != bShown)
+		{
+			Spinner->SetVisibility(bShown, true);
+			// The models a pair doesn't have stay hidden.
+			if (bShown)
+			{
+				SkinnedModel->SetVisibility(SkinnedModel->GetSkinnedAsset() != nullptr);
+				PlainModel->SetVisibility(PlainModel->GetStaticMesh() != nullptr);
+				PairModel->SetVisibility(PairModel->GetStaticMesh() != nullptr);
+			}
+		}
 		return;
 	}
 	// It turns and bobs, there or not.
@@ -465,4 +644,51 @@ namespace
 		TEXT("CheeseStrikePickups"),
 		TEXT("CheeseStrikePickups: every weapon's stand in the log."),
 		FConsoleCommandWithWorldDelegate::CreateStatic(&ListPickups));
+
+#if !UE_BUILD_SHIPPING
+	/** The host's own character, for the looking commands below. */
+	ACheeseStrikeCharacter* PickupHostCharacter(UWorld* World)
+	{
+		APlayerController* Player = World != nullptr ? World->GetFirstPlayerController() : nullptr;
+		ACheeseStrikeCharacter* Character = Player != nullptr ? Cast<ACheeseStrikeCharacter>(Player->GetPawn()) : nullptr;
+		return Character != nullptr && Character->HasAuthority() ? Character : nullptr;
+	}
+
+	/** `CheeseStrikeStand <weapon> [cm]` (development, the host): a stand holding it on the floor so far ahead (2.5 m), for looking at. */
+	void PutStand(const TArray<FString>& Args, UWorld* World)
+	{
+		ACheeseStrikeCharacter* Character = PickupHostCharacter(World);
+		if (Character == nullptr || Args.Num() == 0 || !CheeseStrikePickups::CanLieOnAStand(FName(*Args[0])))
+		{
+			return;
+		}
+		const float Ahead = Args.Num() > 1 ? FCString::Atof(*Args[1]) : 250.0f;
+		const FVector From = Character->GetActorLocation() + FRotator(0.0f, Character->GetControlRotation().Yaw, 0.0f).Vector() * Ahead;
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikePutStand), false, Character);
+		const FVector Floor = World->LineTraceSingleByChannel(Hit, From, From - FVector(0.0f, 0.0f, 500.0f), ECC_Visibility, Params) ? Hit.ImpactPoint : PickupFeetOf(Character);
+		const FTransform Where(Floor);
+		if (ACheeseStrikePickup* Stand = World->SpawnActorDeferred<ACheeseStrikePickup>(ACheeseStrikePickup::StaticClass(), Where))
+		{
+			Stand->SetWeapon(FName(*Args[0]));
+			UGameplayStatics::FinishSpawningActor(Stand, Where);
+		}
+	}
+
+	/** `CheeseStrikeDropWeapon <weapon>` (development, the host): that weapon dropped on the floor ahead, as a swap drops one, for looking at. */
+	void DropWeapon(const TArray<FString>& Args, UWorld* World)
+	{
+		ACheeseStrikeCharacter* Character = PickupHostCharacter(World);
+		const FWeaponStats* Stats = Args.Num() > 0 ? CheeseStrikeArsenal::Find(FName(*Args[0])) : nullptr;
+		if (Character != nullptr && Stats != nullptr)
+		{
+			ACheeseStrikePickup::Drop(Character, Stats->Id, Stats->MagazineSize, Stats->Reserve);
+		}
+	}
+
+	FAutoConsoleCommandWithWorldAndArgs StandCommand(TEXT("CheeseStrikeStand"), TEXT("CheeseStrikeStand <weapon> [cm]: a weapon's stand on the floor ahead (development, the host)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&PutStand));
+	FAutoConsoleCommandWithWorldAndArgs DropCommand(TEXT("CheeseStrikeDropWeapon"), TEXT("CheeseStrikeDropWeapon <weapon>: that weapon dropped on the floor ahead (development, the host)."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&DropWeapon));
+#endif
 }

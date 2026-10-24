@@ -770,10 +770,10 @@ bool ACheeseStrikeBotController::ThinkAboutPickups()
 		WantedPickup = nullptr;
 		return false;
 	}
-	// There: a swap is pressed for (walking over the rest takes them).
-	if (Best->IsInReach(Me, CheeseStrikePickups::Reach) && Best->HowFor(Me) == CheeseStrikePickups::ETake::Press)
+	// There: it presses Interact for it, as a player must (walking over it takes nothing).
+	if (Best->IsInReach(Me, CheeseStrikePickups::Reach))
 	{
-		Inventory->TakePickup(Best, true);
+		Inventory->TakePickup(Best);
 		WantedPickup = nullptr;
 		return false;
 	}
@@ -1001,15 +1001,8 @@ bool ACheeseStrikeBotController::AimToLandAt(const FVector& Spot, FVector& OutAi
 	for (float Pitch = -15.0f; Pitch <= 60.0f; Pitch += 2.5f)
 	{
 		const FVector Aim = FRotator(Pitch, Yaw, 0.0f).Vector();
-		FPredictProjectilePathParams Path(CheeseStrikeGrenades::CollisionRadius, Grenades->ReleasePoint(Aim), CheeseStrikeGrenades::LaunchVelocity(Aim, Me->GetVelocity()), CheeseStrikeGrenades::Fuse);
-		Path.bTraceWithCollision = true;
-		Path.bTraceWithChannel = false;
-		Path.ObjectTypes = {UEngineTypes::ConvertToObjectType(ECC_WorldStatic), UEngineTypes::ConvertToObjectType(ECC_WorldDynamic)};
-		Path.ActorsToIgnore.Add(const_cast<ACheeseStrikeCharacter*>(Me));
-		Path.SimFrequency = 15.0f;
-		Path.OverrideGravityZ = GetWorld()->GetGravityZ() * CheeseStrikeGrenades::GravityScale;
 		FPredictProjectilePathResult Result;
-		if (!UGameplayStatics::PredictProjectilePath(this, Path, Result) || !Result.HitResult.bBlockingHit)
+		if (!Grenades->PredictPath(Aim, Result, 15.0f))
 		{
 			continue;
 		}
