@@ -18,8 +18,8 @@ class UStaticMesh;
 class UStaticMeshComponent;
 
 /**
- * A cheese grenade in flight: a little round of cheese in red wax with a lit
- * fuse, thrown by a player (UCheeseStrikeGrenades). The server spawns it and
+ * A cheese grenade in flight: a frag grenade of yellow holed cheese with a
+ * steel fuse, spoon and ring, sparking as it burns, thrown by a player (UCheeseStrikeGrenades). The server spawns it and
  * moves it, an arc under gravity that bounces off what it meets (but not
  * off players), and every machine sees it as the server has it, spinning
  * as it goes, the fuse sparking, a knock at each bounce. When its fuse has
@@ -74,13 +74,11 @@ protected:
 	TObjectPtr<USphereComponent> Collision;
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<UProjectileMovementComponent> Movement;
-	/** The round of cheese, its fuse and the fuse's spark, under a spinning pivot. */
+	/** The grenade and its fuse's spark, under a spinning pivot. */
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<USceneComponent> Pivot;
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<UStaticMeshComponent> Round;
-	UPROPERTY(VisibleAnywhere, Category="Components")
-	TObjectPtr<UStaticMeshComponent> Wick;
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<UStaticMeshComponent> Spark;
 

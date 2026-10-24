@@ -25,12 +25,13 @@
 namespace
 {
 	/**
-	 * Its look, loaded as it begins rather than held by the class, as scripts rebuild them: the wheel of cheese the maps
-	 * stack (tools/art/wheel_mesh.py; a metre across and high), here a round 9 cm across and 4.5 cm thick, in the red wax
-	 * of the cheese the mice leave alone (tools/art/wax_material.py), and the glow its spark burns with.
+	 * Its look, loaded as it begins rather than held by the class, as scripts rebuild them: a frag grenade 9 cm high, its
+	 * body yellow holed cheese, its fuse, spoon and ring steel (tools/art/weapon_models.py, weapon_materials.py), and the
+	 * glow its spark burns with.
 	 */
-	const TCHAR* GrenadeWheelPath = TEXT("/Game/CheeseStrike/Meshes/SM_CheeseWheel.SM_CheeseWheel");
-	const TCHAR* GrenadeWaxPath = TEXT("/Game/CheeseStrike/Materials/M_CheeseWax.M_CheeseWax");
+	const TCHAR* GrenadeFragPath = TEXT("/Game/CheeseStrike/Weapons/Grenade/SM_FragGrenade.SM_FragGrenade");
+	const TCHAR* const GrenadeMaterialPaths[] = {TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeCheese.MI_GrenadeCheese"),
+		TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeMetal.MI_GrenadeMetal")};
 	const TCHAR* GrenadeGlowPath = TEXT("/Game/CheeseStrike/Materials/M_Glow.M_Glow");
 	const TCHAR* GrenadeScorchPath = TEXT("/Game/CheeseStrike/Materials/MI_Decal_OilStain.MI_Decal_OilStain");
 	/** Lyra's grenade knocking on the ground (Content/LICENSES.md). */
@@ -38,12 +39,9 @@ namespace
 		TEXT("/Game/Audio/Sounds/Grenade/grenade_bounce_01.grenade_bounce_01"), TEXT("/Game/Audio/Sounds/Grenade/grenade_bounce_02.grenade_bounce_02"),
 		TEXT("/Game/Audio/Sounds/Grenade/grenade_bounce_03.grenade_bounce_03"), TEXT("/Game/Audio/Sounds/Grenade/grenade_bounce_04.grenade_bounce_04"),
 		TEXT("/Game/Audio/Sounds/Grenade/grenade_bounce_05.grenade_bounce_05")};
-	const FVector GrenadeRoundScale(0.09f, 0.09f, 0.045f);
-	/** The fuse: a short cord out of the top of the round, its spark at the end. */
-	const FVector GrenadeWickScale(0.006f, 0.006f, 0.03f);
-	const FVector GrenadeWickAt(0.0f, 0.0f, 3.5f);
-	const FVector GrenadeSparkAt(0.0f, 0.0f, 5.2f);
-	constexpr float GrenadeSparkSize = 0.015f;
+	/** The fuse's spark, on its cap. */
+	const FVector GrenadeSparkAt(0.0f, 0.0f, 5.4f);
+	constexpr float GrenadeSparkSize = 0.012f;
 	/** The burst: how long its flash and fireball last (s), how bright the flash is (candelas) and how far it reaches. */
 	constexpr float GrenadeFlashTime = 0.4f;
 	constexpr float GrenadeFlashBrightness = 1200.0f;
@@ -121,12 +119,7 @@ ACheeseStrikeGrenade::ACheeseStrikeGrenade()
 	Pivot->SetupAttachment(Collision);
 	Round = Part(TEXT("Round"), Pivot);
 	Round->SetStaticMesh(Cylinder.Object);
-	Round->SetRelativeScale3D(GrenadeRoundScale);
-	Wick = Part(TEXT("Wick"), Pivot);
-	Wick->SetStaticMesh(Cylinder.Object);
-	Wick->SetRelativeLocation(GrenadeWickAt);
-	Wick->SetRelativeScale3D(GrenadeWickScale);
-	Wick->SetCastShadow(false);
+	Round->SetRelativeScale3D(FVector(0.06f, 0.06f, 0.09f));
 	Spark = Part(TEXT("Spark"), Pivot);
 	Spark->SetStaticMesh(Sphere.Object);
 	Spark->SetRelativeLocation(GrenadeSparkAt);
@@ -170,19 +163,17 @@ void ACheeseStrikeGrenade::BeginPlay()
 	Movement->OnProjectileBounce.AddDynamic(this, &ACheeseStrikeGrenade::OnBounce);
 	// Each spins its own way as it flies, mostly end over end.
 	Spin = FRotator(FMath::FRandRange(-720.0f, -420.0f), FMath::FRandRange(-90.0f, 90.0f), FMath::FRandRange(-160.0f, 160.0f));
-	if (UStaticMesh* Wheel = LoadObject<UStaticMesh>(nullptr, GrenadeWheelPath))
+	if (UStaticMesh* Frag = LoadObject<UStaticMesh>(nullptr, GrenadeFragPath))
 	{
-		Round->SetStaticMesh(Wheel);
-	}
-	if (UMaterialInterface* Wax = LoadObject<UMaterialInterface>(nullptr, GrenadeWaxPath))
-	{
-		Round->SetMaterial(0, Wax);
-	}
-	if (UMaterialInterface* BasicShape = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
-	{
-		UMaterialInstanceDynamic* Cord = UMaterialInstanceDynamic::Create(BasicShape, this);
-		Cord->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.06f, 0.04f, 0.025f));
-		Wick->SetMaterial(0, Cord);
+		Round->SetStaticMesh(Frag);
+		Round->SetRelativeScale3D(FVector::OneVector);
+		for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(GrenadeMaterialPaths); ++Slot)
+		{
+			if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, GrenadeMaterialPaths[Slot]))
+			{
+				Round->SetMaterial(Slot, Material);
+			}
+		}
 	}
 	if (UMaterialInterface* Glow = LoadObject<UMaterialInterface>(nullptr, GrenadeGlowPath))
 	{

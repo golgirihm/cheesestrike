@@ -9,8 +9,8 @@ import unreal
 #
 # Imports the weapons' models: the Fab models of the primaries that aren't Lyra's (Content/LICENSES.md lists
 # each listing) into /Game/Fab/<publisher>/<model>/, each a static mesh (no Nanite, which the first-person view
-# doesn't draw; no collision, as a weapon in hand needs none) with its textures; and the Cheese Knife and the muzzle
-# flash, made by weapon_models.py, into /Game/CheeseStrike/Weapons/. Lyra's shotgun, copied in with its 4096-pixel maps,
+# doesn't draw; no collision, as a weapon in hand needs none) with its textures; and the Cheese Knife, the muzzle
+# flash and the cheese grenade, made by weapon_models.py, into /Game/CheeseStrike/Weapons/. Lyra's shotgun, copied in with its 4096-pixel maps,
 # has them cut to MAX. Also writes each mesh's vertices to Saved/weapon_shapes/ for looking at their shapes, and imports
 # the HUD's weapon icons that tools/art/weapon_icons.py drew into FAB/x/weapons/icons, into /Game/CheeseStrike/Weapons/Icons/.
 FAB = os.environ.get("CHEESESTRIKE_FAB", r"C:\Hamid\code\FabDownloads")
@@ -31,7 +31,8 @@ MODELS = [
     ("M1911", "/Game/Fab/Xeradev/M1911", "Xeradev_M1911/fbx/FBX/NonRigged/NonRigged_M1911.fbx", [], -90.0),
 ]
 OURS = [("CheeseKnife", "/Game/CheeseStrike/Weapons/Knife", os.path.join(WORK, "cheese_knife.obj")),
-        ("MuzzleFlash", "/Game/CheeseStrike/Weapons/Flash", os.path.join(WORK, "muzzle_flash.obj"))]
+        ("MuzzleFlash", "/Game/CheeseStrike/Weapons/Flash", os.path.join(WORK, "muzzle_flash.obj")),
+        ("FragGrenade", "/Game/CheeseStrike/Weapons/Grenade", os.path.join(WORK, "frag_grenade.obj"))]
 SHOTGUN_TEXTURES = ["/Game/Weapons/Shotgun/Texture/T_Shotgun_AORM", "/Game/Weapons/Shotgun/Texture/T_Shotgun_D", "/Game/Weapons/Shotgun/Texture/T_Shotgun_N", "/Game/Weapons/Shotgun/Texture/T_Shotgun_Mask"]
 
 lines = []

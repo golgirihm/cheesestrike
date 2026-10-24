@@ -15,6 +15,12 @@ The muzzle flash (muzzle_flash.obj): two crossed quads along +Y from the
 muzzle, a flame drawn on each by its material, and one facing along the
 barrel for the flare seen from in front. Two materials: Side and Front.
 
+The cheese grenade (frag_grenade.obj): a frag grenade, an egg of cheese
+grooved into a pineapple's blocks, a steel fuse on its top with the spoon
+down its side and the pin's ring through it. It stands along +Z, the fuse
+up, the spoon on +X and the ring on -X; the origin is the middle of the
+egg. Two materials: Cheese (the body) and Metal (the rest).
+
 Lengths are centimetres at life size.
 """
 
@@ -288,10 +294,195 @@ def make(path):
     return mesh
 
 
+# The grenade: the egg's half width and its heights below and above its middle; its grooves (blocks round it and rows
+# up it, and how deep, as a share of the radius); the fuse, its collar and cap (radius, from, to); the spoon; the ring.
+FRAG_RADIUS = 2.9
+FRAG_BELOW = 3.7
+FRAG_ABOVE = 3.4
+FRAG_BLOCKS = 8
+FRAG_ROWS = 5
+FRAG_GROOVE = 0.09
+FRAG_COLLAR = (1.45, 2.75, 3.3)
+FRAG_FUSE = (1.0, 2.6, 4.5)
+FRAG_CAP = (1.18, 4.5, 4.95)
+SPOON_WIDTH = 1.3
+SPOON_THICK = 0.18
+RING_AT = (-2.35, 0.0, 4.1)
+RING_RADIUS = 1.05
+RING_TUBE = 0.13
+PIN_RADIUS = 0.11
+
+
+def tri_out(mesh, material, a, b, c):
+    """A triangle wound to face the way its vertices' normals do."""
+    pa, pb, pc = (mesh.positions[i - 1] for i in (a, b, c))
+    u = [pb[k] - pa[k] for k in range(3)]
+    v = [pc[k] - pa[k] for k in range(3)]
+    face = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+    normal = [sum(mesh.normals[i - 1][k] for i in (a, b, c)) for k in range(3)]
+    if sum(face[k] * normal[k] for k in range(3)) < 0.0:
+        b, c = c, b
+    mesh.triangle(material, a, b, c)
+
+
+def grid(mesh, material, at, nu, nv, outward, closed=True, uv_scale=1.0):
+    """A surface over a grid of `at(i, j)` positions (i round, j along), its normals from the grid, turned to point
+    the way `outward(position)` says is out; closed round, smooth across the seam."""
+    points = [[at(i, j) for j in range(nv + 1)] for i in range(nu + 1)]
+
+    def sub(p, q):
+        return [p[k] - q[k] for k in range(3)]
+
+    ids = []
+    for i in range(nu + 1):
+        column = []
+        for j in range(nv + 1):
+            i0 = (i - 1) % nu if closed else max(i - 1, 0)
+            i1 = (i + 1) % nu if closed else min(i + 1, nu)
+            j0, j1 = max(j - 1, 0), min(j + 1, nv)
+            du, dv = sub(points[i1][j], points[i0][j]), sub(points[i][j1], points[i][j0])
+            n = [du[1] * dv[2] - du[2] * dv[1], du[2] * dv[0] - du[0] * dv[2], du[0] * dv[1] - du[1] * dv[0]]
+            out = outward(points[i][j])
+            if sum(c * c for c in n) < 1e-12:
+                n = list(out)
+            elif sum(n[k] * out[k] for k in range(3)) < 0.0:
+                n = [-c for c in n]
+            column.append(mesh.vertex(tuple(points[i][j]), tuple(n), (i / nu * uv_scale, j / nv * uv_scale)))
+        ids.append(column)
+    for i in range(nu):
+        for j in range(nv):
+            a, b, c, d = ids[i][j], ids[i + 1][j], ids[i + 1][j + 1], ids[i][j + 1]
+            tri_out(mesh, material, a, b, c)
+            tri_out(mesh, material, a, c, d)
+
+
+def frag_body_at(i, j, nu, nv):
+    u = i / nu
+    latitude = -math.pi / 2 + math.pi * j / nv
+    theta = 2 * math.pi * u
+
+    # The blocks are raised, the grooves between them round and up it; the ends are smooth.
+    def ridge(x):
+        return min(1.0, abs(math.sin(math.pi * x)) * 3.2)
+
+    rows = (latitude + math.radians(72.0)) / math.radians(124.0) * FRAG_ROWS
+    banded = 0.0 <= rows <= FRAG_ROWS
+    bump = min(ridge(u * FRAG_BLOCKS), ridge(rows)) if banded else 1.0
+    scale = 1.0 - FRAG_GROOVE * (1.0 - bump)
+    r = FRAG_RADIUS * math.cos(latitude) * scale
+    z = (FRAG_ABOVE if latitude > 0 else FRAG_BELOW) * math.sin(latitude) * scale
+    return (r * math.cos(theta), r * math.sin(theta), z)
+
+
+def radial(p):
+    """Out from the grenade's middle."""
+    return (p[0], p[1], p[2] * 0.6)
+
+
+def cylinder(mesh, material, radius, z0, z1, sides=20, at=(0.0, 0.0)):
+    """An upright cylinder, capped."""
+    def side(i, j):
+        a = 2 * math.pi * i / sides
+        return (at[0] + radius * math.cos(a), at[1] + radius * math.sin(a), z0 + (z1 - z0) * j)
+
+    grid(mesh, material, side, sides, 1, lambda p: (p[0] - at[0], p[1] - at[1], 0.0))
+    for z, up in ((z0, -1.0), (z1, 1.0)):
+        centre = mesh.vertex((at[0], at[1], z), (0.0, 0.0, up), (0.5, 0.5))
+        rim = [mesh.vertex((at[0] + radius * math.cos(2 * math.pi * k / sides), at[1] + radius * math.sin(2 * math.pi * k / sides), z), (0.0, 0.0, up), (0.0, 0.0))
+               for k in range(sides)]
+        for k in range(sides):
+            tri_out(mesh, material, centre, rim[k], rim[(k + 1) % sides])
+
+
+def frag_surface_x(z):
+    """How far out (+X) the egg's surface is at height `z`, outside its grooves."""
+    height = FRAG_ABOVE if z > 0 else FRAG_BELOW
+    s = max(-1.0, min(1.0, z / height))
+    return FRAG_RADIUS * math.sqrt(max(0.0, 1.0 - s * s))
+
+
+def spoon(mesh):
+    """The spoon: a strip of steel from over the fuse's cap, out and down the +X side, close over the egg."""
+    path = [(0.3, FRAG_CAP[2] + 0.06), (1.2, FRAG_CAP[2] + 0.06), (1.65, 4.75), (1.9, 4.25)]
+    for k in range(11):
+        z = 3.7 - k * 0.42
+        path.append((frag_surface_x(z) + 0.24, z))
+    # Each station: its middle and the way out (across the path, in XZ, away from the egg's middle).
+    stations = []
+    for k, (x, z) in enumerate(path):
+        x0, z0 = path[max(k - 1, 0)]
+        x1, z1 = path[min(k + 1, len(path) - 1)]
+        tx, tz = x1 - x0, z1 - z0
+        length = math.hypot(tx, tz) or 1.0
+        nx, nz = tz / length, -tx / length
+        if nx * x + nz * z < 0.0:
+            nx, nz = -nx, -nz
+        stations.append((x, z, nx, nz))
+    half_w, half_t = SPOON_WIDTH / 2.0, SPOON_THICK / 2.0
+    # Round the strip's section: out, across +Y, in, across -Y.
+    sides = [((half_t, -half_w), (half_t, half_w), (1.0, 0.0)), ((half_t, half_w), (-half_t, half_w), (0.0, 1.0)),
+             ((-half_t, half_w), (-half_t, -half_w), (-1.0, 0.0)), ((-half_t, -half_w), (half_t, -half_w), (0.0, -1.0))]
+    for a, b, (nout, nacross) in sides:
+        ids = []
+        for j, (x, z, nx, nz) in enumerate(stations):
+            n = (nx * nout, nacross, nz * nout)
+            ids.append([mesh.vertex((x + nx * out, across, z + nz * out), n, (j / len(stations), 0.0)) for out, across in (a, b)])
+        for j in range(len(stations) - 1):
+            tri_out(mesh, "Metal", ids[j][0], ids[j + 1][0], ids[j + 1][1])
+            tri_out(mesh, "Metal", ids[j][0], ids[j + 1][1], ids[j][1])
+    # Its two ends.
+    corners = [(half_t, -half_w), (half_t, half_w), (-half_t, half_w), (-half_t, -half_w)]
+    for j, toward in ((0, (-1.0, 0.0)), (len(stations) - 1, (0.0, -1.0))):
+        x, z, nx, nz = stations[j]
+        ids = [mesh.vertex((x + nx * out, across, z + nz * out), (toward[0], 0.0, toward[1]), (0.0, 0.0)) for out, across in corners]
+        tri_out(mesh, "Metal", ids[0], ids[1], ids[2])
+        tri_out(mesh, "Metal", ids[0], ids[2], ids[3])
+
+
+def ring(mesh):
+    """The pin's ring, upright in the XZ plane on the -X side, and the pin from it into the fuse."""
+    cx, cy, cz = RING_AT
+    nu, nv = 28, 8
+
+    def at(i, j):
+        a = 2 * math.pi * i / nu
+        b = 2 * math.pi * j / nv
+        r = RING_RADIUS + RING_TUBE * math.cos(b)
+        return (cx + r * math.cos(a), cy + RING_TUBE * math.sin(b), cz + r * math.sin(a))
+
+    def ring_out(p):
+        dx, dz = p[0] - cx, p[2] - cz
+        length = math.hypot(dx, dz) or 1.0
+        return (p[0] - (cx + dx / length * RING_RADIUS), p[1] - cy, p[2] - (cz + dz / length * RING_RADIUS))
+
+    grid(mesh, "Metal", at, nu, nv, ring_out)
+    sides = 10
+    start, end = cx + RING_RADIUS - 0.1, 0.0
+
+    def pin(i, j):
+        a = 2 * math.pi * i / sides
+        return (start + (end - start) * j, PIN_RADIUS * math.cos(a), cz + PIN_RADIUS * math.sin(a))
+
+    grid(mesh, "Metal", pin, sides, 1, lambda p: (0.0, p[1], p[2] - cz))
+
+
+def frag(path):
+    mesh = Mesh()
+    nu, nv = 64, 48
+    grid(mesh, "Cheese", lambda i, j: frag_body_at(i, j, nu, nv), nu, nv, radial, uv_scale=2.0)
+    cylinder(mesh, "Metal", FRAG_COLLAR[0], FRAG_COLLAR[1], FRAG_COLLAR[2], 24)
+    cylinder(mesh, "Metal", FRAG_FUSE[0], FRAG_FUSE[1], FRAG_FUSE[2], 20)
+    cylinder(mesh, "Metal", FRAG_CAP[0], FRAG_CAP[1], FRAG_CAP[2], 20)
+    spoon(mesh)
+    ring(mesh)
+    mesh.write(path)
+    return mesh
+
+
 if __name__ == "__main__":
     folder = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.environ.get("CHEESESTRIKE_FAB", r"C:\Hamid\code\FabDownloads"), "x", "weapons")
     os.makedirs(folder, exist_ok=True)
-    for name, maker in (("cheese_knife.obj", make), ("muzzle_flash.obj", flash)):
+    for name, maker in (("cheese_knife.obj", make), ("muzzle_flash.obj", flash), ("frag_grenade.obj", frag)):
         out = os.path.join(folder, name)
         made = maker(out)
         print("%s: %d vertices, %d triangles" % (out, len(made.positions), sum(len(t) for t in made.faces.values())))

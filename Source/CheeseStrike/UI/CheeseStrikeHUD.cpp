@@ -22,6 +22,7 @@
 #include "Rules/CheeseStrikeMice.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeModes.h"
+#include "UI/CheeseStrikeGrenadeHUD.h"
 #include "UI/CheeseStrikeModeHUD.h"
 #include "UI/CheeseStrikePickupHUD.h"
 #include "Weapons/CheeseStrikeArsenal.h"
@@ -776,7 +777,7 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 	{
 		DrawWeaponIcon(Shapes, Stats.Slot, IconAt, IconSize, IconColour);
 	}
-	// The grenades carried, left of the weapon: a round of red wax each, its fuse up, and the key that throws one over them.
+	// The grenades carried, left of the weapon: a yellow cheese frag each, and the key that throws one over them.
 	const UCheeseStrikeGrenades* Grenades = Character->GetGrenades();
 	const int32 GrenadeCount = Grenades != nullptr ? Grenades->GetCount() : 0;
 	const float GrenadeRadius = 8.0f * U;
@@ -786,9 +787,7 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 	for (int32 Index = 0; Index < GrenadeCount; ++Index)
 	{
 		const FVector2D Middle(GrenadesRight - GrenadeRadius - Index * GrenadeStep, GrenadeY);
-		Shapes.Line(Middle + FVector2D(0.0f, -GrenadeRadius * 0.6f), Middle + FVector2D(GrenadeRadius * 0.45f, -GrenadeRadius * 1.55f), FMath::Max(1.0f, 1.6f * U), HudDraw::Soft);
-		Shapes.Disc(Middle, GrenadeRadius, FLinearColor(0.72f, 0.1f, 0.07f, 0.95f));
-		Shapes.Disc(Middle + FVector2D(-GrenadeRadius * 0.3f, -GrenadeRadius * 0.3f), GrenadeRadius * 0.3f, FLinearColor(1.0f, 0.55f, 0.45f, 0.5f), 10);
+		CheeseStrikeGrenadeHUD::DrawIcon(Shapes, Middle, GrenadeRadius);
 	}
 	Shapes.Draw(Canvas);
 	if (bPicture)
