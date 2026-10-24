@@ -1364,6 +1364,7 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	EnhancedInputComponent->BindAction(Input->LastWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::LastWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->Streak, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::StreakStarted);
 	EnhancedInputComponent->BindAction(Input->Grenade, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::GrenadeStarted);
+	EnhancedInputComponent->BindAction(Input->Grenade, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::GrenadeEnded);
 	EnhancedInputComponent->BindAction(Input->Interact, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::InteractStarted);
 	EnhancedInputComponent->BindAction(Input->Interact, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::InteractEnded);
 }
@@ -1374,7 +1375,7 @@ void ACheeseStrikeCharacter::InteractStarted()
 	{
 		return;
 	}
-	// Someone down in reach comes first; else a weapon on a stand in reach, swapped for the primary.
+	// Someone down in reach comes first; else a weapon in reach (on a stand or the floor), swapped for the primary.
 	CheeseStrikeModes::EInteract Kind = CheeseStrikeModes::EInteract::None;
 	if ((LastStand == nullptr || LastStand->InteractTarget(Kind) == nullptr) && Inventory != nullptr && Inventory->PressForPickup())
 	{
@@ -1396,11 +1397,20 @@ void ACheeseStrikeCharacter::InteractEnded()
 
 void ACheeseStrikeCharacter::GrenadeStarted()
 {
-	// Marking where a Cheese Strike goes, the hands are busy with the marker.
+	// Marking where a Cheese Strike goes, the hands are busy with the marker. Held, the arc shows; let go, it is thrown.
 	const ACheeseStrikePlayerState* Player = GetPlayerState<ACheeseStrikePlayerState>();
-	if (Player == nullptr || !Player->IsMarkingStrike())
+	if (Grenades != nullptr && TakesInput() && (Player == nullptr || !Player->IsMarkingStrike()))
 	{
-		DoThrowGrenade();
+		Grenades->BeginHold();
+	}
+}
+
+void ACheeseStrikeCharacter::GrenadeEnded()
+{
+	if (Grenades != nullptr && Grenades->IsHolding())
+	{
+		MoveEnded();
+		Grenades->EndHold(GetControlRotation().Vector());
 	}
 }
 
@@ -1548,7 +1558,7 @@ void ACheeseStrikeCharacter::DoFire(bool bHeld)
 		return;
 	}
 	// The hands busy with a throw, the trigger waits for it.
-	if (bHeld && TakesInput() && (Grenades == nullptr || !Grenades->IsThrowing()))
+	if (bHeld && TakesInput() && (Grenades == nullptr || !Grenades->IsBusy()))
 	{
 		HeldWeapon->StartFiring();
 	}
@@ -1566,7 +1576,7 @@ void ACheeseStrikeCharacter::DoAimDownSights(bool bHeld)
 		return;
 	}
 	// Down, from the hip only.
-	if (bHeld && TakesInput() && !IsDowned() && (Grenades == nullptr || !Grenades->IsThrowing()))
+	if (bHeld && TakesInput() && !IsDowned() && (Grenades == nullptr || !Grenades->IsBusy()))
 	{
 		HeldWeapon->StartAiming();
 	}

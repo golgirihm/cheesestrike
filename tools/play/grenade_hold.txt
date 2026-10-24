@@ -1,0 +1,38 @@
+# Holds a cheese grenade's throw and lets it go: the grenade up in the free
+# hand with the arc it would fly shown, a mark where it comes down; let go,
+# it is thrown along it. Then a throw seen from outside, slowed, the grenade
+# in flight. The HUD's grenades (bottom right) count down. Run with
+# tools/play.ps1 -StartAt 1150,-1450,100,117 (open ground on the shooter
+# level, a long clear run).
+wait 3
+shot hold_1_ready
+look 0 -12
+hold Grenade
+wait 0.5
+shot hold_2_arc
+look 0 32
+wait 0.1
+shot hold_3_arc_lob
+release Grenade
+wait 0.36
+cmd slomo 0.1
+wait 0.012
+shot hold_4_flying
+wait 0.02
+shot hold_5_flying
+cmd slomo 1
+look 0 -32
+wait 3
+look 0 12
+cmd CheeseStrikeOutside 420 70 20 0
+wait 0.5
+tap Grenade
+wait 0.4
+cmd slomo 0.1
+wait 0.015
+shot hold_6_outside_flying
+wait 0.02
+shot hold_7_outside_flying
+cmd slomo 1
+wait 3
+quit

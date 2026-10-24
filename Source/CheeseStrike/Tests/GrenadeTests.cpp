@@ -1,8 +1,9 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 // The cheese grenade as arithmetic: how many a player carries, its fuse and
-// throw, the harm of its burst with distance, the arc a bot works out to
-// land one, and when a bot throws.
+// throw, the harm of its burst with distance, a throw held and its arc's
+// dots, its bounce, the arc a bot works out to land one, and when a bot
+// throws.
 
 #include "Misc/AutomationTest.h"
 #include "Weapons/CheeseStrikeGrenadeRules.h"
@@ -47,6 +48,34 @@ bool FAGrenadeBurstsAndFallsOff::RunTest(const FString& Parameters)
 	const float G = 980.0f * GravityScale;
 	const float FlatRange = ThrowSpeed * ThrowSpeed * FMath::Sin(FMath::DegreesToRadians(2.0f * (30.0f + ThrowLift))) / G;
 	TestTrue(FString::Printf(TEXT("thrown up at 30 degrees it carries %.0f cm"), FlatRange), FlatRange > 1500.0f && FlatRange < 3000.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAThrowIsHeldWithItsArcShown, "CheeseStrike.Weapons.AThrowIsHeldWithItsArcShown", GrenadeTests::Flags)
+
+bool FAThrowIsHeldWithItsArcShown::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeGrenades;
+	// Held: the throw waits for the key to be let go.
+	TestTrue(TEXT("held, it goes on"), HeldThrow(true, true, false) == EHeld::Holding);
+	TestTrue(TEXT("let go, it is thrown"), HeldThrow(false, true, false) == EHeld::Throw);
+	TestTrue(TEXT("changing weapons puts it away"), HeldThrow(true, true, true) == EHeld::PutAway);
+	TestTrue(TEXT("even as it is let go"), HeldThrow(false, true, true) == EHeld::PutAway);
+	TestTrue(TEXT("and so does being unable to throw (down, dead, held by a count, reloading, none left)"), HeldThrow(true, false, false) == EHeld::PutAway && HeldThrow(false, false, false) == EHeld::PutAway);
+
+	// The arc's dots: evenly along the flight, none right by the eyes, no more than so many.
+	const TArray<FVector> Line = {FVector(0.0f), FVector(100.0f, 0.0f, 0.0f), FVector(100.0f, 200.0f, 0.0f)};
+	const TArray<FVector> Dots = PreviewPoints(Line, 50.0f, 25.0f, 100);
+	TestEqual(TEXT("a dot every 50 cm of 300 from 25 on"), Dots.Num(), 6);
+	TestTrue(TEXT("the first 25 cm along"), Dots.Num() > 0 && Dots[0].Equals(FVector(25.0f, 0.0f, 0.0f), 0.01f));
+	TestTrue(TEXT("round the corner, as the path goes"), Dots.Num() > 2 && Dots[2].Equals(FVector(100.0f, 25.0f, 0.0f), 0.01f));
+	TestTrue(TEXT("each the spacing from the last along it"), Dots.Num() == 6 && Dots[5].Equals(FVector(100.0f, 175.0f, 0.0f), 0.01f));
+	TestEqual(TEXT("at most as many as asked"), PreviewPoints(Line, 10.0f, 0.0f, 7).Num(), 7);
+	TestEqual(TEXT("none for a path of one point"), PreviewPoints({FVector(0.0f)}).Num(), 0);
+	TestTrue(TEXT("the usual dots reach a long throw"), PreviewSpacing * PreviewDots + PreviewSkip > 2000.0f);
+
+	// A little more bouncy off the ground than it was (0.3).
+	TestTrue(FString::Printf(TEXT("its bounce keeps %.2f of its speed into the ground"), Bounciness), Bounciness > 0.35f && Bounciness <= 0.5f);
 	return true;
 }
 

@@ -42,7 +42,7 @@ namespace CheeseStrikeGrenades
 	/** Gravity on it, as a share of the world's. */
 	constexpr float GravityScale = 1.0f;
 	/** How much of its speed a bounce keeps (into the surface), and how much along the surface friction takes. */
-	constexpr float Bounciness = 0.3f;
+	constexpr float Bounciness = 0.4f;
 	constexpr float Friction = 0.55f;
 	/** How fast it slows rolling along the ground (cm/s each second): the bounces' friction alone would let it roll on and on. */
 	constexpr float RollDrag = 900.0f;
@@ -52,6 +52,32 @@ namespace CheeseStrikeGrenades
 	/** Seconds from the press to the grenade leaving the hand (the throw's wind-up), and to the hands being free again. */
 	constexpr float ReleaseDelay = 0.35f;
 	constexpr float ThrowTime = 0.8f;
+
+	/**
+	 * A player's throw is held (G or the right bumper held down): the
+	 * grenade is taken up in the free hand and its arc shown, and the throw
+	 * is made as the key is let go (the whole throw, as a bot's).
+	 */
+	/** What becomes of a held throw: it goes on being held, is thrown (the key let go), or is put away, the grenade kept. */
+	enum class EHeld : uint8
+	{
+		Holding,
+		Throw,
+		PutAway,
+	};
+	/**
+	 * A held throw, each frame: put away if the holder can't throw now (dead,
+	 * down, held by a count, none left) or has changed weapons since taking
+	 * it in hand; else thrown once the key is let go.
+	 */
+	EHeld HeldThrow(bool bKeyHeld, bool bCanThrow, bool bChangedWeapon);
+
+	/** The arc shown while a throw is held: a dot every PreviewSpacing cm of its flight, none in its first PreviewSkip (too near the eyes), at most PreviewDots. */
+	constexpr float PreviewSpacing = 30.0f;
+	constexpr float PreviewSkip = 70.0f;
+	constexpr int32 PreviewDots = 80;
+	/** The dots along `Path` (its points in order of flight): every `Spacing` cm along it from `Skip` on, at most `MostDots`. */
+	TArray<FVector> PreviewPoints(TConstArrayView<FVector> Path, float Spacing = PreviewSpacing, float Skip = PreviewSkip, int32 MostDots = PreviewDots);
 
 	/** The burst: harm up to Radius from it, Most at its middle and falling off in a straight line to Least at the edge. */
 	constexpr float Radius = 450.0f;

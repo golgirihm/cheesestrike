@@ -5,7 +5,8 @@
 // the count going down on the server and on the thrower's machine; the
 // grenade flies, bounces and bursts after its fuse, hurting the enemy near
 // it; one at its thrower's feet kills them, as nobody's kill; and a wall between the burst and someone saves
-// them.
+// them. Held, a throw shows its arc and where it comes down, goes as the key is let go and lands there, and is put
+// away by drawing another weapon.
 
 #include "Misc/AutomationTest.h"
 #include "Components/StaticMeshComponent.h"
@@ -14,6 +15,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "CheeseStrikeCharacter.h"
+#include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "PlayTesting.h"
 #include "Weapons/CheeseStrikeGrenade.h"
@@ -38,6 +40,7 @@ namespace GrenadePlayTests
 	int32 MostBounces = 0;
 	int32 KillsBefore = 0;
 	int32 DeathsBefore = 0;
+	TWeakObjectPtr<AActor> Backstop;
 
 	/** Player `Of`'s state, on the server. */
 	ACheeseStrikePlayerState* StateOf(int32 Of)
@@ -117,17 +120,28 @@ bool FAGrenadeIsThrownAndBursts::RunTest(const FString& Parameters)
 		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
 		TestTrue(FString::Printf(TEXT("the burst hurt the host near it (health %.0f)"), Host->GetHealth()), Host->GetHealth() < CheeseStrikeWeapons::MaxHealth);
 	});
-	// The thrower is hurt by their own, as anyone: one at their feet kills them, as their own doing, nobody's kill. The
+	// The thrower is hurt by their own, as anyone: one at their feet (off a wall just ahead) kills them, as their own doing, nobody's kill. The
 	// host goes well out of the way.
 	PutAt(0, AsideSpot, 0.0f);
 	Then([]()
 	{
 		// Hurt already, so that wherever at their feet it comes to rest, it kills.
 		CharacterOf(1, 0)->SetHealth(30.0f);
+		// Looking down at their feet, a wall just ahead, so that it bounces back to them rather than on.
+		Controller(1)->SetControlRotation(FRotator(-89.0f, JoinerYaw, 0.0f));
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		AStaticMeshActor* Wall = World(0)->SpawnActor<AStaticMeshActor>(Joiner->GetActorLocation() + FVector(0.0f, 130.0f, 0.0f), FRotator::ZeroRotator, Params);
+		Wall->SetMobility(EComponentMobility::Movable);
+		Wall->GetStaticMeshComponent()->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
+		Wall->GetStaticMeshComponent()->SetCollisionProfileName(TEXT("BlockAll"));
+		Wall->SetActorScale3D(FVector(4.0f, 0.2f, 4.0f));
+		Backstop = Wall;
 		KillsBefore = StateOf(0)->GetKills();
 		DeathsBefore = StateOf(1)->GetDeaths();
 	});
-	Play(1, TEXT("look 0 -60\ntap Grenade\nwait 0.5"));
+	Play(1, TEXT("tap Grenade\nwait 0.5"));
 	WaitUntil(TEXT("the thrower dying by their own grenade"), 5.0f, []() { const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0); return Joiner == nullptr || !Joiner->IsAlive(); });
 	Then([this]()
 	{
@@ -137,6 +151,10 @@ bool FAGrenadeIsThrownAndBursts::RunTest(const FString& Parameters)
 		TestEqual(TEXT("saying how"), Joiner != nullptr ? Joiner->GetDiedHow() : FString(), FString(CheeseStrikeGrenades::OwnWords));
 		TestEqual(TEXT("a death for them"), StateOf(1)->GetDeaths(), DeathsBefore + 1);
 		TestEqual(TEXT("and no kill for anyone"), StateOf(0)->GetKills(), KillsBefore);
+		if (Backstop.IsValid())
+		{
+			Backstop->Destroy();
+		}
 	});
 	WaitUntil(TEXT("the joiner back"), 6.0f, []() { const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0); return Joiner != nullptr && Joiner->IsAlive(); });
 	PutAt(1, JoinerSpot, JoinerYaw);
@@ -161,6 +179,75 @@ bool FAGrenadeIsThrownAndBursts::RunTest(const FString& Parameters)
 		TestEqual(TEXT("behind a wall, nothing"), Walled, 0.0f);
 		Wall->Destroy();
 		TestEqual(TEXT("and past its reach, nothing"), ACheeseStrikeGrenade::HarmAt(Server, Joiner->GetActorLocation() + FVector(0.0f, CheeseStrikeGrenades::Radius + 300.0f, 0.0f), Joiner, Distance), 0.0f);
+	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAHeldThrowShowsItsArcAndGoesOnRelease, "CheeseStrike.Play.AHeldThrowShowsItsArcAndGoesOnRelease", GrenadePlayTests::Flags)
+
+bool FAHeldThrowShowsItsArcAndGoesOnRelease::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace GrenadePlayTests;
+	static FVector Predicted = FVector::ZeroVector;
+	static FVector FirstBounce = FVector::ZeroVector;
+	Thrown = nullptr;
+	StartPlaying({2, TEXT("?RespawnDelay=1")});
+	// The joiner throws, over the network; the host well out of the way.
+	PutAt(0, AsideSpot, 0.0f);
+	PutAt(1, JoinerSpot, JoinerYaw);
+	WaitUntil(TEXT("the joiner's machine knowing its grenades"), 3.0f, []() { return CountOf(Character(1)) == CheeseStrikeGrenades::SpawnCount; });
+	// Held: the arm wound back, the arc shown with where it comes down, nothing thrown.
+	Play(1, TEXT("look 0 -25\nhold Grenade\nwait 0.6"));
+	Then([this]()
+	{
+		const UCheeseStrikeGrenades* Mine = Character(1)->GetGrenades();
+		TestTrue(TEXT("held, the throw waits"), Mine->IsHolding() && Mine->IsBusy());
+		TestTrue(FString::Printf(TEXT("its arc is shown (%d dots)"), Mine->GetPreview().Num()), Mine->GetPreview().Num() >= 10);
+		TestTrue(TEXT("with where it comes down"), Mine->GetPreviewLanding(Predicted));
+		TestTrue(FString::Printf(TEXT("a way off, on the floor (%.0f cm)"), FVector::Dist2D(Predicted, Character(1)->GetActorLocation())),
+			FVector::Dist2D(Predicted, Character(1)->GetActorLocation()) > 300.0f);
+		TestEqual(TEXT("nothing thrown yet"), Grenades(0).Num(), 0);
+		TestEqual(TEXT("and none spent"), CountOf(CharacterOf(1, 0)), CheeseStrikeGrenades::SpawnCount);
+	});
+	// Let go: thrown, along the arc shown.
+	Play(1, TEXT("release Grenade\nwait 0.3"));
+	Then([this]()
+	{
+		TestFalse(TEXT("let go, the arc goes"), Character(1)->GetGrenades()->IsHolding() || Character(1)->GetGrenades()->GetPreview().Num() > 0);
+		const TArray<ACheeseStrikeGrenade*> Flying = Grenades(0);
+		TestEqual(TEXT("one grenade flies on the server"), Flying.Num(), 1);
+		Thrown = Flying.Num() > 0 ? Flying[0] : nullptr;
+		TestEqual(TEXT("one spent"), CountOf(CharacterOf(1, 0)), CheeseStrikeGrenades::SpawnCount - 1);
+	});
+	WaitUntil(TEXT("its first bounce"), 3.0f, []()
+	{
+		const ACheeseStrikeGrenade* Grenade = Thrown.Get();
+		if (Grenade != nullptr && Grenade->GetBounces() > 0)
+		{
+			FirstBounce = Grenade->GetActorLocation();
+			return true;
+		}
+		return Grenade == nullptr;
+	});
+	Then([this]()
+	{
+		TestTrue(FString::Printf(TEXT("it comes down where the arc said (%.0f cm off)"), FVector::Dist2D(FirstBounce, Predicted)), FVector::Dist2D(FirstBounce, Predicted) < 120.0f);
+	});
+	WaitUntil(TEXT("the grenade gone"), 6.0f, []() { return Grenades(0).Num() == 0; });
+	// Held, then a weapon drawn: put away, still carried, and letting go throws nothing.
+	Play(1, TEXT("hold Grenade\nwait 0.4\ntap Sidearm\nwait 0.3"));
+	Then([this]()
+	{
+		TestFalse(TEXT("drawing another weapon puts the throw away"), Character(1)->GetGrenades()->IsHolding());
+		TestEqual(TEXT("its arc gone"), Character(1)->GetGrenades()->GetPreview().Num(), 0);
+	});
+	Play(1, TEXT("release Grenade\nwait 0.8"));
+	Then([this]()
+	{
+		TestEqual(TEXT("letting go then throws nothing"), Grenades(0).Num(), 0);
+		TestEqual(TEXT("and the grenade is still carried"), CountOf(CharacterOf(1, 0)), CheeseStrikeGrenades::SpawnCount - 1);
 	});
 	StopPlaying();
 	return true;

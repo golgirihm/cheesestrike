@@ -330,11 +330,12 @@ protected:
 	void NextWeaponStarted();
 	void PreviousWeaponStarted();
 	void LastWeaponStarted();
-	/** The Grenade key (G): throws one. */
+	/** The Grenade key (G), held and let go: shows the throw's arc while held (UCheeseStrikeGrenades::BeginHold), throws as it is let go. */
 	void GrenadeStarted();
+	void GrenadeEnded();
 	/** The Streak key: its player calls in their next streak (ACheeseStrikePlayerState::StreakPressed). */
 	void StreakStarted();
-	/** Interact (E), held and let go: reviving or finishing someone down (UCheeseStrikeLastStand); pressed, taking the weapon on a stand in reach (UCheeseStrikeInventory::PressForPickup). */
+	/** Interact (E), held and let go: reviving or finishing someone down (UCheeseStrikeLastStand); else pressed, taking a weapon in reach, on a stand or the floor (UCheeseStrikeInventory::PressForPickup). */
 	void InteractStarted();
 	void InteractEnded();
 

@@ -43,6 +43,39 @@ namespace CheeseStrikeGrenades
 		return true;
 	}
 
+	EHeld HeldThrow(bool bKeyHeld, bool bCanThrow, bool bChangedWeapon)
+	{
+		if (!bCanThrow || bChangedWeapon)
+		{
+			return EHeld::PutAway;
+		}
+		return bKeyHeld ? EHeld::Holding : EHeld::Throw;
+	}
+
+	TArray<FVector> PreviewPoints(TConstArrayView<FVector> Path, float Spacing, float Skip, int32 MostDots)
+	{
+		TArray<FVector> Points;
+		if (Path.Num() < 2 || Spacing <= 0.0f || MostDots <= 0)
+		{
+			return Points;
+		}
+		// Walking along the path, a dot each time another `Spacing` has gone by.
+		float Along = 0.0f;
+		float Next = Skip;
+		for (int32 Index = 1; Index < Path.Num() && Points.Num() < MostDots; ++Index)
+		{
+			const FVector From = Path[Index - 1];
+			const float Length = FVector::Dist(From, Path[Index]);
+			while (Length > 0.0f && Next <= Along + Length && Points.Num() < MostDots)
+			{
+				Points.Add(FMath::Lerp(From, Path[Index], (Next - Along) / Length));
+				Next += Spacing;
+			}
+			Along += Length;
+		}
+		return Points;
+	}
+
 	float BotLandingShort(float Distance)
 	{
 		// The faster it comes down, the further it goes on: a quarter of the way, at most four metres, and never so short
