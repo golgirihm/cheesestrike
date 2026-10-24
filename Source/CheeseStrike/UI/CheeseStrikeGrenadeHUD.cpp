@@ -26,7 +26,7 @@ namespace CheeseStrikeGrenadeHUD
 		Shapes.Arc(Top + FVector2D(-Radius * 0.62f, -Radius * 0.28f), Radius * 0.32f, Thin, 0.0f, 360.0f, Steel, false);
 		Shapes.Rect(Top.X - Radius * 0.3f, Top.Y - Radius * 0.42f, Radius * 0.6f, Radius * 0.5f, Steel);
 		Shapes.Rect(Top.X - Radius * 0.38f, Top.Y - Radius * 0.56f, Radius * 0.76f, Radius * 0.18f, Steel);
-		Shapes.Polygon(Egg, Cheese);
+		Shapes.SmoothPolygon(Egg, Cheese);
 		// The pineapple's grooves: two down it, two across.
 		for (const float Across : {-0.36f, 0.36f})
 		{
