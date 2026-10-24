@@ -893,7 +893,7 @@ bool FExecutionOvertimeWaitsForTheDown::RunTest(const FString& Parameters)
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
 	// The round's time runs out while the host is down, getting up by themself.
-	WaitUntil(TEXT("the round's last 12 s"), 35.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->SecondsLeftInRound() <= 12.0f; });
+	WaitUntil(TEXT("the round's last 8 s"), 35.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->SecondsLeftInRound() <= 8.0f; });
 	Then([this]()
 	{
 		CharacterOf(0, 0)->GetLastStand()->GoDown(StateOf(1, 0));
