@@ -241,12 +241,37 @@ bool FTheWheelsFallAndBurst::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeStreaks;
 	const FVector Spot(1000.0f, 2000.0f, 50.0f);
-	const TArray<FVector> Line = StrikeLine(Spot, 90.0f);
-	if (TestEqual(TEXT("seven wheels"), Line.Num(), StrikeWheels))
+	const TArray<FVector> Area = StrikeArea(Spot, 90.0f);
+	if (TestEqual(TEXT("seven wheels"), Area.Num(), StrikeWheels))
 	{
-		TestTrue(TEXT("the middle one on the mark"), Line[StrikeWheels / 2].Equals(Spot, 0.1f));
-		TestTrue(TEXT("along the way the caller faced (+Y)"), FMath::IsNearlyEqual(Line.Last().Y - Line[0].Y, StrikeSpacing * (StrikeWheels - 1), 0.5f) && FMath::IsNearlyEqual(Line.Last().X, Line[0].X, 0.5f));
-		TestTrue(TEXT("evenly spaced"), FMath::IsNearlyEqual(FVector::Dist(Line[0], Line[1]), StrikeSpacing, 0.5f));
+		TestTrue(TEXT("the first on the mark"), Area[0].Equals(Spot, 0.1f));
+		TestTrue(TEXT("the next the way the caller faced (+Y)"), Area[1].Equals(Spot + FVector(0.0f, StrikeRadius * StrikeRing, 0.0f), 0.5f));
+		bool bRing = true;
+		for (int32 Index = 1; Index < Area.Num(); ++Index)
+		{
+			bRing &= FMath::IsNearlyEqual(FVector::Dist(Area[Index], Spot), StrikeRadius * StrikeRing, 0.5f) && FMath::IsNearlyEqual(Area[Index].Z, Spot.Z, 0.01f);
+		}
+		TestTrue(TEXT("the rest round it, inside the area, at the mark's height"), bRing && StrikeRadius * StrikeRing < StrikeRadius);
+		TestTrue(TEXT("evenly"), FMath::IsNearlyEqual(FVector::Dist(Area[1], Area[2]), StrikeRadius * StrikeRing, 0.5f));
+		// Every point of the area is within a burst of some wheel.
+		float Worst = 0.0f;
+		for (float X = -StrikeRadius; X <= StrikeRadius; X += 25.0f)
+		{
+			for (float Y = -StrikeRadius; Y <= StrikeRadius; Y += 25.0f)
+			{
+				if (X * X + Y * Y > StrikeRadius * StrikeRadius)
+				{
+					continue;
+				}
+				float Nearest = BIG_NUMBER;
+				for (const FVector& Wheel : Area)
+				{
+					Nearest = FMath::Min(Nearest, static_cast<float>(FVector::Dist(Wheel, Spot + FVector(X, Y, 0.0f))));
+				}
+				Worst = FMath::Max(Worst, Nearest);
+			}
+		}
+		TestTrue(FString::Printf(TEXT("no point of the area out of every burst (the furthest %.0f cm from a wheel)"), Worst), Worst < StrikeBlast.Radius);
 	}
 	TestEqual(TEXT("a direct hit does the most"), BlastDamage(StrikeBlast, 0.0f), StrikeBlast.Centre);
 	TestEqual(TEXT("a strike's direct hit kills"), StrikeBlast.Centre >= 100.0f, true);

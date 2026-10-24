@@ -65,22 +65,35 @@ namespace CheeseStrikeHUDDraw
 		void RectAcross(float X, float Y, float Width, float Height, const FLinearColor& Left, const FLinearColor& Right);
 		/** The outline of a rectangle, `Thickness` wide, inside it. */
 		void Frame(float X, float Y, float Width, float Height, float Thickness, const FLinearColor& Colour);
-		/** A rectangle with its corners rounded to `Radius` (CheeseStrikeHUD::RoundedRect). */
+		/** A rectangle with its corners rounded to `Radius` (CheeseStrikeHUD::RoundedRect), its edge soft (SmoothPolygon). */
 		void RoundedRect(float X, float Y, float Width, float Height, float Radius, const FLinearColor& Colour);
 		/** The same shaded from `Top` to `Bottom`. */
 		void RoundedRectDown(float X, float Y, float Width, float Height, float Radius, const FLinearColor& Top, const FLinearColor& Bottom);
 		/** The outline of a rounded rectangle, `Thickness` wide, inside it, its inner corners rounded to match. */
 		void RoundedFrame(float X, float Y, float Width, float Height, float Radius, float Thickness, const FLinearColor& Colour);
-		/** A convex polygon, its corners in order round. */
+		/** A convex polygon, its corners in order round, its edges hard: for pieces that meet edge to edge, as the minimap's do. */
 		void Polygon(TConstArrayView<FVector2D> Corners, const FLinearColor& Colour);
+		/**
+		 * A convex polygon standing alone, its edge soft (CheeseStrikeHUD::SoftEdge):
+		 * solid to half a pixel inside its outline, clear half a pixel outside,
+		 * so that its curves and slants are smooth rather than stepped.
+		 */
+		void SmoothPolygon(TConstArrayView<FVector2D> Corners, const FLinearColor& Colour);
+		/** The same, each point's colour `ColourAt` it (a gradient). */
+		void SmoothFill(TConstArrayView<FVector2D> Corners, TFunctionRef<FLinearColor(const FVector2D&)> ColourAt);
+		/** The band between two convex outlines with as many corners, `Inner` inside `Outer`, corner to corner, both its edges soft. */
+		void SmoothBand(TConstArrayView<FVector2D> Outer, TConstArrayView<FVector2D> Inner, const FLinearColor& Colour);
+		/** A soft edge along `A` to `B`, from `Colour` there to clear `Out` beyond it: for a piece cut to a rounded edge. */
+		void Fringe(const FVector2D& A, const FVector2D& B, const FVector2D& Out, const FLinearColor& Colour);
+		/** A disc with a soft edge, with at least `Sides` sides and as many as its size needs to look round. */
 		void Disc(const FVector2D& Middle, float Radius, const FLinearColor& Colour, int32 Sides = 20);
 		/** A half disc hanging below `Middle` (a drop's end), shaded from `Inner` in the middle to `Outer` at the rim. */
 		void Bulb(const FVector2D& Middle, float Radius, float Depth, const FLinearColor& Inner, const FLinearColor& Outer, int32 Sides = 14);
 		void Line(const FVector2D& From, const FVector2D& To, float Thickness, const FLinearColor& Colour);
 		/**
 		 * A band round `Middle` at `Radius`, `Thickness` wide, from `From` to
-		 * `To` degrees clockwise from straight up; with `bFade`, it fades out
-		 * towards both ends.
+		 * `To` degrees clockwise from straight up, its edges soft; with
+		 * `bFade`, it fades out towards both ends.
 		 */
 		void Arc(const FVector2D& Middle, float Radius, float Thickness, float From, float To, const FLinearColor& Colour, bool bFade);
 

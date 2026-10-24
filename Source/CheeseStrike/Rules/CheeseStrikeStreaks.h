@@ -12,8 +12,8 @@
  *
  *   - three: the Unmanned Aerial Cheese, a cheese drone over the map whose
  *     sweeps show the earner's side where every enemy is, for 25 s;
- *   - five: the Cheese Strike, a run of gouda wheels dropped along a line
- *     through a spot the player marks, after a falling whistle;
+ *   - five: the Cheese Strike, gouda wheels dropped over an area the
+ *     player chooses on the minimap, after a falling whistle;
  *   - ten: the Gouda Overload, a siren and a warning to everyone, then
  *     wheels raining on every enemy for eight seconds; cover overhead saves
  *     them, and so does keeping on the move.
@@ -120,15 +120,25 @@ namespace CheeseStrikeStreaks
 	/** The roof over a circle, from the roofs found over its points (those with none left out); 0 for none. */
 	float DroneRoof(TArray<float> Roofs);
 
-	/** Cheese Strike: how many wheels, how far apart along the line, how far a spot may be marked from the caller (cm). */
+	/**
+	 * Cheese Strike: how many wheels, the radius of the area they fall on
+	 * (cm; the caller chooses it on the minimap, ACheeseStrikeHUD's strike
+	 * map), how far out from its middle the ring of wheels round the middle
+	 * one is (a share of the radius: with StrikeBlast's reach every point of
+	 * the area is in a burst), and how far a spot may be marked from the
+	 * caller (cm).
+	 */
 	constexpr int32 StrikeWheels = 7;
-	constexpr float StrikeSpacing = 300.0f;
+	constexpr float StrikeRadius = 750.0f;
+	constexpr float StrikeRing = 0.6f;
 	constexpr float StrikeRange = 15000.0f;
 	/** Seconds from the call to the first wheel landing (the whistle), and between wheels. */
 	constexpr float StrikeWarning = 2.2f;
 	constexpr float StrikeInterval = 0.12f;
-	/** Where the wheels land, on the ground: centred on `Spot`, along the way `Yaw` (degrees) faces. */
-	TArray<FVector> StrikeLine(const FVector& Spot, float Yaw);
+	/** Where the wheels land, on the ground, in the order they fall: the first on `Spot`, the rest round it StrikeRing of StrikeRadius out, from the way `Yaw` (degrees) faces, clockwise seen from above. */
+	TArray<FVector> StrikeArea(const FVector& Spot, float Yaw);
+	/** How far the strike's mark on the minimap moves for a degree the view would have turned (cm), the mouse's and the stick's alike. */
+	constexpr float StrikeCursorPerDegree = 35.0f;
 
 	/** Gouda Overload: the warning before the rain, how long it rains, how often a wheel falls on each enemy, and how far from them it may land. */
 	constexpr float OverloadWarning = 4.0f;

@@ -18,8 +18,6 @@
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
-#include "Streaks/CheeseStrikeBombs.h"
-#include "Streaks/CheeseStrikeOverhead.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "UI/CheeseStrikeHUDDraw.h"
 #include "UI/CheeseStrikeHillHUD.h"
@@ -38,26 +36,6 @@ namespace
 		const FVector Projected = Hud->Project(At, true);
 		Out = FVector2D(Projected.X, Projected.Y);
 		return Projected.Z > 0.0f;
-	}
-
-	/** A ring on the ground, `Radius` round `Centre`, as the view sees it. */
-	void ModeHudRing(const AHUD* Hud, HudDraw::FShapes& Shapes, const FVector& Centre, float Radius, const FLinearColor& Colour, float Thickness)
-	{
-		constexpr int32 Segments = 32;
-		FVector2D Last = FVector2D::ZeroVector;
-		bool bLast = false;
-		for (int32 Step = 0; Step <= Segments; ++Step)
-		{
-			const float Angle = 2.0f * UE_PI * Step / Segments;
-			FVector2D Here;
-			const bool bHere = ModeHudOnScreen(Hud, Centre + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 5.0f), Here);
-			if (bHere && bLast)
-			{
-				Shapes.Line(Last, Here, Thickness, Colour);
-			}
-			Last = Here;
-			bLast = bHere;
-		}
 	}
 
 	/**
@@ -127,7 +105,7 @@ namespace
 		return Canvas->SizeY - (ACheeseStrikeHUD::Margin + ACheeseStrikeHUD::ScoreHeight + 12.0f) * HudDraw::Unit(Canvas);
 	}
 
-	/** The streaks, over `Bottom`: the one to call in, the run of kills, and the Cheese Strike's marking. */
+	/** The streaks, over `Bottom`: the one to call in, and word of one just earned. */
 	void ModeHudDrawStreaks(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine, float Bottom)
 	{
 		const float U = HudDraw::Unit(Canvas);
@@ -135,7 +113,6 @@ namespace
 		const TArray<CheeseStrikeStreaks::EStreak> Ready = Mine->GetReadyStreaks();
 		// The keys as the player plays: the keyboard's, or the gamepad's if they last used one.
 		const FString StreakKey = UCheeseStrikeInputSet::Prompt(Hud->PlayerOwner, &UCheeseStrikeInputSet::Streak);
-		const FString MenuKey = UCheeseStrikeInputSet::Prompt(Hud->PlayerOwner, &UCheeseStrikeInputSet::Menu);
 		const float SinceEarned = Match->GetServerWorldTimeSeconds() - Mine->GetLastEarnedAt();
 		if (!Mine->IsMarkingStrike() && Mine->GetLastEarned() != CheeseStrikeStreaks::EStreak::None && Mine->GetLastEarnedAt() > 0.0f && SinceEarned < ModeHudEarnedLife && Ready.Contains(Mine->GetLastEarned()))
 		{
@@ -166,42 +143,8 @@ namespace
 			HudDraw::Text(Canvas, Name, FVector2D(Left + Key + 10.0f * U, Y + (KeyHigh - NameSize.Y) / 2.0f), Line, HudDraw::Accent);
 			Y -= 10.0f * U;
 		}
-		if (Mine->GetStreak() > 0)
-		{
-			// The run of kills, and the streak it is on its way to.
-			const CheeseStrikeStreaks::EStreak Next = CheeseStrikeStreaks::NextAfter(Mine->GetStreak());
-			const FString Run = Next != CheeseStrikeStreaks::EStreak::None
-				? FString::Printf(TEXT("%d IN A ROW  ·  %s AT %d"), Mine->GetStreak(), *FString(CheeseStrikeStreaks::Info(Next).Name).ToUpper(), CheeseStrikeStreaks::Info(Next).Kills)
-				: FString::Printf(TEXT("%d IN A ROW"), Mine->GetStreak());
-			const FSlateFontInfo Small = HudDraw::Font(13.0f * U);
-			Y -= HudDraw::Measure(Run, Small).Y;
-			HudDraw::Text(Canvas, Run, FVector2D(Middle, Y), Small, HudDraw::Soft, 0.5f);
-		}
-
-		// Marking a Cheese Strike: where its wheels will land.
-		if (Mine->IsMarkingStrike())
-		{
-			FVector Spot;
-			float Yaw = 0.0f;
-			HudDraw::FShapes Shapes;
-			if (Mine->StrikeAim(Spot, Yaw))
-			{
-				// Each wheel where it will land: the first thing it meets coming down, or indoors the floor under the roof.
-				const FCheeseStrikeOverhead& Overhead = FCheeseStrikeOverhead::Of(Hud->GetWorld());
-				for (const FVector& Wheel : CheeseStrikeStreaks::StrikeLine(Spot, Yaw))
-				{
-					FVector Impact;
-					float Roof = 0.0f;
-					if (ACheeseStrikeBombs::StrikeLanding(Hud->GetWorld(), Overhead, Wheel, Impact, Roof))
-					{
-						ModeHudRing(Hud, Shapes, Impact, 90.0f, HudDraw::Danger, 2.0f * U);
-					}
-				}
-				ModeHudRing(Hud, Shapes, Spot, CheeseStrikeStreaks::StrikeBlast.Radius, HudDraw::Faded(HudDraw::Accent, 0.6f), 1.5f * U);
-			}
-			Shapes.Draw(Canvas);
-			HudDraw::Text(Canvas, FString::Printf(TEXT("FIRE TO MARK THE CHEESE STRIKE  ·  %s OR %s TO CALL IT OFF"), *StreakKey, *MenuKey), FVector2D(Middle, Canvas->SizeY * 0.68f), HudDraw::Font(18.0f * U), HudDraw::Accent, 0.5f);
-		}
+		// The run of kills and the streak it is on its way to are the HUD's streak panel (ACheeseStrikeHUD::DrawStreak); choosing
+		// where a Cheese Strike goes, its strike map (ACheeseStrikeHUD::DrawStrikeMap).
 	}
 
 	void ModeHudDrawReveal(AHUD* Hud, UCanvas* Canvas, const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* Mine)

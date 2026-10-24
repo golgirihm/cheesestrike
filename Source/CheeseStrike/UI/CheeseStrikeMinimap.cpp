@@ -215,6 +215,11 @@ void FCheeseStrikeMinimap::Gather(UWorld* World)
 		}
 	}
 	Pieces.Sort([](const FPiece& A, const FPiece& B) { return A.Top < B.Top; });
+	Bounds = FBox2D(ForceInit);
+	for (const FPiece& Piece : Pieces)
+	{
+		Bounds += FBox2D(Piece.Middle - FVector2D(Piece.Radius, Piece.Radius), Piece.Middle + FVector2D(Piece.Radius, Piece.Radius));
+	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("Minimap: %d pieces and %d blocks of cheese"), Pieces.Num(), Cheese.Num());
 }
 
@@ -250,6 +255,24 @@ void FCheeseStrikeMinimap::DrawPiece(CheeseStrikeHUDDraw::FShapes& Shapes, const
 		Cut = CheeseStrikeHUD::ClipToConvex(Cut, Edge);
 	}
 	Shapes.Polygon(Cut, Colour);
+	// Where it was cut to the square's edge, a soft edge outward, so that the rounded corners are smooth (the pieces' own
+	// edges stay hard, where they meet each other).
+	float Area = 0.0f;
+	for (int32 Index = 0; Index < Cut.Num(); ++Index)
+	{
+		Area += Cut[Index].X * Cut[(Index + 1) % Cut.Num()].Y - Cut[(Index + 1) % Cut.Num()].X * Cut[Index].Y;
+	}
+	const auto OnEdge = [&](const FVector2D& Point) { return FMath::Abs(CheeseStrikeHUD::InsideRoundedRect(Point, Min, Max, Corner)) < 0.15f; };
+	for (int32 Index = 0; Index < Cut.Num(); ++Index)
+	{
+		const FVector2D& A = Cut[Index];
+		const FVector2D& B = Cut[(Index + 1) % Cut.Num()];
+		if (OnEdge(A) && OnEdge(B) && OnEdge((A + B) / 2.0f) && !A.Equals(B, 0.01f))
+		{
+			const FVector2D Along = (B - A).GetSafeNormal();
+			Shapes.Fringe(A, B, FVector2D(Along.Y, -Along.X) * (Area >= 0.0f ? 1.0f : -1.0f) * CheeseStrikeHUD::SoftEdge, Colour);
+		}
+	}
 }
 
 void FCheeseStrikeMinimap::Draw(CheeseStrikeHUDDraw::FShapes& Shapes, const FVector2D& Min, const FVector2D& Max, const FVector2D& Middle, float ViewYaw, float Feet, float Scale, float InCorner)

@@ -1,0 +1,43 @@
+# The HUD's rounded shapes and their smooth edges: the score summary (a mode
+# of sides; with wide scores, CheeseStrike.HUD.Score), the health's blocks,
+# and the kill-streak panel as a run grows (CheeseStrike.HUD.Streak), its
+# count popping, at 1920 by 1080, 2560 by 1440 and the smallest window,
+# 1280 by 720. Run with -Extra "?Mode=Deathmatch" (or KingOfTheHill for a
+# hill's three-figure points, FreeForAll with -Name for a long player's name).
+cmd r.SetRes 1920x1080w
+wait 6
+shot rounded_1080
+cmd CheeseStrike.HUD.Health 65
+cmd CheeseStrike.HUD.Streak 1
+wait 0.05
+shot rounded_1080_pop1
+wait 0.6
+cmd CheeseStrike.HUD.Streak 2
+wait 0.6
+cmd CheeseStrike.HUD.Streak 3
+wait 0.12
+shot rounded_1080_streak3_pop
+wait 0.6
+cmd CheeseStrike.HUD.Streak 4
+wait 1.0
+shot rounded_1080_streak4
+cmd CheeseStrike.HUD.Score 150
+wait 0.3
+shot rounded_1080_score150
+cmd r.SetRes 2560x1440w
+wait 1.5
+shot rounded_1440
+cmd CheeseStrike.HUD.Streak 7
+cmd CheeseStrike.HUD.Health 18
+wait 1.5
+shot rounded_1440_streak7
+cmd r.SetRes 1280x720w
+wait 1.5
+shot rounded_720_score150
+cmd CheeseStrike.HUD.Score 1234
+wait 0.3
+shot rounded_720_score1234
+cmd CheeseStrike.HUD.Score -1
+cmd CheeseStrike.HUD.Streak -1
+cmd CheeseStrike.HUD.Health -1
+quit

@@ -1427,9 +1427,31 @@ void ACheeseStrikeCharacter::MoveInput(const FInputActionValue& Value)
 	DoMove(Axis.X, Axis.Y);
 }
 
+bool ACheeseStrikeCharacter::MoveStrikeMark(float Yaw, float Pitch)
+{
+	// Choosing where a Cheese Strike goes, the look moves its mark on the strike map rather than the view, as fast as the
+	// player's options would turn it, whichever way they invert it.
+	ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>();
+	if (Mine == nullptr || !Mine->IsMarkingStrike())
+	{
+		return false;
+	}
+	const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
+	if (TakesInput() && (Player == nullptr || !Player->IsPaused()))
+	{
+		const FVector2D Scale = Player != nullptr ? Player->LookScale() : FVector2D(1.0, 1.0);
+		Mine->MoveStrikeTarget(FVector2D(Yaw * FMath::Abs(Scale.X), Pitch * FMath::Abs(Scale.Y)));
+	}
+	return true;
+}
+
 void ACheeseStrikeCharacter::MouseLookInput(const FInputActionValue& Value)
 {
 	const FVector2D Axis = Value.Get<FVector2D>();
+	if (MoveStrikeMark(Axis.X * CheeseStrikeInput::MouseDegreesPerCount, Axis.Y * CheeseStrikeInput::MouseDegreesPerCount))
+	{
+		return;
+	}
 	DoAim(Axis.X * CheeseStrikeInput::MouseDegreesPerCount, Axis.Y * CheeseStrikeInput::MouseDegreesPerCount);
 }
 
@@ -1439,6 +1461,11 @@ void ACheeseStrikeCharacter::StickLookInput(const FInputActionValue& Value)
 	const FVector2D Axis = Value.Get<FVector2D>();
 	const float Seconds = GetWorld() != nullptr ? GetWorld()->GetDeltaSeconds() : 0.0f;
 	const FVector2D Turn = CheeseStrikeInput::StickTurn(Axis, Seconds, StickEdgeSeconds);
+	if (MoveStrikeMark(Turn.X, -Turn.Y))
+	{
+		AimAssist = CheeseStrikeAimAssist::FAssist();
+		return;
+	}
 	// Slower over an enemy, and drawn a little toward one while turning: the stick's alone, never the mouse's or a bot's.
 	const ACheeseStrikePlayerController* Player = Cast<ACheeseStrikePlayerController>(GetController());
 	AimAssist = TakesInput() && (Player == nullptr || !Player->IsPaused()) ? CheeseStrikeAimAssist::ForCharacter(this, !Turn.IsNearlyZero(), Seconds) : CheeseStrikeAimAssist::FAssist();

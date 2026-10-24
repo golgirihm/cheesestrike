@@ -3,7 +3,8 @@
 // Tests that play the modes and the streaks in the editor (see
 // PlayTesting.h): a team winning Deathmatch with friendly fire off, a round
 // of Elimination ending and the next beginning, and the streaks called in
-// and scoring for their callers.
+// and scoring for their callers, and a Cheese Strike chosen on the strike
+// map landing in its area.
 
 #include "Misc/AutomationTest.h"
 #include "Engine/World.h"
@@ -275,6 +276,112 @@ bool FAnEliminationRoundEndsWhenASideIsOut::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAStrikeIsChosenOnTheMinimapAndLandsInItsArea, "CheeseStrike.Play.AStrikeIsChosenOnTheMinimapAndLandsInItsArea", ModePlayTests::Flags)
+
+bool FAStrikeIsChosenOnTheMinimapAndLandsInItsArea::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace ModePlayTests;
+	using CheeseStrikeStreaks::EStreak;
+	// Alone, on open ground: the Streak key opens the strike map, the mouse and the stick move its mark (not the view), and
+	// a shot calls the strike in over the area round the mark, every wheel landing inside it.
+	StartPlaying({1});
+	PutAt(0, AsideSpot, AsideYaw);
+	static FRotator ViewBefore;
+	static FVector2D MarkAt;
+	static float MouseUp;
+	static float MouseAhead;
+	// First, which way the mouse pushed forward turns the view: the mark is to go the same way on the map.
+	Then([]() { ViewBefore = Controller(0)->GetControlRotation(); });
+	Play(0, TEXT("hold MouseLook 0 1\nwait 0.1\nrelease MouseLook\nwait 0.1"));
+	Then([]()
+	{
+		MouseUp = FRotator::NormalizeAxis(Controller(0)->GetControlRotation().Pitch - ViewBefore.Pitch);
+		Controller(0)->SetControlRotation(FRotator(0.0f, AsideYaw, 0.0f));
+		Mode()->CheeseStrikeGiveStreak(2);
+		ShotsBefore = Character(0)->GetWeapon()->ShotsFired;
+	});
+	Play(0, TEXT("wait 0.2\ntap Streak\nwait 0.2"));
+	Then([this]()
+	{
+		const ACheeseStrikePlayerState* Mine = StateOf(0, 0);
+		TestTrue(TEXT("the Streak key opens the strike map"), Mine->IsMarkingStrike());
+		const FVector2D Off = Mine->GetStrikeTarget() - FVector2D(Character(0)->GetActorLocation());
+		const FVector2D Ahead(FRotator(0.0f, AsideYaw, 0.0f).Vector());
+		TestTrue(FString::Printf(TEXT("its mark starting ahead of the player (%.0f, %.0f off)"), Off.X, Off.Y), FVector2D::DotProduct(Off.GetSafeNormal(), Ahead) > 0.9f);
+		TestTrue(TEXT("turned the way the view was"), FMath::IsNearlyEqual(FRotator::NormalizeAxis(Mine->GetStrikeYaw() - AsideYaw), 0.0f, 2.0f));
+		ViewBefore = Controller(0)->GetControlRotation();
+		MarkAt = Mine->GetStrikeTarget();
+	});
+	// The mouse pushed forward moves the mark up the map if it would have turned the view up.
+	Play(0, TEXT("hold MouseLook 0 1\nwait 0.3\nrelease MouseLook\nwait 0.1"));
+	Then([this]()
+	{
+		const ACheeseStrikePlayerState* Mine = StateOf(0, 0);
+		const FVector2D Moved = Mine->GetStrikeTarget() - MarkAt;
+		const FVector2D Ahead(FRotator(0.0f, AsideYaw, 0.0f).Vector());
+		MouseAhead = FVector2D::DotProduct(Moved, Ahead);
+		TestTrue(FString::Printf(TEXT("the mouse moves the mark up the map as it turns the view up (%.0f cm ahead, the view %.2f degrees up)"), MouseAhead, MouseUp), FMath::Abs(MouseAhead) > 100.0f && MouseAhead * MouseUp > 0.0f);
+		TestTrue(TEXT("and not aside"), FMath::Abs(FVector2D::CrossProduct(Ahead, Moved)) < 0.2f * Moved.Size() + 1.0f);
+		TestTrue(TEXT("while the view stays"), Controller(0)->GetControlRotation().Equals(ViewBefore, 0.5f));
+		MarkAt = Mine->GetStrikeTarget();
+	});
+	// The stick, which turns the view the other way for the same sign (CheeseStrike.Play.AGamepadPlays), moves it the other way.
+	Play(0, TEXT("device gamepad\nhold Look 0 1\nwait 0.4\nrelease Look\nwait 0.1"));
+	Then([this]()
+	{
+		const ACheeseStrikePlayerState* Mine = StateOf(0, 0);
+		const FVector2D Moved = Mine->GetStrikeTarget() - MarkAt;
+		const FVector2D Ahead(FRotator(0.0f, AsideYaw, 0.0f).Vector());
+		const float StickAhead = FVector2D::DotProduct(Moved, Ahead);
+		TestTrue(FString::Printf(TEXT("the stick moves the mark as it would the view (%.0f cm ahead)"), StickAhead), FMath::Abs(StickAhead) > 100.0f && StickAhead * MouseAhead < 0.0f);
+		TestTrue(TEXT("the view still where it was"), Controller(0)->GetControlRotation().Equals(ViewBefore, 0.5f));
+		MarkAt = Mine->GetStrikeTarget();
+	});
+	// The mouse moved right moves it right.
+	Play(0, TEXT("device mouse\nhold MouseLook 2 0\nwait 0.3\nrelease MouseLook\nwait 0.1"));
+	Then([this]()
+	{
+		const ACheeseStrikePlayerState* Mine = StateOf(0, 0);
+		const FVector2D Moved = Mine->GetStrikeTarget() - MarkAt;
+		const FVector2D Ahead(FRotator(0.0f, AsideYaw, 0.0f).Vector());
+		const FVector2D Right(-Ahead.Y, Ahead.X);
+		TestTrue(FString::Printf(TEXT("the mouse moves the mark right (%.0f cm)"), FVector2D::DotProduct(Moved, Right)), FVector2D::DotProduct(Moved, Right) > 100.0f);
+		TestTrue(TEXT("the view still where it was"), Controller(0)->GetControlRotation().Equals(ViewBefore, 0.5f));
+		// Then to a spot of open ground 12 m ahead, for the wheels to land on.
+		StateOf(0, 0)->SetStrikeTarget(FVector2D(Character(0)->GetActorLocation()) + Ahead * 1200.0f);
+		MarkAt = StateOf(0, 0)->GetStrikeTarget();
+	});
+	Play(0, TEXT("wait 0.1\ntap Fire\nwait 0.3"));
+	Then([this]()
+	{
+		const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0));
+		TestFalse(TEXT("the shot calls it in"), StateOf(0, 0)->IsMarkingStrike());
+		TestEqual(TEXT("rather than firing"), Character(0)->GetWeapon()->ShotsFired, ShotsBefore);
+		if (TestNotNull(TEXT("the strike is coming"), Bombs) && TestEqual(TEXT("seven wheels"), Bombs->GetDrops().Num(), CheeseStrikeStreaks::StrikeWheels))
+		{
+			float Furthest = 0.0f;
+			for (const FCheeseStrikeDrop& Drop : Bombs->GetDrops())
+			{
+				Furthest = FMath::Max(Furthest, static_cast<float>(FVector2D::Distance(FVector2D(Drop.Impact), MarkAt)));
+			}
+			TestTrue(FString::Printf(TEXT("every wheel lands in the area round the mark (the furthest %.0f cm out)"), Furthest), Furthest <= CheeseStrikeStreaks::StrikeRadius);
+			TestTrue(TEXT("the first on the mark"), FVector2D::Distance(FVector2D(Bombs->GetDrops()[0].Impact), MarkAt) < 5.0f);
+		}
+	});
+	WaitUntil(TEXT("every wheel landing"), CheeseStrikeStreaks::StrikeWarning + 3.0f, []()
+	{
+		const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0));
+		return Bombs == nullptr || Bombs->GetLanded() >= CheeseStrikeStreaks::StrikeWheels;
+	});
+	Then([this]()
+	{
+		TestTrue(TEXT("and the caller, out of it, unhurt"), Character(0)->IsAlive() && Character(0)->GetHealth() == CheeseStrikeWeapons::MaxHealth);
+	});
+	StopPlaying();
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FStreaksAreCalledInAndScoreForTheirCallers, "CheeseStrike.Play.StreaksAreCalledInAndScoreForTheirCallers", ModePlayTests::Flags)
 
 bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Parameters)
@@ -305,14 +412,16 @@ bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Paramete
 		return Match != nullptr && Match->GetAnnouncements().Num() > 0 && Match->IsRevealedTo(StateOf(0, 1)) && First<ACheeseStrikeAerialCheese>(World(1)) != nullptr;
 	});
 
-	// The Cheese Strike: marked on the ground just past the joiner, it kills them, as the host's kill.
+	// The Cheese Strike: chosen on the strike map over the joiner, it kills them, as the host's kill.
 	Then([]()
 	{
 		Mode()->CheeseStrikeGiveStreak(2);
 		ShotsBefore = Character(0)->GetWeapon()->ShotsFired;
 	});
 	WaitUntil(TEXT("the host hearing of the strike"), 3.0f, []() { const ACheeseStrikePlayerState* Host = StateOf(0, 0); return Host != nullptr && Host->NextStreak() == EStreak::CheeseStrike; });
-	Play(0, TEXT("tap Streak\nwait 0.2\nlook 0 -20\nwait 0.2\ntap Fire\nwait 0.3"));
+	Play(0, TEXT("tap Streak\nwait 0.2"));
+	Then([]() { StateOf(0, 0)->SetStrikeTarget(FVector2D(CharacterOf(1, 0)->GetActorLocation())); });
+	Play(0, TEXT("wait 0.1\ntap Fire\nwait 0.3"));
 	Then([this]()
 	{
 		const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0));

@@ -110,7 +110,7 @@ public:
 
 	/** Its colour for `Viewer` at the world's time `Time`: neutral, a side's (or the viewer's own, or another's), or contested. */
 	FLinearColor ColourFor(const APlayerState* Viewer, float Time) const;
-	/** The colour nobody holding it shows. */
+	/** The colour nobody holding it shows: a grey, unlike any side's (CheeseStrikeModes::TeamColour). */
 	static const FLinearColor Neutral;
 	/** The solo mode's colour for the viewer's own hold, and for anyone else's. */
 	static const FLinearColor Own;
