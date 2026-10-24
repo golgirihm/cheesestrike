@@ -168,14 +168,15 @@ namespace CheeseStrikeWeapons
 	{
 		static const FWeaponStats Stats = []
 		{
-			// Counter-Strike's Dual Berettas in cheese: a pistol in each hand, firing in turn, quick and loose, with middling
-			// damage, a long magazine and a long reload; a primary here, for the loadout and the bots.
+			// Counter-Strike's Dual Berettas in cheese: a pistol in each hand, firing in turn, a shot a pull (as theirs are),
+			// quick and loose, with middling damage, a long magazine and a long reload; a primary here, for the loadout and
+			// the bots. Pulled as fast as a finger can, no more than ten a second.
 			FWeaponStats Weapon = MakeWeapon(TEXT("burratas"), NSLOCTEXT("CheeseStrike", "Burratas", "Dual Burratas"), EWeaponSlot::Primary);
 			Weapon.bDual = true;
 			Weapon.Damage = 15.0f;
 			Weapon.HeadMultiplier = 1.5f;
-			Weapon.FireInterval = 0.09f;
-			Weapon.bAutomatic = true;
+			Weapon.FireInterval = 0.1f;
+			Weapon.bAutomatic = false;
 			Weapon.MagazineSize = 30;
 			Weapon.ReloadTime = 3.0f;
 			Weapon.Reserve = 90;
