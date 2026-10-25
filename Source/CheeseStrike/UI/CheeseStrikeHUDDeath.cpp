@@ -233,7 +233,7 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 	{
 		// Clear of the letters, however far they sag.
 		const float Below = Height * 0.33f + LineHeight * 1.3f + 16.0f * U;
-		const FString By = !Character->GetKilledBy().IsEmpty() ? FString::Printf(TEXT("KILLED BY %s"), *Character->GetKilledBy().ToUpper())
+		const FString By = !Character->GetKilledBy().IsEmpty() ? FString::Printf(TEXT("BY %s"), *Character->GetKilledBy().ToUpper())
 			: (Character->GetDiedHow().IsEmpty() ? FString(TEXT("KILLED")) : Character->GetDiedHow().ToUpper());
 		const FSlateFontInfo ByFont = HudDraw::Font(30.0f * U);
 		const FString Fitted = CheeseStrikeHUD::FitNameIn(By, Character->GetKilledBy().ToUpper(), 480.0f * U, [&ByFont](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, ByFont).X); });

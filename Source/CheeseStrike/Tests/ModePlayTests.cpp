@@ -882,9 +882,9 @@ bool FExecutionAllDownIsNotOut::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExecutionOvertimeWaitsForTheDown, "CheeseStrike.Play.ExecutionOvertimeWaitsForTheDown", ModePlayTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FExecutionTimeUpIsADrawWithNoOvertime, "CheeseStrike.Play.ExecutionTimeUpIsADrawWithNoOvertime", ModePlayTests::Flags)
 
-bool FExecutionOvertimeWaitsForTheDown::RunTest(const FString& Parameters)
+bool FExecutionTimeUpIsADrawWithNoOvertime::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
 	using namespace ModePlayTests;
@@ -892,40 +892,25 @@ bool FExecutionOvertimeWaitsForTheDown::RunTest(const FString& Parameters)
 	StartPlaying({2, TEXT("?Mode=Execution?Rounds=1?RoundTime=30")});
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
-	// The round's time runs out while the host is down, getting up by themself.
+	// The round's time runs out while the host is down: both sides still have someone in, so it is a draw at once.
 	WaitUntil(TEXT("the round's last 8 s"), 35.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->SecondsLeftInRound() <= 8.0f; });
-	Then([this]()
-	{
-		CharacterOf(0, 0)->GetLastStand()->GoDown(StateOf(1, 0));
-		bool bTold = false;
-		for (const FAnnouncement& Word : GameState(0)->GetAnnouncements())
-		{
-			bTold |= Word.Text.Contains(TEXT("seconds left"));
-		}
-		TestTrue(TEXT("everyone was told the round's time is running out"), bTold);
-	});
+	Then([this]() { CharacterOf(0, 0)->GetLastStand()->GoDown(StateOf(1, 0)); });
 	WaitUntil(TEXT("the round's time up"), 15.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->SecondsLeftInRound() <= 0.0f; });
 	Wait(1.0f);
 	Then([this]()
 	{
 		const ACheeseStrikeGameState* Match = GameState(0);
-		TestFalse(TEXT("out of time with the host down, the round goes on in overtime"), Match->IsRoundBreak() || Match->HasMatchEnded());
-		TestTrue(TEXT("the host is down, alive, getting up by themself"), CharacterOf(0, 0)->IsAlive() && CharacterOf(0, 0)->IsDowned() && CharacterOf(0, 0)->GetLastStand()->SelfReviveLeft() > 0.0f);
-		TestFalse(TEXT("and not out"), StateOf(0, 0)->IsOut());
-		bool bTold = false;
+		TestTrue(TEXT("out of time, the round is over: no overtime"), Match->IsRoundBreak() || Match->HasMatchEnded());
+		TestTrue(TEXT("the host is still down and in, not out"), CharacterOf(0, 0)->IsDowned() && !StateOf(0, 0)->IsOut());
+		bool bOvertime = false;
+		bool bDraw = false;
 		for (const FAnnouncement& Word : GameState(1)->GetAnnouncements())
 		{
-			bTold |= Word.Text.Equals(TEXT("Overtime"));
+			bOvertime |= Word.Text.Equals(TEXT("Overtime"));
+			bDraw |= Word.Text.Contains(TEXT("is a draw"));
 		}
-		TestTrue(TEXT("everyone is told it is overtime"), bTold);
-	});
-	// Up again, the round is decided by whatever stands: one each, and the joiner, with more health, takes it.
-	WaitUntil(TEXT("the host up by themself"), CheeseStrikeModes::SelfReviveTime, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 0); return Host != nullptr && !Host->IsDowned(); });
-	WaitUntil(TEXT("the match ending"), 3.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->HasMatchEnded(); });
-	Then([this]()
-	{
-		TestTrue(TEXT("the host lived through it"), CharacterOf(0, 0)->IsAlive());
-		TestEqual(TEXT("the side with more health left takes it"), GameState(0)->GetWinningTeam(), StateOf(1, 0)->GetTeam());
+		TestFalse(TEXT("everyone is never told it is overtime"), bOvertime);
+		TestTrue(TEXT("everyone is told the round is a draw"), bDraw);
 	});
 	StopPlaying();
 	return true;

@@ -116,9 +116,10 @@ bool FTheScoreSummaryKeepsNamesOffTheScores::RunTest(const FString& Parameters)
 	TestTrue(TEXT("at 1280 by 720 too"), 0.667f * Pad + SmallWords(Text.Caption) + 0.667f * Gap + SmallDigits(TEXT("150")) * Text.ScoreScale <= 0.667f * (Width - Pad) + 0.01f);
 
 	// The scoreboard says what a side's score counts.
-	TestEqual(TEXT("rounds won in a mode of rounds"), TeamScoreLabel(CheeseStrikeModes::EWinBy::Rounds), FString(TEXT("ROUNDS WON")));
-	TestEqual(TEXT("points on the hill"), TeamScoreLabel(CheeseStrikeModes::EWinBy::Hill), FString(TEXT("POINTS")));
-	TestEqual(TEXT("kills in Deathmatch"), TeamScoreLabel(CheeseStrikeModes::EWinBy::TeamKills), FString(TEXT("KILLS")));
+	TestEqual(TEXT("rounds won in a mode of rounds"), TeamScoreLabel(CheeseStrikeModes::EWinBy::Rounds, 2), FString(TEXT("ROUNDS WON")));
+	TestEqual(TEXT("round one in a mode of rounds"), TeamScoreLabel(CheeseStrikeModes::EWinBy::Rounds, 1), FString(TEXT("ROUND WON")));
+	TestEqual(TEXT("points on the hill"), TeamScoreLabel(CheeseStrikeModes::EWinBy::Hill, 2), FString(TEXT("POINTS")));
+	TestEqual(TEXT("kills in Deathmatch"), TeamScoreLabel(CheeseStrikeModes::EWinBy::TeamKills, 2), FString(TEXT("KILLS")));
 	TestTrue(TEXT("Elimination and Execution are modes of rounds"), CheeseStrikeModes::Info(CheeseStrikeModes::EMode::Elimination).WinBy == CheeseStrikeModes::EWinBy::Rounds
 		&& CheeseStrikeModes::Info(CheeseStrikeModes::EMode::Execution).WinBy == CheeseStrikeModes::EWinBy::Rounds);
 	return true;
@@ -144,12 +145,12 @@ bool FTheStreakPanelCountsToEachStreak::RunTest(const FString& Parameters)
 	TestTrue(TEXT("four kills make four pips"), Four[3].bMade && !Four[4].bMade);
 	TestTrue(TEXT("a run past ten has them all"), !StreakPips(13).ContainsByPredicate([](const FStreakPip& Pip) { return !Pip.bMade; }) && StreakPips(13).Num() == 10);
 	// What comes next.
-	TestEqual(TEXT("from nothing, the drone in three"), StreakNext(0), FString(TEXT("UNMANNED AERIAL CHEESE IN 3")));
+	TestEqual(TEXT("from nothing, the UAC in three"), StreakNext(0), FString(TEXT("UAC IN 3")));
 	TestEqual(TEXT("one off, the next kill"), StreakNext(4), FString(TEXT("CHEESE STRIKE NEXT KILL")));
-	TestEqual(TEXT("after the strike, the Overload"), StreakNext(5), FString(TEXT("GOUDA OVERLOAD IN 5")));
+	TestEqual(TEXT("after the strike, the Gouda Overload"), StreakNext(5), FString(TEXT("GOUDA OVERLOAD IN 5")));
 	TestEqual(TEXT("after the last"), StreakNext(10), FString(TEXT("EVERY STREAK EARNED")));
-	TestEqual(TEXT("or short"), StreakNext(1, true), FString(TEXT("DRONE IN 2")));
-	TestEqual(TEXT("the pips' words"), StreakShortName(EStreak::CheeseStrike), FString(TEXT("STRIKE")));
+	TestEqual(TEXT("the UAC one off"), StreakNext(1), FString(TEXT("UAC IN 2")));
+	TestEqual(TEXT("the names as the panel says them"), StreakShortName(EStreak::CheeseStrike), FString(TEXT("CHEESE STRIKE")));
 	// The pop: big at once, back through its size, a little under, and settled.
 	TestTrue(TEXT("at rest before a kill"), StreakPop(-1.0f) == 1.0f);
 	TestTrue(TEXT("springing up at the kill"), StreakPop(0.0f) > 1.4f);

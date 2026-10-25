@@ -34,7 +34,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheLobbyStartsWithTheUsualRules, "CheeseStrike
 bool FTheLobbyStartsWithTheUsualRules::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeModes;
-	// Hosting from the front end: Gruyère Grotto, Deathmatch to 50, back 5 s after a death, seven bots of normal skill.
+	// Hosting from the front end: Gruyère Grotto, Deathmatch to 50, back 5 s after a death, no bots.
 	const FString Options = CheeseStrikeRules::HostOptions();
 	const int32 Map = CheeseStrikeRules::MapFrom(Options, INDEX_NONE);
 	TestTrue(FString::Printf(TEXT("Gruyère Grotto (%s)"), *Options), Map >= 0 && FString(CheeseStrikeRules::Maps[Map].Level).EndsWith(TEXT("Lvl_Grotto")));
@@ -42,7 +42,7 @@ bool FTheLobbyStartsWithTheUsualRules::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Deathmatch"), ModeFrom(Options) == EMode::Deathmatch);
 	TestEqual(TEXT("to 50 kills"), KillLimitFor(ModeFrom(Options), Options), 50);
 	TestEqual(TEXT("back 5 s after a death"), CheeseStrikeRules::RespawnDelayFrom(Options), 5.0f);
-	TestEqual(TEXT("seven bots"), CheeseStrikeRules::BotsFrom(Options), 7);
+	TestEqual(TEXT("no bots"), CheeseStrikeRules::BotsFrom(Options), 0);
 	const int32 Skill = CheeseStrikeBots::SkillFrom(Options, INDEX_NONE);
 	TestTrue(TEXT("of normal skill"), Skill >= 0 && FString(CheeseStrikeBots::Skill(Skill).Name) == TEXT("Normal"));
 

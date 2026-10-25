@@ -282,7 +282,7 @@ namespace
 			{
 				// Reviving fills the green bar; otherwise it fills toward getting up alone.
 				const float Done = Theirs != nullptr ? Theirs->WorkDone() : 1.0f - Stand->SelfReviveLeft() / CheeseStrikeModes::SelfReviveTime;
-				ModeHudReviveBar(Canvas, Middle, Y + 70.0f * U, 300.0f * U, Done);
+				ModeHudReviveBar(Canvas, Middle, Y + 84.0f * U, 300.0f * U, Done);
 			}
 			return;
 		}

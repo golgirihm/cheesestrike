@@ -914,6 +914,44 @@ FReply SCheeseStrikeMenu::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& 
 	return InKeyEvent.GetKey() == EKeys::SpaceBar ? FReply::Handled() : SCompoundWidget::OnKeyUp(MyGeometry, InKeyEvent);
 }
 
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeCloseLobbyButton()
+{
+	// The host's first click arms it; the second closes the lobby, for everyone.
+	return MakeButton(bArmedCloseLobby ? TEXT("CONFIRM: CLOSE LOBBY") : TEXT("CLOSE LOBBY"), [this]()
+	{
+		if (!bArmedCloseLobby)
+		{
+			bArmedCloseLobby = true;
+			Refresh();
+			return;
+		}
+		bArmedCloseLobby = false;
+		if (Controller.IsValid())
+		{
+			Controller->LeaveFromMenu();
+		}
+	}, EButtonKind::Danger);
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeQuitButton()
+{
+	// Quit asks for a second click too, as closing the lobby does.
+	return MakeButton(bArmedQuit ? TEXT("CONFIRM: QUIT") : TEXT("QUIT"), [this]()
+	{
+		if (!bArmedQuit)
+		{
+			bArmedQuit = true;
+			Refresh();
+			return;
+		}
+		bArmedQuit = false;
+		if (Controller.IsValid())
+		{
+			Controller->QuitFromMenu();
+		}
+	}, EButtonKind::Danger);
+}
+
 void SCheeseStrikeMenu::ConfirmBackToLobby(bool bAsk)
 {
 	bConfirmingBackToLobby = bAsk;
@@ -1223,7 +1261,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
-			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ]
+			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeQuitButton() ]
 		];
 }
 
@@ -1325,12 +1363,12 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const CheeseStrikeRules::FRo
 	// seat only its edge, faint. The player's own is edged in cheese, so that they find themself. A pale side (the Mozza
 	// Radicals' white) is darkened further, so that the white name stays clear on it.
 	const float Deep = FMath::Min(1.0f, 0.42f / FMath::Max(0.05f, Colour.GetLuminance()));
-	const FLinearColor Fill = Seat.bEmpty ? FLinearColor::Transparent : (Seat.bBot ? Shade(Colour, 0.2f * Deep) : Shade(Colour, 0.4f * Deep));
+	const FLinearColor Fill = Seat.bEmpty ? FLinearColor(Colour.R, Colour.G, Colour.B, 0.16f) : (Seat.bBot ? Shade(Colour, 0.2f * Deep) : Shade(Colour, 0.4f * Deep));
 	const FLinearColor Edge = Seat.bEmpty ? Shade(Colour, 0.55f, 0.55f) : (Seat.bBot ? FLinearColor::Transparent : (bMine ? Cheese : Colour));
 	TSharedRef<SWidget> Inside = SNullWidget::NullWidget;
 	if (Seat.bEmpty)
 	{
-		Inside = SNew(STextBlock).Text(FText::FromString(TEXT("Open seat"))).Font(Font(18)).ColorAndOpacity(Shade(Colour, 0.8f, 0.6f));
+		Inside = SNew(STextBlock).Text(FText::FromString(TEXT("Invite a friend"))).Font(Font(18)).ColorAndOpacity(Shade(Colour, 0.8f, 0.6f));
 	}
 	else
 	{
@@ -1782,7 +1820,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 
 	// The host's lobby is the match: leaving it closes it for everyone.
 	TSharedRef<SHorizontalBox> Bottom = SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(bHost ? TEXT("CLOSE LOBBY") : TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ];
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ bHost ? MakeCloseLobbyButton() : MakeButton(TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ];
 	// In a mode of sides, until the countdown: over to the other side (clicking a seat there does the same).
 	const ACheeseStrikePlayerState* Mine = Player.IsValid() ? Player->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
 	if (Match != nullptr && Match->HasTeams() && Mine != nullptr && (Status == CheeseStrikeMenu::ELobbyStatus::CanStart || Status == CheeseStrikeMenu::ELobbyStatus::Waiting))
@@ -1915,7 +1953,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePause()
 		[
 			bHost ? MakeButton(TEXT("BACK TO LOBBY"), [this]() { ConfirmBackToLobby(true); }) : MakeButton(TEXT("LEAVE THE MATCH"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); })
 		]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("QUIT"), [Player]() { if (Player.IsValid()) Player->QuitFromMenu(); }) ];
+		+ SVerticalBox::Slot().AutoHeight() [ MakeQuitButton() ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionRow(const FString& Label, TSharedRef<SWidget> Setter)
@@ -2094,7 +2132,20 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 		})));
 		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("A gamepad's: the stick turns slower over an enemy, and a little toward them. Never the mouse."), true) ];
 		break;
-	case EOptionsTab::View:
+	case EOptionsTab::Sound:
+		Add(MakeOptionRow(TEXT("Master volume"), MakeSlider(0.0f, 1.0f, 0.01f,
+			[Kept]() { return Kept.IsValid() ? Kept->GetMasterVolume() : CheeseStrikeSettings::DefaultVolume; },
+			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMasterVolume(Value); }, Percent)));
+		Add(MakeOptionRow(TEXT("Effects volume"), MakeSlider(0.0f, 1.0f, 0.01f,
+			[Kept]() { return Kept.IsValid() ? Kept->GetEffectsVolume() : CheeseStrikeSettings::DefaultVolume; },
+			[Kept](float Value) { if (Kept.IsValid()) Kept->SetEffectsVolume(Value); }, Percent)));
+		Add(MakeOptionRow(TEXT("Music volume"), MakeSlider(0.0f, 1.0f, 0.01f,
+			[Kept]() { return Kept.IsValid() ? Kept->GetMusicVolume() : CheeseStrikeSettings::DefaultMusicVolume; },
+			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMusicVolume(Value); }, Percent)));
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("The effects are the game's sounds, the music the front end's and the lobby's; the master volume is everything, the menu's too."), true) ];
+		break;
+	case EOptionsTab::Graphics:
+	{
 		Add(MakeOptionRow(TEXT("Field of view"), MakeSlider(CheeseStrikeSettings::MinFieldOfView, CheeseStrikeSettings::MaxFieldOfView, 1.0f,
 			[Kept]() { return Kept.IsValid() ? Kept->GetFieldOfView() : CheeseStrikeSettings::DefaultFieldOfView; },
 			[Kept](float Value) { if (Kept.IsValid()) Kept->SetFieldOfView(Value); },
@@ -2118,21 +2169,6 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 				})
 			];
 		}
-		break;
-	case EOptionsTab::Sound:
-		Add(MakeOptionRow(TEXT("Master volume"), MakeSlider(0.0f, 1.0f, 0.01f,
-			[Kept]() { return Kept.IsValid() ? Kept->GetMasterVolume() : CheeseStrikeSettings::DefaultVolume; },
-			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMasterVolume(Value); }, Percent)));
-		Add(MakeOptionRow(TEXT("Effects volume"), MakeSlider(0.0f, 1.0f, 0.01f,
-			[Kept]() { return Kept.IsValid() ? Kept->GetEffectsVolume() : CheeseStrikeSettings::DefaultVolume; },
-			[Kept](float Value) { if (Kept.IsValid()) Kept->SetEffectsVolume(Value); }, Percent)));
-		Add(MakeOptionRow(TEXT("Music volume"), MakeSlider(0.0f, 1.0f, 0.01f,
-			[Kept]() { return Kept.IsValid() ? Kept->GetMusicVolume() : CheeseStrikeSettings::DefaultMusicVolume; },
-			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMusicVolume(Value); }, Percent)));
-		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("The effects are the game's sounds, the music the front end's and the lobby's; the master volume is everything, the menu's too."), true) ];
-		break;
-	case EOptionsTab::Graphics:
-	{
 		TArray<FString> Qualities;
 		for (const TCHAR* Name : QualityNames)
 		{

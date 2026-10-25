@@ -52,7 +52,7 @@ namespace CheeseStrikeRules
 	/**
 	 * The URL options a match hosted from the front end begins its lobby
 	 * with, before the host changes anything: Gruyère Grotto, Deathmatch to
-	 * 50 team kills, back 5 s after a death, seven bots of normal skill.
+	 * 50 team kills, back 5 s after a death, no bots.
 	 */
 	FString HostOptions();
 	/** Which of Maps a level's package (or its path with the object name) is, or INDEX_NONE. */
@@ -125,7 +125,7 @@ namespace CheeseStrikeRules
 	/** The seats in a match, players and bots together. */
 	constexpr int32 SeatCount = Teams * TeamSize;
 	/** How many bots a hosted match starts with, before the host changes it in the lobby. */
-	constexpr int32 DefaultBots = 7;
+	constexpr int32 DefaultBots = 0;
 	/** How many bots fill in: the URL's `?Bots=` (-1 for every empty slot), or DefaultBots without it. */
 	int32 BotsFrom(const FString& Options);
 	/** How many bots a match with `Players` players has when `BotsWanted` of them are asked for (-1 for every empty slot). */

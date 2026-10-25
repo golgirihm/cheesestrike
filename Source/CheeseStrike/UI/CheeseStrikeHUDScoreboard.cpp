@@ -263,7 +263,7 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 			const FString Score = FString::FromInt(Match->GetTeamScore(Section.Team));
 			HudDraw::Text(Canvas, Score, FVector2D(ScoreX, Y + 6.0f * U), Side, HudDraw::Ink);
 			const float LabelX = ScoreX + HudDraw::Measure(Score, Side).X + 6.0f * U;
-			HudDraw::Text(Canvas, CheeseStrikeHUD::TeamScoreLabel(Match->GetModeInfo().WinBy), FVector2D(LabelX, Y + 6.0f * U + HudDraw::Measure(TEXT("0"), Side).Y - HudDraw::Measure(TEXT("0"), Heading).Y - 2.0f * U), Heading, HudDraw::Soft);
+			HudDraw::Text(Canvas, CheeseStrikeHUD::TeamScoreLabel(Match->GetModeInfo().WinBy, Match->GetTeamScore(Section.Team)), FVector2D(LabelX, Y + 6.0f * U + HudDraw::Measure(TEXT("0"), Side).Y - HudDraw::Measure(TEXT("0"), Heading).Y - 2.0f * U), Heading, HudDraw::Soft);
 			Y += SectionHeight;
 		}
 		for (const FLine& Line : Section.Lines)

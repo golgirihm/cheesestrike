@@ -593,12 +593,12 @@ namespace CheeseStrikeHUD
 		return Text;
 	}
 
-	FString TeamScoreLabel(CheeseStrikeModes::EWinBy WinBy)
+	FString TeamScoreLabel(CheeseStrikeModes::EWinBy WinBy, int32 Score)
 	{
 		switch (WinBy)
 		{
 		case CheeseStrikeModes::EWinBy::Rounds:
-			return TEXT("ROUNDS WON");
+			return Score == 1 ? TEXT("ROUND WON") : TEXT("ROUNDS WON");
 		case CheeseStrikeModes::EWinBy::Hill:
 			return TEXT("POINTS");
 		default:
@@ -620,7 +620,7 @@ namespace CheeseStrikeHUD
 		return Pips;
 	}
 
-	FString StreakNext(int32 Kills, bool bShort)
+	FString StreakNext(int32 Kills)
 	{
 		using namespace CheeseStrikeStreaks;
 		const EStreak Next = NextAfter(FMath::Max(0, Kills));
@@ -628,7 +628,7 @@ namespace CheeseStrikeHUD
 		{
 			return TEXT("EVERY STREAK EARNED");
 		}
-		const FString Name = bShort ? StreakShortName(Next) : FString(Info(Next).Name).ToUpper();
+		const FString Name = StreakShortName(Next);
 		const int32 ToGo = Info(Next).Kills - FMath::Max(0, Kills);
 		return ToGo <= 1 ? FString::Printf(TEXT("%s NEXT KILL"), *Name) : FString::Printf(TEXT("%s IN %d"), *Name, ToGo);
 	}
@@ -638,11 +638,11 @@ namespace CheeseStrikeHUD
 		switch (Kind)
 		{
 		case CheeseStrikeStreaks::EStreak::AerialCheese:
-			return TEXT("DRONE");
+			return TEXT("UAC");
 		case CheeseStrikeStreaks::EStreak::CheeseStrike:
-			return TEXT("STRIKE");
+			return TEXT("CHEESE STRIKE");
 		case CheeseStrikeStreaks::EStreak::GoudaOverload:
-			return TEXT("OVERLOAD");
+			return TEXT("GOUDA OVERLOAD");
 		default:
 			return FString();
 		}
@@ -668,7 +668,7 @@ namespace CheeseStrikeHUD
 		}
 		// Up at once, back through 1 a third of the way, a little under, and settled.
 		const float Along = Seconds / StreakPopTime;
-		return 1.0f + 0.5f * FMath::Square(1.0f - Along) * FMath::Cos(Along * UE_PI * 1.5f);
+		return 1.0f + 0.9f * FMath::Square(1.0f - Along) * FMath::Cos(Along * UE_PI * 1.5f);
 	}
 
 	FTagLook TagLook(float Distance)

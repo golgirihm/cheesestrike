@@ -297,7 +297,7 @@ namespace CheeseStrikeHUD
 	// ---------------------------------------------------------------- the scoreboard's sides
 
 	/** What a side's score on the scoreboard counts, said beside it: "ROUNDS WON" in a mode of rounds, "POINTS" on the hill, else "KILLS". */
-	FString TeamScoreLabel(CheeseStrikeModes::EWinBy WinBy);
+	FString TeamScoreLabel(CheeseStrikeModes::EWinBy WinBy, int32 Score);
 
 	// ---------------------------------------------------------------- the kill streak
 
@@ -310,14 +310,14 @@ namespace CheeseStrikeHUD
 	/** The track for a run of `Kills`: a pip for each kill up to the last streak's (the Gouda Overload's ten), the streaks' kills marked; a longer run has them all made. */
 	TArray<FStreakPip> StreakPips(int32 Kills);
 	/** What the panel says is next: "CHEESE STRIKE IN 2", one kill off "CHEESE STRIKE NEXT KILL"; past the last streak "EVERY STREAK EARNED". `bShort` names it as under its pip ("DRONE IN 3"). */
-	FString StreakNext(int32 Kills, bool bShort = false);
+	FString StreakNext(int32 Kills);
 	/** Seconds the count's pop takes after a kill. */
 	constexpr float StreakPopTime = 0.45f;
 	/** How big the count is drawn `Seconds` after a kill (1 at rest, and before 0): it springs up past 1.4 and settles back by StreakPopTime. */
 	float StreakPop(float Seconds);
 	/** Seconds a whole track of kills ended by a death takes to drain out of the panel. */
 	constexpr float StreakDrainTime = 0.6f;
-	/** A streak's word under its pip: "DRONE", "STRIKE", "OVERLOAD". */
+	/** A streak's name as the panel says it: "UAC", "CHEESE STRIKE", "GOUDA OVERLOAD". */
 	FString StreakShortName(CheeseStrikeStreaks::EStreak Kind);
 	/** The pips shown filled for a run of `Kills`, from `Shown` (what was shown the frame before), `DeltaSeconds` on: rising StreakFillRate pips a second, and draining a run that has ended (a whole track in StreakDrainTime). */
 	constexpr float StreakFillRate = 9.0f;

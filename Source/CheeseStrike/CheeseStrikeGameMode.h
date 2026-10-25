@@ -213,9 +213,8 @@ protected:
 	 * still in (until executed, or up again by themself).
 	 */
 	void CheckRound(bool bTimeUp);
-	/** Elimination: the round's time is up; in overtime (someone down, Execution) until they are up or out, or OvertimeMost. */
+	/** Elimination: the round's time is up; no overtime, the round is over now (a draw if both sides have someone in). */
 	void RoundTimeUp();
-	void OvertimeOver();
 	/** Elimination: tells everyone how long the round has left as its end nears (CheeseStrikeModes::RoundWarnings), and sets the next warning. */
 	void WarnRoundTime();
 	void CheckRoundNow() { CheckRound(false); }
@@ -233,9 +232,8 @@ protected:
 	float RoundStartedAt = 0.0f;
 	FTimerHandle RoundTimer;
 	FTimerHandle RoundWarnTimer;
-	/** Whether the round's time is up (it may go on in overtime), and whether its overtime is over too. */
+	/** Whether the round's time is up. */
 	bool bRoundTimeUp = false;
-	bool bOvertimeOver = false;
 	int32 BotsWanted = -1;
 	/** The sides the host moved the lobby's bots to (CheeseStrikeRules::Seats), carried to the match's levels (`?BotSides=`). */
 	TArray<int32> BotSides;
