@@ -68,7 +68,8 @@ namespace CheeseStrikeWeaponLooks
 	FVector KnifeHand();
 	/** The knife's swoosh, its stroke landing, and drawing a weapon. */
 	extern const TCHAR* const KnifeSwings[4];
-	extern const TCHAR* const KnifeHits[3];
+	/** The knife's stab, as it lands (tools/art/stab_sound.py, from OpenGameArt): the sound of a blow, not a punch. */
+	extern const TCHAR* const KnifeStab;
 	extern const TCHAR* const DrawSounds[3];
 	/** The muzzle flash's model and material, and the material of a flash's light. */
 	extern const TCHAR* const FlashModel;

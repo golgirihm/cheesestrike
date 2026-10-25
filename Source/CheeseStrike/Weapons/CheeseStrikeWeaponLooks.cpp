@@ -232,11 +232,7 @@ namespace CheeseStrikeWeaponLooks
 		TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeWhoosh_03.Lyra_MeleeWhoosh_03"),
 		TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeWhoosh_04.Lyra_MeleeWhoosh_04"),
 	};
-	const TCHAR* const KnifeHits[3] = {
-		TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_01.Lyra_MeleeImpact_01"),
-		TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_02.Lyra_MeleeImpact_02"),
-		TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_03.Lyra_MeleeImpact_03"),
-	};
+	const TCHAR* const KnifeStab = TEXT("/Game/OpenGameArt/Stab/SW_KnifeStabIn.SW_KnifeStabIn");
 	const TCHAR* const DrawSounds[3] = {
 		TEXT("/Game/Audio/Sounds/Foley_Misc/Lyra_WeaponSwap_01.Lyra_WeaponSwap_01"),
 		TEXT("/Game/Audio/Sounds/Foley_Misc/Lyra_WeaponSwap_02.Lyra_WeaponSwap_02"),

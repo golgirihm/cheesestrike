@@ -70,7 +70,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheLobbyDealsItsSeats, "CheeseStrike.Rules.The
 bool FTheLobbyDealsItsSeats::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeRules;
-	TestEqual(TEXT("a hosted match starts with seven bots"), DefaultBots, 7);
+	TestEqual(TEXT("a hosted match starts with no bots"), DefaultBots, 0);
 	TestEqual(TEXT("unless the URL says otherwise"), BotsFrom(TEXT("?KillLimit=5")), DefaultBots);
 	TestEqual(TEXT("sixteen seats in all"), SeatCount, 16);
 	TestEqual(TEXT("alone, the host may have fifteen bots, every other seat"), MostBots(1), 15);
@@ -81,8 +81,8 @@ bool FTheLobbyDealsItsSeats::RunTest(const FString& Parameters)
 	TArray<FRosterEntry> Host;
 	Host.Add({TEXT("Host"), 0, false});
 	// Alone with seven bots: four a side, the host and three on the first, four on the second, and the rest of each column empty.
-	const TArray<FRosterEntry> First = WithEmptySeats(TeamColumn(0, Host, Names, DefaultBots), TeamSize, 0);
-	const TArray<FRosterEntry> Second = WithEmptySeats(TeamColumn(1, Host, Names, DefaultBots), TeamSize, 1);
+	const TArray<FRosterEntry> First = WithEmptySeats(TeamColumn(0, Host, Names, 7), TeamSize, 0);
+	const TArray<FRosterEntry> Second = WithEmptySeats(TeamColumn(1, Host, Names, 7), TeamSize, 1);
 	TestEqual(TEXT("eight seats a side"), First.Num(), TeamSize);
 	TestEqual(TEXT("on both sides"), Second.Num(), TeamSize);
 	TestTrue(TEXT("the host first"), !First[0].bBot && !First[0].bEmpty && First[0].Name == TEXT("Host"));
@@ -96,9 +96,9 @@ bool FTheLobbyDealsItsSeats::RunTest(const FString& Parameters)
 	// A joiner on the second side: seven bots, five and four with the players.
 	TArray<FRosterEntry> Two = Host;
 	Two.Add({TEXT("Joiner"), 1, false});
-	TestEqual(TEXT("with a joiner, the first side has five"), TeamColumn(0, Two, Names, DefaultBots).Num(), 5);
-	TestEqual(TEXT("the second four"), TeamColumn(1, Two, Names, DefaultBots).Num(), 4);
-	TestEqual(TEXT("still eight seats a side"), WithEmptySeats(TeamColumn(1, Two, Names, DefaultBots), TeamSize, 1).Num(), TeamSize);
+	TestEqual(TEXT("with a joiner, the first side has five"), TeamColumn(0, Two, Names, 7).Num(), 5);
+	TestEqual(TEXT("the second four"), TeamColumn(1, Two, Names, 7).Num(), 4);
+	TestEqual(TEXT("still eight seats a side"), WithEmptySeats(TeamColumn(1, Two, Names, 7), TeamSize, 1).Num(), TeamSize);
 	// Every seat: fifteen bots, none empty.
 	TestEqual(TEXT("fifteen bots fill every seat"), LobbyTests::Empty(WithEmptySeats(TeamColumn(0, Host, Names, 15), TeamSize, 0)) + LobbyTests::Empty(WithEmptySeats(TeamColumn(1, Host, Names, 15), TeamSize, 1)), 0);
 	TestEqual(TEXT("and no more seats than the column has"), WithEmptySeats(TeamColumn(0, Host, Names, 15), 4, 0).Num(), 4);
@@ -243,6 +243,7 @@ bool FTheMenuHasItsMusic::RunTest(const FString& Parameters)
 	}
 	// Its volume is its own, kept with the others.
 	UCheeseStrikeSettings* Settings = NewObject<UCheeseStrikeSettings>(GetTransientPackage());
+	Settings->SetToDefaults();
 	TestEqual(TEXT("under the sounds to begin with"), Settings->GetMusicVolume(), CheeseStrikeSettings::DefaultMusicVolume);
 	TestTrue(TEXT("which is quieter than they are"), CheeseStrikeSettings::DefaultMusicVolume < CheeseStrikeSettings::DefaultVolume);
 	Settings->SetMusicVolume(3.0f);
@@ -440,7 +441,9 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	TestEqual(TEXT("or the biggest below it"), ResolutionIndex(Offered, FIntPoint(2000, 1200)), 1);
 
 	// The settings object keeps each to its range, and the engine keeps the game's.
+	// (Starting from the defaults: a settings file a previous run left must not decide what these check.)
 	UCheeseStrikeSettings* Settings = NewObject<UCheeseStrikeSettings>(GetTransientPackage());
+	Settings->SetToDefaults();
 	TestEqual(TEXT("seventy-five to begin with"), Settings->GetFieldOfView(), 75.0f);
 	Settings->SetFieldOfView(500.0f);
 	TestEqual(TEXT("the field of view keeps to its range"), Settings->GetFieldOfView(), MaxFieldOfView);

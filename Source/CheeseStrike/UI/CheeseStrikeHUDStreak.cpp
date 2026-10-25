@@ -45,6 +45,11 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	}
 	StreakSeen = Kills;
 	StreakFill = CheeseStrikeHUD::StreakFillToward(StreakFill, Kills, GetWorld()->GetDeltaSeconds());
+	// Nothing until a kill: the panel comes in with the first.
+	if (Kills <= 0)
+	{
+		return;
+	}
 
 	const float U = Unit();
 	const float Left = Margin * U;
@@ -78,7 +83,6 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	const float PipMiddle = Top + 31.0f * U;
 	const float Small = 8.0f * U;
 	const float Tall = 14.0f * U;
-	const FSlateFontInfo Label = HudDraw::Font(9.0f * U);
 	struct FMarked
 	{
 		float X;
@@ -97,7 +101,7 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 		const float Filled = FMath::Clamp(StreakFill - Index, 0.0f, 1.0f);
 		// The pip just made swells a little with the count's pop.
 		const bool bNewest = Index == Kills - 1 && Since < CheeseStrikeHUD::StreakPopTime;
-		const float Swell = bNewest ? (Pop - 1.0f) * 3.0f * U : 0.0f;
+		const float Swell = bNewest ? (Pop - 1.0f) * 6.0f * U : 0.0f;
 		const FLinearColor Lit = bStreak ? HudDraw::Accent : HudDraw::Ink;
 		Shapes.RoundedRect(X - Swell, Y - Swell, PipWidth + 2.0f * Swell, High + 2.0f * Swell, PipRound + Swell, bStreak ? HudDraw::Faded(HudDraw::Accent, 0.22f) : HudDraw::Dim);
 		if (Filled > 0.0f)
@@ -138,16 +142,35 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	FString Next = CheeseStrikeHUD::StreakNext(Kills);
 	if (CaptionMeasure(Next) > NextRoom)
 	{
-		Next = CheeseStrikeHUD::FitName(CheeseStrikeHUD::StreakNext(Kills, true), NextRoom, CaptionMeasure);
+		Next = CheeseStrikeHUD::FitName(Next, NextRoom, CaptionMeasure);
 	}
 	HudDraw::Text(Canvas, Next, FVector2D(TrackRight, CaptionTop), Caption, bRunning ? HudDraw::Accent : HudDraw::Soft, 1.0f);
+	// Under each streak's pip, its icon: a ring for the UAC, a wedge for the Cheese Strike, a disc for the Gouda Overload.
+	const float IconRadius = 4.0f * U;
 	const float LabelTop = PipMiddle + Tall / 2.0f + 2.0f * U;
-	for (int32 Index = 0; Index < Marked.Num(); ++Index)
+	HudDraw::FShapes Icons;
+	for (const FMarked& Mark : Marked)
 	{
-		// Centred under its pip, but the last kept inside the panel's right.
-		const FString Word = CheeseStrikeHUD::StreakShortName(Marked[Index].Kind);
-		const float WordWidth = HudDraw::Measure(Word, Label).X;
-		const float X = FMath::Min(Marked[Index].X, TrackRight - WordWidth / 2.0f);
-		HudDraw::Text(Canvas, Word, FVector2D(X, LabelTop), Label, Marked[Index].bMade ? HudDraw::Accent : HudDraw::Soft, 0.5f, false);
+		const FLinearColor IconColour = Mark.bMade ? HudDraw::Accent : HudDraw::Soft;
+		const FVector2D Centre(FMath::Min(Mark.X, TrackRight - IconRadius), LabelTop + IconRadius);
+		switch (Mark.Kind)
+		{
+		case CheeseStrikeStreaks::EStreak::AerialCheese:
+			Icons.Arc(Centre, IconRadius, 1.5f * U, 0.0f, 360.0f, IconColour, false);
+			Icons.RoundedRect(Centre.X - U, Centre.Y - U, 2.0f * U, 2.0f * U, U, IconColour);
+			break;
+		case CheeseStrikeStreaks::EStreak::CheeseStrike:
+		{
+			const TArray<FVector2D> Wedge = {Centre + FVector2D(0.0f, -IconRadius), Centre + FVector2D(IconRadius * 0.87f, IconRadius * 0.5f), Centre + FVector2D(-IconRadius * 0.87f, IconRadius * 0.5f)};
+			Icons.SmoothPolygon(Wedge, IconColour);
+			break;
+		}
+		case CheeseStrikeStreaks::EStreak::GoudaOverload:
+			Icons.RoundedRect(Centre.X - IconRadius, Centre.Y - IconRadius, 2.0f * IconRadius, 2.0f * IconRadius, IconRadius, IconColour);
+			break;
+		default:
+			break;
+		}
 	}
+	Icons.Draw(Canvas);
 }

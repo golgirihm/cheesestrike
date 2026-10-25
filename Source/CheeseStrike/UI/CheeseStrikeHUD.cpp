@@ -1032,7 +1032,7 @@ void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 			HudDraw::Text(Canvas, Fitted.Name, FVector2D(Block.X + Pad, Top + 27.0f * U), Name, HudDraw::Ink);
 		}
 		const float ScoreHigh = ScoreSize.Y * Fitted.ScoreScale;
-		HudDraw::Text(Canvas, FString::FromInt(Block.Line->Score), FVector2D(Block.X + BlockWidth - Pad, Top + (BlockHeight - ScoreHigh) / 2.0f - 1.0f * U), Score, HudDraw::Ink, 1.0f, true, FVector2D(Fitted.ScoreScale, Fitted.ScoreScale));
+		HudDraw::Text(Canvas, FString::FromInt(Block.Line->Score), FVector2D(Block.X + BlockWidth - Pad, Top + (BlockHeight - ScoreHigh) / 2.0f - 1.0f * U), Score, Block.Line->Team != INDEX_NONE ? HudDraw::SideColour(Block.Line->Team) : HudDraw::Ink, 1.0f, true, FVector2D(Fitted.ScoreScale, Fitted.ScoreScale));
 	}
 	HudDraw::Text(Canvas, GoalText, FVector2D(GoalX + GoalWidth / 2.0f, Top + (BlockHeight - HudDraw::Measure(TEXT("F"), Goal).Y) / 2.0f), Goal, HudDraw::Soft, 0.5f);
 }

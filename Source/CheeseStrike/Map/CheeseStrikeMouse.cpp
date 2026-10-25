@@ -42,8 +42,8 @@ namespace
 	constexpr float MouseHeardWithin = 600.0f;
 	constexpr float MouseHeardTo = 3500.0f;
 	/** Seconds between its squeaks, from and to; and between its crunches while it eats. */
-	constexpr float MouseSqueakFrom = 4.0f;
-	constexpr float MouseSqueakTo = 9.0f;
+	constexpr float MouseSqueakFrom = 12.0f;
+	constexpr float MouseSqueakTo = 25.0f;
 	constexpr float MouseCrunchFrom = 0.4f;
 	constexpr float MouseCrunchTo = 0.9f;
 	/** How far below its feet it looks for ground before a step (cm): a step down a stair or a ramp, not off an edge. */

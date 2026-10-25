@@ -748,7 +748,7 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 		ShowMenu(EMenuPage::Pause);
 		Menu->ConfirmBackToLobby(Tab.Equals(TEXT("Ask"), ESearchCase::IgnoreCase) && CanGoBackToLobby());
 	}
-	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("Aiming"), TEXT("View"), TEXT("Sound"), TEXT("Graphics")};
+	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("Aiming"), TEXT("Sound"), TEXT("Graphics")};
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Tabs) && Menu.IsValid(); ++Index)
 	{
 		if (Tab.Equals(Tabs[Index], ESearchCase::IgnoreCase))

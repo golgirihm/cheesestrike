@@ -105,7 +105,7 @@ namespace CheeseStrikeModes
 		return NoTeam;
 	}
 
-	bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner, bool bOvertimeOver)
+	bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner)
 	{
 		OutWinner = NoTeam;
 		const bool bBothHavePlayers = First.Members > 0 && Second.Members > 0;
@@ -116,23 +116,16 @@ namespace CheeseStrikeModes
 			OutWinner = bFirstGone && bSecondGone ? NoTeam : (bFirstGone ? 1 : 0);
 			return true;
 		}
-		// Out of time, it ends once nobody is down (overtime), or at the end of the overtime.
-		if (!bTimeUp || ((First.Down > 0 || Second.Down > 0) && !bOvertimeOver))
+		// Out of time, there is no overtime: both still with someone in is a draw, else the side with someone in takes it.
+		if (!bTimeUp)
 		{
 			return false;
 		}
-		if (First.Alive != Second.Alive)
+		if (First.Alive > 0 && Second.Alive > 0)
 		{
-			OutWinner = First.Alive > Second.Alive ? 0 : 1;
+			return true;
 		}
-		else if (First.Standing() != Second.Standing())
-		{
-			OutWinner = First.Standing() > Second.Standing() ? 0 : 1;
-		}
-		else if (!FMath::IsNearlyEqual(First.Health, Second.Health, 0.5f))
-		{
-			OutWinner = First.Health > Second.Health ? 0 : 1;
-		}
+		OutWinner = First.Alive > 0 ? 0 : (Second.Alive > 0 ? 1 : NoTeam);
 		return true;
 	}
 
@@ -334,7 +327,8 @@ namespace CheeseStrikeModes
 		case 0:
 			return FLinearColor::FromSRGBColor(FColor(230, 159, 0));
 		case 1:
-			return FLinearColor::FromSRGBColor(FColor(240, 236, 224));
+			// Mozzarella: a cool pearl white, so that the side reads as a colour of its own, not as the neutral greys.
+			return FLinearColor::FromSRGBColor(FColor(214, 232, 255));
 		default:
 			return FLinearColor(0.96f, 0.72f, 0.2f);
 		}

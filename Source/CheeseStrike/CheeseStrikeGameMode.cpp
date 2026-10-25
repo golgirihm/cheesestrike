@@ -1009,7 +1009,6 @@ void ACheeseStrikeGameMode::StartRound(bool bFirst)
 	}
 	GetWorldTimerManager().SetTimer(RoundTimer, this, &ACheeseStrikeGameMode::RoundTimeUp, CountLeft + RoundTime, false);
 	bRoundTimeUp = false;
-	bOvertimeOver = false;
 	GetWorldTimerManager().ClearTimer(RoundWarnTimer);
 	if (const float WarnIn = CheeseStrikeModes::NextRoundWarning(RoundTime + CountLeft, CountLeft); WarnIn > 0.0f)
 	{
@@ -1045,21 +1044,8 @@ void ACheeseStrikeGameMode::WarnRoundTime()
 
 void ACheeseStrikeGameMode::RoundTimeUp()
 {
-	ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>();
+	// No overtime: the round is over now, a draw if both sides still have someone in (CheeseStrikeModes::RoundOver).
 	bRoundTimeUp = true;
-	CheckRound(true);
-	// Someone down: overtime, until they are up again or out, but no longer than OvertimeMost.
-	if (State != nullptr && IsMatchInProgress() && !State->IsRoundBreak() && State->GetRound() > 0 && !bOvertimeOver)
-	{
-		State->Announce(TEXT("Overtime"));
-		UE_LOG(LogCheeseStrike, Display, TEXT("Round %d: overtime, someone is down"), State->GetRound());
-		GetWorldTimerManager().SetTimer(RoundTimer, this, &ACheeseStrikeGameMode::OvertimeOver, CheeseStrikeModes::OvertimeMost, false);
-	}
-}
-
-void ACheeseStrikeGameMode::OvertimeOver()
-{
-	bOvertimeOver = true;
 	CheckRound(true);
 }
 
@@ -1103,7 +1089,7 @@ void ACheeseStrikeGameMode::CheckRound(bool bTimeUp)
 		}
 	}
 	int32 Winner = CheeseStrikeModes::NoTeam;
-	if (!CheeseStrikeModes::RoundOver(Sides[0], Sides[1], bTimeUp, Winner, bOvertimeOver))
+	if (!CheeseStrikeModes::RoundOver(Sides[0], Sides[1], bTimeUp, Winner))
 	{
 		return;
 	}
@@ -1120,7 +1106,6 @@ void ACheeseStrikeGameMode::EndRound(int32 Winner)
 	GetWorldTimerManager().ClearTimer(RoundTimer);
 	GetWorldTimerManager().ClearTimer(RoundWarnTimer);
 	bRoundTimeUp = false;
-	bOvertimeOver = false;
 	if (Winner != CheeseStrikeModes::NoTeam)
 	{
 		State->AddTeamScore(Winner, 1);

@@ -719,10 +719,11 @@ bool FAMatchWaitsInTheLobbyAndComesBackToIt::RunTest(const FString& Parameters)
 			const TArray<CheeseStrikeRules::FRosterEntry> First = Match->TeamColumn(0);
 			const TArray<CheeseStrikeRules::FRosterEntry> Second = Match->TeamColumn(1);
 			TestEqual(TEXT("the sides have the players and seven bots"), First.Num() + Second.Num(), 2 + CheeseStrikeRules::DefaultBots);
-			TestEqual(TEXT("dealt evenly"), First.Num() - Second.Num(), 1);
+			TestTrue(TEXT("dealt evenly"), FMath::Abs(First.Num() - Second.Num()) <= 1);
 			TestTrue(TEXT("the host leads the first side"), First.Num() > 0 && !First[0].bBot);
 			TestTrue(TEXT("the joiner the second"), Second.Num() > 0 && !Second[0].bBot);
-			TestTrue(TEXT("the rest are bots"), First.Num() > 1 && First[1].bBot && Second.Num() > 1 && Second[1].bBot);
+			// No bots by default, so there are none to check: with some, the rest of each side are bots.
+			TestTrue(TEXT("the rest are bots"), CheeseStrikeRules::DefaultBots == 0 || (First.Num() > 1 && First[1].bBot && Second.Num() > 1 && Second[1].bBot));
 			TestEqual(TEXT("with names the match drew"), Match->GetBotNames().Num(), CheeseStrikeRules::TeamSize * CheeseStrikeRules::Teams);
 			if (const ACheeseStrikeGameState* Theirs = GameState(1))
 			{

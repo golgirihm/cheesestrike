@@ -88,7 +88,7 @@ namespace CheeseStrikeModes
 	constexpr int32 RoundLimit = 4;
 	constexpr int32 RoundLimitChoices[] = {2, 3, 4, 5, 7};
 	/** Seconds a round lasts at most, and the pause between rounds (the Godot game's ROUND_BREAK). */
-	constexpr float RoundTime = 120.0f;
+	constexpr float RoundTime = 180.0f;
 	constexpr float RoundBreak = 6.0f;
 	/**
 	 * As a round's time runs out, everyone is told how long is left, at
@@ -132,22 +132,16 @@ namespace CheeseStrikeModes
 		/** How many are standing: in, and not down. */
 		int32 Standing() const { return Alive - Down; }
 	};
-	/**
-	 * Whether a round of Elimination is over, and who took it (`OutWinner`,
-	 * NoTeam for a draw). It is over once a side with players is out
-	 * (FSide::IsOut: none left in; someone down is in) while the other has players (nothing ends while a side is
-	 * empty: there is nobody to beat), and the other side takes it; both
-	 * gone at once is a draw. When its time is up (`bTimeUp`) and nobody
-	 * is down, it is over whatever stands: the side with more still in
-	 * takes it, then the one with more health left; level on both, a draw.
-	 * With anyone down (Execution) it goes on in overtime, until they are
-	 * up again (revived, or by themself) or out, or the overtime is over
-	 * too (`bOvertimeOver`, OvertimeMost after the time): then someone down
-	 * counts as in, and less than someone standing.
-	 */
-	bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner, bool bOvertimeOver = false);
-	/** The longest a round goes on in overtime: long enough for someone just down to get up by themself and be executed. */
-	constexpr float OvertimeMost = 30.0f;
+		/**
+		 * Whether a round of Elimination is over, and who took it (`OutWinner`,
+		 * NoTeam for a draw). It is over once a side with players is out
+		 * (FSide::IsOut: none left in; someone down is in) while the other has players (nothing ends while a side is
+		 * empty: there is nobody to beat), and the other side takes it; both
+		 * gone at once is a draw. When its time is up (`bTimeUp`) there is no
+		 * overtime: if both sides still have someone in (alive, down or not) it
+		 * is a draw; otherwise the side with someone in takes it.
+		 */
+		bool RoundOver(const FSide& First, const FSide& Second, bool bTimeUp, int32& OutWinner);
 
 	/**
 	 * Whether a player on `AttackerTeam` may hurt one on `VictimTeam`. Never

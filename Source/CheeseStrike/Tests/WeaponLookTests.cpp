@@ -116,10 +116,7 @@ bool FEveryWeaponHasItsOwnLook::RunTest(const FString& Parameters)
 	{
 		TestNotNull(TEXT("the knife swings"), Load<USoundBase>(Sound));
 	}
-	for (const TCHAR* Sound : CheeseStrikeWeaponLooks::KnifeHits)
-	{
-		TestNotNull(TEXT("and lands"), Load<USoundBase>(Sound));
-	}
+	TestNotNull(TEXT("and its stab lands"), Load<USoundBase>(CheeseStrikeWeaponLooks::KnifeStab));
 	for (const TCHAR* Sound : CheeseStrikeWeaponLooks::DrawSounds)
 	{
 		TestNotNull(TEXT("a weapon is drawn"), Load<USoundBase>(Sound));

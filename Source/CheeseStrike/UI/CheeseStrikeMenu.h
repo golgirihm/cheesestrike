@@ -40,7 +40,6 @@ enum class EOptionsTab : uint8
 	Controls,
 	/** The look's sensitivity, aiming's share of it, inverting it, and the gamepad's aim assist. */
 	Aiming,
-	View,
 	Sound,
 	Graphics,
 };
@@ -208,6 +207,9 @@ public:
 	bool HasDropdownOpen() const { return IsDropdownOpen(); }
 	/** The host's pause menu asks whether to end the match and take everyone back to the lobby (`bAsk`), or stops asking. */
 	void ConfirmBackToLobby(bool bAsk);
+	/** The buttons that close the lobby or quit: the first click arms them, the second does it. */
+	TSharedRef<SWidget> MakeCloseLobbyButton();
+	TSharedRef<SWidget> MakeQuitButton();
 	bool IsConfirmingBackToLobby() const { return bConfirmingBackToLobby; }
 	/** How many times the lobby has been built afresh: not when a rule changes, which its rows show as they are. */
 	int32 GetLobbyBuilds() const { return LobbyBuilds; }
@@ -350,5 +352,8 @@ private:
 	FString ShownPageKey;
 	/** Whether the host's pause menu is asking to confirm Back to Lobby. */
 	bool bConfirmingBackToLobby = false;
+	/** A first click on the host's Close Lobby or on Quit has armed it: the second click does it, so that a press too many doesn't close the lobby or the game. */
+	bool bArmedCloseLobby = false;
+	bool bArmedQuit = false;
 	int32 LobbyBuilds = 0;
 };

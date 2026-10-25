@@ -70,7 +70,7 @@ bool FTheModesAreNamedAndPicked::RunTest(const FString& Parameters)
 	TestEqual(TEXT("first to four rounds, as the design has it"), RoundLimitFrom(TEXT("")), 4);
 	TestEqual(TEXT("or as many as the host says"), RoundLimitFrom(TEXT("?Rounds=2")), 2);
 	TestEqual(TEXT("but at least one"), RoundLimitFrom(TEXT("?Rounds=0")), 1);
-	TestEqual(TEXT("two minutes a round"), RoundTimeFrom(TEXT("")), 120.0f);
+	TestEqual(TEXT("three minutes a round"), RoundTimeFrom(TEXT("")), 180.0f);
 	TestEqual(TEXT("or the host's"), RoundTimeFrom(TEXT("?RoundTime=90")), 90.0f);
 	TestEqual(TEXT("within reason"), RoundTimeFrom(TEXT("?RoundTime=5")), 30.0f);
 
@@ -120,10 +120,9 @@ bool FARoundGoesToTheSideLeftStanding::RunTest(const FString& Parameters)
 	TestTrue(TEXT("both gone at once"), RoundOver(Side(2, 0, 0), Side(2, 0, 0), false, Winner));
 	TestEqual(TEXT("is a draw"), Winner, NoTeam);
 	TestFalse(TEXT("a side with nobody on it loses nothing: there is nobody to beat"), RoundOver(Side(1, 1, 100), Side(0, 0, 0), false, Winner));
-	TestTrue(TEXT("time up: over, whatever stands"), RoundOver(Side(4, 2, 100), Side(4, 1, 100), true, Winner));
-	TestEqual(TEXT("to the side with more left standing"), Winner, 0);
-	TestTrue(TEXT("as many standing: to the one with more health"), RoundOver(Side(4, 2, 90), Side(4, 2, 160), true, Winner) && Winner == 1);
-	TestTrue(TEXT("level on both: a draw"), RoundOver(Side(4, 2, 100), Side(4, 2, 100), true, Winner) && Winner == NoTeam);
+	TestTrue(TEXT("time up with both sides in: a draw, whatever stands"), RoundOver(Side(4, 2, 100), Side(4, 1, 100), true, Winner) && Winner == NoTeam);
+	TestTrue(TEXT("as many standing, health or not: a draw"), RoundOver(Side(4, 2, 90), Side(4, 2, 160), true, Winner) && Winner == NoTeam);
+	TestTrue(TEXT("time up with one side with nobody in: the other takes it"), RoundOver(Side(4, 2, 100), Side(4, 0, 0), true, Winner) && Winner == 0);
 	TestTrue(TEXT("and a lone player, at the time, takes it"), RoundOver(Side(1, 1, 100), Side(0, 0, 0), true, Winner) && Winner == 0);
 	TestTrue(TEXT("rounds are short and the break shorter"), RoundTime >= 60.0f && RoundBreak > 0.0f && RoundBreak <= 10.0f);
 	// Execution: someone down is in until executed, even with everyone of their side down: nobody is out for being down.
@@ -139,17 +138,12 @@ bool FARoundGoesToTheSideLeftStanding::RunTest(const FString& Parameters)
 	TestFalse(TEXT("a side of one, down: still in"), RoundOver(LoneDown, Side(1, 1, 100), false, Winner));
 	TestFalse(TEXT("both sides all down at once: on, until someone is executed or gets up"), RoundOver(LoneDown, AllDown, false, Winner));
 	TestTrue(TEXT("once the last of them is executed, out"), Side(1, 0, 0).IsOut() && RoundOver(Side(1, 0, 0), Side(1, 1, 100), false, Winner) && Winner == 1);
-	// Time up with someone down: overtime, until they are up again or out; then whatever stands.
-	TestFalse(TEXT("time up with someone down: overtime, the round goes on"), RoundOver(Side(3, 1, 40), AllDown, true, Winner));
-	TestFalse(TEXT("a lone player down, getting up by themself, isn't beaten at the time"), RoundOver(LoneDown, Side(1, 1, 100), true, Winner));
-	TestTrue(TEXT("up again in overtime: over, to the side with more in"), RoundOver(Side(3, 2, 40), Side(3, 1, 100), true, Winner) && Winner == 0);
-	TestTrue(TEXT("at the end of the overtime, over whoever is down: someone down counts as in"), RoundOver(Side(3, 1, 40), AllDown, true, Winner, true) && Winner == 1);
-	FSide TwoDown = Side(3, 2, 50);
-	TwoDown.Down = 1;
-	TestTrue(TEXT("as many in: the one with more standing"), RoundOver(TwoDown, Side(3, 2, 100), true, Winner, true) && Winner == 1);
-	TestTrue(TEXT("overtime is long enough to get up by oneself and be executed"), OvertimeMost > SelfReviveTime + CheeseStrikeExecution::StabSeconds);
+	// Time up with someone down: no overtime, someone down is still in, so the round is over as it stands.
+	TestTrue(TEXT("time up with someone down: over, a draw while both sides have someone in"), RoundOver(Side(3, 1, 40), AllDown, true, Winner) && Winner == NoTeam);
+	TestTrue(TEXT("a lone player down, getting up by themself, is still in: a draw"), RoundOver(LoneDown, Side(1, 1, 100), true, Winner) && Winner == NoTeam);
+	TestTrue(TEXT("time up with a side with nobody in: the other takes it"), RoundOver(Side(3, 0, 0), Side(3, 1, 100), true, Winner) && Winner == 1);
 	FSide OtherTwo = Side(3, 2, 30);
-	TestTrue(TEXT("as many standing: more health"), RoundOver(Side(3, 2, 60), OtherTwo, true, Winner) && Winner == 0);
+	TestTrue(TEXT("as many standing, health or not: a draw"), RoundOver(Side(3, 2, 60), OtherTwo, true, Winner) && Winner == NoTeam);
 	// The time is told as it runs out: at 30 s left and at 10, and no more.
 	TestEqual(TEXT("30 s left is told"), RoundWarning(30.2f), FString(TEXT("30 seconds left in the round")));
 	TestEqual(TEXT("and 10"), RoundWarning(9.8f), FString(TEXT("10 seconds left in the round")));
