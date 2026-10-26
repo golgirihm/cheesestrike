@@ -71,6 +71,28 @@ namespace CheeseStrikeSynth
 		return Samples;
 	}
 
+	TArray<int16> Thump(float Weight)
+	{
+		const int32 Count = FMath::RoundToInt(0.06f * SampleRate);
+		TArray<int16> Samples;
+		Samples.SetNumUninitialized(Count);
+		uint32 Seed = 987654u;
+		float Low = 0.0f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const float Along = static_cast<float>(Index) / Count;
+			Seed = Seed * 1664525u + 1013904223u;
+			const float Noise = static_cast<float>(Seed >> 8) / 16777216.0f - 0.5f;
+			// A one-pole low-pass keeps the noise dull; a falling low tone gives it body.
+			Low += (Noise - Low) * 0.18f;
+			const float Body = FMath::Sin(2.0f * PI * FMath::Lerp(140.0f, 70.0f, Along) * Index / SampleRate);
+			const float Envelope = FMath::Min(1.0f, Along * 0.06f / 0.004f) * FMath::Pow(1.0f - Along, 2.0f);
+			const float Value = (Low * 2.4f + Body * 0.5f) * Envelope * 0.7f * Weight;
+			Samples[Index] = static_cast<int16>(FMath::Clamp(Value, -1.0f, 1.0f) * 32767.0f);
+		}
+		return Samples;
+	}
+
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples)
 	{
 		USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(Outer);

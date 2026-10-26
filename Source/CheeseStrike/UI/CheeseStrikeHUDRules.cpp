@@ -630,7 +630,7 @@ namespace CheeseStrikeHUD
 		}
 		const FString Name = StreakShortName(Next);
 		const int32 ToGo = Info(Next).Kills - FMath::Max(0, Kills);
-		return ToGo <= 1 ? FString::Printf(TEXT("%s NEXT KILL"), *Name) : FString::Printf(TEXT("%s IN %d"), *Name, ToGo);
+		return ToGo <= 1 ? FString::Printf(TEXT("%s next kill"), *Name) : FString::Printf(TEXT("%s in %d"), *Name, ToGo);
 	}
 
 	FString StreakShortName(CheeseStrikeStreaks::EStreak Kind)
@@ -640,9 +640,9 @@ namespace CheeseStrikeHUD
 		case CheeseStrikeStreaks::EStreak::AerialCheese:
 			return TEXT("UAC");
 		case CheeseStrikeStreaks::EStreak::CheeseStrike:
-			return TEXT("CHEESE STRIKE");
+			return TEXT("Cheese Strike");
 		case CheeseStrikeStreaks::EStreak::GoudaOverload:
-			return TEXT("GOUDA OVERLOAD");
+			return TEXT("Gouda Overload");
 		default:
 			return FString();
 		}
@@ -666,9 +666,9 @@ namespace CheeseStrikeHUD
 		{
 			return 1.0f;
 		}
-		// Up at once, back through 1 a third of the way, a little under, and settled.
+		// Punched up to 1.8 at once, back through 1 a third of the way, a little under, and settled.
 		const float Along = Seconds / StreakPopTime;
-		return 1.0f + 0.9f * FMath::Square(1.0f - Along) * FMath::Cos(Along * UE_PI * 1.5f);
+		return 1.0f + 0.8f * FMath::Square(1.0f - Along) * FMath::Cos(Along * UE_PI * 1.5f);
 	}
 
 	float FallFlashAlpha(float Seconds)
@@ -723,6 +723,20 @@ namespace CheeseStrikeHUD
 		const float Amount = Random.FRandRange(0.3f, 1.0f);
 		const float Start = 0.45f + Random.FRandRange(0.0f, 0.3f);
 		return Amount * Ease((Seconds - Start) / 1.1f);
+	}
+
+	FVerminLook VerminLook(float Age, float SinceTick)
+	{
+		FVerminLook Look;
+		const float Along = FMath::Clamp(Age / VerminEntrance, 0.0f, 1.0f);
+		// Down fast from 2.5 to just under 1 (70% of the time), then back up to 1.
+		Look.Scale = Along < 0.7f ? FMath::Lerp(2.5f, 0.9f, 1.0f - FMath::Square(1.0f - Along / 0.7f)) : FMath::Lerp(0.9f, 1.0f, (Along - 0.7f) / 0.3f);
+		Look.Alpha = FMath::Clamp(Along * 2.5f, 0.0f, 1.0f);
+		if (Age >= VerminEntrance && SinceTick >= 0.0f && SinceTick < VerminPulse)
+		{
+			Look.Scale += 0.15f * FMath::Square(1.0f - SinceTick / VerminPulse);
+		}
+		return Look;
 	}
 
 	FString VerminWords(float ToGo)

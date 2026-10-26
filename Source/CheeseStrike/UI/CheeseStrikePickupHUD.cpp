@@ -12,6 +12,7 @@
 #include "Input/CheeseStrikeInput.h"
 #include "Rules/CheeseStrikePickups.h"
 #include "UI/CheeseStrikeHUDDraw.h"
+#include "UI/CheeseStrikeHUDRules.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikePickup.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -89,9 +90,12 @@ namespace CheeseStrikePickupHUD
 		const FSlateFontInfo Small = HudDraw::Font(16.0f * U);
 		const FVector2D LineSize = HudDraw::Measure(Line, Big);
 		HudDraw::FShapes Shapes;
-		Shapes.Rect(Middle - LineSize.X / 2.0f - 14.0f * U, Y - 6.0f * U, LineSize.X + 28.0f * U, LineSize.Y + 30.0f * U, HudDraw::Panel);
+		// A rounded card, its colour strip along the top from side to side, clipped to the card's corners.
+		const FVector2D CardMin(Middle - LineSize.X / 2.0f - 14.0f * U, Y - 6.0f * U);
+		const FVector2D CardMax = CardMin + FVector2D(LineSize.X + 28.0f * U, LineSize.Y + 30.0f * U);
+		Shapes.RoundedRect(CardMin.X, CardMin.Y, CardMax.X - CardMin.X, CardMax.Y - CardMin.Y, 8.0f * U, HudDraw::Panel);
 		const FLinearColor Worth = CheeseStrikePickups::WorthColour(CheeseStrikePickups::Worth(Offered->GetWeapon()));
-		Shapes.Rect(Middle - LineSize.X / 2.0f - 14.0f * U, Y - 6.0f * U, 4.0f * U, LineSize.Y + 30.0f * U, Worth);
+		Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(CheeseStrikeHUD::RoundedRect(CardMin, CardMax, 8.0f * U), CardMin, FVector2D(CardMax.X, CardMin.Y + 4.0f * U)), Worth);
 		Shapes.Draw(Canvas);
 		HudDraw::Text(Canvas, Line, FVector2D(Middle, Y), Big, HudDraw::Ink, 0.5f);
 		HudDraw::Text(Canvas, Under, FVector2D(Middle, Y + LineSize.Y + 2.0f * U), Small, HudDraw::Soft, 0.5f);

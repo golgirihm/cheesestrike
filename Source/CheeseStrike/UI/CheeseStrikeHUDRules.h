@@ -312,8 +312,8 @@ namespace CheeseStrikeHUD
 	/** What the panel says is next: "CHEESE STRIKE IN 2", one kill off "CHEESE STRIKE NEXT KILL"; past the last streak "EVERY STREAK EARNED". `bShort` names it as under its pip ("DRONE IN 3"). */
 	FString StreakNext(int32 Kills);
 	/** Seconds the count's pop takes after a kill. */
-	constexpr float StreakPopTime = 0.45f;
-	/** How big the count is drawn `Seconds` after a kill (1 at rest, and before 0): it springs up past 1.4 and settles back by StreakPopTime. */
+	constexpr float StreakPopTime = 0.35f;
+	/** How big the count is drawn `Seconds` after a kill (1 at rest, and before 0): it punches up to 1.8 and settles back by StreakPopTime. */
 	float StreakPop(float Seconds);
 	/** How long the red flash for a fall lasts, and its strongest. */
 	constexpr float FallFlashTime = 0.6f;
@@ -394,4 +394,16 @@ namespace CheeseStrikeHUD
 	 */
 	constexpr float VerminCameFor = 4.0f;
 	FString VerminWords(float ToGo);
+
+	/** How the vermin words are drawn: their size (a multiple of the settled one) and how solid they are. */
+	struct FVerminLook
+	{
+		float Scale = 1.0f;
+		float Alpha = 1.0f;
+	};
+	/** The entrance of the vermin words, `Age` seconds after they first showed: from 2.5 times as big and clear, shrinking past 1 a little and settling, over VerminEntrance seconds. */
+	constexpr float VerminEntrance = 0.4f;
+	/** The pulse of each counted second: `SinceTick` seconds after the number changed, a swell of up to 0.15 that dies away over VerminPulse seconds. */
+	constexpr float VerminPulse = 0.3f;
+	FVerminLook VerminLook(float Age, float SinceTick);
 }

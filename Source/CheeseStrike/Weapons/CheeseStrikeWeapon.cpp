@@ -1,11 +1,13 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeWeapon.h"
+#include "Streaks/CheeseStrikeSynth.h"
 #include "Animation/AnimInstance.h"
 #include "AnimationRuntime.h"
 #include "Animation/AnimSequence.h"
 #include "Camera/CameraComponent.h"
 #include "Sound/SoundBase.h"
+#include "Sound/SoundWaveProcedural.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
 #include "Animation/CheeseStrikeBodies.h"
 #include "Components/CapsuleComponent.h"
@@ -1139,7 +1141,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 			UGameplayStatics::ApplyPointDamage(Hit.Wall.GetActor(), Damage, Direction, Hit.Wall, Holder->GetController(), this, nullptr);
 			if (Hit.Wall.GetActor()->IsA<APawn>() || Hit.Wall.GetActor()->IsA<ACheeseStrikeMouse>())
 			{
-				ClientHit(Damage, false);
+				ClientHit(Damage, false, false);
 			}
 			UE_LOG(LogCheeseStrike, Verbose, TEXT("Shot: %s hit %s at %.0f cm"), *Holder->GetName(), *Hit.Wall.GetActor()->GetName(), Hit.Distance);
 		}
@@ -1150,7 +1152,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		const FHurt& Theirs = Each.Value;
 		if (Victim->TakeShot(Theirs.Damage, Holder, Theirs.bHead))
 		{
-			ClientHit(Theirs.Damage, Theirs.bHead);
+			ClientHit(Theirs.Damage, Theirs.bHead, !Victim->IsAlive());
 			UE_LOG(LogCheeseStrike, Display, TEXT("Shot: %s hit %s with the %s%s at %.0f cm for %.0f%s (health %.0f)"), *Holder->GetName(), *Victim->GetName(), *Stats->DisplayName.ToString(),
 				Theirs.bHead ? TEXT(" on the head") : TEXT(""), Theirs.Distance, Theirs.Damage,
 				Stats->Pellets > 1 ? *FString::Printf(TEXT(", %d of %d pellets"), Theirs.Pellets, Stats->Pellets) : TEXT(""), Victim->GetHealth());
@@ -1201,7 +1203,7 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 			const bool bBack = CheeseStrikeWeapons::FromBehind(Fan[Ray], Struck->VictimYaw);
 			if (Struck->Victim->TakeShot(Damage, Holder, false))
 			{
-				ClientHit(Damage, false);
+				ClientHit(Damage, false, !Struck->Victim->IsAlive());
 				UE_LOG(LogCheeseStrike, Display, TEXT("Stroke: %s cut %s%s at %.0f cm for %.0f (health %.0f)"), *Holder->GetName(), *Struck->Victim->GetName(), bBack ? TEXT(" in the back") : TEXT(""), Struck->Distance, Damage, Struck->Victim->GetHealth());
 			}
 		}
@@ -1216,14 +1218,19 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 		if (Thing != nullptr && (Thing->IsA<APawn>() || Thing->IsA<ACheeseStrikeMouse>()))
 		{
 			UGameplayStatics::ApplyPointDamage(Thing, Stats->Damage, Fan[Ray], Hits[Ray].Wall, Holder->GetController(), this, nullptr);
-			ClientHit(Stats->Damage, false);
+			ClientHit(Stats->Damage, false, false);
 			return;
 		}
 	}
 }
 
-void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead)
+void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead, bool bKill)
 {
+	// A soft thump, like a smack on a pillow, for a hit by this machine's own player.
+	if (!Stats->IsMelee() && Holder != nullptr && Holder->IsLocallyControlled())
+	{
+		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Thump(bKill ? 1.3f : 1.0f)), 0.35f);
+	}
 	// The knife's stroke landing, heard by the one who struck.
 	if (Stats->IsMelee())
 	{
@@ -1232,6 +1239,7 @@ void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead)
 	++HitsConfirmed;
 	LastHitDamage = Damage;
 	bLastHitHead = bHead;
+	bLastHitKill = bKill;
 	LastHitAt = ServerTime(GetWorld());
 }
 

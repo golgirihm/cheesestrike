@@ -9,6 +9,7 @@
 #include "Misc/AutomationTest.h"
 #include "Algo/Reverse.h"
 #include "Rules/CheeseStrikeModes.h"
+#include "Streaks/CheeseStrikeSynth.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "UI/CheeseStrikeHUDRules.h"
 
@@ -145,15 +146,15 @@ bool FTheStreakPanelCountsToEachStreak::RunTest(const FString& Parameters)
 	TestTrue(TEXT("four kills make four pips"), Four[3].bMade && !Four[4].bMade);
 	TestTrue(TEXT("a run past ten has them all"), !StreakPips(13).ContainsByPredicate([](const FStreakPip& Pip) { return !Pip.bMade; }) && StreakPips(13).Num() == 10);
 	// What comes next.
-	TestEqual(TEXT("from nothing, the UAC in three"), StreakNext(0), FString(TEXT("UAC IN 3")));
-	TestEqual(TEXT("one off, the next kill"), StreakNext(4), FString(TEXT("CHEESE STRIKE NEXT KILL")));
-	TestEqual(TEXT("after the strike, the Gouda Overload"), StreakNext(5), FString(TEXT("GOUDA OVERLOAD IN 5")));
+	TestEqual(TEXT("from nothing, the UAC in three"), StreakNext(0), FString(TEXT("UAC in 3")));
+	TestEqual(TEXT("one off, the next kill"), StreakNext(4), FString(TEXT("Cheese Strike next kill")));
+	TestEqual(TEXT("after the strike, the Gouda Overload"), StreakNext(5), FString(TEXT("Gouda Overload in 5")));
 	TestEqual(TEXT("after the last"), StreakNext(10), FString(TEXT("EVERY STREAK EARNED")));
-	TestEqual(TEXT("the UAC one off"), StreakNext(1), FString(TEXT("UAC IN 2")));
-	TestEqual(TEXT("the names as the panel says them"), StreakShortName(EStreak::CheeseStrike), FString(TEXT("CHEESE STRIKE")));
+	TestEqual(TEXT("the UAC one off"), StreakNext(1), FString(TEXT("UAC in 2")));
+	TestEqual(TEXT("the names as the panel says them"), StreakShortName(EStreak::CheeseStrike), FString(TEXT("Cheese Strike")));
 	// The pop: big at once, back through its size, a little under, and settled.
 	TestTrue(TEXT("at rest before a kill"), StreakPop(-1.0f) == 1.0f);
-	TestTrue(TEXT("springing up at the kill"), StreakPop(0.0f) > 1.4f);
+	TestTrue(TEXT("springing up at the kill"), StreakPop(0.0f) > 1.7f);
 	TestTrue(TEXT("back down soon"), StreakPop(StreakPopTime / 3.0f) < 1.05f);
 	TestTrue(TEXT("a little under"), StreakPop(StreakPopTime * 0.6f) < 1.0f);
 	TestTrue(TEXT("and settled"), StreakPop(StreakPopTime) == 1.0f && FMath::IsNearlyEqual(StreakPop(StreakPopTime * 0.999f), 1.0f, 0.01f));
@@ -193,6 +194,29 @@ bool FTheStrikeMapFollowsItsMark::RunTest(const FString& Parameters)
 	TestTrue(TEXT("on a turned map, too"), HUDLayoutTests::Near(Turned, Middle + FVector2D(0.0f, -1500.0f), 0.1f));
 	// The strike's area fits the map it is chosen on, wherever the mark is let go.
 	TestTrue(TEXT("the area fits inside the strike map at the furthest the mark goes from its middle"), StrikeMapRange * StrikeMapFollow + CheeseStrikeStreaks::StrikeRadius < StrikeMapRange);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheVerminWordsComeInBigAndAHitThumpsSoftly, "CheeseStrike.HUD.TheVerminWordsComeInBigAndAHitThumpsSoftly", HUDLayoutTests::Flags)
+
+bool FTheVerminWordsComeInBigAndAHitThumpsSoftly::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	const FVerminLook First = VerminLook(0.0f, -1.0f);
+	TestTrue(TEXT("they start 2.5 times as big and clear"), FMath::IsNearlyEqual(First.Scale, 2.5f, 0.01f) && First.Alpha < 0.01f);
+	TestTrue(TEXT("shrink past 1 a little"), VerminLook(VerminEntrance * 0.7f, -1.0f).Scale < 1.0f);
+	const FVerminLook Settled = VerminLook(VerminEntrance + 1.0f, -1.0f);
+	TestTrue(TEXT("and settle solid at 1"), Settled.Scale == 1.0f && Settled.Alpha == 1.0f);
+	TestTrue(TEXT("each counted second swells them"), VerminLook(VerminEntrance + 1.0f, 0.0f).Scale > 1.1f && VerminLook(VerminEntrance + 1.0f, VerminPulse).Scale == 1.0f);
+	// A hit's thump is short, soft and not silent.
+	const TArray<int16> Thump = CheeseStrikeSynth::Thump(1.0f);
+	int32 Loudest = 0;
+	for (const int16 Sample : Thump)
+	{
+		Loudest = FMath::Max(Loudest, FMath::Abs(static_cast<int32>(Sample)));
+	}
+	TestTrue(TEXT("about 60 ms"), FMath::Abs(Thump.Num() - CheeseStrikeSynth::SampleRate * 6 / 100) <= 2);
+	TestTrue(TEXT("audible but not loud"), Loudest > 2000 && Loudest < 30000);
 	return true;
 }
 

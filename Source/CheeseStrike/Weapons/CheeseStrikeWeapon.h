@@ -93,6 +93,7 @@ public:
 	int32 HitsConfirmed = 0;
 	float LastHitDamage = 0.0f;
 	bool bLastHitHead = false;
+	bool bLastHitKill = false;
 	/** Seconds since the server last confirmed a hit, for the HUD's marker. */
 	float SinceHit() const;
 	/** Seconds since it last fired (or struck), as this machine knows: its own player's machine and the server. */
@@ -184,9 +185,9 @@ protected:
 	/** Tells the server the knife was swung from `Origin` along `AimDirection`, at `ClientTime`. */
 	UFUNCTION(Server, Reliable)
 	void ServerStrike(FVector_NetQuantize Origin, FVector_NetQuantizeNormal AimDirection, float ClientTime);
-	/** Tells the shooter the server found their shot hit, for `Damage`, on the head or not. */
+	/** Tells the shooter the server found their shot hit, for `Damage`, on the head or not, and whether it was a kill. */
 	UFUNCTION(Client, Reliable)
-	void ClientHit(float Damage, bool bHead);
+	void ClientHit(float Damage, bool bHead, bool bKill);
 	UFUNCTION(Server, Reliable)
 	void ServerReload();
 	void FinishReload();

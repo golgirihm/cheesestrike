@@ -327,8 +327,8 @@ namespace CheeseStrikeModes
 		case 0:
 			return FLinearColor::FromSRGBColor(FColor(230, 159, 0));
 		case 1:
-			// Mozzarella: a cool pearl white, so that the side reads as a colour of its own, not as the neutral greys.
-			return FLinearColor::FromSRGBColor(FColor(214, 232, 255));
+			// A vivid violet, far in hue from the Gouda Guys' orange (and from the solo hill's green and red), so that the side reads as a colour of its own.
+			return FLinearColor::FromSRGBColor(FColor(140, 70, 255));
 		default:
 			return FLinearColor(0.96f, 0.72f, 0.2f);
 		}

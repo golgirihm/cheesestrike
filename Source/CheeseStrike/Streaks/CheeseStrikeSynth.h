@@ -23,6 +23,8 @@ namespace CheeseStrikeSynth
 	TArray<int16> Siren(float Seconds);
 	/** A grunt when hurt: a voice-like sound of `Seconds`, its pitch times `Pitch`, with a breath of noise. */
 	TArray<int16> Grunt(float Seconds, float Pitch);
+	/** A soft thump like a smack on a pillow: about 60 ms of low-passed noise with a low body, `Weight` times as heavy. */
+	TArray<int16> Thump(float Weight);
 	/** A sound, owned by `Outer`, that plays `Samples` once. */
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples);
 }
