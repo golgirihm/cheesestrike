@@ -149,6 +149,7 @@ ACheeseStrikePodium::ACheeseStrikePodium()
 	for (int32 Place = 0; Place < CheeseStrikePodiums::Places; ++Place)
 	{
 		USkeletalMeshComponent* Hero = CreateDefaultSubobject<USkeletalMeshComponent>(*FString::Printf(TEXT("Hero%d"), Place));
+		Hero->SetAllowClothActors(false);
 		Hero->SetupAttachment(RootComponent);
 		Hero->SetRelativeLocation(SlotAt(Place));
 		// The heroes are modelled facing along +Y; the stage faces +X, the camera's way.
