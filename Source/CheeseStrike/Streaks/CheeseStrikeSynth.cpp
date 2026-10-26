@@ -45,6 +45,32 @@ namespace CheeseStrikeSynth
 		return Samples;
 	}
 
+	TArray<int16> Grunt(float Seconds, float Pitch)
+	{
+		const int32 Count = FMath::Max(1, FMath::RoundToInt(Seconds * SampleRate));
+		TArray<int16> Samples;
+		Samples.SetNumUninitialized(Count);
+		double Phase = 0.0;
+		// A small fixed noise, so that the breath is the same each time: a rough sequence from a seed.
+		uint32 Seed = 1234567u;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const float Along = static_cast<float>(Index) / Count;
+			// The voice falls a little over the grunt, from a low note, with a quick vibrato.
+			const float Frequency = Pitch * FMath::Lerp(180.0f, 120.0f, Along) * (1.0f + 0.02f * FMath::Sin(2.0f * PI * 9.0f * Index / SampleRate));
+			Phase += 2.0 * PI * Frequency / SampleRate;
+			// Harmonics, the middle ones loudest, as a throat's are: the vowel's shape.
+			const float Voice = FMath::Sin(Phase) + 0.6f * FMath::Sin(2.0 * Phase) + 0.5f * FMath::Sin(3.0 * Phase) + 0.3f * FMath::Sin(4.0 * Phase) + 0.15f * FMath::Sin(5.0 * Phase);
+			Seed = Seed * 1664525u + 1013904223u;
+			const float Breath = (static_cast<float>(Seed >> 8) / 16777216.0f - 0.5f) * 0.12f;
+			// A sharp start, a push and a fall away.
+			const float Envelope = FMath::Min(1.0f, Along * Seconds / 0.02f) * FMath::Pow(1.0f - Along, 1.5f);
+			const float Value = (Voice * 0.22f + Breath) * Envelope;
+			Samples[Index] = static_cast<int16>(FMath::Clamp(Value, -1.0f, 1.0f) * 32767.0f);
+		}
+		return Samples;
+	}
+
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples)
 	{
 		USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(Outer);

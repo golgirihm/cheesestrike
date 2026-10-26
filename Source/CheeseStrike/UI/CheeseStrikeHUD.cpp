@@ -359,6 +359,7 @@ void ACheeseStrikeHUD::DrawHUD()
 	if (bAlive)
 	{
 		DrawVignette(Character);
+		DrawFallFlash(Character);
 		DrawDamageArcs(Character);
 		DrawFight(Character, FieldOfView);
 	}
@@ -867,6 +868,18 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 			Y += Row;
 		}
 	}
+}
+
+void ACheeseStrikeHUD::DrawFallFlash(const ACheeseStrikeCharacter* Character)
+{
+	const float Alpha = CheeseStrikeHUD::FallFlashAlpha(GetWorld()->GetTimeSeconds() - Character->GetFallFlashAt());
+	if (Alpha <= 0.0f)
+	{
+		return;
+	}
+	HudDraw::FShapes Shapes;
+	Shapes.RoundedRect(0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY, 0.0f, FLinearColor(0.75f, 0.03f, 0.03f, Alpha));
+	Shapes.Draw(Canvas);
 }
 
 void ACheeseStrikeHUD::DrawVignette(const ACheeseStrikeCharacter* Character)
