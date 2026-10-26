@@ -104,13 +104,20 @@ FString UCheeseStrikeCurtainSubsystem::WhereTo(const FString& Level, const UWorl
 	{
 		return TEXT("Going to the lobby");
 	}
-	// From a match the lobby sent everyone to, or one over, the level it goes to is its lobby: after the results, or the
-	// host's Back to Lobby.
-	const ACheeseStrikeGameState* Match = From != nullptr ? From->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	// The front end's level is the lobby's too, so a lobby (or a match's results) going back there is the lobby while its session is
+	// still open. Once the session is closed, leaving the lobby is going back to the menu, which is the same level.
+	const bool bSessionOpen = Sessions != nullptr && Sessions->IsInAMatch();
+	const bool bFrontEnd = Level.EndsWith(TEXT("Lvl_Shooter"));
 	// (Not by the match's state: leaving any level, the lobby too, counts as the match's end.)
+	const ACheeseStrikeGameState* Match = From != nullptr ? From->GetGameState<ACheeseStrikeGameState>() : nullptr;
 	if (Match != nullptr && (Match->GetPlayersExpected() > 0 || !Match->GetWinnerName().IsEmpty()))
 	{
-		return TEXT("Back to the lobby");
+		return bSessionOpen ? TEXT("Back to the lobby") : TEXT("Back to the menu");
+	}
+	if (bFrontEnd)
+	{
+		// Starting the game is no trip anywhere: the front end is where it opens.
+		return Match != nullptr ? TEXT("Back to the menu") : TEXT("Loading");
 	}
 	const int32 MapIndex = CheeseStrikeRules::MapIndexFor(Level);
 	return MapIndex >= 0 ? FString::Printf(TEXT("Going to %s"), CheeseStrikeRules::Maps[MapIndex].Name) : FString(TEXT("Loading"));
