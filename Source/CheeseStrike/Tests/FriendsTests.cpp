@@ -5,6 +5,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Rules/CheeseStrikeFriends.h"
+#include "Sessions/CheeseStrikeSessions.h"
 
 namespace FriendsTests
 {
@@ -42,5 +43,18 @@ bool FAnyoneInAGameInvitesAndOnlyTheHostKicks::RunTest(const FString& Parameters
 	TestTrue(TEXT("the host kicks a joiner"), CanKick(true, false));
 	TestFalse(TEXT("a joiner kicks nobody"), CanKick(false, false));
 	TestFalse(TEXT("the host doesn't kick themself"), CanKick(true, true));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFriendsMayJoinIsTheHostsChoice, "CheeseStrike.Friends.TheHostsChoice", FriendsTests::Flags)
+
+bool FFriendsMayJoinIsTheHostsChoice::RunTest(const FString& Parameters)
+{
+	const FOnlineSessionSettings Settings = CheeseStrikeSessions::HostSettings(TEXT(""), false);
+	TestTrue(TEXT("friends may join a new game"), CheeseStrikeSessions::FriendsMayJoin(Settings));
+	const FOnlineSessionSettings Invite = CheeseStrikeSessions::WithFriendsMayJoin(Settings, false);
+	TestFalse(TEXT("the host can shut them out: invitations only"), CheeseStrikeSessions::FriendsMayJoin(Invite));
+	TestFalse(TEXT("so the game is not joinable through a friend's presence"), Invite.bAllowJoinViaPresence);
+	TestTrue(TEXT("and the host can let them back in"), CheeseStrikeSessions::FriendsMayJoin(CheeseStrikeSessions::WithFriendsMayJoin(Invite, true)));
 	return true;
 }

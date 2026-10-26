@@ -28,7 +28,12 @@ UTexture2D* UCheeseStrikeAvatars::For(const APlayerState* Player)
 	{
 		return nullptr;
 	}
-	const uint64 Id = CheeseStrikeHUD::SteamIdFrom(Player->GetUniqueId().GetType().ToString(), Player->GetUniqueId().ToString());
+	return ForUniqueId(Player->GetUniqueId().GetType().ToString(), Player->GetUniqueId().ToString(), Player->GetWorld());
+}
+
+UTexture2D* UCheeseStrikeAvatars::ForUniqueId(const FString& Type, const FString& Text, const UWorld* World)
+{
+	const uint64 Id = CheeseStrikeHUD::SteamIdFrom(Type, Text);
 	if (Id == 0)
 	{
 		return nullptr;
@@ -37,7 +42,6 @@ UTexture2D* UCheeseStrikeAvatars::For(const APlayerState* Player)
 	{
 		return *Found;
 	}
-	const UWorld* World = Player->GetWorld();
 	if (World == nullptr || !UsesSteam(World))
 	{
 		return nullptr;

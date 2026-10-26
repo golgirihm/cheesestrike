@@ -25,6 +25,8 @@ class CHEESESTRIKE_API UCheeseStrikeAvatars : public UObject
 public:
 	/** `Player`'s picture, or null: without Steam, for a bot, or until Steam has it (it is asked again now and then). */
 	UTexture2D* For(const APlayerState* Player);
+	/** The picture of the Steam user with this unique id (its type and text), or null: as For, for a friend who isn't in the game. */
+	UTexture2D* ForUniqueId(const FString& Type, const FString& Text, const UWorld* World);
 
 	/** Whether this game is on the Steam online service. */
 	static bool UsesSteam(const UWorld* World);

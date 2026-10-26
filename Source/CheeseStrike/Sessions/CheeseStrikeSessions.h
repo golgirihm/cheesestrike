@@ -32,6 +32,11 @@ namespace CheeseStrikeSessions
 	/** A match to be hosted with the URL `Options` (`?KillLimit=10?RespawnDelay=1`), over the local network or the service. */
 	FOnlineSessionSettings HostSettings(const FString& Options, bool bLan);
 
+	/** Whether a match's settings let friends in (by their game, on the presence); else only invitations do. */
+	bool FriendsMayJoin(const FOnlineSessionSettings& Settings);
+	/** The settings with friends let in, or not (invitations only). */
+	FOnlineSessionSettings WithFriendsMayJoin(FOnlineSessionSettings Settings, bool bFriends);
+
 	/** A search for matches of this game, over the local network or the service. */
 	TSharedRef<FOnlineSessionSearch> Search(bool bLan);
 
