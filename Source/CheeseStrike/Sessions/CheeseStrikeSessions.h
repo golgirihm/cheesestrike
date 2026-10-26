@@ -54,6 +54,8 @@ namespace CheeseStrikeSessions
 		HostLeftTheMatch,
 		/** The connection to the host was lost: it timed out or closed with no word from the host. */
 		ConnectionLost,
+		/** The host removed them from the game (the friends panel's Kick). */
+		Kicked,
 		/** The host couldn't be reached on joining. */
 		CouldNotJoin,
 	};

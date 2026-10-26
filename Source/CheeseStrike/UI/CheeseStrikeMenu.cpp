@@ -36,6 +36,7 @@
 #include "Rules/CheeseStrikeBots.h"
 #include "Rules/CheeseStrikeHills.h"
 #include "Rules/CheeseStrikeModes.h"
+#include "Rules/CheeseStrikeFriends.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "UI/CheeseStrikeControls.h"
 #include "UI/CheeseStrikeCredits.h"
@@ -600,6 +601,22 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 				SAssignNew(Content, SBox).WidthOverride(400.0f).VAlign(VAlign_Center)
 			]
 		]
+		// The friends, on the right: a tab, opened by hovering it in the lobby, and open on the find page.
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Fill)
+		[
+			SAssignNew(FriendsBox, SBox).WidthOverride(120.0f).Visibility(EVisibility::Collapsed)
+			[
+				SAssignNew(FriendsContent, SBox)
+			]
+		]
+		// The question before closing the host's lobby or quitting: over everything, and it takes every press.
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SAssignNew(Dialog, SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f)).Visibility(EVisibility::Collapsed)
+			[
+				SAssignNew(DialogContent, SBox).WidthOverride(480.0f)
+			]
+		]
 	];
 }
 
@@ -632,6 +649,54 @@ void SCheeseStrikeMenu::Show(EMenuPage InPage)
 void SCheeseStrikeMenu::Refresh()
 {
 	MenuFocusRingsShown = CheeseStrikeInput::DeviceOf(Controller.Get()) != CheeseStrikeInput::EDevice::Mouse;
+	if (FriendsBox.IsValid())
+	{
+		UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Controller.Get());
+		const bool bPanel = Page == EMenuPage::Lobby || Page == EMenuPage::Find;
+		// Open on the find page, and in the lobby while hovered.
+		const bool bOpen = bPanel && (Page == EMenuPage::Find || FriendsBox->IsHovered());
+		FriendsBox->SetVisibility(bPanel ? EVisibility::Visible : EVisibility::Collapsed);
+		FriendsBox->SetWidthOverride(bOpen ? 380.0f : 120.0f);
+		if (!bPanel)
+		{
+			bFriendsRequested = false;
+		}
+		else if (bOpen && !bFriendsRequested && Sessions != nullptr)
+		{
+			bFriendsRequested = true;
+			Sessions->RefreshFriends();
+		}
+		// Drawn again only when a friend, a player or the status changes (rebuilding it would restart a spinner).
+		FString Key = FString::Printf(TEXT("%d|%s|"), bOpen ? 1 : 0, Sessions != nullptr ? *Sessions->GetStatus() : TEXT(""));
+		if (Sessions != nullptr)
+		{
+			for (const FCheeseStrikeFriend& Each : Sessions->GetFriends())
+			{
+				Key += FString::Printf(TEXT("%s/%d/%d;"), *Each.Name, static_cast<int32>(Each.State), Each.Humans);
+			}
+		}
+		if (const ACheeseStrikeGameState* State = Controller.IsValid() ? Controller->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr)
+		{
+			for (const APlayerState* Each : State->PlayerArray)
+			{
+				Key += FString::Printf(TEXT("%s%s;"), *Each->GetPlayerName(), Each->IsABot() ? TEXT("*") : TEXT(""));
+			}
+		}
+		if (Key != ShownFriendsKey && FriendsContent.IsValid())
+		{
+			ShownFriendsKey = Key;
+			FriendsContent->SetContent(MakeFriendsPanel(bOpen));
+		}
+	}
+	if (Dialog.IsValid())
+	{
+		Dialog->SetVisibility(Asking != EMenuAsk::None ? EVisibility::Visible : EVisibility::Collapsed);
+		if (Asking != ShownAsk && DialogContent.IsValid())
+		{
+			ShownAsk = Asking;
+			DialogContent->SetContent(MakeDialog());
+		}
+	}
 	const bool bLobby = Page == EMenuPage::Lobby;
 	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
 	// The credits and the options are wide: a wider panel, and the game's name out of their way.
@@ -916,40 +981,51 @@ FReply SCheeseStrikeMenu::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& 
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeCloseLobbyButton()
 {
-	// The host's first click arms it; the second closes the lobby, for everyone.
-	return MakeButton(bArmedCloseLobby ? TEXT("CONFIRM: CLOSE LOBBY") : TEXT("CLOSE LOBBY"), [this]()
-	{
-		if (!bArmedCloseLobby)
-		{
-			bArmedCloseLobby = true;
-			Refresh();
-			return;
-		}
-		bArmedCloseLobby = false;
-		if (Controller.IsValid())
-		{
-			Controller->LeaveFromMenu();
-		}
-	}, EButtonKind::Danger);
+	return MakeButton(TEXT("CLOSE LOBBY"), [this]() { AskBefore(EMenuAsk::CloseLobby); }, EButtonKind::Danger);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeQuitButton()
 {
-	// Quit asks for a second click too, as closing the lobby does.
-	return MakeButton(bArmedQuit ? TEXT("CONFIRM: QUIT") : TEXT("QUIT"), [this]()
-	{
-		if (!bArmedQuit)
-		{
-			bArmedQuit = true;
-			Refresh();
-			return;
-		}
-		bArmedQuit = false;
-		if (Controller.IsValid())
-		{
-			Controller->QuitFromMenu();
-		}
-	}, EButtonKind::Danger);
+	return MakeButton(TEXT("QUIT"), [this]() { AskBefore(EMenuAsk::Quit); }, EButtonKind::Danger);
+}
+
+void SCheeseStrikeMenu::AskBefore(EMenuAsk Question)
+{
+	Asking = Question;
+	// The focus starts on keeping things as they are, so that a press too many doesn't close the lobby or quit.
+	FocusName = Question == EMenuAsk::CloseLobby ? TEXT("KEEP IT OPEN") : TEXT("KEEP PLAYING");
+	FocusIndex = 0;
+	bFocusPending = true;
+	Refresh();
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeDialog()
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	const bool bClose = Asking == EMenuAsk::CloseLobby;
+	const FString Keep = bClose ? TEXT("KEEP IT OPEN") : TEXT("KEEP PLAYING");
+	return SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(PanelColour).Padding(FMargin(32.0f, 28.0f))
+	[
+		SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(bClose ? TEXT("CLOSE THE LOBBY?") : TEXT("QUIT THE GAME?")) ]
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			MakeLine(bClose ? TEXT("Everyone in it is sent home, and nobody can join it again.") : TEXT("The game closes. In a lobby, the joiners are told first."), true)
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 20.0f, 0.0f, 0.0f))
+		[
+			MakeButton(bClose ? TEXT("CLOSE LOBBY") : TEXT("QUIT"), [this, Player, bClose]()
+			{
+				Asking = EMenuAsk::None;
+				Refresh();
+				if (Player.IsValid())
+				{
+					if (bClose) { Player->LeaveFromMenu(); } else { Player->QuitFromMenu(); }
+				}
+			}, EButtonKind::Danger)
+		]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(Keep, [this]() { Asking = EMenuAsk::None; Refresh(); }) ]
+	];
 }
 
 void SCheeseStrikeMenu::ConfirmBackToLobby(bool bAsk)
@@ -971,6 +1047,12 @@ FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 	{
 		if (Key != EKeys::Gamepad_Special_Right && CloseDropdowns())
 		{
+			return FReply::Handled();
+		}
+		if (Asking != EMenuAsk::None && Key != EKeys::Gamepad_Special_Right)
+		{
+			Asking = EMenuAsk::None;
+			Refresh();
 			return FReply::Handled();
 		}
 		if (Page == EMenuPage::Pause && bConfirmingBackToLobby)
@@ -1327,16 +1409,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
 	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
 	const bool bJoining = Sessions != nullptr && Sessions->GetPending() == ESessionPending::Joining;
 	const bool bSearching = Sessions != nullptr && Sessions->IsBusy() && !bJoining;
-	TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
-	if (Sessions != nullptr)
-	{
-		const TArray<FString>& Found = Sessions->GetFound();
-		for (int32 Index = 0; Index < Found.Num(); ++Index)
-		{
-			List->AddSlot().AutoHeight() [ MakeButton(Found[Index], [Sessions, Index]() { Sessions->Join(Index); }) ];
-		}
-	}
-	// What is going on, with a spinner while it goes on: looking, or, once a match is picked, joining it until its lobby comes.
+	// What is going on, with a spinner while it goes on: joining a friend's game until its lobby comes.
 	const FString Status = bJoining ? FString(TEXT("Joining the lobby")) : (Sessions != nullptr ? Sessions->GetStatus() : FString(TEXT("No online service")));
 	TSharedRef<SHorizontalBox> StatusRow = SNew(SHorizontalBox);
 	if (bJoining || bSearching)
@@ -1347,14 +1420,100 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FIND A MATCH")) ]
 		+ SVerticalBox::Slot().AutoHeight() [ StatusRow ]
-		+ SVerticalBox::Slot().AutoHeight()
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f))
 		[
-			// Nothing to press while joining: the match picked is on its way.
+			// Nothing to press while joining: the game picked is on its way.
 			SNew(SVerticalBox).IsEnabled(!bJoining)
-			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ SNew(SScrollBox) + SScrollBox::Slot() [ List ] ]
-			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("SEARCH AGAIN"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); }) ]
-			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); }) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Matches are the games of your friends, and the ones you're invited to. The friends on the right are their games; there's no public list."), true, true) ]
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); }) ];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
+	if (!bOpen)
+	{
+		return SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(PanelColour).Padding(FMargin(12.0f, 24.0f))
+		[
+			MakeLine(TEXT("FRIENDS"), false)
 		];
+	}
+	TSharedRef<SVerticalBox> Friends = SNew(SVerticalBox);
+	if (Sessions != nullptr)
+	{
+		const TArray<FCheeseStrikeFriend>& List = Sessions->GetFriends();
+		if (List.IsEmpty())
+		{
+			Friends->AddSlot().AutoHeight() [ MakeLine(TEXT("No friends in a game of this one right now."), true) ];
+		}
+		for (int32 Index = 0; Index < List.Num(); ++Index)
+		{
+			Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 4.0f)) [ MakeFriendRow(Index) ];
+		}
+	}
+	// In the game (a lobby or a match): who is in it, and the host's Kick.
+	TSharedRef<SVerticalBox> Players = SNew(SVerticalBox);
+	const bool bHost = Player.IsValid() && Player->IsLocalController() && Player->HasAuthority();
+	const bool bInGame = Sessions != nullptr && Sessions->IsInAMatch();
+	if (bInGame)
+	{
+		if (const ACheeseStrikeGameState* State = Player.IsValid() ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr)
+		{
+			for (const APlayerState* Each : State->PlayerArray)
+			{
+				if (Each == nullptr || Each->IsABot())
+				{
+					continue;
+				}
+				const bool bSelf = Each == Player->PlayerState;
+				TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center) [ MakeLine(Each->GetPlayerName() + (bSelf ? TEXT("  (you)") : TEXT("")), false) ];
+				if (CheeseStrikeFriends::CanKick(bHost, bSelf))
+				{
+					const ACheeseStrikePlayerState* Who = Cast<ACheeseStrikePlayerState>(Each);
+					Row->AddSlot().AutoWidth().VAlign(VAlign_Center) [ MakeButton(TEXT("KICK"), [Player, Who]() { if (Player.IsValid() && Who != nullptr) Player->KickFromMenu(const_cast<ACheeseStrikePlayerState*>(Who)); }, EButtonKind::Danger) ];
+				}
+				Players->AddSlot().AutoHeight().Padding(FMargin(0.0f, 2.0f)) [ Row ];
+			}
+		}
+	}
+	return SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(PanelColour).Padding(FMargin(24.0f, 28.0f))
+	[
+		SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FRIENDS")) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Sessions != nullptr ? Sessions->GetStatus() : FString(TEXT("No online service")), true) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ MakeButton(TEXT("REFRESH"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); }) ]
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ Friends ] ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 14.0f, 0.0f, 0.0f)) [ bInGame ? MakeLine(TEXT("In this game"), true) : SNullWidget::NullWidget ]
+		+ SVerticalBox::Slot().AutoHeight() [ Players ]
+	];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
+	const FCheeseStrikeFriend& Friend = Sessions->GetFriends()[Index];
+	const bool bInAGame = Sessions != nullptr && Sessions->IsInAMatch();
+	TSharedRef<SWidget> Action = SNew(SSpacer);
+	if (Friend.State == CheeseStrikeFriends::EState::Join)
+	{
+		Action = MakeButton(TEXT("JOIN"), [Sessions, Index]() { Sessions->JoinFriend(Index); }, EButtonKind::Primary);
+	}
+	else if (bInAGame && CheeseStrikeFriends::CanInvite(true, false) && Friend.State != CheeseStrikeFriends::EState::Full)
+	{
+		Action = MakeButton(TEXT("INVITE"), [Sessions, Index]() { Sessions->InviteFriend(Index); });
+	}
+	return SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Friend.Name, false) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(CheeseStrikeFriends::StateLine(Friend.State, Friend.Humans), true) ]
+		]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Action ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const CheeseStrikeRules::FRosterEntry& Seat, bool bHost, const FLinearColor& Colour, bool bMine, TFunction<void()> Click)

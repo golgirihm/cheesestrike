@@ -140,6 +140,21 @@ public:
 	 */
 	UFUNCTION(Client, Reliable)
 	void ClientHostLeft(bool bInMatch);
+
+	/** A joiner: the host removed them from the game. They go back to the front end, which says so. */
+	UFUNCTION(Client, Reliable)
+	void ClientKicked();
+
+	/** The host asks the server to remove `Who` (the friends panel's Kick); only the host's own controller can. */
+	UFUNCTION(Server, Reliable)
+	void ServerKick(ACheeseStrikePlayerState* Who);
+
+	/** The host's console: `CheeseStrikeKick <name>`, for looking at it. */
+	UFUNCTION(Exec)
+	void CheeseStrikeKick(const FString& Name);
+
+	/** The menu's Kick: on the host, asks the server to remove `Who`. */
+	void KickFromMenu(ACheeseStrikePlayerState* Who);
 	/** Looks for matches, through the service or the local network without Steam. */
 	void FindFromMenu();
 	/** The host starts the match, after the countdown. */
