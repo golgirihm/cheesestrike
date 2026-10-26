@@ -84,7 +84,6 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Set->DrawKnife = MakeAction(Set, TEXT("IA_DrawKnife"), EInputActionValueType::Boolean);
 	Set->NextWeapon = MakeAction(Set, TEXT("IA_NextWeapon"), EInputActionValueType::Boolean);
 	Set->PreviousWeapon = MakeAction(Set, TEXT("IA_PreviousWeapon"), EInputActionValueType::Boolean);
-	Set->LastWeapon = MakeAction(Set, TEXT("IA_LastWeapon"), EInputActionValueType::Boolean);
 	Set->Scoreboard = MakeAction(Set, TEXT("IA_Scoreboard"), EInputActionValueType::Boolean);
 	Set->Menu = MakeAction(Set, TEXT("IA_Menu"), EInputActionValueType::Boolean);
 	Set->Streak = MakeAction(Set, TEXT("IA_Streak"), EInputActionValueType::Boolean);
@@ -126,9 +125,9 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->Aim, EKeys::Gamepad_LeftTrigger);
 	Map(Context, Set->Reload, EKeys::R);
 	Map(Context, Set->Reload, EKeys::Gamepad_FaceButton_Left);
-	// Changing weapons: the number keys, the wheel (down for the next), Q for the last; on a gamepad, the d-pad for each,
+	// Changing weapons: the number keys, the wheel (down for the next); on a gamepad, the d-pad for each,
 	// the top face button for the next, and pressing the right stick for the knife (a console shooter's melee). With three
-	// weapons the d-pad reaches each at once, so the one before and the last have no button of their own.
+	// weapons the d-pad reaches each at once, so the one before has no button of their own.
 	Map(Context, Set->DrawPrimary, EKeys::One);
 	Map(Context, Set->DrawPrimary, EKeys::Gamepad_DPad_Up);
 	Map(Context, Set->DrawSidearm, EKeys::Two);
@@ -139,13 +138,12 @@ UCheeseStrikeInputSet* UCheeseStrikeInputSet::Build(UObject* Outer)
 	Map(Context, Set->NextWeapon, EKeys::MouseScrollDown);
 	Map(Context, Set->NextWeapon, EKeys::Gamepad_FaceButton_Top);
 	Map(Context, Set->PreviousWeapon, EKeys::MouseScrollUp);
-	Map(Context, Set->LastWeapon, EKeys::Q);
 	Map(Context, Set->Scoreboard, EKeys::Tab);
 	Map(Context, Set->Scoreboard, EKeys::Gamepad_Special_Left);
 	Map(Context, Set->Menu, EKeys::Escape);
 	Map(Context, Set->Menu, EKeys::Gamepad_Special_Right);
-	// Kill streaks: 4, and the d-pad's last way.
-	Map(Context, Set->Streak, EKeys::Four);
+	// Kill streaks: Q (wave 9; it was 4, and Q the last weapon), and the d-pad's last way.
+	Map(Context, Set->Streak, EKeys::Q);
 	Map(Context, Set->Streak, EKeys::Gamepad_DPad_Down);
 	// Grenades: G, and the right bumper.
 	Map(Context, Set->Grenade, EKeys::G);

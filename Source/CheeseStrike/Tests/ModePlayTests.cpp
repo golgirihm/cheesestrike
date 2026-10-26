@@ -936,7 +936,7 @@ bool FGunGameMovesUpTheLadderToTheKnife::RunTest(const FString& Parameters)
 		TestEqual(TEXT("and no grenades"), Host->GetGrenades()->GetCount(), 0);
 	});
 	// Every way of changing weapons does nothing: there is nothing to change to, and the HUD lists only the one.
-	Play(0, TEXT("tap Knife\nwait 0.3\ntap Sidearm\nwait 0.3\ntap NextWeapon\nwait 0.3\ntap PreviousWeapon\nwait 0.3\ntap LastWeapon\nwait 0.3"));
+	Play(0, TEXT("tap Knife\nwait 0.3\ntap Sidearm\nwait 0.3\ntap NextWeapon\nwait 0.3\ntap PreviousWeapon\nwait 0.3"));
 	Then([this]()
 	{
 		const TArray<FName>& Ladder = CheeseStrikeArsenal::GunGameLadder();

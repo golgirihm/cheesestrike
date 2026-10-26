@@ -282,8 +282,9 @@ namespace CheeseStrikeModes
 	/**
 	 * A side's colour, the game's one, on the lobby's chips and columns, the
 	 * HUD and the announcements: The Gouda Guys' orange (Okabe and Ito's)
-	 * and the Mozza Radicals' vivid violet (a hue far from the orange, and from
-	 * the solo hill's green and red); any other team, as in a
+	 * and the Mozza Radicals' very bright white, as mozzarella's (which any eye
+	 * tells from the orange; the HUD edges it in dark where it could meet a
+	 * pale ground, HudDraw::Text); any other team, as in a
 	 * free-for-all, a cheese yellow.
 	 */
 	FLinearColor TeamColour(int32 Team);

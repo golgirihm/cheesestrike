@@ -213,7 +213,7 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	{
 		const FVector2D PanelMin(Left, Top);
 		const FVector2D PanelMax(Left + PanelWidth, Top + PanelHeight);
-		Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(CheeseStrikeHUD::RoundedRect(PanelMin, PanelMax, PanelRound), PanelMin, FVector2D(PanelMax.X, Top + 3.0f * U)), bOver ? HudDraw::Accent : HudDraw::Ink);
+		Shapes.SmoothPolygon(CheeseStrikeHUD::TopStrip(PanelMin, PanelMax, PanelRound, 3.0f * U), bOver ? HudDraw::Accent : HudDraw::Ink);
 	}
 	Shapes.Rect(Left + 20.0f * U, Top + 104.0f * U, PanelWidth - 40.0f * U, U, HudDraw::Rule);
 	{

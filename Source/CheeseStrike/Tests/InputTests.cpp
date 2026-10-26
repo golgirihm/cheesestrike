@@ -59,7 +59,7 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	TestTrue(TEXT("so does the gamepad's left special button"), InputTests::Has(Set->KeysFor(Set->Scoreboard), EKeys::Gamepad_Special_Left));
 	TestTrue(TEXT("escape opens the menu"), InputTests::Has(Set->KeysFor(Set->Menu), EKeys::Escape));
 	TestTrue(TEXT("so does the gamepad's right special button"), InputTests::Has(Set->KeysFor(Set->Menu), EKeys::Gamepad_Special_Right));
-	TestTrue(TEXT("4 calls in a streak"), InputTests::Has(Set->KeysFor(Set->Streak), EKeys::Four));
+	TestTrue(TEXT("Q calls in a streak"), InputTests::Has(Set->KeysFor(Set->Streak), EKeys::Q));
 	TestTrue(TEXT("so does the d-pad's down"), InputTests::Has(Set->KeysFor(Set->Streak), EKeys::Gamepad_DPad_Down));
 	TestTrue(TEXT("G throws a grenade"), InputTests::Has(Set->KeysFor(Set->Grenade), EKeys::G));
 	TestTrue(TEXT("so does the right bumper"), InputTests::Has(Set->KeysFor(Set->Grenade), EKeys::Gamepad_RightShoulder));
@@ -75,16 +75,15 @@ bool FTheKeysAreTheGodotGames::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the wheel down draws the next"), InputTests::Has(Set->KeysFor(Set->NextWeapon), EKeys::MouseScrollDown));
 	TestTrue(TEXT("so does the top face button"), InputTests::Has(Set->KeysFor(Set->NextWeapon), EKeys::Gamepad_FaceButton_Top));
 	TestTrue(TEXT("the wheel up the one before"), InputTests::Has(Set->KeysFor(Set->PreviousWeapon), EKeys::MouseScrollUp));
-	TestTrue(TEXT("Q the last"), InputTests::Has(Set->KeysFor(Set->LastWeapon), EKeys::Q));
 	TestTrue(TEXT("the d-pad up draws the primary"), InputTests::Has(Set->KeysFor(Set->DrawPrimary), EKeys::Gamepad_DPad_Up));
 	TestTrue(TEXT("left the sidearm"), InputTests::Has(Set->KeysFor(Set->DrawSidearm), EKeys::Gamepad_DPad_Left));
 	TestTrue(TEXT("right the knife"), InputTests::Has(Set->KeysFor(Set->DrawKnife), EKeys::Gamepad_DPad_Right));
-	TestEqual(TEXT("and the last has only Q"), Set->KeysFor(Set->LastWeapon).Num(), 1);
+	TestEqual(TEXT("the streak has Q and the pad"), Set->KeysFor(Set->Streak).Num(), 2);
 
 	// No key does two things.
 	TArray<FKey> All;
 	for (const UInputAction* Action : {Set->Jump.Get(), Set->Sprint.Get(), Set->Crouch.Get(), Set->Fire.Get(), Set->Aim.Get(), Set->Reload.Get(), Set->Scoreboard.Get(), Set->Menu.Get(),
-		Set->DrawPrimary.Get(), Set->DrawSidearm.Get(), Set->DrawKnife.Get(), Set->NextWeapon.Get(), Set->PreviousWeapon.Get(), Set->LastWeapon.Get(), Set->Streak.Get(), Set->Interact.Get(),
+		Set->DrawPrimary.Get(), Set->DrawSidearm.Get(), Set->DrawKnife.Get(), Set->NextWeapon.Get(), Set->PreviousWeapon.Get(), Set->Streak.Get(), Set->Interact.Get(),
 		Set->Grenade.Get(), Set->SprintToggle.Get(), Set->CrouchToggle.Get()})
 	{
 		for (const FKey& Key : Set->KeysFor(Action))

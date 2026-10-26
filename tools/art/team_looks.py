@@ -10,7 +10,7 @@ import unreal, traceback
 # Materials/Teams folder, with the colour parameters that paint its armour
 # (or coat, or metal) set to the side's colour, as the lobby and the HUD show
 # it (CheeseStrikeModes::TeamColour): the Gouda Guys orange, the Mozza Radicals
-# violet. Only parameters change, so the instances share their parents'
+# white. Only parameters change, so the instances share their parents'
 # shaders. CheeseStrikeBodies names the slots (TeamSlots), and
 # ACheeseStrikeCharacter puts the instances on.
 
@@ -18,7 +18,7 @@ def linear(r, g, b):
     return [((c / 255.0) / 12.92) if c / 255.0 <= 0.04045 else (((c / 255.0) + 0.055) / 1.055) ** 2.4 for c in (r, g, b)]
 
 # The sides' colours (CheeseStrikeMenu::TeamColour), as linear colours.
-SIDES = {"Gouda": linear(230, 159, 0), "Mozza": linear(180, 120, 255)}
+SIDES = {"Gouda": linear(230, 159, 0), "Mozza": linear(255, 255, 250)}
 
 # Each hero: its Materials folder, and for each slot, the colour parameters to
 # set and how bright (the side's colour times this: a parameter that paints a
@@ -46,9 +46,9 @@ LOOKS = {
     }),
 }
 
-# Brighter or darker than the brightness above for a side on a hero, by name: none now. (The Mozza Radicals were mozzarella white and
-# needed lifting on three heroes; their violet is put on as the Gouda Guys' orange is.)
-WHITER = {}
+# The Mozza Radicals' white is put on brighter than the brightness above (tuned for darker colours) on the heroes whose armour would
+# otherwise read as a dull grey, so that it reads as a very bright white (wave 9; violet in wave 8, white before it).
+WHITER = {"Mozza": {"Belica": 2.4, "Murdock": 1.7, "Twinblast": 1.9, "Wraith": 1.15}}
 
 OUT = unreal.Paths.project_saved_dir() + "team_looks.txt"
 lines = []

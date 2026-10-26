@@ -327,8 +327,9 @@ namespace CheeseStrikeModes
 		case 0:
 			return FLinearColor::FromSRGBColor(FColor(230, 159, 0));
 		case 1:
-			// A vivid violet, far in hue from the Gouda Guys' orange (and from the solo hill's green and red), so that the side reads as a colour of its own.
-			return FLinearColor::FromSRGBColor(FColor(180, 120, 255));
+			// Mozzarella, a very bright white (wave 9; wave 8 had made it violet). Far from the orange, and from the solo hill's neutral grey in brightness;
+			// the HUD edges its words in dark (HudDraw::Text) and the menu's chips keep dark words on it, so that it reads on a pale ground and carries text.
+			return FLinearColor::FromSRGBColor(FColor(255, 255, 250));
 		default:
 			return FLinearColor(0.96f, 0.72f, 0.2f);
 		}

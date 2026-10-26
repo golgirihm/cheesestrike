@@ -72,7 +72,7 @@ public:
 	/** Where a bone of place `Place`'s hero is now, in the mesh's own space (for telling that it moves); zero without one. */
 	FVector BoneOf(int32 Place, FName Bone) const;
 
-	/** The cheese glyph of a number, 1 to 9 (UI/Countdown), for the places. */
+	/** The cheese glyph of a place's number, 1 to 3 (UI/Countdown/T_Podium_*, straight on). */
 	UTexture2D* Glyph(int32 Number) const;
 
 	virtual void Tick(float DeltaSeconds) override;

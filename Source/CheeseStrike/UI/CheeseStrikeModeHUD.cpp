@@ -141,7 +141,7 @@ namespace
 				Name += FString::Printf(TEXT("  +%d"), Ready.Num() - 1);
 			}
 			const FVector2D NameSize = HudDraw::Measure(Name, Line);
-			// The key's box fits its label: "4", or the d-pad's down.
+			// The key's box fits its label: "Q", or the d-pad's down.
 			const float Key = FMath::Max(NameSize.Y * 0.95f, static_cast<float>(HudDraw::Measure(StreakKey, Line).X) + 10.0f * U);
 			const float KeyHigh = NameSize.Y * 0.95f;
 			const float Width = Key + 10.0f * U + NameSize.X;

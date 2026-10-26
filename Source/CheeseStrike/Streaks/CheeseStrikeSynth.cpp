@@ -85,9 +85,11 @@ namespace CheeseStrikeSynth
 			const float Noise = static_cast<float>(Seed >> 8) / 16777216.0f - 0.5f;
 			// A one-pole low-pass keeps the noise dull; a falling low tone gives it body.
 			Low += (Noise - Low) * 0.18f;
-			const float Body = FMath::Sin(2.0f * PI * FMath::Lerp(140.0f, 70.0f, Along) * Index / SampleRate);
-			const float Envelope = FMath::Min(1.0f, Along * 0.06f / 0.004f) * FMath::Pow(1.0f - Along, 2.0f);
-			const float Value = (Low * 2.4f + Body * 0.5f) * Envelope * 0.7f * Weight;
+			// Wave 9: the old thump was a quiet 140 Hz tone that died within a few milliseconds (a squared envelope), so it was lost under the
+			// shots. The tone is higher (laptop speakers show it), fuller, and the envelope falls away more slowly.
+			const float Body = FMath::Sin(2.0f * PI * FMath::Lerp(220.0f, 100.0f, Along) * Index / SampleRate);
+			const float Envelope = FMath::Min(1.0f, Along * 0.06f / 0.004f) * FMath::Pow(1.0f - Along, 1.3f);
+			const float Value = (Low * 2.4f + Body * 0.9f) * Envelope * 0.7f * Weight;
 			Samples[Index] = static_cast<int16>(FMath::Clamp(Value, -1.0f, 1.0f) * 32767.0f);
 		}
 		return Samples;

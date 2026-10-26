@@ -151,8 +151,6 @@ public:
 	TObjectPtr<UInputAction> NextWeapon;
 	UPROPERTY()
 	TObjectPtr<UInputAction> PreviousWeapon;
-	UPROPERTY()
-	TObjectPtr<UInputAction> LastWeapon;
 	/** Shows the scoreboard while held. */
 	UPROPERTY()
 	TObjectPtr<UInputAction> Scoreboard;

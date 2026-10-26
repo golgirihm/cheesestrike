@@ -154,9 +154,10 @@ bool FTheStreakPanelCountsToEachStreak::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the names as the panel says them"), StreakShortName(EStreak::CheeseStrike), FString(TEXT("Cheese Strike")));
 	// The pop: big at once, back through its size, a little under, and settled.
 	TestTrue(TEXT("at rest before a kill"), StreakPop(-1.0f) == 1.0f);
-	TestTrue(TEXT("springing up at the kill"), StreakPop(0.0f) > 1.7f);
-	TestTrue(TEXT("back down soon"), StreakPop(StreakPopTime / 3.0f) < 1.05f);
-	TestTrue(TEXT("a little under"), StreakPop(StreakPopTime * 0.6f) < 1.0f);
+	TestTrue(TEXT("huge at the kill, about the minimap's size"), StreakPop(0.0f) >= 6.0f);
+	TestTrue(TEXT("held a beat"), StreakPop(StreakPopHold * 0.5f) == StreakPop(0.0f));
+	TestTrue(TEXT("easing down, shrinking fastest first"), StreakPop(StreakPopTime * 0.3f) < StreakPop(StreakPopHold) && StreakPop(StreakPopTime * 0.3f) > StreakPop(StreakPopTime * 0.6f) && StreakPop(StreakPopTime * 0.6f) > 1.0f);
+	TestTrue(TEXT("most of the shrinking is done halfway"), StreakPop((StreakPopTime + StreakPopHold) / 2.0f) < 1.0f + (StreakPopPeak - 1.0f) * 0.2f);
 	TestTrue(TEXT("and settled"), StreakPop(StreakPopTime) == 1.0f && FMath::IsNearlyEqual(StreakPop(StreakPopTime * 0.999f), 1.0f, 0.01f));
 	// The track fills toward the run, and a death drains it.
 	float Fill = 0.0f;

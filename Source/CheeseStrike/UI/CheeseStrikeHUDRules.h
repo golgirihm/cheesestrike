@@ -51,6 +51,12 @@ namespace CheeseStrikeHUD
 	FVector2D NorthMark(float ViewYaw, float HalfSize);
 	/** The convex hull of `Points`, in order round it; fewer than three points come back as they are. */
 	TArray<FVector2D> ConvexHull(TArray<FVector2D> Points);
+	/**
+	 * The top `Thickness` of the rounded rectangle from `Min` to `Max` (`Radius` as RoundedRect takes it): the strip along its top edge that
+	 * follows the rounding of both top corners. Worked out from the arcs, mirrored left to right, so that it is the same thickness at
+	 * both ends (cutting RoundedRect's outline with ClipToRect left it thicker at the top right).
+	 */
+	TArray<FVector2D> TopStrip(const FVector2D& Min, const FVector2D& Max, float Radius, float Thickness);
 	/** A convex `Polygon` cut to the rectangle from `Min` to `Max`; empty if none of it is inside. */
 	TArray<FVector2D> ClipToRect(const TArray<FVector2D>& Polygon, const FVector2D& Min, const FVector2D& Max);
 	/** A convex `Polygon` cut to the convex polygon `Clip` (its corners in order round, either way); empty if none of it is inside. */
@@ -312,8 +318,11 @@ namespace CheeseStrikeHUD
 	/** What the panel says is next: "CHEESE STRIKE IN 2", one kill off "CHEESE STRIKE NEXT KILL"; past the last streak "EVERY STREAK EARNED". `bShort` names it as under its pip ("DRONE IN 3"). */
 	FString StreakNext(int32 Kills);
 	/** Seconds the count's pop takes after a kill. */
-	constexpr float StreakPopTime = 0.35f;
-	/** How big the count is drawn `Seconds` after a kill (1 at rest, and before 0): it punches up to 1.8 and settles back by StreakPopTime. */
+	constexpr float StreakPopTime = 0.6f;
+	/** The count's biggest (about the minimap's side in height), and how long it stays so before it eases down. */
+	constexpr float StreakPopPeak = 7.0f;
+	constexpr float StreakPopHold = 0.08f;
+	/** How big the count is drawn `Seconds` after a kill (1 at rest, and before 0): StreakPopPeak at once, held a beat, then eased down to 1 by StreakPopTime. */
 	float StreakPop(float Seconds);
 	/** How long the red flash for a fall lasts, and its strongest. */
 	constexpr float FallFlashTime = 0.6f;

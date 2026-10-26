@@ -91,7 +91,7 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 		const float Filled = FMath::Clamp(StreakFill - Index, 0.0f, 1.0f);
 		// The pip just made swells a little with the count's pop.
 		const bool bNewest = Index == Kills - 1 && Since < CheeseStrikeHUD::StreakPopTime;
-		const float Swell = bNewest ? (Pop - 1.0f) * 3.0f * U : 0.0f;
+		const float Swell = bNewest ? (FMath::Min(Pop, 1.8f) - 1.0f) * 3.0f * U : 0.0f;
 		if (bStreak)
 		{
 			// A streak's kill is an orange icon of the streak (lit once made), where the plain pips have a bubble.
@@ -149,7 +149,10 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	const FVector2D NumberSize = HudDraw::Measure(Number, Count);
 	const FVector2D TileMiddle(Left + Tile / 2.0f, Top + Tile / 2.0f);
 	const FLinearColor NumberColour = bRunning ? FMath::Lerp(HudDraw::Accent, FLinearColor(1.0f, 0.95f, 0.8f, 1.0f), Flash) : HudDraw::Soft;
-	HudDraw::Text(Canvas, Number, FVector2D(TileMiddle.X, TileMiddle.Y - NumberSize.Y * Pop / 2.0f), Count, NumberColour, 0.5f, true, FVector2D(Pop, Pop));
+	// Huge at the kill it may outgrow the tile and the screen's corner: its middle is kept so that all of it shows.
+	const FVector2D Grown = NumberSize * Pop;
+	const FVector2D Middle(FMath::Max(TileMiddle.X, Grown.X / 2.0f + Margin * U / 2.0f), FMath::Min(TileMiddle.Y, Canvas->SizeY - Grown.Y / 2.0f - Margin * U / 2.0f));
+	HudDraw::Text(Canvas, Number, FVector2D(Middle.X, Middle.Y - Grown.Y / 2.0f), Count, NumberColour, 0.5f, true, FVector2D(Pop, Pop));
 
 	// Over the track: what it is, and what comes next; under the streaks' pips, their names.
 	const FSlateFontInfo Caption = HudDraw::Font(12.0f * U);

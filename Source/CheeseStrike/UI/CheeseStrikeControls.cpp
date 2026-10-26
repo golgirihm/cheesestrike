@@ -32,7 +32,6 @@ namespace CheeseStrikeControls
 				{TEXT("Knife"), {TEXT("DrawKnife")}},
 				{TEXT("Next weapon"), {TEXT("NextWeapon")}},
 				{TEXT("Weapon before"), {TEXT("PreviousWeapon")}},
-				{TEXT("Last weapon"), {TEXT("LastWeapon")}},
 				{TEXT("Throw a grenade"), {TEXT("Grenade"), TEXT("ThrowGrenade")}},
 				{TEXT("Call in a streak"), {TEXT("Streak")}},
 				{TEXT("Interact: revive, finish, pick up (hold)"), {TEXT("Interact")}},

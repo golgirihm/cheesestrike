@@ -92,6 +92,40 @@ namespace CheeseStrikeHUD
 		return Hull;
 	}
 
+	TArray<FVector2D> TopStrip(const FVector2D& Min, const FVector2D& Max, float Radius, float Thickness)
+	{
+		const float R = FMath::Clamp(Radius, 0.0f, FMath::Min(Max.X - Min.X, Max.Y - Min.Y) / 2.0f);
+		const float T = FMath::Clamp(Thickness, 0.0f, Max.Y - Min.Y);
+		if (R <= KINDA_SMALL_NUMBER)
+		{
+			return {Min, FVector2D(Max.X, Min.Y), FVector2D(Max.X, Min.Y + T), FVector2D(Min.X, Min.Y + T)};
+		}
+		// Where the arc is T below the top: its angle round from the top, and the arc's points from there up to the top, on the left;
+		// the right is the left mirrored, so the two ends can never differ.
+		const float Depth = FMath::Min(T, R);
+		const float Round = FMath::Acos(FMath::Clamp(1.0f - Depth / R, -1.0f, 1.0f));
+		const int32 Steps = FMath::Max(1, CornerSteps(R) * FMath::CeilToInt(Round / UE_HALF_PI + 0.0001f));
+		TArray<FVector2D> Left;
+		for (int32 Step = 0; Step <= Steps; ++Step)
+		{
+			const float Angle = Round * (1.0f - static_cast<float>(Step) / Steps);
+			Left.Add(FVector2D(Min.X + R - FMath::Sin(Angle) * R, Min.Y + R - FMath::Cos(Angle) * R));
+		}
+		// Past the arc (a strip thicker than the rounding) the sides go straight down.
+		const float Below = T - Depth;
+		TArray<FVector2D> Strip = Left;
+		for (int32 Index = Left.Num() - 1; Index >= 0; --Index)
+		{
+			Strip.Add(FVector2D(Min.X + Max.X - Left[Index].X, Left[Index].Y));
+		}
+		if (Below > KINDA_SMALL_NUMBER)
+		{
+			Strip.Insert(FVector2D(Min.X, Min.Y + R + Below), 0);
+			Strip.Add(FVector2D(Max.X, Min.Y + R + Below));
+		}
+		return Strip;
+	}
+
 	TArray<FVector2D> ClipToRect(const TArray<FVector2D>& Polygon, const FVector2D& Min, const FVector2D& Max)
 	{
 		// Sutherland and Hodgman: cut by each of the four edges in turn.
@@ -666,9 +700,13 @@ namespace CheeseStrikeHUD
 		{
 			return 1.0f;
 		}
-		// Punched up to 1.8 at once, back through 1 a third of the way, a little under, and settled.
-		const float Along = Seconds / StreakPopTime;
-		return 1.0f + 0.8f * FMath::Square(1.0f - Along) * FMath::Cos(Along * UE_PI * 1.5f);
+		// Wave 9: huge at once (about the minimap's size), held for a beat, then shrunk to its size by an ease-out.
+		if (Seconds < StreakPopHold)
+		{
+			return StreakPopPeak;
+		}
+		const float Along = (Seconds - StreakPopHold) / (StreakPopTime - StreakPopHold);
+		return 1.0f + (StreakPopPeak - 1.0f) * FMath::Pow(1.0f - Along, 3.0f);
 	}
 
 	float FallFlashAlpha(float Seconds)

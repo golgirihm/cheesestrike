@@ -142,9 +142,9 @@ bool FItChangesWeapons::RunTest(const FString& Parameters)
 			TestTrue(TEXT("and only the knife shows"), OnlyHeldShows(Character));
 		}
 	});
-	// Q goes back to the last; the wheel goes round.
-	Play(0, TEXT("tap LastWeapon\nwait 0.4"));
-	Then([this]() { TestEqual(TEXT("Q goes back to the pistol"), HeldId(Pawn(0)), CheeseStrikeWeapons::Pistol().Id); });
+	// 2 draws the pistol; the wheel goes round.
+	Play(0, TEXT("tap Sidearm\nwait 0.4"));
+	Then([this]() { TestEqual(TEXT("2 draws the pistol"), HeldId(Pawn(0)), CheeseStrikeWeapons::Pistol().Id); });
 	Play(0, TEXT("tap NextWeapon\nwait 0.4"));
 	Then([this]() { TestEqual(TEXT("the wheel down goes on to the knife"), HeldId(Pawn(0)), CheeseStrikeWeapons::Knife().Id); });
 	Play(0, TEXT("tap NextWeapon\nwait 0.4"));

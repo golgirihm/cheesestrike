@@ -6,7 +6,7 @@ background. Run by Blender, headless:
 
     blender.exe -b --factory-startup -P tools/art/countdown_glyphs.py -- <out folder>
 
-It writes T_Count_1.png to T_Count_9.png and T_Count_Fight.png
+It writes T_Podium_1.png to T_Podium_3.png (the podium's places, straight on) and T_Count_1.png to T_Count_9.png and T_Count_Fight.png
 (512 pixels high, as wide as a power of two) into the folder; tools/art/import_countdown.py imports them
 into /Game/CheeseStrike/UI/Countdown/, where the HUD finds them
 (UI/CheeseStrikeHUDCountdown.cpp). Roboto is Apache 2.0, from the engine's
@@ -25,6 +25,10 @@ from mathutils import Vector, Matrix
 FONT = r"C:\Program Files\Epic Games\UE_5.8\Engine\Content\Slate\Fonts\Roboto-Black.ttf"
 # The usual count is 3 (2 before a later round); ?Countdown= may ask for up to 9.
 WORDS = {**{str(n): f"T_Count_{n}" for n in range(1, 10)}, "FIGHT": "T_Count_Fight"}
+# The podium's places (wave 9): the same cheese, but straight on, not turned, and all three framed alike (the same scale, the same baseline
+# in the picture, each centred across), so that the HUD can stand them on one line, upright. (The turned countdown ones sat in their
+# pictures by their own turned outlines, so no two stood alike.)
+PODIUM = {str(n): f"T_Podium_{n}" for n in range(1, 4)}
 HEIGHT = 512
 EXTRUDE = 0.09
 BEVEL = 0.022
@@ -198,13 +202,29 @@ def holes(body, rng):
     return len(placed)
 
 
-def stage(body):
-    """Turned a little to show its depth, lit, and framed by an orthographic camera that fits it."""
-    body.rotation_euler = (math.radians(14.0), math.radians(-20.0), 0.0)
+def straight_rows():
+    """The lowest and highest the podium's digits reach together (they share a baseline, and a framing)."""
+    low, high = 1e9, -1e9
+    for word in PODIUM:
+        body = lettering(word)
+        for v in body.data.vertices:
+            low = min(low, v.co.y)
+            high = max(high, v.co.y)
+        mesh = body.data
+        bpy.data.objects.remove(body)
+        bpy.data.meshes.remove(mesh)
+    return low, high
+
+
+def stage(body, rows=None):
+    """Turned a little to show its depth (unless `rows`, the straight digits' shared vertical extent, is given: then straight on), lit, and framed by an orthographic camera that fits it."""
+    body.rotation_euler = (0.0, 0.0, 0.0) if rows else (math.radians(14.0), math.radians(-20.0), 0.0)
     bpy.context.view_layer.update()
     corners = [body.matrix_world @ v.co for v in body.data.vertices]
     low = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
     high = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
+    if rows:
+        low.y, high.y = rows
     middle = (low + high) / 2.0
     width = (high.x - low.x) * 1.08
     height = (high.y - low.y) * 1.08
@@ -237,7 +257,7 @@ def stage(body):
     light("Rim", "SUN", 2.0, (-120.0, 0.0, 0.0), 4.0)
 
 
-def render(word, name, out, rng):
+def render(word, name, out, rng, rows=None):
     clear()
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
@@ -262,7 +282,7 @@ def render(word, name, out, rng):
     body.data.materials.append(cheese_material())
     for polygon in body.data.polygons:
         polygon.material_index = 0
-    stage(body)
+    stage(body, rows)
     scene.render.filepath = os.path.join(out, name + ".png")
     bpy.ops.render.render(write_still=True)
     return count
@@ -273,9 +293,18 @@ def main():
     out = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "countdown"))
     os.makedirs(out, exist_ok=True)
     report = []
-    for index, (word, name) in enumerate(WORDS.items()):
-        count = render(word, name, out, random.Random(1000 + index))
-        report.append(f"{name}: {count} holes, {bpy.context.scene.render.resolution_x} x {HEIGHT}")
+    # CHEESESTRIKE_GLYPH_SETS: which to render, "count" (the countdown's) and "podium" (the places'); both by default.
+    sets = os.environ.get("CHEESESTRIKE_GLYPH_SETS", "count,podium").split(",")
+    if "count" in sets:
+        for index, (word, name) in enumerate(WORDS.items()):
+            count = render(word, name, out, random.Random(1000 + index))
+            report.append(f"{name}: {count} holes, {bpy.context.scene.render.resolution_x} x {HEIGHT}")
+    if "podium" in sets:
+        clear()
+        rows = straight_rows()
+        for index, (word, name) in enumerate(PODIUM.items()):
+            count = render(word, name, out, random.Random(1000 + int(word) - 1), rows)
+            report.append(f"{name}: {count} holes, {bpy.context.scene.render.resolution_x} x {HEIGHT}")
     with open(os.path.join(out, "countdown_glyphs.txt"), "w") as f:
         f.write("\n".join(report) + "\n")
 
