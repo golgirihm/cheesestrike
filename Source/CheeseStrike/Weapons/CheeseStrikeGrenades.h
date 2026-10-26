@@ -133,6 +133,9 @@ protected:
 	/** A throw held: the weapon in hand as it began (changing it puts the throw away), and the grenade shown up in view. */
 	bool bHolding = false;
 	TWeakObjectPtr<ACheeseStrikeWeapon> HeldWith;
+	/** The gun put away from view while a grenade is held or thrown, brought back after. */
+	TWeakObjectPtr<ACheeseStrikeWeapon> AwayGun;
+	void UpdateGunAway();
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> HeldInView;
 	/** The arc shown: its dots and the mark where it comes down, seen by its player alone. */

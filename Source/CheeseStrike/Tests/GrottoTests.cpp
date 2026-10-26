@@ -121,7 +121,7 @@ namespace GrottoTests
 	void WalkThrough(FAutomationTestBase* Test, const FString& What, const FVector& At, float Yaw, const FString& Script, TFunction<bool(const FVector&)> Arrived)
 	{
 		PlayTesting::PutAt(0, At, Yaw);
-		PlayTesting::Play(0, Script.IsNumeric() ? FString::Printf(TEXT("hold Move 0 1\nwait %s\nrelease Move\nwait 0.4"), *Script) : Script);
+		PlayTesting::Play(0, Script.IsNumeric() ? FString::Printf(TEXT("hold Move 0 1\nwait %.2f\nrelease Move\nwait 0.4"), FCString::Atof(*Script) * PlayTesting::WalkTimeScale) : Script);
 		PlayTesting::Then([Test, What, Arrived]()
 		{
 			const ACheeseStrikeCharacter* Character = PlayTesting::Character(0);

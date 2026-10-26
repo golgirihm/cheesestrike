@@ -72,8 +72,9 @@ namespace CheeseStrikeMice
 	 * map, few mice, long walks) they bite bigger, up to MaxPace (a block at
 	 * a bite), and ahead smaller, down to MinPace.
 	 */
-	constexpr float EatenWithin = 82.0f;
-	constexpr float PlannedWithin = 62.0f;
+	// Twice as long as they were (82 and 62): the mice eat at half the pace.
+	constexpr float EatenWithin = 164.0f;
+	constexpr float PlannedWithin = 124.0f;
 	constexpr float MinPace = 0.25f;
 	constexpr float MaxPace = 4.0f;
 	float PlannedLeft(float SecondsIn);

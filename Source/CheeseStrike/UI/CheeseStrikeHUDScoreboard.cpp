@@ -17,6 +17,7 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
 #include "CheeseStrikeHUDDraw.h"
+#include "UI/CheeseStrikeHUDRules.h"
 #include "Rules/CheeseStrikePodiums.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -206,10 +207,14 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	const FLinearColor OwnColour = HudDraw::Accent;
 
 	HudDraw::FShapes Shapes;
-	// A rounded panel, its top edge lit (clear of the rounding).
+	// A rounded panel, its top edge lit from side to side, clipped to the panel's corners.
 	const float PanelRound = 12.0f * U;
 	Shapes.RoundedRect(Left, Top, PanelWidth, PanelHeight, PanelRound, FLinearColor(0.02f, 0.02f, 0.025f, 0.85f));
-	Shapes.RoundedRect(Left + PanelRound, Top, PanelWidth - 2.0f * PanelRound, 2.0f * U, U, bOver ? HudDraw::Accent : HudDraw::Ink);
+	{
+		const FVector2D PanelMin(Left, Top);
+		const FVector2D PanelMax(Left + PanelWidth, Top + PanelHeight);
+		Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(CheeseStrikeHUD::RoundedRect(PanelMin, PanelMax, PanelRound), PanelMin, FVector2D(PanelMax.X, Top + 3.0f * U)), bOver ? HudDraw::Accent : HudDraw::Ink);
+	}
 	Shapes.Rect(Left + 20.0f * U, Top + 104.0f * U, PanelWidth - 40.0f * U, U, HudDraw::Rule);
 	{
 		float Y = Top + 114.0f * U;

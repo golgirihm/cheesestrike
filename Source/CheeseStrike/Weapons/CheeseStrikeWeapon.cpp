@@ -185,45 +185,11 @@ void ACheeseStrikeWeapon::SetWeapon(FName Id)
 	Reserve = Stats->Reserve;
 }
 
-void ACheeseStrikeWeapon::PlaceIronSights()
-{
-	// Not for a gun with a scope, nor the carbine, whose rail has the dot, nor the two-gun Burratas, which have no sights to aim down.
-	const bool bNeeded = Look->Sight.IsSet() && !Stats->bScoped && !Stats->bDual && Stats->Id != FName(TEXT("carbine"));
-	if (IronSightFront == nullptr)
-	{
-		for (TObjectPtr<UStaticMeshComponent>* Sight : {&IronSightFront, &IronSightRear})
-		{
-			*Sight = NewObject<UStaticMeshComponent>(this);
-			(*Sight)->SetCollisionProfileName(FName("NoCollision"));
-			(*Sight)->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
-			(*Sight)->bOnlyOwnerSee = true;
-			(*Sight)->RegisterComponent();
-			(*Sight)->AttachToComponent(FirstPersonModel, FAttachmentTransformRules::KeepRelativeTransform);
-		}
-	}
-	UStaticMesh* Block = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-	const FVector Scale = FirstPersonModel->GetComponentScale();
-	const FVector Size = FVector(FMath::Max(Scale.GetMax(), 0.01f));
-	// Set in the model's own space, as the flash is: the post on the muzzle, the notch at the sight, each a few millimetres across.
-	IronSightFront->SetStaticMesh(bNeeded ? Block : nullptr);
-	IronSightFront->SetRelativeLocation(Look->Muzzle + FVector(0.0f, 0.0f, 3.0f));
-	IronSightFront->SetRelativeScale3D(FVector(0.012f, 0.012f, 0.03f) / Size.X);
-	IronSightRear->SetStaticMesh(bNeeded ? Block : nullptr);
-	IronSightRear->SetRelativeLocation(bNeeded ? Look->Sight.GetValue() + FVector(0.0f, 0.0f, 2.5f) : FVector::ZeroVector);
-	IronSightRear->SetRelativeScale3D(FVector(0.03f, 0.012f, 0.024f) / Size.X);
-	if (bNeeded)
-	{
-		IronSightFront->SetMaterial(0, FirstPersonModel->GetMaterial(0));
-		IronSightRear->SetMaterial(0, FirstPersonModel->GetMaterial(0));
-	}
-}
-
 void ACheeseStrikeWeapon::ApplyWeapon()
 {
 	const FWeaponStats* Found = CheeseStrikeArsenal::Find(WeaponId);
 	Stats = Found != nullptr ? Found : &CheeseStrikeWeapons::Blaster();
 	Look = &CheeseStrikeWeaponLooks::For(Stats->Id);
-	PlaceIronSights();
 	USkeletalMesh* Skinned = LoadLook<USkeletalMesh>(Look->SkinnedModel);
 	UStaticMesh* Plain = LoadLook<UStaticMesh>(Look->PlainModel);
 	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
@@ -342,6 +308,14 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 	if (Holder == nullptr || !Holder->IsLocallyControlled())
 	{
 		return;
+	}
+	if (bTriggerHeld && Stats->bAutomatic)
+	{
+		const int32 Due = CheeseStrikeWeapons::ShotsDue(ServerTime(GetWorld()), AutoNextAt, FiringStats().FireInterval);
+		for (int32 Shot = 0; Shot < Due; ++Shot)
+		{
+			TryFire(true);
+		}
 	}
 	UCheeseStrikeMovementComponent* Movement = Holder->GetCheeseStrikeMovement();
 	if (bInHand && Movement != nullptr)
@@ -469,6 +443,18 @@ bool ACheeseStrikeWeapon::LeftHandHoldFor(const USkeletalMeshComponent* Body, FV
 	// The model rides the bone the hand follows (hand_r, or the mannequin's weapon_r): from its space into the bone's.
 	OutHold = Model->GetRelativeTransform().TransformPosition(Look->LeftHand.GetValue());
 	return true;
+}
+
+void ACheeseStrikeWeapon::SetFirstPersonAway(bool bAway)
+{
+	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(FirstPersonMesh), static_cast<UPrimitiveComponent*>(FirstPersonModel), static_cast<UPrimitiveComponent*>(FirstPersonOffHand)})
+	{
+		if (Part != nullptr)
+		{
+			// Not passed on to the flash, which has its own say.
+			Part->SetVisibility(!bAway, false);
+		}
+	}
 }
 
 void ACheeseStrikeWeapon::SetInHand(bool bIsInHand)
@@ -895,7 +881,8 @@ void ACheeseStrikeWeapon::StartFiring()
 	FireOnce();
 	if (Stats->bAutomatic)
 	{
-		GetWorldTimerManager().SetTimer(FireTimer, this, &ACheeseStrikeWeapon::FireOnce, FiringStats().FireInterval, true);
+		// The beat goes on from Tick, one shot every interval exactly (a timer is only as fine as the frame).
+		AutoNextAt = ServerTime(GetWorld()) + FiringStats().FireInterval;
 	}
 	else if (IsDrawing() && bInHand)
 	{
@@ -908,7 +895,6 @@ void ACheeseStrikeWeapon::StartFiring()
 void ACheeseStrikeWeapon::StopFiring()
 {
 	bTriggerHeld = false;
-	GetWorldTimerManager().ClearTimer(FireTimer);
 }
 
 void ACheeseStrikeWeapon::StartAiming()
@@ -924,12 +910,18 @@ void ACheeseStrikeWeapon::StopAiming()
 
 void ACheeseStrikeWeapon::FireOnce()
 {
+	TryFire(false);
+}
+
+void ACheeseStrikeWeapon::TryFire(bool bOnTheBeat)
+{
 	if (Holder == nullptr || !Holder->IsLocallyControlled() || !Holder->CanAct() || Holder->InExecution() || !bInHand)
 	{
 		return;
 	}
 	const float Now = ServerTime(GetWorld());
-	if (IsDrawing() || IsReloading() || BurstLeft > 0 || Now - LastShotAt < CheeseStrikeWeapons::Cooldown(FiringStats(), LastInBurst) * 0.9f)
+	// On the automatic beat the shot is due by the schedule, whatever the frame made of the last gap.
+	if (IsDrawing() || IsReloading() || BurstLeft > 0 || (!bOnTheBeat && Now - LastShotAt < CheeseStrikeWeapons::Cooldown(FiringStats(), LastInBurst) * 0.9f))
 	{
 		return;
 	}

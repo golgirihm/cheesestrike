@@ -1035,6 +1035,24 @@ def free_starts(points, z=0, room=150):
         count("starts")
 
 
+def arch_pieces(u0, u1, z0, z1, steps=12):
+    """A mouse hole's shape, square at the bottom and rounded at the top (an arch), as rectangles ((u0, z0), (u1, z1)) in
+    the face's own (along, up) coordinates: the straight part up to a half circle's start (the width over two below the
+    top), then thin slices of the half circle, each narrower than the one below, so that the top reads as round."""
+    half = (u1 - u0) / 2.0
+    mid = (u0 + u1) / 2.0
+    rise = min(half, z1 - z0)
+    start = z1 - rise
+    pieces = [((u0, z0), (u1, start))]
+    for k in range(steps):
+        a = start + rise * k / steps
+        b = start + rise * (k + 1) / steps
+        # The slice is as wide as the arch is at its lower edge, less a hair so that the rounding shows.
+        across = half * (1.0 - ((a - start) / rise) ** 2) ** 0.5 if rise > 0 else half
+        pieces.append(((mid - across, a), (mid + across, b)))
+    return pieces
+
+
 def mouse_entry(x, y, z, yaw):
     """Where a mouse comes over the edge: a point on top of the outer wall at (x, y, z), facing `yaw` into the map
     (ACheeseStrikeGameMode::SpawnMice). It lands on the navigation mesh 5 m in."""

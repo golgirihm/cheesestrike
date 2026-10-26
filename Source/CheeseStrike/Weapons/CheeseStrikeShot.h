@@ -122,6 +122,14 @@ namespace CheeseStrikeWeapons
 	float ShotTime(const FWeaponStats& Weapon, int32 Index);
 	/** Seconds after a shot, number `InBurst` of its burst (0 the first), until the next may go. */
 	float Cooldown(const FWeaponStats& Weapon, int32 InBurst);
+	/**
+	 * Automatic fire on a steady beat: with `NextAt` the time the next shot is due, how many are due at `Now` (at most
+	 * `Most`, which more than a frame's worth never needs), moving NextAt on by `Interval` for each. A frame is rarely
+	 * a whole number of intervals long, so a shot is sometimes late and the next must not be early for it: the beat
+	 * stays at exactly one shot every `Interval`, two in one frame if a frame was long. If it fell further behind than
+	 * Most (a hitch), the beat starts over from `Now`.
+	 */
+	int32 ShotsDue(float Now, float& NextAt, float Interval, int32 Most = 4);
 	/** Shots a second, at most, over a while: what the server holds a shooter to. */
 	float ShotsPerSecond(const FWeaponStats& Weapon);
 

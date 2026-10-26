@@ -66,6 +66,43 @@ bool FTheCarbineFiresInBurstsOfThree::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAutomaticFireKeepsAnExactBeat, "CheeseStrike.Weapons.AutomaticFireKeepsAnExactBeat", WeaponTests::Flags)
+
+bool FAutomaticFireKeepsAnExactBeat::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	// Frames of every length from a fast PC's to a slow one's: over two seconds the shots are exactly as many as the beat has.
+	for (const float Frame : {0.004f, 0.0167f, 0.033f, 0.05f, 0.11f})
+	{
+		for (const FWeaponStats* Weapon : {&Blaster(), &Munster()})
+		{
+			const float Interval = Weapon->FireInterval;
+			float NextAt = Interval;
+			int32 Shots = 0;
+			int32 MostInAFrame = 0;
+			float Now = 0.0f;
+			while (Now < 2.0f)
+			{
+				Now += Frame;
+				const int32 Due = ShotsDue(Now, NextAt, Interval);
+				Shots += Due;
+				MostInAFrame = FMath::Max(MostInAFrame, Due);
+			}
+			TestTrue(FString::Printf(TEXT("%s at %.0f ms frames fires %d shots in 2 s (%d)"), *Weapon->Id.ToString(), Frame * 1000.0f, FMath::FloorToInt(Now / Interval), Shots), FMath::Abs(Shots - FMath::FloorToInt(Now / Interval)) <= 1);
+			if (Frame < Interval)
+			{
+				TestTrue(TEXT("and never two in a frame shorter than the interval, one past it"), MostInAFrame <= 1);
+			}
+		}
+	}
+	float NextAt = 0.1f;
+	TestEqual(TEXT("a long frame owes two shots"), ShotsDue(0.1f + 2.5f * Blaster().FireInterval, NextAt, Blaster().FireInterval), 3);
+	NextAt = 0.0f;
+	TestEqual(TEXT("a hitch is caught up no further than four"), ShotsDue(5.0f, NextAt, Blaster().FireInterval), 4);
+	TestTrue(TEXT("and the beat starts over from there"), NextAt > 5.0f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheShotgunFiresNinePellets, "CheeseStrike.Weapons.TheShotgunFiresNinePellets", WeaponTests::Flags)
 
 bool FTheShotgunFiresNinePellets::RunTest(const FString& Parameters)

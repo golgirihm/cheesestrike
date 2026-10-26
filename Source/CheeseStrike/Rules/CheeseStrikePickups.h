@@ -95,7 +95,7 @@ namespace CheeseStrikePickups
 
 	/** What a primary is worth, 0 the spawn primary to 3 the Roquefort: the better ones lie at the riskier spots, and bots want them more. */
 	int32 Worth(FName Weapon);
-	/** The colour of a weapon worth `Worth`, on its stand's pad and the minimap: green, blue, then the cheese's gold for the best. */
+	/** The colour of a weapon's stand pad, prompt and label: the same cheese gold for every weapon, whatever it is worth. */
 	FLinearColor WorthColour(int32 Worth);
 	/** Seconds until a stand taken until `BackAt` is back, at `Now` (both the server's); 0 if it is there. */
 	float SecondsLeft(float Now, float BackAt);

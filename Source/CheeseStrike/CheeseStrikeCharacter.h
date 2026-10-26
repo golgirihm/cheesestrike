@@ -406,6 +406,8 @@ protected:
 	float FallFlashAt = -1000.0f;
 	/** On this machine: the health it last heard, so that losing any of it gives a grunt. */
 	float HeardHealth = 100.0f;
+	/** Gives the grunt for any health lost since last heard, to the local player alone. */
+	void HearHealth();
 	/** Where it has lately been: the server's record. */
 	FHitHistory HitHistory;
 	/** The usual field of view, to come back to after aiming down the sights. */

@@ -1052,8 +1052,17 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 	}
 	else if (Me != nullptr && Me->GetVelocity().Size2D() > 50.0f)
 	{
-		// Where it is going.
-		Wanted = FRotator(0.0f, Me->GetVelocity().Rotation().Yaw, 0.0f);
+		// Where it is going: its heading eased in, since the velocity's own direction swings about with every step up a stair or
+		// round a corner, and a view that follows it shakes.
+		const float Heading = Me->GetVelocity().Rotation().Yaw;
+		const float Ease = 1.0f - FMath::Exp(-DeltaSeconds * 3.0f);
+		WalkingYaw = FRotator::NormalizeAxis(WalkingYaw + FRotator::NormalizeAxis(Heading - WalkingYaw) * Ease);
+		Wanted = FRotator(0.0f, WalkingYaw, 0.0f);
+	}
+	else
+	{
+		// Standing: the next walk starts from where it faces.
+		WalkingYaw = GetControlRotation().Yaw;
 	}
 	// A throw decided on: it turns to it, and lets go once it faces it (or has tried a moment).
 	if (bThrowPending && Me != nullptr)

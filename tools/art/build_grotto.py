@@ -180,7 +180,8 @@ def holed_box(label, folder, low, high, material, face, holes, depth=250):
         behind_high[axis] = split
     box(label, folder, tuple(behind_low), tuple(behind_high), material)
     a, b = sorted((front, split))
-    cut = [((h[0], h[2]), (h[1], h[3])) for h in holes]
+    # Each hole is an arch: square at the bottom, rounded at the top.
+    cut = [piece for h in holes for piece in kit.arch_pieces(h[0], h[1], h[2], h[3])]
     for i, (p, q) in enumerate(kit.rect_minus((low[other], low[2]), (high[other], high[2]), cut)):
         lo, hi = [0.0, 0.0, p[1]], [0.0, 0.0, q[1]]
         lo[axis], hi[axis] = a, b

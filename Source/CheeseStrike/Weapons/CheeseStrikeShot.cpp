@@ -38,6 +38,22 @@ namespace CheeseStrikeWeapons
 		return FMath::Max(Weapon.FireInterval - (Burst - 1) * Weapon.BurstInterval, Weapon.BurstInterval);
 	}
 
+	int32 ShotsDue(float Now, float& NextAt, float Interval, int32 Most)
+	{
+		Interval = FMath::Max(Interval, 0.001f);
+		int32 Due = 0;
+		while (NextAt <= Now && Due < Most)
+		{
+			++Due;
+			NextAt += Interval;
+		}
+		if (NextAt <= Now)
+		{
+			NextAt = Now + Interval;
+		}
+		return Due;
+	}
+
 	float ShotsPerSecond(const FWeaponStats& Weapon)
 	{
 		return FMath::Max(Weapon.Burst, 1) / FMath::Max(Weapon.FireInterval, 0.01f);

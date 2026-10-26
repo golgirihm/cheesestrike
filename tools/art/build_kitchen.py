@@ -649,17 +649,21 @@ def starts():
 
 def mouse_entries():
     """The mice come out of holes: in the skirting of the south wall, in the splashback on the worktop and at the back
-    of each cupboard. Each hole is drawn, dark, where its mouse comes out."""
+    of each cupboard. Each hole is drawn, dark, where its mouse comes out: square at the bottom, rounded at the top (an arch)."""
     f = "Mice"
     dark = m("BlackGlass")
+
+    def hole(label, x, y0, y1, z0):
+        for i, ((u0, w0), (u1, w1)) in enumerate(kit.arch_pieces(x - 100, x + 100, z0, z0 + 160)):
+            box(f"{label}_{i}", f, (u0, y0, w0), (u1, y1, w1), dark)
     for x in (-2000, -700, 700, 2000):
         kit.mouse_entry(x, Y_S + 5, 0, 90)
-        box(f"MouseHole_South_{x}", f, (x - 100, Y_S, 0), (x + 100, Y_S + 7, 160), dark)
+        hole(f"MouseHole_South_{x}", x, Y_S, Y_S + 7, 0)
     for x in (-1520, 1520):
         kit.mouse_entry(x, Y_N - 10, TOP, -90)
-        box(f"MouseHole_Worktop_{x}", f, (x - 100, Y_N - 10, TOP), (x + 100, Y_N - 7, TOP + 160), dark)
+        hole(f"MouseHole_Worktop_{x}", x, Y_N - 10, Y_N - 7, TOP)
         kit.mouse_entry(x * 0.85, Y_N - 45, SHELF, -90)
-        box(f"MouseHole_Cupboard_{x}", f, (x * 0.85 - 100, Y_N - 43, SHELF), (x * 0.85 + 100, Y_N - 40, SHELF + 160), dark)
+        hole(f"MouseHole_Cupboard_{x}", x * 0.85, Y_N - 43, Y_N - 40, SHELF)
 
 
 def places():
