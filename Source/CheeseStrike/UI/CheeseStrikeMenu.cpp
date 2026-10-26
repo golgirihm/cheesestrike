@@ -1480,11 +1480,13 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 {
+	// Rounded, like every card: white, tinted by the border's colour.
+	static const FSlateRoundedBoxBrush FriendsCardBrush(FLinearColor::White, 12.0f);
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
 	if (!bOpen)
 	{
-		return SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(PanelColour).Padding(FMargin(12.0f, 24.0f))
+		return SNew(SBorder).BorderImage(&FriendsCardBrush).BorderBackgroundColor(PanelColour).Padding(FMargin(12.0f, 24.0f))
 		[
 			MakeLine(TEXT("FRIENDS"), false, false)
 		];
@@ -1560,7 +1562,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 			}
 		}
 	}
-	return SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(PanelColour).Padding(FMargin(24.0f, 28.0f))
+	return SNew(SBorder).BorderImage(&FriendsCardBrush).BorderBackgroundColor(PanelColour).Padding(FMargin(24.0f, 28.0f))
 	[
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FRIENDS")) ]

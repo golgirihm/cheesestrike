@@ -39,8 +39,6 @@ namespace CheeseStrikePodiumHUD
 	float CountdownAlpha(float SecondsToLobby);
 	constexpr float CountdownFadeFrom = 1.0f;
 	constexpr float CountdownGoneAt = 0.4f;
-	/** How far down a place's cheese number its plate starts, in the number's height: the name is written under the number. */
-	constexpr float PlateUnderGlyph = 0.97f;
 }
 
 /**

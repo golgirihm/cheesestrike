@@ -409,8 +409,15 @@ void ACheeseStrikeHUD::DrawMice(const ACheeseStrikeGameState* Match)
 	const FString Words = CheeseStrikeHUD::VerminWords(Match->GetMiceAt() - static_cast<float>(Match->GetServerWorldTimeSeconds()));
 	if (!Words.IsEmpty())
 	{
-		const FLinearColor Warning(1.0f, 0.18f, 0.12f);
-		HudDraw::Text(Canvas, Words, FVector2D(Canvas->SizeX / 2.0f, Canvas->SizeY * 0.15f), HudDraw::Font(26.0f * Unit()), Warning, 0.5f);
+		const float ToGo = Match->GetMiceAt() - static_cast<float>(Match->GetServerWorldTimeSeconds());
+		// It comes in big and settles (the countdown first, and the word that they are here), and each counted second swells it.
+		const float Age = ToGo > 0.0f ? CheeseStrikeMice::Warning - ToGo : -ToGo;
+		const float SinceTick = ToGo > 0.0f ? FMath::CeilToFloat(ToGo) - ToGo : -1.0f;
+		const CheeseStrikeHUD::FVerminLook Look = CheeseStrikeHUD::VerminLook(Age, SinceTick);
+		const FLinearColor Warning(1.0f, 0.18f, 0.12f, Look.Alpha);
+		const FSlateFontInfo Font = HudDraw::Font(26.0f * Unit());
+		const float High = HudDraw::Measure(Words, Font).Y * Look.Scale;
+		HudDraw::Text(Canvas, Words, FVector2D(Canvas->SizeX / 2.0f, Canvas->SizeY * 0.15f - High / 2.0f), Font, Warning, 0.5f, true, FVector2D(Look.Scale, Look.Scale));
 	}
 }
 
@@ -443,6 +450,17 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 		Shapes.Arc(Middle, Radius, CrosshairThickness + 0.5f, 0.0f, 360.0f, Sign, false);
 		Shapes.Line(Middle + FVector2D(-Slant, -Slant), Middle + FVector2D(Slant, Slant), CrosshairThickness + 0.5f, Sign);
 	}
+	else if (Weapon != nullptr && Weapon->GetStats().Pellets > 1 && !Weapon->IsAimed())
+	{
+		// A shotgun: a circle as wide as the spread, with a pip at each side and a dot in the middle.
+		const float Radius = FMath::Max(14.0f, Gap + 4.0f);
+		Shapes.Arc(Middle, Radius, CrosshairThickness, 0.0f, 360.0f, Cross, false);
+		for (const FVector2D& Way : {FVector2D(1, 0), FVector2D(-1, 0), FVector2D(0, 1), FVector2D(0, -1)})
+		{
+			Shapes.Line(Middle + Way * (Radius - 3.0f), Middle + Way * (Radius + 4.0f), CrosshairThickness, Cross);
+		}
+		Shapes.Rect(Middle.X - 1.0f, Middle.Y - 1.0f, 2.0f, 2.0f, Cross);
+	}
 	else if (Weapon == nullptr || !Weapon->IsAimed())
 	{
 		Shapes.Line(FVector2D(Middle.X - Gap - CrosshairLength, Middle.Y), FVector2D(Middle.X - Gap, Middle.Y), CrosshairThickness, Cross);
@@ -458,8 +476,10 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 	// A hit: four diagonal ticks, longer and yellow for the head.
 	if (Weapon != nullptr && Weapon->SinceHit() < HitMarkLife)
 	{
-		const float Tick = Weapon->bLastHitHead ? 16.0f : 11.0f;
-		const FLinearColor Colour = Weapon->bLastHitHead ? HudDraw::Accent : Cross;
+		// Fading out over its life; red and longer for a kill, yellow for the head.
+		const float Fade = 1.0f - Weapon->SinceHit() / HitMarkLife;
+		const float Tick = Weapon->bLastHitKill ? 18.0f : Weapon->bLastHitHead ? 16.0f : 11.0f;
+		const FLinearColor Colour = HudDraw::Faded(Weapon->bLastHitKill ? FLinearColor(1.0f, 0.15f, 0.1f, 1.0f) : Weapon->bLastHitHead ? HudDraw::Accent : FLinearColor::White, FMath::Clamp(Fade, 0.0f, 1.0f));
 		for (const FVector2D& Way : {FVector2D(1, 1), FVector2D(-1, 1), FVector2D(1, -1), FVector2D(-1, -1)})
 		{
 			const FVector2D From = Middle + Way * (Gap + 2.0f);
@@ -653,11 +673,6 @@ void ACheeseStrikeHUD::DrawHealth(const ACheeseStrikeCharacter* Character)
 		}
 	}
 	Shapes.Draw(Canvas);
-	if (Character->IsProtected())
-	{
-		const FSlateFontInfo Label = HudDraw::Font(12.0f * U);
-		HudDraw::Text(Canvas, TEXT("PROTECTED"), FVector2D(Left, StreakPanelTop() - 8.0f * U - HudDraw::Measure(TEXT("P"), Label).Y), Label, HudDraw::Accent);
-	}
 }
 
 void ACheeseStrikeHUD::DrawWeaponIcon(HudDraw::FShapes& Shapes, EWeaponSlot Slot, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour) const

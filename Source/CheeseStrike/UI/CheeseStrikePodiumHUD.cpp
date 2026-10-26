@@ -100,22 +100,43 @@ namespace CheeseStrikePodiumHUD
 		const FSlateFontInfo ScoreFont = HudDraw::Font(18.0f * U);
 		const float NameHeight = HudDraw::Measure(TEXT("Ag"), NameFont).Y;
 		const float ScoreHeight = HudDraw::Measure(TEXT("Ag"), ScoreFont).Y;
+		// Every place's foot first: the plates are as wide as the room between neighbours allows (never overlapping, whatever the
+		// number of places), and the numbers and plates all stand on one line, each centred on its own pedestal.
+		TArray<TPair<const FPodiumPlace*, FVector2D>> Feet;
 		for (const FPodiumPlace& Placed : Podium->GetPlaces())
 		{
 			FVector2D Foot;
-			if (!Project(Podium->PedestalFront(Placed.Place), Foot))
+			if (Project(Podium->PedestalFront(Placed.Place), Foot))
 			{
-				continue;
+				Feet.Emplace(&Placed, Foot);
 			}
+		}
+		float PlateWidth = 300.0f * U;
+		for (int32 First = 0; First < Feet.Num(); ++First)
+		{
+			for (int32 Second = First + 1; Second < Feet.Num(); ++Second)
+			{
+				PlateWidth = FMath::Min(PlateWidth, FMath::Abs(Feet[First].Value.X - Feet[Second].Value.X) - 16.0f * U);
+			}
+		}
+		PlateWidth = FMath::Max(PlateWidth, 60.0f * U);
+		float BaseY = -FLT_MAX;
+		for (const TPair<const FPodiumPlace*, FVector2D>& Each : Feet)
+		{
+			BaseY = FMath::Max(BaseY, Each.Value.Y);
+		}
+		const float GlyphHeight = 104.0f * U;
+		const float GlyphTop = BaseY + 14.0f * U - GlyphHeight * 0.78f;
+		for (const TPair<const FPodiumPlace*, FVector2D>& Each : Feet)
+		{
+			const FPodiumPlace& Placed = *Each.Key;
+			const FVector2D Foot(Each.Value.X, BaseY);
 			const FLinearColor Colour = Placed.Team >= 0 ? HudDraw::SideColour(Placed.Team) : HudDraw::Accent;
-			const float PlateWidth = 300.0f * U;
 			const float PlateHeight = NameHeight + ScoreHeight + 28.0f * U;
-			// The place's number on the pedestal's foot, and the plate under it, the name clear of the number.
+			// The place's number on the pedestal's foot, and the plate a little lower under it, the name clear of the number.
 			UTexture2D* Glyph = Podium->Glyph(Placed.Place + 1);
 			const bool bGlyph = Glyph != nullptr && Glyph->GetResource() != nullptr && Glyph->GetSizeY() > 0;
-			const float GlyphHeight = (Placed.Place == 0 ? 120.0f : 96.0f) * U;
-			const float GlyphTop = Foot.Y + 14.0f * U - GlyphHeight * 0.78f;
-			const float PlateTop = bGlyph ? GlyphTop + GlyphHeight * PlateUnderGlyph : Foot.Y + 14.0f * U;
+			const float PlateTop = (bGlyph ? GlyphTop + GlyphHeight : Foot.Y + 14.0f * U) + 10.0f * U;
 			Shapes.RoundedRect(Foot.X - PlateWidth / 2.0f, PlateTop, PlateWidth, PlateHeight, 10.0f * U, HudDraw::Faded(FLinearColor(0.02f, 0.02f, 0.025f, 0.72f), Alpha));
 			// The side's colour along the top, out to the plate's rounded corners and clipped to them, as a score block's is.
 			const FVector2D Corner(Foot.X - PlateWidth / 2.0f, PlateTop);

@@ -148,8 +148,8 @@ namespace
 			Y -= KeyHigh;
 			const float Left = Middle - Width / 2.0f;
 			HudDraw::FShapes Shapes;
-			Shapes.Rect(Left - 6.0f * U, Y - 3.0f * U, Width + 12.0f * U, KeyHigh + 6.0f * U, HudDraw::Panel);
-			Shapes.Frame(Left, Y, Key, KeyHigh, FMath::Max(1.0f, 1.5f * U), HudDraw::Accent);
+			Shapes.RoundedRect(Left - 6.0f * U, Y - 3.0f * U, Width + 12.0f * U, KeyHigh + 6.0f * U, 6.0f * U, HudDraw::Panel);
+			Shapes.RoundedFrame(Left, Y, Key, KeyHigh, 4.0f * U, FMath::Max(1.0f, 1.5f * U), HudDraw::Accent);
 			Shapes.Draw(Canvas);
 			HudDraw::Text(Canvas, StreakKey, FVector2D(Left + Key / 2.0f, Y + (KeyHigh - HudDraw::Measure(StreakKey, Line).Y) / 2.0f), Line, HudDraw::Accent, 0.5f);
 			HudDraw::Text(Canvas, Name, FVector2D(Left + Key + 10.0f * U, Y + (KeyHigh - NameSize.Y) / 2.0f), Line, HudDraw::Accent);

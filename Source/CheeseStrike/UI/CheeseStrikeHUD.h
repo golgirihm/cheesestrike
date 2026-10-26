@@ -50,7 +50,7 @@ public:
 	static constexpr float CrosshairThickness = 2.0f;
 	static constexpr float CrosshairGap = 5.0f;
 	/** Seconds a hit mark shows. */
-	static constexpr float HitMarkLife = 0.25f;
+	static constexpr float HitMarkLife = 0.2f;
 	/** Seconds an enemy stays on the minimap after they were last seen. */
 	static constexpr float SeenLife = 1.5f;
 	/** The margin from the screen's edges, and the minimap's side, in design pixels (Unit). */
