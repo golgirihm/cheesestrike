@@ -286,7 +286,7 @@ bool FItWalksSprintsAndSlides::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("faster than a walk (%.0f)"), Character->GetVelocity().Size2D()), Character->GetVelocity().Size2D() > WalkSpeed);
 		}
 	});
-	Play(0, TEXT("wait 1.5\nstate"));
+	Play(0, TEXT("wait 2.0\nstate"));
 	Then([this]()
 	{
 		if (ACheeseStrikeCharacter* Character = PlayTests::Pawn(0))
