@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "Rules/CheeseStrikeCredit.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Weapons/CheeseStrikeShot.h"
@@ -266,6 +267,12 @@ public:
 	bool TakeOwnBlast(float Damage, const FString& How);
 	/** Server only: who last hurt it, and the server's time they did; a bot turns to whoever shoots it. */
 	ACheeseStrikeCharacter* GetLastHurtBy() const { return LastHurtBy.Get(); }
+	/** Server only: `By` hit this character (for its assists). */
+	void RecordHitBy(ACheeseStrikePlayerState* By);
+	/** Server only: the recent hits, by whom and when. */
+	TArray<CheeseStrikeCredit::FHit> GetHitBy() const { return HitBy; }
+	/** Server only: forgotten, as the character dies. */
+	void ClearHitBy() { HitBy.Reset(); }
 	float GetLastHurtAt() const { return LastHurtAt; }
 
 	/**
@@ -390,6 +397,8 @@ protected:
 	/** Whether its death has been shown here. */
 	bool bDeathShown = false;
 	TWeakObjectPtr<ACheeseStrikeCharacter> LastHurtBy;
+	/** Server only: the hits lately on this character, by whom, for the assists when it dies (CheeseStrikeCredit). */
+	TArray<CheeseStrikeCredit::FHit> HitBy;
 	float LastHurtAt = -1000.0f;
 	/** Where it has lately been: the server's record. */
 	FHitHistory HitHistory;

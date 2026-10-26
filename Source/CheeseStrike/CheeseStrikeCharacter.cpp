@@ -643,6 +643,16 @@ FHitHistory::FSample ACheeseStrikeCharacter::SampleNow(float Time) const
 	return Sample;
 }
 
+void ACheeseStrikeCharacter::RecordHitBy(ACheeseStrikePlayerState* By)
+{
+	const float Now = ServerNow();
+	HitBy.RemoveAll([Now](const CheeseStrikeCredit::FHit& Hit) { return Now - Hit.At > CheeseStrikeCredit::AssistWindow; });
+	if (By != nullptr)
+	{
+		HitBy.Add({By->GetPlayerId(), Now});
+	}
+}
+
 bool ACheeseStrikeCharacter::CanBeHurtBy(const ACheeseStrikeCharacter* From, const ACheeseStrikePlayerState* By) const
 {
 	const ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
@@ -667,6 +677,7 @@ bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From
 		return bHurt;
 	}
 	Health = FMath::Max(0.0f, Health - Damage);
+	RecordHitBy(From != nullptr ? From->GetPlayerState<ACheeseStrikePlayerState>() : nullptr);
 	LastHurtBy = From;
 	LastHurtAt = ServerNow();
 	if (From != nullptr && IsPlayerControlled())

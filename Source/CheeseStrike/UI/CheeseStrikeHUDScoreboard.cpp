@@ -101,6 +101,8 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	// King of the Hill: each player's time on the hill; in the solo mode, their points first, which it is played to.
 	const bool bHill = Match->GetModeInfo().WinBy == CheeseStrikeModes::EWinBy::Hill;
 	const bool bSoloHill = bHill && !Match->HasTeams();
+	// Execution counts downs beside the kills.
+	const bool bExecution = Match->GetMode() == CheeseStrikeModes::EMode::Execution;
 
 	// The players in order: in a team mode, each side apart under its name and score; in a free-for-all, everyone together.
 	// Gun Game goes by the step up the ladder, then the kills.
@@ -110,6 +112,8 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 		int32 Step = 0;
 		int32 HillSeconds = 0;
 		int32 HillPoints = 0;
+		int32 Assists = 0;
+		int32 Downs = 0;
 	};
 	struct FSection
 	{
@@ -134,6 +138,7 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 				Contender.Standing = Ours->Standing();
 				Contender.GunLevel = Ours->GetGunLevel();
 				Contender.HillPoints = Ours->GetHillPoints();
+				Contender.HillSeconds = Ours->GetHillSeconds();
 				const CheeseStrikeRules::FStanding Standing = CheeseStrikePodiums::RankedStanding(Contender, Match->GetModeInfo().WinBy, Match->HasTeams());
 				Players[Match->HasTeams() ? FMath::Clamp(Match->TeamOf(Ours), 0, CheeseStrikeRules::Teams - 1) : 0].Emplace(Standing, Ours);
 			}
@@ -162,6 +167,8 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 				Line.Step = Player->GetGunLevel() + 1;
 				Line.HillSeconds = Player->GetHillSeconds();
 				Line.HillPoints = Player->GetHillPoints();
+				Line.Assists = Player->GetAssists();
+				Line.Downs = Player->GetDowns();
 			}
 		}
 	}
@@ -169,16 +176,18 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	// The columns, from the panel's left: the figure, the name, the status; from its right: the deaths, the kills and Gun Game's step.
 	const float RowHeight = 30.0f * U;
 	const float SectionHeight = Match->HasTeams() ? 40.0f * U : 0.0f;
-	const float PanelWidth = (bSoloHill ? 750.0f : (bLadder || bHill) ? 640.0f : 580.0f) * U;
+	const float PanelWidth = (bSoloHill ? 830.0f : (bLadder || bHill || bExecution) ? 740.0f : 660.0f) * U;
 	const float Left = (Width - PanelWidth) / 2.0f;
 	const float FigureX = Left + 36.0f * U;
 	const float NameX = Left + 60.0f * U;
 	const float DeathsX = Left + PanelWidth - 20.0f * U;
-	const float KillsX = Left + PanelWidth - 100.0f * U;
-	const float StepX = Left + PanelWidth - 180.0f * U;
-	const float PointsX = Left + PanelWidth - 290.0f * U;
+	const float AssistsX = Left + PanelWidth - 100.0f * U;
+	const float KillsX = Left + PanelWidth - 180.0f * U;
+	// Gun Game's step, the hill's time, or Execution's downs.
+	const float StepX = Left + PanelWidth - 260.0f * U;
+	const float PointsX = Left + PanelWidth - 340.0f * U;
 	const float ChipWidth = 66.0f * U;
-	const float StatusX = (bSoloHill ? PointsX - 110.0f * U : (bLadder || bHill) ? StepX - 110.0f * U : KillsX - 110.0f * U) - ChipWidth / 2.0f;
+	const float StatusX = (bSoloHill ? PointsX - 110.0f * U : (bLadder || bHill || bExecution) ? StepX - 110.0f * U : KillsX - 110.0f * U) - ChipWidth / 2.0f;
 	const float NameWidth = StatusX - ChipWidth / 2.0f - 14.0f * U - NameX;
 
 	float PanelHeight = 128.0f * U;
@@ -243,6 +252,11 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 	{
 		HudDraw::Text(Canvas, TEXT("ON THE HILL"), FVector2D(StepX, Y), Heading, HudDraw::Soft, 1.0f);
 	}
+	if (bExecution)
+	{
+		HudDraw::Text(Canvas, TEXT("DOWNS"), FVector2D(StepX, Y), Heading, HudDraw::Soft, 1.0f);
+	}
+	HudDraw::Text(Canvas, TEXT("ASSISTS"), FVector2D(AssistsX, Y), Heading, HudDraw::Soft, 1.0f);
 	if (bSoloHill)
 	{
 		HudDraw::Text(Canvas, TEXT("POINTS"), FVector2D(PointsX, Y), Heading, HudDraw::Soft, 1.0f);
@@ -290,6 +304,11 @@ void ACheeseStrikeHUD::DrawScoreboard(const ACheeseStrikeGameState* Match, bool 
 				HudDraw::Text(Canvas, FString::FromInt(Line.HillPoints), FVector2D(PointsX, Y), RowFont, Colour, 1.0f);
 			}
 			HudDraw::Text(Canvas, FString::FromInt(Row.Kills), FVector2D(KillsX, Y), RowFont, Colour, 1.0f);
+			HudDraw::Text(Canvas, FString::FromInt(Line.Assists), FVector2D(AssistsX, Y), RowFont, Colour, 1.0f);
+			if (bExecution)
+			{
+				HudDraw::Text(Canvas, FString::FromInt(Line.Downs), FVector2D(StepX, Y), RowFont, Colour, 1.0f);
+			}
 			HudDraw::Text(Canvas, FString::FromInt(Row.Deaths), FVector2D(DeathsX, Y), RowFont, Colour, 1.0f);
 			Y += RowHeight;
 		}
