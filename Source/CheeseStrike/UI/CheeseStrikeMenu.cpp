@@ -242,6 +242,11 @@ namespace
 		FSlateRoundedBoxBrush ReadOnlyValue;
 		/** The ring round the item that has the focus, for a gamepad or the keyboard. */
 		FSlateRoundedBoxBrush FocusRing;
+		/** Behind a map's picture, and the bar with its name over the picture's foot: rounded to match the picture. */
+		FSlateRoundedBoxBrush MapBack;
+		FSlateRoundedBoxBrush MapNameBar;
+		/** A confirmation dialog's card. */
+		FSlateRoundedBoxBrush DialogCard;
 		FSliderStyle Slider;
 		TUniquePtr<FSlateDynamicImageBrush> PlayerIcon;
 		TUniquePtr<FSlateDynamicImageBrush> BotIcon;
@@ -256,7 +261,15 @@ namespace
 			if (!MapPictures.Contains(File))
 			{
 				const FString Path = FPaths::ProjectContentDir() / TEXT("UI") / TEXT("Maps") / File;
-				MapPictures.Add(File, FPaths::FileExists(Path) ? MakeUnique<FSlateDynamicImageBrush>(FName(*Path), FVector2D(CheeseStrikeMenu::MapPictureWidth, CheeseStrikeMenu::MapPictureWidth * 9.0f / 16.0f)) : nullptr);
+				TUniquePtr<FSlateDynamicImageBrush> Picture;
+				if (FPaths::FileExists(Path))
+				{
+					Picture = MakeUnique<FSlateDynamicImageBrush>(FName(*Path), FVector2D(CheeseStrikeMenu::MapPictureWidth, CheeseStrikeMenu::MapPictureWidth * 9.0f / 16.0f));
+					// Drawn as a rounded box with the picture in it: the corners are rounded, whatever the picture.
+					Picture->DrawAs = ESlateBrushDrawType::RoundedBox;
+					Picture->OutlineSettings = FSlateBrushOutlineSettings(CheeseStrikeMenu::MapPictureRounding);
+				}
+				MapPictures.Add(File, MoveTemp(Picture));
 			}
 			return MapPictures[File].Get();
 		}
@@ -300,6 +313,9 @@ namespace
 			, DropdownList(FLinearColor(0.025f, 0.025f, 0.028f, 1.0f), CheeseStrikeMenu::Rounding, FLinearColor(0.22f, 0.22f, 0.24f), 1.0f)
 			, ReadOnlyValue(FLinearColor(0.12f, 0.12f, 0.13f, 0.9f), CheeseStrikeMenu::Rounding)
 			, FocusRing(FLinearColor::Transparent, CheeseStrikeMenu::Rounding, Cheese, 3.0f)
+			, MapBack(FLinearColor(0.1f, 0.1f, 0.11f, 1.0f), CheeseStrikeMenu::MapPictureRounding)
+			, MapNameBar(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f), FVector4(0.0, 0.0, CheeseStrikeMenu::MapPictureRounding, CheeseStrikeMenu::MapPictureRounding))
+			, DialogCard(FLinearColor(PanelColour.R, PanelColour.G, PanelColour.B, 1.0f), 16.0f)
 		{
 			const auto Make = [](FButtonStyle& Style, const FLinearColor& Rest, const FLinearColor& Hover, const FLinearColor& Press)
 			{
@@ -611,11 +627,20 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 			]
 		]
 		// The question before closing the host's lobby or quitting: over everything, and it takes every press.
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		// Modal: a layer over the whole screen that blurs and darkens all that is behind it, other UI too, and is hit
+		// itself, so that nothing under it can be clicked.
+		+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Fill)
 		[
-			SAssignNew(Dialog, SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f)).Visibility(EVisibility::Collapsed)
+			SAssignNew(Dialog, SBackgroundBlur)
+			.BlurStrength(CheeseStrikeMenu::PauseBlur)
+			.Padding(0.0f)
+			.Visibility(EVisibility::Collapsed)
 			[
-				SAssignNew(DialogContent, SBox).WidthOverride(480.0f)
+				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f)).Padding(0.0f)
+				.HAlign(HAlign_Center).VAlign(VAlign_Center)
+				[
+					SAssignNew(DialogContent, SBox).WidthOverride(CheeseStrikeMenu::DialogWidth)
+				]
 			]
 		]
 	];
@@ -1015,13 +1040,15 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDialog()
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 	const bool bClose = Asking == EMenuAsk::CloseLobby;
 	const FString Keep = bClose ? TEXT("KEEP IT OPEN") : TEXT("KEEP PLAYING");
-	return SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(PanelColour).Padding(FMargin(32.0f, 28.0f))
+	// The card is rounded, and its text wraps at the width the card gives it (its width less the padding), so that
+	// the card is its full height from the first frame it is drawn in.
+	return SNew(SBorder).BorderImage(&Looks().DialogCard).Padding(FMargin(CheeseStrikeMenu::DialogPadding, 28.0f))
 	[
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(bClose ? TEXT("CLOSE THE LOBBY?") : TEXT("QUIT THE GAME?")) ]
 		+ SVerticalBox::Slot().AutoHeight()
 		[
-			MakeLine(bClose ? TEXT("Everyone in it is sent home, and nobody can join it again.") : TEXT("The game closes. In a lobby, the joiners are told first."), true)
+			MakeLine(bClose ? TEXT("Everyone in it is sent home, and nobody can join it again.") : TEXT("Quit to desktop"), true, true, CheeseStrikeMenu::DialogWidth - 2.0f * CheeseStrikeMenu::DialogPadding)
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 20.0f, 0.0f, 0.0f))
 		[
@@ -1114,9 +1141,15 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeTitle(const FString& Text)
 	return SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(34, FName("Bold"))).ColorAndOpacity(Cheese).Margin(FMargin(0.0f, 0.0f, 0.0f, 20.0f));
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim, bool bWrap)
+float SCheeseStrikeMenu::WrapWidth() const
 {
-	return SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(16)).ColorAndOpacity(bDim ? Muted : Ink).Margin(FMargin(0.0f, 4.0f)).AutoWrapText(bWrap);
+	// The same widths as the content box is given in Refresh.
+	return (Page == EMenuPage::Options ? 900.0f : (Page == EMenuPage::Credits ? 640.0f : 400.0f)) - 24.0f;
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim, bool bWrap, float WrapAt)
+{
+	return SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(16)).ColorAndOpacity(bDim ? Muted : Ink).Margin(FMargin(0.0f, 4.0f)).WrapTextAt(bWrap ? (WrapAt > 0.0f ? WrapAt : WrapWidth()) : 0.0f);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind, TSharedPtr<SWidget> Inside)
@@ -1379,7 +1412,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFarewell()
 				[
 					SNew(STextBlock).Text(FText::FromString(CheeseStrikeSessions::FarewellTitle(Farewell))).Font(Font(20, FName("Bold"))).ColorAndOpacity(FLinearColor(1.0f, 0.62f, 0.55f))
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 4.0f, 0.0f, 8.0f)) [ MakeLine(CheeseStrikeSessions::FarewellText(Farewell)) ]
+				+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 4.0f, 0.0f, 8.0f)) [ MakeLine(CheeseStrikeSessions::FarewellText(Farewell), false, true, WrapWidth() - 36.0f) ]
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left)
 				[
 					MakeButton(TEXT("OK"), [Player]()
@@ -1401,7 +1434,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeCredits()
 	for (int32 Index = 0; Index < CheeseStrikeCredits::NumCredits(); ++Index)
 	{
 		const CheeseStrikeCredits::FCredit& Credit = CheeseStrikeCredits::Credits[Index];
-		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 2.0f)) [ SNew(STextBlock).Text(FText::FromString(FString(Credit.Heading).ToUpper())).Font(Font(15, FName("Bold"))).ColorAndOpacity(Cheese).AutoWrapText(true) ];
+		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 2.0f)) [ SNew(STextBlock).Text(FText::FromString(FString(Credit.Heading).ToUpper())).Font(Font(15, FName("Bold"))).ColorAndOpacity(Cheese).WrapTextAt(WrapWidth()) ];
 		List->AddSlot().AutoHeight() [ MakeLine(Credit.Text) ];
 	}
 	// Up and down scroll the list (OnNavigation).
@@ -1427,7 +1460,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
 	{
 		StatusRow->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 10.0f, 0.0f)) [ MakeSpinner(9.0f) ];
 	}
-	StatusRow->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center) [ MakeLine(Status, !bJoining) ];
+	StatusRow->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center) [ MakeLine(Status, !bJoining, true, WrapWidth() - 28.0f) ];
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FIND A MATCH")) ]
 		+ SVerticalBox::Slot().AutoHeight() [ StatusRow ]
@@ -1448,7 +1481,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 	{
 		return SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(PanelColour).Padding(FMargin(12.0f, 24.0f))
 		[
-			MakeLine(TEXT("FRIENDS"), false)
+			MakeLine(TEXT("FRIENDS"), false, false)
 		];
 	}
 	FriendBrushes.Reset();
@@ -1458,7 +1491,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 		const TArray<FCheeseStrikeFriend>& List = Sessions->GetFriends();
 		if (List.IsEmpty())
 		{
-			Friends->AddSlot().AutoHeight() [ MakeLine(TEXT("No friends in a game of this one right now."), true) ];
+			Friends->AddSlot().AutoHeight() [ MakeLine(TEXT("No friends in a game of this one right now."), true, true, 330.0f) ];
 		}
 		for (int32 Index = 0; Index < List.Num(); ++Index)
 		{
@@ -1481,7 +1514,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 				}
 				const bool bSelf = Each == Player->PlayerState;
 				TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center) [ MakeLine(Each->GetPlayerName() + (bSelf ? TEXT("  (you)") : TEXT("")), false) ];
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center) [ MakeLine(Each->GetPlayerName() + (bSelf ? TEXT("  (you)") : TEXT("")), false, false) ];
 				if (CheeseStrikeFriends::CanKick(bHost, bSelf))
 				{
 					const ACheeseStrikePlayerState* Who = Cast<ACheeseStrikePlayerState>(Each);
@@ -1495,11 +1528,11 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 	[
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FRIENDS")) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Sessions != nullptr ? Sessions->GetStatus() : FString(TEXT("No online service")), true) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Sessions != nullptr ? Sessions->GetStatus() : FString(TEXT("No online service")), true, true, 330.0f) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ bHost && bInGame ? MakeButton(Sessions->FriendsMayJoinHere() ? TEXT("FRIENDS CAN JOIN: ON") : TEXT("FRIENDS CAN JOIN: OFF"), [Sessions]() { Sessions->SetFriendsMayJoin(!Sessions->FriendsMayJoinHere()); }) : SNullWidget::NullWidget ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ MakeButton(TEXT("REFRESH"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); }) ]
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ Friends ] ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 14.0f, 0.0f, 0.0f)) [ bInGame ? MakeLine(TEXT("In this game"), true) : SNullWidget::NullWidget ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 14.0f, 0.0f, 0.0f)) [ bInGame ? MakeLine(TEXT("In this game"), true, false) : SNullWidget::NullWidget ]
 		+ SVerticalBox::Slot().AutoHeight() [ Players ]
 	];
 }
@@ -1534,8 +1567,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
 			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Friend.Name, false) ]
-			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(CheeseStrikeFriends::StateLine(Friend.State, Friend.Humans), true) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Friend.Name, false, false) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(CheeseStrikeFriends::StateLine(Friend.State, Friend.Humans), true, false) ]
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Action ];
 }
@@ -1710,7 +1743,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMapPicture(TFunction<int32()> GetMap)
 	return SNew(SBox).WidthOverride(CheeseStrikeMenu::MapPictureWidth).HeightOverride(CheeseStrikeMenu::MapPictureWidth * 9.0f / 16.0f)
 		[
 			SNew(SOverlay)
-			+ SOverlay::Slot() [ SNew(SBorder).BorderImage(&Looks().BotChip) ]
+			+ SOverlay::Slot() [ SNew(SBorder).BorderImage(&Looks().MapBack) ]
 			+ SOverlay::Slot()
 			[
 				SNew(SImage).Image_Lambda([Known]() -> const FSlateBrush*
@@ -1722,7 +1755,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMapPicture(TFunction<int32()> GetMap)
 			]
 			+ SOverlay::Slot().VAlign(VAlign_Bottom).HAlign(HAlign_Fill)
 			[
-				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f)).Padding(FMargin(14.0f, 8.0f))
+				SNew(SBorder).BorderImage(&Looks().MapNameBar).Padding(FMargin(14.0f, 8.0f))
 				[
 					SNew(STextBlock).Font(Font(22, FName("Bold"))).ColorAndOpacity(Cheese).Text_Lambda([Known]()
 					{
@@ -1771,6 +1804,22 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 		for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeModes::RoundLimitChoices); ++Index)
 		{
 			Chosen = CheeseStrikeModes::RoundLimitChoices[Index] == Rounds ? Index : Chosen;
+		}
+		return Chosen;
+	};
+	TArray<FString> TimeNames;
+	for (const float Seconds : CheeseStrikeModes::RoundTimeChoices)
+	{
+		TimeNames.Add(FString::Printf(TEXT("%d min"), FMath::RoundToInt(Seconds / 60.0f)));
+	}
+	const auto TimeChosen = [Now]()
+	{
+		const ACheeseStrikeGameState* State = Now();
+		const float Seconds = State != nullptr ? State->GetRoundTime() : CheeseStrikeModes::RoundTime;
+		int32 Chosen = INDEX_NONE;
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeModes::RoundTimeChoices); ++Index)
+		{
+			Chosen = FMath::IsNearlyEqual(CheeseStrikeModes::RoundTimeChoices[Index], Seconds) ? Index : Chosen;
 		}
 		return Chosen;
 	};
@@ -1854,6 +1903,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	else if (ModeRules.WinBy == CheeseStrikeModes::EWinBy::Rounds)
 	{
 		Row(TEXT("Rounds to win"), MakeDropdown(RoundNames, RoundsChosen, bCanPick, [Player](int32 Index) { if (Player.IsValid()) Player->SetRoundsFromMenu(CheeseStrikeModes::RoundLimitChoices[Index]); }));
+		Row(TEXT("Round time"), MakeDropdown(TimeNames, TimeChosen, bCanPick, [Player](int32 Index) { if (Player.IsValid()) Player->SetRoundTimeFromMenu(CheeseStrikeModes::RoundTimeChoices[Index]); }));
 	}
 	else if (ModeRules.WinBy == CheeseStrikeModes::EWinBy::Hill)
 	{
@@ -2202,7 +2252,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSlider(float Min, float Max, float St
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 {
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
-	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("AIMING"), TEXT("VIEW"), TEXT("SOUND"), TEXT("GRAPHICS")};
+	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS")};
 	const bool bInMatch = Page == EMenuPage::Options && Player.IsValid() && Player->IsPaused();
 	const bool bControls = OptionsTab == EOptionsTab::Controls;
 	// The controls are a table that scrolls under its heading; the other tabs' rows scroll as one.
@@ -2222,7 +2272,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SAssignNew(Scroll, SScrollBox).ScrollWhenFocusChanges(EScrollWhenFocusChanges::AnimatedScroll) + SScrollBox::Slot().Padding(FMargin(0.0f, 0.0f, bControls ? 20.0f : 0.0f, 0.0f)) [ bControls ? MakeControls() : MakeOptionsTab() ] ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f))
 		[
-			MakeLine(bControls ? TEXT("Read from the game's own bindings.") : (bInMatch ? TEXT("The match goes on; each change is made at once and kept.") : TEXT("Each change is made at once and kept.")), true)
+			bControls ? SNullWidget::NullWidget : MakeLine(bInMatch ? TEXT("The match goes on; each change is made at once and kept.") : TEXT("Each change is made at once and kept."), true)
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f)).HAlign(HAlign_Left)
 		[
@@ -2237,9 +2287,10 @@ TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const 
 {
 	// The action, then its keys, then each pad's buttons, the column of what the player uses now lit.
 	const bool bPadLit = CheeseStrikeInput::IsUsingGamepad(Controller.Get());
-	const auto Cell = [](const FString& Text, const FSlateFontInfo& Look, const FLinearColor& Colour)
+	// Each column wraps at the width its share of the table gives it (880 across: the page less the clear of the scroll bar).
+	const auto Cell = [](const FString& Text, const FSlateFontInfo& Look, const FLinearColor& Colour, float Weight, bool bLast = false)
 	{
-		return SNew(STextBlock).Text(FText::FromString(Text)).Font(Look).ColorAndOpacity(Colour).AutoWrapText(true);
+		return SNew(STextBlock).Text(FText::FromString(Text)).Font(Look).ColorAndOpacity(Colour).WrapTextAt(880.0f * Weight - (bLast ? 4.0f : 16.0f));
 	};
 	const FSlateFontInfo Look = bHeading ? Font(14, FName("Bold")) : Font(17);
 	const FSlateFontInfo KeyLook = bHeading ? Font(14, FName("Bold")) : Font(17, FName("Bold"));
@@ -2247,10 +2298,10 @@ TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const 
 	const FLinearColor KeysColour = bHeading ? Muted : (bPadLit ? Muted : Cheese);
 	const FLinearColor PadColour = bHeading ? Muted : (bPadLit ? Cheese : Muted);
 	return SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().FillWidth(0.36f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Action, Look, Name) ]
-		+ SHorizontalBox::Slot().FillWidth(0.26f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Keys, KeyLook, KeysColour) ]
-		+ SHorizontalBox::Slot().FillWidth(0.19f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Xbox, KeyLook, PadColour) ]
-		+ SHorizontalBox::Slot().FillWidth(0.19f).VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour) ];
+		+ SHorizontalBox::Slot().FillWidth(0.36f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Action, Look, Name, 0.36f) ]
+		+ SHorizontalBox::Slot().FillWidth(0.26f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Keys, KeyLook, KeysColour, 0.26f) ]
+		+ SHorizontalBox::Slot().FillWidth(0.19f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Xbox, KeyLook, PadColour, 0.19f) ]
+		+ SHorizontalBox::Slot().FillWidth(0.19f).VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour, 0.19f, true) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeControls()
@@ -2294,7 +2345,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 		Add(MakeOptionRow(TEXT("Aiming sensitivity"), MakeSlider(CheeseStrikeSettings::MinAimedSensitivity, CheeseStrikeSettings::MaxAimedSensitivity, 0.05f,
 			[Kept]() { return Kept.IsValid() ? Kept->GetAimedSensitivity() : CheeseStrikeSettings::DefaultAimedSensitivity; },
 			[Kept](float Value) { if (Kept.IsValid()) Kept->SetAimedSensitivity(Value); }, Times)));
-		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("While aiming down the sights, as a share of the look's (the mouse's and a gamepad's stick)."), true) ];
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("While aiming down the sights, as a share of the look's (the mouse's and a gamepad's stick)."), true, true, WrapWidth() - OptionLabelWidth) ];
 		Add(MakeOptionRow(TEXT("Invert look"), MakeChoiceButtons({TEXT("OFF"), TEXT("ON")}, Settings->IsLookInverted() ? 1 : 0, true, [this, Kept](int32 Index)
 		{
 			if (Kept.IsValid())
@@ -2313,7 +2364,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			}
 			Refresh();
 		})));
-		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("A gamepad's: the stick turns slower over an enemy, and a little toward them. Never the mouse."), true) ];
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("A gamepad's: the stick turns slower over an enemy, and a little toward them. Never the mouse."), true, true, WrapWidth() - OptionLabelWidth) ];
 		break;
 	case EOptionsTab::Sound:
 		Add(MakeOptionRow(TEXT("Master volume"), MakeSlider(0.0f, 1.0f, 0.01f,
@@ -2325,7 +2376,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 		Add(MakeOptionRow(TEXT("Music volume"), MakeSlider(0.0f, 1.0f, 0.01f,
 			[Kept]() { return Kept.IsValid() ? Kept->GetMusicVolume() : CheeseStrikeSettings::DefaultMusicVolume; },
 			[Kept](float Value) { if (Kept.IsValid()) Kept->SetMusicVolume(Value); }, Percent)));
-		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("The effects are the game's sounds, the music the front end's and the lobby's; the master volume is everything, the menu's too."), true) ];
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("The effects are the game's sounds, the music the front end's and the lobby's; the master volume is everything, the menu's too."), true, true, WrapWidth() - OptionLabelWidth) ];
 		break;
 	case EOptionsTab::Graphics:
 	{
@@ -2338,7 +2389,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 			Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f))
 			[
-				SNew(STextBlock).Font(Font(16)).ColorAndOpacity(Muted).AutoWrapText(true).Text_Lambda([Kept, Player]()
+				SNew(STextBlock).Font(Font(16)).ColorAndOpacity(Muted).WrapTextAt(WrapWidth() - OptionLabelWidth).Text_Lambda([Kept, Player]()
 				{
 					FVector2D Size(16.0, 9.0);
 					const ULocalPlayer* Local = Player.IsValid() ? Player->GetLocalPlayer() : nullptr;
@@ -2415,7 +2466,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			[PickResolution, ResolutionChosen, Resolutions]() { PickResolution(FMath::Min(Resolutions.Num() - 1, ResolutionChosen + 1)); })));
 		if (bFullScreen)
 		{
-			Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("Full screen, the game is drawn at this resolution and the menus at the screen's own."), true) ];
+			Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("Full screen, the game is drawn at this resolution and the menus at the screen's own."), true, true, WrapWidth() - OptionLabelWidth) ];
 		}
 		Add(MakeOptionRow(TEXT("VSync"), MakeChoiceButtons({TEXT("OFF"), TEXT("ON")}, Settings->IsVSyncEnabled() ? 1 : 0, true, [this, Kept](int32 Index)
 		{

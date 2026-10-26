@@ -60,6 +60,11 @@ private:
 	FString LoadingTo;
 	double LoadingSince = 0.0;
 	double UpSince = 0.0;
+	/** When the last level finished loading, and which: a second load of it soon after is logged with its stack, to find who asked. */
+	double LoadedAt = 0.0;
+	FString LoadedLevel;
+	/** The DPI scale the viewport had when the loading screen went up, kept for the cover that follows (see OnLevelLoaded). */
+	float CoverScale = 0.0f;
 	/** Where the covered level is, as the cover says it. */
 	FString GoingTo;
 };

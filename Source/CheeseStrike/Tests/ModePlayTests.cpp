@@ -892,6 +892,7 @@ bool FExecutionTimeUpIsADrawWithNoOvertime::RunTest(const FString& Parameters)
 	StartPlaying({2, TEXT("?Mode=Execution?Rounds=1?RoundTime=30")});
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
+	Then([this]() { TestEqual(TEXT("the match uses the chosen round time, everyone told"), GameState(1)->GetRoundTime(), 30.0f); });
 	// The round's time runs out while the host is down: both sides still have someone in, so it is a draw at once.
 	WaitUntil(TEXT("the round's last 8 s"), 35.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->SecondsLeftInRound() <= 8.0f; });
 	Then([this]() { CharacterOf(0, 0)->GetLastStand()->GoDown(StateOf(1, 0)); });

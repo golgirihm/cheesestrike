@@ -6,7 +6,7 @@ namespace CheeseStrikeCredits
 {
 	const FCredit Credits[] = {
 		{TEXT("CheeseStrike: Gouda Overload"), TEXT("Made by Hamid Golgiri.")},
-		{TEXT("Engine"), TEXT("Made with Unreal Engine 5, by Epic Games. Begun from its First Person template.")},
+		{TEXT("Engine"), TEXT("Made with Unreal Engine 5, by Epic Games.")},
 		{TEXT("The soldiers"), TEXT("Lt. Belica, Murdock, Twinblast and Wraith, from Paragon, by Epic Games (Fab).")},
 		{TEXT("Animations, the rifle, the pistol and the shotgun and their sounds, and the bursts of the streaks and the grenades"), TEXT("From Lyra Starter Game, by Epic Games.")},
 		{TEXT("The weapons"), TEXT("\"PPSH 41 Low-poly PBR\" and \"DP28 Light Machine Gun Low-poly PBR\" by Max3d (Fab). \"M1911 (FREE)\" by Xeradev (Fab). \"SV-98 Sniper Rifle\" and \"Classic M4\" by SpatialNeglect (Fab), licensed under Creative Commons Attribution 4.0 (CC BY 4.0): creativecommons.org/licenses/by/4.0; made into cheese for this game.")},

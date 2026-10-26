@@ -582,9 +582,17 @@ void UCheeseStrikeSessionSubsystem::OnDestroyedToLeave(FName SessionName, bool b
 {
 	bBusy = false;
 	Say(TEXT("Left the match"));
-	// Back to the level, alone.
+	// Back to the level, alone. Not if the player is there already, alone (the match was left some other way meanwhile, by the
+	// host's goodbye, say): a second trip to the same place would show the loading cover again and end where it began.
 	if (APlayerController* Player = GetGameInstance() != nullptr ? GetGameInstance()->GetFirstLocalPlayerController() : nullptr)
 	{
+		const UWorld* Here = Player->GetWorld();
+		const bool bAlreadyThere = Here != nullptr && Here->GetNetMode() == NM_Standalone && Here->GetOutermost()->GetName().EndsWith(TEXT("Lvl_Shooter"));
+		if (bAlreadyThere)
+		{
+			UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: already back at the front end, not travelling there again"));
+			return;
+		}
 		Player->ClientTravel(CheeseStrikeSessions::Level, TRAVEL_Absolute);
 	}
 }

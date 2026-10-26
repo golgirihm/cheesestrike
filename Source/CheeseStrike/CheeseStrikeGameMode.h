@@ -56,6 +56,8 @@ public:
 	void SetMode(CheeseStrikeModes::EMode InMode);
 	/** The host sets the rounds to win, from the lobby. */
 	void SetRoundLimit(int32 Rounds);
+	/** The host sets a round's length in seconds, from the lobby (30 to 600). */
+	void SetRoundTime(float Seconds);
 	/** Execution: `Victim` has gone down, put there by `By`; down still counts as in, until executed (UCheeseStrikeLastStand). */
 	void Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By);
 	/** Execution: `Body` is up again (revived, or by themself): a round in overtime may be over now. */

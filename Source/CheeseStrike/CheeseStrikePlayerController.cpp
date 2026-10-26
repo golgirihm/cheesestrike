@@ -609,6 +609,18 @@ void ACheeseStrikePlayerController::SetRoundsFromMenu(int32 Rounds)
 	}
 }
 
+void ACheeseStrikePlayerController::SetRoundTimeFromMenu(float Seconds)
+{
+	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr; Mode != nullptr && Mode->CanChangeLobby())
+	{
+		Mode->SetRoundTime(Seconds);
+	}
+	if (Menu.IsValid())
+	{
+		Menu->Refresh();
+	}
+}
+
 void ACheeseStrikePlayerController::SetBotsFromMenu(int32 Wanted)
 {
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr; Mode != nullptr && Mode->CanChangeLobby())

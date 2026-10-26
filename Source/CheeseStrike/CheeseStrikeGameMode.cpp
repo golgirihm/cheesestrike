@@ -614,6 +614,7 @@ void ACheeseStrikeGameMode::InitGameState()
 		State->SetLimits(KillLimit, RespawnDelay);
 		State->SetMode(Mode);
 		State->SetRoundLimit(RoundLimit);
+		State->SetRoundTime(RoundTime);
 		// The bots' names are drawn once, so that the lobby and the match agree on them.
 		State->SetBots(CheeseStrikeRules::BotNames(BotSeed, CheeseStrikeRules::Teams * CheeseStrikeRules::TeamSize), BotsWanted);
 		State->SetBotSides(BotSides);
@@ -915,6 +916,16 @@ void ACheeseStrikeGameMode::SetRoundLimit(int32 Rounds)
 		State->SetRoundLimit(RoundLimit);
 	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("Rounds: first to win %d"), RoundLimit);
+}
+
+void ACheeseStrikeGameMode::SetRoundTime(float Seconds)
+{
+	RoundTime = FMath::Clamp(Seconds, 30.0f, 600.0f);
+	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
+	{
+		State->SetRoundTime(RoundTime);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Rounds: %.0f s each"), RoundTime);
 }
 
 void ACheeseStrikeGameMode::Downed(ACheeseStrikeCharacter* Victim, ACheeseStrikePlayerState* By)
