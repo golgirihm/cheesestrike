@@ -2418,7 +2418,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const 
 		return SNew(SBox).WidthOverride(Across)
 			.Padding(FMargin(0.0f, 0.0f, Clear, 0.0f))
 			[
-				SNew(STextBlock).Text(FText::FromString(Text)).Font(Look).ColorAndOpacity(Colour).AutoWrapText(true)
+				SNew(STextBlock).Text(FText::FromString(Text)).Font(Look).ColorAndOpacity(Colour).WrapTextAt(Across - Clear)
 			];
 	};
 	const FSlateFontInfo Look = bHeading ? Font(14, FName("Bold")) : Font(17);
