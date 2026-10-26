@@ -97,6 +97,10 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	// standing on the capsule's floor, turned to face its front.
 	USkeletalMesh* const First = BodyMeshes.IsEmpty() ? nullptr : BodyMeshes[0].Get();
 	const TSubclassOf<UAnimInstance> BodyAnimation = UCheeseStrikeHeroAnimInstance::StaticClass();
+	// No cloth simulation: Twinblast's coat would otherwise be simulated, and the engine's cloth vertex factory can render the body
+	// swapped onto a live component before any simulated data is written (an assert in GetClothBufferIndexForReading). With no
+	// cloth actors there is never any simulated data, so the vertex factory is never double buffered and never reads it.
+	GetMesh()->SetAllowClothActors(false);
 	GetMesh()->SetSkeletalMeshAsset(First);
 	GetMesh()->SetAnimInstanceClass(BodyAnimation);
 	GetMesh()->SetRelativeLocationAndRotation(FVector(-10.0f, 0.0f, -CapsuleHalfHeight), FRotator(0.0f, -90.0f, 0.0f));
@@ -105,6 +109,7 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 	FirstPersonMesh->SetupAttachment(GetMesh());
+	FirstPersonMesh->SetAllowClothActors(false);
 	FirstPersonMesh->SetSkeletalMeshAsset(First);
 	FirstPersonMesh->SetAnimInstanceClass(BodyAnimation);
 	FirstPersonMesh->SetOnlyOwnerSee(true);
