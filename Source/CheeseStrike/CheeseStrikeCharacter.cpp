@@ -11,6 +11,8 @@
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "EnhancedPlayerInput.h"
 #include "Engine/SkeletalMesh.h"
 #include "InputActionValue.h"
 #include "UObject/ConstructorHelpers.h"
@@ -1267,6 +1269,7 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	UpdateGhost();
 	UpdateDown(DeltaSeconds);
 	UpdateFootsteps(DeltaSeconds);
+	ResumeSprintKey();
 	// The server keeps where everyone has been, for shots fired at where they were seen.
 	if (HasAuthority() && GetWorld() != nullptr && GetWorld()->GetGameState() != nullptr)
 	{
@@ -1756,6 +1759,24 @@ void ACheeseStrikeCharacter::AimEnded()
 void ACheeseStrikeCharacter::ReloadStarted()
 {
 	DoReload();
+}
+
+void ACheeseStrikeCharacter::ResumeSprintKey()
+{
+	const bool bCan = IsLocallyControlled() && IsPlayerControlled() && TakesInput();
+	if (bCan && !bCouldAct)
+	{
+		const APlayerController* Player = Cast<APlayerController>(GetController());
+		const ULocalPlayer* Local = Player != nullptr ? Player->GetLocalPlayer() : nullptr;
+		const UEnhancedInputLocalPlayerSubsystem* Subsystem = Local != nullptr ? Local->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+		const UEnhancedPlayerInput* PlayerInput = Subsystem != nullptr ? Subsystem->GetPlayerInput() : nullptr;
+		const UCheeseStrikeInputSet* Input = UCheeseStrikeInputSet::Get(this);
+		if (PlayerInput != nullptr && Input != nullptr && Input->Sprint != nullptr && PlayerInput->GetActionValue(Input->Sprint).Get<bool>())
+		{
+			DoSprint(true);
+		}
+	}
+	bCouldAct = bCan;
 }
 
 void ACheeseStrikeCharacter::SprintStarted()
