@@ -109,7 +109,7 @@ namespace CheeseStrikePodiumHUD
 			}
 			const FLinearColor Colour = Placed.Team >= 0 ? HudDraw::SideColour(Placed.Team) : HudDraw::Accent;
 			const float PlateWidth = 300.0f * U;
-			const float PlateHeight = NameHeight + ScoreHeight + 22.0f * U;
+			const float PlateHeight = NameHeight + ScoreHeight + 28.0f * U;
 			// The place's number on the pedestal's foot, and the plate under it, the name clear of the number.
 			UTexture2D* Glyph = Podium->Glyph(Placed.Place + 1);
 			const bool bGlyph = Glyph != nullptr && Glyph->GetResource() != nullptr && Glyph->GetSizeY() > 0;
@@ -117,7 +117,10 @@ namespace CheeseStrikePodiumHUD
 			const float GlyphTop = Foot.Y + 14.0f * U - GlyphHeight * 0.78f;
 			const float PlateTop = bGlyph ? GlyphTop + GlyphHeight * PlateUnderGlyph : Foot.Y + 14.0f * U;
 			Shapes.RoundedRect(Foot.X - PlateWidth / 2.0f, PlateTop, PlateWidth, PlateHeight, 10.0f * U, HudDraw::Faded(FLinearColor(0.02f, 0.02f, 0.025f, 0.72f), Alpha));
-			Shapes.Rect(Foot.X - PlateWidth / 2.0f + 10.0f * U, PlateTop, PlateWidth - 20.0f * U, 3.0f * U, HudDraw::Faded(Colour, Alpha));
+			// The side's colour along the top, out to the plate's rounded corners and clipped to them, as a score block's is.
+			const FVector2D Corner(Foot.X - PlateWidth / 2.0f, PlateTop);
+			const TArray<FVector2D> Outline = CheeseStrikeHUD::RoundedRect(Corner, Corner + FVector2D(PlateWidth, PlateHeight), 10.0f * U);
+			Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(Outline, Corner, Corner + FVector2D(PlateWidth, 3.0f * U)), HudDraw::Faded(Colour, Alpha));
 			if (Placed.bMine)
 			{
 				Shapes.RoundedFrame(Foot.X - PlateWidth / 2.0f, PlateTop, PlateWidth, PlateHeight, 10.0f * U, 2.0f * U, HudDraw::Faded(HudDraw::Accent, Alpha));
@@ -125,8 +128,8 @@ namespace CheeseStrikePodiumHUD
 			FWords& Line = Words.AddDefaulted_GetRef();
 			Line.Name = CheeseStrikeHUD::FitName(Placed.Name, PlateWidth - 24.0f * U, [&NameFont](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, NameFont).X); });
 			Line.Score = Placed.Score;
-			Line.NameAt = FVector2D(Foot.X, PlateTop + 9.0f * U);
-			Line.ScoreAt = FVector2D(Foot.X, PlateTop + 11.0f * U + NameHeight);
+			Line.NameAt = FVector2D(Foot.X, PlateTop + 14.0f * U);
+			Line.ScoreAt = FVector2D(Foot.X, PlateTop + 16.0f * U + NameHeight);
 			Line.Colour = Colour;
 			if (bGlyph)
 			{
