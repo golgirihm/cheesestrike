@@ -36,6 +36,7 @@ namespace CheeseStrikePodiums
 		int32 GunLevel = 0;
 		/** King of the Hill's points of their own. */
 		int32 HillPoints = 0;
+		int32 HillSeconds = 0;
 	};
 
 	/**

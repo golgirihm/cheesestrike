@@ -287,6 +287,7 @@ TArray<FPodiumPlace> ACheeseStrikePodium::PlacesFor(const ACheeseStrikeGameState
 			Contender.Team = Match->TeamOf(Player);
 			Contender.GunLevel = Player->GetGunLevel();
 			Contender.HillPoints = Player->GetHillPoints();
+			Contender.HillSeconds = Player->GetHillSeconds();
 			Players.Add(Player);
 		}
 	}

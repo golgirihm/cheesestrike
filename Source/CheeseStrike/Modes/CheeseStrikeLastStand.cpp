@@ -312,6 +312,10 @@ void UCheeseStrikeLastStand::GoDown(ACheeseStrikePlayerState* By)
 	bDowned = true;
 	DownedAt = ServerNow();
 	DownedBy = By;
+	if (By != nullptr && By != Me->GetPlayerState<ACheeseStrikePlayerState>())
+	{
+		By->AddDown();
+	}
 	bInteractHeld = false;
 	StopWork();
 	// Only the sidearm, in hand at once.

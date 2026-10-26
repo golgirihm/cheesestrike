@@ -30,6 +30,14 @@ class CHEESESTRIKE_API ACheeseStrikePlayerState : public APlayerState
 public:
 	int32 GetKills() const { return Kills; }
 	int32 GetDeaths() const { return Deaths; }
+	/** Kills they helped with: hurt the one killed lately. */
+	int32 GetAssists() const { return Assists; }
+	/** Players they put down (Execution). */
+	int32 GetDowns() const { return Downs; }
+	/** Server only. */
+	void AddAssist() { ++Assists; }
+	/** Server only. */
+	void AddDown() { ++Downs; }
 	/** The side this player is on (CheeseStrikeRules::TeamNames); in free-for-all every player has one too, which nothing uses. */
 	int32 GetTeam() const { return Team; }
 	/** Server only. A kill, by this player's own weapon (`bCountsForStreak`) or a streak's; returns the streak it earns, if any. */
@@ -126,6 +134,10 @@ protected:
 	int32 Kills = 0;
 	UPROPERTY(Replicated)
 	int32 Deaths = 0;
+	UPROPERTY(Replicated)
+	int32 Assists = 0;
+	UPROPERTY(Replicated)
+	int32 Downs = 0;
 	UPROPERTY(Replicated)
 	int32 Team = 0;
 	UPROPERTY(Replicated)

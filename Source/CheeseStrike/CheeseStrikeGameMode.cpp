@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 // Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
+#include "Rules/CheeseStrikeCredit.h"
+
 #include "CheeseStrikeGameMode.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Components/CapsuleComponent.h"
@@ -670,6 +672,22 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 			Weapon->AddReserve(Weapon->GetStats().MagazineSize);
 		}
 	}
+	// The assists: whoever hurt the victim lately, but not the killer. Their hits are forgotten with the death.
+	const float Now = State->GetServerWorldTimeSeconds();
+	for (const int32 Helper : CheeseStrikeCredit::Assisters(Victim->GetHitBy(), KillerState != nullptr ? KillerState->GetPlayerId() : -1, VictimState != nullptr ? VictimState->GetPlayerId() : -1, Now))
+	{
+		for (APlayerState* Each : State->PlayerArray)
+		{
+			if (Each != nullptr && Each->GetPlayerId() == Helper)
+			{
+				if (ACheeseStrikePlayerState* Assisting = Cast<ACheeseStrikePlayerState>(Each))
+				{
+					Assisting->AddAssist();
+				}
+			}
+		}
+	}
+	Victim->ClearHitBy();
 	if (VictimState != nullptr)
 	{
 		VictimState->AddDeath();

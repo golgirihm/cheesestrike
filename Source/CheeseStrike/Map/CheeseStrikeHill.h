@@ -173,5 +173,7 @@ protected:
 	CheeseStrikeHills::FClock Clock;
 	float Pending = 0.0f;
 	CheeseStrikeHills::FHold Announced;
+	/** The hill's time given out so far, and so whose turn it is for it (CheeseStrikeCredit). */
+	float CreditedSeconds = 0.0f;
 	bool bWarned = false;
 };

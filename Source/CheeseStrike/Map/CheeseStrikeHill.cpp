@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
+#include "Rules/CheeseStrikeCredit.h"
 #include "CheeseStrikeHill.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
@@ -330,9 +331,22 @@ void ACheeseStrikeHill::Score(float Seconds)
 		InsideStates.Add(Theirs);
 	}
 	const CheeseStrikeHills::FHold Hold = CheeseStrikeHills::HoldOf(bTeams, Inside);
-	for (ACheeseStrikePlayerState* Each : InsideStates)
+	// The time captured goes to one of those holding the hill, in turn: the holder's side in a team mode, and nobody while it is contested.
+	if (Hold.State == CheeseStrikeHills::EHold::Held)
 	{
-		Each->AddHillTime(Seconds);
+		TArray<ACheeseStrikePlayerState*> Holders;
+		for (ACheeseStrikePlayerState* Each : InsideStates)
+		{
+			if (!bTeams || Each->GetTeam() == Hold.Holder)
+			{
+				Holders.Add(Each);
+			}
+		}
+		if (Holders.Num() > 0)
+		{
+			Holders[CheeseStrikeCredit::CreditIndex(CreditedSeconds, Holders.Num())]->AddHillTime(Seconds);
+			CreditedSeconds += Seconds;
+		}
 	}
 	ACheeseStrikePlayerState* HolderState = nullptr;
 	if (Hold.State == CheeseStrikeHills::EHold::Held && !bTeams)
@@ -380,6 +394,7 @@ void ACheeseStrikeHill::Score(float Seconds)
 
 void ACheeseStrikeHill::MoveOn(float MovesFrom)
 {
+	CreditedSeconds = 0.0f;
 	if (!HasBegun())
 	{
 		return;

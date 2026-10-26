@@ -18,6 +18,8 @@ void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ACheeseStrikePlayerState, Kills);
 	DOREPLIFETIME(ACheeseStrikePlayerState, Deaths);
+	DOREPLIFETIME(ACheeseStrikePlayerState, Assists);
+	DOREPLIFETIME(ACheeseStrikePlayerState, Downs);
 	DOREPLIFETIME(ACheeseStrikePlayerState, Team);
 	DOREPLIFETIME(ACheeseStrikePlayerState, JoinOrder);
 	DOREPLIFETIME(ACheeseStrikePlayerState, GunLevel);

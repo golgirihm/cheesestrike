@@ -47,9 +47,17 @@ namespace CheeseStrikePodiums
 		{
 			Ranked.Kills += (Contender.GunLevel + 1) * PodiumRankWeight;
 		}
-		if (WinBy == CheeseStrikeModes::EWinBy::Hill && !bTeams)
+		if (WinBy == CheeseStrikeModes::EWinBy::Hill)
 		{
-			Ranked.Kills += Contender.HillPoints * PodiumRankWeight;
+			// The hill ranks by the time captured, kills breaking a tie; the solo hill is played to points, so those come first.
+			if (bTeams)
+			{
+				Ranked.Kills = Contender.HillSeconds * PodiumRankWeight + Contender.Standing.Kills;
+			}
+			else
+			{
+				Ranked.Kills = Contender.HillPoints * PodiumRankWeight + Contender.HillSeconds;
+			}
 		}
 		return Ranked;
 	}
