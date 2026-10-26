@@ -85,6 +85,19 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	}
 }
 
+void ACheeseStrikeGameMode::GoAtOnceIfAlone()
+{
+	// The net driver holds a server travel back (ServerTravelPause) for its clients to be told; with none there is nobody to wait for.
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (It->IsValid() && !It->Get()->IsLocalController())
+		{
+			return;
+		}
+	}
+	GetWorld()->NextSwitchCountdown = 0.0f;
+}
+
 FString ACheeseStrikeGameMode::TravelTo(const FURL& Url)
 {
 	// The map and the options only: travel is relative to where the server is, so it keeps listening on its port, and a URL
@@ -176,6 +189,7 @@ void ACheeseStrikeGameMode::CountdownOver()
 	// The countdown is left at its end, not cleared: the lobby says "Starting" until the travel takes over, rather than
 	// offering Start the Match again for the moment before it does.
 	GetWorld()->ServerTravel(TravelTo(Url), GetTravelType());
+	GoAtOnceIfAlone();
 }
 
 bool ACheeseStrikeGameMode::ReadyToStartMatch_Implementation()
@@ -231,6 +245,7 @@ void ACheeseStrikeGameMode::RestartGame()
 		Url.AddOption(*Option);
 	}
 	GetWorld()->ServerTravel(TravelTo(Url), GetTravelType());
+	GoAtOnceIfAlone();
 }
 
 void ACheeseStrikeGameMode::PostLogin(APlayerController* NewPlayer)

@@ -12,7 +12,7 @@
 #include "Styling/CoreStyle.h"
 #include "UnrealClient.h"
 #include "Widgets/Images/SImage.h"
-#include "Widgets/Images/SThrobber.h"
+#include "CheeseStrikeLoader.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SScaleBox.h"
 #include "Widgets/SOverlay.h"
@@ -126,7 +126,7 @@ void UCheeseStrikePostGameSubsystem::Show(TSharedRef<SWidget> Screen)
 			.Visibility_Lambda([this]() { return Waited > SpinnerAfter && FadingSince < 0.0 ? EVisibility::HitTestInvisible : EVisibility::Hidden; })
 			.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f)).Padding(FMargin(12.0f))
 			[
-				SNew(SCircularThrobber).Radius(10.0f).NumPieces(8).Period(1.0f).PieceImage(FCoreStyle::Get().GetBrush("Throbber.CircleChunk")).ColorAndOpacity(FLinearColor::White)
+				SNew(SCheeseStrikeLoader).Radius(12.0f)
 			]
 		];
 	Viewport->AddViewportWidgetContent(Cover.ToSharedRef(), PostGameOrder);

@@ -363,6 +363,13 @@ private:
 	};
 	/** The items of the page as last drawn. */
 	TArray<FFocusable> Focusables;
+	/** The items of the dialog, which has the focus to itself while it is up (Asking): the page's are out of reach meanwhile. */
+	TArray<FFocusable> DialogFocusables;
+	bool bBuildingDialog = false;
+	const TArray<FFocusable>& Active() const { return Asking != EMenuAsk::None ? DialogFocusables : Focusables; }
+	TArray<FFocusable>& Active() { return Asking != EMenuAsk::None ? DialogFocusables : Focusables; }
+	/** What had the focus before the dialog came up, to have it back as it goes. */
+	FString FocusBeforeAsk;
 	FString FocusName;
 	int32 FocusIndex = 0;
 	/** Whether the focus is still to be put on FocusName's item. */

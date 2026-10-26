@@ -16,7 +16,7 @@
 #include "Styling/CoreStyle.h"
 #include "Styling/SlateTypes.h"
 #include "Widgets/Images/SImage.h"
-#include "Widgets/Images/SThrobber.h"
+#include "CheeseStrikeLoader.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SMenuAnchor.h"
 #include "Widgets/Input/SSlider.h"
@@ -725,7 +725,8 @@ void SCheeseStrikeMenu::Refresh()
 				Key += FString::Printf(TEXT("%s%s;"), *Each->GetPlayerName(), Each->IsABot() ? TEXT("*") : TEXT(""));
 			}
 		}
-		if (Key != ShownFriendsKey && FriendsContent.IsValid())
+		// (Not while a dropdown is open, which drawing the panel again would close.)
+		if (Key != ShownFriendsKey && FriendsContent.IsValid() && !IsDropdownOpen())
 		{
 			ShownFriendsKey = Key;
 			FriendsContent->SetContent(MakeFriendsPanel(bOpen));
@@ -736,8 +737,27 @@ void SCheeseStrikeMenu::Refresh()
 		Dialog->SetVisibility(Asking != EMenuAsk::None ? EVisibility::Visible : EVisibility::Collapsed);
 		if (Asking != ShownAsk && DialogContent.IsValid())
 		{
+			const bool bWasAsking = ShownAsk != EMenuAsk::None;
 			ShownAsk = Asking;
-			DialogContent->SetContent(MakeDialog());
+			DialogFocusables.Reset();
+			bBuildingDialog = true;
+			DialogContent->SetContent(Asking != EMenuAsk::None ? MakeDialog() : SNullWidget::NullWidget);
+			bBuildingDialog = false;
+			if (Asking == EMenuAsk::None && bWasAsking)
+			{
+				// The question answered or put away: the focus goes back to what had it.
+				FocusName = FocusBeforeAsk;
+				bFocusPending = true;
+			}
+		}
+		// While the question is up nothing behind it can take a press, a click or the focus: the pad and the keys stay in the dialog.
+		const bool bBehind = Asking == EMenuAsk::None;
+		for (const TSharedPtr<SWidget>& Each : TArray<TSharedPtr<SWidget>>{ Panel, FriendsBox, Lobby })
+		{
+			if (Each.IsValid() && Each->IsEnabled() != bBehind)
+			{
+				Each->SetEnabled(bBehind);
+			}
 		}
 	}
 	const bool bLobby = Page == EMenuPage::Lobby;
@@ -811,18 +831,19 @@ int32 SCheeseStrikeMenu::UserIndex() const
 TSharedRef<SWidget> SCheeseStrikeMenu::Focusable(const FString& Name, TSharedRef<SWidget> Widget)
 {
 	FString Unique = Name;
-	for (int32 Number = 2; Focusables.ContainsByPredicate([&Unique](const FFocusable& Each) { return Each.Name == Unique; }); ++Number)
+	TArray<FFocusable>& Items = bBuildingDialog ? DialogFocusables : Focusables;
+	for (int32 Number = 2; Items.ContainsByPredicate([&Unique](const FFocusable& Each) { return Each.Name == Unique; }); ++Number)
 	{
 		Unique = FString::Printf(TEXT("%s #%d"), *Name, Number);
 	}
-	Focusables.Add({Unique, Widget});
+	Items.Add({Unique, Widget});
 	return Widget;
 }
 
 TArray<FString> SCheeseStrikeMenu::GetFocusableNames() const
 {
 	TArray<FString> Names;
-	for (const FFocusable& Each : Focusables)
+	for (const FFocusable& Each : Active())
 	{
 		Names.Add(Each.Name);
 	}
@@ -836,7 +857,7 @@ void SCheeseStrikeMenu::FocusItem(const FString& Name)
 	{
 		FocusName = Name;
 		FocusIndex = Index;
-		bFocusPending = !GiveFocus(Focusables[Index].Widget.Pin());
+		bFocusPending = !GiveFocus(Active()[Index].Widget.Pin());
 	}
 }
 
@@ -885,12 +906,12 @@ void SCheeseStrikeMenu::KeepFocus()
 	}
 	// Which item has it, if one does.
 	const int32 User = UserIndex();
-	for (int32 Index = 0; Index < Focusables.Num(); ++Index)
+	for (int32 Index = 0; Index < Active().Num(); ++Index)
 	{
-		const TSharedPtr<SWidget> Widget = Focusables[Index].Widget.Pin();
+		const TSharedPtr<SWidget> Widget = Active()[Index].Widget.Pin();
 		if (Widget.IsValid() && Widget->HasUserFocus(User).IsSet())
 		{
-			FocusName = Focusables[Index].Name;
+			FocusName = Active()[Index].Name;
 			FocusIndex = Index;
 			bFocusPending = false;
 			return;
@@ -905,13 +926,13 @@ void SCheeseStrikeMenu::KeepFocus()
 		return;
 	}
 	const int32 Chosen = CheeseStrikeMenu::FocusAfterRedraw(GetFocusableNames(), FocusName, FocusIndex);
-	for (int32 Step = 0; Chosen != INDEX_NONE && Step < Focusables.Num(); ++Step)
+	for (int32 Step = 0; Chosen != INDEX_NONE && Step < Active().Num(); ++Step)
 	{
-		const int32 Index = (Chosen + Step) % Focusables.Num();
-		const TSharedPtr<SWidget> Widget = Focusables[Index].Widget.Pin();
+		const int32 Index = (Chosen + Step) % Active().Num();
+		const TSharedPtr<SWidget> Widget = Active()[Index].Widget.Pin();
 		if (IsReallyEnabled(Widget))
 		{
-			FocusName = Focusables[Index].Name;
+			FocusName = Active()[Index].Name;
 			FocusIndex = Index;
 			bFocusPending = !GiveFocus(Widget);
 			return;
@@ -963,7 +984,7 @@ FNavigationReply SCheeseStrikeMenu::OnNavigation(const FGeometry& MyGeometry, co
 	int32 From = INDEX_NONE;
 	TArray<TSharedPtr<SWidget>> Widgets;
 	TArray<FSlateRect> Rects;
-	for (const FFocusable& Each : Focusables)
+	for (const FFocusable& Each : Active())
 	{
 		const TSharedPtr<SWidget> Widget = Each.Widget.Pin();
 		const bool bFrom = Widget.IsValid() && Widget->HasUserFocus(InNavigationEvent.GetUserIndex()).IsSet();
@@ -1034,6 +1055,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeQuitButton()
 
 void SCheeseStrikeMenu::AskBefore(EMenuAsk Question)
 {
+	FocusBeforeAsk = FocusName;
 	Asking = Question;
 	// The focus starts on keeping things as they are, so that a press too many doesn't close the lobby or quit.
 	FocusName = Question == EMenuAsk::CloseLobby ? TEXT("KEEP IT OPEN") : TEXT("KEEP PLAYING");
@@ -1047,6 +1069,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDialog()
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 	const bool bClose = Asking == EMenuAsk::CloseLobby;
 	const FString Keep = bClose ? TEXT("KEEP IT OPEN") : TEXT("KEEP PLAYING");
+	const UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Controller.Get());
+	const bool bHostingNow = !bClose && Player.IsValid() && Player->HasAuthority() && Sessions != nullptr && Sessions->IsInAMatch();
 	// The card is rounded, and its text wraps at the width the card gives it (its width less the padding), so that
 	// the card is its full height from the first frame it is drawn in.
 	return SNew(SBorder).BorderImage(&Looks().DialogCard).Padding(FMargin(CheeseStrikeMenu::DialogPadding, 28.0f))
@@ -1056,6 +1080,11 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDialog()
 		+ SVerticalBox::Slot().AutoHeight()
 		[
 			MakeLine(bClose ? TEXT("Everyone in it is sent home, and nobody can join it again.") : TEXT("Quit to desktop"), true, true, CheeseStrikeMenu::DialogWidth - 2.0f * CheeseStrikeMenu::DialogPadding)
+		]
+		// Quitting as the host closes the lobby or ends the match for everyone in it.
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, bHostingNow ? 10.0f : 0.0f, 0.0f, 0.0f))
+		[
+			bHostingNow ? MakeLine(TEXT("You are hosting: everyone in your lobby will be sent back to the menu."), true, true, CheeseStrikeMenu::DialogWidth - 2.0f * CheeseStrikeMenu::DialogPadding) : SNullWidget::NullWidget
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 20.0f, 0.0f, 0.0f))
 		[
@@ -1140,7 +1169,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePage()
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeSpinner(float Radius) const
 {
-	return SNew(SCircularThrobber).Radius(Radius).NumPieces(8).Period(1.0f).PieceImage(FCoreStyle::Get().GetBrush("Throbber.CircleChunk")).ColorAndOpacity(FLinearColor::White);
+	return SNew(SCheeseStrikeLoader).Radius(Radius + 2.0f);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeTitle(const FString& Text)
@@ -1519,15 +1548,12 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 		{
 			const FCheeseStrikeFriend& Each = List[Index];
 			const bool bParty = Each.bInMyParty || (Sessions->IsInAMatch() && HereNames.Contains(Each.Name));
-			const CheeseStrikeFriends::ESection Section = CheeseStrikeFriends::SectionFor(bParty, Each.Status, Each.Permission, CheeseStrikeFriends::HasSpace(Each.Humans), CheeseStrikeFriends::OwnsTheGame(Each.bRunningThisGame, Each.bPublishesStatus));
+			const CheeseStrikeFriends::ESection Section = CheeseStrikeFriends::SectionFor(bParty, Each.Status, Each.Permission, CheeseStrikeFriends::HasSpace(Each.Humans), CheeseStrikeFriends::PlayedBefore(Each.bRunningThisGame, Each.bPublishesStatus));
 			Listed[static_cast<int32>(Section)].Add(Index);
 		}
 		for (int32 Section = 0; Section < CheeseStrikeFriends::NumSections; ++Section)
 		{
-			if (Listed[Section].IsEmpty())
-			{
-				continue;
-			}
+			// Every section shows, with a count of 0 when nobody is in it.
 			Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 6.0f, 0.0f, 0.0f)) [ MakeSectionHeader(static_cast<CheeseStrikeFriends::ESection>(Section), Listed[Section].Num()) ];
 			if (!ClosedFriendSections.Contains(static_cast<uint8>(Section)))
 			{
@@ -1581,15 +1607,15 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePartyPermission(bool bHost, UCheeseSt
 {
 	// The host's choice, a property of every player in the party (it rides on the session): the host picks, the others read it.
 	using namespace CheeseStrikeFriends;
-	const int32 Chosen = Sessions->FriendsMayJoinHere() ? 1 : 0;
 	const TArray<FString> Choices = { PermissionLabel(EPermission::InviteOnly), PermissionLabel(EPermission::InvitesAndFriends) };
+	const TWeakObjectPtr<UCheeseStrikeSessionSubsystem> Weak = Sessions;
+	// A dropdown like the lobby's rules, the host's to change; the others see the choice in a plain box.
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Who can join the party"), true, false) ]
-		+ SVerticalBox::Slot().AutoHeight()
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
 		[
-			bHost
-				? MakeChoiceButtons(Choices, Chosen, true, [Sessions](int32 Picked) { Sessions->SetFriendsMayJoin(Picked == 1); })
-				: MakeReadOnly(FText::FromString(Choices[Chosen]))
+			MakeDropdown(Choices, [Weak]() { return Weak.IsValid() && Weak->FriendsMayJoinHere() ? 1 : 0; }, bHost,
+				[Weak](int32 Picked) { if (Weak.IsValid()) Weak->SetFriendsMayJoin(Picked == 1); })
 		];
 }
 
@@ -1632,7 +1658,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
 	{
 		Action = MakeButton(TEXT("JOIN"), [Sessions, Index]() { Sessions->JoinFriend(Index); }, EButtonKind::Primary);
 	}
-	else if (bInAGame && !Friend.bInMyParty && CheeseStrikeFriends::OwnsTheGame(Friend.bRunningThisGame, Friend.bPublishesStatus) && CheeseStrikeFriends::CanInvite(true, false) && Friend.State != CheeseStrikeFriends::EState::Full)
+	else if (bInAGame && !Friend.bInMyParty && CheeseStrikeFriends::PlayedBefore(Friend.bRunningThisGame, Friend.bPublishesStatus) && CheeseStrikeFriends::CanInvite(true, false) && Friend.State != CheeseStrikeFriends::EState::Full)
 	{
 		Action = MakeButton(TEXT("INVITE"), [Sessions, Index]() { Sessions->InviteFriend(Index); });
 	}
@@ -1646,8 +1672,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
 		FriendBrushes.Add(Brush);
 		Picture = SNew(SImage).Image(Brush.Get());
 	}
-	// Hovering the row says what the panel knows of them. Whether they own the game is Steam's best guess (see OwnsTheGame).
-	const bool bOwns = CheeseStrikeFriends::OwnsTheGame(Friend.bRunningThisGame, Friend.bPublishesStatus);
+	// Hovering the row says what the panel knows of them. Whether they have played before is what their presence shows (see PlayedBefore).
+	const bool bOwns = CheeseStrikeFriends::PlayedBefore(Friend.bRunningThisGame, Friend.bPublishesStatus);
 	const FString Hover = CheeseStrikeFriends::Tooltip(bOwns, Friend.Status, Friend.Permission, CheeseStrikeFriends::HasSpace(Friend.Humans), Friend.Humans);
 	const bool bInAParty = Friend.Status == CheeseStrikeFriends::EStatus::InLobby || Friend.Status == CheeseStrikeFriends::EStatus::InMatch;
 	return SNew(SHorizontalBox)
@@ -1736,10 +1762,18 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSeatColumn(const FString& Title, cons
 	const bool bSidesOpen = Team != INDEX_NONE && Match != nullptr && Match->HasTeams() && !Match->IsCountingDown() && HaveMatch() && LobbyStatusNow() != CheeseStrikeMenu::ELobbyStatus::Travelling;
 	const bool bHostHere = Player.IsValid() && Player->HasAuthority();
 	const bool bOtherSide = Mine != nullptr && Mine->GetTeam() != Team;
+	// The side's name sits in a band as tall as the page's title ("LOBBY", with its margin) on the other side of the lobby, so that
+	// the first seat starts level with the top of the map's picture there (each seat has 4 of padding above it).
+	const TSharedRef<SWidget> TitleOfThePage = MakeTitle(TEXT("LOBBY"));
+	TitleOfThePage->SlatePrepass(1.0f);
+	const float Band = TitleOfThePage->GetDesiredSize().Y - 4.0f;
 	TSharedRef<SVerticalBox> Column = SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(4.0f, 0.0f, 0.0f, 12.0f))
+		+ SVerticalBox::Slot().AutoHeight()
 		[
-			SNew(STextBlock).Text(FText::FromString(Title.ToUpper())).Font(Font(26, FName("Bold"))).ColorAndOpacity(Colour)
+			SNew(SBox).HeightOverride(Band).Padding(FMargin(4.0f, 0.0f, 0.0f, 12.0f)).VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(FText::FromString(Title.ToUpper())).Font(Font(26, FName("Bold"))).ColorAndOpacity(Colour)
+			]
 		];
 	// The seats share the column's height: the column is the side, full or not.
 	for (const CheeseStrikeRules::FRosterEntry& Seat : Seats)

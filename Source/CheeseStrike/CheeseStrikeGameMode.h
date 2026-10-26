@@ -209,6 +209,8 @@ protected:
 	FString RulesOptions() const;
 	/** What ServerTravel is given for `Url`: its map and options, without its host and port. */
 	static FString TravelTo(const FURL& Url);
+	/** After a server travel is asked for: with no remote player to be told, it goes at once rather than after the net driver's pause. */
+	void GoAtOnceIfAlone();
 	/** The match is over: `Team` has won it. */
 	void EndMatchFor(int32 Team);
 	/** Elimination: a round begins, everyone back at their side's starts with full health (the first comes with the match). */

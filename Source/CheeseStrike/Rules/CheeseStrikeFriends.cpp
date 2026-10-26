@@ -101,7 +101,7 @@ namespace CheeseStrikeFriends
 		return Permission == EPermission::InviteOnly ? TEXT("Invite only") : TEXT("Invites + friends");
 	}
 
-	bool OwnsTheGame(bool bRunningThisGame, bool bPublishesStatus)
+	bool PlayedBefore(bool bRunningThisGame, bool bPublishesStatus)
 	{
 		return bRunningThisGame || bPublishesStatus;
 	}
@@ -140,7 +140,7 @@ namespace CheeseStrikeFriends
 	{
 		const bool bInAParty = Status == EStatus::InLobby || Status == EStatus::InMatch;
 		const FString Players = bInAParty && Humans >= 0 ? FString::Printf(TEXT("%d/%d"), Humans, MaxHumans) : FString(TEXT("-"));
-		return FString::Printf(TEXT("Owns the game: %s\nStatus: %s\nParty permission: %s\nSpace in party: %s\nPlayers: %s"),
+		return FString::Printf(TEXT("Played before: %s\nStatus: %s\nParty permission: %s\nSpace in party: %s\nPlayers: %s"),
 			bOwns ? TEXT("Yes") : TEXT("No"),
 			*StatusLabel(Status),
 			bInAParty ? *PermissionLabel(Permission) : TEXT("None"),

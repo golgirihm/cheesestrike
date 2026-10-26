@@ -90,13 +90,13 @@ bool FAFriendsStatusAndPermissionRoundTrip::RunTest(const FString& Parameters)
 	TestEqual(TEXT("invite only reads back"), PermissionFromValue(PermissionValue(EPermission::InviteOnly)), EPermission::InviteOnly);
 	TestEqual(TEXT("invites + friends reads back"), PermissionFromValue(PermissionValue(EPermission::InvitesAndFriends)), EPermission::InvitesAndFriends);
 	TestEqual(TEXT("no value: friends may join, as a new game"), PermissionFromValue(FString()), EPermission::InvitesAndFriends);
-	TestTrue(TEXT("running our app: owns it"), OwnsTheGame(true, false));
-	TestTrue(TEXT("publishing our status: owns it"), OwnsTheGame(false, true));
-	TestFalse(TEXT("neither: not known to"), OwnsTheGame(false, false));
+	TestTrue(TEXT("running our app: owns it"), PlayedBefore(true, false));
+	TestTrue(TEXT("publishing our status: owns it"), PlayedBefore(false, true));
+	TestFalse(TEXT("neither: not known to"), PlayedBefore(false, false));
 	TestTrue(TEXT("fifteen humans: room"), HasSpace(MaxHumans - 1));
 	TestFalse(TEXT("sixteen humans: none"), HasSpace(MaxHumans));
 	TestEqual(TEXT("the tooltip counts the players"), Tooltip(true, EStatus::InLobby, EPermission::InvitesAndFriends, true, 7),
-		FString(TEXT("Owns the game: Yes\nStatus: In a lobby\nParty permission: Invites + friends\nSpace in party: Yes\nPlayers: 7/16")));
+		FString(TEXT("Played before: Yes\nStatus: In a lobby\nParty permission: Invites + friends\nSpace in party: Yes\nPlayers: 7/16")));
 	TestTrue(TEXT("the tooltip says not in game"), Tooltip(false, EStatus::NotInGame, EPermission::InviteOnly, true, -1).Contains(TEXT("Status: Not in game")));
 	return true;
 }

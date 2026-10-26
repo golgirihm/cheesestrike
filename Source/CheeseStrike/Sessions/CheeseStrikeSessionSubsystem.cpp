@@ -94,6 +94,7 @@ bool UCheeseStrikeSessionSubsystem::IsInAMatch() const
 void UCheeseStrikeSessionSubsystem::Say(const FString& What)
 {
 	Status = What;
+	StatusAt = FPlatformTime::Seconds();
 	UE_LOG(LogCheeseStrike, Display, TEXT("Sessions: %s"), *What);
 }
 

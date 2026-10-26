@@ -106,7 +106,11 @@ public:
 	/** The matches the last search found, described. */
 	const TArray<FString>& GetFound() const { return Found; }
 	/** What is going on, in a line. */
-	const FString& GetStatus() const { return Status; }
+	/**
+	 * What the sessions last said ("Left the match", "The search failed"), for a few seconds after it was said, or while a
+	 * search or a join is still going: an old note must not greet the player on a page they open much later.
+	 */
+	FString GetStatus() const { return (bBusy || FPlatformTime::Seconds() - StatusAt < StatusSeconds) ? Status : FString(); }
 	/** Whether something is under way that the next command would cut across. */
 	bool IsBusy() const { return bBusy; }
 	/**
@@ -169,6 +173,8 @@ protected:
 	TArray<FOnlineSessionSearchResult> Results;
 	TArray<FString> Found;
 	FString Status;
+	double StatusAt = 0.0;
+	static constexpr double StatusSeconds = 8.0;
 	bool bBusy = false;
 	ESessionPending Pending = ESessionPending::None;
 	/** What the next step needs: the options of the match being hosted, or the match being joined. */

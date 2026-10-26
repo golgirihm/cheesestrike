@@ -39,6 +39,7 @@
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
 #include "Sessions/CheeseStrikeSessions.h"
 #include "UI/CheeseStrikeMenu.h"
+#include "UI/CheeseStrikeCurtain.h"
 #include "UI/CheeseStrikeMenuFigure.h"
 #include "UI/CheeseStrikeMusic.h"
 #include "UI/CheeseStrikePostGame.h"
@@ -169,6 +170,15 @@ void ACheeseStrikePlayerController::PreClientTravel(const FString& PendingURL, E
 	if (bLeaving && Ended != nullptr && Ended->HasMatchEnded() && Ended->GetLobbyAt() > 0.0f)
 	{
 		HoldTheResults();
+	}
+	else if (bLeaving && IsLocalController() && GetGameInstance() != nullptr)
+	{
+		// The level stays loaded for a moment while the others are told (ServerTravelPause): the cover goes up now, not with the
+		// loading screen, or the old lobby would sit there with a spinner in its corner and then a second screen follow.
+		if (UCheeseStrikeCurtainSubsystem* Curtain = GetGameInstance()->GetSubsystem<UCheeseStrikeCurtainSubsystem>())
+		{
+			Curtain->RaiseForTravel(PendingURL);
+		}
 	}
 	if (Menu.IsValid())
 	{

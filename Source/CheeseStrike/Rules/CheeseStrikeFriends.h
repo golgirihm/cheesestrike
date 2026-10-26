@@ -87,10 +87,10 @@ namespace CheeseStrikeFriends
 	FString PermissionLabel(EPermission Permission);
 
 	/**
-	 * Whether a friend owns the game. Steam can't report that for a friend, so this is a guess: running our app or publishing our
-	 * presence says yes; anyone else is unknown, and treated as not owning it.
+	 * Whether a friend has played the game before (has run CheeseStrike). Steam can't report who owns it for a friend, so this is
+	 * what can be told: running our app or publishing our presence says yes; anyone else is unknown, and treated as not.
 	 */
-	bool OwnsTheGame(bool bRunningThisGame, bool bPublishesStatus);
+	bool PlayedBefore(bool bRunningThisGame, bool bPublishesStatus);
 
 	/** Whether a party with `Humans` players (-1 when not known) has room for one more. */
 	bool HasSpace(int32 Humans);
@@ -102,7 +102,7 @@ namespace CheeseStrikeFriends
 		YourParty,
 		/** In a lobby or match that lets friends in and has room: a click joins. */
 		Joinable,
-		/** Owns the game, and can be invited. */
+		/** Played the game before, and can be invited. */
 		Invitable,
 		/** Everyone else. */
 		Others,
