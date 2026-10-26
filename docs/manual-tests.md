@@ -297,3 +297,24 @@ Setup: Play in Editor on the shooter level, alone and then as a listen server wi
 | SND-03 | The countdown's tones | 1. In a lobby with a joiner, start the match and listen on both PCs; then start one and call it off at 3.<br>2. Turn the master volume down to 20% and start again. | Each second of the countdown (5 to 1) sounds the same short, soft tone, gentle rather than a beep, on both PCs at once; at 0 a brighter two-note chime, heard to its end even as the level loads. Called off, the tones stop and there is no chime. At 20% they are quieter with everything else. |
 | SND-04 | Gunfire near and far | 1. Host The Creamery with 15 bots and play a few minutes, from a dock while the bots fight in the lanes, then in the middle of a fight.<br>2. Type `CheeseStrike.TraceGunfire 1` and look at the output log. | Your own shots are always whole and in both ears. A bot's shots close by are loud and from where it is; across the map they are faint and dull, the crack gone and only a thud left; beyond about 60 m nothing. In a big fight close by it is busy but not a wall of noise: the far shots give way to the near. The log names each shot heard, how far off, at what share of its volume and above what frequency it was cut. |
 | MOV-04 | Nobody is corrected | 1. Play as a listen server with two players (PRJ-03). In the joining window, sprint, slide, crouch and jump about for a minute.<br>2. Watch the host's view of the joiner, and the output log. | The joiner is never snapped back or jerked, in its own window or the host's, and the log has no line about a client adjustment or a position correction. |
+
+## Changes from the latest wave
+
+Checked by hand, because the tests can't see them: how they look and sound, and what Steam does.
+
+| ID | What | Steps | Expected |
+|----|------|-------|----------|
+| STA-01 | Assists and downs | 1. In Deathmatch with bots, hurt a bot, then have a teammate kill it within ten seconds.<br>2. Hold Tab. | The teammate who hurt it has an ASSISTS of 1; the killer has the kill, not the assist. |
+| STA-02 | Downs in Execution | 1. In Execution, put an enemy down, then hold Tab. | The one who put them down has a DOWNS of 1, under the DOWNS heading in the middle column. |
+| STA-03 | King of the Hill credit | 1. Stand in the hill with a teammate, and the rest of the side out of it, for a minute.<br>2. Hold Tab, and look at ON THE HILL. | The two of you share the time (each about half), not both the full minute. The podium ranks by that time. |
+| WPN-SIGHT | Iron sights | 1. With the Blaster, the Grater, the Munster and the Shotgun, aim down the sights (right button or LT).<br>2. With the carbine, aim down the rail. | Each gun without a scope shows a small post on its muzzle and a notch at its sight; the carbine shows none. The Burratas have none. |
+| WPN-DROP | A dropped weapon | 1. Stand beside a weapon stand, and drop your weapon (its own key) facing a stand.<br>2. Look where it lands. | It lands on the floor clear of the stand, not under it. |
+| GRN-ARC | Grenade arc | 1. Hold G, and look at the arc. | The dots start near your hand, not a long way out. |
+| FDB-01 | The grunt | 1. Take a shot, a blast, and a fall, each in turn.<br>2. Listen. | A short grunt each time you lose health, from every kind of hit. None on dying. |
+| FDB-02 | The fall's flash | 1. Fall from a height that hurts.<br>2. Watch the view. | The whole view reddens briefly and fades; a shot's hit still shows its arc, not the flash. |
+| PDM-01 | The podium plate | 1. Finish a match, and watch the podium.<br>2. Look at each plate. | The name sits lower, under the score; the side's colour runs across the plate's top out to its rounded corners. |
+| LDG-01 | The loading cover | 1. Start the game: the first cover says "Loading".<br>2. Close a lobby: the cover says "Back to the menu". | Neither says "Going to the Proving Ground". |
+| FRD-06 | Friends may join | 1. As host, press FRIENDS CAN JOIN until it says OFF.<br>2. On a friend\'s PC, look at your row for the host\'s game. | It says "Invite only", with no JOIN, until invited. |
+| FRD-07 | Friends' pictures | 1. Open the friends panel with friends in games and not.<br>2. Look at each row. | A Steam picture beside each friend, once Steam has it. |
+| FRD-08 | The panel's motion | 1. Hover the lobby's right edge, and move away.<br>2. Look at the panel. | It eases open and shut, and refreshes its friends about every 20 seconds while open. |
+
