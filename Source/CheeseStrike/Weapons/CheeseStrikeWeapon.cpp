@@ -1221,7 +1221,7 @@ void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead, boo
 	// A soft thump, like a smack on a pillow, for a hit by this machine's own player.
 	if (!Stats->IsMelee() && Holder != nullptr && Holder->IsLocallyControlled())
 	{
-		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Thump(bKill ? 1.3f : 1.0f)), 0.35f);
+		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Thump(bKill ? 1.3f : 1.0f)), 0.6f);
 	}
 	// The knife's stroke landing, heard by the one who struck.
 	if (Stats->IsMelee())

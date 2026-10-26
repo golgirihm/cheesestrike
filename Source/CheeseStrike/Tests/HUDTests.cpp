@@ -304,6 +304,38 @@ bool FLongNamesAreCutWithDots::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheTopStripIsTheSameAtBothEnds, "CheeseStrike.HUD.TheTopStripIsTheSameAtBothEnds", HUDTests::Flags)
+bool FTheTopStripIsTheSameAtBothEnds::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	// A panel at an awkward place, as the scoreboard's is, with its rounding and the strip's thickness at several scales.
+	for (const float Scale : {0.75f, 1.0f, 1.37f, 2.0f})
+	{
+		const FVector2D Min(641.3f * Scale, 216.2f * Scale);
+		const FVector2D Max(Min.X + 660.0f * Scale, Min.Y + 500.0f * Scale);
+		const TArray<FVector2D> Strip = TopStrip(Min, Max, 12.0f * Scale, 3.0f * Scale);
+		TestTrue(TEXT("a strip with an even number of points"), Strip.Num() >= 6 && Strip.Num() % 2 == 0);
+		bool bMirrored = true;
+		float Lowest = Min.Y;
+		for (int32 Index = 0; Index < Strip.Num() / 2; ++Index)
+		{
+			const FVector2D& Left = Strip[Index];
+			const FVector2D& Right = Strip[Strip.Num() - 1 - Index];
+			bMirrored &= FMath::IsNearlyEqual(Left.Y, Right.Y, 0.001f) && FMath::IsNearlyEqual(Left.X - Min.X, Max.X - Right.X, 0.01f);
+			Lowest = FMath::Max(Lowest, Left.Y);
+		}
+		TestTrue(TEXT("the right end is the left's mirror"), bMirrored);
+		TestTrue(TEXT("and it is as thick as asked"), FMath::IsNearlyEqual(Lowest - Min.Y, 3.0f * Scale, 0.01f));
+		bool bInside = true;
+		for (const FVector2D& Point : Strip)
+		{
+			bInside &= InsideRoundedRect(Point, Min, Max, 12.0f * Scale) > -0.05f && Point.Y >= Min.Y - 0.001f;
+		}
+		TestTrue(TEXT("within the panel's rounding"), bInside);
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRoundedShapesKeepToTheirCorners, "CheeseStrike.HUD.RoundedShapesKeepToTheirCorners", HUDTests::Flags)
 bool FRoundedShapesKeepToTheirCorners::RunTest(const FString& Parameters)
 {

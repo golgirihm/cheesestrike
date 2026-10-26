@@ -62,7 +62,7 @@ try:
     os.makedirs(folder, exist_ok=True)
     render(folder)
     for file in sorted(os.listdir(folder)):
-        if file.startswith("T_Count_") and file.endswith(".png"):
+        if (file.startswith("T_Count_") or file.startswith("T_Podium_")) and file.endswith(".png"):
             glyph(os.path.join(folder, file), file[:-4])
 except Exception:
     lines.append(traceback.format_exc())

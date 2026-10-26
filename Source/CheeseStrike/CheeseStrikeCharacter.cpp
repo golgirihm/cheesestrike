@@ -1440,7 +1440,6 @@ void ACheeseStrikeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	EnhancedInputComponent->BindAction(Input->DrawKnife, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::KnifeStarted);
 	EnhancedInputComponent->BindAction(Input->NextWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::NextWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->PreviousWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::PreviousWeaponStarted);
-	EnhancedInputComponent->BindAction(Input->LastWeapon, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::LastWeaponStarted);
 	EnhancedInputComponent->BindAction(Input->Streak, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::StreakStarted);
 	EnhancedInputComponent->BindAction(Input->Grenade, ETriggerEvent::Started, this, &ACheeseStrikeCharacter::GrenadeStarted);
 	EnhancedInputComponent->BindAction(Input->Grenade, ETriggerEvent::Completed, this, &ACheeseStrikeCharacter::GrenadeEnded);
@@ -1700,19 +1699,6 @@ void ACheeseStrikeCharacter::DoNextWeapon(int32 Step)
 	}
 }
 
-void ACheeseStrikeCharacter::DoLastWeapon()
-{
-	if (TakesInput())
-	{
-		const bool bAiming = GetWeapon() != nullptr && GetWeapon()->IsAimed();
-		Inventory->DrawLast();
-		if (bAiming && GetWeapon() != nullptr)
-		{
-			GetWeapon()->StartAiming();
-		}
-	}
-}
-
 void ACheeseStrikeCharacter::PrimaryStarted()
 {
 	DoDrawWeapon(EWeaponSlot::Primary);
@@ -1736,11 +1722,6 @@ void ACheeseStrikeCharacter::NextWeaponStarted()
 void ACheeseStrikeCharacter::PreviousWeaponStarted()
 {
 	DoNextWeapon(-1);
-}
-
-void ACheeseStrikeCharacter::LastWeaponStarted()
-{
-	DoLastWeapon();
 }
 
 void ACheeseStrikeCharacter::FireStarted()

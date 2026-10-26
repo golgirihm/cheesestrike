@@ -450,14 +450,15 @@ void ACheeseStrikeHUD::DrawFight(const ACheeseStrikeCharacter* Character, float 
 		Shapes.Arc(Middle, Radius, CrosshairThickness + 0.5f, 0.0f, 360.0f, Sign, false);
 		Shapes.Line(Middle + FVector2D(-Slant, -Slant), Middle + FVector2D(Slant, Slant), CrosshairThickness + 0.5f, Sign);
 	}
-	else if (Weapon != nullptr && Weapon->GetStats().Pellets > 1 && !Weapon->IsAimed())
+	else if (Weapon != nullptr && Weapon->GetStats().Pellets > 1)
 	{
-		// A shotgun: a circle as wide as the spread, with a pip at each side and a dot in the middle.
-		const float Radius = FMath::Max(14.0f, Gap + 4.0f);
+		// A shotgun: a circle half as wide as the spread was (wave 9), with a pip at each side and a dot in the middle. It stays
+		// down the sights too, where a shotgun has no other mark.
+		const float Radius = FMath::Max(14.0f, Gap + 4.0f) * 0.5f;
 		Shapes.Arc(Middle, Radius, CrosshairThickness, 0.0f, 360.0f, Cross, false);
 		for (const FVector2D& Way : {FVector2D(1, 0), FVector2D(-1, 0), FVector2D(0, 1), FVector2D(0, -1)})
 		{
-			Shapes.Line(Middle + Way * (Radius - 3.0f), Middle + Way * (Radius + 4.0f), CrosshairThickness, Cross);
+			Shapes.Line(Middle + Way * (Radius - 1.5f), Middle + Way * (Radius + 2.0f), CrosshairThickness, Cross);
 		}
 		Shapes.Rect(Middle.X - 1.0f, Middle.Y - 1.0f, 2.0f, 2.0f, Cross);
 	}

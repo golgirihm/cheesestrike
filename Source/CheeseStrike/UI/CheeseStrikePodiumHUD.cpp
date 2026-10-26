@@ -111,12 +111,12 @@ namespace CheeseStrikePodiumHUD
 				Feet.Emplace(&Placed, Foot);
 			}
 		}
-		float PlateWidth = 300.0f * U;
+		float PlateWidth = 230.0f * U;
 		for (int32 First = 0; First < Feet.Num(); ++First)
 		{
 			for (int32 Second = First + 1; Second < Feet.Num(); ++Second)
 			{
-				PlateWidth = FMath::Min(PlateWidth, FMath::Abs(Feet[First].Value.X - Feet[Second].Value.X) - 16.0f * U);
+				PlateWidth = FMath::Min(PlateWidth, FMath::Abs(Feet[First].Value.X - Feet[Second].Value.X) - 36.0f * U);
 			}
 		}
 		PlateWidth = FMath::Max(PlateWidth, 60.0f * U);
@@ -136,12 +136,11 @@ namespace CheeseStrikePodiumHUD
 			// The place's number on the pedestal's foot, and the plate a little lower under it, the name clear of the number.
 			UTexture2D* Glyph = Podium->Glyph(Placed.Place + 1);
 			const bool bGlyph = Glyph != nullptr && Glyph->GetResource() != nullptr && Glyph->GetSizeY() > 0;
-			const float PlateTop = (bGlyph ? GlyphTop + GlyphHeight : Foot.Y + 14.0f * U) + 10.0f * U;
+			const float PlateTop = (bGlyph ? GlyphTop + GlyphHeight : Foot.Y + 14.0f * U) + 28.0f * U;
 			Shapes.RoundedRect(Foot.X - PlateWidth / 2.0f, PlateTop, PlateWidth, PlateHeight, 10.0f * U, HudDraw::Faded(FLinearColor(0.02f, 0.02f, 0.025f, 0.72f), Alpha));
 			// The side's colour along the top, out to the plate's rounded corners and clipped to them, as a score block's is.
 			const FVector2D Corner(Foot.X - PlateWidth / 2.0f, PlateTop);
-			const TArray<FVector2D> Outline = CheeseStrikeHUD::RoundedRect(Corner, Corner + FVector2D(PlateWidth, PlateHeight), 10.0f * U);
-			Shapes.SmoothPolygon(CheeseStrikeHUD::ClipToRect(Outline, Corner, Corner + FVector2D(PlateWidth, 3.0f * U)), HudDraw::Faded(Colour, Alpha));
+			Shapes.SmoothPolygon(CheeseStrikeHUD::TopStrip(Corner, Corner + FVector2D(PlateWidth, PlateHeight), 10.0f * U, 3.0f * U), HudDraw::Faded(Colour, Alpha));
 			if (Placed.bMine)
 			{
 				Shapes.RoundedFrame(Foot.X - PlateWidth / 2.0f, PlateTop, PlateWidth, PlateHeight, 10.0f * U, 2.0f * U, HudDraw::Faded(HudDraw::Accent, Alpha));

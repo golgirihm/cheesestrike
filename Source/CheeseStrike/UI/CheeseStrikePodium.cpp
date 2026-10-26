@@ -225,10 +225,10 @@ ACheeseStrikePodium::ACheeseStrikePodium()
 	Look.bOverride_MotionBlurAmount = true;
 	Look.MotionBlurAmount = 0.0f;
 
-	// The places' numbers, in the countdown's cheese lettering.
+	// The places' numbers, in cheese lettering like the countdown's but straight on (T_Podium_*, tools/art/countdown_glyphs.py).
 	for (int32 Number = 1; Number <= CheeseStrikePodiums::Places; ++Number)
 	{
-		ConstructorHelpers::FObjectFinder<UTexture2D> Lettering(*FString::Printf(TEXT("/Game/CheeseStrike/UI/Countdown/T_Count_%d.T_Count_%d"), Number, Number));
+		ConstructorHelpers::FObjectFinder<UTexture2D> Lettering(*FString::Printf(TEXT("/Game/CheeseStrike/UI/Countdown/T_Podium_%d.T_Podium_%d"), Number, Number));
 		Glyphs.Add(Lettering.Object);
 	}
 	// Every hero's emotes, loaded with the class so that they are cooked with it.

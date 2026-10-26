@@ -136,10 +136,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoReload();
 
-	/** Changing weapons: to the one in a slot, to the next (`Step` 1) or the one before (-1), or back to the last. */
+	/** Changing weapons: to the one in a slot, to the next (`Step` 1) or the one before (-1). */
 	void DoDrawWeapon(EWeaponSlot Slot);
 	void DoNextWeapon(int32 Step);
-	void DoLastWeapon();
 	/** Throws a cheese grenade along the view, if it has one and its hands are free (UCheeseStrikeGrenades). */
 	void DoThrowGrenade();
 
@@ -338,7 +337,6 @@ protected:
 	void KnifeStarted();
 	void NextWeaponStarted();
 	void PreviousWeaponStarted();
-	void LastWeaponStarted();
 	/** The Grenade key (G), held and let go: shows the throw's arc while held (UCheeseStrikeGrenades::BeginHold), throws as it is let go. */
 	void GrenadeStarted();
 	void GrenadeEnded();
