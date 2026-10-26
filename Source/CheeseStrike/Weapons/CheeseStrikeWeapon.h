@@ -272,6 +272,14 @@ protected:
 	TObjectPtr<UStaticMeshComponent> ThirdPersonFlash;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPointLightComponent> FlashLight;
+
+	/** The iron sights of a gun without a scope or the rail's dot: a front post on the muzzle and a rear notch, on the first-person model. */
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> IronSightFront;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> IronSightRear;
+	/** Makes the sights (or hides them, for a gun that has its own) for the weapon in hand. */
+	void PlaceIronSights();
 	/** The look it has. */
 	const FWeaponLook* Look = nullptr;
 	/** When the flash goes out (world time). */

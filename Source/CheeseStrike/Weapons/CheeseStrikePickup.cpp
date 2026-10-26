@@ -340,16 +340,31 @@ ACheeseStrikePickup* ACheeseStrikePickup::Drop(ACheeseStrikeCharacter* From, FNa
 	const FVector Middle = From->GetActorLocation();
 	const FVector Feet = PickupFeetOf(From);
 	const float Yaw = From->GetActorRotation().Yaw;
-	FVector Ahead = Middle + FRotator(0.0f, Yaw, 0.0f).Vector() * DropAhead;
-	FHitResult Hit;
-	if (World->SweepSingleByObjectType(Hit, Middle, Ahead, FQuat::Identity, Solid, FCollisionShape::MakeSphere(12.0f), Params))
-	{
-		Ahead = Hit.Location;
-	}
 	FVector Floor = Feet;
-	if (World->LineTraceSingleByObjectType(Hit, Ahead, Ahead - FVector(0.0f, 0.0f, 300.0f), Solid, Params) && Feet.Z - Hit.ImpactPoint.Z < CheeseStrikePickups::ReachUp)
+	// A few spots round them, ahead first: the first with floor under it that is clear of walls, of the stands (pickups, which
+	// have their own plinths) and of anything else standing there. Failing all, at their feet.
+	const FVector Up = FVector(0.0f, 0.0f, 1.0f);
+	for (const float Turn : {0.0f, 45.0f, -45.0f, 90.0f, -90.0f, 135.0f, -135.0f})
 	{
-		Floor = Hit.ImpactPoint;
+		FVector Ahead = Middle + FRotator(0.0f, Yaw + Turn, 0.0f).Vector() * DropAhead;
+		FHitResult Hit;
+		if (World->SweepSingleByObjectType(Hit, Middle, Ahead, FQuat::Identity, Solid, FCollisionShape::MakeSphere(12.0f), Params))
+		{
+			Ahead = Hit.Location;
+		}
+		if (!World->LineTraceSingleByObjectType(Hit, Ahead + Up * 60.0f, Ahead - Up * 300.0f, Solid, Params) || Feet.Z - Hit.ImpactPoint.Z >= CheeseStrikePickups::ReachUp)
+		{
+			continue;
+		}
+		if (Cast<ACheeseStrikePickup>(Hit.GetActor()) != nullptr)
+		{
+			continue;
+		}
+		if (!World->OverlapAnyTestByObjectType(Hit.ImpactPoint + Up * 14.0f, FQuat::Identity, Solid, FCollisionShape::MakeSphere(14.0f), Params))
+		{
+			Floor = Hit.ImpactPoint;
+			break;
+		}
 	}
 	// Turned across the way they faced, a little at random.
 	const FTransform Where(FRotator(0.0f, Yaw + 90.0f + FMath::FRandRange(-25.0f, 25.0f), 0.0f), Floor);
