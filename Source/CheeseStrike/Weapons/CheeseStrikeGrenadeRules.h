@@ -74,7 +74,7 @@ namespace CheeseStrikeGrenades
 
 	/** The arc shown while a throw is held: a dot every PreviewSpacing cm of its flight, none in its first PreviewSkip (too near the eyes), at most PreviewDots. */
 	constexpr float PreviewSpacing = 30.0f;
-	constexpr float PreviewSkip = 70.0f;
+	constexpr float PreviewSkip = 20.0f;
 	constexpr int32 PreviewDots = 80;
 	/** The dots along `Path` (its points in order of flight): every `Spacing` cm along it from `Skip` on, at most `MostDots`. */
 	TArray<FVector> PreviewPoints(TConstArrayView<FVector> Path, float Spacing = PreviewSpacing, float Skip = PreviewSkip, int32 MostDots = PreviewDots);

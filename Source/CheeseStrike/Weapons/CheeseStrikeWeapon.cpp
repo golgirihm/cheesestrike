@@ -183,11 +183,45 @@ void ACheeseStrikeWeapon::SetWeapon(FName Id)
 	Reserve = Stats->Reserve;
 }
 
+void ACheeseStrikeWeapon::PlaceIronSights()
+{
+	// Not for a gun with a scope, nor the carbine, whose rail has the dot, nor the two-gun Burratas, which have no sights to aim down.
+	const bool bNeeded = Look->Sight.IsSet() && !Stats->bScoped && !Stats->bDual && Stats->Id != FName(TEXT("carbine"));
+	if (IronSightFront == nullptr)
+	{
+		for (TObjectPtr<UStaticMeshComponent>* Sight : {&IronSightFront, &IronSightRear})
+		{
+			*Sight = NewObject<UStaticMeshComponent>(this);
+			(*Sight)->SetCollisionProfileName(FName("NoCollision"));
+			(*Sight)->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
+			(*Sight)->bOnlyOwnerSee = true;
+			(*Sight)->RegisterComponent();
+			(*Sight)->AttachToComponent(FirstPersonModel, FAttachmentTransformRules::KeepRelativeTransform);
+		}
+	}
+	UStaticMesh* Block = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	const FVector Scale = FirstPersonModel->GetComponentScale();
+	const FVector Size = FVector(FMath::Max(Scale.GetMax(), 0.01f));
+	// Set in the model's own space, as the flash is: the post on the muzzle, the notch at the sight, each a few millimetres across.
+	IronSightFront->SetStaticMesh(bNeeded ? Block : nullptr);
+	IronSightFront->SetRelativeLocation(Look->Muzzle + FVector(0.0f, 0.0f, 3.0f));
+	IronSightFront->SetRelativeScale3D(FVector(0.012f, 0.012f, 0.03f) / Size.X);
+	IronSightRear->SetStaticMesh(bNeeded ? Block : nullptr);
+	IronSightRear->SetRelativeLocation(bNeeded ? Look->Sight.GetValue() + FVector(0.0f, 0.0f, 2.5f) : FVector::ZeroVector);
+	IronSightRear->SetRelativeScale3D(FVector(0.03f, 0.012f, 0.024f) / Size.X);
+	if (bNeeded)
+	{
+		IronSightFront->SetMaterial(0, FirstPersonModel->GetMaterial(0));
+		IronSightRear->SetMaterial(0, FirstPersonModel->GetMaterial(0));
+	}
+}
+
 void ACheeseStrikeWeapon::ApplyWeapon()
 {
 	const FWeaponStats* Found = CheeseStrikeArsenal::Find(WeaponId);
 	Stats = Found != nullptr ? Found : &CheeseStrikeWeapons::Blaster();
 	Look = &CheeseStrikeWeaponLooks::For(Stats->Id);
+	PlaceIronSights();
 	USkeletalMesh* Skinned = LoadLook<USkeletalMesh>(Look->SkinnedModel);
 	UStaticMesh* Plain = LoadLook<UStaticMesh>(Look->PlainModel);
 	for (USkeletalMeshComponent* Mesh : {FirstPersonMesh.Get(), ThirdPersonMesh.Get()})
