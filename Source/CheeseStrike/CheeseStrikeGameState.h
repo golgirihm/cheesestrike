@@ -187,6 +187,8 @@ public:
 
 	/** Rounds to win the match, and the round being played (1 on), 0 before the first. */
 	int32 GetRoundLimit() const { return RoundLimit; }
+	/** A round's length in seconds, as the host chose it in the lobby. */
+	float GetRoundTime() const { return RoundTime; }
 	int32 GetRound() const { return Round; }
 	/** Whether the match is between rounds: nobody can be hurt, and everyone comes back at the next. */
 	bool IsRoundBreak() const { return RoundBreakUntil > 0.0f; }
@@ -198,6 +200,7 @@ public:
 	int32 GetLastRoundWinner() const { return LastRoundWinner; }
 	/** Server only. */
 	void SetRoundLimit(int32 Limit) { RoundLimit = Limit; }
+	void SetRoundTime(float Seconds) { RoundTime = Seconds; }
 	void StartRound(int32 Number, float EndsAt);
 	void EndRound(int32 Winner, float BreakUntil);
 
@@ -269,6 +272,8 @@ protected:
 	int32 WinningTeam = CheeseStrikeModes::NoTeam;
 	UPROPERTY(Replicated)
 	int32 RoundLimit = CheeseStrikeModes::RoundLimit;
+	UPROPERTY(Replicated)
+	float RoundTime = CheeseStrikeModes::RoundTime;
 	UPROPERTY(Replicated)
 	int32 Round = 0;
 	UPROPERTY(Replicated)

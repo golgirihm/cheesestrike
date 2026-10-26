@@ -126,6 +126,7 @@ public:
 	/** The host picks the mode (CheeseStrikeModes::Modes), and the rounds to win in a mode of rounds, from the lobby. */
 	void SetModeFromMenu(int32 ModeIndex);
 	void SetRoundsFromMenu(int32 Rounds);
+	void SetRoundTimeFromMenu(float Seconds);
 	void SetBotsFromMenu(int32 Wanted);
 	/** In the lobby of a mode of sides: this player goes over to the other side, if it has room (ACheeseStrikeGameMode::SwitchSide). */
 	void SwitchSideFromMenu();

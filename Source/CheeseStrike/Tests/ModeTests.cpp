@@ -71,6 +71,8 @@ bool FTheModesAreNamedAndPicked::RunTest(const FString& Parameters)
 	TestEqual(TEXT("or as many as the host says"), RoundLimitFrom(TEXT("?Rounds=2")), 2);
 	TestEqual(TEXT("but at least one"), RoundLimitFrom(TEXT("?Rounds=0")), 1);
 	TestEqual(TEXT("three minutes a round"), RoundTimeFrom(TEXT("")), 180.0f);
+	TestEqual(TEXT("the lobby offers one to five minutes, three among them"), static_cast<int32>(UE_ARRAY_COUNT(RoundTimeChoices)), 5);
+	TestEqual(TEXT("and the default is one of them"), RoundTimeChoices[2], RoundTime);
 	TestEqual(TEXT("or the host's"), RoundTimeFrom(TEXT("?RoundTime=90")), 90.0f);
 	TestEqual(TEXT("within reason"), RoundTimeFrom(TEXT("?RoundTime=5")), 30.0f);
 

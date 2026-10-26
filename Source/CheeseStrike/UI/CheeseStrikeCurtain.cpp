@@ -14,6 +14,10 @@
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Images/SThrobber.h"
 #include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SDPIScaler.h"
+#include "Engine/UserInterfaceSettings.h"
+#include "Engine/GameViewportClient.h"
+#include "Misc/OutputDeviceRedirector.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
@@ -32,6 +36,21 @@ namespace
 	{
 		static FSlateDynamicImageBrush Brush(FName(*(FPaths::ProjectContentDir() / TEXT("UI") / TEXT("lobby_tile.png"))), FVector2D(512.0, 512.0), FLinearColor::White, ESlateBrushTileType::Both);
 		return &Brush;
+	}
+
+	/** The scale the game's UI is drawn at in `Viewport` (the DPI curve at its size), which the cover is drawn at too. */
+	float ViewportScale(const UGameViewportClient* Viewport)
+	{
+		FVector2D Size(1920.0, 1080.0);
+		if (Viewport != nullptr)
+		{
+			Viewport->GetViewportSize(Size);
+		}
+		if (Size.X < 1.0 || Size.Y < 1.0)
+		{
+			return 1.0f;
+		}
+		return GetDefault<UUserInterfaceSettings>()->GetDPIScaleBasedOnSize(FIntPoint(FMath::RoundToInt(Size.X), FMath::RoundToInt(Size.Y)));
 	}
 
 	/** How many times the loading screen has been drawn, on its own thread, since it went up: for the log. */
@@ -133,6 +152,13 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoading(const FWorldContext& Context,
 		return;
 	}
 	LoadingTo = WhereTo(Level, Context.World());
+	// The cover that follows is drawn at the scale of this viewport, not whatever the next world's has for its first frames.
+	CoverScale = ViewportScale(GetGameInstance() != nullptr ? GetGameInstance()->GetGameViewportClient() : nullptr);
+	if (LoadedAt > 0.0 && FPlatformTime::Seconds() - LoadedAt < 20.0 && Level == LoadedLevel)
+	{
+		UE_LOG(LogCheeseStrike, Warning, TEXT("A second trip to %s, %.1f s after the last arrived there (%s):"), *Level, FPlatformTime::Seconds() - LoadedAt, *LoadingTo);
+		FDebug::DumpStackTraceToLog(ELogVerbosity::Warning);
+	}
 	if (!IsMoviePlayerEnabled() || GetMoviePlayer() == nullptr)
 	{
 		return;
@@ -157,6 +183,8 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 		return;
 	}
 	Lift();
+	LoadedAt = FPlatformTime::Seconds();
+	LoadedLevel = World->GetOutermost()->GetName();
 	if (!LoadingTo.IsEmpty() && LoadingSince > 0.0)
 	{
 		UE_LOG(LogCheeseStrike, Display, TEXT("The loading screen was drawn %d times over the %.1f s the level took to load"), LoadingScreenFrames.load(), FPlatformTime::Seconds() - LoadingSince);
@@ -166,7 +194,19 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 	LoadingTo.Reset();
 	LoadingSince = 0.0;
 	TWeakObjectPtr<UWorld> Watched = World;
-	Curtain = MakeCover(TAttribute<FText>::CreateLambda([Watched, Where]() { return FText::FromString(SayingFor(Watched.Get(), Where)); }));
+	TSharedRef<SWidget> Cover = MakeCover(TAttribute<FText>::CreateLambda([Watched, Where]() { return FText::FromString(SayingFor(Watched.Get(), Where)); }));
+	// The text and spinner stay the size they had under the loading screen: as the new world's viewport takes over its DPI scale
+	// may differ for a few frames, which grew them. Drawn at the scale held from the start, whatever the viewport's now.
+	const float Held = CoverScale > 0.0f ? CoverScale : ViewportScale(Viewport);
+	TWeakObjectPtr<UGameViewportClient> WatchedViewport = Viewport;
+	Curtain = SNew(SDPIScaler).DPIScale_Lambda([Held, WatchedViewport]()
+	{
+		return Held / FMath::Max(0.1f, ViewportScale(WatchedViewport.Get()));
+	})
+	[
+		Cover
+	];
+	CoverScale = 0.0f;
 	Viewport->AddViewportWidgetContent(Curtain.ToSharedRef(), CurtainOrder);
 	GoingTo = Where;
 	CoveredWorld = World;

@@ -237,7 +237,7 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	Menu->FocusItem(TEXT("SETTINGS"));
 	Menu->Show(EMenuPage::Options);
 	TestEqual(TEXT("the settings' first item is their first tab"), Menu->GetFocusName(), FString(TEXT("CONTROLS")));
-	TestEqual(TEXT("the controls' tab has nothing to focus but the tabs and Back"), Menu->GetFocusableNames(), TArray<FString>({TEXT("CONTROLS"), TEXT("AIMING"), TEXT("VIEW"), TEXT("SOUND"), TEXT("GRAPHICS"), TEXT("BACK")}));
+	TestEqual(TEXT("the controls' tab has nothing to focus but the tabs and Back"), Menu->GetFocusableNames(), TArray<FString>({TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS"), TEXT("BACK")}));
 	Menu->SetOptionsTab(EOptionsTab::Aiming);
 	Menu->Refresh();
 	const TArray<FString> Options = Menu->GetFocusableNames();

@@ -119,8 +119,12 @@ namespace CheeseStrikeMenu
 	bool ShouldRedrawLobby(bool bChanged, bool bStatusChanged, bool bDropdownOpen);
 	/** Corners, in Slate units. */
 	constexpr float Rounding = 6.0f;
+	/** A confirmation dialog's card: how wide, and how far its content is in from its sides. */
+	constexpr float DialogWidth = 480.0f;
+	constexpr float DialogPadding = 32.0f;
 	/** The lobby's picture of the map, wide (16:9), and its rules' column as wide; the gap between it and the seats. */
 	constexpr float MapPictureWidth = 680.0f;
+	constexpr float MapPictureRounding = 12.0f;
 	constexpr float LobbyGap = 44.0f;
 	/** The width of the names of the lobby's rules, left of their dropdowns. */
 	constexpr float RuleLabelWidth = 220.0f;
@@ -263,7 +267,14 @@ private:
 	TSharedRef<SWidget> MakeSpinner(float Radius = 10.0f) const;
 	TSharedRef<SWidget> MakeTitle(const FString& Text);
 	/** A line of text, wrapped at the width it was last given unless `bWrap` is off (in the lobby, which a frame of unwrapped words would shrink). */
-	TSharedRef<SWidget> MakeLine(const FString& Text, bool bDim = false, bool bWrap = true);
+	/**
+	 * A line of text. Wrapped, it wraps at a width given, not at the one it happens to have been drawn at (AutoWrapText
+	 * only knows that after a layout pass, so the text stood a word a line, and the page grew, for a frame or two):
+	 * `WrapAt` if there is one, otherwise what the page has (WrapWidth).
+	 */
+	TSharedRef<SWidget> MakeLine(const FString& Text, bool bDim = false, bool bWrap = true, float WrapAt = 0.0f);
+	/** How wide the current page's content is, less room for a scroll bar: what a line of text there wraps at. */
+	float WrapWidth() const;
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain, TSharedPtr<SWidget> Inside = nullptr);
 	/**
 	 * A dropdown: the chosen one of `Choices` (`GetChosen`, read as it is
@@ -372,7 +383,7 @@ private:
 	EMenuAsk Asking = EMenuAsk::None;
 	/** What the dialog was last drawn for, so that it is drawn again only when that changes. */
 	EMenuAsk ShownAsk = EMenuAsk::None;
-	TSharedPtr<SBorder> Dialog;
+	TSharedPtr<SWidget> Dialog;
 	TSharedPtr<SBox> DialogContent;
 	/** The friends panel on the right: a tab, opened by hovering it in the lobby, and open on the find page. */
 	TSharedPtr<SBox> FriendsBox;

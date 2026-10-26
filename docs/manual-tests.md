@@ -318,3 +318,16 @@ Checked by hand, because the tests can't see them: how they look and sound, and 
 | FRD-07 | Friends' pictures | 1. Open the friends panel with friends in games and not.<br>2. Look at each row. | A Steam picture beside each friend, once Steam has it. |
 | FRD-08 | The panel's motion | 1. Hover the lobby's right edge, and move away.<br>2. Look at the panel. | It eases open and shut, and refreshes its friends about every 20 seconds while open. |
 
+
+## Changes from wave 8
+
+| ID | What | Steps | Expected |
+|----|------|-------|----------|
+| W8-MEN-01 | Settings tabs | 1. Open Settings.<br>2. Open each tab. | Tabs are Controls, Aiming, Sound, Graphics; no View. Sound holds the three volumes, Graphics holds field of view, quality and screen. |
+| W8-MEN-02 | Credits and controls text | 1. Open Credits: look at Engine.<br>2. Settings, Controls: look under the table. | No "First Person template"; no "read from the game's own bindings". |
+| W8-LOB-01 | Round time | 1. Host Elimination or Execution.<br>2. Pick a Round time, 1 to 5 min (3 by default).<br>3. Start; look at the round clock; join from another PC to see the lobby's value. | The round lasts the chosen time; a timeout with both sides alive is a draw; joiners see the value read-only. |
+| W8-LOB-02 | Rounded map picture | Look at the lobby's map picture. | Rounded corners on the picture and its name bar. If the picture's corners are still square, the engine did not honour a rounded textured brush: report it. |
+| W8-DLG-01 | Confirmation dialogs | 1. As host press CLOSE LOBBY; then QUIT in the menu.<br>2. Try clicking buttons behind the dialog.<br>3. Watch the card as it opens. | Rounded card, everything behind blurred (other UI too) and unclickable; Quit says "Quit to desktop"; the card appears at its final size at once. |
+| W8-MEN-03 | No text growth | Change settings, open Credits, Find a match, the pause menu. | No frame where wrapped text stands a word a line and then grows. |
+| W8-LDG-01 | Cover size | Host a match and watch the end of the loading cover on a 1440p or 4K screen (DPI scale over 1). | The text and spinner keep their size until the cover lifts. |
+| W8-LDG-02 | Second trip | Play a match, go back to the lobby, wait 30 s; repeat leaving a lobby. | No second loading screen. If one shows, Saved/Logs has "A second trip to ..." with the stack of who asked. |

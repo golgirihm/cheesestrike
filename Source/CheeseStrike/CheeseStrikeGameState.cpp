@@ -35,6 +35,7 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeGameState, TeamScores);
 	DOREPLIFETIME(ACheeseStrikeGameState, WinningTeam);
 	DOREPLIFETIME(ACheeseStrikeGameState, RoundLimit);
+	DOREPLIFETIME(ACheeseStrikeGameState, RoundTime);
 	DOREPLIFETIME(ACheeseStrikeGameState, Round);
 	DOREPLIFETIME(ACheeseStrikeGameState, RoundEndsAt);
 	DOREPLIFETIME(ACheeseStrikeGameState, RoundBreakUntil);

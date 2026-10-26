@@ -89,6 +89,8 @@ namespace CheeseStrikeModes
 	constexpr int32 RoundLimitChoices[] = {2, 3, 4, 5, 7};
 	/** Seconds a round lasts at most, and the pause between rounds (the Godot game's ROUND_BREAK). */
 	constexpr float RoundTime = 180.0f;
+	/** What a host may pick for a round's length in the lobby, in seconds (1 to 5 minutes; no overtime). */
+	constexpr float RoundTimeChoices[] = {60.0f, 120.0f, 180.0f, 240.0f, 300.0f};
 	constexpr float RoundBreak = 6.0f;
 	/**
 	 * As a round's time runs out, everyone is told how long is left, at
