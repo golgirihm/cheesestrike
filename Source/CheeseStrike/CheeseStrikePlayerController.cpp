@@ -695,9 +695,10 @@ void ACheeseStrikePlayerController::CheeseStrikeMice()
 
 void ACheeseStrikePlayerController::FindFromMenu()
 {
+	// The friends and their games: there is no public search.
 	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
 	{
-		Sessions->Find(Sessions->ServiceName() != TEXT("STEAM"));
+		Sessions->RefreshFriends();
 	}
 }
 
@@ -842,6 +843,70 @@ void ACheeseStrikePlayerController::ClientHostLeft_Implementation(bool bInMatch)
 	{
 		ClientTravel(CheeseStrikeSessions::Level, TRAVEL_Absolute);
 	}
+}
+
+void ACheeseStrikePlayerController::ClientKicked_Implementation()
+{
+	UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+	if (Sessions == nullptr || HasAuthority())
+	{
+		return;
+	}
+	Sessions->SayFarewell(CheeseStrikeSessions::EFarewell::Kicked);
+	bPaused = false;
+	ChosenPage = EMenuPage::Main;
+	if (Sessions->IsInAMatch())
+	{
+		Sessions->Leave();
+	}
+	else
+	{
+		ClientTravel(CheeseStrikeSessions::Level, TRAVEL_Absolute);
+	}
+}
+
+void ACheeseStrikePlayerController::ServerKick_Implementation(ACheeseStrikePlayerState* Who)
+{
+	// Only the host's own controller, the one on the listen server, may kick.
+	if (!IsLocalController() || Who == nullptr || Who->GetPlayerController() == this)
+	{
+		return;
+	}
+	// Their controller: the one whose player state it is.
+	ACheeseStrikePlayerController* Target = nullptr;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (ACheeseStrikePlayerController* Each = Cast<ACheeseStrikePlayerController>(It->Get()); Each != nullptr && Each != this && Each->PlayerState == Who)
+		{
+			Target = Each;
+		}
+	}
+	if (ACheeseStrikeGameMode* Mode = GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>(); Mode != nullptr && Target != nullptr)
+	{
+		Mode->KickPlayer(Target);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeKick(const FString& Name)
+{
+	if (!IsLocalController() || !HasAuthority())
+	{
+		return;
+	}
+	const UWorld* World = GetWorld();
+	for (TActorIterator<ACheeseStrikePlayerState> It(World); It; ++It)
+	{
+		if (It->GetPlayerName().Equals(Name, ESearchCase::IgnoreCase) && It->GetPlayerController() != this)
+		{
+			ServerKick(*It);
+			return;
+		}
+	}
+}
+
+void ACheeseStrikePlayerController::KickFromMenu(ACheeseStrikePlayerState* Who)
+{
+	ServerKick(Who);
 }
 
 void ACheeseStrikePlayerController::QuitFromMenu()

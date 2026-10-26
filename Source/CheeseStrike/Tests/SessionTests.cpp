@@ -23,11 +23,11 @@ bool FAMatchIsOfferedAsALobby::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeSessions;
 	const FOnlineSessionSettings Steam = HostSettings(TEXT("?KillLimit=5?RespawnDelay=1"), false);
 	TestEqual(TEXT("room for the design's players"), Steam.NumPublicConnections, MaxPlayers);
-	TestTrue(TEXT("advertised"), Steam.bShouldAdvertise);
+	TestFalse(TEXT("not advertised to a public search: a friend finds it, or it is sent on an invite"), Steam.bShouldAdvertise);
 	TestTrue(TEXT("joinable while on"), Steam.bAllowJoinInProgress);
 	TestTrue(TEXT("with invitations"), Steam.bAllowInvites);
 	TestTrue(TEXT("a lobby, which the friends list can join"), Steam.bUseLobbiesIfAvailable && Steam.bUsesPresence && Steam.bAllowJoinViaPresence);
-	TestFalse(TEXT("for anyone, not friends only"), Steam.bAllowJoinViaPresenceFriendsOnly);
+	TestTrue(TEXT("joinable by friends only, and on invites"), Steam.bAllowJoinViaPresenceFriendsOnly);
 	TestFalse(TEXT("not on the local network"), Steam.bIsLANMatch);
 	TestFalse(TEXT("not dedicated"), Steam.bIsDedicated);
 	FString Game;

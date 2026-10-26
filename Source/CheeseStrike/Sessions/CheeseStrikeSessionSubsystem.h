@@ -6,6 +6,7 @@
 #include "Engine/EngineBaseTypes.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
+#include "Rules/CheeseStrikeFriends.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "CheeseStrikeSessions.h"
 #include "CheeseStrikeSessionSubsystem.generated.h"
@@ -23,6 +24,20 @@ enum class ESessionPending : uint8
 	Joining,
 };
 
+/** A friend, as the friends panel lists them: their name, whether their game can be joined from here, and how full it is. */
+struct FCheeseStrikeFriend
+{
+	FString Name;
+	FUniqueNetIdPtr Id;
+	/** Whether Steam says their game (a lobby or match of this one) is joinable. */
+	bool bInGame = false;
+	/** The players in it, once its session has been looked up (-1 until then). */
+	int32 Humans = -1;
+	/** Their game's session, as Steam found it: what joining takes. */
+	FOnlineSessionSearchResult Session;
+	CheeseStrikeFriends::EState State = CheeseStrikeFriends::EState::NotPlaying;
+};
+
 /**
  * Hosts, finds, joins and leaves matches through the online service: Steam
  * when the Steam client is running, or the Null service on the local
@@ -36,6 +51,7 @@ enum class ESessionPending : uint8
  * CheeseStrikeJoin <number>, CheeseStrikeLeave (CheeseStrikePlayerController),
  * and the Lan forms for the local network.
  */
+
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeSessionSubsystem : public UGameInstanceSubsystem
 {
@@ -55,6 +71,15 @@ public:
 	void Leave();
 	/** The host's match, as offered, now says these URL `Options` (its rules), for those looking for one. */
 	void UpdateRules(const FString& Options);
+
+	/** The friends the last refresh found, with their games. */
+	const TArray<FCheeseStrikeFriend>& GetFriends() const { return Friends; }
+	/** Reads the friends list again, and looks up each joinable friend's game. */
+	void RefreshFriends();
+	/** Invites the friend `Index` (of GetFriends()) to the lobby or match we are in. */
+	void InviteFriend(int32 Index);
+	/** Joins the game of the friend `Index`. */
+	void JoinFriend(int32 Index);
 
 	/** The matches the last search found, described. */
 	const TArray<FString>& GetFound() const { return Found; }
@@ -102,6 +127,12 @@ protected:
 	void OnDestroyedToJoin(FName SessionName, bool bWasSuccessful);
 	void CreateNow();
 	void JoinNow(const FOnlineSessionSearchResult& Result);
+	/** Joins `Result`'s match, leaving the one we are in first. */
+	void StartJoin(const FOnlineSessionSearchResult& Result);
+	void OnFriendsRead(int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr);
+	/** Looks up the game of the next joinable friend (the Steam calls go one at a time). */
+	void LookUpNextFriend();
+	void OnFriendSession(int32 LocalUserNum, bool bWasSuccessful, const TArray<FOnlineSessionSearchResult>& Looked);
 	void Travel(const FString& Url, bool bAsHost);
 	/** Hosting or joining is over: a level of this game's has loaded, or the travel failed. */
 	void OnLevelLoaded(UWorld* World);
@@ -122,6 +153,10 @@ protected:
 	FString HostingOptions;
 	bool bHostingLan = false;
 	FOnlineSessionSearchResult Joining;
+	/** The friends as last read, and the next one whose game is to be looked up. */
+	TArray<FCheeseStrikeFriend> Friends;
+	int32 NextFriendLookup = 0;
+	FDelegateHandle FriendSessionHandle;
 
 	FDelegateHandle CreatedHandle;
 	FDelegateHandle FoundHandle;

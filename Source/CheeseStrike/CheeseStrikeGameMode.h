@@ -14,6 +14,7 @@
 class ACheeseStrikeCharacter;
 class ACheeseStrikeGameState;
 class ACheeseStrikeHill;
+class ACheeseStrikePlayerController;
 class ACheeseStrikePlayerState;
 
 /**
@@ -39,6 +40,9 @@ class CHEESESTRIKE_API ACheeseStrikeGameMode : public AGameMode
 	GENERATED_BODY()
 
 public:
+	/** The host removes a joiner from the game (lobby or match): told first, then the connection closes. Nothing for the host. */
+	void KickPlayer(ACheeseStrikePlayerController* Player);
+
 	ACheeseStrikeGameMode();
 
 	int32 GetKillLimit() const { return KillLimit; }
@@ -192,6 +196,7 @@ protected:
 	void Respawn(TWeakObjectPtr<AController> Who);
 	/** Fills the empty slots with bots, by the roster the lobby showed. */
 	void SpawnBots();
+
 	/** The mice come over the edge of the map: one for every so many blocks of cheese, at its MouseEntry points (CheeseStrikeMice). */
 	void SpawnMice();
 	/** The countdown is over: the match starts here, or travels to the map the host picked and starts there. */

@@ -4,6 +4,7 @@
 #include "CheeseStrikeGameMode.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/NetConnection.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Engine/GameInstance.h"
@@ -271,6 +272,33 @@ void ACheeseStrikeGameMode::PostLogin(APlayerController* NewPlayer)
 			Ours->SetHostName(State->GetPlayerName());
 		}
 	}
+}
+
+void ACheeseStrikeGameMode::KickPlayer(ACheeseStrikePlayerController* Player)
+{
+	if (!HasAuthority() || Player == nullptr)
+	{
+		return;
+	}
+	const APlayerState* Who = Player->GetPlayerState<APlayerState>();
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s is removed from the game by the host"), Who != nullptr ? *Who->GetPlayerName() : TEXT("someone"));
+	Player->ClientKicked();
+	// A moment for the word to reach them before the connection closes.
+	// Removed by the engine, which also drops their player and their connection: the connection is closed here too, since
+	// it stays with the player list until it is.
+	const TWeakObjectPtr<UNetConnection> Link = Cast<UNetConnection>(Player->Player);
+	FTimerHandle Handle;
+	GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [this, Player, Link]()
+	{
+		if (IsValid(Player) && GameSession != nullptr)
+		{
+			GameSession->KickPlayer(Player, FText::FromString(TEXT("The host removed you from the game.")));
+		}
+		if (Link.IsValid())
+		{
+			Link->Close();
+		}
+	}), 0.5f, false);
 }
 
 void ACheeseStrikeGameMode::SpawnBots()

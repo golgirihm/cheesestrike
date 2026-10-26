@@ -31,6 +31,7 @@ namespace CheeseStrikeSessions
 		case EFarewell::HostLeftTheMatch: return TEXT("THE HOST LEFT");
 		case EFarewell::ConnectionLost: return TEXT("DISCONNECTED");
 		case EFarewell::CouldNotJoin: return TEXT("COULDN'T JOIN");
+		case EFarewell::Kicked: return TEXT("YOU WERE REMOVED");
 		default: return FString();
 		}
 	}
@@ -43,6 +44,7 @@ namespace CheeseStrikeSessions
 		case EFarewell::HostLeftTheMatch: return TEXT("The host left, and the match is over.");
 		case EFarewell::ConnectionLost: return TEXT("The connection to the host was lost.");
 		case EFarewell::CouldNotJoin: return TEXT("The host's match couldn't be reached.");
+		case EFarewell::Kicked: return TEXT("The host removed you from the game.");
 		default: return FString();
 		}
 	}
@@ -69,7 +71,9 @@ namespace CheeseStrikeSessions
 		FOnlineSessionSettings Settings;
 		Settings.NumPublicConnections = MaxPlayers;
 		Settings.NumPrivateConnections = 0;
-		Settings.bShouldAdvertise = true;
+		// On the service, not advertised to everyone: a friend finds it (presence) or it is sent on an invite, never by a public
+		// search. On the local network (the editor, the tests), found by a search there as it always was.
+		Settings.bShouldAdvertise = bLan;
 		Settings.bAllowJoinInProgress = true;
 		Settings.bAllowInvites = true;
 		Settings.bIsLANMatch = bLan;
@@ -77,7 +81,7 @@ namespace CheeseStrikeSessions
 		Settings.bUsesPresence = !bLan;
 		Settings.bUseLobbiesIfAvailable = !bLan;
 		Settings.bAllowJoinViaPresence = !bLan;
-		Settings.bAllowJoinViaPresenceFriendsOnly = false;
+		Settings.bAllowJoinViaPresenceFriendsOnly = true;
 		Settings.bIsDedicated = false;
 		Settings.bUsesStats = false;
 		Settings.bAntiCheatProtected = false;

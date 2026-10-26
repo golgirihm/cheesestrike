@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeSessionSubsystem.h"
+#include "Interfaces/OnlineFriendsInterface.h"
+#include "Interfaces/OnlinePresenceInterface.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
@@ -153,7 +155,7 @@ void UCheeseStrikeSessionSubsystem::SayFarewell(CheeseStrikeSessions::EFarewell 
 		return;
 	}
 	// The host's own word stands over the lost connection that follows it.
-	const bool bHostSaid = Farewell == EFarewell::HostClosedTheLobby || Farewell == EFarewell::HostLeftTheMatch;
+	const bool bHostSaid = Farewell == EFarewell::HostClosedTheLobby || Farewell == EFarewell::HostLeftTheMatch || Farewell == EFarewell::Kicked;
 	if (bHostSaid && Why == EFarewell::ConnectionLost && FPlatformTime::Seconds() - FarewellAt < 30.0)
 	{
 		return;
@@ -327,6 +329,11 @@ void UCheeseStrikeSessionSubsystem::Join(int32 Index)
 		Say(FString::Printf(TEXT("There is no match %d to join; CheeseStrikeFind looks for them"), Index + 1));
 		return;
 	}
+	StartJoin(Results[Index]);
+}
+
+void UCheeseStrikeSessionSubsystem::StartJoin(const FOnlineSessionSearchResult& Result)
+{
 	if (bBusy)
 	{
 		Say(TEXT("Busy; try again in a moment"));
@@ -335,7 +342,7 @@ void UCheeseStrikeSessionSubsystem::Join(int32 Index)
 	bBusy = true;
 	SetPending(ESessionPending::Joining);
 	DismissFarewell();
-	Joining = Results[Index];
+	Joining = Result;
 	if (Sessions()->GetNamedSession(NAME_GameSession) != nullptr)
 	{
 		Say(TEXT("Leaving the match to join another"));
@@ -343,6 +350,117 @@ void UCheeseStrikeSessionSubsystem::Join(int32 Index)
 		return;
 	}
 	JoinNow(Joining);
+}
+
+void UCheeseStrikeSessionSubsystem::RefreshFriends()
+{
+	IOnlineSubsystem* Service = Online::GetSubsystem(GetWorld());
+	IOnlineFriendsPtr FriendsInterface = Service != nullptr ? Service->GetFriendsInterface() : nullptr;
+	if (!FriendsInterface.IsValid())
+	{
+		Say(TEXT("No friends to read: no online service"));
+		return;
+	}
+	// The list is read from the service; then each joinable friend's game is looked up, one at a time.
+	FriendsInterface->ReadFriendsList(0, EFriendsLists::ToString(EFriendsLists::Default), FOnReadFriendsListComplete::CreateUObject(this, &UCheeseStrikeSessionSubsystem::OnFriendsRead));
+}
+
+void UCheeseStrikeSessionSubsystem::OnFriendsRead(int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
+{
+	Friends.Empty();
+	IOnlineSubsystem* Service = Online::GetSubsystem(GetWorld());
+	IOnlineFriendsPtr FriendsInterface = Service != nullptr ? Service->GetFriendsInterface() : nullptr;
+	if (!bWasSuccessful || !FriendsInterface.IsValid())
+	{
+		Say(FString::Printf(TEXT("The friends couldn't be read%s"), ErrorStr.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(": %s"), *ErrorStr)));
+		return;
+	}
+	TArray<TSharedRef<FOnlineFriend>> Listed;
+	FriendsInterface->GetFriendsList(LocalUserNum, ListName, Listed);
+	for (const TSharedRef<FOnlineFriend>& Each : Listed)
+	{
+		FCheeseStrikeFriend Friend;
+		Friend.Name = Each->GetDisplayName();
+		Friend.Id = Each->GetUserId();
+		// Joinable: their lobby or match, which Steam lets friends into by presence (and on invites).
+		Friend.bInGame = Each->GetPresence().bIsJoinable;
+		Friend.State = CheeseStrikeFriends::Classify(Friend.bInGame, 0, true, false);
+		Friends.Add(Friend);
+	}
+	NextFriendLookup = 0;
+	LookUpNextFriend();
+}
+
+void UCheeseStrikeSessionSubsystem::LookUpNextFriend()
+{
+	while (Friends.IsValidIndex(NextFriendLookup) && !Friends[NextFriendLookup].bInGame)
+	{
+		++NextFriendLookup;
+	}
+	IOnlineSessionPtr Interface = Sessions();
+	if (!Friends.IsValidIndex(NextFriendLookup) || !Interface.IsValid())
+	{
+		return;
+	}
+	FriendSessionHandle = Interface->AddOnFindFriendSessionCompleteDelegate_Handle(0, FOnFindFriendSessionCompleteDelegate::CreateUObject(this, &UCheeseStrikeSessionSubsystem::OnFriendSession));
+	if (!Interface->FindFriendSession(0, *Friends[NextFriendLookup].Id))
+	{
+		Interface->ClearOnFindFriendSessionCompleteDelegate_Handle(0, FriendSessionHandle);
+		++NextFriendLookup;
+		LookUpNextFriend();
+	}
+}
+
+void UCheeseStrikeSessionSubsystem::OnFriendSession(int32 LocalUserNum, bool bWasSuccessful, const TArray<FOnlineSessionSearchResult>& Looked)
+{
+	if (IOnlineSessionPtr Interface = Sessions(); Interface.IsValid())
+	{
+		Interface->ClearOnFindFriendSessionCompleteDelegate_Handle(0, FriendSessionHandle);
+	}
+	if (Friends.IsValidIndex(NextFriendLookup))
+	{
+		FCheeseStrikeFriend& Friend = Friends[NextFriendLookup];
+		if (bWasSuccessful && Looked.Num() > 0 && Looked[0].IsValid())
+		{
+			Friend.Session = Looked[0];
+			// Bots don't count: the players in the game against its room.
+			Friend.Humans = Looked[0].Session.SessionSettings.NumPublicConnections - Looked[0].Session.NumOpenPublicConnections;
+			Friend.State = CheeseStrikeFriends::Classify(true, Friend.Humans, true, false);
+		}
+		else
+		{
+			// No game to be found now: they are not playing.
+			Friend.bInGame = false;
+			Friend.State = CheeseStrikeFriends::EState::NotPlaying;
+		}
+	}
+	++NextFriendLookup;
+	LookUpNextFriend();
+}
+
+void UCheeseStrikeSessionSubsystem::InviteFriend(int32 Index)
+{
+	if (!Friends.IsValidIndex(Index) || !CheeseStrikeFriends::CanInvite(IsInAMatch(), false))
+	{
+		Say(TEXT("Only a friend can be invited, to a lobby or match of ours"));
+		return;
+	}
+	if (!Sessions()->SendSessionInviteToFriend(0, NAME_GameSession, *Friends[Index].Id))
+	{
+		Say(FString::Printf(TEXT("The invitation to %s couldn't be sent"), *Friends[Index].Name));
+		return;
+	}
+	Say(FString::Printf(TEXT("Invited %s"), *Friends[Index].Name));
+}
+
+void UCheeseStrikeSessionSubsystem::JoinFriend(int32 Index)
+{
+	if (!Friends.IsValidIndex(Index) || Friends[Index].State != CheeseStrikeFriends::EState::Join || !Friends[Index].Session.IsValid())
+	{
+		Say(FString::Printf(TEXT("%s's game can't be joined"), Friends.IsValidIndex(Index) ? *Friends[Index].Name : TEXT("That friend")));
+		return;
+	}
+	StartJoin(Friends[Index].Session);
 }
 
 void UCheeseStrikeSessionSubsystem::OnDestroyedToJoin(FName SessionName, bool bWasSuccessful)

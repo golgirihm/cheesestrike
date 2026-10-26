@@ -34,6 +34,14 @@ enum class EMenuPage : uint8
 };
 
 /** The settings page's tabs. */
+/** What the menu's dialog asks before it does something it can't take back: closing the host's lobby, or quitting the game. */
+enum class EMenuAsk : uint8
+{
+	None,
+	CloseLobby,
+	Quit,
+};
+
 enum class EOptionsTab : uint8
 {
 	/** Every action's keys and buttons (CheeseStrikeControls), as a table. */
@@ -210,6 +218,12 @@ public:
 	/** The buttons that close the lobby or quit: the first click arms them, the second does it. */
 	TSharedRef<SWidget> MakeCloseLobbyButton();
 	TSharedRef<SWidget> MakeQuitButton();
+	/** The dialog over the whole menu, for what `Asking` is: its question, and what to press. */
+	TSharedRef<SWidget> MakeDialog();
+	/** The friends panel, open or as its tab; and a friend's row in it, with Join or Invite. */
+	TSharedRef<SWidget> MakeFriendsPanel(bool bOpen);
+	TSharedRef<SWidget> MakeFriendRow(int32 Index);
+	void AskBefore(EMenuAsk Question);
 	bool IsConfirmingBackToLobby() const { return bConfirmingBackToLobby; }
 	/** How many times the lobby has been built afresh: not when a rule changes, which its rows show as they are. */
 	int32 GetLobbyBuilds() const { return LobbyBuilds; }
@@ -353,7 +367,16 @@ private:
 	/** Whether the host's pause menu is asking to confirm Back to Lobby. */
 	bool bConfirmingBackToLobby = false;
 	/** A first click on the host's Close Lobby or on Quit has armed it: the second click does it, so that a press too many doesn't close the lobby or the game. */
-	bool bArmedCloseLobby = false;
-	bool bArmedQuit = false;
+	EMenuAsk Asking = EMenuAsk::None;
+	/** What the dialog was last drawn for, so that it is drawn again only when that changes. */
+	EMenuAsk ShownAsk = EMenuAsk::None;
+	TSharedPtr<SBorder> Dialog;
+	TSharedPtr<SBox> DialogContent;
+	/** The friends panel on the right: a tab, opened by hovering it in the lobby, and open on the find page. */
+	TSharedPtr<SBox> FriendsBox;
+	TSharedPtr<SBox> FriendsContent;
+	/** What the panel was last drawn for, and whether its friends were asked for since it opened. */
+	FString ShownFriendsKey;
+	bool bFriendsRequested = false;
 	int32 LobbyBuilds = 0;
 };
