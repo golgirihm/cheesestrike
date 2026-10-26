@@ -145,7 +145,7 @@ namespace PlayTests
 		return FMath::Abs(FMath::RadiansToDegrees((Now * AsMade.Inverse()).GetTwistAngle(Spine)));
 	}
 
-	/** Whether a fallen body has come to rest: none of its bodies moving faster than 5 cm/s. */
+	/** Whether a fallen body has come to rest: none of its bodies moving faster than 12 cm/s (a ragdoll's last settling jitters at 5 to 10 cm/s for a second or two, and the body is gone five seconds after it falls). */
 	bool AtRest(const ACheeseStrikeCharacter* Character)
 	{
 		const USkeletalMeshComponent* Mesh = Character != nullptr ? Character->GetMesh() : nullptr;
@@ -155,7 +155,7 @@ namespace PlayTests
 		}
 		for (const FBodyInstance* Body : Mesh->Bodies)
 		{
-			if (Body != nullptr && Body->GetUnrealWorldVelocity().Size() > 5.0f)
+			if (Body != nullptr && Body->GetUnrealWorldVelocity().Size() > 12.0f)
 			{
 				return false;
 			}

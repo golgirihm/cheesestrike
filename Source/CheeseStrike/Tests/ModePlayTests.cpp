@@ -571,7 +571,7 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 		const FRotator View = Host->GetControlRotation();
 		const float Off = FRotator::NormalizeAxis(View.Yaw - Host->GetActorRotation().Yaw);
 		TestTrue(FString::Printf(TEXT("the view (%.1f off the body, pitch %.1f) is kept to the cone"), Off, FRotator::NormalizeAxis(View.Pitch)), CheeseStrikeDowned::InCone(View, Host->GetActorRotation().Yaw, 1.0f));
-		TestTrue(TEXT("at its lowest"), FMath::IsNearlyEqual(FRotator::NormalizeAxis(View.Pitch), CheeseStrikeDowned::LowestPitch, 1.0f));
+		TestTrue(FString::Printf(TEXT("at its lowest, give or take the hurt view's sway (pitch %.2f)"), FRotator::NormalizeAxis(View.Pitch)), FMath::IsNearlyEqual(FRotator::NormalizeAxis(View.Pitch), CheeseStrikeDowned::LowestPitch, CheeseStrikeModes::DownedSwayPitch + 1.0f));
 		const float Turned = FMath::Abs(FRotator::NormalizeAxis(Host->GetActorRotation().Yaw - DownYaw));
 		TestTrue(FString::Printf(TEXT("the body turns after it, slowly (%.1f degrees)"), Turned), Turned > 1.0f && Turned < 25.0f);
 		// The others see it aim where it does.
