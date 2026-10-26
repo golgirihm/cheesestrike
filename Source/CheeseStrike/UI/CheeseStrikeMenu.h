@@ -6,9 +6,11 @@
 #include "Layout/SlateRect.h"
 #include "Types/SlateEnums.h"
 #include "Widgets/SCompoundWidget.h"
+#include "Rules/CheeseStrikeFriends.h"
 #include "Rules/CheeseStrikeRules.h"
 
 class ACheeseStrikePlayerController;
+class UCheeseStrikeSessionSubsystem;
 class SBox;
 class SScrollBox;
 struct FButtonStyle;
@@ -126,6 +128,8 @@ namespace CheeseStrikeMenu
 	constexpr float MapPictureWidth = 680.0f;
 	constexpr float MapPictureRounding = 12.0f;
 	constexpr float LobbyGap = 44.0f;
+	/** The friends panel's width when it is collapsed to its tab: the lobby leaves this much room at its right, so nothing is under it. */
+	constexpr float FriendsTabWidth = 120.0f;
 	/** The width of the names of the lobby's rules, left of their dropdowns. */
 	constexpr float RuleLabelWidth = 220.0f;
 	/** The smallest the game's window may be made (in a window), so that nothing in the menus is crowded out. */
@@ -229,6 +233,10 @@ public:
 	/** The friends panel, open or as its tab; and a friend's row in it, with Join or Invite. */
 	TSharedRef<SWidget> MakeFriendsPanel(bool bOpen);
 	TSharedRef<SWidget> MakeFriendRow(int32 Index);
+	/** The host's choice of who can join the party (read-only for everyone else). */
+	TSharedRef<SWidget> MakePartyPermission(bool bHost, UCheeseStrikeSessionSubsystem* Sessions);
+	/** A friends section's header: its name and count, which a click folds away or opens again (remembered while the menu lasts). */
+	TSharedRef<SWidget> MakeSectionHeader(CheeseStrikeFriends::ESection Section, int32 Count);
 	void AskBefore(EMenuAsk Question);
 	bool IsConfirmingBackToLobby() const { return bConfirmingBackToLobby; }
 	/** How many times the lobby has been built afresh: not when a rule changes, which its rows show as they are. */
@@ -393,6 +401,8 @@ private:
 	/** When the friends were last asked for, the panel's width now and when it was last set (to ease it open and shut). */
 	double FriendsReadAt = -1000.0;
 	float FriendsWidth = 120.0f;
+	/** The friends sections folded shut (remembered while the menu lasts). */
+	TSet<uint8> ClosedFriendSections;
 	double FriendsWidthAt = 0.0;
 	/** The pictures of the friends in the rows drawn (kept while they are). */
 	TArray<TSharedPtr<FSlateBrush>> FriendBrushes;

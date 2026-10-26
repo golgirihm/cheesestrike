@@ -584,7 +584,8 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 			[
 				SNew(SImage).Image(Looks().LobbyTile.Get()).ColorAndOpacity(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f))
 			]
-			+ SOverlay::Slot().Padding(FMargin(56.0f, 40.0f))
+			// The friends tab sits at the right edge, collapsed: its width is kept free, so that it never lies over the seats.
+			+ SOverlay::Slot().Padding(FMargin(56.0f, 40.0f, 56.0f + CheeseStrikeMenu::FriendsTabWidth, 40.0f))
 			[
 				SNew(SCheeseStrikeFitBox)
 				[
@@ -621,7 +622,7 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 		// The friends, on the right: a tab, opened by hovering it in the lobby, and open on the find page.
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Fill)
 		[
-			SAssignNew(FriendsBox, SBox).WidthOverride(120.0f).Visibility(EVisibility::Collapsed)
+			SAssignNew(FriendsBox, SBox).WidthOverride(CheeseStrikeMenu::FriendsTabWidth).Visibility(EVisibility::Collapsed)
 			[
 				SAssignNew(FriendsContent, SBox)
 			]
@@ -684,7 +685,7 @@ void SCheeseStrikeMenu::Refresh()
 		FriendsBox->SetVisibility(bPanel ? EVisibility::Visible : EVisibility::Collapsed);
 		// Eased open and shut, rather than snapping: a fifth of a second to the width it wants.
 		const double Now = FPlatformTime::Seconds();
-		FriendsWidth = FMath::FInterpConstantTo(FriendsWidth, bOpen ? 380.0f : 120.0f, static_cast<float>(FMath::Min(0.1, Now - FriendsWidthAt)), 1500.0f);
+		FriendsWidth = FMath::FInterpConstantTo(FriendsWidth, bOpen ? 380.0f : CheeseStrikeMenu::FriendsTabWidth, static_cast<float>(FMath::Min(0.1, Now - FriendsWidthAt)), 1500.0f);
 		FriendsWidthAt = Now;
 		FriendsBox->SetWidthOverride(FriendsWidth);
 		// Asked for when it opens, and again every 20 s while it is open, so that a friend who joins a game shows.
@@ -699,7 +700,7 @@ void SCheeseStrikeMenu::Refresh()
 		{
 			for (const FCheeseStrikeFriend& Each : Sessions->GetFriends())
 			{
-				Key += FString::Printf(TEXT("%s/%d/%d;"), *Each.Name, static_cast<int32>(Each.State), Each.Humans);
+				Key += FString::Printf(TEXT("%s/%d/%d/%d/%d/%d;"), *Each.Name, static_cast<int32>(Each.State), Each.Humans, static_cast<int32>(Each.Status), static_cast<int32>(Each.Permission), Each.bInMyParty ? 1 : 0);
 			}
 		}
 		if (Sessions != nullptr)
@@ -710,6 +711,10 @@ void SCheeseStrikeMenu::Refresh()
 				Key += Sessions->AvatarOf(Index) != nullptr ? TEXT("a") : TEXT("-");
 			}
 			Key += Sessions->FriendsMayJoinHere() ? TEXT("J") : TEXT("I");
+			for (int32 Section = 0; Section < CheeseStrikeFriends::NumSections; ++Section)
+			{
+				Key += ClosedFriendSections.Contains(static_cast<uint8>(Section)) ? TEXT("c") : TEXT("o");
+			}
 		}
 		if (const ACheeseStrikeGameState* State = Controller.IsValid() ? Controller->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr)
 		{
@@ -1491,11 +1496,42 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 		const TArray<FCheeseStrikeFriend>& List = Sessions->GetFriends();
 		if (List.IsEmpty())
 		{
-			Friends->AddSlot().AutoHeight() [ MakeLine(TEXT("No friends in a game of this one right now."), true, true, 330.0f) ];
+			Friends->AddSlot().AutoHeight() [ MakeLine(TEXT("No friends to show."), true, true, 330.0f) ];
 		}
+		// In sections, each with a header that folds it. Who is in our party is by Steam's lobby id, or by name among the players here.
+		TArray<FString> HereNames;
+		if (const ACheeseStrikeGameState* State = Player.IsValid() ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr)
+		{
+			for (const APlayerState* Each : State->PlayerArray)
+			{
+				if (Each != nullptr && !Each->IsABot())
+				{
+					HereNames.Add(Each->GetPlayerName());
+				}
+			}
+		}
+		TArray<int32> Listed[CheeseStrikeFriends::NumSections];
 		for (int32 Index = 0; Index < List.Num(); ++Index)
 		{
-			Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 4.0f)) [ MakeFriendRow(Index) ];
+			const FCheeseStrikeFriend& Each = List[Index];
+			const bool bParty = Each.bInMyParty || (Sessions->IsInAMatch() && HereNames.Contains(Each.Name));
+			const CheeseStrikeFriends::ESection Section = CheeseStrikeFriends::SectionFor(bParty, Each.Status, Each.Permission, CheeseStrikeFriends::HasSpace(Each.Humans), CheeseStrikeFriends::OwnsTheGame(Each.bRunningThisGame, Each.bPublishesStatus));
+			Listed[static_cast<int32>(Section)].Add(Index);
+		}
+		for (int32 Section = 0; Section < CheeseStrikeFriends::NumSections; ++Section)
+		{
+			if (Listed[Section].IsEmpty())
+			{
+				continue;
+			}
+			Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 6.0f, 0.0f, 0.0f)) [ MakeSectionHeader(static_cast<CheeseStrikeFriends::ESection>(Section), Listed[Section].Num()) ];
+			if (!ClosedFriendSections.Contains(static_cast<uint8>(Section)))
+			{
+				for (const int32 Index : Listed[Section])
+				{
+					Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 4.0f)) [ MakeFriendRow(Index) ];
+				}
+			}
 		}
 	}
 	// In the game (a lobby or a match): who is in it, and the host's Kick.
@@ -1529,12 +1565,56 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FRIENDS")) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Sessions != nullptr ? Sessions->GetStatus() : FString(TEXT("No online service")), true, true, 330.0f) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ bHost && bInGame ? MakeButton(Sessions->FriendsMayJoinHere() ? TEXT("FRIENDS CAN JOIN: ON") : TEXT("FRIENDS CAN JOIN: OFF"), [Sessions]() { Sessions->SetFriendsMayJoin(!Sessions->FriendsMayJoinHere()); }) : SNullWidget::NullWidget ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ bInGame ? MakePartyPermission(bHost, Sessions) : SNullWidget::NullWidget ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ MakeButton(TEXT("REFRESH"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); }) ]
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ Friends ] ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 14.0f, 0.0f, 0.0f)) [ bInGame ? MakeLine(TEXT("In this game"), true, false) : SNullWidget::NullWidget ]
 		+ SVerticalBox::Slot().AutoHeight() [ Players ]
 	];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakePartyPermission(bool bHost, UCheeseStrikeSessionSubsystem* Sessions)
+{
+	// The host's choice, a property of every player in the party (it rides on the session): the host picks, the others read it.
+	using namespace CheeseStrikeFriends;
+	const int32 Chosen = Sessions->FriendsMayJoinHere() ? 1 : 0;
+	const TArray<FString> Choices = { PermissionLabel(EPermission::InviteOnly), PermissionLabel(EPermission::InvitesAndFriends) };
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Who can join the party"), true, false) ]
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			bHost
+				? MakeChoiceButtons(Choices, Chosen, true, [Sessions](int32 Picked) { Sessions->SetFriendsMayJoin(Picked == 1); })
+				: MakeReadOnly(FText::FromString(Choices[Chosen]))
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeSectionHeader(CheeseStrikeFriends::ESection Section, int32 Count)
+{
+	const uint8 Id = static_cast<uint8>(Section);
+	const bool bClosed = ClosedFriendSections.Contains(Id);
+	const FString Text = FString::Printf(TEXT("%s %s (%d)"), bClosed ? TEXT(">") : TEXT("v"), *CheeseStrikeFriends::SectionTitle(Section).ToUpper(), Count);
+	return SNew(SCheeseStrikeButton)
+		.ButtonStyle(&ButtonStyle(EButtonKind::Quiet))
+		.ContentPadding(FMargin(8.0f, 4.0f))
+		.HAlign(HAlign_Left)
+		.OnClicked_Lambda([this, Id]()
+		{
+			if (ClosedFriendSections.Contains(Id))
+			{
+				ClosedFriendSections.Remove(Id);
+			}
+			else
+			{
+				ClosedFriendSections.Add(Id);
+			}
+			// Drawn again at the next refresh.
+			ShownFriendsKey.Reset();
+			return FReply::Handled();
+		})
+		[
+			SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(15, FName("Bold"))).ColorAndOpacity(Muted)
+		];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
@@ -1548,7 +1628,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
 	{
 		Action = MakeButton(TEXT("JOIN"), [Sessions, Index]() { Sessions->JoinFriend(Index); }, EButtonKind::Primary);
 	}
-	else if (bInAGame && CheeseStrikeFriends::CanInvite(true, false) && Friend.State != CheeseStrikeFriends::EState::Full)
+	else if (bInAGame && !Friend.bInMyParty && CheeseStrikeFriends::OwnsTheGame(Friend.bRunningThisGame, Friend.bPublishesStatus) && CheeseStrikeFriends::CanInvite(true, false) && Friend.State != CheeseStrikeFriends::EState::Full)
 	{
 		Action = MakeButton(TEXT("INVITE"), [Sessions, Index]() { Sessions->InviteFriend(Index); });
 	}
@@ -1562,13 +1642,18 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
 		FriendBrushes.Add(Brush);
 		Picture = SNew(SImage).Image(Brush.Get());
 	}
+	// Hovering the row says what the panel knows of them. Whether they own the game is Steam's best guess (see OwnsTheGame).
+	const bool bOwns = CheeseStrikeFriends::OwnsTheGame(Friend.bRunningThisGame, Friend.bPublishesStatus);
+	const FString Hover = CheeseStrikeFriends::Tooltip(bOwns, Friend.Status, Friend.Permission, CheeseStrikeFriends::HasSpace(Friend.Humans), Friend.Humans);
+	const bool bInAParty = Friend.Status == CheeseStrikeFriends::EStatus::InLobby || Friend.Status == CheeseStrikeFriends::EStatus::InMatch;
 	return SNew(SHorizontalBox)
+		.ToolTipText(FText::FromString(Hover))
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Picture ]
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Friend.Name, false, false) ]
-			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(CheeseStrikeFriends::StateLine(Friend.State, Friend.Humans), true, false) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeLine(bInAParty && (Friend.State == CheeseStrikeFriends::EState::Join || Friend.State == CheeseStrikeFriends::EState::Full) ? CheeseStrikeFriends::StateLine(Friend.State, Friend.Humans) : CheeseStrikeFriends::StatusLabel(Friend.Status), true, false) ]
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Action ];
 }

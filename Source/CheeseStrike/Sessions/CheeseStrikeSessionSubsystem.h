@@ -37,6 +37,16 @@ struct FCheeseStrikeFriend
 	/** Their game's session, as Steam found it: what joining takes. */
 	FOnlineSessionSearchResult Session;
 	CheeseStrikeFriends::EState State = CheeseStrikeFriends::EState::NotPlaying;
+	/** Whether Steam says they are running this game (the best Steam gives for "owns it"). */
+	bool bRunningThisGame = false;
+	/** Whether they publish our status (cs_status): they have the game. */
+	bool bPublishesStatus = false;
+	/** What they are doing, from their published status. */
+	CheeseStrikeFriends::EStatus Status = CheeseStrikeFriends::EStatus::NotInGame;
+	/** Their party's permission, from their game's session or what they publish. */
+	CheeseStrikeFriends::EPermission Permission = CheeseStrikeFriends::EPermission::InvitesAndFriends;
+	/** Whether Steam puts them in the lobby we are in. */
+	bool bInMyParty = false;
 };
 
 /**
@@ -87,6 +97,11 @@ public:
 	bool FriendsMayJoinHere() const;
 	/** The host lets friends join by their game, or only on an invitation. */
 	void SetFriendsMayJoin(bool bFriends);
+	/**
+	 * Tells Steam (rich presence) what this player is doing, their party's permission and the humans in it, for their friends'
+	 * panels. Does nothing until one of them has changed; the controller calls it each tick.
+	 */
+	void PublishPresence(CheeseStrikeFriends::EStatus Now, int32 Humans);
 
 	/** The matches the last search found, described. */
 	const TArray<FString>& GetFound() const { return Found; }
@@ -164,6 +179,8 @@ protected:
 	TArray<FCheeseStrikeFriend> Friends;
 	int32 NextFriendLookup = 0;
 	FDelegateHandle FriendSessionHandle;
+	/** The presence last published, so that it is sent again only when it changes. */
+	FString PublishedPresence;
 	/** Pictures of friends, by Steam id (created when first asked for). */
 	UPROPERTY()
 	TObjectPtr<UCheeseStrikeAvatars> Avatars;

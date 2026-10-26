@@ -4,6 +4,7 @@
 #include "Interfaces/OnlineFriendsInterface.h"
 #include "UI/CheeseStrikeAvatars.h"
 #include "Interfaces/OnlinePresenceInterface.h"
+#include "Interfaces/OnlineIdentityInterface.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
@@ -384,8 +385,37 @@ void UCheeseStrikeSessionSubsystem::OnFriendsRead(int32 LocalUserNum, bool bWasS
 		Friend.Name = Each->GetDisplayName();
 		Friend.Id = Each->GetUserId();
 		// Joinable: their lobby or match, which Steam lets friends into by presence (and on invites).
-		Friend.bInGame = Each->GetPresence().bIsJoinable;
+		const FOnlineUserPresence& Presence = Each->GetPresence();
+		Friend.bInGame = Presence.bIsJoinable;
 		Friend.State = CheeseStrikeFriends::Classify(Friend.bInGame, 0, true, false);
+		// What they publish: where they are, their party's permission and how many are in it. Steam can't say whether a friend
+		// owns the game; running our app, or publishing our status, is the best sign there is.
+		const FVariantData* Published = Presence.Status.Properties.Find(CheeseStrikeFriends::PresenceKey);
+		FString Value;
+		if (Published != nullptr)
+		{
+			Published->GetValue(Value);
+		}
+		Friend.bRunningThisGame = Presence.bIsPlayingThisGame;
+		Friend.bPublishesStatus = Published != nullptr;
+		Friend.Status = CheeseStrikeFriends::StatusFromValue(Value, Friend.bRunningThisGame || Friend.bPublishesStatus);
+		FString Access;
+		if (const FVariantData* Shut = Presence.Status.Properties.Find(CheeseStrikeFriends::PermissionKey))
+		{
+			Shut->GetValue(Access);
+		}
+		Friend.Permission = CheeseStrikeFriends::PermissionFromValue(Access);
+		FString Count;
+		if (const FVariantData* Counted = Presence.Status.Properties.Find(CheeseStrikeFriends::HumansKey))
+		{
+			Counted->GetValue(Count);
+			Friend.Humans = Count.IsNumeric() ? FCString::Atoi(*Count) : -1;
+		}
+		// In the lobby we are in: Steam gives both our session ids as the lobby's.
+		const IOnlineSessionPtr Interface = Sessions();
+		const FNamedOnlineSession* Ours = Interface.IsValid() ? Interface->GetNamedSession(NAME_GameSession) : nullptr;
+		Friend.bInMyParty = Ours != nullptr && Ours->SessionInfo.IsValid() && Presence.SessionId.IsValid()
+			&& Presence.SessionId->ToString() == Ours->SessionInfo->GetSessionId().ToString();
 		Friends.Add(Friend);
 	}
 	NextFriendLookup = 0;
@@ -427,6 +457,8 @@ void UCheeseStrikeSessionSubsystem::OnFriendSession(int32 LocalUserNum, bool bWa
 			// Bots don't count: the players in the game against its room.
 			Friend.Humans = Looked[0].Session.SessionSettings.NumPublicConnections - Looked[0].Session.NumOpenPublicConnections;
 			Friend.State = CheeseStrikeFriends::Classify(true, Friend.Humans, CheeseStrikeSessions::FriendsMayJoin(Looked[0].Session.SessionSettings), false);
+			// Their party's permission, as its session says.
+			Friend.Permission = CheeseStrikeSessions::FriendsMayJoin(Looked[0].Session.SessionSettings) ? CheeseStrikeFriends::EPermission::InvitesAndFriends : CheeseStrikeFriends::EPermission::InviteOnly;
 		}
 		else
 		{
@@ -470,7 +502,39 @@ void UCheeseStrikeSessionSubsystem::SetFriendsMayJoin(bool bFriends)
 	}
 	FOnlineSessionSettings Settings = CheeseStrikeSessions::WithFriendsMayJoin(Named->SessionSettings, bFriends);
 	Interface->UpdateSession(NAME_GameSession, Settings, true);
+	// The presence says the permission too: send it again.
+	PublishedPresence.Reset();
 	Say(bFriends ? TEXT("Friends can join") : TEXT("Only invitations let players in"));
+}
+
+void UCheeseStrikeSessionSubsystem::PublishPresence(CheeseStrikeFriends::EStatus Now, int32 Humans)
+{
+	IOnlineSubsystem* Service = Online::GetSubsystem(GetWorld());
+	const IOnlinePresencePtr Presence = Service != nullptr ? Service->GetPresenceInterface() : nullptr;
+	const IOnlineIdentityPtr Identity = Service != nullptr ? Service->GetIdentityInterface() : nullptr;
+	const FUniqueNetIdPtr Me = Identity.IsValid() ? Identity->GetUniquePlayerId(0) : nullptr;
+	if (!Presence.IsValid() || !Me.IsValid())
+	{
+		return;
+	}
+	const CheeseStrikeFriends::EPermission Permission = FriendsMayJoinHere() ? CheeseStrikeFriends::EPermission::InvitesAndFriends : CheeseStrikeFriends::EPermission::InviteOnly;
+	const bool bParty = IsInAMatch();
+	const FString Key = FString::Printf(TEXT("%d|%d|%d|%d"), static_cast<int32>(Now), static_cast<int32>(Permission), bParty ? Humans : -1, bParty ? 1 : 0);
+	if (Key == PublishedPresence)
+	{
+		return;
+	}
+	PublishedPresence = Key;
+	FOnlineUserPresenceStatus Published;
+	Published.State = EOnlinePresenceState::Online;
+	Published.StatusStr = CheeseStrikeFriends::StatusLabel(Now);
+	Published.Properties.Add(CheeseStrikeFriends::PresenceKey, FVariantData(CheeseStrikeFriends::StatusValue(Now)));
+	if (bParty)
+	{
+		Published.Properties.Add(CheeseStrikeFriends::PermissionKey, FVariantData(CheeseStrikeFriends::PermissionValue(Permission)));
+		Published.Properties.Add(CheeseStrikeFriends::HumansKey, FVariantData(FString::FromInt(Humans)));
+	}
+	Presence->SetPresence(*Me, Published);
 }
 
 void UCheeseStrikeSessionSubsystem::InviteFriend(int32 Index)
