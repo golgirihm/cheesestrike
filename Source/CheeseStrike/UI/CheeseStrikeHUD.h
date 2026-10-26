@@ -147,6 +147,8 @@ protected:
 	/** The outline of the weapon in `Slot` (a rifle, a pistol, a knife) in the box at `At`, `Size` big, facing left. */
 	void DrawWeaponIcon(CheeseStrikeHUDDraw::FShapes& Shapes, EWeaponSlot Slot, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour) const;
 	void DrawVignette(const ACheeseStrikeCharacter* Character);
+	/** A red flash over the view for a moment after a fall: the fall has no direction to point at. */
+	void DrawFallFlash(const ACheeseStrikeCharacter* Character);
 	void DrawDamageArcs(const ACheeseStrikeCharacter* Character);
 	void DrawMinimap(const ACheeseStrikePlayerController* Controller, const ACheeseStrikeCharacter* Character, float FieldOfView);
 	/** Where a map of the level is drawn: the screen's square, the world's point (X and Y) at its middle, pixels a cm, its corners' rounding, the yaw it is turned by (up is that way), and whether it is the strike map. */

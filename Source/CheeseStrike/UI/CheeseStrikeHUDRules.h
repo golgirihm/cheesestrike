@@ -315,6 +315,11 @@ namespace CheeseStrikeHUD
 	constexpr float StreakPopTime = 0.45f;
 	/** How big the count is drawn `Seconds` after a kill (1 at rest, and before 0): it springs up past 1.4 and settles back by StreakPopTime. */
 	float StreakPop(float Seconds);
+	/** How long the red flash for a fall lasts, and its strongest. */
+	constexpr float FallFlashTime = 0.6f;
+	constexpr float FallFlashPeak = 0.35f;
+	/** The flash's strength `Seconds` after a fall (0 before it and after): a fall has no direction, so the whole view reddens. */
+	float FallFlashAlpha(float Seconds);
 	/** Seconds a whole track of kills ended by a death takes to drain out of the panel. */
 	constexpr float StreakDrainTime = 0.6f;
 	/** A streak's name as the panel says it: "UAC", "CHEESE STRIKE", "GOUDA OVERLOAD". */

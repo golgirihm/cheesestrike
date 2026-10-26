@@ -49,6 +49,8 @@
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeWeaponLooks.h"
+#include "Streaks/CheeseStrikeSynth.h"
+#include "Sound/SoundWaveProcedural.h"
 
 /** With this on, every character writes its state to the log four times a second, for watching a run from outside. */
 static TAutoConsoleVariable<int32> CVarTraceState(TEXT("CheeseStrike.TraceState"), 0, TEXT("Log each character's state four times a second."));
@@ -824,6 +826,10 @@ bool ACheeseStrikeCharacter::TakeOwnBlast(float Damage, const FString& How)
 
 void ACheeseStrikeCharacter::MulticastHardLanding_Implementation(float Damage)
 {
+	if (IsLocallyControlled())
+	{
+		FallFlashAt = GetWorld()->GetTimeSeconds();
+	}
 	static TSoftObjectPtr<USoundBase> Thud(FSoftObjectPath(TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_02.Lyra_MeleeImpact_02")));
 	USoundBase* Sound = Thud.LoadSynchronous();
 	if (Sound == nullptr || GetNetMode() == NM_DedicatedServer)
@@ -980,6 +986,13 @@ void ACheeseStrikeCharacter::ClientHurtFrom_Implementation(FVector_NetQuantize F
 
 void ACheeseStrikeCharacter::OnRep_Health()
 {
+	// A grunt for any damage taken, by a shot, a blast, a fall or anything else: heard by the one hurt, whose health it is.
+	const float Lost = HeardHealth - Health;
+	HeardHealth = Health;
+	if (Lost > 0.0f && IsAlive() && IsLocallyControlled())
+	{
+		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Grunt(0.3f, FMath::FRandRange(0.9f, 1.1f))), 0.8f);
+	}
 	if (!IsAlive())
 	{
 		ShowDeath();

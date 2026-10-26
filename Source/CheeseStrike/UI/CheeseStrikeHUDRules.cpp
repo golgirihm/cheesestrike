@@ -671,6 +671,15 @@ namespace CheeseStrikeHUD
 		return 1.0f + 0.9f * FMath::Square(1.0f - Along) * FMath::Cos(Along * UE_PI * 1.5f);
 	}
 
+	float FallFlashAlpha(float Seconds)
+	{
+		if (Seconds < 0.0f || Seconds >= FallFlashTime)
+		{
+			return 0.0f;
+		}
+		return FallFlashPeak * FMath::Square(1.0f - Seconds / FallFlashTime);
+	}
+
 	FTagLook TagLook(float Distance)
 	{
 		FTagLook Look;

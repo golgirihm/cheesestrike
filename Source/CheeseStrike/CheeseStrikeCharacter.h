@@ -274,6 +274,8 @@ public:
 	/** Server only: forgotten, as the character dies. */
 	void ClearHitBy() { HitBy.Reset(); }
 	float GetLastHurtAt() const { return LastHurtAt; }
+	/** When this character last fell hard, on the local machine (the flash), or -1000. */
+	float GetFallFlashAt() const { return FallFlashAt; }
 
 	/**
 	 * The body `State`'s player has in `Match` (CheeseStrikeBodies::For, by their rank by player id on their side, or in
@@ -400,6 +402,10 @@ protected:
 	/** Server only: the hits lately on this character, by whom, for the assists when it dies (CheeseStrikeCredit). */
 	TArray<CheeseStrikeCredit::FHit> HitBy;
 	float LastHurtAt = -1000.0f;
+	/** On this machine: when the character last fell hard, for the red flash (the local player only). */
+	float FallFlashAt = -1000.0f;
+	/** On this machine: the health it last heard, so that losing any of it gives a grunt. */
+	float HeardHealth = 100.0f;
 	/** Where it has lately been: the server's record. */
 	FHitHistory HitHistory;
 	/** The usual field of view, to come back to after aiming down the sights. */

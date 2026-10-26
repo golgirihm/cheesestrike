@@ -21,6 +21,8 @@ namespace CheeseStrikeSynth
 	TArray<int16> Whistle(float Seconds);
 	/** An air-raid siren, rising and falling, for `Seconds`. */
 	TArray<int16> Siren(float Seconds);
+	/** A grunt when hurt: a voice-like sound of `Seconds`, its pitch times `Pitch`, with a breath of noise. */
+	TArray<int16> Grunt(float Seconds, float Pitch);
 	/** A sound, owned by `Outer`, that plays `Samples` once. */
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples);
 }
