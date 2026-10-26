@@ -117,9 +117,10 @@ namespace
 			Look.Muzzle = FVector(0.0f, 43.0f, 3.0f);
 			Look.FlashSize = 1.5f;
 			Look.LeftHand = FVector(0.0f, 32.0f, 3.0f);
-			Look.Shots[0] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Punch_01.Weapons_Shotgun_Punch_01");
-			Look.Shots[1] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Punch_02.Weapons_Shotgun_Punch_02");
-			Look.Shots[2] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Punch_03.Weapons_Shotgun_Punch_03");
+			// Real shotgun blasts (OpenGameArt, CC0; tools/art/wave8_sounds.py), not Lyra's.
+			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot1.SW_ShotgunShot1");
+			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot2.SW_ShotgunShot2");
+			Look.Shots[2] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot3.SW_ShotgunShot3");
 			Look.DryFire = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_DryFire_01.Weapons_Shotgun_DryFire_01");
 			Look.ReloadSounds[0] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_ClipOut_01.Weapons_Shotgun_ClipOut_01");
 			Look.ReloadSounds[1] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_ClipIn_01.Weapons_Shotgun_ClipIn_01");

@@ -229,6 +229,8 @@ protected:
 	void MulticastKill(const FString& Killer, const FString& Victim, bool bHead, const FString& How);
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastAnnounce(const FString& Text, uint8 Streak, int32 Team, const FString& Who);
+	/** On this machine: the voice that tells of a streak called in, if it has one (the Unmanned Aerial Cheese). */
+	void SpeakStreak(const FAnnouncement& Entry);
 
 	UPROPERTY(Replicated)
 	int32 KillLimit = CheeseStrikeRules::KillLimit;

@@ -476,6 +476,12 @@ protected:
 	void UpdateBody();
 	/** Makes both meshes body `Index` in side `Team`'s colours, its own weapons hidden, the camera at its eyes. */
 	void ApplyBody(int32 Index, int32 Team);
+	/** Every frame: the sound of a step each stride of ground covered (CheeseStrikeFootsteps), on every machine for every body it shows. */
+	void UpdateFootsteps(float DeltaSeconds);
+	/** The share of a stride walked since the last step. */
+	float StepProgress = 0.6f;
+	/** Steps taken, to vary the sound. */
+	int32 StepsTaken = 0;
 	/** Seconds since the state was last traced to the log. */
 	float SinceTrace = 0.0f;
 	/** Whether -StartAt has been applied. */

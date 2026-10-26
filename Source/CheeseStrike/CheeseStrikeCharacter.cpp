@@ -15,6 +15,7 @@
 #include "InputActionValue.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Kismet/GameplayStatics.h"
+#include "Sound/SoundAttenuation.h"
 #include "Sound/SoundBase.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
@@ -39,6 +40,7 @@
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeFalls.h"
+#include "Rules/CheeseStrikeFootsteps.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStart.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -989,6 +991,41 @@ void ACheeseStrikeCharacter::ClientHurtFrom_Implementation(FVector_NetQuantize F
 	}
 }
 
+void ACheeseStrikeCharacter::UpdateFootsteps(float DeltaSeconds)
+{
+	if (GetNetMode() == NM_DedicatedServer || GetCharacterMovement() == nullptr)
+	{
+		return;
+	}
+	const UCheeseStrikeMovementComponent* Moving = GetCheeseStrikeMovement();
+	const float Speed = GetVelocity().Size2D();
+	const CheeseStrikeFootsteps::EGait Gait = CheeseStrikeFootsteps::GaitFor(IsAlive(), GetCharacterMovement()->IsMovingOnGround(), Moving != nullptr && Moving->IsSliding(), bIsCrouched, Moving != nullptr && Moving->IsSprinting(), Speed);
+	if (!CheeseStrikeFootsteps::Advance(StepProgress, Gait, Speed * DeltaSeconds))
+	{
+		return;
+	}
+	// Heard from the feet, fading with distance (the listener's own too, which are right under them); a few sounds, varied a little in pitch.
+	static USoundAttenuation* Attenuation = nullptr;
+	if (Attenuation == nullptr)
+	{
+		Attenuation = NewObject<USoundAttenuation>(GetTransientPackage(), TEXT("CheeseStrikeFootstepAttenuation"));
+		Attenuation->Attenuation.bAttenuate = true;
+		Attenuation->Attenuation.bSpatialize = true;
+		Attenuation->Attenuation.AttenuationShape = EAttenuationShape::Sphere;
+		Attenuation->Attenuation.AttenuationShapeExtents = FVector(CheeseStrikeFootsteps::FullWithin, 0.0f, 0.0f);
+		Attenuation->Attenuation.FalloffDistance = CheeseStrikeFootsteps::FalloffDistance;
+		Attenuation->Attenuation.DistanceAlgorithm = EAttenuationDistanceModel::NaturalSound;
+		Attenuation->Attenuation.dBAttenuationAtMax = -40.0f;
+		Attenuation->Attenuation.FalloffMode = ENaturalSoundFalloffMode::Silent;
+		Attenuation->Attenuation.NonSpatializedRadiusStart = 100.0f;
+		Attenuation->Attenuation.NonSpatializedRadiusEnd = 30.0f;
+		Attenuation->AddToRoot();
+	}
+	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Footstep(StepsTaken)), Feet, FRotator::ZeroRotator, CheeseStrikeFootsteps::Volume(Gait), FMath::FRandRange(0.92f, 1.08f), 0.0f, Attenuation);
+	++StepsTaken;
+}
+
 void ACheeseStrikeCharacter::HearHealth()
 {
 	// A grunt for any damage taken, by a shot, a blast, a fall or anything else: heard by the one hurt, whose health it is.
@@ -1224,6 +1261,7 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	UpdateBody();
 	UpdateGhost();
 	UpdateDown(DeltaSeconds);
+	UpdateFootsteps(DeltaSeconds);
 	// The server keeps where everyone has been, for shots fired at where they were seen.
 	if (HasAuthority() && GetWorld() != nullptr && GetWorld()->GetGameState() != nullptr)
 	{

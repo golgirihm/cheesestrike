@@ -3,7 +3,10 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
 #include "Map/CheeseStrikeHill.h"
+#include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Sound/SoundBase.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 
 ACheeseStrikeGameState::ACheeseStrikeGameState()
@@ -306,5 +309,36 @@ void ACheeseStrikeGameState::MulticastAnnounce_Implementation(const FString& Tex
 	while (Announcements.Num() > AnnouncementsKept)
 	{
 		Announcements.RemoveAt(0);
+	}
+	SpeakStreak(Entry);
+}
+
+void ACheeseStrikeGameState::SpeakStreak(const FAnnouncement& Entry)
+{
+	// The Unmanned Aerial Cheese is spoken of: "UAC is online" for the caller's own side, "Enemy UAC online" for any other.
+	if (Entry.Streak != static_cast<uint8>(CheeseStrikeStreaks::EStreak::AerialCheese) || GetNetMode() == NM_DedicatedServer || GetWorld() == nullptr)
+	{
+		return;
+	}
+	const APlayerController* Listener = GetWorld()->GetFirstPlayerController();
+	const APlayerState* Hearing = Listener != nullptr ? Listener->PlayerState.Get() : nullptr;
+	const APlayerState* Caller = nullptr;
+	for (const APlayerState* Each : PlayerArray)
+	{
+		if (Each != nullptr && Each->GetPlayerName() == Entry.Who)
+		{
+			Caller = Each;
+			break;
+		}
+	}
+	if (Hearing == nullptr || Caller == nullptr)
+	{
+		return;
+	}
+	const bool bOurs = AreTeammates(Hearing, Caller);
+	const TCHAR* Path = bOurs ? TEXT("/Game/CheeseStrike/Voice/SW_UacOnline.SW_UacOnline") : TEXT("/Game/CheeseStrike/Voice/SW_UacEnemy.SW_UacEnemy");
+	if (USoundBase* Voice = LoadObject<USoundBase>(nullptr, Path))
+	{
+		UGameplayStatics::PlaySound2D(this, Voice, 1.0f);
 	}
 }
