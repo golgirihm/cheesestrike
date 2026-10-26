@@ -93,6 +93,225 @@ namespace CheeseStrikeSynth
 		return Samples;
 	}
 
+	namespace
+	{
+		/** The next noise value, from -1 to 1, of a small fixed generator, so that a sound made twice is the same. */
+		float Noise(uint32& Seed)
+		{
+			Seed = Seed * 1664525u + 1013904223u;
+			return static_cast<float>(Seed >> 8) / 8388608.0f - 1.0f;
+		}
+
+		/** Scaled so that its loudest sample is `Peak`, then made 16-bit. */
+		TArray<int16> Normalised(const TArray<float>& Values, float Peak)
+		{
+			float Loudest = 1e-6f;
+			for (const float Value : Values)
+			{
+				Loudest = FMath::Max(Loudest, FMath::Abs(Value));
+			}
+			TArray<int16> Samples;
+			Samples.SetNumUninitialized(Values.Num());
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				Samples[Index] = static_cast<int16>(FMath::Clamp(Values[Index] * Peak / Loudest, -1.0f, 1.0f) * 32767.0f);
+			}
+			return Samples;
+		}
+
+		/** The share of the gap a one-pole low-pass closes each sample, for a cutoff in Hz. */
+		float PoleFor(float Hertz)
+		{
+			return 1.0f - FMath::Exp(-2.0f * PI * Hertz / SampleRate);
+		}
+
+		/** A string plucked at `Start` (seconds) for `Length` seconds, added to `Mix`: Karplus-Strong, a noise burst in a delay line that loses its highs as it rings. */
+		void Pluck(TArray<float>& Mix, float Start, float Length, float Hertz, float Loudness, float Ring, uint32& Seed)
+		{
+			const int32 Delay = FMath::Max(2, FMath::RoundToInt(SampleRate / Hertz));
+			TArray<float> Line;
+			Line.SetNumUninitialized(Delay);
+			float Low = 0.0f;
+			for (int32 Index = 0; Index < Delay; ++Index)
+			{
+				// The pick: noise, softened.
+				Low += (Noise(Seed) - Low) * 0.6f;
+				Line[Index] = Low;
+			}
+			const int32 First = FMath::RoundToInt(Start * SampleRate);
+			const int32 Count = FMath::RoundToInt(Length * SampleRate);
+			int32 At = 0;
+			for (int32 Index = 0; Index < Count && First + Index < Mix.Num(); ++Index)
+			{
+				const float Here = Line[At];
+				const float Next = Line[(At + 1) % Delay];
+				Line[At] = Ring * 0.5f * (Here + Next);
+				At = (At + 1) % Delay;
+				// A short fade at the note's end, so that a muted note stops cleanly.
+				const float Tail = FMath::Min(1.0f, (Count - Index) / (0.01f * SampleRate));
+				Mix[First + Index] += Here * Loudness * Tail;
+			}
+		}
+	}
+
+	TArray<int16> Footstep(int32 Variant)
+	{
+		const int32 Count = FMath::RoundToInt(0.14f * SampleRate);
+		TArray<float> Values;
+		Values.SetNumUninitialized(Count);
+		const int32 Kind = FMath::Abs(Variant) % 4;
+		uint32 Seed = 40503u + static_cast<uint32>(Kind) * 7919u;
+		const float HeelPole = PoleFor(700.0f + 180.0f * Kind);
+		float Heel = 0.0f;
+		float Previous = 0.0f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const float Time = static_cast<float>(Index) / SampleRate;
+			const float White = Noise(Seed);
+			// The heel: dull noise that dies in a few hundredths of a second, with a low thud under it.
+			Heel += (White - Heel) * HeelPole;
+			const float Attack = FMath::Min(1.0f, Time / 0.002f);
+			const float Thud = FMath::Sin(2.0f * PI * FMath::Lerp(95.0f, 55.0f, FMath::Min(1.0f, Time / 0.08f)) * Time) * FMath::Exp(-Time / 0.05f) * 0.7f;
+			const float Body = Heel * 2.2f * FMath::Exp(-Time / 0.028f);
+			// The scuff of the sole, a hiss in the first few thousandths.
+			const float Scuff = (White - Previous) * 0.25f * FMath::Exp(-Time / 0.012f);
+			Previous = White;
+			Values[Index] = (Body + Thud + Scuff) * Attack;
+		}
+		return Normalised(Values, 0.9f);
+	}
+
+	TArray<int16> JetPass(float Seconds)
+	{
+		const int32 Count = FMath::Max(1, FMath::RoundToInt(Seconds * SampleRate));
+		TArray<float> Values;
+		Values.SetNumUninitialized(Count);
+		uint32 Seed = 8675309u;
+		float A = 0.0f, B = 0.0f, RumbleA = 0.0f, RumbleB = 0.0f;
+		double Whine = 0.0, Spool = 0.0;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const float Along = static_cast<float>(Index) / Count;
+			// Loud as it comes, loudest as it passes at 45%, falling away behind: a bell, not quite even.
+			const float Near = FMath::Exp(-FMath::Square((Along - 0.45f) / (Along < 0.45f ? 0.2f : 0.28f)));
+			const float White = Noise(Seed);
+			// The roar: noise through two low-pass poles whose cutoff climbs with nearness, so that it brightens as the jet arrives.
+			const float Pole = PoleFor(350.0f + 2300.0f * Near);
+			A += (White - A) * Pole;
+			B += (A - B) * Pole;
+			const float Roar = B * (3.0f + 5.0f * Near);
+			// The low rumble of the engines, heard all the way.
+			RumbleA += (White - RumbleA) * PoleFor(140.0f);
+			RumbleB += (RumbleA - RumbleB) * PoleFor(140.0f);
+			const float Rumble = RumbleB * 6.0f;
+			// The turbine's whine, its pitch dropping as the jet passes (the Doppler shift: higher coming, lower going), and the engines' low spool.
+			const float Shift = FMath::Lerp(1.18f, 0.82f, FMath::Clamp((Along - 0.35f) / 0.2f, 0.0f, 1.0f));
+			Whine += 2.0 * PI * 1250.0 * Shift / SampleRate;
+			Spool += 2.0 * PI * 95.0 * Shift / SampleRate;
+			const float Tone = 0.07f * FMath::Sin(Whine) + 0.05f * FMath::Sin(2.0 * Whine) + 0.12f * FMath::Sin(Spool);
+			const float Fade = FMath::Min(1.0f, Along * Seconds / 0.3f) * FMath::Min(1.0f, (1.0f - Along) * Seconds / 0.5f);
+			Values[Index] = (Roar + Tone * (0.4f + Near)) * (0.15f + 0.85f * Near) * Fade + Rumble * (0.2f + 0.5f * Near) * Fade;
+		}
+		return Normalised(Values, 0.85f);
+	}
+
+	TArray<int16> Explosion(float Seconds, int32 Seed)
+	{
+		const int32 Count = FMath::Max(1, FMath::RoundToInt(Seconds * SampleRate));
+		TArray<float> Values;
+		Values.SetNumUninitialized(Count);
+		uint32 Random = 24680u + static_cast<uint32>(FMath::Abs(Seed)) * 104729u;
+		float A = 0.0f, B = 0.0f;
+		double Phase = 0.0;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const float Time = static_cast<float>(Index) / SampleRate;
+			const float White = Noise(Random);
+			// The crack: a hard burst of noise, over in a few hundredths.
+			const float Crack = White * FMath::Exp(-Time / 0.025f);
+			// The boom: a low tone falling from 70 Hz to 28, heavy and slow to die.
+			Phase += 2.0 * PI * (28.0f + 42.0f * FMath::Exp(-Time / 0.25f)) / SampleRate;
+			const float Boom = static_cast<float>(FMath::Sin(Phase)) * FMath::Min(1.0f, Time / 0.006f) * FMath::Exp(-Time / 0.7f) * 1.3f;
+			// The rumble: noise whose cutoff falls from 700 Hz to 70 as the blast rolls away.
+			const float Pole = PoleFor(FMath::Lerp(700.0f, 70.0f, FMath::Min(1.0f, Time / (Seconds * 0.7f))));
+			A += (White - A) * Pole;
+			B += (A - B) * Pole;
+			const float Roll = B * 7.0f * FMath::Min(1.0f, Time / 0.02f) * FMath::Exp(-Time / 1.1f);
+			// Debris falling after: sparse clicks, fewer as time goes.
+			float Debris = 0.0f;
+			if (Time > 0.15f && FMath::Abs(Noise(Random)) > 0.9985f - 0.001f * FMath::Exp(-(Time - 0.15f) / 0.8f))
+			{
+				Debris = Noise(Random) * 0.5f * FMath::Exp(-Time / 1.2f);
+			}
+			Values[Index] = FMath::Tanh((Crack * 0.9f + Boom + Roll) * 1.4f) + Debris;
+		}
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			// Out over the last fifth.
+			Values[Index] *= FMath::Min(1.0f, static_cast<float>(Count - Index) / (Count * 0.2f));
+		}
+		return Normalised(Values, 0.95f);
+	}
+
+	TArray<int16> GuitarRiff()
+	{
+		// An eighth note at 160 beats a minute is 0.1875 s. The riff in E: E E E G E A E D, then E ringing.
+		constexpr float Eighth = 0.1875f;
+		struct FNote
+		{
+			float Hertz;
+			float Length;
+			float Ring;
+		};
+		const FNote Riff[] = {
+			{82.41f, Eighth, 0.99f},
+			{82.41f, Eighth, 0.99f},
+			{82.41f, Eighth, 0.99f},
+			{98.00f, Eighth, 0.99f},
+			{82.41f, Eighth, 0.99f},
+			{110.00f, Eighth, 0.99f},
+			{82.41f, Eighth, 0.99f},
+			{73.42f, Eighth * 1.5f, 0.99f},
+			{82.41f, 1.3f, 0.9985f},
+		};
+		const float Total = Eighth * 7.0f + Eighth * 1.5f + 1.3f + 0.15f;
+		TArray<float> Mix;
+		Mix.SetNumZeroed(FMath::RoundToInt(Total * SampleRate));
+		uint32 Seed = 1357911u;
+		float Start = 0.0f;
+		for (const FNote& Note : Riff)
+		{
+			// A power chord: the root, a fifth over it and the octave. The short notes are palm-muted (they ring little).
+			const bool bMuted = Note.Length < 0.5f;
+			const float Length = bMuted ? Note.Length * 0.9f : Note.Length;
+			Pluck(Mix, Start, Length, Note.Hertz, 1.0f, Note.Ring, Seed);
+			Pluck(Mix, Start, Length, Note.Hertz * 1.4983f, 0.8f, Note.Ring, Seed);
+			Pluck(Mix, Start, Length, Note.Hertz * 2.0f, 0.6f, Note.Ring, Seed);
+			Start += Note.Length;
+		}
+		// Overdrive: pushed hard into a soft clip twice, with the lows thinned before and the cabinet's highs taken off after.
+		float Low = 0.0f;
+		float Cabinet = 0.0f;
+		float CabinetAgain = 0.0f;
+		const float LowPole = PoleFor(110.0f);
+		const float CabinetPole = PoleFor(3200.0f);
+		for (float& Value : Mix)
+		{
+			Low += (Value - Low) * LowPole;
+			float Driven = FMath::Tanh((Value - Low * 0.8f) * 6.0f);
+			Driven = FMath::Tanh(Driven * 3.0f);
+			Cabinet += (Driven - Cabinet) * CabinetPole;
+			CabinetAgain += (Cabinet - CabinetAgain) * CabinetPole;
+			Value = CabinetAgain;
+		}
+		// A short fade in, and out over the last tenth of a second.
+		for (int32 Index = 0; Index < Mix.Num(); ++Index)
+		{
+			Mix[Index] *= FMath::Min(1.0f, Index / (0.003f * SampleRate)) * FMath::Min(1.0f, (Mix.Num() - Index) / (0.12f * SampleRate));
+		}
+		return Normalised(Mix, 0.85f);
+	}
+
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples)
 	{
 		USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(Outer);

@@ -333,8 +333,8 @@ void ACheeseStrikeBombs::ShowWarning()
 	}
 	else
 	{
-		// The whistle coming down on the mark.
-		UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Whistle(CheeseStrikeStreaks::StrikeWarning)), FVector(WarnWhere) + FVector(0.0f, 0.0f, 1500.0f), FRotator::ZeroRotator, 1.0f, 1.0f, 0.0f, Attenuation);
+		// A jet screaming over the mark before the bombs come: its fly-by rises through the warning and passes as they fall.
+		UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::JetPass(CheeseStrikeStreaks::StrikeWarning + 1.6f)), FVector(WarnWhere) + FVector(0.0f, 0.0f, 1500.0f), FRotator::ZeroRotator, 1.0f, 1.0f, 0.0f, Attenuation);
 	}
 }
 
@@ -344,7 +344,16 @@ void ACheeseStrikeBombs::ShowBurst(const FVector& At, bool bIndoors)
 	{
 		return;
 	}
-	if (Thumps.Num() > 0)
+	if (GetKind() == CheeseStrikeStreaks::EStreak::CheeseStrike)
+	{
+		// A heavy blast: a crack, a deep boom and a rumble that rolls away, under a recorded punch pitched down.
+		UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Explosion(3.2f, FMath::RandRange(0, 1000))), At, FRotator::ZeroRotator, 1.0f, FMath::FRandRange(0.92f, 1.05f), 0.0f, Attenuation);
+		if (Thumps.Num() > 0)
+		{
+			UGameplayStatics::SpawnSoundAtLocation(this, Thumps[FMath::RandHelper(Thumps.Num())], At, FRotator::ZeroRotator, 0.8f, FMath::FRandRange(0.65f, 0.8f), 0.0f, Attenuation);
+		}
+	}
+	else if (Thumps.Num() > 0)
 	{
 		UGameplayStatics::SpawnSoundAtLocation(this, Thumps[FMath::RandHelper(Thumps.Num())], At, FRotator::ZeroRotator, 1.0f, FMath::FRandRange(0.85f, 1.0f), 0.0f, Attenuation);
 	}

@@ -21,7 +21,9 @@
 #include "GameFramework/GameState.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
+#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Streaks/CheeseStrikeSynth.h"
 #include "CheeseStrikeBotController.h"
 #include "Map/CheeseStrikeCheese.h"
 #include "Map/CheeseStrikeMouse.h"
@@ -289,6 +291,11 @@ void ACheeseStrikePlayerController::ShowPodium()
 	if (PlayerCameraManager != nullptr)
 	{
 		PlayerCameraManager->StartCameraFade(1.0f, 0.0f, 0.6f, FLinearColor::Black, false, false);
+	}
+	// A quick electric guitar riff as the results come up.
+	if (IsLocalController())
+	{
+		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::GuitarRiff()), 0.7f);
 	}
 	FString Who;
 	for (const FPodiumPlace& Placed : Podium->GetPlaces())
