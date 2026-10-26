@@ -361,3 +361,19 @@ Checked by hand, because the tests can't see them: how they look and sound, and 
 | W8-SND-03 | Post-game guitar riff | Finish a match and watch the podium come up. | A short, distorted electric guitar riff (about 2.5 s) plays as the podium appears, on every player's machine, once. |
 | W8-SND-04 | Swiss shotgun | Pick up the Swiss Shotgun and fire it, alone and with another player nearby. | A real shotgun blast (one of three) per shot; the other player hears it from where it is fired, fading with distance. |
 | W8-SND-05 | UAC voice | Call in an Unmanned Aerial Cheese (3 kills) on a team and in a free-for-all, with another player on each side. | The caller and their teammates hear a deep, serious, radio-filtered voice say "UAC is online"; the other side hears "Enemy UAC online" (in a free-for-all, everyone but the caller). Neither is cut off nor too loud. |
+
+## Changes from wave 9
+
+Setup: the packaged or `-game` build (the loading screen is not drawn in the editor), a host and, for some rows, a joiner.
+
+| ID | What | Steps | Expected |
+|----|------|-------|----------|
+| W9-UI-01 | Lobby alignment | Open the lobby as host. | The top of the first row of seats is level with the top of the map picture, in teams and in a free-for-all. |
+| W9-UI-02 | Steady loading cover | Host a match, start it, and watch the cover from the loading screen to the lobby or map. | The cheese loader and the words keep one size from the first frame to the last; they do not shrink or grow when the loading screen hands over. |
+| W9-UI-03 | One trip | From a match, Back to Lobby (host) and, as a joiner, follow it; also start the match from the lobby. | The cover goes up at once with the right words ("Back to the lobby" / "Going to ..."), the loading screen follows without a second cover and without a corner spinner in the old lobby, and the lobby or map is next. Alone, the wait before the load is nil; with joiners about a second and a half. |
+| W9-UI-04 | Cheese loader | Look at any spinner: loading cover, hosting, joining, finding, the post-game wait. | A wheel of cheese with a bite that turns and opens and closes, not the grey dots. |
+| W9-UI-05 | Dialog keeps the focus | Open Quit (main menu) or Close Lobby (lobby) and press the arrows, Tab and the pad's d-pad or stick. | The focus stays on the two buttons of the dialog; nothing behind it can be reached, even with the mouse hidden. Closing the dialog gives the focus back to where it was. |
+| W9-UI-06 | Quit as host | As host with a lobby or match open, press Quit. | The dialog adds "You are hosting: everyone in your lobby will be sent back to the menu." Not shown when not hosting. |
+| W9-UI-07 | Party permission | In the friends panel as host and as joiner. | A dropdown like the lobby's rules ("Invite only" / "Invites + friends"); the joiner sees the host's choice in a plain box. |
+| W9-UI-08 | Friends sections | Open the friends panel with no one in some sections. | Your party, Joinable, Invitable and Others always show, each with a count (0 when empty). The tooltip says "Played before". |
+| W9-UI-09 | No stale note | Leave a match, then open Find a match and the main menu. | "Left the match" shows only for a few seconds after leaving, never later. |

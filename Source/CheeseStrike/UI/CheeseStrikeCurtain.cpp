@@ -1,6 +1,9 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeCurtain.h"
+#include "CheeseStrikeLoader.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
 #include "Brushes/SlateDynamicImageBrush.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
@@ -12,9 +15,7 @@
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectGlobals.h"
 #include "Widgets/Images/SImage.h"
-#include "Widgets/Images/SThrobber.h"
 #include "Widgets/Layout/SBorder.h"
-#include "Widgets/Layout/SDPIScaler.h"
 #include "Engine/UserInterfaceSettings.h"
 #include "Engine/GameViewportClient.h"
 #include "Misc/OutputDeviceRedirector.h"
@@ -53,6 +54,21 @@ namespace
 		return GetDefault<UUserInterfaceSettings>()->GetDPIScaleBasedOnSize(FIntPoint(FMath::RoundToInt(Size.X), FMath::RoundToInt(Size.Y)));
 	}
 
+	/**
+	 * The scale the cover is drawn at, on the loading screen and in the game alike: the window's, times the game's UI scale at
+	 * `Viewport`'s size. The loading screen draws at the window's scale alone, and the game's UI scale can change as a level
+	 * loads, so the cover measures the scale it is given and makes up the difference (SCheeseStrikeSteadyScale).
+	 */
+	float CoverTarget(const UGameViewportClient* Viewport)
+	{
+		float Window = 1.0f;
+		if (Viewport != nullptr && Viewport->GetWindow().IsValid() && Viewport->GetWindow()->GetNativeWindow().IsValid())
+		{
+			Window = Viewport->GetWindow()->GetNativeWindow()->GetDPIScaleFactor();
+		}
+		return FSlateApplication::Get().GetApplicationScale() * Window * ViewportScale(Viewport);
+	}
+
 	/** How many times the loading screen has been drawn, on its own thread, since it went up: for the log. */
 	std::atomic<int32> LoadingScreenFrames{0};
 
@@ -76,7 +92,7 @@ namespace
 	 * of Slate alone, nothing of the game, so that the loading screen can draw
 	 * it on its own thread while the game's is busy loading a level.
 	 */
-	TSharedRef<SWidget> MakeCover(const TAttribute<FText>& Saying, bool bCountFrames = false)
+	TSharedRef<SWidget> MakeCover(const TAttribute<FText>& Saying, float Target, bool bCountFrames = false)
 	{
 		return SNew(SOverlay)
 			+ SOverlay::Slot() [ bCountFrames ? StaticCastSharedRef<SWidget>(SNew(SCheeseStrikeFrameCounter)) : SNullWidget::NullWidget ]
@@ -87,14 +103,17 @@ namespace
 			+ SOverlay::Slot() [ SNew(SImage).Image(Tile()) ]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				SNew(SCheeseStrikeSteadyScale).Target(Target)
 				[
-					SNew(SCircularThrobber).Radius(12.0f).NumPieces(8).Period(1.0f).PieceImage(FCoreStyle::Get().GetBrush("Throbber.CircleChunk")).ColorAndOpacity(FLinearColor::White)
-				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14.0f, 0.0f, 0.0f, 0.0f))
-				[
-					SNew(STextBlock).Text(Saying).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SCheeseStrikeLoader).Radius(16.0f)
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14.0f, 0.0f, 0.0f, 0.0f))
+					[
+						SNew(STextBlock).Text(Saying).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
+					]
 				]
 			];
 	}
@@ -153,12 +172,7 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoading(const FWorldContext& Context,
 	}
 	LoadingTo = WhereTo(Level, Context.World());
 	// The cover that follows is drawn at the scale of this viewport, not whatever the next world's has for its first frames.
-	CoverScale = ViewportScale(GetGameInstance() != nullptr ? GetGameInstance()->GetGameViewportClient() : nullptr);
-	if (LoadedAt > 0.0 && FPlatformTime::Seconds() - LoadedAt < 20.0 && Level == LoadedLevel)
-	{
-		UE_LOG(LogCheeseStrike, Warning, TEXT("A second trip to %s, %.1f s after the last arrived there (%s):"), *Level, FPlatformTime::Seconds() - LoadedAt, *LoadingTo);
-		FDebug::DumpStackTraceToLog(ELogVerbosity::Warning);
-	}
+	CoverScale = CoverTarget(GetGameInstance() != nullptr ? GetGameInstance()->GetGameViewportClient() : nullptr);
 	if (!IsMoviePlayerEnabled() || GetMoviePlayer() == nullptr)
 	{
 		return;
@@ -168,11 +182,29 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoading(const FWorldContext& Context,
 	Screen.bMoviesAreSkippable = false;
 	Screen.bWaitForManualStop = false;
 	Screen.MinimumLoadingScreenDisplayTime = -1.0f;
-	Screen.WidgetLoadingScreen = MakeCover(FText::FromString(LoadingTo), true);
+	Screen.WidgetLoadingScreen = MakeCover(FText::FromString(LoadingTo), CoverScale, true);
 	LoadingScreenFrames = 0;
 	LoadingSince = FPlatformTime::Seconds();
 	GetMoviePlayer()->SetupLoadingScreen(Screen);
 	UE_LOG(LogCheeseStrike, Display, TEXT("The loading screen is up: %s"), *LoadingTo);
+}
+
+void UCheeseStrikeCurtainSubsystem::RaiseForTravel(const FString& PendingURL)
+{
+	// A listen server's travel waits the net driver's ServerTravelPause (a few seconds by default, see DefaultEngine.ini) for its
+	// clients to follow before the level loads. Without this the old level stays on, a spinner in a corner of its lobby, and
+	// then the loading screen comes: two trips for one. The cover goes up now, the loading screen takes over from it.
+	UGameViewportClient* Viewport = GetGameInstance() != nullptr ? GetGameInstance()->GetGameViewportClient() : nullptr;
+	UWorld* World = GetGameInstance() != nullptr ? GetGameInstance()->GetWorld() : nullptr;
+	if (Viewport == nullptr || World == nullptr || !IsMoviePlayerEnabled() || GetMoviePlayer() == nullptr)
+	{
+		return;
+	}
+	Lift();
+	const FString Where = WhereTo(FURL(nullptr, *PendingURL, TRAVEL_Absolute).Map, World);
+	Curtain = MakeCover(FText::FromString(Where), CoverTarget(Viewport));
+	Viewport->AddViewportWidgetContent(Curtain.ToSharedRef(), CurtainOrder);
+	UE_LOG(LogCheeseStrike, Display, TEXT("The cover goes up for the travel: %s"), *Where);
 }
 
 void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
@@ -183,8 +215,6 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 		return;
 	}
 	Lift();
-	LoadedAt = FPlatformTime::Seconds();
-	LoadedLevel = World->GetOutermost()->GetName();
 	if (!LoadingTo.IsEmpty() && LoadingSince > 0.0)
 	{
 		UE_LOG(LogCheeseStrike, Display, TEXT("The loading screen was drawn %d times over the %.1f s the level took to load"), LoadingScreenFrames.load(), FPlatformTime::Seconds() - LoadingSince);
@@ -194,18 +224,10 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 	LoadingTo.Reset();
 	LoadingSince = 0.0;
 	TWeakObjectPtr<UWorld> Watched = World;
-	TSharedRef<SWidget> Cover = MakeCover(TAttribute<FText>::CreateLambda([Watched, Where]() { return FText::FromString(SayingFor(Watched.Get(), Where)); }));
-	// The text and spinner stay the size they had under the loading screen: as the new world's viewport takes over its DPI scale
-	// may differ for a few frames, which grew them. Drawn at the scale held from the start, whatever the viewport's now.
-	const float Held = CoverScale > 0.0f ? CoverScale : ViewportScale(Viewport);
-	TWeakObjectPtr<UGameViewportClient> WatchedViewport = Viewport;
-	Curtain = SNew(SDPIScaler).DPIScale_Lambda([Held, WatchedViewport]()
-	{
-		return Held / FMath::Max(0.1f, ViewportScale(WatchedViewport.Get()));
-	})
-	[
-		Cover
-	];
+	// The text and loader stay the size they had under the loading screen, whatever the new world's viewport scales its UI by
+	// as it takes over (the cover measures the scale it is given and makes it up: SCheeseStrikeSteadyScale).
+	const float Held = CoverScale > 0.0f ? CoverScale : CoverTarget(Viewport);
+	Curtain = MakeCover(TAttribute<FText>::CreateLambda([Watched, Where]() { return FText::FromString(SayingFor(Watched.Get(), Where)); }), Held);
 	CoverScale = 0.0f;
 	Viewport->AddViewportWidgetContent(Curtain.ToSharedRef(), CurtainOrder);
 	GoingTo = Where;

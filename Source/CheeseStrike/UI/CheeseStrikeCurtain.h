@@ -36,6 +36,8 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
+	/** A travel to `PendingURL` has been told to this machine: puts the cover up at once, for the loading screen to take over from. */
+	void RaiseForTravel(const FString& PendingURL);
 	bool IsUp() const { return Curtain.IsValid(); }
 	/** What the cover says now, or nothing when it is down. */
 	FString GetSaying() const;
@@ -60,10 +62,7 @@ private:
 	FString LoadingTo;
 	double LoadingSince = 0.0;
 	double UpSince = 0.0;
-	/** When the last level finished loading, and which: a second load of it soon after is logged with its stack, to find who asked. */
-	double LoadedAt = 0.0;
-	FString LoadedLevel;
-	/** The DPI scale the viewport had when the loading screen went up, kept for the cover that follows (see OnLevelLoaded). */
+	/** The scale the cover is drawn at (CoverTarget), taken when when the loading screen went up, kept for the cover that follows (see OnLevelLoaded). */
 	float CoverScale = 0.0f;
 	/** Where the covered level is, as the cover says it. */
 	FString GoingTo;
