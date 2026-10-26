@@ -176,6 +176,8 @@ namespace CheeseStrikeMenu
  * Each item is registered by name as it is made (Focusable), so that a page
  * drawn again (PageKey, LobbyKey) gives the focus back to the same item.
  */
+struct FSlateBrush;
+
 class SCheeseStrikeMenu : public SCompoundWidget
 {
 public:
@@ -375,8 +377,13 @@ private:
 	/** The friends panel on the right: a tab, opened by hovering it in the lobby, and open on the find page. */
 	TSharedPtr<SBox> FriendsBox;
 	TSharedPtr<SBox> FriendsContent;
-	/** What the panel was last drawn for, and whether its friends were asked for since it opened. */
+	/** What the panel was last drawn for. */
 	FString ShownFriendsKey;
-	bool bFriendsRequested = false;
+	/** When the friends were last asked for, the panel's width now and when it was last set (to ease it open and shut). */
+	double FriendsReadAt = -1000.0;
+	float FriendsWidth = 120.0f;
+	double FriendsWidthAt = 0.0;
+	/** The pictures of the friends in the rows drawn (kept while they are). */
+	TArray<TSharedPtr<FSlateBrush>> FriendBrushes;
 	int32 LobbyBuilds = 0;
 };

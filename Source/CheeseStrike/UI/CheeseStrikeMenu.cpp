@@ -37,6 +37,7 @@
 #include "Rules/CheeseStrikeHills.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeFriends.h"
+#include "Styling/SlateBrush.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "UI/CheeseStrikeControls.h"
 #include "UI/CheeseStrikeCredits.h"
@@ -656,14 +657,15 @@ void SCheeseStrikeMenu::Refresh()
 		// Open on the find page, and in the lobby while hovered.
 		const bool bOpen = bPanel && (Page == EMenuPage::Find || FriendsBox->IsHovered());
 		FriendsBox->SetVisibility(bPanel ? EVisibility::Visible : EVisibility::Collapsed);
-		FriendsBox->SetWidthOverride(bOpen ? 380.0f : 120.0f);
-		if (!bPanel)
+		// Eased open and shut, rather than snapping: a fifth of a second to the width it wants.
+		const double Now = FPlatformTime::Seconds();
+		FriendsWidth = FMath::FInterpConstantTo(FriendsWidth, bOpen ? 380.0f : 120.0f, static_cast<float>(FMath::Min(0.1, Now - FriendsWidthAt)), 1500.0f);
+		FriendsWidthAt = Now;
+		FriendsBox->SetWidthOverride(FriendsWidth);
+		// Asked for when it opens, and again every 20 s while it is open, so that a friend who joins a game shows.
+		if (bOpen && Sessions != nullptr && Now - FriendsReadAt > 20.0)
 		{
-			bFriendsRequested = false;
-		}
-		else if (bOpen && !bFriendsRequested && Sessions != nullptr)
-		{
-			bFriendsRequested = true;
+			FriendsReadAt = Now;
 			Sessions->RefreshFriends();
 		}
 		// Drawn again only when a friend, a player or the status changes (rebuilding it would restart a spinner).
@@ -674,6 +676,15 @@ void SCheeseStrikeMenu::Refresh()
 			{
 				Key += FString::Printf(TEXT("%s/%d/%d;"), *Each.Name, static_cast<int32>(Each.State), Each.Humans);
 			}
+		}
+		if (Sessions != nullptr)
+		{
+			// A picture arriving, and the host's choice, show too.
+			for (int32 Index = 0; Index < Sessions->GetFriends().Num(); ++Index)
+			{
+				Key += Sessions->AvatarOf(Index) != nullptr ? TEXT("a") : TEXT("-");
+			}
+			Key += Sessions->FriendsMayJoinHere() ? TEXT("J") : TEXT("I");
 		}
 		if (const ACheeseStrikeGameState* State = Controller.IsValid() ? Controller->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr)
 		{
@@ -1440,6 +1451,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 			MakeLine(TEXT("FRIENDS"), false)
 		];
 	}
+	FriendBrushes.Reset();
 	TSharedRef<SVerticalBox> Friends = SNew(SVerticalBox);
 	if (Sessions != nullptr)
 	{
@@ -1484,6 +1496,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FRIENDS")) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Sessions != nullptr ? Sessions->GetStatus() : FString(TEXT("No online service")), true) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ bHost && bInGame ? MakeButton(Sessions->FriendsMayJoinHere() ? TEXT("FRIENDS CAN JOIN: ON") : TEXT("FRIENDS CAN JOIN: OFF"), [Sessions]() { Sessions->SetFriendsMayJoin(!Sessions->FriendsMayJoinHere()); }) : SNullWidget::NullWidget ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ MakeButton(TEXT("REFRESH"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); }) ]
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ Friends ] ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 14.0f, 0.0f, 0.0f)) [ bInGame ? MakeLine(TEXT("In this game"), true) : SNullWidget::NullWidget ]
@@ -1506,7 +1519,18 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
 	{
 		Action = MakeButton(TEXT("INVITE"), [Sessions, Index]() { Sessions->InviteFriend(Index); });
 	}
+	// The friend's picture, when Steam has it (else a space of the same size).
+	TSharedRef<SWidget> Picture = SNew(SSpacer).Size(FVector2D(40.0f, 40.0f));
+	if (UTexture2D* Texture = Sessions != nullptr ? Sessions->AvatarOf(Index) : nullptr)
+	{
+		TSharedPtr<FSlateBrush> Brush = MakeShared<FSlateBrush>();
+		Brush->SetResourceObject(Texture);
+		Brush->ImageSize = FVector2D(40.0f, 40.0f);
+		FriendBrushes.Add(Brush);
+		Picture = SNew(SImage).Image(Brush.Get());
+	}
 	return SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Picture ]
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
 			SNew(SVerticalBox)

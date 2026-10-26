@@ -13,6 +13,7 @@
 
 class UNetDriver;
 class UWorld;
+class UCheeseStrikeAvatars;
 
 /** What the player has set going that ends in a level change: the front end shows it, and takes no more clicks until it is over. */
 enum class ESessionPending : uint8
@@ -80,6 +81,12 @@ public:
 	void InviteFriend(int32 Index);
 	/** Joins the game of the friend `Index`. */
 	void JoinFriend(int32 Index);
+	/** The picture of the friend `Index`, if Steam has one yet (asked for, else). */
+	UTexture2D* AvatarOf(int32 Index);
+	/** Whether friends may join this game (the host's choice; true with no game). */
+	bool FriendsMayJoinHere() const;
+	/** The host lets friends join by their game, or only on an invitation. */
+	void SetFriendsMayJoin(bool bFriends);
 
 	/** The matches the last search found, described. */
 	const TArray<FString>& GetFound() const { return Found; }
@@ -157,6 +164,9 @@ protected:
 	TArray<FCheeseStrikeFriend> Friends;
 	int32 NextFriendLookup = 0;
 	FDelegateHandle FriendSessionHandle;
+	/** Pictures of friends, by Steam id (created when first asked for). */
+	UPROPERTY()
+	TObjectPtr<UCheeseStrikeAvatars> Avatars;
 
 	FDelegateHandle CreatedHandle;
 	FDelegateHandle FoundHandle;

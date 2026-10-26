@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeSessionSubsystem.h"
 #include "Interfaces/OnlineFriendsInterface.h"
+#include "UI/CheeseStrikeAvatars.h"
 #include "Interfaces/OnlinePresenceInterface.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -425,7 +426,7 @@ void UCheeseStrikeSessionSubsystem::OnFriendSession(int32 LocalUserNum, bool bWa
 			Friend.Session = Looked[0];
 			// Bots don't count: the players in the game against its room.
 			Friend.Humans = Looked[0].Session.SessionSettings.NumPublicConnections - Looked[0].Session.NumOpenPublicConnections;
-			Friend.State = CheeseStrikeFriends::Classify(true, Friend.Humans, true, false);
+			Friend.State = CheeseStrikeFriends::Classify(true, Friend.Humans, CheeseStrikeSessions::FriendsMayJoin(Looked[0].Session.SessionSettings), false);
 		}
 		else
 		{
@@ -436,6 +437,40 @@ void UCheeseStrikeSessionSubsystem::OnFriendSession(int32 LocalUserNum, bool bWa
 	}
 	++NextFriendLookup;
 	LookUpNextFriend();
+}
+
+UTexture2D* UCheeseStrikeSessionSubsystem::AvatarOf(int32 Index)
+{
+	if (!Friends.IsValidIndex(Index) || !Friends[Index].Id.IsValid())
+	{
+		return nullptr;
+	}
+	if (Avatars == nullptr)
+	{
+		Avatars = NewObject<UCheeseStrikeAvatars>(this);
+	}
+	return Avatars->ForUniqueId(Friends[Index].Id->GetType().ToString(), Friends[Index].Id->ToString(), GetWorld());
+}
+
+bool UCheeseStrikeSessionSubsystem::FriendsMayJoinHere() const
+{
+	const IOnlineSessionPtr Interface = Sessions();
+	const FNamedOnlineSession* Named = Interface.IsValid() ? Interface->GetNamedSession(NAME_GameSession) : nullptr;
+	return Named == nullptr || CheeseStrikeSessions::FriendsMayJoin(Named->SessionSettings);
+}
+
+void UCheeseStrikeSessionSubsystem::SetFriendsMayJoin(bool bFriends)
+{
+	IOnlineSessionPtr Interface = Sessions();
+	FNamedOnlineSession* Named = Interface.IsValid() ? Interface->GetNamedSession(NAME_GameSession) : nullptr;
+	if (Named == nullptr || !Named->bHosting)
+	{
+		Say(TEXT("Only the host decides who can join"));
+		return;
+	}
+	FOnlineSessionSettings Settings = CheeseStrikeSessions::WithFriendsMayJoin(Named->SessionSettings, bFriends);
+	Interface->UpdateSession(NAME_GameSession, Settings, true);
+	Say(bFriends ? TEXT("Friends can join") : TEXT("Only invitations let players in"));
 }
 
 void UCheeseStrikeSessionSubsystem::InviteFriend(int32 Index)

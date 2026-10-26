@@ -52,6 +52,7 @@ namespace CheeseStrikeSessions
 	const TCHAR* const Level = TEXT("/Game/Variant_Shooter/Lvl_Shooter");
 	const FName GameKey(TEXT("CHEESESTRIKE"));
 	const FName KillLimitKey(TEXT("KILLLIMIT"));
+	const FName AccessKey(TEXT("ACCESS"));
 	const FName RespawnDelayKey(TEXT("RESPAWNDELAY"));
 	const TCHAR* const GameValue = TEXT("GoudaOverload");
 
@@ -86,11 +87,27 @@ namespace CheeseStrikeSessions
 		Settings.bUsesStats = false;
 		Settings.bAntiCheatProtected = false;
 		Settings.Set(GameKey, FString(GameValue), EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+		Settings.Set(AccessKey, FString(TEXT("Friends")), EOnlineDataAdvertisementType::ViaOnlineService);
 		// The map the match is to be played on, by name: the one picked in the lobby, or the level it is hosted on.
 		const int32 Map = CheeseStrikeRules::MapFrom(Normalised, CheeseStrikeRules::MapIndexFor(Level));
 		Settings.Set(SETTING_MAPNAME, Map >= 0 ? FString(CheeseStrikeRules::Maps[Map].Name) : FString(Level), EOnlineDataAdvertisementType::ViaOnlineService);
 		Settings.Set(KillLimitKey, CheeseStrikeRules::KillLimitFrom(Normalised), EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 		Settings.Set(RespawnDelayKey, CheeseStrikeRules::RespawnDelayFrom(Normalised), EOnlineDataAdvertisementType::ViaOnlineService);
+		return Settings;
+	}
+
+	bool FriendsMayJoin(const FOnlineSessionSettings& Settings)
+	{
+		FString Access;
+		return !Settings.Get(AccessKey, Access) || Access != TEXT("Invite");
+	}
+
+	FOnlineSessionSettings WithFriendsMayJoin(FOnlineSessionSettings Settings, bool bFriends)
+	{
+		Settings.Set(AccessKey, FString(bFriends ? TEXT("Friends") : TEXT("Invite")), EOnlineDataAdvertisementType::ViaOnlineService);
+		// Joined by friends through their game (presence), or only on an invitation.
+		Settings.bAllowJoinViaPresence = bFriends;
+		Settings.bAllowJoinViaPresenceFriendsOnly = bFriends;
 		return Settings;
 	}
 
