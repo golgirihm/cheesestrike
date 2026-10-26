@@ -165,7 +165,7 @@ bool FMiceEatAtAPace::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeMice;
 	TestEqual(TEXT("all the cheese planned to be left as they come"), PlannedLeft(0.0f), 1.0f);
 	TestEqual(TEXT("none some way before five minutes, for the walks to the last blocks"), PlannedLeft(PlannedWithin), 0.0f);
-	TestTrue(TEXT("which is before a minute and a half"), PlannedWithin < EatenWithin && EatenWithin == 82.0f);
+	TestTrue(TEXT("which is before three minutes"), PlannedWithin < EatenWithin && EatenWithin == 164.0f);
 	TestEqual(TEXT("on the plan, a bite is a bite"), BiteFor(0.5f, PlannedWithin / 2.0f), Bite);
 	TestTrue(TEXT("behind it, bigger"), BiteFor(0.8f, PlannedWithin / 2.0f) > Bite);
 	TestTrue(TEXT("ahead of it, smaller"), BiteFor(0.2f, PlannedWithin / 2.0f) < Bite);
@@ -225,8 +225,8 @@ bool FMiceEatAtAPace::RunTest(const FString& Parameters)
 			}
 		}
 		AddInfo(FString::Printf(TEXT("%s, %d mice: all eaten after %.0f s, %.0f%% left after %.0f s"), Map.Name, Mice, GoneAt, 100.0f * LeftAfterAThird, EatenWithin / 3.0f));
-		TestTrue(FString::Printf(TEXT("%s is eaten within a minute and a half (%.0f s)"), Map.Name, GoneAt), GoneAt > 0.0f && GoneAt <= 90.0f);
-		TestTrue(FString::Printf(TEXT("%s is not eaten much before a minute (%.0f s)"), Map.Name, GoneAt), GoneAt >= 45.0f);
+		TestTrue(FString::Printf(TEXT("%s is eaten within three minutes (%.0f s)"), Map.Name, GoneAt), GoneAt > 0.0f && GoneAt <= 180.0f);
+		TestTrue(FString::Printf(TEXT("%s is not eaten much before two minutes (%.0f s)"), Map.Name, GoneAt), GoneAt >= 90.0f);
 		TestTrue(FString::Printf(TEXT("%s is eaten steadily: most of it left after a third of that (%.0f%%)"), Map.Name, 100.0f * LeftAfterAThird), LeftAfterAThird > 0.5f && LeftAfterAThird < 0.9f);
 	}
 	return true;

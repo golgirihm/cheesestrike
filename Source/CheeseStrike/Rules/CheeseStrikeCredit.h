@@ -30,7 +30,7 @@ namespace CheeseStrikeCredit
 	TArray<int32> Assisters(TConstArrayView<FHit> Hits, int32 Killer, int32 Victim, float Now);
 
 	/** How long each player holds the hill's time before it passes to the next of those holding it together. */
-	constexpr float CreditRotation = 3.0f;
+	constexpr float CreditRotation = 1.0f;
 
 	/**
 	 * Whose turn it is for the hill's time, with `Credited` seconds of time

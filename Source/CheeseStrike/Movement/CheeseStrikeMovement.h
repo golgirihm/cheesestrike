@@ -15,8 +15,8 @@
  */
 namespace CheeseStrikeMovement
 {
-	/** Walking, in cm/s. */
-	constexpr float WalkSpeed = 450.0f;
+	/** Walking, in cm/s (a fifth slower than it was at 450; the sprint follows). */
+	constexpr float WalkSpeed = 360.0f;
 	/** Sprinting, with the key held, is this much faster. */
 	constexpr float SprintFactor = 1.5f;
 	/** Aiming down the sights slows a player to this share of walking. */

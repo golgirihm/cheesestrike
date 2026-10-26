@@ -174,6 +174,8 @@ protected:
 	FRotator Wanted = FRotator::ZeroRotator;
 	/** Its aim error's drift, so that the error wanders rather than jumps. */
 	float Wobble = 0.0f;
+	/** The way it faces while walking with nothing to look at: its heading, smoothed (the raw velocity swings with every step it takes up a stair). */
+	float WalkingYaw = 0.0f;
 	CheeseStrikeBots::FBursts Bursts;
 	bool bTriggerHeld = false;
 	float StepSide = 1.0f;

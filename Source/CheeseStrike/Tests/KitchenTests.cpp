@@ -63,7 +63,7 @@ namespace KitchenTests
 	void KitchenWalk(FAutomationTestBase* Test, const FString& What, const FVector& At, float Yaw, const FString& Script, TFunction<bool(const FVector&)> Arrived)
 	{
 		PlayTesting::PutAt(0, At, Yaw);
-		PlayTesting::Play(0, Script.IsNumeric() ? FString::Printf(TEXT("hold Move 0 1\nwait %s\nrelease Move\nwait 0.4"), *Script) : Script);
+		PlayTesting::Play(0, Script.IsNumeric() ? FString::Printf(TEXT("hold Move 0 1\nwait %.2f\nrelease Move\nwait 0.4"), FCString::Atof(*Script) * PlayTesting::WalkTimeScale) : Script);
 		PlayTesting::Then([Test, What, Arrived]()
 		{
 			const ACheeseStrikeCharacter* Character = PlayTesting::Character(0);
@@ -200,7 +200,7 @@ bool FCrumbKitchenHoldsTogether::RunTest(const FString& Parameters)
 	KitchenWalk(this, TEXT("up the Mozza cookbooks onto the worktop"), FVector(2190, 1000, 100), 90.0f, TEXT("3.0"), [](const FVector& At) { return At.Z > 500.0f && At.Y > 1900.0f; });
 	KitchenWalk(this, TEXT("up the wedge's slope onto the worktop"), FVector(0, 100, 100), 90.0f, TEXT("4.3"), [](const FVector& At) { return At.Z > 500.0f && At.Y > 1900.0f; });
 	KitchenWalk(this, TEXT("along the hollow and through its door under the sink"), FVector(-1000, 1580, 100), 0.0f,
-		TEXT("hold Move 0 1\nwait 1.45\nrelease Move\nlook 90 0\nhold Move 0 1\nwait 1.8\nrelease Move\nwait 0.4"), [](const FVector& At) { return At.Y > 1960.0f && FMath::Abs(At.X) < 700.0f && At.Z < 300.0f; });
+		TEXT("hold Move 0 1\nwait 1.8\nrelease Move\nlook 90 0\nhold Move 0 1\nwait 2.25\nrelease Move\nwait 0.4"), [](const FVector& At) { return At.Y > 1960.0f && FMath::Abs(At.X) < 700.0f && At.Z < 300.0f; });
 	KitchenWalk(this, TEXT("through the Gouda cupboard's door"), FVector(-1350, 1300, 100), 90.0f, TEXT("2.2"), [](const FVector& At) { return At.Y > 1960.0f && At.Z < 300.0f; });
 	KitchenWalk(this, TEXT("up the books onto the table"), FVector(-2100, -1100, 100), 0.0f, TEXT("2.5"), [](const FVector& At) { return At.Z > 420.0f && At.X > -1300.0f; });
 	KitchenWalk(this, TEXT("down into the sink and out of it"), FVector(-620, 2330, 550), 0.0f, TEXT("3.0"), [](const FVector& At) { return At.Z > 500.0f && At.X > 560.0f; });

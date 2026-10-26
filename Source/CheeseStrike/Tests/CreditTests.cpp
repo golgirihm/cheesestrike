@@ -36,7 +36,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheHillsTimeGoesRoundTheHoldersInTurn, "Cheese
 bool FTheHillsTimeGoesRoundTheHoldersInTurn::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeCredit;
-	TestEqual(TEXT("the first three seconds to the first holder"), CreditIndex(0.0f, 2), 0);
+	TestEqual(TEXT("the first second to the first holder"), CreditIndex(0.0f, 2), 0);
 	TestEqual(TEXT("then the next"), CreditIndex(CreditRotation, 2), 1);
 	TestEqual(TEXT("and back round"), CreditIndex(2.0f * CreditRotation, 2), 0);
 	TestEqual(TEXT("one holder: always them"), CreditIndex(100.0f, 1), 0);

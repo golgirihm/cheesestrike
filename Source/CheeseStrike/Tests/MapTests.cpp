@@ -50,7 +50,7 @@ namespace MapTests
 	void Walk(FAutomationTestBase* Test, const FString& What, const FVector& At, float Yaw, const FString& Script, TFunction<bool(const FVector&)> Arrived)
 	{
 		PlayTesting::PutAt(0, At, Yaw);
-		PlayTesting::Play(0, Script.IsNumeric() ? FString::Printf(TEXT("hold Move 0 1\nwait %s\nrelease Move\nwait 0.4"), *Script) : Script);
+		PlayTesting::Play(0, Script.IsNumeric() ? FString::Printf(TEXT("hold Move 0 1\nwait %.2f\nrelease Move\nwait 0.4"), FCString::Atof(*Script) * PlayTesting::WalkTimeScale) : Script);
 		PlayTesting::Then([Test, What, Arrived]()
 		{
 			const ACheeseStrikeCharacter* Character = PlayTesting::Character(0);
@@ -129,7 +129,7 @@ bool FTheCreameryHoldsTogether::RunTest(const FString& Parameters)
 	Walk(this, TEXT("up the dock's ramp onto the platform"), FVector(-5200, -1600, 100), 180.0f, TEXT("3.0"), [](const FVector& At) { return At.Z > 200.0f && At.X < -5900.0f; });
 	Walk(this, TEXT("up to the hall's mezzanine"), FVector(-2150, 0, 100), -90.0f, TEXT("3.5"), [](const FVector& At) { return At.Z > 450.0f; });
 	Walk(this, TEXT("up the Curing House's stairs to its upper floor"), FVector(-3500, -1870, 100), 180.0f, TEXT("3.0"), [](const FVector& At) { return At.Z > 400.0f; });
-	Walk(this, TEXT("along the Rind Tunnel and through its door into the hall"), FVector(-3300, -2075, 100), 0.0f, TEXT("hold Move 0 1\nwait 4.2\nrelease Move\nlook 90 0\nhold Move 0 1\nwait 2\nrelease Move\nwait 0.4"), [](const FVector& At) { return At.Y > -1650.0f && At.Z < 200.0f; });
+	Walk(this, TEXT("along the Rind Tunnel and through its door into the hall"), FVector(-3300, -2075, 100), 0.0f, TEXT("hold Move 0 1\nwait 5.25\nrelease Move\nlook 90 0\nhold Move 0 1\nwait 2.5\nrelease Move\nwait 0.4"), [](const FVector& At) { return At.Y > -1650.0f && At.Z < 200.0f; });
 	Walk(this, TEXT("over a catwalk from the mezzanine to the gallery"), FVector(-900, -1500, 500), 90.0f, TEXT("7.0"), [](const FVector& At) { return At.Y > 1350.0f && At.Z > 450.0f; });
 	Walk(this, TEXT("out of the canal up its ramp"), FVector(-3000, -3200, -200), 180.0f, TEXT("6.5"), [](const FVector& At) { return At.Z > 50.0f && At.X < -5300.0f; });
 	Walk(this, TEXT("out of the canal up its steps"), FVector(-1100, -2950, -200), 180.0f, TEXT("3.5"), [](const FVector& At) { return At.Z > 50.0f; });

@@ -1,9 +1,8 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 // Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
-#include "Rules/CheeseStrikeCredit.h"
-
 #include "CheeseStrikeGameMode.h"
+#include "Rules/CheeseStrikeCredit.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/NetConnection.h"

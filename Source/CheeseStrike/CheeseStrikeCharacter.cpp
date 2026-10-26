@@ -295,6 +295,7 @@ void ACheeseStrikeCharacter::SetHealth(float InHealth)
 	if (HasAuthority())
 	{
 		Health = FMath::Clamp(InHealth, 0.0f, CheeseStrikeWeapons::MaxHealth);
+		HearHealth();
 	}
 }
 
@@ -679,6 +680,7 @@ bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From
 		return bHurt;
 	}
 	Health = FMath::Max(0.0f, Health - Damage);
+	HearHealth();
 	RecordHitBy(From != nullptr ? From->GetPlayerState<ACheeseStrikePlayerState>() : nullptr);
 	LastHurtBy = From;
 	LastHurtAt = ServerNow();
@@ -707,6 +709,7 @@ bool ACheeseStrikeCharacter::TakeBlast(float Damage, ACheeseStrikePlayerState* B
 		return bHurt;
 	}
 	Health = FMath::Max(0.0f, Health - Damage);
+	HearHealth();
 	LastHurtBy = From;
 	LastHurtAt = ServerNow();
 	if (!IsAlive())
@@ -797,6 +800,7 @@ bool ACheeseStrikeCharacter::TakeFall(float Damage)
 		return bHurt;
 	}
 	Health = FMath::Max(0.0f, Health - Damage);
+	HearHealth();
 	if (!IsAlive())
 	{
 		Die(Pusher, false, nullptr, Pusher != nullptr ? FString() : CheeseStrikeFalls::HardLandingWords());
@@ -817,6 +821,7 @@ bool ACheeseStrikeCharacter::TakeOwnBlast(float Damage, const FString& How)
 		return bHurt;
 	}
 	Health = FMath::Max(0.0f, Health - Damage);
+	HearHealth();
 	if (!IsAlive())
 	{
 		Die(Pusher, false, nullptr, Pusher != nullptr ? FString() : How);
@@ -984,7 +989,7 @@ void ACheeseStrikeCharacter::ClientHurtFrom_Implementation(FVector_NetQuantize F
 	}
 }
 
-void ACheeseStrikeCharacter::OnRep_Health()
+void ACheeseStrikeCharacter::HearHealth()
 {
 	// A grunt for any damage taken, by a shot, a blast, a fall or anything else: heard by the one hurt, whose health it is.
 	const float Lost = HeardHealth - Health;
@@ -993,6 +998,13 @@ void ACheeseStrikeCharacter::OnRep_Health()
 	{
 		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Grunt(0.3f, FMath::FRandRange(0.9f, 1.1f))), 0.8f);
 	}
+}
+
+void ACheeseStrikeCharacter::OnRep_Health()
+{
+	// A client hears its health change here; the server, which the replication never tells (a listen server's host, or a bot's
+	// machine), hears it where the damage is dealt.
+	HearHealth();
 	if (!IsAlive())
 	{
 		ShowDeath();

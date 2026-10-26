@@ -44,10 +44,10 @@ bool FAGrenadeBurstsAndFallsOff::RunTest(const FString& Parameters)
 	TestEqual(TEXT("a running throw goes faster"), static_cast<float>(Running.X - Level.X), 400.0f * CarriedSpeedShare, 0.5f);
 	const FVector Up = LaunchVelocity(FVector::UpVector, FVector::ZeroVector);
 	TestTrue(TEXT("thrown straight up, it goes up"), Up.Z > ThrowSpeed * 0.99f);
-	// How far a throw on flat ground carries before its first bounce: a good way across a room, short of a long sightline.
+	// How far a throw on flat ground carries before its first bounce: half what it was: across a room, well short of a long sightline.
 	const float G = 980.0f * GravityScale;
 	const float FlatRange = ThrowSpeed * ThrowSpeed * FMath::Sin(FMath::DegreesToRadians(2.0f * (30.0f + ThrowLift))) / G;
-	TestTrue(FString::Printf(TEXT("thrown up at 30 degrees it carries %.0f cm"), FlatRange), FlatRange > 1500.0f && FlatRange < 3000.0f);
+	TestTrue(FString::Printf(TEXT("thrown up at 30 degrees it carries %.0f cm"), FlatRange), FlatRange > 750.0f && FlatRange < 1500.0f);
 	return true;
 }
 
@@ -92,7 +92,7 @@ bool FABotThrowsAGrenadeSensibly::RunTest(const FString& Parameters)
 	TestEqual(TEXT("and the arc found comes down there"), Height, 0.0f, 1.0f);
 	TestTrue(FString::Printf(TEXT("the lower arc (%.1f degrees)"), Pitch), Pitch > 0.0f && Pitch < 45.0f);
 	float Higher = 0.0f;
-	TestTrue(TEXT("a spot up on a ledge is in reach"), PitchToReach(1000.0f, 300.0f, ThrowSpeed, 980.0f, Higher));
+	TestTrue(TEXT("a spot up on a ledge is in reach"), PitchToReach(1000.0f, 100.0f, ThrowSpeed, 980.0f, Higher));
 	TestTrue(TEXT("by a higher throw"), Higher > Pitch);
 	TestFalse(TEXT("a spot 50 m off isn't"), PitchToReach(5000.0f, 0.0f, ThrowSpeed, 980.0f, Pitch));
 

@@ -106,15 +106,10 @@ namespace CheeseStrikePickups
 		return 2;
 	}
 
-	FLinearColor WorthColour(int32 Worth)
+	FLinearColor WorthColour(int32 /*Worth*/)
 	{
-		switch (Worth)
-		{
-		case 1: return FLinearColor(0.36f, 0.86f, 0.38f);
-		case 2: return FLinearColor(0.3f, 0.62f, 1.0f);
-		case 3: return FLinearColor(0.98f, 0.76f, 0.22f);
-		default: return FLinearColor(0.85f, 0.85f, 0.85f);
-		}
+		// Every weapon is the one colour, the cheese's gold: what a gun is worth is not shown by a tint.
+		return FLinearColor(0.98f, 0.76f, 0.22f);
 	}
 
 	float SecondsLeft(float Now, float BackAt)

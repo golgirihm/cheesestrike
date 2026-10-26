@@ -34,8 +34,8 @@ namespace CheeseStrikeGrenades
 
 	/** Seconds from leaving the hand to the burst. */
 	constexpr float Fuse = 2.5f;
-	/** How fast it leaves the hand, and how far above the aim (degrees), as a throw goes a little up from where one looks. */
-	constexpr float ThrowSpeed = 1500.0f;
+	/** How fast it leaves the hand (about half the range it had at 1500), and how far above the aim (degrees), as a throw goes a little up from where one looks. */
+	constexpr float ThrowSpeed = 1060.0f;
 	constexpr float ThrowLift = 7.0f;
 	/** The share of the thrower's own speed it carries. */
 	constexpr float CarriedSpeedShare = 0.5f;

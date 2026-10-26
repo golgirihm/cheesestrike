@@ -51,7 +51,7 @@ namespace CheeseStrikeAnimation
 	/** Speed (cm/s) from which the character is moving rather than standing, and at which the walk and jog cycles are at full weight. */
 	constexpr float MovingFrom = 30.0f;
 	constexpr float WalkFull = 250.0f;
-	constexpr float JogFull = 450.0f;
+	constexpr float JogFull = 360.0f;
 	/** How fast the crouch, air and aim blends go, per second. */
 	constexpr float BlendRate = 10.0f;
 

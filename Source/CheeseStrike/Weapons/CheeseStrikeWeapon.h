@@ -60,6 +60,8 @@ public:
 	/** Which weapon of the arsenal it is: before it is spawned (SpawnActorDeferred), on the server. */
 	void SetWeapon(FName Id);
 	FName GetWeaponId() const { return WeaponId; }
+	/** Puts the weapon away from its own player's view (while a grenade is held or thrown), or brings it back; others still see it. */
+	void SetFirstPersonAway(bool bAway);
 	const FWeaponStats& GetStats() const { return *Stats; }
 	/** The numbers it fires by now: its own, or worse in the hand of someone down (CheeseStrikeModes::DownedWeapon). */
 	const FWeaponStats& FiringStats() const;
@@ -173,6 +175,8 @@ public:
 protected:
 	/** Fires one shot (or strikes once) on the owner's machine, if the weapon can. */
 	void FireOnce();
+	/** One shot; on the automatic beat it skips the gap since the last, which the beat itself keeps. */
+	void TryFire(bool bOnTheBeat);
 	/** Fires shot number `InBurst` of a burst (0 the first, or the only one): the kick, the show and the word to the server. */
 	void FireShot(int32 InBurst);
 	/** The rest of a burst, after its first shot. */
@@ -274,13 +278,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPointLightComponent> FlashLight;
 
-	/** The iron sights of a gun without a scope or the rail's dot: a front post on the muzzle and a rear notch, on the first-person model. */
-	UPROPERTY()
-	TObjectPtr<UStaticMeshComponent> IronSightFront;
-	UPROPERTY()
-	TObjectPtr<UStaticMeshComponent> IronSightRear;
-	/** Makes the sights (or hides them, for a gun that has its own) for the weapon in hand. */
-	void PlaceIronSights();
 	/** The look it has. */
 	const FWeaponLook* Look = nullptr;
 	/** When the flash goes out (world time). */
@@ -325,7 +322,8 @@ protected:
 	/** The owner's side of firing. */
 	bool bTriggerHeld = false;
 	bool bAimed = false;
-	FTimerHandle FireTimer;
+	/** The server time the next shot of automatic fire is due. */
+	float AutoNextAt = 0.0f;
 	FTimerHandle BurstTimer;
 	/** A pull of the trigger while the weapon was coming up, to fire once it is. */
 	FTimerHandle PendingShotTimer;

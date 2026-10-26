@@ -558,6 +558,8 @@ namespace
 void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 {
 	Controller = InArgs._Controller;
+	// The pages' panel stands against the left edge of the screen, so its two right corners are the ones rounded.
+	static const FSlateRoundedBoxBrush PagesPanelBrush(FLinearColor::White, FVector4(0.0, 18.0, 18.0, 0.0));
 	ChildSlot
 	[
 		SNew(SOverlay)
@@ -612,7 +614,7 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Fill)
 		[
 			SAssignNew(Panel, SBorder)
-			.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+			.BorderImage(&PagesPanelBrush)
 			.BorderBackgroundColor(PanelColour)
 			.Padding(FMargin(48.0f, 64.0f))
 			[

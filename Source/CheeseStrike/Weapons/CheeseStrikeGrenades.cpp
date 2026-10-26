@@ -479,10 +479,31 @@ void UCheeseStrikeGrenades::Release(FVector Aim)
 	Thrown.Add(Grenade);
 }
 
+void UCheeseStrikeGrenades::UpdateGunAway()
+{
+	const ACheeseStrikeCharacter* Character = Holder();
+	// The gun is put away from its player's view for as long as a grenade is held or being thrown, and comes back after.
+	ACheeseStrikeWeapon* Wanted = Character != nullptr && Character->IsLocallyControlled() && Character->IsAlive() && IsBusy() ? Character->GetWeapon() : nullptr;
+	ACheeseStrikeWeapon* Was = AwayGun.Get();
+	if (Was != Wanted)
+	{
+		if (Was != nullptr)
+		{
+			Was->SetFirstPersonAway(false);
+		}
+		if (Wanted != nullptr)
+		{
+			Wanted->SetFirstPersonAway(true);
+		}
+		AwayGun = Wanted;
+	}
+}
+
 void UCheeseStrikeGrenades::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	UpdateHold();
+	UpdateGunAway();
 	// The round in hand goes as it is let go (or the throw is cut short by death).
 	const bool bShow = GetWorld()->GetTimeSeconds() < InHandUntil && Holder() != nullptr && Holder()->IsAlive();
 	for (UStaticMeshComponent* Mesh : {InHandFirst.Get(), InHandThird.Get()})
@@ -496,6 +517,10 @@ void UCheeseStrikeGrenades::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 void UCheeseStrikeGrenades::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (ACheeseStrikeWeapon* Gun = AwayGun.Get())
+	{
+		Gun->SetFirstPersonAway(false);
+	}
 	ShowPreview(false);
 	ShowHeldInView(false);
 	Super::EndPlay(EndPlayReason);
