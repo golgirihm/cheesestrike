@@ -44,4 +44,76 @@ namespace CheeseStrikeFriends
 
 	/** The line the panel shows under a friend's name for `State`, with `Humans` in the game. */
 	FString StateLine(EState State, int32 Humans);
+
+	/** What a friend is doing, as the friend publishes it (Steam rich presence, key PresenceKey). */
+	enum class EStatus : uint8
+	{
+		/** Not running the game. */
+		NotInGame,
+		/** On the front end. */
+		MainMenu,
+		/** In a lobby. */
+		InLobby,
+		/** In a match. */
+		InMatch,
+	};
+
+	/** Who may join a party: set by its host, and the same for every player in it. */
+	enum class EPermission : uint8
+	{
+		InviteOnly,
+		InvitesAndFriends,
+	};
+
+	/** The rich presence keys a player publishes: where they are, their party's permission, and the humans in it. */
+	extern const TCHAR* const PresenceKey;
+	extern const TCHAR* const PermissionKey;
+	extern const TCHAR* const HumansKey;
+
+	/** The value published for `Status` ("Menu", "Lobby" or "Match"; empty for NotInGame). */
+	FString StatusValue(EStatus Status);
+	/**
+	 * What a friend's published value means. A friend running this game with no value yet is on the menu; one not running it
+	 * is not in the game whatever stale value is left.
+	 */
+	EStatus StatusFromValue(const FString& Value, bool bRunningThisGame);
+	/** The words for a status: "Not in game", "Main menu", "In a lobby", "In a match". */
+	FString StatusLabel(EStatus Status);
+
+	/** The value published for a permission ("Invite" or "Friends"); anything but "Invite" is Invites + friends (the default). */
+	FString PermissionValue(EPermission Permission);
+	EPermission PermissionFromValue(const FString& Value);
+	/** "Invite only" or "Invites + friends". */
+	FString PermissionLabel(EPermission Permission);
+
+	/**
+	 * Whether a friend owns the game. Steam can't report that for a friend, so this is a guess: running our app or publishing our
+	 * presence says yes; anyone else is unknown, and treated as not owning it.
+	 */
+	bool OwnsTheGame(bool bRunningThisGame, bool bPublishesStatus);
+
+	/** Whether a party with `Humans` players (-1 when not known) has room for one more. */
+	bool HasSpace(int32 Humans);
+
+	/** The collapsible sections of the friends panel, in the order shown. */
+	enum class ESection : uint8
+	{
+		/** In the lobby or match we are in. */
+		YourParty,
+		/** In a lobby or match that lets friends in and has room: a click joins. */
+		Joinable,
+		/** Owns the game, and can be invited. */
+		Invitable,
+		/** Everyone else. */
+		Others,
+	};
+	constexpr int32 NumSections = 4;
+
+	/** The section a friend is listed in; the first that fits, in the order of ESection. */
+	ESection SectionFor(bool bInMyParty, EStatus Status, EPermission Permission, bool bHasSpace, bool bOwns);
+	/** The header of a section. */
+	FString SectionTitle(ESection Section);
+
+	/** What the hover tooltip of a friend's row says. `Humans` is -1 when not known. */
+	FString Tooltip(bool bOwns, EStatus Status, EPermission Permission, bool bHasSpace, int32 Humans);
 }

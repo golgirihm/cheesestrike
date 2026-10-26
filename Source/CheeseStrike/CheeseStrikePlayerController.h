@@ -241,6 +241,8 @@ protected:
 	void SoundCountdown();
 	/** The match is over and on its way back to the lobby: the results are held up until the lobby is there. */
 	void HoldTheResults();
+	/** Tells the friends what this player is doing (the menu, a lobby or a match) and how many humans are with them. */
+	void PublishPresence(bool bMatchStarted);
 	/** The menu's music, as the page wants it (CheeseStrikeMusic::IsWanted). */
 	void PlayMusic();
 	void ShowMenuCamera();

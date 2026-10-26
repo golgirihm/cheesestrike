@@ -130,6 +130,7 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	const bool bTravelling = (Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap) || bLeaving;
 	const UCheeseStrikePostGameSubsystem* PostGame = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>() : nullptr;
 	const bool bResultsHeld = PostGame != nullptr && PostGame->IsHeld();
+	PublishPresence(bStarted);
 	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch() || bLeaving, bPaused, ChosenPage, bTravelling, bResultsHeld);
 	if (Wanted != ShownPage)
 	{
@@ -440,6 +441,25 @@ void ACheeseStrikePlayerController::SoundCountdown()
 	{
 		CheeseStrikeTones::Play(GetWorld(), GoTone == CheeseStrikeMenu::ECountdownTone::End ? CheeseStrikeTones::ETone::End : CheeseStrikeTones::ETone::Second);
 	}
+}
+
+void ACheeseStrikePlayerController::PublishPresence(bool bMatchStarted)
+{
+	UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr;
+	if (Sessions == nullptr)
+	{
+		return;
+	}
+	int32 Humans = 0;
+	if (const AGameStateBase* State = GetWorld()->GetGameState())
+	{
+		for (const APlayerState* Each : State->PlayerArray)
+		{
+			Humans += Each != nullptr && !Each->IsABot() ? 1 : 0;
+		}
+	}
+	using CheeseStrikeFriends::EStatus;
+	Sessions->PublishPresence(!IsInAMatch() ? EStatus::MainMenu : (bMatchStarted ? EStatus::InMatch : EStatus::InLobby), Humans);
 }
 
 bool ACheeseStrikePlayerController::IsInAMatch() const
