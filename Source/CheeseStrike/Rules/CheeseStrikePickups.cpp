@@ -108,8 +108,9 @@ namespace CheeseStrikePickups
 
 	FLinearColor WorthColour(int32 /*Worth*/)
 	{
-		// Every weapon is the one colour, the cheese's gold: what a gun is worth is not shown by a tint.
-		return FLinearColor(0.98f, 0.76f, 0.22f);
+		// Every weapon is the one colour, a green apart from the cheese's yellow (26 Oct 2026): what a gun is worth is not
+		// shown by a tint. The pad, its glow and beam, the prompt and the minimap all read it from here.
+		return FLinearColor(0.25f, 0.9f, 0.3f);
 	}
 
 	float SecondsLeft(float Now, float BackAt)

@@ -350,6 +350,13 @@ protected:
 	float StickEdgeSeconds = 0.0f;
 	/** Whether a gamepad's sprint is on until the stick is let go (SprintToggled). */
 	bool bSprintLatched = false;
+	/**
+	 * Whether this player could act as of the last frame, and the sprint key's held state (Enhanced Input's, which keeps
+	 * it whichever pawn is bound) taken up as they can: a key held through the countdown or a respawn sprints at once,
+	 * where its Started had come and gone with nobody to act on it.
+	 */
+	bool bCouldAct = false;
+	void ResumeSprintKey();
 	CheeseStrikeAimAssist::FAssist AimAssist;
 
 	/** Pawn mesh: first person view (seen only by self). */

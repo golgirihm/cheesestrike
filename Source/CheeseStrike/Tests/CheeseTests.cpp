@@ -30,13 +30,13 @@ namespace CheeseTests
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
 	/**
 	 * The mice in AfterTheMice: when they come, by when they have eaten
-	 * everything (twice as long as the minute and a half of 23 Oct 2026, which
-	 * the user found twice too fast), when it is seen that they eat steadily, and the most and the least of the
+	 * everything (four times as long as the minute and a half of 23 Oct 2026, which
+	 * the user found twice too fast, and then twice too fast again), when it is seen that they eat steadily, and the most and the least of the
 	 * blocks left then.
 	 */
 	constexpr int32 MiceAt = 8;
-	constexpr float EatenBy = 180.0f;
-	constexpr float SteadyAt = 50.0f;
+	constexpr float EatenBy = 360.0f;
+	constexpr float SteadyAt = 100.0f;
 	constexpr float MostLeftThen = 0.95f;
 	constexpr float LeastLeftThen = 0.4f;
 	/**
@@ -44,9 +44,9 @@ namespace CheeseTests
 	 * the nearest other, as a share of what it would be were they scattered
 	 * at random over the cheese (half the square root of its area from above
 	 * over the mice), at least (0.8 till the mice ate at half the pace, 26 Oct 2026: eating twice as long, the few left near the end
-	 * stand closer, and Crumb Kitchen reads 0.68).
+	 * stand closer, and Crumb Kitchen reads 0.68; 0.55 to 0.57 at half that pace again, 26 Oct 2026).
 	 */
-	constexpr float SpreadAtLeast = 0.6f;
+	constexpr float SpreadAtLeast = 0.5f;
 	const TCHAR* const Level = TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery");
 	/** A house of cheese in it, and a door. */
 	const FName House(TEXT("CuringHouseGouda"));

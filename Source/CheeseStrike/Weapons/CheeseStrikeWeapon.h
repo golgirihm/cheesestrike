@@ -176,9 +176,10 @@ protected:
 	/** Fires one shot (or strikes once) on the owner's machine, if the weapon can. */
 	void FireOnce();
 	/** One shot; on the automatic beat it skips the gap since the last, which the beat itself keeps. */
-	void TryFire(bool bOnTheBeat);
+	void TryFire(bool bOnTheBeat, float ShowDelay = 0.0f);
 	/** Fires shot number `InBurst` of a burst (0 the first, or the only one): the kick, the show and the word to the server. */
-	void FireShot(int32 InBurst);
+	/** Fires a shot; `ShowDelay` seconds before its flash and sound show, to keep a beat steady when several fall due in one frame. */
+	void FireShot(int32 InBurst, float ShowDelay = 0.0f);
 	/** The rest of a burst, after its first shot. */
 	void FireBurstShot();
 	/** Swings the knife, on the owner's machine. */
@@ -322,7 +323,7 @@ protected:
 	/** The owner's side of firing. */
 	bool bTriggerHeld = false;
 	bool bAimed = false;
-	/** The server time the next shot of automatic fire is due. */
+	/** The time (this machine's world clock, not the server's estimate, which steps when it is corrected) the next shot of automatic fire is due. */
 	float AutoNextAt = 0.0f;
 	FTimerHandle BurstTimer;
 	/** A pull of the trigger while the weapon was coming up, to fire once it is. */

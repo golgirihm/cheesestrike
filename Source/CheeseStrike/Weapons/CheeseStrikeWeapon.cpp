@@ -46,6 +46,8 @@ namespace
 	constexpr float OriginTolerance = 250.0f;
 	/** Shots that may arrive together after a delay on the network, over the rate. */
 	constexpr float RateBurst = 3.0f;
+	/** The seconds the server counts shots over. */
+	constexpr float RateWindow = 2.0f;
 	/** The bone on the mannequin's right hand the weapon sits in, and how the rifle turns in it to point the way the hand does. */
 	const FName HandSocket(TEXT("weapon_r"));
 	const FRotator GripRotation(0.0f, -90.0f, 0.0f);
@@ -311,10 +313,13 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 	}
 	if (bTriggerHeld && Stats->bAutomatic)
 	{
-		const int32 Due = CheeseStrikeWeapons::ShotsDue(ServerTime(GetWorld()), AutoNextAt, FiringStats().FireInterval);
+		// By the local clock: a client's estimate of the server's steps whenever it is corrected, and the beat
+		// stuttered with it. Shots falling due together in a long frame are shown as far apart as they are due.
+		const float Interval = FiringStats().FireInterval;
+		const int32 Due = CheeseStrikeWeapons::ShotsDue(GetWorld()->GetTimeSeconds(), AutoNextAt, Interval);
 		for (int32 Shot = 0; Shot < Due; ++Shot)
 		{
-			TryFire(true);
+			TryFire(true, Shot * Interval);
 		}
 	}
 	UCheeseStrikeMovementComponent* Movement = Holder->GetCheeseStrikeMovement();
@@ -882,7 +887,7 @@ void ACheeseStrikeWeapon::StartFiring()
 	if (Stats->bAutomatic)
 	{
 		// The beat goes on from Tick, one shot every interval exactly (a timer is only as fine as the frame).
-		AutoNextAt = ServerTime(GetWorld()) + FiringStats().FireInterval;
+		AutoNextAt = GetWorld()->GetTimeSeconds() + FiringStats().FireInterval;
 	}
 	else if (IsDrawing() && bInHand)
 	{
@@ -913,7 +918,7 @@ void ACheeseStrikeWeapon::FireOnce()
 	TryFire(false);
 }
 
-void ACheeseStrikeWeapon::TryFire(bool bOnTheBeat)
+void ACheeseStrikeWeapon::TryFire(bool bOnTheBeat, float ShowDelay)
 {
 	if (Holder == nullptr || !Holder->IsLocallyControlled() || !Holder->CanAct() || Holder->InExecution() || !bInHand)
 	{
@@ -936,7 +941,7 @@ void ACheeseStrikeWeapon::TryFire(bool bOnTheBeat)
 		StartReload();
 		return;
 	}
-	FireShot(0);
+	FireShot(0, ShowDelay);
 	// A burst goes on by itself, a shot every BurstInterval.
 	BurstLeft = FMath::Min(Stats->Burst - 1, Magazine);
 	if (BurstLeft > 0)
@@ -961,7 +966,7 @@ void ACheeseStrikeWeapon::FireBurstShot()
 	}
 }
 
-void ACheeseStrikeWeapon::FireShot(int32 InBurst)
+void ACheeseStrikeWeapon::FireShot(int32 InBurst, float ShowDelay)
 {
 	const float Now = ServerTime(GetWorld());
 	const int32 Index = NextShotIndex();
@@ -983,7 +988,15 @@ void ACheeseStrikeWeapon::FireShot(int32 InBurst)
 	LastShotIndex = Index;
 	LastInBurst = InBurst;
 	++ShotsFired;
-	ShowShot();
+	if (ShowDelay > KINDA_SMALL_NUMBER)
+	{
+		FTimerHandle Later;
+		GetWorldTimerManager().SetTimer(Later, FTimerDelegate::CreateWeakLambda(this, [this]() { ShowShot(); }), ShowDelay, false);
+	}
+	else
+	{
+		ShowShot();
+	}
 	ServerFire(Origin, Aim, Seed, Index, bAimed, Now);
 }
 
@@ -1006,8 +1019,10 @@ bool ACheeseStrikeWeapon::ServerAllowsShot(float Now)
 	{
 		return false;
 	}
-	ServerShotTimes.RemoveAll([Now](float Time) { return Time < Now - 1.0f; });
-	const float Allowed = CheeseStrikeWeapons::ShotsPerSecond(FiringStats()) + RateBurst;
+	// Over RateWindow seconds, not one: shots a steady hand sent evenly reach the server unevenly, a few late and then
+	// together, and a second's count was dropping some of them (wave 8 and 9, the Munster and the Blaster).
+	ServerShotTimes.RemoveAll([Now](float Time) { return Time < Now - RateWindow; });
+	const float Allowed = CheeseStrikeWeapons::ShotsPerSecond(FiringStats()) * RateWindow * 1.1f + RateBurst;
 	if (ServerShotTimes.Num() >= Allowed || (Stats->UsesRounds() && Magazine <= 0) || IsReloading())
 	{
 		return false;

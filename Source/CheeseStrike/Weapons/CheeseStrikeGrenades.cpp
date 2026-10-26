@@ -32,7 +32,7 @@ namespace
 	const FName ThrowHandBone(TEXT("hand_l"));
 	const FVector ThrowInHandAt(9.0f, 3.0f, -1.0f);
 	const FRotator ThrowInHandTurn(0.0f, 0.0f, 90.0f);
-	/** A throw held: the grenade up in the free hand, low on the left of its player's view (cm from the eye: ahead, right, up), its spoon toward them. */
+	/** A throw held, with no arms to hold it in: the grenade low on the left of its player's view (cm from the eye: ahead, right, up), its spoon toward them. */
 	const FVector HeldInViewAt(40.0f, -17.0f, -14.0f);
 	const FRotator HeldInViewTurn(-15.0f, 200.0f, 10.0f);
 	/** The grenade (tools/art/weapon_models.py) and its materials (tools/art/weapon_materials.py), as ACheeseStrikeGrenade has them. */
@@ -258,9 +258,22 @@ void UCheeseStrikeGrenades::ShowHeldInView(bool bShow)
 		HeldInView->SetCastShadow(false);
 		HeldInView->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
 		HeldInView->bOnlyOwnerSee = true;
-		HeldInView->SetupAttachment(Character->GetFirstPersonCameraComponent());
+		// In the free hand of the arms, where the throw takes it from (ShowInHand), not hung in the view, where it floated
+		// off to the left of the arms (waves 8 and 9). Without that hand, in the view as before.
+		USkeletalMeshComponent* Arms = Character->GetFirstPersonMesh();
+		const bool bInHand = Arms != nullptr && Arms->GetSkeletalMeshAsset() != nullptr && Arms->GetBoneIndex(ThrowHandBone) != INDEX_NONE;
 		HeldInView->RegisterComponent();
-		HeldInView->SetRelativeLocationAndRotation(HeldInViewAt, HeldInViewTurn);
+		if (bInHand)
+		{
+			HeldInView->AttachToComponent(Arms, FAttachmentTransformRules::SnapToTargetNotIncludingScale, ThrowHandBone);
+			HeldInView->SetRelativeLocationAndRotation(ThrowInHandAt, ThrowInHandTurn);
+			HeldInView->SetWorldScale3D(FVector(1.0f));
+		}
+		else
+		{
+			HeldInView->AttachToComponent(Character->GetFirstPersonCameraComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+			HeldInView->SetRelativeLocationAndRotation(HeldInViewAt, HeldInViewTurn);
+		}
 	}
 	if (HeldInView != nullptr)
 	{

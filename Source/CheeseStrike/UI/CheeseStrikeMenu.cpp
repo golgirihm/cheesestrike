@@ -2410,10 +2410,16 @@ TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const 
 {
 	// The action, then its keys, then each pad's buttons, the column of what the player uses now lit.
 	const bool bPadLit = CheeseStrikeInput::IsUsingGamepad(Controller.Get());
-	// Each column wraps at the width its share of the table gives it (880 across: the page less the clear of the scroll bar).
-	const auto Cell = [](const FString& Text, const FSlateFontInfo& Look, const FLinearColor& Colour, float Weight, bool bLast = false)
+	// Each column is a fixed width (880 across: the page less the clear of the scroll bar), its text wrapped inside it. Fill
+	// widths with the wrapping set from outside re-flowed the text a frame after the table was laid out, which was the
+	// flicker side to side that remained after the up and down one (waves 8 and 9).
+	const auto Cell = [](const FString& Text, const FSlateFontInfo& Look, const FLinearColor& Colour, float Across, float Clear)
 	{
-		return SNew(STextBlock).Text(FText::FromString(Text)).Font(Look).ColorAndOpacity(Colour).WrapTextAt(880.0f * Weight - (bLast ? 4.0f : 16.0f));
+		return SNew(SBox).WidthOverride(Across)
+			.Padding(FMargin(0.0f, 0.0f, Clear, 0.0f))
+			[
+				SNew(STextBlock).Text(FText::FromString(Text)).Font(Look).ColorAndOpacity(Colour).AutoWrapText(true)
+			];
 	};
 	const FSlateFontInfo Look = bHeading ? Font(14, FName("Bold")) : Font(17);
 	const FSlateFontInfo KeyLook = bHeading ? Font(14, FName("Bold")) : Font(17, FName("Bold"));
@@ -2421,10 +2427,10 @@ TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const 
 	const FLinearColor KeysColour = bHeading ? Muted : (bPadLit ? Muted : Cheese);
 	const FLinearColor PadColour = bHeading ? Muted : (bPadLit ? Cheese : Muted);
 	return SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().FillWidth(0.36f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Action, Look, Name, 0.36f) ]
-		+ SHorizontalBox::Slot().FillWidth(0.26f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Keys, KeyLook, KeysColour, 0.26f) ]
-		+ SHorizontalBox::Slot().FillWidth(0.19f).VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 12.0f, 0.0f)) [ Cell(Xbox, KeyLook, PadColour, 0.19f) ]
-		+ SHorizontalBox::Slot().FillWidth(0.19f).VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour, 0.19f, true) ];
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Action, Look, Name, 317.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Keys, KeyLook, KeysColour, 229.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Xbox, KeyLook, PadColour, 167.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour, 167.0f, 4.0f) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeControls()
