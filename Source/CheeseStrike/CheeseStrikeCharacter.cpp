@@ -551,7 +551,8 @@ float ACheeseStrikeCharacter::ServerNow() const
 bool ACheeseStrikeCharacter::CanAct() const
 {
 	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
-	return IsAlive() && (State == nullptr || !State->HasMatchEnded()) && !IsFrozen();
+	const ACheeseStrikeGameState* Match = Cast<ACheeseStrikeGameState>(State);
+	return CheeseStrikeStart::MayAct(IsAlive(), IsFrozen(), Match != nullptr && Match->IsRoundBreak(), State != nullptr && State->HasMatchEnded());
 }
 
 bool ACheeseStrikeCharacter::IsFrozen() const

@@ -126,6 +126,11 @@ namespace CheeseStrikeBeat
 		LastSlot = -1;
 	}
 
+	FQuartzQuantizationBoundary NextTick()
+	{
+		return FQuartzQuantizationBoundary(EQuartzCommandQuantization::Tick, 1.0f, EQuarztQuantizationReference::CurrentTimeRelative);
+	}
+
 	double PaceShow(double Arrival, double LastShown, double Interval, double Lead, double Behind)
 	{
 		if (Arrival - LastShown > 2.0 * Interval)

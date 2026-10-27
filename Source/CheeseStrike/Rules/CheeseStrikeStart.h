@@ -34,6 +34,21 @@ namespace CheeseStrikeStart
 
 	/** Whether everyone is held: the count ends at `GoAt` (0 for no count) and it is `Now`. */
 	bool IsFrozen(float Now, float GoAt);
+	/**
+	 * Whether a character may move, fire, change weapons, throw or call in a streak: alive, and play is on: not while a
+	 * count runs (`bCountingIn`), nor once its round is over (`bRoundOver`, the break before the next) or the match is
+	 * (`bMatchOver`). A character that may not is held where it stands at once (UCheeseStrikeMovementComponent), and a
+	 * bot stops.
+	 */
+	bool MayAct(bool bAlive, bool bCountingIn, bool bRoundOver, bool bMatchOver);
+	/**
+	 * Seconds after a character is held that the server takes its player's machine's word for where it is: the machine
+	 * learns of the end a moment after the server, and its steps in between would otherwise be snapped back.
+	 */
+	constexpr float HoldGrace = 1.0f;
+	/** Whether the server takes that word `SinceHeld` seconds after the character was held (negative: it isn't). */
+	bool TakesClientWord(float SinceHeld);
+
 	/** Seconds left on a round's clock that ends at `EndsAt`: it stands still while the count before the round runs. */
 	float RoundLeft(float Now, float GoAt, float EndsAt);
 

@@ -6,6 +6,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "Rules/CheeseStrikeDowned.h"
 #include "Rules/CheeseStrikeFalls.h"
+#include "Rules/CheeseStrikeStart.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 
@@ -44,11 +45,45 @@ bool UCheeseStrikeMovementComponent::IsDownedHere() const
 	return Body != nullptr && Body->IsAlive() && Body->IsDowned();
 }
 
+bool UCheeseStrikeMovementComponent::IsHeldHere() const
+{
+	const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(CharacterOwner);
+	return Body != nullptr && Body->IsAlive() && !Body->CanAct();
+}
+
+void UCheeseStrikeMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	// A player's machine learns that play has stopped a moment after the server: the steps it took in between it keeps,
+	// rather than being snapped back, the server taking its word for where it is for that moment. A bot, or the server's
+	// own player, is the server's already.
+	if (CharacterOwner != nullptr && CharacterOwner->HasAuthority() && !CharacterOwner->IsLocallyControlled() && GetWorld() != nullptr)
+	{
+		const float Now = GetWorld()->GetTimeSeconds();
+		const bool bHeld = IsHeldHere();
+		if (bHeld && HeldSince < 0.0f)
+		{
+			HeldSince = Now;
+		}
+		else if (!bHeld)
+		{
+			HeldSince = -1.0f;
+		}
+		const bool bTake = CheeseStrikeStart::TakesClientWord(HeldSince >= 0.0f ? Now - HeldSince : -1.0f);
+		if (bTake != bTakingClientWord)
+		{
+			bTakingClientWord = bTake;
+			bIgnoreClientMovementErrorChecksAndCorrection = bTake;
+			bServerAcceptClientAuthoritativePosition = bTake;
+		}
+	}
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+}
+
 FVector UCheeseStrikeMovementComponent::ConstrainInputAcceleration(const FVector& InputAcceleration) const
 {
 	const FVector Constrained = Super::ConstrainInputAcceleration(InputAcceleration);
-	// In an execution, either side of it, nobody moves.
-	if (const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(CharacterOwner); Body != nullptr && Body->InExecution())
+	// In an execution, either side of it, nobody moves; nor does anyone held by the count or once the round or the match is over.
+	if (const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(CharacterOwner); Body != nullptr && (Body->InExecution() || IsHeldHere()))
 	{
 		return FVector::ZeroVector;
 	}
@@ -92,6 +127,11 @@ float UCheeseStrikeMovementComponent::GetMaxAcceleration() const
 
 float UCheeseStrikeMovementComponent::GetMaxBrakingDeceleration() const
 {
+	// Held, it stops where it stands, on the ground (in the air it comes down as it would).
+	if (IsHeldHere() && IsMovingOnGround())
+	{
+		return CheeseStrikeMovement::HoldBraking;
+	}
 	// The slide sets its own speed: nothing else slows it.
 	return IsSliding() ? 0.0f : Super::GetMaxBrakingDeceleration();
 }
@@ -141,7 +181,7 @@ void UCheeseStrikeMovementComponent::UpdateCharacterStateBeforeMovement(float De
 	if (IsSliding())
 	{
 		SlideElapsed += DeltaSeconds;
-		const bool bOver = SlideElapsed >= CheeseStrikeMovement::SlideTime || !bWantsToCrouch || !IsMovingOnGround();
+		const bool bOver = SlideElapsed >= CheeseStrikeMovement::SlideTime || !bWantsToCrouch || !IsMovingOnGround() || IsHeldHere();
 		if (bOver)
 		{
 			EndSlide();
@@ -157,7 +197,7 @@ void UCheeseStrikeMovementComponent::UpdateCharacterStateBeforeMovement(float De
 	{
 		SinceSlide += DeltaSeconds;
 		const float GroundSpeed = Velocity.Size2D();
-		if (bWantsToCrouch && bWantsToSprint && IsMovingOnGround() && !IsCrouching()
+		if (bWantsToCrouch && bWantsToSprint && IsMovingOnGround() && !IsCrouching() && !IsHeldHere()
 			&& SinceSlide >= CheeseStrikeMovement::SlideRest && CheeseStrikeMovement::CanSlide(GroundSpeed))
 		{
 			StartSlide();

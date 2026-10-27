@@ -21,6 +21,8 @@
 # -FixedFps 30 steps the game by a thirtieth of a second a frame however slowly
 # it renders, so that a busy PC still sees what a person would at that time (a
 # ragdoll falling, not in slow motion).
+# -Sound plays it with sound (on the PC's speakers), for what only the audio engine
+# does: Quartz's shot sounds (tools/play/gunfire_sound.txt).
 param(
   [Parameter(Mandatory=$true)][string]$Script,
   [string]$Tag = "play",
@@ -39,6 +41,7 @@ param(
   [switch]$Bots,
   [switch]$Mice,
   [switch]$Countdown,
+  [switch]$Sound,
   [int]$TimeoutSeconds = 180,
   [string]$Res = "960x540",
   [int]$FixedFps = 0
@@ -67,8 +70,9 @@ $port = 7800 + ($hash % 1000)
 $buildId = 100000 + ($hash % 900000)
 function Launch($map, $script, $tag, $startAt, $x, $more = @()) {
   $scriptPath = (Resolve-Path $script).Path
-  $arguments = @("`"$project`"", $map, "-game", "-resx=$($Res.Split('x')[0])", "-resy=$($Res.Split('x')[1])", "-WinX=$x", "-WinY=40", "-log=$tag.log", "-nosound", "-unattended",
+  $arguments = @("`"$project`"", $map, "-game", "-resx=$($Res.Split('x')[0])", "-resy=$($Res.Split('x')[1])", "-WinX=$x", "-WinY=40", "-log=$tag.log", "-unattended",
     "-TraceState", "-StartAt=$startAt", "-PlayScript=`"$scriptPath`"", "-BuildIdOverride=$buildId") + $more
+  if (-not $Sound) { $arguments += "-nosound" }
   if (-not $Window) { $arguments += "-RenderOffscreen" } else { $arguments += "-windowed" }
   if (-not $Steam) { $arguments += "-NOSTEAM" }
   if ($FixedFps -gt 0) { $arguments += @("-UseFixedTimeStep", "-FPS=$FixedFps") }

@@ -1,0 +1,18 @@
+# Holds fire with the Munster Machine Gun for 3 s, then the Cheddar Blaster,
+# with the gunfire traced, for counting the shot sounds Quartz started against
+# the shots fired. Run with tools/play.ps1 -Sound.
+wait 2
+cmd CheeseStrike.TraceGunfire 1
+cmd CheeseStrikeArm munster
+wait 1.5
+hold Fire
+wait 3
+release Fire
+wait 1
+cmd CheeseStrikeArm blaster
+wait 1.5
+hold Fire
+wait 2
+release Fire
+wait 1
+quit

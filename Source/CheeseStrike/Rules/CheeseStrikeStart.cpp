@@ -26,6 +26,16 @@ namespace CheeseStrikeStart
 		return GoAt > 0.0f && Now < GoAt;
 	}
 
+	bool MayAct(bool bAlive, bool bCountingIn, bool bRoundOver, bool bMatchOver)
+	{
+		return bAlive && !bCountingIn && !bRoundOver && !bMatchOver;
+	}
+
+	bool TakesClientWord(float SinceHeld)
+	{
+		return SinceHeld >= 0.0f && SinceHeld < HoldGrace;
+	}
+
 	float RoundLeft(float Now, float GoAt, float EndsAt)
 	{
 		return EndsAt > 0.0f ? FMath::Max(0.0f, EndsAt - FMath::Max(Now, GoAt)) : 0.0f;
