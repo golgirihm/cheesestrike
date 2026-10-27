@@ -244,6 +244,7 @@ void UCheeseStrikeSessionSubsystem::Host(const FString& Options, bool bLan)
 
 void UCheeseStrikeSessionSubsystem::OnDestroyedToHost(FName SessionName, bool bWasSuccessful)
 {
+	FriendsChoice.Reset();
 	CreateNow();
 }
 
@@ -489,20 +490,27 @@ bool UCheeseStrikeSessionSubsystem::FriendsMayJoinHere() const
 {
 	const IOnlineSessionPtr Interface = Sessions();
 	const FNamedOnlineSession* Named = Interface.IsValid() ? Interface->GetNamedSession(NAME_GameSession) : nullptr;
-	return Named == nullptr || CheeseStrikeSessions::FriendsMayJoin(Named->SessionSettings);
+	// The host's own pick shows as picked: the dropdown read the session's settings alone, which an update leaves as they were
+	// until it has finished (and a game with no session of its own, a listen server hosted by travel, has none to change).
+	const bool bHosting = Named == nullptr || Named->bHosting;
+	return CheeseStrikeFriends::FriendsMayJoinShown(bHosting, FriendsChoice, Named == nullptr || CheeseStrikeSessions::FriendsMayJoin(Named->SessionSettings));
 }
 
 void UCheeseStrikeSessionSubsystem::SetFriendsMayJoin(bool bFriends)
 {
 	IOnlineSessionPtr Interface = Sessions();
 	FNamedOnlineSession* Named = Interface.IsValid() ? Interface->GetNamedSession(NAME_GameSession) : nullptr;
-	if (Named == nullptr || !Named->bHosting)
+	if (Named != nullptr && !Named->bHosting)
 	{
 		Say(TEXT("Only the host decides who can join"));
 		return;
 	}
-	FOnlineSessionSettings Settings = CheeseStrikeSessions::WithFriendsMayJoin(Named->SessionSettings, bFriends);
-	Interface->UpdateSession(NAME_GameSession, Settings, true);
+	FriendsChoice = bFriends;
+	if (Named != nullptr)
+	{
+		FOnlineSessionSettings Settings = CheeseStrikeSessions::WithFriendsMayJoin(Named->SessionSettings, bFriends);
+		Interface->UpdateSession(NAME_GameSession, Settings, true);
+	}
 	// The presence says the permission too: send it again.
 	PublishedPresence.Reset();
 	Say(bFriends ? TEXT("Friends can join") : TEXT("Only invitations let players in"));
@@ -565,6 +573,7 @@ void UCheeseStrikeSessionSubsystem::JoinFriend(int32 Index)
 
 void UCheeseStrikeSessionSubsystem::OnDestroyedToJoin(FName SessionName, bool bWasSuccessful)
 {
+	FriendsChoice.Reset();
 	JoinNow(Joining);
 }
 
@@ -645,6 +654,7 @@ void UCheeseStrikeSessionSubsystem::UpdateRules(const FString& Options)
 
 void UCheeseStrikeSessionSubsystem::OnDestroyedToLeave(FName SessionName, bool bWasSuccessful)
 {
+	FriendsChoice.Reset();
 	bBusy = false;
 	Say(TEXT("Left the match"));
 	// Back to the level, alone. Not if the player is there already, alone (the match was left some other way meanwhile, by the

@@ -47,6 +47,16 @@ public:
 	void Construct(const FArguments& InArgs);
 	virtual void OnArrangeChildren(const FGeometry& AllottedGeometry, FArrangedChildren& ArrangedChildren) const override;
 	virtual float GetRelativeLayoutScale(const int32 ChildIndex, float LayoutScaleMultiplier) const override;
+	virtual FVector2D ComputeDesiredSize(float LayoutScaleMultiplier) const override;
+
+	// The sizes, as plain rules (CheeseStrike.HUD.TheCoverFitsAtAnyResolution): `Accumulated` is the scale the widgets above give,
+	// `Target` the scale wanted, `Content` the content's own size.
+	/** The scale the content is laid out at relative to what is given: Target over Accumulated. */
+	static float RelativeScale(float Target, float Accumulated);
+	/** The size this widget asks for: the content's, grown by the relative scale, since it is drawn that much larger. */
+	static FVector2D DesiredFor(const FVector2D& Content, float Target, float Accumulated);
+	/** The size the content is given to lay out in, in its own units, out of the `Allotted` size: the allotted size over the relative scale. */
+	static FVector2D ContentArea(const FVector2D& Allotted, float Target, float Accumulated);
 
 private:
 	float Target = 1.0f;

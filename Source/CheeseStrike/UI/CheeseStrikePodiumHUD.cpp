@@ -94,6 +94,7 @@ namespace CheeseStrikePodiumHUD
 			UTexture2D* Glyph = nullptr;
 			FVector2D GlyphAt;
 			FVector2D GlyphSize;
+			FSlateFontInfo NameFont;
 		};
 		TArray<FWords> Words;
 		const FSlateFontInfo NameFont = HudDraw::Font(26.0f * U);
@@ -146,9 +147,13 @@ namespace CheeseStrikePodiumHUD
 				Shapes.RoundedFrame(Foot.X - PlateWidth / 2.0f, PlateTop, PlateWidth, PlateHeight, 10.0f * U, 2.0f * U, HudDraw::Faded(HudDraw::Accent, Alpha));
 			}
 			FWords& Line = Words.AddDefaulted_GetRef();
-			Line.Name = CheeseStrikeHUD::FitName(Placed.Name, PlateWidth - 24.0f * U, [&NameFont](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, NameFont).X); });
+			// A long name shrinks to fit its plate first (down to 55% of the size), and is cut with dots only past that.
+			const float Room = PlateWidth - 24.0f * U;
+			const float FitSize = CheeseStrikeHUD::ShrinkToFit(static_cast<float>(HudDraw::Measure(Placed.Name, NameFont).X), Room, 26.0f * U, 0.55f);
+			Line.NameFont = HudDraw::Font(FitSize);
+			Line.Name = CheeseStrikeHUD::FitName(Placed.Name, Room, [&Line](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, Line.NameFont).X); });
 			Line.Score = Placed.Score;
-			Line.NameAt = FVector2D(Foot.X, PlateTop + 14.0f * U);
+			Line.NameAt = FVector2D(Foot.X, PlateTop + 14.0f * U + (NameHeight - HudDraw::Measure(TEXT("Ag"), Line.NameFont).Y) / 2.0f);
 			Line.ScoreAt = FVector2D(Foot.X, PlateTop + 16.0f * U + NameHeight);
 			Line.Colour = Colour;
 			if (bGlyph)
@@ -170,7 +175,7 @@ namespace CheeseStrikePodiumHUD
 		}
 		for (const FWords& Line : Words)
 		{
-			HudDraw::Text(Canvas, Line.Name, Line.NameAt, NameFont, HudDraw::Faded(Line.Colour, Alpha), 0.5f);
+			HudDraw::Text(Canvas, Line.Name, Line.NameAt, Line.NameFont, HudDraw::Faded(Line.Colour, Alpha), 0.5f);
 			HudDraw::Text(Canvas, Line.Score, Line.ScoreAt, ScoreFont, HudDraw::Faded(HudDraw::Ink, Alpha), 0.5f);
 		}
 

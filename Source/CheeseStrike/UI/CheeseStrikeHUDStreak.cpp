@@ -65,14 +65,8 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	const bool bRunning = Kills > 0;
 
 	HudDraw::FShapes Shapes;
-	// The panel, and the count's tile at its left: dark, edged in the cheese while a run is on, lit for a moment by a kill.
+	// The panel; the count's tile at its left is drawn last (below), over the rest, as it grows.
 	Shapes.RoundedRect(Left, Top, Width, Height, Round, HudDraw::Panel);
-	Shapes.RoundedRectDown(Left, Top, Tile, Tile, Round, FLinearColor(0.06f, 0.055f, 0.04f, 0.8f), FLinearColor(0.02f, 0.02f, 0.025f, 0.8f));
-	if (Flash > 0.0f)
-	{
-		Shapes.RoundedRect(Left, Top, Tile, Tile, Round, HudDraw::Faded(HudDraw::Accent, 0.35f * Flash * Flash));
-	}
-	Shapes.RoundedFrame(Left, Top, Tile, Tile, Round, FMath::Max(1.0f, 1.5f * U), bRunning ? HudDraw::Faded(HudDraw::Accent, 0.55f + 0.45f * Flash) : HudDraw::Rule);
 
 	// The track: a pip a kill, filled as far as the run (rising, and draining after a death), the streaks' pips taller.
 	const TArray<CheeseStrikeHUD::FStreakPip> Pips = CheeseStrikeHUD::StreakPips(Kills);
@@ -143,17 +137,6 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	}
 	Shapes.Draw(Canvas);
 
-	// The count, popping as each kill comes: drawn from its middle, so that it swells in place.
-	const FSlateFontInfo Count = HudDraw::Font(30.0f * U);
-	const FString Number = FString::FromInt(Kills);
-	const FVector2D NumberSize = HudDraw::Measure(Number, Count);
-	const FVector2D TileMiddle(Left + Tile / 2.0f, Top + Tile / 2.0f);
-	const FLinearColor NumberColour = bRunning ? FMath::Lerp(HudDraw::Accent, FLinearColor(1.0f, 0.95f, 0.8f, 1.0f), Flash) : HudDraw::Soft;
-	// Huge at the kill it may outgrow the tile and the screen's corner: its middle is kept so that all of it shows.
-	const FVector2D Grown = NumberSize * Pop;
-	const FVector2D Middle(FMath::Max(TileMiddle.X, Grown.X / 2.0f + Margin * U / 2.0f), FMath::Min(TileMiddle.Y, Canvas->SizeY - Grown.Y / 2.0f - Margin * U / 2.0f));
-	HudDraw::Text(Canvas, Number, FVector2D(Middle.X, Middle.Y - Grown.Y / 2.0f), Count, NumberColour, 0.5f, true, FVector2D(Pop, Pop));
-
 	// Over the track: what it is, and what comes next; under the streaks' pips, their names.
 	const FSlateFontInfo Caption = HudDraw::Font(12.0f * U);
 	const float CaptionTop = Top + 6.0f * U;
@@ -168,4 +151,28 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 		Next = CheeseStrikeHUD::FitName(Next, NextRoom, CaptionMeasure);
 	}
 	HudDraw::Text(Canvas, Next, FVector2D(TrackRight, CaptionTop), Caption, bRunning ? HudDraw::Accent : HudDraw::Soft, 1.0f);
+
+	// The count's tile and the count, popping as each kill comes: both drawn from the tile's middle and grown together, so that
+	// they swell in place, over the track and its words.
+	const FSlateFontInfo Count = HudDraw::Font(30.0f * U);
+	const FString Number = FString::FromInt(Kills);
+	const FVector2D NumberSize = HudDraw::Measure(Number, Count);
+	const FVector2D TileMiddle(Left + Tile / 2.0f, Top + Tile / 2.0f);
+	const FLinearColor NumberColour = bRunning ? FMath::Lerp(HudDraw::Accent, FLinearColor(1.0f, 0.95f, 0.8f, 1.0f), Flash) : HudDraw::Soft;
+	// Grown it may outgrow the screen's corner: its middle is kept so that all of it shows.
+	const float Grown = Tile * Pop;
+	const FVector2D Middle(FMath::Max(TileMiddle.X, Grown / 2.0f + Margin * U / 2.0f), FMath::Min(TileMiddle.Y, Canvas->SizeY - Grown / 2.0f - Margin * U / 2.0f));
+	const float GrownLeft = Middle.X - Grown / 2.0f;
+	const float GrownTop = Middle.Y - Grown / 2.0f;
+	const float GrownRound = Round * Pop;
+	HudDraw::FShapes TileShapes;
+	// Dark, edged in the cheese while a run is on, lit for a moment by a kill.
+	TileShapes.RoundedRectDown(GrownLeft, GrownTop, Grown, Grown, GrownRound, FLinearColor(0.06f, 0.055f, 0.04f, 0.8f), FLinearColor(0.02f, 0.02f, 0.025f, 0.8f));
+	if (Flash > 0.0f)
+	{
+		TileShapes.RoundedRect(GrownLeft, GrownTop, Grown, Grown, GrownRound, HudDraw::Faded(HudDraw::Accent, 0.35f * Flash * Flash));
+	}
+	TileShapes.RoundedFrame(GrownLeft, GrownTop, Grown, Grown, GrownRound, FMath::Max(1.0f, 1.5f * U) * FMath::Sqrt(Pop), bRunning ? HudDraw::Faded(HudDraw::Accent, 0.55f + 0.45f * Flash) : HudDraw::Rule);
+	TileShapes.Draw(Canvas);
+	HudDraw::Text(Canvas, Number, FVector2D(Middle.X, Middle.Y - NumberSize.Y * Pop / 2.0f), Count, NumberColour, 0.5f, true, FVector2D(Pop, Pop));
 }

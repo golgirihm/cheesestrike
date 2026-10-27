@@ -277,6 +277,10 @@ bool FTheScoreboardShowsStatusAndWhoPlays::RunTest(const FString& Parameters)
 	TestEqual(TEXT("exactly fitting is whole"), FitName(TEXT("0123456789"), 100.0f, Measure), FString(TEXT("0123456789")));
 	TestEqual(TEXT("a long name is cut with dots, within the width"), FitName(TEXT("Sir Reginald Cheddarington"), 100.0f, Measure), FString(TEXT("Sir Reg...")));
 	TestEqual(TEXT("no space left before the dots"), FitName(TEXT("Sir Reginald"), 70.0f, Measure), FString(TEXT("Sir...")));
+	TestEqual(TEXT("a name that fits keeps its size"), ShrinkToFit(80.0f, 100.0f, 26.0f, 0.55f), 26.0f);
+	TestTrue(TEXT("a wider name shrinks in proportion"), FMath::IsNearlyEqual(ShrinkToFit(150.0f, 100.0f, 30.0f, 0.55f), 20.0f, 0.001f));
+	TestTrue(TEXT("a little wider shrinks a little"), FMath::IsNearlyEqual(ShrinkToFit(125.0f, 100.0f, 26.0f, 0.55f), 26.0f * 0.8f, 0.001f));
+	TestTrue(TEXT("never below the least share: cut instead"), FMath::IsNearlyEqual(ShrinkToFit(1000.0f, 100.0f, 26.0f, 0.55f), 26.0f * 0.55f, 0.001f));
 	TestEqual(TEXT("never less than a letter"), FitName(TEXT("Cheddar"), 5.0f, Measure), FString(TEXT("C...")));
 	return true;
 }
