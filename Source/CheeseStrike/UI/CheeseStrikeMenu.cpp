@@ -696,8 +696,9 @@ void SCheeseStrikeMenu::Refresh()
 			FriendsReadAt = Now;
 			Sessions->RefreshFriends();
 		}
-		// Drawn again only when a friend, a player or the status changes (rebuilding it would restart a spinner).
-		FString Key = FString::Printf(TEXT("%d|%s|"), bOpen ? 1 : 0, Sessions != nullptr ? *Sessions->GetStatus() : TEXT(""));
+		// Drawn again only when a friend or a player changes (rebuilding it would restart a spinner). The session's status is not in
+		// it: the dropdown and its line say how friends may join, and a failure says why where it happened (the lobby, the matches found).
+		FString Key = FString::Printf(TEXT("%d|"), bOpen ? 1 : 0);
 		if (Sessions != nullptr)
 		{
 			for (const FCheeseStrikeFriend& Each : Sessions->GetFriends())
@@ -1594,7 +1595,6 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 	[
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("FRIENDS")) ]
-		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(Sessions != nullptr ? Sessions->GetStatus() : FString(TEXT("No online service")), true, true, 330.0f) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ bInGame ? MakePartyPermission(bHost, Sessions) : SNullWidget::NullWidget ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ MakeButton(TEXT("REFRESH"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); }) ]
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ Friends ] ]

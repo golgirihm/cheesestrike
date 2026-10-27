@@ -297,6 +297,14 @@ namespace CheeseStrikeHUD
 	/** How wide every podium plate is, its places' feet at `FeetX` across the screen (pixels) and `Unit` pixels a unit: as wide as the nearest two allow with PodiumPlateGap between them, up to PodiumPlateMost, never under PodiumPlateLeast. */
 	float PodiumPlateWidth(const TArray<float>& FeetX, float Unit);
 	/**
+	 * The room kept clear at the foot of the podium's screen (units) for the host's button to go back to the lobby
+	 * (SCheeseStrikePodiumSkip, bottom right: its gap under it, its height and a gap over it), so that no plate reaches it at any
+	 * shape of the screen.
+	 */
+	constexpr float PodiumFootReserve = 76.0f;
+	/** How far the podium's numbers and plates are raised so that the plates' bottom (`PlatesBottom`) stays `Reserve` over the foot of a screen `ScreenHeight` high (pixels): none when they are clear of it already. */
+	float PodiumLift(float PlatesBottom, float ScreenHeight, float Reserve);
+	/**
 	 * `Line` with the name `Name` in it cut to fit `Width` (FitName), the
 	 * rest of the line kept whole: an announcement or a death screen's line
 	 * naming a player, whose name may be as long as Steam's (32 letters,
@@ -387,6 +395,15 @@ namespace CheeseStrikeHUD
 	constexpr float StreakPopPeak = 250.0f / 58.0f;
 	/** How big the count and its tile are drawn `Seconds` after a kill (1 at rest, and before 0): StreakPopPeak from the kill, held, eased down to 1 by StreakPopTime. */
 	float StreakPop(float Seconds);
+	/** The gap left under the grown count's tile, over the kill-streak panel, at its peak (at a unit's scale, as the HUD's sizes are). */
+	constexpr float StreakPopClear = 8.0f;
+	/**
+	 * The top-left corner of the count's tile drawn `Pop` times its size (StreakPop), its side `Tile * Pop`: at rest (1) its place at the
+	 * panel's left (`Left`, `PanelTop`); at the peak standing on the panel, its bottom `Clear` over `PanelTop`, so that the grown tile
+	 * and its number sit over the panel and the health under it and never cover them; carried down into place, at the same left, as it
+	 * shrinks.
+	 */
+	FVector2D StreakPopCorner(float Left, float PanelTop, float Tile, float Pop, float Clear);
 	/** How long the red flash for a fall lasts, and its strongest. */
 	constexpr float FallFlashTime = 0.6f;
 	constexpr float FallFlashPeak = 0.35f;
@@ -439,6 +456,13 @@ namespace CheeseStrikeHUD
 	bool ShowsDeathScreen(bool bOut, float Seconds);
 	/** How solid the death screen is then: whole, but fading over its last half second when out of the round. */
 	float DeathScreenAlpha(bool bOut, float Seconds);
+	/**
+	 * Whether the marks drawn on the view over things in the world (the Unmanned Aerial Cheese's red diamonds where its sweep saw
+	 * each enemy) show: only in play, alive, with nothing covering the view: not while choosing a Cheese Strike's spot on the strike
+	 * map, with the scoreboard up, killed (the death screen), in a menu (paused) or once the match is over. They are drawn before
+	 * the HUD's panels, so that any panel covers them.
+	 */
+	bool ShowsMarksInView(bool bAlive, bool bStrikeMap, bool bScoreboard, bool bMenu, bool bOver);
 
 	/** Seconds the cheese takes to run down when the player is killed. */
 	constexpr float MeltTime = 1.6f;

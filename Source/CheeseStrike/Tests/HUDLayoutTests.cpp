@@ -162,6 +162,17 @@ bool FTheStreakPanelCountsToEachStreak::RunTest(const FString& Parameters)
 	TestTrue(TEXT("easing down, steady through the middle, gentle at both ends"), StreakPop(ShrinkStart + 0.05f) > StreakPopPeak - 0.1f * (StreakPopPeak - 1.0f) && StreakPop(ShrinkStart + 0.25f) < StreakPop(ShrinkStart + 0.1f) && StreakPop(ShrinkStart + 0.25f) > StreakPop(ShrinkStart + 0.4f) && StreakPop(ShrinkStart + 0.45f) < 1.0f + 0.1f * (StreakPopPeak - 1.0f));
 	TestTrue(TEXT("halfway down at the middle"), FMath::IsNearlyEqual(StreakPop(ShrinkStart + 0.25f), (1.0f + StreakPopPeak) / 2.0f, 0.01f));
 	TestTrue(TEXT("and settled"), StreakPop(StreakPopTime) == 1.0f && FMath::IsNearlyEqual(StreakPop(StreakPopTime * 0.999f), 1.0f, 0.02f));
+	{
+		// Grown, the tile stands over the panel (and the health under it), never on them; at rest it is in its place; between, it comes down.
+		const float PanelTop = 900.0f;
+		const float Tile = 58.0f;
+		const FVector2D Peak = StreakPopCorner(28.0f, PanelTop, Tile, StreakPopPeak, StreakPopClear);
+		TestTrue(TEXT("at its peak the tile's bottom is over the panel's top"), Peak.Y + Tile * StreakPopPeak <= PanelTop - StreakPopClear + 0.01f && Peak.X == 28.0f);
+		TestTrue(TEXT("at rest it is in its place"), StreakPopCorner(28.0f, PanelTop, Tile, 1.0f, StreakPopClear).Equals(FVector2D(28.0f, PanelTop)));
+		const float Half = (1.0f + StreakPopPeak) / 2.0f;
+		const float HalfBottom = StreakPopCorner(28.0f, PanelTop, Tile, Half, StreakPopClear).Y + Tile * Half;
+		TestTrue(TEXT("halfway, its bottom is between the two"), HalfBottom > PanelTop - StreakPopClear && HalfBottom < PanelTop + Tile);
+	}
 	// The track fills toward the run, and a death drains it.
 	float Fill = 0.0f;
 	Fill = StreakFillToward(Fill, 3, 0.1f);

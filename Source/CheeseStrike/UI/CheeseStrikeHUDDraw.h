@@ -85,6 +85,12 @@ namespace CheeseStrikeHUDDraw
 		void SmoothBand(TConstArrayView<FVector2D> Outer, TConstArrayView<FVector2D> Inner, const FLinearColor& Colour);
 		/** A soft edge along `A` to `B`, from `Colour` there to clear `Out` beyond it: for a piece cut to a rounded edge. */
 		void Fringe(const FVector2D& A, const FVector2D& B, const FVector2D& Out, const FLinearColor& Colour);
+		/**
+		 * A soft edge round a shape already drawn hard (of quads, as a drip is, convex or not): from each point of its `Outline`, in
+		 * its colour of `Colours`, to clear a soft edge (CheeseStrikeHUD::SoftEdge) outside it, so that its curves are smooth rather
+		 * than stepped. The edge from the last point back to the first is left hard when `bOpen` (where the shape runs on into another).
+		 */
+		void SoftRim(TConstArrayView<FVector2D> Outline, TConstArrayView<FLinearColor> Colours, bool bOpen);
 		/** A disc with a soft edge, with at least `Sides` sides and as many as its size needs to look round. */
 		void Disc(const FVector2D& Middle, float Radius, const FLinearColor& Colour, int32 Sides = 20);
 		/** A half disc hanging below `Middle` (a drop's end), shaded from `Inner` in the middle to `Outer` at the rim. */

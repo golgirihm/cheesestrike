@@ -394,6 +394,15 @@ void ACheeseStrikeHUD::DrawHUD()
 	{
 		DrawNameTags(Controller);
 	}
+	// The marks over things in the world (the drone's diamonds over the enemies it saw) first, so that every panel covers them, and
+	// none while a panel fills the view: the strike map, the scoreboard, the death screen, the pause menu.
+	{
+		const ACheeseStrikePlayerState* Mine = Controller->GetPlayerState<ACheeseStrikePlayerState>();
+		if (CheeseStrikeHUD::ShowsMarksInView(bAlive, Mine != nullptr && Mine->IsMarkingStrike(), Controller->IsScoreboardShown(), Controller->GetMenuPage() != EMenuPage::None, bOver))
+		{
+			CheeseStrikeModeHUD::DrawMarksInView(this, Canvas);
+		}
+	}
 	if (bAlive)
 	{
 		DrawVignette(Character);
