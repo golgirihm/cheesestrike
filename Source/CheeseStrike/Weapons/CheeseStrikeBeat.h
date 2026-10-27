@@ -57,63 +57,52 @@ namespace CheeseStrikeBeat
 	FEvenness Evenness(const TArray<double>& Times);
 
 	/**
+	 * The beat the shot sounds of automatic fire are heard on, kept apart from the frames that show the shots: a shot
+	 * is shown in a frame, but its sound is handed to the audio engine's Quartz clock, which starts it at a tick
+	 * (sample-accurately), so the sounds come exactly an interval apart whatever the frames do. The weapon's clock
+	 * ticks once an interval from when it was last set (tick 0), and each shot's sound takes a tick of its own, counted
+	 * from there: the first tick far enough ahead for the audio thread to have the sound by then (Lead), or the one
+	 * after the last sound's, whichever is later, so that no two sounds ever share a tick and none is lost.
+	 *
+	 * The tick is named by its number since the clock was set (Quartz's transport-relative count), not as the next tick
+	 * from whenever the audio thread takes the sound: that comes 20 to 65 ms after it is handed over (the end of the
+	 * game's frame, the audio thread, then an audio buffer), so two sounds handed over either side of a tick were put on
+	 * the same next tick, heard as one shot.
+	 */
+	struct FSoundBeat
+	{
+		/** The time (seconds, real clock) of tick 0 and the seconds between ticks. */
+		double Origin = 0.0;
+		double Interval = 0.0;
+		/** The last tick taken by a sound (-1: none since the grid was set). */
+		int64 LastSlot = -1;
+
+		/** Ticks every `NewInterval` from `NewOrigin` (an estimate of the clock's; it moves a little). A new interval is a new count. */
+		void SetGrid(double NewOrigin, double NewInterval);
+		/** How far ahead a sound handed over at a frame of `FrameSeconds` must be queued for the audio thread to have it in time. */
+		static double LeadFor(double FrameSeconds);
+		/** The tick for a shot's sound handed over at `Now`, `Lead` ahead at least and after the last; taken. */
+		int64 Take(double Now, double Lead);
+		/** The time (real clock) of tick `Slot`. */
+		double TickTime(int64 Slot) const { return Origin + Slot * Interval; }
+	};
+
+	/**
+	 * The Quartz boundary a shot sound is queued on: tick `Slot` counted from when the clock was set (Quartz's next
+	 * multiple of Slot + 1 ticks from the transport's start, which is tick Slot itself while it is ahead). Not the bar's
+	 * first tick (Quartz's default, the next bar line, 32 ticks off), nor the next tick from whenever the audio thread
+	 * takes it.
+	 */
+	FQuartzQuantizationBoundary AtTick(int64 Slot);
+	/** The boundary the clock's transport is reset on when it is set: at once (the handle's own ResetTransport waits for the next bar). */
+	FQuartzQuantizationBoundary AtOnce();
+
+	/**
 	 * When to show a shot another machine was told of at `Arrival` (seconds), the one before having been shown at
 	 * `LastShown`, when the weapon fires every `Interval`: held a `Lead` back at the start of a run (a gap of more than two
 	 * intervals) so that the network's clumps and lulls fall inside it, then one `Interval` after the last, or at its
 	 * arrival if that is later. If it would come to be more than `Behind` after its arrival (a server that sends faster
 	 * than the beat), the run starts over from the arrival.
 	 */
-	/**
-	 * The beat the shot sounds of automatic fire are heard on, kept apart from the frames that show the shots: a shot
-	 * is shown in a frame, but its sound is handed to the audio engine's Quartz clock, which starts it at a tick
-	 * (sample-accurately), so the sounds come exactly an interval apart whatever the frames do. The first sound of a
-	 * run starts the clock, a Lead after its shot was shown; every later one is queued for the first tick after the
-	 * shot was shown, the Lead being the room a late frame has. A shot that comes after its tick goes to the next, or
-	 * after any sound already queued for that tick, so no two sounds ever share one.
-	 */
-	struct FSoundBeat
-	{
-		/** What to do with a shot's sound. */
-		struct FPlan
-		{
-			/** The sound starts the run: reset the clock and play it, at CallAt. */
-			bool bStartsRun = false;
-			/** The beat (tick) it is heard on, counted from the run's start. */
-			int64 Slot = 0;
-			/** When to hand it to the audio engine (seconds, real clock): now, or later if its tick is taken. */
-			double CallAt = 0.0;
-			/** When it is heard (seconds, real clock; for a run's first, when it is handed over). */
-			double BeatTime = 0.0;
-		};
-
-		/** The share of an interval the first sound of a run is held back, the room a late frame has before the tick. */
-		static constexpr double LeadShare = 0.6;
-		/** How near before a tick a sound can still be queued for it (the game thread's hand-over to the audio thread takes this long). */
-		static constexpr double Guard = 0.012;
-		/** A run ends when its sounds stop for this many intervals. */
-		static constexpr double EndsAfterIntervals = 2.5;
-
-		bool bRunning = false;
-		/** Whether the run's first sound has been handed over yet (it is held back a lead, and a frame may be late); until then the others wait. */
-		bool bStarted = false;
-		/** The time (real clock) of the run's tick 0. */
-		double Origin = 0.0;
-		double Interval = 0.0;
-		int64 LastSlot = -1;
-
-		/** What to do with the sound of a shot shown at `Now`, the weapon firing every `NewInterval`. Remembers it. */
-		FPlan Plan(double Now, double NewInterval);
-		/** The run's first sound was handed over at `At`: that is its tick 0. */
-		void Started(double At);
-		/** Forgets the run. */
-		void Reset();
-	};
-
-	/**
-	 * The Quartz boundary a shot sound is queued on: the clock's next tick (one tick a shot), counted from now. Quartz's
-	 * default counts from the bar, where a multiplier of 1 is the bar's first tick: the next bar line, 32 ticks off.
-	 */
-	FQuartzQuantizationBoundary NextTick();
-
 	double PaceShow(double Arrival, double LastShown, double Interval, double Lead, double Behind);
 }

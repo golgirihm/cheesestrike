@@ -9,11 +9,18 @@
 
 class UAudioComponent;
 class USoundWave;
+class UGameInstance;
 
 namespace CheeseStrikeMusic
 {
-	/** The loop that plays (tools/art/menu_music.py makes it). */
-	extern const TCHAR* const Track;
+	/** The songs that play, one after another in a random order: Fab's "FREE Cyber Metal Music Pack" by Intersonic Sound. */
+	extern const TCHAR* const Songs[];
+	int32 NumSongs();
+	/**
+	 * The song to play next of `Count`, the one before having been `Last` (none: -1), by `Roll`, a number from 0 to
+	 * the number of songs it may be less one: any but the one just played, each as likely.
+	 */
+	int32 NextSong(int32 Count, int32 Last, int32 Roll);
 	/** Seconds the music takes to come in, and to go out other than into a match. */
 	constexpr float FadeInSeconds = 2.0f;
 	constexpr float FadeOutSeconds = 1.5f;
@@ -30,13 +37,14 @@ namespace CheeseStrikeMusic
 }
 
 /**
- * The menu's music: an electric guitar loop under the front end and the
- * lobby, at the options' music volume (UCheeseStrikeSettings::
- * MusicSoundClass), going on unbroken from one level to the next (hosting
- * reloads the level into its lobby), fading out into the match as the
- * lobby's countdown runs, and back in when the lobby is back. The player
- * controller says each frame whether it is wanted (CheeseStrikeMusic::
- * IsWanted); this plays it. Nothing without an audio device (-nosound).
+ * The menu's music: metal songs under the front end and the lobby, one
+ * after another chosen at random (never the same twice running), at the
+ * options' music volume (UCheeseStrikeSettings::MusicSoundClass), going on
+ * unbroken from one level to the next (hosting reloads the level into its
+ * lobby), fading out into the match as the lobby's countdown runs, and back
+ * in with another song when the lobby is back. The player controller says
+ * each frame whether it is wanted (CheeseStrikeMusic::IsWanted); this plays
+ * it. Nothing without an audio device (-nosound).
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeMusicSubsystem : public UGameInstanceSubsystem
@@ -51,11 +59,19 @@ public:
 	/** Whether it is wanted now, and whether it is heard (playing, fading in or out). */
 	bool IsWanted() const { return bWanted; }
 	bool IsPlaying() const;
+	/** The song playing or last played (an index into CheeseStrikeMusic::Songs; -1 for none yet). */
+	int32 GetSong() const { return Song; }
 
 private:
+	/** Puts on the next song, coming in over `FadeSeconds` (0: at once). */
+	void PlayNextSong(float FadeSeconds);
+	void SongEnded(UAudioComponent* Ended);
+
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> Player;
 	UPROPERTY()
-	TObjectPtr<USoundWave> Loop;
+	TArray<TObjectPtr<USoundWave>> Loaded;
+	TWeakObjectPtr<UWorld> LastWorld;
+	int32 Song = -1;
 	bool bWanted = false;
 };

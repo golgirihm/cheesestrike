@@ -2,7 +2,9 @@
 
 #include "CheeseStrikeMusic.h"
 #include "Components/AudioComponent.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundWave.h"
 #include "CheeseStrike.h"
@@ -10,7 +12,30 @@
 
 namespace CheeseStrikeMusic
 {
-	const TCHAR* const Track = TEXT("/Game/OpenGameArt/Music/SW_MenuMusic.SW_MenuMusic");
+	const TCHAR* const Songs[] = {
+		TEXT("/Game/Free_Cyber_Metal_Music_Pack/WAVs/Reborn_WAV.Reborn_WAV"),
+		TEXT("/Game/Free_Cyber_Metal_Music_Pack/WAVs/The_Devil_s_Confidant_WAV.The_Devil_s_Confidant_WAV"),
+		TEXT("/Game/Free_Cyber_Metal_Music_Pack/WAVs/Focus_WAV.Focus_WAV"),
+		TEXT("/Game/Free_Cyber_Metal_Music_Pack/WAVs/Focus_2_WAV.Focus_2_WAV"),
+		TEXT("/Game/Free_Cyber_Metal_Music_Pack/WAVs/Cauldronized_WAV.Cauldronized_WAV"),
+		TEXT("/Game/Free_Cyber_Metal_Music_Pack/WAVs/Opener_WAV.Opener_WAV"),
+	};
+
+	int32 NumSongs()
+	{
+		return UE_ARRAY_COUNT(Songs);
+	}
+
+	int32 NextSong(int32 Count, int32 Last, int32 Roll)
+	{
+		if (Count <= 1)
+		{
+			return 0;
+		}
+		const bool bSkip = Last >= 0 && Last < Count;
+		const int32 Pick = FMath::Clamp(Roll, 0, Count - (bSkip ? 2 : 1));
+		return bSkip && Pick >= Last ? Pick + 1 : Pick;
+	}
 
 	bool IsWanted(EMenuPage Page, bool bPausedInAMatch, bool bCountingDown, bool bLeaving, bool bHeld)
 	{
@@ -50,6 +75,10 @@ bool UCheeseStrikeMusicSubsystem::IsPlaying() const
 
 void UCheeseStrikeMusicSubsystem::Want(UWorld* World, bool bPlay, float FadeSeconds)
 {
+	if (World != nullptr)
+	{
+		LastWorld = World;
+	}
 	if (bPlay == bWanted)
 	{
 		return;
@@ -63,32 +92,75 @@ void UCheeseStrikeMusicSubsystem::Want(UWorld* World, bool bPlay, float FadeSeco
 		}
 		return;
 	}
+	// Back in with another song.
+	PlayNextSong(CheeseStrikeMusic::FadeInSeconds);
+}
+
+void UCheeseStrikeMusicSubsystem::PlayNextSong(float FadeSeconds)
+{
+	UWorld* World = LastWorld.Get();
 	if (World == nullptr)
 	{
 		return;
 	}
-	if (Loop == nullptr)
+	if (Loaded.Num() == 0)
 	{
-		Loop = LoadObject<USoundWave>(nullptr, CheeseStrikeMusic::Track);
-		if (Loop == nullptr)
+		for (int32 Index = 0; Index < CheeseStrikeMusic::NumSongs(); ++Index)
 		{
-			UE_LOG(LogCheeseStrike, Warning, TEXT("Music: %s isn't there"), CheeseStrikeMusic::Track);
-			return;
+			USoundWave* Wave = LoadObject<USoundWave>(nullptr, CheeseStrikeMusic::Songs[Index]);
+			if (Wave == nullptr)
+			{
+				UE_LOG(LogCheeseStrike, Warning, TEXT("Music: %s isn't there"), CheeseStrikeMusic::Songs[Index]);
+				Loaded.Reset();
+				return;
+			}
+			// One song plays to its end, then the next comes on.
+			Wave->bLooping = false;
+			Wave->SoundClassObject = UCheeseStrikeSettings::MusicSoundClass();
+			Loaded.Add(Wave);
 		}
-		Loop->bLooping = true;
-		Loop->SoundClassObject = UCheeseStrikeSettings::MusicSoundClass();
 	}
+	const int32 Count = Loaded.Num();
+	Song = CheeseStrikeMusic::NextSong(Count, Song, FMath::RandRange(0, Song >= 0 && Count > 1 ? Count - 2 : Count - 1));
 	// Made once, kept from one level to the next; without an audio device (-nosound), none.
 	if (Player == nullptr)
 	{
-		Player = UGameplayStatics::CreateSound2D(World, Loop, 1.0f, 1.0f, 0.0f, nullptr, true, false);
+		Player = UGameplayStatics::CreateSound2D(World, Loaded[Song], 1.0f, 1.0f, 0.0f, nullptr, true, false);
 		if (Player == nullptr)
 		{
 			return;
 		}
 		Player->bIsUISound = true;
+		Player->OnAudioFinishedNative.AddUObject(this, &UCheeseStrikeMusicSubsystem::SongEnded);
 		UCheeseStrikeSettings::ApplySound();
 	}
-	// From the top: it fades out to a stop.
-	Player->FadeIn(CheeseStrikeMusic::FadeInSeconds, 1.0f);
+	else
+	{
+		Player->SetSound(Loaded[Song]);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Music: %s"), *Loaded[Song]->GetName());
+	if (FadeSeconds > 0.0f)
+	{
+		Player->FadeIn(FadeSeconds, 1.0f);
+	}
+	else
+	{
+		Player->Play();
+	}
+}
+
+void UCheeseStrikeMusicSubsystem::SongEnded(UAudioComponent* Ended)
+{
+	// A song that played to its end (not one faded out, nor one stopped to change songs) is followed by another, next tick.
+	if (!bWanted || Ended != Player || GetGameInstance() == nullptr)
+	{
+		return;
+	}
+	GetGameInstance()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		if (bWanted && Player != nullptr && !Player->IsPlaying())
+		{
+			PlayNextSong(0.0f);
+		}
+	}));
 }

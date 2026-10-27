@@ -18,7 +18,7 @@ namespace CheeseStrikeCredits
 		{TEXT("The vermin"), TEXT("\"Black Rat\" by Nestaeric (Fab), licensed under Creative Commons Attribution 4.0 (CC BY 4.0): creativecommons.org/licenses/by/4.0")},
 		{TEXT("The vermin's sounds"), TEXT("From OpenGameArt.org. \"Squeaky Rat\" by Iwan \"qubodup\" Gabovitch, CC0, from sounds by Zabuhailo and moneykube (freesound.org). \"Rat Monster Screams\" by Iwan \"qubodup\" Gabovitch, licensed under Creative Commons Attribution 3.0 (CC BY 3.0): creativecommons.org/licenses/by/3.0. \"Rabbit Eating\" by Voltiment555, CC0. \"7 Eating Crunches\" by StarNinjas, CC0.")},
 		{TEXT("Rind Market's surfaces and props"), TEXT("From Poly Haven (polyhaven.com), CC0: textures by Rob Tuytel, Amal Kumar, Dario Barresi and Dimitrios Savva, colormass and Rico Cilliers; lamps, a barrel, a crate, a basket and a bench by Josh Dean, James Ray Cock, Kuutti Siitonen and Kirill Sannikov.")},
-		{TEXT("The menu's music"), TEXT("\"Bravery Beats\" by MintoDog, from OpenGameArt.org, CC0.")},
+		{TEXT("The music"), TEXT("\"FREE Cyber Metal Music Pack\" by Intersonic Sound (Fab). \"Aggression - Adaptive Metal Combat Loop (Free Demo)\" by RiffFuel (Fab).")},
 		{TEXT("The knife's stab"), TEXT("From \"8 Wet Squish, Slurp Impacts\" by Independent.nu, from OpenGameArt.org, CC0.")},
 		{TEXT("The Swiss Shotgun's shots"), TEXT("From \"The Free Firearm Sound Library\" by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney, from OpenGameArt.org, CC0.")},
 		{TEXT("Online play"), TEXT("Steamworks, by Valve.")},
