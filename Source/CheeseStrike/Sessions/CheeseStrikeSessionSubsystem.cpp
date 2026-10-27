@@ -486,13 +486,19 @@ UTexture2D* UCheeseStrikeSessionSubsystem::AvatarOf(int32 Index)
 	return Avatars->ForUniqueId(Friends[Index].Id->GetType().ToString(), Friends[Index].Id->ToString(), GetWorld());
 }
 
+bool UCheeseStrikeSessionSubsystem::IsServerHere() const
+{
+	const UWorld* World = GetWorld();
+	return World != nullptr && (World->GetNetMode() == NM_ListenServer || World->GetNetMode() == NM_DedicatedServer);
+}
+
 bool UCheeseStrikeSessionSubsystem::FriendsMayJoinHere() const
 {
 	const IOnlineSessionPtr Interface = Sessions();
 	const FNamedOnlineSession* Named = Interface.IsValid() ? Interface->GetNamedSession(NAME_GameSession) : nullptr;
 	// The host's own pick shows as picked: the dropdown read the session's settings alone, which an update leaves as they were
 	// until it has finished (and a game with no session of its own, a listen server hosted by travel, has none to change).
-	const bool bHosting = Named == nullptr || Named->bHosting;
+	const bool bHosting = Named == nullptr || Named->bHosting || IsServerHere();
 	return CheeseStrikeFriends::FriendsMayJoinShown(bHosting, FriendsChoice, Named == nullptr || CheeseStrikeSessions::FriendsMayJoin(Named->SessionSettings));
 }
 
@@ -500,7 +506,9 @@ void UCheeseStrikeSessionSubsystem::SetFriendsMayJoin(bool bFriends)
 {
 	IOnlineSessionPtr Interface = Sessions();
 	FNamedOnlineSession* Named = Interface.IsValid() ? Interface->GetNamedSession(NAME_GameSession) : nullptr;
-	if (Named != nullptr && !Named->bHosting)
+	// The server is the host, whatever Steam's session says: back in the lobby after a match, the host's session has been
+	// seen to say it isn't hosting, and the host's pick was refused.
+	if (Named != nullptr && !Named->bHosting && !IsServerHere())
 	{
 		Say(TEXT("Only the host decides who can join"));
 		return;
