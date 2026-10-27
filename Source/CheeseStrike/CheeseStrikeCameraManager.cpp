@@ -42,6 +42,10 @@ void ACheeseStrikeCameraManager::UpdateViewTarget(FTViewTarget& OutVT, float Del
 	// Leaning into a slide.
 	ACheeseStrikeCharacter* Character = Cast<ACheeseStrikeCharacter>(OutVT.Target);
 	OutVT.POV.Rotation.Roll += Character->GetViewRoll();
+	// A scoped rifle's breathing.
+	const FRotator Sway = Character->GetScopeSway();
+	OutVT.POV.Rotation.Pitch += Sway.Pitch;
+	OutVT.POV.Rotation.Yaw += Sway.Yaw;
 	// Where the weapon in hand is in the view, for how steadily it is held (and for the trace).
 	const UPrimitiveComponent* Model = Character->GetWeapon() != nullptr ? Character->GetWeapon()->GetModel(true) : nullptr;
 	if (Model == nullptr)

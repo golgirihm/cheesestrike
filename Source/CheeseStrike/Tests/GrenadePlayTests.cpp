@@ -9,6 +9,8 @@
 // away by drawing another weapon.
 
 #include "Misc/AutomationTest.h"
+#include "Camera/CameraComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
@@ -249,6 +251,48 @@ bool FAHeldThrowShowsItsArcAndGoesOnRelease::RunTest(const FString& Parameters)
 		TestEqual(TEXT("letting go then throws nothing"), Grenades(0).Num(), 0);
 		TestEqual(TEXT("and the grenade is still carried"), CountOf(CharacterOf(1, 0)), CheeseStrikeGrenades::SpawnCount - 1);
 	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAHeldGrenadeIsSeenInTheRightHand, "CheeseStrike.Play.AHeldGrenadeIsSeenInTheRightHand", GrenadePlayTests::Flags)
+
+bool FAHeldGrenadeIsSeenInTheRightHand::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	StartPlaying({1, TEXT("")});
+	Play(0, TEXT("hold Grenade\nwait 0.8"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Me = Character(0);
+		if (!TestNotNull(TEXT("a character"), Me) || !TestNotNull(TEXT("with grenades"), Me->GetGrenades()))
+		{
+			return;
+		}
+		const UStaticMeshComponent* Held = Me->GetGrenades()->GetHeldInView();
+		if (!TestNotNull(TEXT("the held grenade is made"), Held))
+		{
+			return;
+		}
+		const USkeletalMeshComponent* Body = Me->GetFirstPersonMesh();
+		const FTransform Eye(Me->GetFirstPersonCameraComponent()->GetComponentRotation(), Me->GetFirstPersonCameraComponent()->GetComponentLocation());
+		const FVector InView = Eye.InverseTransformPosition(Held->GetComponentLocation());
+		const FVector RightHand = Eye.InverseTransformPosition(Body->GetBoneLocation(TEXT("hand_r")));
+		const FVector LeftHand = Eye.InverseTransformPosition(Body->GetBoneLocation(TEXT("hand_l")));
+		AddInfo(FString::Printf(TEXT("held grenade: visible %d hidden %d registered %d rendered %d parent %s socket %s fp-type %d owner-only %d scale %.3f world scale %.3f bounds %.1f cm; in the view at (%.1f, %.1f, %.1f); hand_r at (%.1f, %.1f, %.1f), hand_l at (%.1f, %.1f, %.1f); mesh %s materials %d"),
+			Held->IsVisible(), Held->bHiddenInGame, Held->IsRegistered(), Held->IsRenderStateCreated(), *GetNameSafe(Held->GetAttachParent()), *Held->GetAttachSocketName().ToString(), static_cast<int32>(Held->FirstPersonPrimitiveType), Held->bOnlyOwnerSee,
+			Held->GetRelativeScale3D().X, Held->GetComponentScale().X, Held->Bounds.SphereRadius * 2.0f, InView.X, InView.Y, InView.Z, RightHand.X, RightHand.Y, RightHand.Z, LeftHand.X, LeftHand.Y, LeftHand.Z, *GetNameSafe(Held->GetStaticMesh()), Held->GetNumMaterials()));
+		TestTrue(TEXT("shown"), Held->IsVisible());
+		TestTrue(TEXT("in the first-person body's hand"), Held->GetAttachParent() == Body);
+		TestEqual(TEXT("the right"), Held->GetAttachSocketName(), FName(TEXT("hand_r")));
+		TestTrue(TEXT("a grenade's size"), Held->Bounds.SphereRadius > 2.0f && Held->Bounds.SphereRadius < 20.0f);
+		TestTrue(FString::Printf(TEXT("near that hand (%.1f cm)"), FVector::Dist(InView, RightHand)), FVector::Dist(InView, RightHand) < 45.0f);
+		// What the first-person view shows is within its field of view (76 degrees across, 16 by 9 at the narrowest, 21 by 9):
+		// the tangents of the angles off the view's middle are at most 0.78 across and 0.33 up and down. It was at 0.42 down, off the screen.
+		TestTrue(TEXT("ahead of the eye"), InView.X > 15.0f && InView.X < 120.0f);
+		TestTrue(FString::Printf(TEXT("on the right of the view, within the screen (across %.2f, down %.2f)"), InView.Y / InView.X, InView.Z / InView.X), InView.Y > 0.0f && InView.Y / InView.X < 0.6f && FMath::Abs(InView.Z / InView.X) < 0.3f);
+	});
+	Play(0, TEXT("release Grenade\nwait 1.0"));
 	StopPlaying();
 	return true;
 }

@@ -105,6 +105,13 @@ protected:
 	void ShowThrow();
 	/** A throw held: the grenade up in its player's view, or put away. */
 	void ShowHeldInView(bool bShow);
+public:
+	/** The grenade shown in the hand while a throw is held, or the round in it while it winds up; null before they are first shown. */
+	const UStaticMeshComponent* GetHeldInView() const { return HeldInView; }
+	const UStaticMeshComponent* GetInHandFirst() const { return InHandFirst; }
+protected:
+	/** Puts the held grenade in its player's right hand, where the view has it (or in the view, without arms). */
+	void PutHeldInHand();
 	/** Puts the round in the throwing hand on both bodies. */
 	void ShowInHand();
 	/** Each frame of a throw held: puts it away or throws it, and draws its arc. */

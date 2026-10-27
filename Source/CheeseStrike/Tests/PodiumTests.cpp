@@ -11,6 +11,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "EngineUtils.h"
 #include "Animation/CheeseStrikeBodies.h"
+#include "Animation/CheeseStrikeEmote.h"
 #include "CheeseStrikeBotController.h"
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
@@ -154,6 +155,51 @@ bool FEveryHeroHasItsOwnEmoteForEachPlace::RunTest(const FString& Parameters)
 			}
 		}
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnEmoteLoopsWithoutASeam, "CheeseStrike.Podium.AnEmoteLoopsWithoutASeam", PodiumTests::Flags)
+
+bool FAnEmoteLoopsWithoutASeam::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeEmote;
+	// Where the two players are, and what shows, at every moment of every hero's emotes (and of lengths between): the picture
+	// is a blend of the two, so the timeline "First, Second, how much of the second" has to carry on across the seam
+	// where a pass ends and the next begins, and never jump within one.
+	TArray<float> Lengths = {0.5f, 1.0f, 2.5f, 4.0f, 7.3f, 12.0f};
+	for (int32 Body = 0; Body < CheeseStrikeBodies::All().Num(); ++Body)
+	{
+		for (int32 Place = 0; Place < CheeseStrikePodiums::Places; ++Place)
+		{
+			if (const UAnimSequenceBase* Emote = LoadObject<UAnimSequenceBase>(nullptr, CheeseStrikePodiums::Emote(Body, Place)))
+			{
+				Lengths.Add(Emote->GetPlayLength());
+			}
+		}
+	}
+	for (const float Length : Lengths)
+	{
+		const float Overlap = OverlapFor(Length);
+		const float Period = Length - Overlap;
+		TestTrue(*FString::Printf(TEXT("a %.2f s emote is blended over %.2f s, at most %.0f%% of it"), Length, Overlap, MostOverlapShare * 100.0f), Overlap > 0.0f && Overlap <= Length * MostOverlapShare + 0.0001f);
+		// The seam: just before a pass ends and just after the next begins show the same.
+		const float Eps = 0.0005f;
+		const FLoop Before = LoopAt(Period - Eps, Length, Overlap);
+		const FLoop After = LoopAt(Period + Eps, Length, Overlap);
+		const auto Shown = [](const FLoop& At) { return At.Second * At.SecondShows + At.First * (1.0f - At.SecondShows); };
+		TestTrue(*FString::Printf(TEXT("%.2f s: the seam shows the same picture (%.4f to %.4f)"), Length, Shown(Before), Shown(After)), FMath::Abs(Shown(Before) - Shown(After)) < 0.01f);
+		TestTrue(*FString::Printf(TEXT("%.2f s: the second player is all that shows at the seam, at the first's next start"), Length), Before.SecondShows > 0.99f && FMath::Abs(Before.Second - After.First) < 0.01f && After.SecondShows == 0.0f);
+		// Neither player is ever put past either end of the sequence, and the blend stays between none and all.
+		bool bInside = true;
+		for (float Time = 0.0f; Time < Period * 3.0f; Time += 0.01f)
+		{
+			const FLoop At = LoopAt(Time, Length, Overlap);
+			bInside &= At.First >= 0.0f && At.First <= Length + 0.0001f && At.Second >= 0.0f && At.Second <= Length + 0.0001f && At.SecondShows >= 0.0f && At.SecondShows <= 1.0f;
+		}
+		TestTrue(*FString::Printf(TEXT("%.2f s: the players stay inside the sequence"), Length), bInside);
+	}
+	TestEqual(TEXT("a sequence too short to blend is played plainly"), OverlapFor(0.1f), 0.0f);
+	TestEqual(TEXT("round in its own length"), LoopAt(0.25f, 0.5f, 0.0f).First, 0.25f);
 	return true;
 }
 

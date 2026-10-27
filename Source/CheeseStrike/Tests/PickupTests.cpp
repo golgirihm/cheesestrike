@@ -119,11 +119,11 @@ bool FAWeaponIsTakenByWhatIsCarried::RunTest(const FString& Parameters)
 	TestFalse(TEXT("nor from the floor under it"), InReach(Stand, Stand - FVector(0.0f, 0.0f, ReachUp + 10.0f), Reach));
 	TestTrue(TEXT("a jump over it does"), InReach(Stand, Stand + FVector(0.0f, 0.0f, 60.0f), Reach));
 
-	// Back after half a minute, the HUD's seconds rounded up.
-	TestEqual(TEXT("half a minute"), RespawnSeconds, 30.0f);
+	// Back after a minute (27 Oct 2026; half a minute before), the HUD's seconds rounded up.
+	TestEqual(TEXT("a minute"), RespawnSeconds, 60.0f);
 	TestEqual(TEXT("there: none to go"), SecondsLeft(100.0f, 0.0f), 0.0f);
-	TestEqual(TEXT("taken at 100: 25 to go at 105"), SecondsLeft(105.0f, 100.0f + RespawnSeconds), 25.0f);
-	TestEqual(TEXT("and none once it is back"), SecondsLeft(140.0f, 100.0f + RespawnSeconds), 0.0f);
+	TestEqual(TEXT("taken at 100: 55 to go at 105"), SecondsLeft(105.0f, 100.0f + RespawnSeconds), 55.0f);
+	TestEqual(TEXT("and none once it is back"), SecondsLeft(170.0f, 100.0f + RespawnSeconds), 0.0f);
 	TestEqual(TEXT("24.2 s shows 25"), ShownSeconds(24.2f), 25);
 	TestEqual(TEXT("and 0.1 shows 1"), ShownSeconds(0.1f), 1);
 

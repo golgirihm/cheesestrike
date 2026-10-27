@@ -6,9 +6,9 @@
 // look (the mouse or the right stick) moves a mark over it instead of the
 // view (ACheeseStrikeCharacter::MoveStrikeMark). Round the mark, the area
 // the wheels fall on (CheeseStrikeStreaks::StrikeRadius) and where each will
-// land; the map follows the mark when it nears an edge
-// (CheeseStrikeHUD::FollowMark). Fire calls the strike in there; the Streak
-// key or Escape calls it off.
+// land. The map shows the whole level at once, fitted to its square
+// (CheeseStrikeHUD::FitMap), and never pans. Fire calls the strike in there;
+// the Streak key or Escape calls it off.
 
 #include "CheeseStrikeHUD.h"
 #include "Camera/PlayerCameraManager.h"
@@ -40,7 +40,7 @@ bool ACheeseStrikeHUD::DrawStrikeMap(const ACheeseStrikePlayerController* Contro
 	const float Yaw = Mine->GetStrikeYaw();
 	const FVector At = Character->GetActorLocation();
 
-	// The mark kept over the level, and the map's middle following it (from the player, as it opens).
+	// The mark kept over the level.
 	const FBox2D& Level = Minimap.GetBounds();
 	if (Level.bIsValid)
 	{
@@ -52,12 +52,7 @@ bool ACheeseStrikeHUD::DrawStrikeMap(const ACheeseStrikePlayerController* Contro
 		}
 	}
 	const FVector2D Mark = Mine->GetStrikeTarget();
-	if (!bStrikeMapShown)
-	{
-		StrikeMapMiddle = FVector2D(At);
-		bStrikeMapShown = true;
-	}
-	StrikeMapMiddle = CheeseStrikeHUD::FollowMark(StrikeMapMiddle, Mark, Yaw, CheeseStrikeHUD::StrikeMapRange * CheeseStrikeHUD::StrikeMapFollow);
+	bStrikeMapShown = true;
 
 	// Big in the middle, as much of the screen's height as leaves room for its words over and under it.
 	const FSlateFontInfo Title = HudDraw::Font(22.0f * U);
@@ -67,9 +62,12 @@ bool ACheeseStrikeHUD::DrawStrikeMap(const ACheeseStrikePlayerController* Contro
 	FMapFrame Frame;
 	Frame.Min = Centre - FVector2D(Side, Side) / 2.0f;
 	Frame.Max = Centre + FVector2D(Side, Side) / 2.0f;
-	Frame.Middle = StrikeMapMiddle;
+	// The whole level, turned as the view was, fitted to the square; a level that can't be read is shown round the player.
+	const CheeseStrikeHUD::FMapFit Fit = Level.bIsValid ? CheeseStrikeHUD::FitMap(Level.Min, Level.Max, Yaw, Side, 12.0f * U) : CheeseStrikeHUD::FMapFit{FVector2D(At), Side / 2.0f / 3500.0f};
+	StrikeMapMiddle = Fit.Middle;
+	Frame.Middle = Fit.Middle;
 	Frame.ViewYaw = Yaw;
-	Frame.Scale = Side / 2.0f / CheeseStrikeHUD::StrikeMapRange;
+	Frame.Scale = Fit.Scale;
 	Frame.Corner = 24.0f * U;
 	Frame.bStrike = true;
 	const auto OnMap = [&Frame, &Centre](const FVector2D& Where) { return Centre + CheeseStrikeHUD::MapPoint(Where - Frame.Middle, Frame.ViewYaw, Frame.Scale); };
@@ -85,17 +83,6 @@ bool ACheeseStrikeHUD::DrawStrikeMap(const ACheeseStrikePlayerController* Contro
 	const FVector2D MarkAt = OnMap(Mark);
 	const float Radius = CheeseStrikeStreaks::StrikeRadius * Frame.Scale;
 	HudDraw::FShapes Shapes;
-	// A faint dashed line from the player to the mark.
-	const FVector2D PlayerAt = OnMap(FVector2D(At));
-	const float Length = FVector2D::Distance(PlayerAt, MarkAt);
-	if (Length > Radius)
-	{
-		const FVector2D Way = (MarkAt - PlayerAt) / Length;
-		for (float Along = 22.0f * U; Along + 8.0f * U < Length - Radius; Along += 16.0f * U)
-		{
-			Shapes.Line(PlayerAt + Way * Along, PlayerAt + Way * (Along + 8.0f * U), 2.0f * U, FLinearColor(1.0f, 1.0f, 1.0f, 0.35f));
-		}
-	}
 	// Over nothing (past the level's edge), grey, and a shot does nothing.
 	FVector Spot;
 	const bool bGround = Mine->StrikeSpot(Spot);

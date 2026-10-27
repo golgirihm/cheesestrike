@@ -163,6 +163,12 @@ public:
 	static constexpr float DownViewHeight = 22.0f;
 	/** How far its own player's view is rolled (degrees): leaning into a slide. */
 	float GetViewRoll() const { return ViewRoll; }
+	/**
+	 * The turn (pitch and yaw) the breath puts on its own player's aim while they are scoped
+	 * (CheeseStrikeWeapons::ScopeSway), eased in with the sights; none otherwise, or on anyone else's machine.
+	 * The view and the shots' direction both add it.
+	 */
+	FRotator GetScopeSway() const;
 
 	/** The weapon in hand, or null before one arrives. */
 	ACheeseStrikeWeapon* GetWeapon() const;

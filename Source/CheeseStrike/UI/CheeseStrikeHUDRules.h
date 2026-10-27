@@ -37,16 +37,20 @@ namespace CheeseStrikeHUD
 	FVector2D MapPoint(const FVector2D& Offset, float ViewYaw, float Scale);
 	/** The other way to MapPoint: the world's offset (cm along X and Y) for a point `Screen` pixels right of and below a minimap's middle. */
 	FVector2D MapOffset(const FVector2D& Screen, float ViewYaw, float Scale);
+	/** How the strike map shows a level: its middle (world X and Y) and its pixels a cm. */
+	struct FMapFit
+	{
+		FVector2D Middle = FVector2D::ZeroVector;
+		float Scale = 0.0f;
+	};
 	/**
-	 * The strike map's middle (world X and Y) as it follows the strike's
-	 * `Mark`: kept where it is while the mark is within `Reach` cm of it
-	 * across and up and down the map (turned by `ViewYaw`), and moved just
-	 * far enough to bring it back within that when it strays.
+	 * The strike map that shows the whole of a level at once: the box from
+	 * `Min` to `Max` (world X and Y), turned by `ViewYaw` as the map is, fitted
+	 * into a square of `Side` pixels with `Border` pixels clear all round.
+	 * The middle is the box's middle; the scale the largest at which every
+	 * corner of the turned box is inside.
 	 */
-	FVector2D FollowMark(const FVector2D& Middle, const FVector2D& Mark, float ViewYaw, float Reach);
-	/** How far the strike map reaches from its middle to its edge (cm), and the share of that the mark may go before the map follows it. */
-	constexpr float StrikeMapRange = 3500.0f;
-	constexpr float StrikeMapFollow = 0.6f;
+	FMapFit FitMap(const FVector2D& Min, const FVector2D& Max, float ViewYaw, float Side, float Border);
 	/** Where the N mark rides the edge of a square minimap `HalfSize` pixels from its middle to its edge, from its middle. */
 	FVector2D NorthMark(float ViewYaw, float HalfSize);
 	/** The convex hull of `Points`, in order round it; fewer than three points come back as they are. */

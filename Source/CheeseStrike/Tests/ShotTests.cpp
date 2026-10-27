@@ -5,6 +5,7 @@
 // ray tests a hit is decided by, and where a player was put back to.
 
 #include "Misc/AutomationTest.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Rules/CheeseStrikeDowned.h"
 
@@ -29,6 +30,40 @@ bool FDamageFallsOffWithDistanceAndDoublesOnTheHead::RunTest(const FString& Para
 	TestEqual(TEXT("the head takes more"), CheeseStrikeWeapons::DamageAt(Weapon, 100.0f, true), Weapon.Damage * Weapon.HeadMultiplier);
 	TestTrue(TEXT("five body shots to kill, in about half a second"), CheeseStrikeWeapons::TimeToKill(Weapon) > 0.4f && CheeseStrikeWeapons::TimeToKill(Weapon) < 0.6f);
 	TestTrue(TEXT("falloff starts beyond a room and ends across a yard"), Weapon.FalloffStart > 1000.0f && Weapon.FalloffEnd < 4000.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAScopedRifleSwaysWithTheBreath, "CheeseStrike.Shot.AScopedRifleSwaysWithTheBreath", ShotTests::Flags)
+
+bool FAScopedRifleSwaysWithTheBreath::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	TestTrue(TEXT("only the Roquefort is scoped"), Roquefort().bScoped && !Blaster().bScoped);
+	TestTrue(TEXT("a few tenths of a degree each way"), ScopeSwayYaw > 0.1f && ScopeSwayYaw < 0.6f && ScopeSwayPitch > 0.1f && ScopeSwayPitch < 0.6f);
+	TestEqual(TEXT("it starts at the aim"), ScopeSway(0.0f), FVector2D::ZeroVector);
+	// Over a period: within its amplitudes, centred, slow, and a figure-eight (the pitch goes twice for the yaw's once).
+	FVector2D Sum = FVector2D::ZeroVector;
+	FVector2D Most = FVector2D::ZeroVector;
+	float Fastest = 0.0f;
+	int32 PitchCrossings = 0;
+	int32 YawCrossings = 0;
+	constexpr float Step = 0.01f;
+	FVector2D Last = ScopeSway(0.0f);
+	for (float Time = Step; Time < ScopeSwayPeriod; Time += Step)
+	{
+		const FVector2D Now = ScopeSway(Time);
+		Sum += Now;
+		Most = FVector2D(FMath::Max(Most.X, FMath::Abs(Now.X)), FMath::Max(Most.Y, FMath::Abs(Now.Y)));
+		Fastest = FMath::Max(Fastest, static_cast<float>((Now - Last).Size() / Step));
+		PitchCrossings += (Now.Y > 0.0f) != (Last.Y > 0.0f) ? 1 : 0;
+		YawCrossings += (Now.X > 0.0f) != (Last.X > 0.0f) ? 1 : 0;
+		Last = Now;
+	}
+	TestTrue(FString::Printf(TEXT("it never goes past its amplitudes (%.3f, %.3f)"), Most.X, Most.Y), Most.X <= ScopeSwayYaw + 0.0001f && Most.Y <= ScopeSwayPitch + 0.0001f && Most.X > ScopeSwayYaw * 0.99f && Most.Y > ScopeSwayPitch * 0.99f);
+	TestTrue(TEXT("and is centred on the aim"), FMath::Abs(Sum.X) / (ScopeSwayPeriod / Step) < 0.01f && FMath::Abs(Sum.Y) / (ScopeSwayPeriod / Step) < 0.01f);
+	TestTrue(FString::Printf(TEXT("it is slow: under half a degree a second (%.2f)"), Fastest), Fastest < 0.5f);
+	TestTrue(FString::Printf(TEXT("the pitch crosses the aim twice as often as the yaw (%d, %d)"), PitchCrossings, YawCrossings), PitchCrossings >= 2 * YawCrossings - 1 && PitchCrossings <= 2 * YawCrossings + 1);
+	TestTrue(TEXT("and it comes back to where it began after a period"), ScopeSway(ScopeSwayPeriod * 3.0f).Equals(ScopeSway(0.0f), 0.001f));
 	return true;
 }
 

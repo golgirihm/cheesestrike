@@ -16,11 +16,12 @@ namespace CheeseStrikeMice
 {
 	/**
 	 * Seconds into a match the mice come, and the seconds before that a red
-	 * countdown shows: nothing for the first minute and a half, then "VERMIN
-	 * INVASION IN 0:30" counting down (the user's, 24 Oct 2026; it showed
-	 * the whole minute before; they came a minute in till 26 Oct 2026).
+	 * countdown shows: nothing for the first two and a half minutes, then
+	 * "VERMIN INVASION IN 0:30" counting down (the user's, 24 Oct 2026; it
+	 * showed the whole minute before; they came a minute in till 26 Oct
+	 * 2026, two minutes in till 27 Oct 2026).
 	 */
-	constexpr float ArriveAfter = 120.0f;
+	constexpr float ArriveAfter = 180.0f;
 	constexpr float Warning = 30.0f;
 	/** Seconds into a match the countdown shows, for the mice coming `Arrival` seconds in: at once if that is no more than Warning. */
 	float CountdownFrom(float Arrival);
@@ -59,7 +60,7 @@ namespace CheeseStrikeMice
 	/** How far a mouse reaches to eat: across (cm, from its middle to the block) and up (from its feet to the block's bottom). */
 	constexpr float ReachAcross = 260.0f;
 	constexpr float ReachUp = 400.0f;
-	/** Eating: a bite of Bite every BiteEvery seconds, at an even pace; a block's 400 takes four bites, four seconds of one mouse (two till 26 Oct 2026: the mice eat at half the pace again). */
+	/** Eating: a bite of Bite every BiteEvery seconds, at an even pace; a block's 400 takes four bites, four seconds of one mouse; how big a bite is (Pace) is what sets how long a map takes. */
 	constexpr float Bite = 100.0f;
 	constexpr float BiteEvery = 1.0f;
 	/**
@@ -72,10 +73,11 @@ namespace CheeseStrikeMice
 	 * map, few mice, long walks) they bite bigger, up to MaxPace (a block at
 	 * a bite), and ahead smaller, down to MinPace.
 	 */
-	// Twice as long again as they were (164 and 124, 82 and 62 before): the mice eat at half the pace again (26 Oct 2026).
-	constexpr float EatenWithin = 328.0f;
-	constexpr float PlannedWithin = 248.0f;
-	constexpr float MinPace = 0.25f;
+	// Half as long again as they were (328 and 248, 164 and 124, 82 and 62 before): the mice eat 50% slower (27 Oct 2026).
+	// MinPace is lower with it: the slowest bite of a mouse with a map of its own to eat has to be able to take this long.
+	constexpr float EatenWithin = 492.0f;
+	constexpr float PlannedWithin = 372.0f;
+	constexpr float MinPace = 0.15f;
 	constexpr float MaxPace = 4.0f;
 	float PlannedLeft(float SecondsIn);
 	float Pace(float ShareLeft, float SecondsIn);

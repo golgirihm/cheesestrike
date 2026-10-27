@@ -104,6 +104,12 @@ namespace CheeseStrikeWeapons
 		return FromBehind(Direction, Yaw) ? Knife.BackstabDamage : Knife.Damage;
 	}
 
+	FVector2D ScopeSway(float Time)
+	{
+		const float Phase = 2.0f * PI * Time / ScopeSwayPeriod;
+		return FVector2D(ScopeSwayYaw * FMath::Sin(Phase), ScopeSwayPitch * FMath::Sin(2.0f * Phase));
+	}
+
 	float SpreadFor(const FWeaponStats& Weapon, int32 Index, bool bAimed)
 	{
 		const float Full = bAimed ? Weapon.SpreadDegrees : Weapon.HipSpreadDegrees;

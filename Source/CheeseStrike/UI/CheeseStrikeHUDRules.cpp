@@ -44,12 +44,19 @@ namespace CheeseStrikeHUD
 		return Scale > 0.0f ? (Right * Screen.X - Forward * Screen.Y) / Scale : FVector2D::ZeroVector;
 	}
 
-	FVector2D FollowMark(const FVector2D& Middle, const FVector2D& Mark, float ViewYaw, float Reach)
+	FMapFit FitMap(const FVector2D& Min, const FVector2D& Max, float ViewYaw, float Side, float Border)
 	{
-		// On the map as it is turned, a centimetre a pixel: hold the mark's offset within the reach each way.
-		const FVector2D Off = MapPoint(Mark - Middle, ViewYaw, 1.0f);
-		const FVector2D Held(FMath::Clamp(Off.X, -Reach, Reach), FMath::Clamp(Off.Y, -Reach, Reach));
-		return Mark - MapOffset(Held, ViewYaw, 1.0f);
+		FMapFit Fit;
+		Fit.Middle = (Min + Max) / 2.0f;
+		// A centimetre a pixel, the corners of the box turned: the furthest any is from the middle across or up and down.
+		float Reach = 0.0f;
+		for (const FVector2D& Corner : {Min, FVector2D(Max.X, Min.Y), Max, FVector2D(Min.X, Max.Y)})
+		{
+			const FVector2D Off = MapPoint(Corner - Fit.Middle, ViewYaw, 1.0f);
+			Reach = FMath::Max(Reach, FMath::Max(FMath::Abs(Off.X), FMath::Abs(Off.Y)));
+		}
+		Fit.Scale = Reach > UE_SMALL_NUMBER ? FMath::Max(0.0f, Side / 2.0f - Border) / Reach : 0.0f;
+		return Fit;
 	}
 
 	FVector2D NorthMark(float ViewYaw, float HalfSize)

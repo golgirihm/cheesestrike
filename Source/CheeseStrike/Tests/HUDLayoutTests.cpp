@@ -200,9 +200,9 @@ bool FTheCoverFitsAtAnyResolution::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheStrikeMapFollowsItsMark, "CheeseStrike.HUD.TheStrikeMapFollowsItsMark", HUDLayoutTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheStrikeMapShowsTheWholeLevel, "CheeseStrike.HUD.TheStrikeMapShowsTheWholeLevel", HUDLayoutTests::Flags)
 
-bool FTheStrikeMapFollowsItsMark::RunTest(const FString& Parameters)
+bool FTheStrikeMapShowsTheWholeLevel::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeHUD;
 	// The way back from the map to the world: what MapPoint does, undone, at any turn.
@@ -212,15 +212,22 @@ bool FTheStrikeMapFollowsItsMark::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("there and back at %.0f degrees"), Yaw), HUDLayoutTests::Near(MapOffset(MapPoint(Offset, Yaw, 0.08f), Yaw, 0.08f), Offset, 0.1f));
 	}
 	TestTrue(TEXT("up the map is the way it is turned"), HUDLayoutTests::Near(MapOffset(FVector2D(0.0f, -100.0f), 90.0f, 1.0f), FVector2D(0.0f, 100.0f), 0.01f));
-	// The map's middle stays while the mark is near it, and follows it just enough when it strays.
-	const FVector2D Middle(500.0f, 500.0f);
-	TestTrue(TEXT("a mark near the middle leaves it"), HUDLayoutTests::Near(FollowMark(Middle, Middle + FVector2D(300.0f, -200.0f), 0.0f, 1000.0f), Middle));
-	const FVector2D Followed = FollowMark(Middle, Middle + FVector2D(2500.0f, 0.0f), 0.0f, 1000.0f);
-	TestTrue(TEXT("one ahead beyond the reach brings it along"), HUDLayoutTests::Near(Followed, Middle + FVector2D(1500.0f, 0.0f), 0.1f));
-	const FVector2D Turned = FollowMark(Middle, Middle + FVector2D(0.0f, -2500.0f), 90.0f, 1000.0f);
-	TestTrue(TEXT("on a turned map, too"), HUDLayoutTests::Near(Turned, Middle + FVector2D(0.0f, -1500.0f), 0.1f));
-	// The strike's area fits the map it is chosen on, wherever the mark is let go.
-	TestTrue(TEXT("the area fits inside the strike map at the furthest the mark goes from its middle"), StrikeMapRange * StrikeMapFollow + CheeseStrikeStreaks::StrikeRadius < StrikeMapRange);
+	// The map shows the whole level at once: every corner of it, turned as the map is, inside the square with its border.
+	const FVector2D Min(-4000.0f, -1000.0f);
+	const FVector2D Max(6000.0f, 3000.0f);
+	for (const float Yaw : {0.0f, 37.0f, 90.0f, -150.0f})
+	{
+		const FMapFit Fit = FitMap(Min, Max, Yaw, 620.0f, 20.0f);
+		TestTrue(TEXT("its middle is the level's"), HUDLayoutTests::Near(Fit.Middle, FVector2D(1000.0f, 1000.0f)));
+		float Furthest = 0.0f;
+		for (const FVector2D& Corner : {Min, FVector2D(Max.X, Min.Y), Max, FVector2D(Min.X, Max.Y)})
+		{
+			const FVector2D On = MapPoint(Corner - Fit.Middle, Yaw, Fit.Scale);
+			Furthest = FMath::Max(Furthest, FMath::Max(FMath::Abs(On.X), FMath::Abs(On.Y)));
+		}
+		TestTrue(FString::Printf(TEXT("the level just fits the square at %.0f degrees (%.2f of 290 px)"), Yaw, Furthest), FMath::IsNearlyEqual(Furthest, 290.0f, 0.1f));
+	}
+	TestTrue(TEXT("a level with no size has no scale"), FitMap(FVector2D::ZeroVector, FVector2D::ZeroVector, 0.0f, 620.0f, 20.0f).Scale == 0.0f);
 	return true;
 }
 

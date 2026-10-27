@@ -30,6 +30,7 @@
 #include "Animation/CheeseStrikeArmsPose.h"
 #include "CheeseStrikeArsenal.h"
 #include "CheeseStrikeCharacter.h"
+#include "CheeseStrikeBeat.h"
 #include "CheeseStrikeGunfire.h"
 #include "CheeseStrikeInventory.h"
 #include "CheeseStrikeWeaponLooks.h"
@@ -42,6 +43,11 @@ static TAutoConsoleVariable<int32> CVarTraceGunfire(TEXT("CheeseStrike.TraceGunf
 
 namespace
 {
+	/** How far behind a shot's arrival the shots of another machine's run are shown at most, in intervals, and how far behind a run starts. */
+	constexpr double RemoteLeadIntervals = 1.0;
+	constexpr double RemoteMostBehindIntervals = 4.0;
+	/** The most shots of another machine kept waiting to be shown. */
+	constexpr int32 RemoteMostWaiting = 12;
 	/** How far a reported shot may start from where the server has the shooter's eyes, allowing for the time their position took to arrive. */
 	constexpr float OriginTolerance = 250.0f;
 	/** Shots that may arrive together after a delay on the network, over the rate. */
@@ -299,6 +305,21 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 			Hold(Character);
 		}
 	}
+	// Shots another machine fired, shown on the beat they were paced to (MulticastShot).
+	if (RemoteShowAt.Num() > 0)
+	{
+		const double Clock = GetWorld()->GetTimeSeconds();
+		int32 Shown = 0;
+		while (RemoteShowAt.Num() > 0 && RemoteShowAt[0] <= Clock)
+		{
+			RemoteShowAt.RemoveAt(0);
+			++Shown;
+		}
+		for (int32 Shot = 0; Shot < Shown; ++Shot)
+		{
+			ShowShot();
+		}
+	}
 	// The flash goes out.
 	if (FlashUntil > 0.0f && GetWorld()->GetTimeSeconds() >= FlashUntil)
 	{
@@ -528,6 +549,7 @@ void ACheeseStrikeWeapon::Flash()
 	{
 		return;
 	}
+	NoteBeat(CheeseStrikeBeat::EEvent::Flashed);
 	// Two guns fire in turn, each from its own muzzle.
 	if (Stats->bDual)
 	{
@@ -552,6 +574,7 @@ void ACheeseStrikeWeapon::PutAway()
 	GetWorldTimerManager().ClearTimer(BurstTimer);
 	GetWorldTimerManager().ClearTimer(PendingShotTimer);
 	StrokeShownAt = -1000.0f;
+	RemoteShowAt.Reset();
 	if (Holder != nullptr && Holder->IsLocallyControlled())
 	{
 		if (UCheeseStrikeMovementComponent* Movement = Holder->GetCheeseStrikeMovement())
@@ -696,6 +719,7 @@ void ACheeseStrikeWeapon::PlayShotSound(USoundBase* Sound) const
 	{
 		return;
 	}
+	NoteBeat(CheeseStrikeBeat::EEvent::Sounded);
 	// Its own player hears it from their own hands, whole.
 	if (Holder != nullptr && Holder->IsLocallyControlled() && Holder->IsPlayerControlled())
 	{
@@ -723,6 +747,7 @@ void ACheeseStrikeWeapon::PlayShotSound(USoundBase* Sound) const
 
 void ACheeseStrikeWeapon::ShowShot()
 {
+	NoteBeat(CheeseStrikeBeat::EEvent::Shown);
 	if (Stats->IsMelee())
 	{
 		// The knife's swipe (the arms play it from SwipePhase), with a swoosh.
@@ -776,13 +801,40 @@ void ACheeseStrikeWeapon::ShowReload()
 	GetWorldTimerManager().SetTimer(BoltTimer, FTimerDelegate::CreateUObject(this, &ACheeseStrikeWeapon::PlaySound, BoltSound.Get()), ReloadTime * 0.85f, false);
 }
 
+void ACheeseStrikeWeapon::NoteBeat(CheeseStrikeBeat::EEvent Event) const
+{
+	if (CVarTraceGunfire.GetValueOnGameThread() != 0)
+	{
+		CheeseStrikeBeat::bRecording = true;
+		UE_LOG(LogCheeseStrike, Display, TEXT("Beat: %s event %d at %.4f"), *GetNameSafe(this), static_cast<int32>(Event), FPlatformTime::Seconds());
+	}
+	CheeseStrikeBeat::Note(this, Event);
+}
+
 void ACheeseStrikeWeapon::MulticastShot_Implementation()
 {
 	// The shooter has shown it already.
-	if (Holder != nullptr && !Holder->IsLocallyControlled())
+	if (Holder == nullptr || Holder->IsLocallyControlled())
 	{
-		ShowShot();
+		return;
 	}
+	NoteBeat(CheeseStrikeBeat::EEvent::Served);
+	// Another machine's automatic fire arrives in clumps (the network sends a few times a second) and is shown on its beat:
+	// each a shot's interval after the last, the first of a run a little behind its arrival.
+	if (Stats->bAutomatic && !Stats->IsMelee() && GetWorld() != nullptr)
+	{
+		const double Clock = GetWorld()->GetTimeSeconds();
+		const double Interval = FiringStats().FireInterval;
+		const double At = CheeseStrikeBeat::PaceShow(Clock, RemoteLastShown, Interval, Interval * RemoteLeadIntervals, Interval * RemoteMostBehindIntervals);
+		RemoteLastShown = At;
+		if (RemoteShowAt.Num() >= RemoteMostWaiting)
+		{
+			RemoteShowAt.RemoveAt(0);
+		}
+		RemoteShowAt.Add(At);
+		return;
+	}
+	ShowShot();
 }
 
 void ACheeseStrikeWeapon::MulticastReload_Implementation()
@@ -973,8 +1025,16 @@ void ACheeseStrikeWeapon::FireShot(int32 InBurst, float ShowDelay)
 	const int32 Seed = FMath::Rand();
 	const UCameraComponent* Camera = Holder->GetFirstPersonCameraComponent();
 	const FVector Origin = Camera->GetComponentLocation();
-	// A player's view is their camera's; a bot's camera takes its control rotation only when someone looks through it, so a bot aims by that.
-	const FVector Aim = Holder->IsPlayerControlled() ? Camera->GetForwardVector() : Holder->GetControlRotation().Vector();
+	// A player's view is their camera's, with the scope's breathing (it sways the view the same); a bot's camera takes its control rotation only when someone looks through it, so a bot aims by that.
+	FVector Aim = Holder->GetControlRotation().Vector();
+	if (Holder->IsPlayerControlled())
+	{
+		const FRotator Sway = Holder->GetScopeSway();
+		FRotator Looking = Camera->GetForwardVector().Rotation();
+		Looking.Pitch += Sway.Pitch;
+		Looking.Yaw += Sway.Yaw;
+		Aim = Sway.IsNearlyZero(KINDA_SMALL_NUMBER) ? Camera->GetForwardVector() : Looking.Vector();
+	}
 	// The view climbs by the shot's kick, so the next lands where the crosshair is: by its degrees, whatever the player's
 	// look sensitivity and however they have their look inverted.
 	const FVector2D Kick = CheeseStrikeWeapons::RecoilFor(*Stats, Index, bAimed) - CheeseStrikeWeapons::RecoilFor(*Stats, Index - 1, bAimed);
@@ -988,6 +1048,7 @@ void ACheeseStrikeWeapon::FireShot(int32 InBurst, float ShowDelay)
 	LastShotIndex = Index;
 	LastInBurst = InBurst;
 	++ShotsFired;
+	NoteBeat(CheeseStrikeBeat::EEvent::Fired);
 	if (ShowDelay > KINDA_SMALL_NUMBER)
 	{
 		FTimerHandle Later;

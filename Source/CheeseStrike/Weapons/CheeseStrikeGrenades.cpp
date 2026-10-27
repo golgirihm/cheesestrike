@@ -35,6 +35,16 @@ namespace
 	/** A throw held, with no arms to hold it in: the grenade low on the left of its player's view (cm from the eye: ahead, right, up), its spoon toward them. */
 	const FVector HeldInViewAt(40.0f, -17.0f, -14.0f);
 	const FRotator HeldInViewTurn(-15.0f, 200.0f, 10.0f);
+	/**
+	 * A throw held, with arms: in the right hand, the one the weapon is in (the arms' pose with the gun away has their
+	 * hands low and near, below what the first-person view shows, and the grenade sat there in the left, unseen in waves
+	 * 9 and 10). Where the grenade is wanted in its player's view (cm from the eye: ahead, right, up), low on the right,
+	 * and how it turns there; it is set in the hand's own space from where that hand is as the throw is taken up, so that it
+	 * is held by the right hand and moves with it.
+	 */
+	const FName HeldHandBone(TEXT("hand_r"));
+	const FVector HeldInHandViewAt(46.0f, 12.0f, -12.0f);
+	const FRotator HeldInHandViewTurn(-15.0f, 160.0f, -10.0f);
 	/** The grenade (tools/art/weapon_models.py) and its materials (tools/art/weapon_materials.py), as ACheeseStrikeGrenade has them. */
 	const TCHAR* ThrowRoundPath = TEXT("/Game/CheeseStrike/Weapons/Grenade/SM_FragGrenade.SM_FragGrenade");
 	const TCHAR* const ThrowMaterialPaths[] = {TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeCheese.MI_GrenadeCheese"),
@@ -258,26 +268,44 @@ void UCheeseStrikeGrenades::ShowHeldInView(bool bShow)
 		HeldInView->SetCastShadow(false);
 		HeldInView->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
 		HeldInView->bOnlyOwnerSee = true;
-		// In the free hand of the arms, where the throw takes it from (ShowInHand), not hung in the view, where it floated
-		// off to the left of the arms (waves 8 and 9). Without that hand, in the view as before.
-		USkeletalMeshComponent* Arms = Character->GetFirstPersonMesh();
-		const bool bInHand = Arms != nullptr && Arms->GetSkeletalMeshAsset() != nullptr && Arms->GetBoneIndex(ThrowHandBone) != INDEX_NONE;
 		HeldInView->RegisterComponent();
-		if (bInHand)
-		{
-			HeldInView->AttachToComponent(Arms, FAttachmentTransformRules::SnapToTargetNotIncludingScale, ThrowHandBone);
-			HeldInView->SetRelativeLocationAndRotation(ThrowInHandAt, ThrowInHandTurn);
-			HeldInView->SetWorldScale3D(FVector(1.0f));
-		}
-		else
-		{
-			HeldInView->AttachToComponent(Character->GetFirstPersonCameraComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-			HeldInView->SetRelativeLocationAndRotation(HeldInViewAt, HeldInViewTurn);
-		}
 	}
 	if (HeldInView != nullptr)
 	{
+		if (bShow)
+		{
+			PutHeldInHand();
+		}
 		HeldInView->SetVisibility(bShow);
+	}
+}
+
+void UCheeseStrikeGrenades::PutHeldInHand()
+{
+	ACheeseStrikeCharacter* Character = Holder();
+	UCameraComponent* Camera = Character != nullptr ? Character->GetFirstPersonCameraComponent() : nullptr;
+	if (HeldInView == nullptr || Camera == nullptr)
+	{
+		return;
+	}
+	// In the right hand of the arms, set where the view wants it from where that hand is now (the hand itself is below the
+	// view with the gun away); without that hand, in the view.
+	USkeletalMeshComponent* Arms = Character->GetFirstPersonMesh();
+	const bool bInHand = Arms != nullptr && Arms->GetSkeletalMeshAsset() != nullptr && Arms->GetBoneIndex(HeldHandBone) != INDEX_NONE;
+	if (bInHand)
+	{
+		const FTransform Hand = Arms->GetSocketTransform(HeldHandBone);
+		const FTransform Eye(Camera->GetComponentRotation(), Camera->GetComponentLocation());
+		const FVector Where = Eye.TransformPosition(HeldInHandViewAt);
+		const FQuat Turn = Eye.GetRotation() * HeldInHandViewTurn.Quaternion();
+		HeldInView->AttachToComponent(Arms, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HeldHandBone);
+		HeldInView->SetRelativeLocationAndRotation(Hand.InverseTransformPositionNoScale(Where), Hand.GetRotation().Inverse() * Turn);
+		HeldInView->SetWorldScale3D(FVector(1.0f));
+	}
+	else
+	{
+		HeldInView->AttachToComponent(Camera, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		HeldInView->SetRelativeLocationAndRotation(HeldInViewAt, HeldInViewTurn);
 	}
 }
 
