@@ -2,7 +2,6 @@
 
 #include "CheeseStrikePodium.h"
 #include "Animation/AnimSequenceBase.h"
-#include "Animation/AnimSingleNodeInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -17,6 +16,7 @@
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/CheeseStrikeBodies.h"
+#include "Animation/CheeseStrikeEmote.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
@@ -343,9 +343,16 @@ void ACheeseStrikePodium::Stage(const TArray<FPodiumPlace>& Who)
 		UAnimSequenceBase* Emote = Emotes.IsValidIndex(Placed->Body * CheeseStrikePodiums::Places + Place) ? Emotes[Placed->Body * CheeseStrikePodiums::Places + Place].Get() : nullptr;
 		if (Emote != nullptr)
 		{
-			Hero->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-			Hero->PlayAnimation(Emote, true);
-			Hero->SetPosition(FMath::Fmod(Place * PodiumStagger, FMath::Max(0.1f, Emote->GetPlayLength())), false);
+			// Looped without a seam: the end of each pass blended into the start of the next (UCheeseStrikeEmoteAnimInstance).
+			if (Hero->GetAnimInstance() == nullptr || !Hero->GetAnimInstance()->IsA<UCheeseStrikeEmoteAnimInstance>())
+			{
+				Hero->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+				Hero->SetAnimInstanceClass(UCheeseStrikeEmoteAnimInstance::StaticClass());
+			}
+			if (UCheeseStrikeEmoteAnimInstance* Playing = Cast<UCheeseStrikeEmoteAnimInstance>(Hero->GetAnimInstance()))
+			{
+				Playing->SetEmote(Emote, FMath::Fmod(Place * PodiumStagger, FMath::Max(0.1f, Emote->GetPlayLength())));
+			}
 		}
 	}
 }
@@ -357,9 +364,9 @@ bool ACheeseStrikePodium::IsEmoting(int32 Place) const
 	{
 		return false;
 	}
-	const UAnimSingleNodeInstance* Playing = Hero->GetSingleNodeInstance();
+	const UCheeseStrikeEmoteAnimInstance* Playing = Cast<UCheeseStrikeEmoteAnimInstance>(Hero->GetAnimInstance());
 	const int32 Index = Places[Place].Body * CheeseStrikePodiums::Places + Place;
-	return Playing != nullptr && Playing->IsPlaying() && Emotes.IsValidIndex(Index) && Emotes[Index] != nullptr && Playing->GetAnimationAsset() == Emotes[Index];
+	return Playing != nullptr && Playing->IsEmoting() && Emotes.IsValidIndex(Index) && Emotes[Index] != nullptr && Playing->GetEmote() == Emotes[Index];
 }
 
 FVector ACheeseStrikePodium::PedestalFront(int32 Place) const

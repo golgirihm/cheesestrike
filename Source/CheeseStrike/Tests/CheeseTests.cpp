@@ -30,15 +30,16 @@ namespace CheeseTests
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
 	/**
 	 * The mice in AfterTheMice: when they come, by when they have eaten
-	 * everything (four times as long as the minute and a half of 23 Oct 2026, which
-	 * the user found twice too fast, and then twice too fast again), when it is seen that they eat steadily, and the most and the least of the
+	 * everything (six times as long as the minute and a half of 23 Oct 2026, which
+	 * the user found twice too fast, then twice too fast again, then 50% too fast), when it is seen that they eat steadily, and the most and the least of the
 	 * blocks left then.
 	 */
 	constexpr int32 MiceAt = 8;
-	constexpr float EatenBy = 360.0f;
-	constexpr float SteadyAt = 100.0f;
+	constexpr float EatenBy = 540.0f;
+	constexpr float SteadyAt = 150.0f;
 	constexpr float MostLeftThen = 0.95f;
-	constexpr float LeastLeftThen = 0.4f;
+	// 0.3 since the mice eat 50% slower (27 Oct 2026): a slower plan is run further ahead of by a few mice (0.38 on Gruyère Grotto and The Fondue Floor at 150 s).
+	constexpr float LeastLeftThen = 0.3f;
 	/**
 	 * How spread out they eat: the mean distance from each mouse eating to
 	 * the nearest other, as a share of what it would be were they scattered

@@ -33,7 +33,7 @@
 namespace CheeseStrikePickups
 {
 	/** Seconds a stand stays empty once taken. */
-	constexpr float RespawnSeconds = 30.0f;
+	constexpr float RespawnSeconds = 60.0f;
 	/** How near (cm, across) a bot goes to a stand before pressing Interact for it. */
 	constexpr float Reach = 65.0f;
 	/** And how far above or below its floor (cm): 2 m up. */

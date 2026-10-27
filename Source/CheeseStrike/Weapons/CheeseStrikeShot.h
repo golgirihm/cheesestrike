@@ -141,6 +141,16 @@ namespace CheeseStrikeWeapons
 	/** The width of the cone, in degrees, shot number `Index` of a run (0 the first) spreads over, aimed or from the hip. */
 	float SpreadFor(const FWeaponStats& Weapon, int32 Index, bool bAimed);
 
+	/**
+	 * A scoped rifle's breathing: the aim drifts in a slow figure-eight, `ScopeSwayYaw` degrees to each side and
+	 * `ScopeSwayPitch` up and down, once round every `ScopeSwayPeriod` seconds, the pitch going twice for the yaw's once.
+	 * `Time` is seconds of play; the result is the turn (yaw, pitch; degrees) from where the player points.
+	 */
+	constexpr float ScopeSwayYaw = 0.3f;
+	constexpr float ScopeSwayPitch = 0.2f;
+	constexpr float ScopeSwayPeriod = 7.0f;
+	FVector2D ScopeSway(float Time);
+
 	/** Whether a weapon drawn at `DrawnAt` (server time) can fire at `Now`, allowing `Allowance` seconds early. */
 	bool IsDrawn(const FWeaponStats& Weapon, float DrawnAt, float Now, float Allowance = 0.0f);
 

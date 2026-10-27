@@ -1324,6 +1324,17 @@ void ACheeseStrikeCharacter::Tick(float DeltaSeconds)
 	Eyes->SetRelativeLocation(FMath::Lerp(FVector(0.0f, 0.0f, EyeOffset), LyingHead, FMath::SmoothStep(0.0f, 1.0f, DownBlend)));
 }
 
+FRotator ACheeseStrikeCharacter::GetScopeSway() const
+{
+	const ACheeseStrikeWeapon* Held = GetWeapon();
+	if (Held == nullptr || !Held->GetStats().bScoped || !Held->IsAimed() || !IsLocallyControlled() || !IsPlayerControlled() || !IsAlive() || GetWorld() == nullptr)
+	{
+		return FRotator::ZeroRotator;
+	}
+	const FVector2D Sway = CheeseStrikeWeapons::ScopeSway(GetWorld()->GetTimeSeconds()) * AimFraction;
+	return FRotator(Sway.Y, Sway.X, 0.0f);
+}
+
 void ACheeseStrikeCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
 {
 	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);

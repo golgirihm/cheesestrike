@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "CheeseStrikeBeat.h"
 #include "CheeseStrikeShot.h"
 #include "CheeseStrikeWeapon.generated.h"
 
@@ -200,6 +201,8 @@ protected:
 	void CancelReload();
 	/** Shows a shot on this machine: the body's and the rifle's firing animations, the muzzle's flash, and the sound. */
 	void ShowShot();
+	/** Notes a step of a shot for the beat (CheeseStrikeBeat), and in the log with the trace on. */
+	void NoteBeat(CheeseStrikeBeat::EEvent Event) const;
 	/** Shows a draw on this machine: the body's animation for bringing it up, and its sound. */
 	void ShowDraw();
 	/** Lights the muzzle for a moment. */
@@ -325,6 +328,9 @@ protected:
 	bool bAimed = false;
 	/** The time (this machine's world clock, not the server's estimate, which steps when it is corrected) the next shot of automatic fire is due. */
 	float AutoNextAt = 0.0f;
+	/** Shots another machine fired, told of and not yet shown: the times (this machine's world clock) to show them at, and when the last was. */
+	TArray<double> RemoteShowAt;
+	double RemoteLastShown = -1000.0;
 	FTimerHandle BurstTimer;
 	/** A pull of the trigger while the weapon was coming up, to fire once it is. */
 	FTimerHandle PendingShotTimer;

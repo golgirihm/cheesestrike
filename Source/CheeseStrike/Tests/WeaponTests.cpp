@@ -6,6 +6,7 @@
 // (loadouts, Gun Game's ladder), and how far a shot carries to the ear.
 
 #include "Misc/AutomationTest.h"
+#include "Weapons/CheeseStrikeBeat.h"
 #include "Animation/CheeseStrikeDualHold.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Weapons/CheeseStrikeArsenal.h"
@@ -100,6 +101,42 @@ bool FAutomaticFireKeepsAnExactBeat::RunTest(const FString& Parameters)
 	NextAt = 0.0f;
 	TestEqual(TEXT("a hitch is caught up no further than four"), ShotsDue(5.0f, NextAt, Blaster().FireInterval), 4);
 	TestTrue(TEXT("and the beat starts over from there"), NextAt > 5.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShotsToldOfInClumpsAreShownOnTheBeat, "CheeseStrike.Weapons.ShotsToldOfInClumpsAreShownOnTheBeat", WeaponTests::Flags)
+
+bool FShotsToldOfInClumpsAreShownOnTheBeat::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeBeat;
+	// A Munster's shots fired every 85 ms, told of in clumps at a network tick of 33 ms (three at a time, then none), as the net does.
+	const double Interval = 0.085;
+	TArray<double> Shown;
+	double Last = -1000.0;
+	for (int32 Shot = 0; Shot < 40; ++Shot)
+	{
+		const double Fired = Shot * Interval;
+		const double Arrival = FMath::CeilToDouble(Fired / 0.033) * 0.033 + (Shot % 5 == 0 ? 0.04 : 0.0);
+		Last = PaceShow(Arrival, Last, Interval, Interval, Interval * 4.0);
+		Shown.Add(Last);
+	}
+	const FEvenness Even = Evenness(Shown);
+	TestTrue(FString::Printf(TEXT("clumps and a late shot in every five are shown on the beat (%.1f to %.1f ms of 85)"), Even.Shortest * 1000.0, Even.Longest * 1000.0), Even.Shortest > Interval * 0.95 && Even.Longest < Interval * 1.05);
+	TestTrue(TEXT("the first of a run a lead behind its arrival"), FMath::IsNearlyEqual(PaceShow(2.0, 0.5, Interval, Interval, Interval * 4.0), 2.0 + Interval));
+	TestTrue(TEXT("one that arrives after a gap of more than two intervals starts a run again"), FMath::IsNearlyEqual(PaceShow(1.3, 1.1, Interval, Interval, Interval * 4.0), 1.3 + Interval));
+	TestTrue(TEXT("one that arrives early is held to an interval after the last"), FMath::IsNearlyEqual(PaceShow(1.12, 1.1, Interval, Interval, Interval * 4.0), 1.1 + Interval));
+	// A server that sends faster than the beat doesn't push the shown shots ever further behind: the run starts over.
+	double Behind = -1000.0;
+	double Furthest = 0.0;
+	for (int32 Shot = 0; Shot < 200; ++Shot)
+	{
+		const double Arrival = Shot * Interval * 0.8;
+		Behind = PaceShow(Arrival, Behind, Interval, Interval, Interval * 4.0);
+		Furthest = FMath::Max(Furthest, Behind - Arrival);
+	}
+	TestTrue(FString::Printf(TEXT("and no more than four intervals behind (%.0f ms)"), Furthest * 1000.0), Furthest <= Interval * 4.0 + 0.0001);
+	const FEvenness Single = Evenness({0.0, 0.1, 0.2});
+	TestTrue(TEXT("evenness of a steady run"), Single.Intervals == 2 && FMath::IsNearlyEqual(Single.Mean, 0.1) && Single.Deviation < 0.0001);
 	return true;
 }
 
