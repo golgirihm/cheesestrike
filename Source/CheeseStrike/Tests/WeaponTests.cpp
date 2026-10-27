@@ -140,6 +140,41 @@ bool FShotsToldOfInClumpsAreShownOnTheBeat::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShotSoundsFallOnTheSoundBeat, "CheeseStrike.Weapons.ShotSoundsFallOnTheSoundBeat", WeaponTests::Flags)
+
+bool FShotSoundsFallOnTheSoundBeat::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeBeat;
+	// A Munster's shots shown on frames of 46 ms with a hitch now and then: the sounds still come exactly an interval apart.
+	const double Interval = 0.085;
+	FSoundBeat Beat;
+	TArray<double> Heard;
+	const FSoundBeat::FPlan First = Beat.Plan(10.0, Interval);
+	TestTrue(TEXT("the first sound starts the run, held back a lead"), First.bStartsRun && FMath::IsNearlyEqual(First.CallAt, 10.0 + FSoundBeat::LeadShare * Interval));
+	Beat.Started(First.CallAt);
+	Heard.Add(First.CallAt);
+	double Shown = 10.0;
+	for (int32 Shot = 1; Shot < 40; ++Shot)
+	{
+		// The shot is shown on the first frame at or after its time; a long frame every seventh shot.
+		const double Frame = Shot % 7 == 0 ? 0.075 : 0.046;
+		Shown = 10.0 + FMath::CeilToDouble(Shot * Interval / Frame) * Frame;
+		const FSoundBeat::FPlan Plan = Beat.Plan(Shown, Interval);
+		TestFalse(TEXT("only the first starts the run"), Plan.bStartsRun);
+		TestTrue(TEXT("and it is heard after it is asked for"), Plan.BeatTime >= Shown);
+		Heard.Add(Plan.BeatTime);
+	}
+	bool bExact = true;
+	for (int32 Index = 1; Index < Heard.Num(); ++Index)
+	{
+		const double Beats = (Heard[Index] - Heard[Index - 1]) / Interval;
+		bExact = bExact && FMath::Abs(Beats - FMath::RoundToDouble(Beats)) * Interval < 0.001 && Beats > 0.5;
+	}
+	TestTrue(TEXT("every sound is on the beat, none on another's"), bExact);
+	TestTrue(TEXT("a run that stops starts again"), Beat.Plan(Shown + 1.0, Interval).bStartsRun);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheShotgunFiresNinePellets, "CheeseStrike.Weapons.TheShotgunFiresNinePellets", WeaponTests::Flags)
 
 bool FTheShotgunFiresNinePellets::RunTest(const FString& Parameters)

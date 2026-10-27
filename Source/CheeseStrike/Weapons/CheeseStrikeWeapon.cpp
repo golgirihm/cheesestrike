@@ -23,7 +23,11 @@
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
+#include "AudioDevice.h"
+#include "Components/AudioComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Quartz/AudioMixerClockHandle.h"
+#include "Quartz/QuartzSubsystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "CheeseStrike.h"
@@ -713,25 +717,147 @@ void ACheeseStrikeWeapon::PlaySound(USoundBase* Sound) const
 	UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), FRotator::ZeroRotator, 1.0f, 1.0f, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
 }
 
-void ACheeseStrikeWeapon::PlayShotSound(USoundBase* Sound) const
+UQuartzClockHandle* ACheeseStrikeWeapon::GetShotClock(double Interval)
+{
+	UWorld* World = GetWorld();
+	if (World == nullptr || GEngine == nullptr || !GEngine->UseSound() || !World->bAllowAudioPlayback || World->IsNetMode(NM_DedicatedServer) || World->GetAudioDeviceRaw() == nullptr)
+	{
+		return nullptr;
+	}
+	UQuartzSubsystem* Quartz = UQuartzSubsystem::Get(World);
+	if (Quartz == nullptr || !Quartz->IsQuartzEnabled())
+	{
+		return nullptr;
+	}
+	if (ShotClock == nullptr)
+	{
+		ShotClockName = FName(*FString::Printf(TEXT("CheeseStrikeShots_%u"), GetUniqueID()));
+		ShotClock = Quartz->CreateNewClock(this, ShotClockName, FQuartzClockSettings(), true);
+		ShotClockInterval = 0.0;
+	}
+	if (ShotClock == nullptr)
+	{
+		return nullptr;
+	}
+	if (ShotClockInterval != Interval)
+	{
+		// One tick is one shot; the rate changes at once.
+		UQuartzClockHandle* Handle = ShotClock;
+		ShotClock->SetSecondsPerTick(this, FQuartzQuantizationBoundary(EQuartzCommandQuantization::None), FOnQuartzCommandEventBP(), Handle, static_cast<float>(Interval));
+		ShotClock->StartClock(this, Handle);
+		ShotClockInterval = Interval;
+	}
+	return ShotClock;
+}
+
+void ACheeseStrikeWeapon::EndPlay(const EEndPlayReason::Type Reason)
+{
+	if (ShotClock != nullptr && GetWorld() != nullptr)
+	{
+		if (UQuartzSubsystem* Quartz = UQuartzSubsystem::Get(GetWorld()))
+		{
+			Quartz->DeleteClockByName(this, ShotClockName);
+		}
+	}
+	ShotClock = nullptr;
+	Super::EndPlay(Reason);
+}
+
+void ACheeseStrikeWeapon::PlayShotSound(USoundBase* Sound)
 {
 	if (Sound == nullptr || GetWorld() == nullptr)
 	{
 		return;
 	}
-	NoteBeat(CheeseStrikeBeat::EEvent::Sounded);
-	// Its own player hears it from their own hands, whole.
-	if (Holder != nullptr && Holder->IsLocallyControlled() && Holder->IsPlayerControlled())
+	const double Interval = FiringStats().FireInterval;
+	if (!Stats->bAutomatic || Stats->IsMelee() || Interval <= 0.0)
 	{
-		UGameplayStatics::PlaySound2D(this, Sound, ShotVolume, ShotPitch);
+		StartShotSound(Sound, false, false, 0);
 		return;
 	}
-	// Everyone else from where it was fired: fading with distance, duller further off, and only so many at once.
-	const FVector From = Holder != nullptr ? Holder->GetActorLocation() : GetActorLocation();
-	UGameplayStatics::PlaySoundAtLocation(this, Sound, From, FRotator::ZeroRotator, ShotVolume, ShotPitch, 0.0f, CheeseStrikeGunfire::AttenuationAsset(), CheeseStrikeGunfire::ConcurrencyAsset());
-	if (CVarTraceGunfire.GetValueOnGameThread() != 0)
+	// Automatic fire's sounds go on the sound beat. Where there is no Quartz (no sound device) the beat is still planned,
+	// so that it is the same on every machine, and the sound plays when it is handed over.
+	GetShotClock(Interval);
+	const double Now = FPlatformTime::Seconds();
+	const CheeseStrikeBeat::FSoundBeat::FPlan Plan = SoundBeat.Plan(Now, Interval);
+	if (Plan.CallAt <= Now + 0.0005)
 	{
-		const APlayerController* Listener = GetWorld()->GetFirstPlayerController();
+		StartShotSound(Sound, !Plan.bStartsRun, Plan.bStartsRun, Plan.Slot);
+		return;
+	}
+	// The run's first sound is held back a little, and a late one waits for the tick after the one a sound is queued for.
+	FTimerHandle Later;
+	GetWorldTimerManager().SetTimer(Later, FTimerDelegate::CreateWeakLambda(this, [this, Sound, Plan]()
+	{
+		StartShotSound(Sound, !Plan.bStartsRun, Plan.bStartsRun, Plan.Slot);
+	}), static_cast<float>(Plan.CallAt - Now), false);
+}
+
+void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, bool bOnBeat, bool bStartsRun, int64 Slot)
+{
+	UWorld* World = GetWorld();
+	if (Sound == nullptr || World == nullptr)
+	{
+		return;
+	}
+	NoteBeat(CheeseStrikeBeat::EEvent::Sounded);
+	if (bStartsRun)
+	{
+		// The sound is heard now: it is the clock's tick 0.
+		SoundBeat.Started(FPlatformTime::Seconds());
+		CheeseStrikeBeat::NoteAt(this, CheeseStrikeBeat::EEvent::Scheduled, SoundBeat.Origin);
+		if (ShotClock != nullptr)
+		{
+			ShotClock->ResetTransport(this, FOnQuartzCommandEventBP());
+		}
+	}
+	else if (bOnBeat)
+	{
+		// Its tick, by the run's start as it was in the end.
+		CheeseStrikeBeat::NoteAt(this, CheeseStrikeBeat::EEvent::Scheduled, SoundBeat.Origin + Slot * SoundBeat.Interval);
+	}
+	const bool bOwn = Holder != nullptr && Holder->IsLocallyControlled() && Holder->IsPlayerControlled();
+	UAudioComponent* Player = nullptr;
+	const FVector From = Holder != nullptr ? Holder->GetActorLocation() : GetActorLocation();
+	if (bOwn)
+	{
+		// Its own player hears it from their own hands, whole.
+		Player = UGameplayStatics::CreateSound2D(this, Sound, ShotVolume, ShotPitch);
+	}
+	else if (GEngine != nullptr && GEngine->UseSound() && World->bAllowAudioPlayback && !World->IsNetMode(NM_DedicatedServer))
+	{
+		// Everyone else from where it was fired: fading with distance, duller further off, and only so many at once.
+		FAudioDevice::FCreateComponentParams Params(World, this);
+		Params.SetLocation(From);
+		Params.AttenuationSettings = CheeseStrikeGunfire::AttenuationAsset();
+		Params.ConcurrencySet.Add(CheeseStrikeGunfire::ConcurrencyAsset());
+		Player = FAudioDevice::CreateComponent(Sound, Params);
+		if (Player != nullptr)
+		{
+			Player->SetWorldLocation(From);
+			Player->SetVolumeMultiplier(ShotVolume);
+			Player->SetPitchMultiplier(ShotPitch);
+			Player->bAllowSpatialization = Params.ShouldUseAttenuation();
+			Player->bAutoDestroy = true;
+			Player->bStopWhenOwnerDestroyed = false;
+		}
+	}
+	if (Player != nullptr)
+	{
+		if (bOnBeat && ShotClock != nullptr)
+		{
+			FQuartzQuantizationBoundary Boundary(EQuartzCommandQuantization::Tick, 1.0f);
+			UQuartzClockHandle* Handle = ShotClock;
+			Player->PlayQuantized(this, Handle, Boundary, FOnQuartzCommandEventBP());
+		}
+		else
+		{
+			Player->Play();
+		}
+	}
+	if (!bOwn && CVarTraceGunfire.GetValueOnGameThread() != 0)
+	{
+		const APlayerController* Listener = World->GetFirstPlayerController();
 		FVector Ear;
 		FVector Front;
 		FVector Right;

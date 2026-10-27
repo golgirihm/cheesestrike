@@ -14,6 +14,8 @@ class UAnimSequence;
 struct FCheeseStrikeAnimSet;
 class USkeletalMesh;
 class USkeletalMeshComponent;
+class UAudioComponent;
+class UQuartzClockHandle;
 class USoundBase;
 class UMaterialInterface;
 class UPointLightComponent;
@@ -172,6 +174,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 protected:
 	/** Fires one shot (or strikes once) on the owner's machine, if the weapon can. */
@@ -218,8 +221,16 @@ protected:
 	void PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAnimSet::* Which, TFunction<float(const UAnimSequence*)> RateFor = nullptr);
 	/** Plays one of its sounds: the reload's and the dry click from the weapon, as heard there. */
 	void PlaySound(USoundBase* Sound) const;
-	/** Plays a shot's sound: whole for its own player, from where it was fired for everyone else. */
-	void PlayShotSound(USoundBase* Sound) const;
+	/**
+	 * Plays a shot's sound: whole for its own player, from where it was fired for everyone else. Automatic fire's sounds
+	 * go on the sound beat (CheeseStrikeBeat::FSoundBeat), on a Quartz clock of the weapon's interval, so that frames
+	 * don't move them.
+	 */
+	void PlayShotSound(USoundBase* Sound);
+	/** Starts a shot's sound (`bOnBeat`: queued for the clock's next tick; `bStartsRun`: the clock is reset to this moment first). */
+	void StartShotSound(USoundBase* Sound, bool bOnBeat, bool bStartsRun, int64 Slot);
+	/** The weapon's Quartz clock, made and set to `Interval` seconds a tick when needed; null if the machine has no Quartz (no sound, a server). */
+	UQuartzClockHandle* GetShotClock(double Interval);
 	/** Whether the server can allow a shot now: in hand and drawn, the rate, and the magazine. */
 	bool ServerAllowsShot(float Now);
 	/** Whether a shot reported from `Origin` at `When` came from about where the server had the shooter's eyes. */
@@ -331,6 +342,12 @@ protected:
 	/** Shots another machine fired, told of and not yet shown: the times (this machine's world clock) to show them at, and when the last was. */
 	TArray<double> RemoteShowAt;
 	double RemoteLastShown = -1000.0;
+	/** The beat the sounds of automatic fire are heard on, and the clock that keeps it. */
+	CheeseStrikeBeat::FSoundBeat SoundBeat;
+	UPROPERTY(Transient)
+	TObjectPtr<UQuartzClockHandle> ShotClock;
+	FName ShotClockName;
+	double ShotClockInterval = 0.0;
 	FTimerHandle BurstTimer;
 	/** A pull of the trigger while the weapon was coming up, to fire once it is. */
 	FTimerHandle PendingShotTimer;
