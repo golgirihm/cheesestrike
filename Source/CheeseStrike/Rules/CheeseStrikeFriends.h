@@ -91,6 +91,8 @@ namespace CheeseStrikeFriends
 	EPermission PermissionFromValue(const FString& Value);
 	/** "Invite only" or "Invites + friends". */
 	FString PermissionLabel(EPermission Permission);
+	/** What a permission means, under the party's dropdown while it is chosen: "Only invitations let players in" or "Friends can join". */
+	FString PermissionDescription(EPermission Permission);
 
 	/**
 	 * Whether a friend has played the game before (has run CheeseStrike). Steam can't report who owns it for a friend, so this is

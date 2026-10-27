@@ -23,10 +23,10 @@ static TAutoConsoleVariable<float> CVarMeltAt(TEXT("CheeseStrike.HUD.MeltAt"), -
 
 namespace
 {
-	/** Melted cheese: its light middle, its body, its deeper edges, and a wet shine. */
-	const FLinearColor MeltLight(1.0f, 0.86f, 0.36f, 0.98f);
-	const FLinearColor MeltBody(0.99f, 0.73f, 0.19f, 0.98f);
-	const FLinearColor MeltDeep(0.84f, 0.5f, 0.06f, 0.98f);
+	/** Melted cheese: its light middle, its body, its deeper edges, and a wet shine. Opaque, so that the sheet drawn over the drips' tops hides them whole. */
+	const FLinearColor MeltLight(1.0f, 0.86f, 0.36f, 1.0f);
+	const FLinearColor MeltBody(0.99f, 0.73f, 0.19f, 1.0f);
+	const FLinearColor MeltDeep(0.84f, 0.5f, 0.06f, 1.0f);
 	const FLinearColor MeltShine(1.0f, 0.97f, 0.84f, 0.55f);
 	const FLinearColor MeltOutline(0.12f, 0.06f, 0.0f, 0.85f);
 
@@ -38,13 +38,85 @@ namespace
 	}
 
 	/**
-	 * A drip hanging from `Top` at `X`, `Width` wide, its end `Length` further
-	 * down: a neck curving out into what it runs from, a body shaded round like
-	 * a rope of cheese and swelling a little towards its end, a round end, and a
-	 * shine down its left. As an outline, the same a little larger, dark. `Overlap`: how far down from `Top` it is still inside
-	 * what it hangs from; there it is the sheet's own colour, so that no seam shows, and the neck's curve begins below it.
+	 * A drip running from the sheet's edge at `X`, `Width` wide, down to `End`, drawn before the sheet so that the sheet covers its
+	 * top: the drip and the sheet are one shape, with no seam. Each side of its neck is a fillet, a quarter of an ellipse that leaves
+	 * the sheet's edge level (where the edge is on that side) and turns down into the drip, so the outline runs on from the sheet's
+	 * without a corner; it is the sheet's edge colour where it meets the sheet and shades to its own over the neck. Above the edge
+	 * it reaches only a little way in (`Hidden`), so that nothing of it shows through the sheet as both fade.
 	 */
-	void MeltDrip(HudDraw::FShapes& Shapes, float X, float Top, float Width, float Length, float Unit, bool bOutline, float Overlap = 0.0f)
+	void SheetDrip(HudDraw::FShapes& Shapes, float X, float Width, float ScreenWidth, float Depth, float End, float Unit)
+	{
+		const float Top = SheetEdge(X, ScreenWidth, Depth);
+		const float Length = End - Top;
+		if (Length <= 1.0f)
+		{
+			return;
+		}
+		const float Hidden = 6.0f * Unit;
+		const float FilletAcross = Width * 0.55f;
+		const float FilletDown = FMath::Min(18.0f * Unit, Length * 0.6f);
+		// The drip's own half width, Below its top: thinning as it runs, gathering into a drop at the end.
+		const auto Body = [&](float Below)
+		{
+			const float Along = FMath::Clamp(Below / Length, 0.0f, 1.0f);
+			return Width / 2.0f * (1.0f - 0.28f * FMath::SmoothStep(0.1f, 0.6f, Along) + 0.38f * FMath::SmoothStep(0.72f, 1.0f, Along));
+		};
+		// What a side's fillet adds at height Y, for a side whose fillet starts level with the sheet's edge at EdgeY.
+		const auto Fillet = [&](float Y, float EdgeY)
+		{
+			const float T = FMath::Clamp((Y - EdgeY) / FilletDown, 0.0f, 1.0f);
+			return FilletAcross * (1.0f - FMath::Sqrt(FMath::Max(0.0f, 1.0f - FMath::Square(1.0f - T))));
+		};
+		const float LeftEdge = SheetEdge(X - Width / 2.0f - FilletAcross, ScreenWidth, Depth);
+		const float RightEdge = SheetEdge(X + Width / 2.0f + FilletAcross, ScreenWidth, Depth);
+		const float Start = FMath::Min3(LeftEdge, RightEdge, Top) - Hidden;
+		const auto Row = [&](float Y, FVector2D (&Points)[4], FLinearColor (&Across)[4])
+		{
+			const float Left = Body(Y - Top) + Fillet(Y, LeftEdge);
+			const float Right = Body(Y - Top) + Fillet(Y, RightEdge);
+			const float Xs[4] = { X - Left, X - Left / 3.0f, X + Right / 3.0f, X + Right };
+			for (int32 Column = 0; Column < 4; ++Column)
+			{
+				const float Edge = SheetEdge(Xs[Column], ScreenWidth, Depth);
+				Points[Column] = FVector2D(Xs[Column], FMath::Max(Y, Edge - Hidden));
+				// The sheet's light edge colour at and above the edge, then the drip's own, shaded round, over the neck.
+				const float Own = FMath::SmoothStep(0.0f, FilletDown, static_cast<float>(Points[Column].Y) - Edge);
+				Across[Column] = FMath::Lerp(MeltLight, Column == 1 ? MeltLight : Column == 2 ? MeltBody : MeltDeep, Own);
+			}
+		};
+		const int32 Steps = FMath::Clamp(FMath::CeilToInt((End - Start) / (4.0f * Unit)), 8, 96);
+		FVector2D Upper[4];
+		FLinearColor UpperAcross[4];
+		Row(Start, Upper, UpperAcross);
+		for (int32 Step = 1; Step <= Steps; ++Step)
+		{
+			// Rows closer together near the top, where the neck curves.
+			const float Share = static_cast<float>(Step) / Steps;
+			FVector2D Lower[4];
+			FLinearColor LowerAcross[4];
+			Row(FMath::Lerp(Start, End, FMath::Lerp(Share, Share * Share, 0.5f)), Lower, LowerAcross);
+			for (int32 Column = 0; Column < 3; ++Column)
+			{
+				Shapes.Quad(Upper[Column], Upper[Column + 1], Lower[Column + 1], Lower[Column], UpperAcross[Column], UpperAcross[Column + 1], LowerAcross[Column + 1], LowerAcross[Column]);
+			}
+			FMemory::Memcpy(Upper, Lower, sizeof(Upper));
+			FMemory::Memcpy(UpperAcross, LowerAcross, sizeof(UpperAcross));
+		}
+		const float Drop = Body(Length);
+		Shapes.Bulb(FVector2D(X, End), Drop, Drop * 1.05f, MeltLight, MeltDeep);
+		if (Length > FilletDown + Width)
+		{
+			Shapes.Rect(X - Width * 0.3f, Top + FilletDown, FMath::Max(1.5f * Unit, Width * 0.12f), Length - FilletDown - Width * 0.2f, MeltShine);
+		}
+	}
+
+	/**
+	 * A drip hanging from `Top` at `X`, `Width` wide, its end `Length` further
+	 * down (from a letter): a neck curving out into what it runs from, a body shaded round like
+	 * a rope of cheese and swelling a little towards its end, a round end, and a
+	 * shine down its left. As an outline, the same a little larger, dark.
+	 */
+	void MeltDrip(HudDraw::FShapes& Shapes, float X, float Top, float Width, float Length, float Unit, bool bOutline)
 	{
 		if (Length <= 1.0f)
 		{
@@ -55,7 +127,7 @@ namespace
 		const auto HalfAt = [&](float Down)
 		{
 			// Out into the sheet at the top, thinning as it runs, gathering into a drop at the end.
-			const float Fillet = FMath::Square(FMath::Max(0.0f, 1.0f - FMath::Max(0.0f, Down - Overlap) / Neck));
+			const float Fillet = FMath::Square(FMath::Max(0.0f, 1.0f - Down / Neck));
 			const float Along = Down / Length;
 			return Width / 2.0f * (1.0f + 1.1f * Fillet - 0.28f * FMath::SmoothStep(0.1f, 0.6f, Along) + 0.38f * FMath::SmoothStep(0.72f, 1.0f, Along)) + Grow;
 		};
@@ -68,14 +140,13 @@ namespace
 			Points[2] = FVector2D(X + Half / 3.0f, Y);
 			Points[3] = FVector2D(X + Half, Y);
 		};
-		// A row's colours across: the sheet's light edge while inside the sheet, then shading to the drip's own over the neck.
+		// A row's colours across, shaded round.
 		const auto Colours = [&](float Down, FLinearColor (&Out)[4])
 		{
-			const float Own = bOutline || Overlap <= 0.0f ? 1.0f : FMath::SmoothStep(Overlap, Overlap + Neck, Down);
-			Out[0] = bOutline ? MeltOutline : FMath::Lerp(MeltLight, MeltDeep, Own);
+			Out[0] = bOutline ? MeltOutline : MeltDeep;
 			Out[1] = bOutline ? MeltOutline : MeltLight;
-			Out[2] = bOutline ? MeltOutline : FMath::Lerp(MeltLight, MeltBody, Own);
-			Out[3] = bOutline ? MeltOutline : FMath::Lerp(MeltLight, MeltDeep, Own);
+			Out[2] = bOutline ? MeltOutline : MeltBody;
+			Out[3] = bOutline ? MeltOutline : MeltDeep;
 		};
 		const int32 Steps = FMath::Clamp(FMath::CeilToInt(Length / (6.0f * Unit)), 3, 40);
 		FVector2D Upper[4];
@@ -100,9 +171,9 @@ namespace
 		}
 		const float End = HalfAt(Length);
 		Shapes.Bulb(FVector2D(X, Top + Length), End, End * 1.05f, bOutline ? MeltOutline : MeltLight, bOutline ? MeltOutline : MeltDeep);
-		if (!bOutline && Length > Overlap + Neck + Width)
+		if (!bOutline && Length > Neck + Width)
 		{
-			Shapes.Rect(X - Width * 0.3f, Top + Overlap + Neck, FMath::Max(1.5f * Unit, Width * 0.12f), Length - Overlap - Neck - Width * 0.2f, MeltShine);
+			Shapes.Rect(X - Width * 0.3f, Top + Neck, FMath::Max(1.5f * Unit, Width * 0.12f), Length - Neck - Width * 0.2f, MeltShine);
 		}
 	}
 }
@@ -122,12 +193,19 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 	}
 	const float Alpha = CheeseStrikeHUD::DeathScreenAlpha(bOut, Seconds);
 
-	// The view darkens a little, and the sheet comes down with its drips.
+	// The view darkens a little, and the sheet comes down with its drips: the drips first, their tops under the sheet, so that the
+	// sheet's edge runs on into each drip's neck as one shape.
 	HudDraw::FShapes Shapes;
 	Shapes.Rect(0.0f, 0.0f, Width, Height, FLinearColor(0.03f, 0.015f, 0.0f, 0.42f * FMath::Clamp(Seconds / 0.5f, 0.0f, 1.0f)));
 	const float Depth = CheeseStrikeHUD::SheetDepth(Seconds) * Height;
 	if (Depth > 0.5f)
 	{
+		for (int32 Index = 0; Index < CheeseStrikeHUD::Drips; ++Index)
+		{
+			const CheeseStrikeHUD::FDrip Drip = CheeseStrikeHUD::Drip(Index, Seconds);
+			const float X = Drip.X * Width;
+			SheetDrip(Shapes, X, Drip.Width * Height, Width, Depth, SheetEdge(X, Width, Depth) - 2.0f * U + Drip.Length * Height, U);
+		}
 		constexpr int32 Steps = 64;
 		for (int32 Step = 0; Step < Steps; ++Step)
 		{
@@ -138,26 +216,6 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 			Shapes.Quad(FVector2D(X0, 0.0f), FVector2D(X1, 0.0f), FVector2D(X1, Y1), FVector2D(X0, Y0), MeltDeep, MeltDeep, MeltLight, MeltLight);
 			// A wet shine just above the edge.
 			Shapes.Quad(FVector2D(X0, Y0 - 9.0f * U), FVector2D(X1, Y1 - 9.0f * U), FVector2D(X1, Y1 - 6.0f * U), FVector2D(X0, Y0 - 6.0f * U), MeltShine);
-		}
-		for (int32 Index = 0; Index < CheeseStrikeHUD::Drips; ++Index)
-		{
-			const CheeseStrikeHUD::FDrip Drip = CheeseStrikeHUD::Drip(Index, Seconds);
-			const float X = Drip.X * Width;
-			// The drip starts above the sheet's edge all across its flared top (the edge slopes, and a drip started at the edge's
-			// height in its middle left a gap where the edge is higher beside it), its length and end where they were.
-			const float DripWidth = Drip.Width * Height;
-			const float Reach = DripWidth * 1.1f + 3.0f * U;
-			float Highest = SheetEdge(X, Width, Depth);
-			float Lowest = Highest;
-			for (int32 Sample = -4; Sample <= 4; ++Sample)
-			{
-				const float Edge = SheetEdge(X + Reach * Sample / 4.0f, Width, Depth);
-				Highest = FMath::Min(Highest, Edge);
-				Lowest = FMath::Max(Lowest, Edge);
-			}
-			const float DripTop = Highest - 4.0f * U;
-			const float End = SheetEdge(X, Width, Depth) - 2.0f * U + Drip.Length * Height;
-			MeltDrip(Shapes, X, DripTop, DripWidth, FMath::Max(1.0f, End - DripTop), U, false, Lowest - DripTop);
 		}
 	}
 	Shapes.Fade(Alpha);

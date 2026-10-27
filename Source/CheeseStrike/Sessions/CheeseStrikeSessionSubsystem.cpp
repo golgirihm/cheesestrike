@@ -519,9 +519,8 @@ void UCheeseStrikeSessionSubsystem::SetFriendsMayJoin(bool bFriends)
 		FOnlineSessionSettings Settings = CheeseStrikeSessions::WithFriendsMayJoin(Named->SessionSettings, bFriends);
 		Interface->UpdateSession(NAME_GameSession, Settings, true);
 	}
-	// The presence says the permission too: send it again.
+	// The presence says the permission too: send it again. What the choice means is the dropdown's own line, not the status note.
 	PublishedPresence.Reset();
-	Say(bFriends ? TEXT("Friends can join") : TEXT("Only invitations let players in"));
 }
 
 void UCheeseStrikeSessionSubsystem::PublishPresence(CheeseStrikeFriends::EStatus Now, int32 Humans)

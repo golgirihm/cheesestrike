@@ -321,7 +321,7 @@ private:
 	/** The main page's word on why the player was put out of a match (the host left, the connection was lost), with OK to dismiss it. */
 	TSharedRef<SWidget> MakeFarewell();
 	/** A number with a button either side to make it less or more; with `bCanPick` off, the buttons can't be pressed. */
-	TSharedRef<SWidget> MakeStepper(const FString& Label, const FString& Value, bool bCanPick, TFunction<void()> Less, TFunction<void()> More);
+	TSharedRef<SWidget> MakeStepper(const FString& Label, const FString& Value, bool bCanLess, bool bCanMore, TFunction<void()> Less, TFunction<void()> More);
 	/** The picture of the map `GetMap` says (CheeseStrikeRules::Maps), its name across the bottom, as it is now. */
 	TSharedRef<SWidget> MakeMapPicture(TFunction<int32()> GetMap);
 	/** What the lobby is made of, as text (not the seconds, nor the rules' values, which its rows show as they are): when it changes, the lobby is drawn again. */

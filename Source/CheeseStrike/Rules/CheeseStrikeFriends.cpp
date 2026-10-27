@@ -106,6 +106,11 @@ namespace CheeseStrikeFriends
 		return Permission == EPermission::InviteOnly ? TEXT("Invite only") : TEXT("Invites + friends");
 	}
 
+	FString PermissionDescription(EPermission Permission)
+	{
+		return Permission == EPermission::InviteOnly ? TEXT("Only invitations let players in") : TEXT("Friends can join");
+	}
+
 	bool PlayedBefore(bool bRunningThisGame, bool bPublishesStatus)
 	{
 		return bRunningThisGame || bPublishesStatus;

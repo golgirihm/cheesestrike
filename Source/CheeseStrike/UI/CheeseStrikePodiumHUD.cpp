@@ -97,7 +97,7 @@ namespace CheeseStrikePodiumHUD
 			FSlateFontInfo NameFont;
 		};
 		TArray<FWords> Words;
-		const FSlateFontInfo NameFont = HudDraw::Font(26.0f * U);
+		const FSlateFontInfo NameFont = HudDraw::Font(CheeseStrikeHUD::PodiumNameSize * U);
 		const FSlateFontInfo ScoreFont = HudDraw::Font(18.0f * U);
 		const float NameHeight = HudDraw::Measure(TEXT("Ag"), NameFont).Y;
 		const float ScoreHeight = HudDraw::Measure(TEXT("Ag"), ScoreFont).Y;
@@ -112,15 +112,12 @@ namespace CheeseStrikePodiumHUD
 				Feet.Emplace(&Placed, Foot);
 			}
 		}
-		float PlateWidth = 230.0f * U;
-		for (int32 First = 0; First < Feet.Num(); ++First)
+		TArray<float> FeetX;
+		for (const TPair<const FPodiumPlace*, FVector2D>& Each : Feet)
 		{
-			for (int32 Second = First + 1; Second < Feet.Num(); ++Second)
-			{
-				PlateWidth = FMath::Min(PlateWidth, FMath::Abs(Feet[First].Value.X - Feet[Second].Value.X) - 36.0f * U);
-			}
+			FeetX.Add(Each.Value.X);
 		}
-		PlateWidth = FMath::Max(PlateWidth, 60.0f * U);
+		const float PlateWidth = CheeseStrikeHUD::PodiumPlateWidth(FeetX, U);
 		float BaseY = -FLT_MAX;
 		for (const TPair<const FPodiumPlace*, FVector2D>& Each : Feet)
 		{
@@ -147,9 +144,9 @@ namespace CheeseStrikePodiumHUD
 				Shapes.RoundedFrame(Foot.X - PlateWidth / 2.0f, PlateTop, PlateWidth, PlateHeight, 10.0f * U, 2.0f * U, HudDraw::Faded(HudDraw::Accent, Alpha));
 			}
 			FWords& Line = Words.AddDefaulted_GetRef();
-			// A long name shrinks to fit its plate first (down to 55% of the size), and is cut with dots only past that.
-			const float Room = PlateWidth - 24.0f * U;
-			const float FitSize = CheeseStrikeHUD::ShrinkToFit(static_cast<float>(HudDraw::Measure(Placed.Name, NameFont).X), Room, 26.0f * U, 0.55f);
+			// A long name shrinks to fit its plate first (Steam's longest fit whole), and is cut with dots only past that.
+			const float Room = PlateWidth - 20.0f * U;
+			const float FitSize = CheeseStrikeHUD::ShrinkToFit(static_cast<float>(HudDraw::Measure(Placed.Name, NameFont).X), Room, CheeseStrikeHUD::PodiumNameSize * U, CheeseStrikeHUD::PodiumNameLeastShare);
 			Line.NameFont = HudDraw::Font(FitSize);
 			Line.Name = CheeseStrikeHUD::FitName(Placed.Name, Room, [&Line](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, Line.NameFont).X); });
 			Line.Score = Placed.Score;
