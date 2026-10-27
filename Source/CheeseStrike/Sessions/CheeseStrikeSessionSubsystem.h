@@ -95,6 +95,8 @@ public:
 	UTexture2D* AvatarOf(int32 Index);
 	/** Whether friends may join this game (the host's choice; true with no game). */
 	bool FriendsMayJoinHere() const;
+	/** Whether this game is the server, so its player the host. */
+	bool IsServerHere() const;
 	/** The host lets friends join by their game, or only on an invitation. */
 	void SetFriendsMayJoin(bool bFriends);
 	/**
