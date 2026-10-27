@@ -235,6 +235,11 @@ namespace CheeseStrikeHUD
 		bool bMine = false;
 	};
 	FBoardRow BoardRow(const CheeseStrikeRules::FStanding& Line, EStatus Status, bool bIsABot, bool bMine);
+	/**
+	 * The size to draw text at to fit `Width`, where `WidthAtFull` is its width at size `Full`: `Full` if it fits, else shrunk in
+	 * proportion, but not below `Full` times `LeastShare` (a name past that is cut, FitName).
+	 */
+	float ShrinkToFit(float WidthAtFull, float Width, float Full, float LeastShare);
 	/** `Name` as it fits `Width`: whole if it does, else cut and ended with "...", by `Measure` (its width as drawn). */
 	FString FitName(const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure);
 	/**
@@ -317,12 +322,17 @@ namespace CheeseStrikeHUD
 	TArray<FStreakPip> StreakPips(int32 Kills);
 	/** What the panel says is next: "CHEESE STRIKE IN 2", one kill off "CHEESE STRIKE NEXT KILL"; past the last streak "EVERY STREAK EARNED". `bShort` names it as under its pip ("DRONE IN 3"). */
 	FString StreakNext(int32 Kills);
-	/** Seconds the count's pop takes after a kill. */
-	constexpr float StreakPopTime = 0.6f;
-	/** The count's biggest (about the minimap's side in height), and how long it stays so before it eases down. */
-	constexpr float StreakPopPeak = 7.0f;
-	constexpr float StreakPopHold = 0.08f;
-	/** How big the count is drawn `Seconds` after a kill (1 at rest, and before 0): StreakPopPeak at once, held a beat, then eased down to 1 by StreakPopTime. */
+	/**
+	 * The count's pop after a kill, with its tile behind it growing together: up over StreakPopGrow, held at StreakPopPeak (about the
+	 * minimap's side, MapSide over the tile's) for StreakPopHold, then back to size over StreakPopShrink, both moves eased.
+	 */
+	constexpr float StreakPopGrow = 0.2f;
+	constexpr float StreakPopHold = 0.5f;
+	constexpr float StreakPopShrink = 0.5f;
+	/** Seconds the whole pop takes after a kill. */
+	constexpr float StreakPopTime = StreakPopGrow + StreakPopHold + StreakPopShrink;
+	constexpr float StreakPopPeak = 250.0f / 58.0f;
+	/** How big the count and its tile are drawn `Seconds` after a kill (1 at rest, and before 0): eased up to StreakPopPeak, held, eased down to 1 by StreakPopTime. */
 	float StreakPop(float Seconds);
 	/** How long the red flash for a fall lasts, and its strongest. */
 	constexpr float FallFlashTime = 0.6f;

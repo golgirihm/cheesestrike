@@ -2445,7 +2445,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeControls()
 	for (const CheeseStrikeControls::FRow& Each : CheeseStrikeControls::Rows(*Set))
 	{
 		const auto Or = [](const FString& Text) { return Text.IsEmpty() ? FString(TEXT("-")) : Text; };
-		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 5.0f)) [ ControlsRow(Each.Action, Or(Each.Keyboard), Or(Each.Xbox), Or(Each.Nintendo), false) ];
+		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ ControlsRow(Each.Action, Or(Each.Keyboard), Or(Each.Xbox), Or(Each.Nintendo), false) ];
 	}
 	return List;
 }

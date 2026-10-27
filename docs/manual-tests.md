@@ -390,3 +390,15 @@ Setup: the packaged or `-game` build (the loading screen is not drawn in the edi
 | W9-PLAY-04 | Held grenade in the hand | Hold the grenade key (G). | The grenade sits in the arms' left hand where the throw takes it from, not floating at the left of the view; it stays there into the throw and is gone after. |
 | W9-PLAY-05 | Sprint held through spawn | Hold Shift in the countdown, and again while dead; spawn without letting go. | The player sprints as soon as they can move, without pressing Shift again. |
 | W9-PLAY-06 | Controls table steady | Settings > Controls; wait and scroll, at 1280 by 720 and 1920 by 1080. | No side-to-side flicker in the columns. |
+
+## Changes from wave 10
+
+| ID | Test | Steps | Expected |
+|---|---|---|---|
+| W10-UI-01 | Controls without a scrollbar | Settings > Controls at 1280 by 720, 1920 by 1080 and 2560 by 1440. | Every action is listed on one line each, with no scrollbar; Sprint, Crouch / slide, Aim, Interact and Scoreboard have short names. |
+| W10-UI-02 | Loading cover at any size | Host a match and watch the loading cover at 1920 by 1080, 2560 by 1440 and 3840 by 2160. | The spinner and words are whole, not clipped at the right or bottom, and keep their size when the cover hands over. |
+| W10-UI-03 | Killstreak pop | Get a kill (`CheeseStrike.HUD.Streak 3`, then raise it). | The number and its rounded-square background grow together to about the minimap's size, hold half a second, then shrink back over half a second, easing. |
+| W10-UI-04 | Pickup card padding | Stand at a weapon you can swap for. | The card has room under its bottom line of text, as much as over the top line. |
+| W10-UI-05 | Party permission dropdown | In a lobby as the host, open Friends and pick Invite only, then Invites + friends. | The dropdown shows the pick at once, and keeps it; a joiner sees it too. |
+| W10-UI-06 | Podium names | End a match with a 32-letter Steam name on the podium. | The name shrinks to fit its plate; dots only appear past a small size. |
+| W10-UI-07 | Death screen cheese | Be killed; `CheeseStrike.HUD.MeltAt 1`, then 2. | The drips run out of the top sheet with no gaps or dark seams where they join it. |

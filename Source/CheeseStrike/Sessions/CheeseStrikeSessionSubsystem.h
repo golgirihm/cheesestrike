@@ -187,6 +187,8 @@ protected:
 	FDelegateHandle FriendSessionHandle;
 	/** The presence last published, so that it is sent again only when it changes. */
 	FString PublishedPresence;
+	/** What the host picked for who can join, shown at once (the session's settings are updated later, or with no session not at all). Cleared when a session is made or left. */
+	TOptional<bool> FriendsChoice;
 	/** Pictures of friends, by Steam id (created when first asked for). */
 	UPROPERTY()
 	TObjectPtr<UCheeseStrikeAvatars> Avatars;

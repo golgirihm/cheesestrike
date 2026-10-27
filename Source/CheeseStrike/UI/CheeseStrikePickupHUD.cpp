@@ -92,7 +92,7 @@ namespace CheeseStrikePickupHUD
 		HudDraw::FShapes Shapes;
 		// A rounded card, its colour strip along the top from side to side, clipped to the card's corners.
 		const FVector2D CardMin(Middle - LineSize.X / 2.0f - 14.0f * U, Y - 6.0f * U);
-		const FVector2D CardMax = CardMin + FVector2D(LineSize.X + 28.0f * U, LineSize.Y + 30.0f * U);
+		const FVector2D CardMax = CardMin + FVector2D(LineSize.X + 28.0f * U, LineSize.Y + (Under.IsEmpty() ? 30.0f : 44.0f) * U);  // room under the second line, as much as over the first
 		Shapes.RoundedRect(CardMin.X, CardMin.Y, CardMax.X - CardMin.X, CardMax.Y - CardMin.Y, 8.0f * U, HudDraw::Panel);
 		const FLinearColor Worth = CheeseStrikePickups::WorthColour(CheeseStrikePickups::Worth(Offered->GetWeapon()));
 		Shapes.SmoothPolygon(CheeseStrikeHUD::TopStrip(CardMin, CardMax, 8.0f * U, 4.0f * U), Worth);

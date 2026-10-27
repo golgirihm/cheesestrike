@@ -12,6 +12,7 @@
 #include "Streaks/CheeseStrikeSynth.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "UI/CheeseStrikeHUDRules.h"
+#include "UI/CheeseStrikeLoader.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -152,13 +153,16 @@ bool FTheStreakPanelCountsToEachStreak::RunTest(const FString& Parameters)
 	TestEqual(TEXT("after the last"), StreakNext(10), FString(TEXT("EVERY STREAK EARNED")));
 	TestEqual(TEXT("the UAC one off"), StreakNext(1), FString(TEXT("UAC in 2")));
 	TestEqual(TEXT("the names as the panel says them"), StreakShortName(EStreak::CheeseStrike), FString(TEXT("Cheese Strike")));
-	// The pop: big at once, back through its size, a little under, and settled.
-	TestTrue(TEXT("at rest before a kill"), StreakPop(-1.0f) == 1.0f);
-	TestTrue(TEXT("huge at the kill, about the minimap's size"), StreakPop(0.0f) >= 6.0f);
-	TestTrue(TEXT("held a beat"), StreakPop(StreakPopHold * 0.5f) == StreakPop(0.0f));
-	TestTrue(TEXT("easing down, shrinking fastest first"), StreakPop(StreakPopTime * 0.3f) < StreakPop(StreakPopHold) && StreakPop(StreakPopTime * 0.3f) > StreakPop(StreakPopTime * 0.6f) && StreakPop(StreakPopTime * 0.6f) > 1.0f);
-	TestTrue(TEXT("most of the shrinking is done halfway"), StreakPop((StreakPopTime + StreakPopHold) / 2.0f) < 1.0f + (StreakPopPeak - 1.0f) * 0.2f);
-	TestTrue(TEXT("and settled"), StreakPop(StreakPopTime) == 1.0f && FMath::IsNearlyEqual(StreakPop(StreakPopTime * 0.999f), 1.0f, 0.01f));
+	// The pop: the count and its tile grow to about the minimap's size, hold half a second, and shrink back over half a second.
+	TestTrue(TEXT("at rest before a kill"), StreakPop(-1.0f) == 1.0f && StreakPop(0.0f) == 1.0f);
+	TestTrue(TEXT("grows, eased"), StreakPop(StreakPopGrow * 0.5f) > 1.0f && StreakPop(StreakPopGrow * 0.5f) < StreakPopPeak && StreakPop(StreakPopGrow * 0.25f) < 1.0f + (StreakPopPeak - 1.0f) * 0.25f);
+	TestTrue(TEXT("about the minimap's size: its side over the tile's"), FMath::IsNearlyEqual(StreakPopPeak * 58.0f, 250.0f, 1.0f) && StreakPop(StreakPopGrow) == StreakPopPeak);
+	TestTrue(TEXT("held for half a second"), FMath::IsNearlyEqual(StreakPopHold, 0.5f) && StreakPop(StreakPopGrow + 0.01f) == StreakPopPeak && StreakPop(StreakPopGrow + StreakPopHold - 0.01f) == StreakPopPeak);
+	TestTrue(TEXT("then shrinks over half a second"), FMath::IsNearlyEqual(StreakPopShrink, 0.5f) && FMath::IsNearlyEqual(StreakPopTime, StreakPopGrow + 1.0f));
+	const float ShrinkStart = StreakPopGrow + StreakPopHold;
+	TestTrue(TEXT("easing down, steady through the middle, gentle at both ends"), StreakPop(ShrinkStart + 0.05f) > StreakPopPeak - 0.1f * (StreakPopPeak - 1.0f) && StreakPop(ShrinkStart + 0.25f) < StreakPop(ShrinkStart + 0.1f) && StreakPop(ShrinkStart + 0.25f) > StreakPop(ShrinkStart + 0.4f) && StreakPop(ShrinkStart + 0.45f) < 1.0f + 0.1f * (StreakPopPeak - 1.0f));
+	TestTrue(TEXT("halfway down at the middle"), FMath::IsNearlyEqual(StreakPop(ShrinkStart + 0.25f), (1.0f + StreakPopPeak) / 2.0f, 0.01f));
+	TestTrue(TEXT("and settled"), StreakPop(StreakPopTime) == 1.0f && FMath::IsNearlyEqual(StreakPop(StreakPopTime * 0.999f), 1.0f, 0.02f));
 	// The track fills toward the run, and a death drains it.
 	float Fill = 0.0f;
 	Fill = StreakFillToward(Fill, 3, 0.1f);
@@ -171,6 +175,28 @@ bool FTheStreakPanelCountsToEachStreak::RunTest(const FString& Parameters)
 	Fill = StreakFillToward(10.0f, 0, StreakDrainTime / 2.0f);
 	TestTrue(TEXT("a whole track drains halfway in half the time"), FMath::IsNearlyEqual(Fill, 5.0f, 0.01f));
 	TestEqual(TEXT("and empty in all of it"), StreakFillToward(Fill, 0, StreakDrainTime / 2.0f), 0.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCoverFitsAtAnyResolution, "CheeseStrike.HUD.TheCoverFitsAtAnyResolution", HUDLayoutTests::Flags)
+
+bool FTheCoverFitsAtAnyResolution::RunTest(const FString& Parameters)
+{
+	// The cover's content lays out in its own size, drawn at the target scale: the loading screen gives a scale of 1, the game's
+	// viewport the target itself, and at 1280x720 up to 3840x2160 the targets run from 2/3 to 2 (the DPI curve).
+	const FVector2D Content(480.0, 40.0);
+	for (const float Target : {2.0f / 3.0f, 1.0f, 4.0f / 3.0f, 2.0f})
+	{
+		for (const float Given : {1.0f, Target, 0.5f * Target})
+		{
+			const FVector2D Wants = SCheeseStrikeSteadyScale::DesiredFor(Content, Target, Given);
+			const FVector2D Area = SCheeseStrikeSteadyScale::ContentArea(Wants, Target, Given);
+			TestTrue(*FString::Printf(TEXT("the content has all of its own size at target %.2f given %.2f"), Target, Given), FMath::IsNearlyEqual(Area.X, Content.X, 0.01) && FMath::IsNearlyEqual(Area.Y, Content.Y, 0.01));
+			// Drawn on screen: the box it asked for, in pixels, is as big as it is drawn.
+			TestTrue(TEXT("and it is drawn within the box it was given"), FMath::IsNearlyEqual(Content.X * SCheeseStrikeSteadyScale::RelativeScale(Target, Given) * Given, Wants.X * Given, 0.01));
+		}
+	}
+	TestTrue(TEXT("above 1920x1080 on the loading screen the box is larger than the content, not smaller"), SCheeseStrikeSteadyScale::DesiredFor(Content, 2.0f, 1.0f).X > Content.X);
 	return true;
 }
 

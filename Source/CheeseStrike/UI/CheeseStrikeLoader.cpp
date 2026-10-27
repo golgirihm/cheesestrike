@@ -91,9 +91,32 @@ void SCheeseStrikeSteadyScale::Construct(const FArguments& InArgs)
 	];
 }
 
+float SCheeseStrikeSteadyScale::RelativeScale(float Target, float Accumulated)
+{
+	return Target / FMath::Max(0.01f, Accumulated);
+}
+
+FVector2D SCheeseStrikeSteadyScale::DesiredFor(const FVector2D& Content, float Target, float Accumulated)
+{
+	return Content * RelativeScale(Target, Accumulated);
+}
+
+FVector2D SCheeseStrikeSteadyScale::ContentArea(const FVector2D& Allotted, float Target, float Accumulated)
+{
+	return Allotted / RelativeScale(Target, Accumulated);
+}
+
 float SCheeseStrikeSteadyScale::GetRelativeLayoutScale(const int32, float LayoutScaleMultiplier) const
 {
-	return Target / FMath::Max(0.01f, LayoutScaleMultiplier);
+	return RelativeScale(Target, LayoutScaleMultiplier);
+}
+
+FVector2D SCheeseStrikeSteadyScale::ComputeDesiredSize(float LayoutScaleMultiplier) const
+{
+	// The content is drawn at Target over what is given, so it takes that much more (or less) room than it asks for in its own
+	// units; asking for its own size alone gave it a box that much too small wherever the scale given was below the target (the
+	// loading screen's, above 1920x1080), clipping its right and bottom.
+	return DesiredFor(FVector2D(ChildSlot.GetWidget()->GetDesiredSize()), Target, LayoutScaleMultiplier);
 }
 
 void SCheeseStrikeSteadyScale::OnArrangeChildren(const FGeometry& AllottedGeometry, FArrangedChildren& ArrangedChildren) const
@@ -102,6 +125,7 @@ void SCheeseStrikeSteadyScale::OnArrangeChildren(const FGeometry& AllottedGeomet
 	{
 		return;
 	}
-	const float Relative = Target / FMath::Max(0.01f, AllottedGeometry.GetAccumulatedLayoutTransform().GetScale());
-	ArrangedChildren.AddWidget(AllottedGeometry.MakeChild(ChildSlot.GetWidget(), FVector2f(AllottedGeometry.GetLocalSize()) / Relative, FSlateLayoutTransform(Relative)));
+	const float Accumulated = AllottedGeometry.GetAccumulatedLayoutTransform().GetScale();
+	const float Relative = RelativeScale(Target, Accumulated);
+	ArrangedChildren.AddWidget(AllottedGeometry.MakeChild(ChildSlot.GetWidget(), FVector2f(ContentArea(FVector2D(AllottedGeometry.GetLocalSize()), Target, Accumulated)), FSlateLayoutTransform(Relative)));
 }

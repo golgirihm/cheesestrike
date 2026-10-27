@@ -80,6 +80,12 @@ namespace CheeseStrikeFriends
 	/** The words for a status: "Not in game", "Main menu", "In a lobby", "In a match". */
 	FString StatusLabel(EStatus Status);
 
+	/**
+	 * Whether the permission shown says friends may join: a host shows its own choice (`HostChoice`, kept once it picks, since the
+	 * session's settings are changed by an update that is not done yet, or are not kept at all with no session), else the session's
+	 * (`bSession`, which is true with no session, the default).
+	 */
+	bool FriendsMayJoinShown(bool bHosting, const TOptional<bool>& HostChoice, bool bSession);
 	/** The value published for a permission ("Invite" or "Friends"); anything but "Invite" is Invites + friends (the default). */
 	FString PermissionValue(EPermission Permission);
 	EPermission PermissionFromValue(const FString& Value);

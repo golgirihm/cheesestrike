@@ -96,6 +96,11 @@ namespace CheeseStrikeFriends
 		return Value == TEXT("Invite") ? EPermission::InviteOnly : EPermission::InvitesAndFriends;
 	}
 
+	bool FriendsMayJoinShown(bool bHosting, const TOptional<bool>& HostChoice, bool bSession)
+	{
+		return bHosting && HostChoice.IsSet() ? HostChoice.GetValue() : bSession;
+	}
+
 	FString PermissionLabel(EPermission Permission)
 	{
 		return Permission == EPermission::InviteOnly ? TEXT("Invite only") : TEXT("Invites + friends");

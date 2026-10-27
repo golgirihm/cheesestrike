@@ -490,6 +490,15 @@ namespace CheeseStrikeHUD
 		return Row;
 	}
 
+	float ShrinkToFit(float WidthAtFull, float Width, float Full, float LeastShare)
+	{
+		if (WidthAtFull <= Width || WidthAtFull <= 0.0f)
+		{
+			return Full;
+		}
+		return FMath::Max(Full * LeastShare, Full * Width / WidthAtFull);
+	}
+
 	FString FitName(const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure)
 	{
 		if (Measure(Name) <= Width)
@@ -700,13 +709,16 @@ namespace CheeseStrikeHUD
 		{
 			return 1.0f;
 		}
-		// Wave 9: huge at once (about the minimap's size), held for a beat, then shrunk to its size by an ease-out.
-		if (Seconds < StreakPopHold)
+		// Wave 10: the count and its tile grow together to about the minimap's size, hold, and ease back.
+		if (Seconds < StreakPopGrow)
+		{
+			return 1.0f + (StreakPopPeak - 1.0f) * Ease(Seconds / StreakPopGrow);
+		}
+		if (Seconds < StreakPopGrow + StreakPopHold)
 		{
 			return StreakPopPeak;
 		}
-		const float Along = (Seconds - StreakPopHold) / (StreakPopTime - StreakPopHold);
-		return 1.0f + (StreakPopPeak - 1.0f) * FMath::Pow(1.0f - Along, 3.0f);
+		return 1.0f + (StreakPopPeak - 1.0f) * (1.0f - Ease((Seconds - StreakPopGrow - StreakPopHold) / StreakPopShrink));
 	}
 
 	float FallFlashAlpha(float Seconds)
