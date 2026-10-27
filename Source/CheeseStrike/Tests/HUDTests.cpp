@@ -150,7 +150,7 @@ bool FEnemiesShowWhereTheyWereLastKnown::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeHUD;
 	FEnemyMarks Marks;
 	TestNull(TEXT("an enemy nobody knows of shows nowhere"), Marks.Find(7, 10.0f));
-	// Firing (or seen, or swept) at 10: the mark goes where they were then.
+	// Firing (or swept) at 10: the mark goes where they were then.
 	TestTrue(TEXT("a first shot places a mark"), Marks.Note(7, FVector(100, 0, 0), 10.0f));
 	TestTrue(TEXT("where they fired from"), Marks.Find(7, 10.2f) != nullptr && Marks.Find(7, 10.2f)->Where.Equals(FVector(100, 0, 0)));
 	// Firing on, running: the mark stays where it was until a second has passed.

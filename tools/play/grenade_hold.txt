@@ -1,4 +1,4 @@
-# Holds a cheese grenade's throw and lets it go: the grenade up in the free
+# Holds a cheese grenade's throw and lets it go: the grenade up in the right
 # hand with the arc it would fly shown, a mark where it comes down; let go,
 # it is thrown along it. Then a throw seen from outside, slowed, the grenade
 # in flight. The HUD's grenades (bottom right) count down. Run with

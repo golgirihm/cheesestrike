@@ -1,0 +1,34 @@
+# The grenade taken up in the right hand and thrown with it: the weapon goes
+# down, the grenade comes up in the right hand (the left let go, out of view),
+# wound back, let go, and the weapon back up after; then the same seen from
+# outside. Run with tools/play.ps1 -StartAt 1150,-1450,100,117.
+wait 3
+shot switch_1_ready
+hold Grenade
+wait 0.1
+shot switch_2_going_down
+wait 0.6
+shot switch_3_held
+cmd slomo 0.1
+release Grenade
+wait 0.2
+shot switch_4_wound_back
+wait 0.12
+shot switch_5_let_go
+cmd slomo 1
+wait 1.5
+shot switch_6_back
+cmd CheeseStrikeOutside 260 150 10 0
+wait 0.5
+hold Grenade
+wait 0.7
+shot switch_7_outside_held
+cmd slomo 0.1
+release Grenade
+wait 0.2
+shot switch_8_outside_wound_back
+wait 0.12
+shot switch_9_outside_let_go
+cmd slomo 1
+wait 2
+quit

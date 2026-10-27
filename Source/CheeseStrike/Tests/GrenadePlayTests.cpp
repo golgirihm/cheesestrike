@@ -6,7 +6,7 @@
 // grenade flies, bounces and bursts after its fuse, hurting the enemy near
 // it; one at its thrower's feet kills them, as nobody's kill; and a wall between the burst and someone saves
 // them. Held, a throw shows its arc and where it comes down, goes as the key is let go and lands there, and is put
-// away by drawing another weapon.
+// away by drawing another weapon. Held, it is in the right hand on both bodies, the left hand let go and the weapon out of sight.
 
 #include "Misc/AutomationTest.h"
 #include "Camera/CameraComponent.h"
@@ -23,6 +23,7 @@
 #include "Weapons/CheeseStrikeGrenade.h"
 #include "Weapons/CheeseStrikeGrenadeRules.h"
 #include "Weapons/CheeseStrikeGrenades.h"
+#include "Weapons/CheeseStrikeWeapon.h"
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
@@ -291,8 +292,38 @@ bool FAHeldGrenadeIsSeenInTheRightHand::RunTest(const FString& Parameters)
 		// the tangents of the angles off the view's middle are at most 0.78 across and 0.33 up and down. It was at 0.42 down, off the screen.
 		TestTrue(TEXT("ahead of the eye"), InView.X > 15.0f && InView.X < 120.0f);
 		TestTrue(FString::Printf(TEXT("on the right of the view, within the screen (across %.2f, down %.2f)"), InView.Y / InView.X, InView.Z / InView.X), InView.Y > 0.0f && InView.Y / InView.X < 0.6f && FMath::Abs(InView.Z / InView.X) < 0.3f);
+		// The left hand let go of the weapon, lowered out of the view; the weapon out of sight.
+		TestTrue(FString::Printf(TEXT("the left hand free, low and out of view (%.2f down)"), LeftHand.Z / FMath::Max(LeftHand.X, 1.0f)), LeftHand.Z < RightHand.Z - 25.0f && (LeftHand.X < 5.0f || LeftHand.Z / LeftHand.X < -0.6f));
+		const ACheeseStrikeWeapon* Weapon = Me->GetWeapon();
+		if (TestNotNull(TEXT("a weapon carried"), Weapon))
+		{
+			TestFalse(TEXT("out of sight in the view"), Weapon->GetModel(true) != nullptr && Weapon->GetModel(true)->IsVisible());
+			TestFalse(TEXT("and on the body"), Weapon->GetModel(false) != nullptr && Weapon->GetModel(false)->IsVisible());
+		}
+		// The body others see holds it in its right hand too, the left hand by its side.
+		const UStaticMeshComponent* Third = Me->GetGrenades()->GetInHandThird();
+		const USkeletalMeshComponent* Seen = Me->GetMesh();
+		if (TestNotNull(TEXT("the body's grenade is made"), Third))
+		{
+			TestTrue(TEXT("shown"), Third->IsVisible());
+			TestTrue(TEXT("in the body's right hand"), Third->GetAttachParent() == Seen && Third->GetAttachSocketName() == FName(TEXT("hand_r")));
+			const float FromHand = FVector::Dist(Third->GetComponentLocation(), Seen->GetBoneLocation(TEXT("hand_r")));
+			TestTrue(FString::Printf(TEXT("in its palm (%.1f cm from the wrist)"), FromHand), FromHand < 15.0f);
+		}
+		const FVector BodyLeft = Seen->GetBoneLocation(TEXT("hand_l"));
+		const FVector BodyRight = Seen->GetBoneLocation(TEXT("hand_r"));
+		TestTrue(FString::Printf(TEXT("the body's left hand low by its side (%.0f cm under the right)"), BodyRight.Z - BodyLeft.Z), BodyRight.Z - BodyLeft.Z > 30.0f);
 	});
-	Play(0, TEXT("release Grenade\nwait 1.0"));
+	Play(0, TEXT("release Grenade\nwait 1.4"));
+	Then([this]()
+	{
+		// Thrown and done: the weapon back in sight, the grenade gone from the hand.
+		const ACheeseStrikeCharacter* Me = Character(0);
+		const ACheeseStrikeWeapon* Weapon = Me != nullptr ? Me->GetWeapon() : nullptr;
+		TestTrue(TEXT("after the throw the weapon is back"), Weapon != nullptr && Weapon->GetModel(true) != nullptr && Weapon->GetModel(true)->IsVisible());
+		TestFalse(TEXT("its hands free"), Me == nullptr || Me->GetGrenades()->IsBusy());
+		TestFalse(TEXT("the grenade gone from the hand"), Me == nullptr || Me->GetGrenades()->GetHeldInView()->IsVisible());
+	});
 	StopPlaying();
 	return true;
 }

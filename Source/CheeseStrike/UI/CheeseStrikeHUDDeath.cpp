@@ -200,13 +200,26 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 	const float Depth = CheeseStrikeHUD::SheetDepth(Seconds) * Height;
 	if (Depth > 0.5f)
 	{
+		// Each drip's neck, where the sheet runs on into it: its middle and how far either side its fillets reach.
+		TArray<FVector2D, TInlineAllocator<32>> Necks;
 		for (int32 Index = 0; Index < CheeseStrikeHUD::Drips; ++Index)
 		{
 			const CheeseStrikeHUD::FDrip Drip = CheeseStrikeHUD::Drip(Index, Seconds);
 			const float X = Drip.X * Width;
 			SheetDrip(Shapes, X, Drip.Width * Height, Width, Depth, SheetEdge(X, Width, Depth) - 2.0f * U + Drip.Length * Height, U);
+			Necks.Add(FVector2D(X, Drip.Width * Height * (0.5f + 0.55f)));
 		}
-		constexpr int32 Steps = 64;
+		// The wet shine along the edge stops short of each neck, so that no line crosses where the sheet and a drip are one.
+		const auto Shine = [&](float X)
+		{
+			float Away = 1.0f;
+			for (const FVector2D& Neck : Necks)
+			{
+				Away = FMath::Min(Away, FMath::SmoothStep(Neck.Y, Neck.Y + 14.0f * U, FMath::Abs(X - Neck.X)));
+			}
+			return FLinearColor(MeltShine.R, MeltShine.G, MeltShine.B, MeltShine.A * Away);
+		};
+		constexpr int32 Steps = 192;
 		for (int32 Step = 0; Step < Steps; ++Step)
 		{
 			const float X0 = Width * Step / Steps;
@@ -214,8 +227,13 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 			const float Y0 = SheetEdge(X0, Width, Depth);
 			const float Y1 = SheetEdge(X1, Width, Depth);
 			Shapes.Quad(FVector2D(X0, 0.0f), FVector2D(X1, 0.0f), FVector2D(X1, Y1), FVector2D(X0, Y0), MeltDeep, MeltDeep, MeltLight, MeltLight);
-			// A wet shine just above the edge.
-			Shapes.Quad(FVector2D(X0, Y0 - 9.0f * U), FVector2D(X1, Y1 - 9.0f * U), FVector2D(X1, Y1 - 6.0f * U), FVector2D(X0, Y0 - 6.0f * U), MeltShine);
+			// A wet shine just above the edge, away from the drips.
+			const FLinearColor Shine0 = Shine(X0);
+			const FLinearColor Shine1 = Shine(X1);
+			if (Shine0.A > 0.01f || Shine1.A > 0.01f)
+			{
+				Shapes.Quad(FVector2D(X0, Y0 - 9.0f * U), FVector2D(X1, Y1 - 9.0f * U), FVector2D(X1, Y1 - 6.0f * U), FVector2D(X0, Y0 - 6.0f * U), Shine0, Shine1, Shine1, Shine0);
+			}
 		}
 	}
 	Shapes.Fade(Alpha);

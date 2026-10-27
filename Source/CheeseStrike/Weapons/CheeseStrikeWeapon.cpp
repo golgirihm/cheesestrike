@@ -476,9 +476,10 @@ bool ACheeseStrikeWeapon::LeftHandHoldFor(const USkeletalMeshComponent* Body, FV
 	return true;
 }
 
-void ACheeseStrikeWeapon::SetFirstPersonAway(bool bAway)
+void ACheeseStrikeWeapon::SetAway(bool bAway)
 {
-	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(FirstPersonMesh), static_cast<UPrimitiveComponent*>(FirstPersonModel), static_cast<UPrimitiveComponent*>(FirstPersonOffHand)})
+	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(FirstPersonMesh), static_cast<UPrimitiveComponent*>(FirstPersonModel), static_cast<UPrimitiveComponent*>(FirstPersonOffHand),
+		static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel), static_cast<UPrimitiveComponent*>(ThirdPersonOffHand)})
 	{
 		if (Part != nullptr)
 		{

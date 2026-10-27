@@ -13,6 +13,8 @@
 #include "CheeseStrikeCharacter.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
+#include "Weapons/CheeseStrikeGrenadeRules.h"
+#include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeWeaponLooks.h"
 
@@ -144,12 +146,7 @@ FCheeseStrikeAnimSets UCheeseStrikeAnimInstance::FindSets(const FString& Rifles)
 	FCheeseStrikeAnimSet& Knife = Found.Of(ECheeseStrikeHold::Knife);
 	Knife = Pistol;
 	Knife.Guard = Find<UAnimSequence>(Pistols, TEXT("MM_Unarmed_Idle_Ready"));
-	// A grenade is tossed the one way, whatever is in the other hand.
-	UAnimSequence* Toss = Find<UAnimSequence>(Animations + TEXT("Grenade/"), TEXT("MM_Rifle_GrenadeToss"));
-	for (FCheeseStrikeAnimSet& Set : Found.Holds)
-	{
-		Set.Throw = Toss;
-	}
+	// A grenade is held and thrown in code (FCheeseStrikeGrenadeHold), with the right hand, the weapon put away.
 	return Found;
 }
 
@@ -248,14 +245,24 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		ModelAlong = Weapon != nullptr ? Weapon->GetModelAlong() : FVector(0.0, 1.0, 0.0);
 		SwipePhase = Weapon != nullptr ? Weapon->SwipePhase() : -1.0f;
 		// Its own player's body: the arms placed in view.
-		View.bPlace = bFirstPersonBody && Character->IsLocallyControlled() && Character->IsAlive() && Weapon != nullptr && CVarHipHold.GetValueOnGameThread() != 0;
-		if (View.bPlace)
+		const bool bOwnView = bFirstPersonBody && Character->IsLocallyControlled() && Character->IsAlive();
+		View.bPlace = bOwnView && Weapon != nullptr && CVarHipHold.GetValueOnGameThread() != 0;
+		if (bOwnView)
 		{
 			View.Turn = GetSkelMeshComponent()->GetComponentQuat().Inverse() * Pawn->GetControlRotation().Quaternion();
 			View.CameraAtHead = Character->GetCameraAtHead();
+		}
+		// A grenade in hand: the weapon going down out of view as the grenade comes up in the right hand, and back.
+		const UCheeseStrikeGrenades* Grenades = Character->GetGrenades();
+		const float Switch = Grenades != nullptr && Character->IsAlive() ? Grenades->GetSwitch() : 0.0f;
+		Grenade.Up = CheeseStrikeGrenades::GrenadeUp(Switch);
+		Grenade.ThrowPhase = Grenades != nullptr && Character->IsAlive() ? Grenades->ThrowPhase() : -1.0f;
+		Grenade.bInView = bOwnView;
+		if (View.bPlace)
+		{
 			View.bHasSight = Character->WeaponSight(View.Sight);
 			View.Aimed = Character->GetAimFraction();
-			View.Lowered = FMath::Square(1.0f - Weapon->DrawnFraction());
+			View.Lowered = FMath::Max(FMath::Square(1.0f - Weapon->DrawnFraction()), CheeseStrikeGrenades::WeaponDown(Switch));
 			const UCheeseStrikeMovementComponent* Movement = Character->GetCheeseStrikeMovement();
 			View.bSprinting = Movement != nullptr && Movement->IsSprinting();
 		}
@@ -395,8 +402,10 @@ void FCheeseStrikeAnimProxy::Link(FName GripAnchor)
 	// Two guns, one in each hand: the hands apart, the left the mirror of the right.
 	DualHold.ComponentPose.SetLinkNode(&ViewHold);
 	LeftHand.ComponentPose.SetLinkNode(&DualHold);
+	// A grenade in the right hand, the left let go.
+	GrenadeHold.ComponentPose.SetLinkNode(&LeftHand);
 	// Last, down: on the back, propped on the left elbow, the pistol out.
-	Downed.ComponentPose.SetLinkNode(&LeftHand);
+	Downed.ComponentPose.SetLinkNode(&GrenadeHold);
 	Executing.ComponentPose.SetLinkNode(&Downed);
 	ToLocalSpace.ComponentPose.SetLinkNode(&Executing);
 	bLinked = true;
@@ -477,6 +486,7 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		ModelAlong = Instance->ModelAlong;
 		SwipePhase = Instance->SwipePhase;
 		View = Instance->View;
+		Grenade = Instance->Grenade;
 		// A change of weapon to one held another way: its animations on the same nodes (and the left hand's grip on it,
 		// measured from the new set's idle).
 		if (bLinked && Hold != LinkedHold)
@@ -617,6 +627,14 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	ViewHold.bKnife = bKnife;
 	ViewHold.SwipePhase = SwipePhase;
 	ViewHold.Montage = 1.0f - SourceWeight;
+	// A grenade in hand: as far as the switch has it up, or all of it as a throw goes on.
+	GrenadeHold.Alpha = FMath::Max(Grenade.Up, CheeseStrikeGrenades::ThrowWeight(Grenade.ThrowPhase)) * Up;
+	GrenadeHold.ThrowPhase = Grenade.ThrowPhase;
+	GrenadeHold.bInView = Grenade.bInView;
+	GrenadeHold.View = View.Turn;
+	GrenadeHold.CameraAtHead = View.CameraAtHead;
+	GrenadeHold.Forward = BodyForward;
+	GrenadeHold.AimPitch = AimPitch;
 }
 
 void FCheeseStrikeAnimProxy::UpdateAnimationNode(const FAnimationUpdateContext& InContext)

@@ -79,6 +79,51 @@ bool FAThrowIsHeldWithItsArcShown::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheGrenadeIsTakenUpAndThrownWithTheRightHand, "CheeseStrike.Weapons.TheGrenadeIsTakenUpAndThrownWithTheRightHand", GrenadeTests::Flags)
+
+bool FTheGrenadeIsTakenUpAndThrownWithTheRightHand::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeGrenades;
+	// The switch: the weapon goes down first, then the grenade comes up; and back the other way.
+	const auto Run = [](float From, bool bBusy, float Seconds)
+	{
+		float Switch = From;
+		for (float Time = 0.0f; Time < Seconds - 1.0e-4f; Time += 1.0f / 60.0f)
+		{
+			Switch = SwitchStep(Switch, bBusy, 1.0f / 60.0f);
+		}
+		return Switch;
+	};
+	const float Down = Run(0.0f, true, PutDownSeconds);
+	TestEqual(FString::Printf(TEXT("the weapon is down after its time (%.2f)"), Down), WeaponDown(Down), 1.0f, 0.05f);
+	TestEqual(TEXT("before the grenade comes up"), GrenadeUp(Down), 0.0f, 0.05f);
+	TestTrue(TEXT("halfway down, the weapon still shows"), !IsWeaponAway(0.5f, false) && WeaponDown(0.5f) == 0.5f);
+	const float Up = Run(Down, true, TakeUpSeconds);
+	TestEqual(TEXT("then the grenade is up"), GrenadeUp(Up), 1.0f, 0.05f);
+	TestTrue(TEXT("the weapon out of sight meanwhile"), IsWeaponAway(Up, false) && IsWeaponAway(1.0f, false));
+	TestTrue(TEXT("and through a throw, whatever the switch"), IsWeaponAway(0.0f, true));
+	TestEqual(TEXT("put back: the grenade down, then the weapon up"), Run(2.0f, false, TakeUpSeconds + PutDownSeconds), 0.0f, 0.05f);
+	TestTrue(TEXT("the whole switch is quick"), PutDownSeconds + TakeUpSeconds <= 0.4f);
+
+	// Held: in the right hand, ahead and on the right of the view, within the screen (76 degrees across at 21 by 9: 0.33 up and down).
+	const FHandAt Held = HeldHand();
+	TestTrue(FString::Printf(TEXT("held ahead on the right (%s)"), *Held.At.ToCompactString()), Held.At.X > 20.0f && Held.At.Y > 0.0f && Held.At.Y / Held.At.X < 0.6f);
+	TestTrue(TEXT("its palm turned in, toward the view's middle"), Held.Palm.Y < -0.5f);
+	TestTrue(TEXT("the fingers up round it"), Held.Fingers.Z > 0.5f);
+	TestTrue(TEXT("a throw starts from the hold"), ThrowHand(0.0f).At.Equals(Held.At, 0.01f));
+	// Thrown: wound back by the ear, let go where the grenade leaves the hand, then down out of sight.
+	TestTrue(TEXT("wound back"), ThrowHand(0.28f).At.X < Held.At.X - 20.0f && ThrowHand(0.28f).At.Z > Held.At.Z + 10.0f);
+	const FHandAt Release = ThrowHand(ReleasePhase);
+	const FVector InPalm = Release.At + Release.Fingers * 5.0f + Release.Palm * 4.0f;
+	const FVector ReleaseAt(ReleaseAhead, ReleaseRight, -ReleaseDown);
+	TestTrue(FString::Printf(TEXT("let go where the grenade leaves the hand (%.1f cm off)"), FVector::Dist(InPalm, ReleaseAt)), FVector::Dist(InPalm, ReleaseAt) < 8.0f);
+	TestTrue(TEXT("its fingers forward as it goes"), Release.Fingers.X > 0.7f);
+	TestTrue(TEXT("and the arm on down out of sight"), ThrowHand(1.0f).At.Z / ThrowHand(1.0f).At.X < -1.0f);
+	TestEqual(TEXT("a throw has the arm at once"), ThrowWeight(0.1f), 1.0f);
+	TestEqual(TEXT("and none without one"), ThrowWeight(-1.0f), 0.0f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FABotThrowsAGrenadeSensibly, "CheeseStrike.Bots.ThrowsAGrenadeSensibly", GrenadeTests::Flags)
 
 bool FABotThrowsAGrenadeSensibly::RunTest(const FString& Parameters)

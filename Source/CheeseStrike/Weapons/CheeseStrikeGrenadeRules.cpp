@@ -16,6 +16,92 @@ namespace CheeseStrikeGrenades
 		return FMath::Lerp(Most, Least, Distance / Radius);
 	}
 
+	float SwitchStep(float Switch, bool bBusy, float DeltaSeconds)
+	{
+		const float Rate = 1.0f / (Switch < 1.0f ? PutDownSeconds : TakeUpSeconds);
+		const float Wanted = bBusy ? 2.0f : 0.0f;
+		// Never past the middle in one step, so that each half takes its own time.
+		const float Step = FMath::FInterpConstantTo(Switch, Wanted, DeltaSeconds, Rate);
+		return (Switch < 1.0f) != (Step < 1.0f) && Switch != 1.0f ? 1.0f : Step;
+	}
+
+	float WeaponDown(float Switch)
+	{
+		return FMath::Clamp(Switch, 0.0f, 1.0f);
+	}
+
+	float GrenadeUp(float Switch)
+	{
+		return FMath::SmoothStep(0.0f, 1.0f, FMath::Clamp(Switch - 1.0f, 0.0f, 1.0f));
+	}
+
+	bool IsWeaponAway(float Switch, bool bThrowing)
+	{
+		return bThrowing || Switch >= 1.0f;
+	}
+
+	namespace
+	{
+		/** One pose of the throw: when (its phase), and the hand then. */
+		struct FThrowKey
+		{
+			float Phase;
+			FVector At;
+			FVector Fingers;
+			FVector Palm;
+		};
+		// Held; wound back by the ear, the palm forward; let go ahead of the eyes, the fingers forward; across and down,
+		// out of sight.
+		const FThrowKey ThrowKeys[] = {
+			{0.0f, FVector(36.0f, 17.0f, -13.0f), FVector(0.45f, -0.35f, 0.8f), FVector(-0.3f, -0.9f, 0.1f)},
+			{0.28f, FVector(0.0f, 26.0f, 6.0f), FVector(-0.45f, 0.1f, 0.9f), FVector(0.85f, -0.2f, 0.3f)},
+			{ReleasePhase, FVector(30.0f, 18.0f, -9.0f), FVector(0.85f, -0.1f, 0.5f), FVector(0.5f, -0.2f, -0.8f)},
+			{0.68f, FVector(48.0f, 2.0f, -32.0f), FVector(0.6f, -0.45f, -0.65f), FVector(-0.5f, -0.5f, -0.6f)},
+			{1.0f, FVector(28.0f, 4.0f, -62.0f), FVector(0.25f, -0.2f, -0.95f), FVector(-0.8f, -0.5f, 0.1f)},
+		};
+
+		FHandAt HandOf(const FThrowKey& Key)
+		{
+			FHandAt Hand;
+			Hand.At = Key.At;
+			Hand.Fingers = Key.Fingers.GetSafeNormal();
+			// The palm square to the fingers.
+			Hand.Palm = (Key.Palm - Hand.Fingers * FVector::DotProduct(Key.Palm, Hand.Fingers)).GetSafeNormal();
+			return Hand;
+		}
+	}
+
+	FHandAt HeldHand()
+	{
+		return HandOf(ThrowKeys[0]);
+	}
+
+	FHandAt ThrowHand(float Phase)
+	{
+		const float At = FMath::Clamp(Phase, 0.0f, 1.0f);
+		int32 Key = 0;
+		while (Key < UE_ARRAY_COUNT(ThrowKeys) - 2 && At > ThrowKeys[Key + 1].Phase)
+		{
+			++Key;
+		}
+		const FHandAt From = HandOf(ThrowKeys[Key]);
+		const FHandAt To = HandOf(ThrowKeys[Key + 1]);
+		const float Along = FMath::SmoothStep(0.0f, 1.0f, (At - ThrowKeys[Key].Phase) / FMath::Max(ThrowKeys[Key + 1].Phase - ThrowKeys[Key].Phase, KINDA_SMALL_NUMBER));
+		const FQuat FromTurn = FRotationMatrix::MakeFromXZ(From.Fingers, From.Palm).ToQuat();
+		const FQuat ToTurn = FRotationMatrix::MakeFromXZ(To.Fingers, To.Palm).ToQuat();
+		const FQuat Turn = FQuat::Slerp(FromTurn, ToTurn, Along);
+		FHandAt Out;
+		Out.At = FMath::Lerp(From.At, To.At, Along);
+		Out.Fingers = Turn.GetAxisX();
+		Out.Palm = Turn.GetAxisZ();
+		return Out;
+	}
+
+	float ThrowWeight(float Phase)
+	{
+		return Phase < 0.0f ? 0.0f : FMath::SmoothStep(0.0f, 0.1f, Phase);
+	}
+
 	FVector LaunchVelocity(const FVector& Aim, const FVector& CarrierVelocity)
 	{
 		const FVector Along = Aim.GetSafeNormal();
