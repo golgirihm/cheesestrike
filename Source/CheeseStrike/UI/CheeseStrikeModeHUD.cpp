@@ -171,20 +171,9 @@ namespace
 		{
 			return;
 		}
+		// The red diamonds over the enemies it saw are drawn first, before the HUD's panels (CheeseStrikeModeHUD::DrawMarksInView).
 		const float U = HudDraw::Unit(Canvas);
 		HudDraw::FShapes Shapes;
-		for (const FVector& Mark : Mine->SweepMarks)
-		{
-			FVector2D At;
-			if (ModeHudOnScreen(Hud, Mark + FVector(0.0f, 0.0f, 40.0f), At))
-			{
-				// A small red diamond, with a dark rim, where each enemy was.
-				const float Size = 8.0f * U;
-				const float Rim = Size + 2.0f * U;
-				Shapes.Quad(At + FVector2D(0, -Rim), At + FVector2D(Rim, 0), At + FVector2D(0, Rim), At + FVector2D(-Rim, 0), FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Sweep.Fade));
-				Shapes.Quad(At + FVector2D(0, -Size), At + FVector2D(Size, 0), At + FVector2D(0, Size), At + FVector2D(-Size, 0), HudDraw::Faded(HudDraw::Danger, Sweep.Fade));
-			}
-		}
 		// Under the minimap and the place's name: its name, its seconds, and a bar running down.
 		const float Left = ACheeseStrikeHUD::Margin * U;
 		const float Top = (ACheeseStrikeHUD::Margin + ACheeseStrikeHUD::MapSide + 40.0f) * U;
@@ -335,6 +324,39 @@ namespace
 
 namespace CheeseStrikeModeHUD
 {
+	void DrawMarksInView(AHUD* Hud, UCanvas* Canvas)
+	{
+		const APlayerController* Owner = Hud != nullptr ? Hud->GetOwningPlayerController() : nullptr;
+		const ACheeseStrikePlayerState* Mine = Owner != nullptr ? Owner->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+		const ACheeseStrikeGameState* Match = Hud != nullptr && Hud->GetWorld() != nullptr ? Hud->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+		if (Canvas == nullptr || Mine == nullptr || Match == nullptr || !Match->HasMatchStarted() || Match->HasMatchEnded() || Mine->IsOut())
+		{
+			return;
+		}
+		const float Until = Match->RevealEndsFor(Mine);
+		const float Now = Match->GetServerWorldTimeSeconds();
+		const CheeseStrikeHUD::FSweep Sweep = CheeseStrikeHUD::SweepAt(Now, Until, Until - Match->RevealStartedFor(Mine), CheeseStrikeStreaks::SweepPeriod);
+		if (Sweep.Index == INDEX_NONE)
+		{
+			return;
+		}
+		const float U = HudDraw::Unit(Canvas);
+		HudDraw::FShapes Shapes;
+		for (const FVector& Mark : Mine->SweepMarks)
+		{
+			FVector2D At;
+			if (ModeHudOnScreen(Hud, Mark + FVector(0.0f, 0.0f, 40.0f), At))
+			{
+				// A small red diamond, with a dark rim, where each enemy was.
+				const float Size = 8.0f * U;
+				const float Rim = Size + 2.0f * U;
+				Shapes.SmoothPolygon({At + FVector2D(0, -Rim), At + FVector2D(Rim, 0), At + FVector2D(0, Rim), At + FVector2D(-Rim, 0)}, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Sweep.Fade));
+				Shapes.SmoothPolygon({At + FVector2D(0, -Size), At + FVector2D(Size, 0), At + FVector2D(0, Size), At + FVector2D(-Size, 0)}, HudDraw::Faded(HudDraw::Danger, Sweep.Fade));
+			}
+		}
+		Shapes.Draw(Canvas);
+	}
+
 	bool IsOut(const AHUD* Hud)
 	{
 		const APlayerController* Owner = Hud != nullptr ? Hud->GetOwningPlayerController() : nullptr;

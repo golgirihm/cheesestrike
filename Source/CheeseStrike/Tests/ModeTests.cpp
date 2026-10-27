@@ -287,7 +287,7 @@ bool FTheWheelsFallAndBurst::RunTest(const FString& Parameters)
 	TestEqual(TEXT("a direct hit does the most"), BlastDamage(StrikeBlast, 0.0f), StrikeBlast.Centre);
 	TestEqual(TEXT("a strike's direct hit kills"), StrikeBlast.Centre >= 100.0f, true);
 	TestTrue(TEXT("and so does a hit at the edge of the burst: a full-health player never survives one"), BlastDamage(StrikeBlast, StrikeBlast.Radius) >= 100.0f && BlastDamage(StrikeBlast, StrikeBlast.Radius * 0.99f) >= 100.0f);
-	TestTrue(TEXT("the area is three quarters as wide again as it first was (750 cm), its bursts too (500 cm)"), FMath::IsNearlyEqual(StrikeRadius, 750.0f * 1.75f) && FMath::IsNearlyEqual(StrikeBlast.Radius, 500.0f * 1.75f));
+	TestTrue(TEXT("the area is twice as wide as it first was (750 cm), its bursts too (500 cm)"), FMath::IsNearlyEqual(StrikeRadius, 750.0f * 2.0f) && FMath::IsNearlyEqual(StrikeBlast.Radius, 500.0f * 2.0f));
 	TestEqual(TEXT("the edge the least"), BlastDamage(StrikeBlast, StrikeBlast.Radius), StrikeBlast.Edge);
 	TestTrue(TEXT("falling off between"), FMath::IsNearlyEqual(BlastDamage(StrikeBlast, StrikeBlast.Radius / 2.0f), (StrikeBlast.Centre + StrikeBlast.Edge) / 2.0f, 0.01f));
 	TestEqual(TEXT("and nothing past it"), BlastDamage(StrikeBlast, StrikeBlast.Radius + 1.0f), 0.0f);

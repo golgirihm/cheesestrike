@@ -129,7 +129,7 @@ namespace CheeseStrikeStreaks
 	 * caller (cm).
 	 */
 	constexpr int32 StrikeWheels = 7;
-	constexpr float StrikeRadius = 1312.5f;
+	constexpr float StrikeRadius = 1500.0f;
 	constexpr float StrikeRing = 0.6f;
 	constexpr float StrikeRange = 15000.0f;
 	/** Seconds from the call to the first wheel landing (the whistle), and between wheels. */
@@ -153,8 +153,8 @@ namespace CheeseStrikeStreaks
 		float Centre;
 		float Edge;
 	};
-	/** A full-health player (100) is killed, or downed in Execution, by any hit of a strike's wheel, at the edge of its burst too. The area and the bursts are three quarters as wide again as they first were (750 and 500 cm). */
-	constexpr FBlast StrikeBlast{875.0f, 150.0f, 100.0f};
+	/** A full-health player (100) is killed, or downed in Execution, by any hit of a strike's wheel, at the edge of its burst too. The area and the bursts are twice as wide as they first were (750 and 500 cm). */
+	constexpr FBlast StrikeBlast{1000.0f, 150.0f, 100.0f};
 	constexpr FBlast OverloadBlast{450.0f, 70.0f, 10.0f};
 	/** The harm `Blast` does `Distance` from where it lands: falling off in a straight line to its edge, none past it. */
 	float BlastDamage(const FBlast& Blast, float Distance);

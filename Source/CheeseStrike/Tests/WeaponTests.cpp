@@ -45,6 +45,15 @@ bool FEveryWeaponKillsInTheDesignsTime::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("the Roquefort kills with one shot to the head"), DamageAt(Roquefort(), Roquefort().MaxRange, true) >= MaxHealth);
 	TestTrue(TEXT("however far: it has no falloff"), DamageAt(Roquefort(), Roquefort().MaxRange, false) == Roquefort().Damage);
+	{
+		// At every range it reaches, a shot to the head takes a full-health player's whole health: killed, or down in Execution.
+		float Least = BIG_NUMBER;
+		for (float Distance = 0.0f; Distance <= Roquefort().MaxRange; Distance += 100.0f)
+		{
+			Least = FMath::Min(Least, DamageAt(Roquefort(), Distance, true));
+		}
+		TestTrue(FString::Printf(TEXT("a Roquefort headshot takes a full health at any range (the least %.0f)"), Least), Least >= MaxHealth);
+	}
 	TestTrue(TEXT("the Curd Pistol is the weakest gun"), Pistol().Damage / Pistol().FireInterval < Blaster().Damage / Blaster().FireInterval);
 	return true;
 }

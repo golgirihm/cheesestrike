@@ -38,6 +38,31 @@ namespace
 	}
 
 	/**
+	 * The soft rim round a drip drawn hard of quads (FShapes::SoftRim): down its left side (`Lefts`, top to bottom), round its drop's
+	 * end (a half ellipse `Radius` across and `Depth` down from `End`, as FShapes::Bulb draws it, in `EndColour`) and up its right,
+	 * open across its top, where it runs on into what it hangs from.
+	 */
+	void DripRim(HudDraw::FShapes& Shapes, const TArray<FVector2D>& Lefts, const TArray<FVector2D>& Rights, const TArray<FLinearColor>& LeftColours,
+		const TArray<FLinearColor>& RightColours, const FVector2D& End, float Radius, float Depth, const FLinearColor& EndColour)
+	{
+		TArray<FVector2D> Rim(Lefts);
+		TArray<FLinearColor> RimColours(LeftColours);
+		constexpr int32 BulbSides = 14;
+		for (int32 Side = BulbSides - 1; Side >= 1; --Side)
+		{
+			const float Angle = UE_PI * Side / BulbSides;
+			Rim.Add(End + FVector2D(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Depth));
+			RimColours.Add(EndColour);
+		}
+		for (int32 Index = Rights.Num() - 1; Index >= 0; --Index)
+		{
+			Rim.Add(Rights[Index]);
+			RimColours.Add(RightColours[Index]);
+		}
+		Shapes.SoftRim(Rim, RimColours, true);
+	}
+
+	/**
 	 * A drip running from the sheet's edge at `X`, `Width` wide, down to `End`, drawn before the sheet so that the sheet covers its
 	 * top: the drip and the sheet are one shape, with no seam. Each side of its neck is a fillet, a quarter of an ellipse that leaves
 	 * the sheet's edge level (where the edge is on that side) and turns down into the drip, so the outline runs on from the sheet's
@@ -88,6 +113,11 @@ namespace
 		FVector2D Upper[4];
 		FLinearColor UpperAcross[4];
 		Row(Start, Upper, UpperAcross);
+		// Its sides, for the soft rim round it.
+		TArray<FVector2D> Lefts = {Upper[0]};
+		TArray<FVector2D> Rights = {Upper[3]};
+		TArray<FLinearColor> LeftColours = {UpperAcross[0]};
+		TArray<FLinearColor> RightColours = {UpperAcross[3]};
 		for (int32 Step = 1; Step <= Steps; ++Step)
 		{
 			// Rows closer together near the top, where the neck curves.
@@ -95,6 +125,10 @@ namespace
 			FVector2D Lower[4];
 			FLinearColor LowerAcross[4];
 			Row(FMath::Lerp(Start, End, FMath::Lerp(Share, Share * Share, 0.5f)), Lower, LowerAcross);
+			Lefts.Add(Lower[0]);
+			Rights.Add(Lower[3]);
+			LeftColours.Add(LowerAcross[0]);
+			RightColours.Add(LowerAcross[3]);
 			for (int32 Column = 0; Column < 3; ++Column)
 			{
 				Shapes.Quad(Upper[Column], Upper[Column + 1], Lower[Column + 1], Lower[Column], UpperAcross[Column], UpperAcross[Column + 1], LowerAcross[Column + 1], LowerAcross[Column]);
@@ -104,6 +138,7 @@ namespace
 		}
 		const float Drop = Body(Length);
 		Shapes.Bulb(FVector2D(X, End), Drop, Drop * 1.05f, MeltLight, MeltDeep);
+		DripRim(Shapes, Lefts, Rights, LeftColours, RightColours, FVector2D(X, End), Drop, Drop * 1.05f, MeltDeep);
 		if (Length > FilletDown + Width)
 		{
 			Shapes.Rect(X - Width * 0.3f, Top + FilletDown, FMath::Max(1.5f * Unit, Width * 0.12f), Length - FilletDown - Width * 0.2f, MeltShine);
@@ -153,6 +188,11 @@ namespace
 		Row(0.0f, Upper);
 		FLinearColor UpperAcross[4];
 		Colours(0.0f, UpperAcross);
+		// Its sides, for the soft rim round it.
+		TArray<FVector2D> Lefts = {Upper[0]};
+		TArray<FVector2D> Rights = {Upper[3]};
+		TArray<FLinearColor> LeftColours = {UpperAcross[0]};
+		TArray<FLinearColor> RightColours = {UpperAcross[3]};
 		for (int32 Step = 1; Step <= Steps; ++Step)
 		{
 			// Rows closer together in the neck, where it curves.
@@ -162,6 +202,10 @@ namespace
 			Row(LowerDown, Lower);
 			FLinearColor LowerAcross[4];
 			Colours(LowerDown, LowerAcross);
+			Lefts.Add(Lower[0]);
+			Rights.Add(Lower[3]);
+			LeftColours.Add(LowerAcross[0]);
+			RightColours.Add(LowerAcross[3]);
 			for (int32 Column = 0; Column < 3; ++Column)
 			{
 				Shapes.Quad(Upper[Column], Upper[Column + 1], Lower[Column + 1], Lower[Column], UpperAcross[Column], UpperAcross[Column + 1], LowerAcross[Column + 1], LowerAcross[Column]);
@@ -171,6 +215,7 @@ namespace
 		}
 		const float End = HalfAt(Length);
 		Shapes.Bulb(FVector2D(X, Top + Length), End, End * 1.05f, bOutline ? MeltOutline : MeltLight, bOutline ? MeltOutline : MeltDeep);
+		DripRim(Shapes, Lefts, Rights, LeftColours, RightColours, FVector2D(X, Top + Length), End, End * 1.05f, bOutline ? MeltOutline : MeltDeep);
 		if (!bOutline && Length > Neck + Width)
 		{
 			Shapes.Rect(X - Width * 0.3f, Top + Neck, FMath::Max(1.5f * Unit, Width * 0.12f), Length - Neck - Width * 0.2f, MeltShine);
@@ -227,6 +272,8 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 			const float Y0 = SheetEdge(X0, Width, Depth);
 			const float Y1 = SheetEdge(X1, Width, Depth);
 			Shapes.Quad(FVector2D(X0, 0.0f), FVector2D(X1, 0.0f), FVector2D(X1, Y1), FVector2D(X0, Y0), MeltDeep, MeltDeep, MeltLight, MeltLight);
+			// Its wavy edge soft, as the drips' sides are.
+			Shapes.Fringe(FVector2D(X0, Y0), FVector2D(X1, Y1), FVector2D(0.0f, CheeseStrikeHUD::SoftEdge), MeltLight);
 			// A wet shine just above the edge, away from the drips.
 			const FLinearColor Shine0 = Shine(X0);
 			const FLinearColor Shine1 = Shine(X1);

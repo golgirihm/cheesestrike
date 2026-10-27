@@ -563,6 +563,11 @@ namespace CheeseStrikeHUD
 		return FMath::Max(Width, PodiumPlateLeast * Unit);
 	}
 
+	float PodiumLift(float PlatesBottom, float ScreenHeight, float Reserve)
+	{
+		return FMath::Max(0.0f, PlatesBottom - (ScreenHeight - Reserve));
+	}
+
 	FString FitName(const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure)
 	{
 		if (Measure(Name) <= Width)
@@ -609,6 +614,11 @@ namespace CheeseStrikeHUD
 	float DeathScreenAlpha(bool bOut, float Seconds)
 	{
 		return bOut ? FMath::Clamp((OutDeathScreen - Seconds) / 0.5f, 0.0f, 1.0f) : 1.0f;
+	}
+
+	bool ShowsMarksInView(bool bAlive, bool bStrikeMap, bool bScoreboard, bool bMenu, bool bOver)
+	{
+		return bAlive && !bStrikeMap && !bScoreboard && !bMenu && !bOver;
 	}
 
 	uint64 SteamIdFrom(const FString& Type, const FString& Id)
@@ -779,6 +789,14 @@ namespace CheeseStrikeHUD
 			return StreakPopPeak;
 		}
 		return 1.0f + (StreakPopPeak - 1.0f) * (1.0f - Ease((Seconds - StreakPopHold) / StreakPopShrink));
+	}
+
+	FVector2D StreakPopCorner(float Left, float PanelTop, float Tile, float Pop, float Clear)
+	{
+		// Its bottom goes from Clear over the panel at the peak down to the panel's own at rest, as far as the size has gone.
+		const float Travel = FMath::Clamp((Pop - 1.0f) / (StreakPopPeak - 1.0f), 0.0f, 1.0f);
+		const float Bottom = FMath::Lerp(PanelTop + Tile, PanelTop - Clear, Travel);
+		return FVector2D(Left, Bottom - Tile * FMath::Max(Pop, 1.0f));
 	}
 
 	float FallFlashAlpha(float Seconds)

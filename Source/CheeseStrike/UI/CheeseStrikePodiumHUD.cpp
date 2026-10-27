@@ -124,13 +124,16 @@ namespace CheeseStrikePodiumHUD
 			BaseY = FMath::Max(BaseY, Each.Value.Y);
 		}
 		const float GlyphHeight = 104.0f * U;
+		const float PlateHeight = NameHeight + ScoreHeight + 28.0f * U;
+		// The numbers and plates raised, all together, as far as keeps the plates out of the room at the foot for the host's button
+		// (bottom right), at any shape of the screen: the plates' bottom is lowest under a number.
+		BaseY -= CheeseStrikeHUD::PodiumLift(BaseY + 14.0f * U + GlyphHeight * 0.22f + 28.0f * U + PlateHeight, Size.Y, CheeseStrikeHUD::PodiumFootReserve * U);
 		const float GlyphTop = BaseY + 14.0f * U - GlyphHeight * 0.78f;
 		for (const TPair<const FPodiumPlace*, FVector2D>& Each : Feet)
 		{
 			const FPodiumPlace& Placed = *Each.Key;
 			const FVector2D Foot(Each.Value.X, BaseY);
 			const FLinearColor Colour = Placed.Team >= 0 ? HudDraw::SideColour(Placed.Team) : HudDraw::Accent;
-			const float PlateHeight = NameHeight + ScoreHeight + 28.0f * U;
 			// The place's number on the pedestal's foot, and the plate a little lower under it, the name clear of the number.
 			UTexture2D* Glyph = Podium->Glyph(Placed.Place + 1);
 			const bool bGlyph = Glyph != nullptr && Glyph->GetResource() != nullptr && Glyph->GetSizeY() > 0;
@@ -207,18 +210,19 @@ void SCheeseStrikePodiumSkip::Construct(const FArguments& InArgs)
 	ChildSlot
 	.HAlign(HAlign_Right)
 	.VAlign(VAlign_Bottom)
-	.Padding(FMargin(0.0f, 0.0f, 56.0f, 40.0f))
+	// Low in the corner, in the room the podium's plates keep clear for it (CheeseStrikeHUD::PodiumFootReserve).
+	.Padding(FMargin(0.0f, 0.0f, 40.0f, 24.0f))
 	[
 		SNew(SButton)
 		.ButtonStyle(&Style)
 		.IsFocusable(false)
-		.ContentPadding(FMargin(18.0f, 10.0f))
+		.ContentPadding(FMargin(16.0f, 8.0f))
 		.OnClicked(this, &SCheeseStrikePodiumSkip::Skip)
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("Back to the lobby"))).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 18))
+				SNew(STextBlock).Text(FText::FromString(TEXT("Back to the lobby"))).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 16))
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(12.0f, 0.0f, 0.0f, 0.0f))
 			[
@@ -227,7 +231,7 @@ void SCheeseStrikePodiumSkip::Construct(const FArguments& InArgs)
 				.Padding(FMargin(8.0f, 2.0f))
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this]() { return FText::FromString(Controller.IsValid() && CheeseStrikeInput::IsUsingGamepad(Controller.Get()) ? TEXT("A") : TEXT("ENTER")); }).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 14))
+					.Text_Lambda([this]() { return FText::FromString(Controller.IsValid() && CheeseStrikeInput::IsUsingGamepad(Controller.Get()) ? TEXT("A") : TEXT("ENTER")); }).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 13))
 				]
 			]
 		]

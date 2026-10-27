@@ -339,6 +339,10 @@ bool FTheScoreboardShowsStatusAndWhoPlays::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the nearest pair decides, in any order"), PodiumPlateWidth({900.0f, 100.0f, 400.0f}, 1.0f), 300.0f - PodiumPlateGap);
 	TestEqual(TEXT("and scales with the unit"), PodiumPlateWidth({0.0f}, 2.0f), 2.0f * PodiumPlateMost);
 	TestEqual(TEXT("never narrower than the least"), PodiumPlateWidth({100.0f, 110.0f}, 1.0f), PodiumPlateLeast);
+	// And they keep clear of the host's button at the foot.
+	TestEqual(TEXT("plates clear of the button's room stay where they are"), PodiumLift(600.0f, 720.0f, PodiumFootReserve), 0.0f);
+	TestEqual(TEXT("plates reaching into it are raised out of it"), PodiumLift(700.0f, 720.0f, PodiumFootReserve), 700.0f - (720.0f - PodiumFootReserve));
+	TestTrue(TEXT("the room is the button's: its gap under it (24), its height (about 41) and a gap over it"), PodiumFootReserve >= 24.0f + 41.0f + 8.0f);
 	return true;
 }
 
@@ -473,6 +477,20 @@ bool FTheDeathScreenShowsForEveryDeath::RunTest(const FString& Parameters)
 	TestEqual(TEXT("whole at first"), DeathScreenAlpha(true, 1.0f), 1.0f);
 	TestTrue(TEXT("fading at its end"), DeathScreenAlpha(true, OutDeathScreen - 0.25f) > 0.0f && DeathScreenAlpha(true, OutDeathScreen - 0.25f) < 1.0f);
 	TestFalse(TEXT("then the notice of being out has the screen"), ShowsDeathScreen(true, OutDeathScreen + 0.1f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheDronesMarksHideUnderEveryPanel, "CheeseStrike.HUD.TheDronesMarksHideUnderEveryPanel", HUDTests::Flags)
+bool FTheDronesMarksHideUnderEveryPanel::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	// ShowsMarksInView(bAlive, bStrikeMap, bScoreboard, bMenu, bOver)
+	TestTrue(TEXT("in play, the UAC's diamonds show over the enemies seen"), ShowsMarksInView(true, false, false, false, false));
+	TestFalse(TEXT("not while choosing a Cheese Strike's spot: the strike map shows them as its own dots"), ShowsMarksInView(true, true, false, false, false));
+	TestFalse(TEXT("not under the scoreboard"), ShowsMarksInView(true, false, true, false, false));
+	TestFalse(TEXT("not killed, under the death screen"), ShowsMarksInView(false, false, false, false, false));
+	TestFalse(TEXT("not paused, under the menu"), ShowsMarksInView(true, false, false, true, false));
+	TestFalse(TEXT("not once the match is over"), ShowsMarksInView(true, false, false, false, true));
 	return true;
 }
 

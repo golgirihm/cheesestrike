@@ -27,6 +27,11 @@ class UCanvas;
 namespace CheeseStrikeModeHUD
 {
 	void Draw(AHUD* Hud, UCanvas* Canvas);
+	/**
+	 * The marks on the view over things in the world: during an Unmanned Aerial Cheese, a red diamond where its last sweep saw each
+	 * enemy. The HUD draws them first, before its panels, and only when nothing covers the view (CheeseStrikeHUD::ShowsMarksInView).
+	 */
+	void DrawMarksInView(AHUD* Hud, UCanvas* Canvas);
 	/** Whether the local player of `Hud` is out of the round, when the HUD's own death notice (with its time until coming back) is not for them. */
 	bool IsOut(const AHUD* Hud);
 }

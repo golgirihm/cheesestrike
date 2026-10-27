@@ -311,6 +311,23 @@ namespace CheeseStrikeHUDDraw
 		Quad(A, B, B + Out, A + Out, Colour, Colour, Faded(Colour, 0.0f), Faded(Colour, 0.0f));
 	}
 
+	void FShapes::SoftRim(TConstArrayView<FVector2D> Outline, TConstArrayView<FLinearColor> Colours, bool bOpen)
+	{
+		const int32 Count = Outline.Num();
+		if (Count < 3 || Colours.Num() != Count)
+		{
+			return;
+		}
+		const TArray<FVector2D> Miters = CheeseStrikeHUD::OutwardMiters(Outline);
+		const float Edge = CheeseStrikeHUD::SoftEdge;
+		for (int32 Index = 0; Index < (bOpen ? Count - 1 : Count); ++Index)
+		{
+			const int32 Next = (Index + 1) % Count;
+			Quad(Outline[Index], Outline[Next], Outline[Next] + Miters[Next] * Edge, Outline[Index] + Miters[Index] * Edge,
+				Colours[Index], Colours[Next], Faded(Colours[Next], 0.0f), Faded(Colours[Index], 0.0f));
+		}
+	}
+
 	void FShapes::Disc(const FVector2D& Middle, float Radius, const FLinearColor& Colour, int32 Sides)
 	{
 		// At least as many sides as a circle that big needs to look round (four of its quarter arcs).
