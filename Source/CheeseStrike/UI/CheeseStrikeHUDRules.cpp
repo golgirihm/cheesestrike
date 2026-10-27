@@ -387,6 +387,50 @@ namespace CheeseStrikeHUD
 		return Sweep;
 	}
 
+	float EnemyMarkFade(float Since)
+	{
+		if (Since <= 0.0f)
+		{
+			return 1.0f;
+		}
+		if (Since >= EnemyMarkLife)
+		{
+			return 0.0f;
+		}
+		constexpr float AtRefresh = 0.45f;
+		return Since < EnemyMarkRefresh
+			? FMath::Lerp(1.0f, AtRefresh, Since / EnemyMarkRefresh)
+			: FMath::Lerp(AtRefresh, 0.0f, (Since - EnemyMarkRefresh) / (EnemyMarkLife - EnemyMarkRefresh));
+	}
+
+	bool FEnemyMarks::Note(uint32 Who, const FVector& Where, float Now, bool bSwept)
+	{
+		FEnemyMark* Mark = Marks.Find(Who);
+		if (Mark != nullptr && Now - Mark->At < EnemyMarkRefresh - EnemyMarkSlack && Now >= Mark->At)
+		{
+			return false;
+		}
+		Marks.Add(Who, {Where, Now, bSwept});
+		return true;
+	}
+
+	const FEnemyMark* FEnemyMarks::Find(uint32 Who, float Now) const
+	{
+		const FEnemyMark* Mark = Marks.Find(Who);
+		return Mark != nullptr && Now - Mark->At < EnemyMarkLife ? Mark : nullptr;
+	}
+
+	void FEnemyMarks::Prune(float Now)
+	{
+		for (auto It = Marks.CreateIterator(); It; ++It)
+		{
+			if (Now - It.Value().At >= EnemyMarkLife)
+			{
+				It.RemoveCurrent();
+			}
+		}
+	}
+
 	float DamageArcAngle(float ViewYaw, const FVector2D& At, const FVector2D& From)
 	{
 		const FVector2D Way = From - At;

@@ -127,6 +127,7 @@ void ACheeseStrikeHUD::UpdateSweep(const ACheeseStrikePlayerController* Controll
 			if (It->IsAlive() && Match->AreEnemies(Mine, It->GetPlayerState()))
 			{
 				Mine->SweepMarks.Add(It->GetActorLocation());
+				NoteEnemy(*It, true);
 			}
 		}
 	}
@@ -183,12 +184,49 @@ bool ACheeseStrikeHUD::ShowsOnMinimap(const ACheeseStrikeCharacter* Enemy) const
 	{
 		return false;
 	}
-	if (AreEnemiesRevealed())
+	return AreEnemiesRevealed() || EnemyMark(Enemy) != nullptr;
+}
+
+const CheeseStrikeHUD::FEnemyMark* ACheeseStrikeHUD::EnemyMark(const ACheeseStrikeCharacter* Enemy) const
+{
+	return Enemy != nullptr && Enemy->IsAlive() && GetWorld() != nullptr ? EnemyMarks.Find(Enemy->GetUniqueID(), GetWorld()->GetTimeSeconds()) : nullptr;
+}
+
+void ACheeseStrikeHUD::NoteEnemy(const ACheeseStrikeCharacter* Enemy, bool bSwept)
+{
+	if (Enemy != nullptr && Enemy->IsAlive() && GetWorld() != nullptr)
 	{
-		return true;
+		EnemyMarks.Note(Enemy->GetUniqueID(), Enemy->GetActorLocation(), GetWorld()->GetTimeSeconds(), bSwept);
 	}
-	const float* Seen = LastSeen.Find(Enemy);
-	return Seen != nullptr && GetWorld() != nullptr && GetWorld()->GetTimeSeconds() - *Seen < SeenLife;
+}
+
+void ACheeseStrikeHUD::NoteShot(const ACheeseStrikeCharacter* Shooter)
+{
+	const APlayerController* Viewer = GetOwningPlayerController();
+	if (Shooter == nullptr || Viewer == nullptr || Shooter == Viewer->GetPawn() || AreTeammates(Viewer->PlayerState, Shooter->GetPlayerState()))
+	{
+		return;
+	}
+	NoteEnemy(Shooter);
+}
+
+void ACheeseStrikeHUD::NoteShotForEveryone(const UWorld* World, const ACheeseStrikeCharacter* Shooter)
+{
+	if (World == nullptr || Shooter == nullptr)
+	{
+		return;
+	}
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* Player = It->Get();
+		if (Player != nullptr && Player->IsLocalController())
+		{
+			if (ACheeseStrikeHUD* Hud = Cast<ACheeseStrikeHUD>(Player->GetHUD()))
+			{
+				Hud->NoteShot(Shooter);
+			}
+		}
+	}
 }
 
 void ACheeseStrikeHUD::AddDamageFrom(const FVector& From, const AActor* By)

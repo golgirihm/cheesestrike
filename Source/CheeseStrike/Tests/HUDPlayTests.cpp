@@ -116,9 +116,24 @@ bool FTheHUDShowsWhereHitsComeFrom::RunTest(const FString& Parameters)
 		ACheeseStrikeHUD* Hud = HUDPlayTests::HUD(1);
 		const ACheeseStrikeCharacter* HostSeen = CharacterOf(0, 1);
 		TestFalse(TEXT("out of sight, the host leaves the minimap"), Hud->ShowsOnMinimap(HostSeen));
+		TestEqual(TEXT("the arc is gone with its time"), Hud->GetDamageArcs().Num(), 0);
+	});
+	// Unseen, the host fires: the joiner's minimap shows them where they fired from, not following them after.
+	Play(0, TEXT("tap Fire"));
+	WaitUntil(TEXT("the host's shot putting them on the joiner's minimap"), 3.0f, []() { return HUDPlayTests::HUD(1)->EnemyMark(CharacterOf(0, 1)) != nullptr; });
+	Then([this]()
+	{
+		ACheeseStrikeHUD* Hud = HUDPlayTests::HUD(1);
+		const ACheeseStrikeCharacter* HostSeen = CharacterOf(0, 1);
+		const CheeseStrikeHUD::FEnemyMark* Mark = Hud->EnemyMark(HostSeen);
+		if (TestNotNull(TEXT("the host's mark"), Mark))
+		{
+			const float Off = FVector::Dist2D(Mark->Where, HostSeen->GetActorLocation());
+			TestTrue(FString::Printf(TEXT("where the host fired from (%.0f cm off)"), Off), Off < 100.0f);
+			TestFalse(TEXT("heard, not swept"), Mark->bSwept);
+		}
 		Hud->RevealEnemies(5.0f);
 		TestTrue(TEXT("revealed, the host is on it unseen"), Hud->ShowsOnMinimap(HostSeen));
-		TestEqual(TEXT("the arc is gone with its time"), Hud->GetDamageArcs().Num(), 0);
 	});
 	// The host calls in an Unmanned Aerial Cheese: its sweeps mark the joiner, an enemy in a free-for-all, for the host's minimap.
 	Play(0, TEXT("cmd CheeseStrikeGiveStreak 1\ntap Streak"));

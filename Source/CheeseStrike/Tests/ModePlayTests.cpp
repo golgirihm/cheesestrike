@@ -356,13 +356,14 @@ bool FAStrikeIsChosenOnTheMinimapAndLandsInItsArea::RunTest(const FString& Param
 		ViewBefore = Controller(0)->GetControlRotation();
 		MarkAt = Mine->GetStrikeTarget();
 	});
-	// The mouse pushed forward moves the mark up the map if it would have turned the view up.
+	// The map is north up whichever way the player faces: the mouse pushed forward moves the mark north (up the map) if it
+	// would have turned the view up.
 	Play(0, TEXT("hold MouseLook 0 1\nwait 0.3\nrelease MouseLook\nwait 0.1"));
 	Then([this]()
 	{
 		const ACheeseStrikePlayerState* Mine = StateOf(0, 0);
 		const FVector2D Moved = Mine->GetStrikeTarget() - MarkAt;
-		const FVector2D Ahead(FRotator(0.0f, AsideYaw, 0.0f).Vector());
+		const FVector2D Ahead(FRotator(0.0f, CheeseStrikeHUD::NorthYaw, 0.0f).Vector());
 		MouseAhead = FVector2D::DotProduct(Moved, Ahead);
 		TestTrue(FString::Printf(TEXT("the mouse moves the mark up the map as it turns the view up (%.0f cm ahead, the view %.2f degrees up)"), MouseAhead, MouseUp), FMath::Abs(MouseAhead) > 100.0f && MouseAhead * MouseUp > 0.0f);
 		TestTrue(TEXT("and not aside"), FMath::Abs(FVector2D::CrossProduct(Ahead, Moved)) < 0.2f * Moved.Size() + 1.0f);
@@ -375,24 +376,24 @@ bool FAStrikeIsChosenOnTheMinimapAndLandsInItsArea::RunTest(const FString& Param
 	{
 		const ACheeseStrikePlayerState* Mine = StateOf(0, 0);
 		const FVector2D Moved = Mine->GetStrikeTarget() - MarkAt;
-		const FVector2D Ahead(FRotator(0.0f, AsideYaw, 0.0f).Vector());
+		const FVector2D Ahead(FRotator(0.0f, CheeseStrikeHUD::NorthYaw, 0.0f).Vector());
 		const float StickAhead = FVector2D::DotProduct(Moved, Ahead);
 		TestTrue(FString::Printf(TEXT("the stick moves the mark as it would the view (%.0f cm ahead)"), StickAhead), FMath::Abs(StickAhead) > 100.0f && StickAhead * MouseAhead < 0.0f);
 		TestTrue(TEXT("the view still where it was"), Controller(0)->GetControlRotation().Equals(ViewBefore, 0.5f));
 		MarkAt = Mine->GetStrikeTarget();
 	});
-	// The mouse moved right moves it right.
+	// The mouse moved right moves it right on the map (east of north).
 	Play(0, TEXT("device mouse\nhold MouseLook 2 0\nwait 0.3\nrelease MouseLook\nwait 0.1"));
 	Then([this]()
 	{
 		const ACheeseStrikePlayerState* Mine = StateOf(0, 0);
 		const FVector2D Moved = Mine->GetStrikeTarget() - MarkAt;
-		const FVector2D Ahead(FRotator(0.0f, AsideYaw, 0.0f).Vector());
+		const FVector2D Ahead(FRotator(0.0f, CheeseStrikeHUD::NorthYaw, 0.0f).Vector());
 		const FVector2D Right(-Ahead.Y, Ahead.X);
 		TestTrue(FString::Printf(TEXT("the mouse moves the mark right (%.0f cm)"), FVector2D::DotProduct(Moved, Right)), FVector2D::DotProduct(Moved, Right) > 100.0f);
 		TestTrue(TEXT("the view still where it was"), Controller(0)->GetControlRotation().Equals(ViewBefore, 0.5f));
 		// Then to a spot of open ground 12 m ahead, for the wheels to land on.
-		StateOf(0, 0)->SetStrikeTarget(FVector2D(Character(0)->GetActorLocation()) + Ahead * 1200.0f);
+		StateOf(0, 0)->SetStrikeTarget(FVector2D(Character(0)->GetActorLocation()) + FVector2D(FRotator(0.0f, AsideYaw, 0.0f).Vector()) * 1200.0f);
 		MarkAt = StateOf(0, 0)->GetStrikeTarget();
 	});
 	Play(0, TEXT("wait 0.1\ntap Fire\nwait 0.3"));

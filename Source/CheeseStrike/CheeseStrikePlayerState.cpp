@@ -12,6 +12,7 @@
 #include "CheeseStrikeGameMode.h"
 #include "Modes/CheeseStrikeWatchCamera.h"
 #include "Streaks/CheeseStrikeBombs.h"
+#include "UI/CheeseStrikeHUDRules.h"
 
 void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -245,8 +246,8 @@ void ACheeseStrikePlayerState::MoveStrikeTarget(const FVector2D& Degrees)
 	{
 		return;
 	}
-	// Right on the map is right of the way the map is turned; up is ahead (CheeseStrikeHUD::MapPoint).
-	const FVector2D Forward(FRotator(0.0f, StrikeYaw, 0.0f).Vector());
+	// The strike map is north up (CheeseStrikeHUD::NorthYaw): right on the screen is right of north, up is north (CheeseStrikeHUD::MapPoint).
+	const FVector2D Forward(FRotator(0.0f, CheeseStrikeHUD::NorthYaw, 0.0f).Vector());
 	const FVector2D Right(-Forward.Y, Forward.X);
 	SetStrikeTarget(StrikeTarget + (Right * Degrees.X + Forward * Degrees.Y) * CheeseStrikeStreaks::StrikeCursorPerDegree);
 }
