@@ -39,6 +39,7 @@
 #include "CheeseStrikeInventory.h"
 #include "CheeseStrikeWeaponLooks.h"
 #include "Map/CheeseStrikeMouse.h"
+#include "UI/CheeseStrikeHUD.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 
@@ -962,6 +963,12 @@ void ACheeseStrikeWeapon::NoteBeat(CheeseStrikeBeat::EEvent Event) const
 
 void ACheeseStrikeWeapon::MulticastShot_Implementation()
 {
+	// Every gun is heard (none is suppressed): a shot puts the shooter on the minimap of every enemy on this machine, where
+	// they fired from (the knife is silent).
+	if (Holder != nullptr && Stats != nullptr && !Stats->IsMelee())
+	{
+		ACheeseStrikeHUD::NoteShotForEveryone(GetWorld(), Holder);
+	}
 	// The shooter has shown it already.
 	if (Holder == nullptr || Holder->IsLocallyControlled())
 	{

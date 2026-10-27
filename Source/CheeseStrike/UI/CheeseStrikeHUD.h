@@ -51,8 +51,8 @@ public:
 	static constexpr float CrosshairGap = 5.0f;
 	/** Seconds a hit mark shows. */
 	static constexpr float HitMarkLife = 0.2f;
-	/** Seconds an enemy stays on the minimap after they were last seen. */
-	static constexpr float SeenLife = 1.5f;
+	/** Seconds an enemy stays on the minimap after they were last known to be somewhere (CheeseStrikeHUD::EnemyMarkLife). */
+	static constexpr float SeenLife = CheeseStrikeHUD::EnemyMarkLife;
 	/** The margin from the screen's edges, and the minimap's side, in design pixels (Unit). */
 	static constexpr float Margin = 28.0f;
 	static constexpr float MapSide = 250.0f;
@@ -91,8 +91,19 @@ public:
 	/** For judging the damage arcs (development): a hit from `Degrees` clockwise from straight ahead, 10 m off. With CheeseStrike.HUD.HoldArcs 1 the arcs stay as they are. */
 	UFUNCTION(Exec)
 	void CheeseStrikeHitFrom(float Degrees);
-	/** Whether `Enemy` shows on the minimap now, where they are: seen in the last SeenLife seconds, or revealed here (RevealEnemies). The side's Unmanned Aerial Cheese shows them where its last sweep saw them (UpdateSweep). */
+	/**
+	 * Whether `Enemy` shows on the minimap now: revealed here (RevealEnemies),
+	 * or with a mark where they were last known to be (EnemyMark): seen,
+	 * heard firing (NoteShot) or swept by the side's Unmanned Aerial Cheese
+	 * (UpdateSweep), each moving the mark at most once a second.
+	 */
 	bool ShowsOnMinimap(const ACheeseStrikeCharacter* Enemy) const;
+	/** Where the minimap shows `Enemy` (their last known place), or null while it shows them nowhere. */
+	const CheeseStrikeHUD::FEnemyMark* EnemyMark(const ACheeseStrikeCharacter* Enemy) const;
+	/** `Shooter` fired an unsuppressed shot (a gun's, not the knife's): an enemy's mark moves to where they are, at most once a second. */
+	void NoteShot(const ACheeseStrikeCharacter* Shooter);
+	/** NoteShot on the HUD of every player of `World` (this machine's). */
+	static void NoteShotForEveryone(const UWorld* World, const ACheeseStrikeCharacter* Shooter);
 
 	/** One hit taken: where it came from, by whom if known, and the world's time it came (this machine's). */
 	struct FDamageArc
@@ -167,13 +178,15 @@ protected:
 	/**
 	 * Choosing where a Cheese Strike goes (ACheeseStrikePlayerState::IsMarkingStrike;
 	 * UI/CheeseStrikeHUDStrike.cpp): the minimap big in the middle of the
-	 * screen, turned as the view was, following the mark (the look moves
-	 * it), with the strike's area round it, where its wheels will land, and
+	 * screen, north up, the whole level filling it, the look moving a mark
+	 * over it, with the strike's area round it, where its wheels will land, and
 	 * the keys to call it in or off. Draws nothing and returns false when
 	 * not choosing.
 	 */
 	bool DrawStrikeMap(const ACheeseStrikePlayerController* Controller, const ACheeseStrikeCharacter* Character, float FieldOfView);
-	/** The strike map's middle (world X and Y), which follows the mark; whether it showed the frame before. */
+	/** The strike map's margin round the level, inside its rounded square (design pixels). */
+	static constexpr float StrikeMapBorder = 10.0f;
+	/** The strike map's middle (world X and Y), the level's; whether it showed the frame before. */
 	FVector2D StrikeMapMiddle = FVector2D::ZeroVector;
 	bool bStrikeMapShown = false;
 	void DrawPlayers(const ACheeseStrikeGameState* Match);
@@ -222,6 +235,10 @@ protected:
 	TArray<FDamageArc> DamageArcs;
 	/** When each enemy was last seen (the world's time). */
 	TMap<TWeakObjectPtr<const ACheeseStrikeCharacter>, float> LastSeen;
+	/** Where each enemy was last known to be, by their character's unique id: what the minimap shows of them. */
+	CheeseStrikeHUD::FEnemyMarks EnemyMarks;
+	/** `Enemy` is known to be where they are now (swept: by the Unmanned Aerial Cheese). */
+	void NoteEnemy(const ACheeseStrikeCharacter* Enemy, bool bSwept = false);
 	float NextLook = 0.0f;
 	/** Until when every enemy shows on the minimap (the world's time). */
 	float RevealedUntil = -1.0f;

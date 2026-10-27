@@ -49,12 +49,15 @@ namespace
 
 	/**
 	 * The player on the minimap: a wedge of cheese seen from above, its point
-	 * the way they face (up), at `Centre`, `U` pixels a design pixel. A dark
-	 * outline, a body shaded from its point, the rind along its round back,
-	 * and a few holes.
+	 * the way they face (up on the minimap; `Turn` degrees clockwise from up on
+	 * the strike map, which is north up), at `Centre`, `U` pixels a design
+	 * pixel. A dark outline, a body shaded from its point, the rind along its
+	 * round back, and a few holes.
 	 */
-	void CheeseWedge(HudDraw::FShapes& Shapes, const FVector2D& Centre, float U)
+	void CheeseWedge(HudDraw::FShapes& Shapes, const FVector2D& Centre, float U, float Turn = 0.0f)
 	{
+		// Every offset from the middle turned clockwise on the screen (its y runs down).
+		const auto Rot = [Turn](const FVector2D& Offset) { return Offset.GetRotated(Turn); };
 		const float HalfAngle = FMath::DegreesToRadians(26.0f);
 		constexpr int32 Steps = 10;
 		const auto Wedge = [&](const FVector2D& Tip, float From, float To, const FLinearColor& Inner, const FLinearColor& Outer)
@@ -67,7 +70,7 @@ namespace
 				for (int32 Step = 0; Step <= Steps; ++Step)
 				{
 					const float Angle = FMath::Lerp(-HalfAngle, HalfAngle, static_cast<float>(Step) / Steps);
-					Outline.Add(Tip + FVector2D(FMath::Sin(Angle), FMath::Cos(Angle)) * To);
+					Outline.Add(Tip + Rot(FVector2D(FMath::Sin(Angle), FMath::Cos(Angle))) * To);
 				}
 				Shapes.SmoothFill(Outline, [&](const FVector2D& Point) { return FMath::Lerp(Inner, Outer, FMath::Clamp(FVector2D::Distance(Point, Tip) / To, 0.0f, 1.0f)); });
 				return;
@@ -76,8 +79,8 @@ namespace
 			{
 				const float A = FMath::Lerp(-HalfAngle, HalfAngle, static_cast<float>(Step) / Steps);
 				const float B = FMath::Lerp(-HalfAngle, HalfAngle, static_cast<float>(Step + 1) / Steps);
-				const FVector2D WayA(FMath::Sin(A), FMath::Cos(A));
-				const FVector2D WayB(FMath::Sin(B), FMath::Cos(B));
+				const FVector2D WayA = Rot(FVector2D(FMath::Sin(A), FMath::Cos(A)));
+				const FVector2D WayB = Rot(FVector2D(FMath::Sin(B), FMath::Cos(B)));
 				if (From <= 0.0f)
 				{
 					Shapes.Triangle(Tip, Tip + WayA * To, Tip + WayB * To, Inner, Outer, Outer);
@@ -90,17 +93,17 @@ namespace
 				}
 			}
 		};
-		const FVector2D Tip = Centre + FVector2D(0.0f, -15.0f * U);
+		const FVector2D Tip = Centre + Rot(FVector2D(0.0f, -15.0f * U));
 		const float Length = 27.0f * U;
 		const float Rind = 4.5f * U;
-		Wedge(Tip + FVector2D(0.0f, -3.0f * U), 0.0f, Length + 4.5f * U, FLinearColor(0.0f, 0.0f, 0.0f, 0.8f), FLinearColor(0.0f, 0.0f, 0.0f, 0.8f));
+		Wedge(Tip + Rot(FVector2D(0.0f, -3.0f * U)), 0.0f, Length + 4.5f * U, FLinearColor(0.0f, 0.0f, 0.0f, 0.8f), FLinearColor(0.0f, 0.0f, 0.0f, 0.8f));
 		Wedge(Tip, 0.0f, Length - Rind, FLinearColor(1.0f, 0.92f, 0.5f, 1.0f), FLinearColor(0.98f, 0.74f, 0.2f, 1.0f));
 		Wedge(Tip, Length - Rind, Length, FLinearColor(0.93f, 0.55f, 0.08f, 1.0f), FLinearColor(0.78f, 0.4f, 0.04f, 1.0f));
 		const FLinearColor Hole(0.8f, 0.48f, 0.06f, 1.0f);
-		Shapes.Disc(Centre + FVector2D(-3.0f * U, 2.4f * U), 2.4f * U, Hole, 12);
-		Shapes.Disc(Centre + FVector2D(2.6f * U, -2.6f * U), 1.8f * U, Hole, 12);
-		Shapes.Disc(Centre + FVector2D(1.8f * U, 5.2f * U), 1.6f * U, Hole, 12);
-		Shapes.Disc(Centre + FVector2D(-0.6f * U, -7.5f * U), 1.1f * U, Hole, 10);
+		Shapes.Disc(Centre + Rot(FVector2D(-3.0f * U, 2.4f * U)), 2.4f * U, Hole, 12);
+		Shapes.Disc(Centre + Rot(FVector2D(2.6f * U, -2.6f * U)), 1.8f * U, Hole, 12);
+		Shapes.Disc(Centre + Rot(FVector2D(1.8f * U, 5.2f * U)), 1.6f * U, Hole, 12);
+		Shapes.Disc(Centre + Rot(FVector2D(-0.6f * U, -7.5f * U)), 1.1f * U, Hole, 10);
 	}
 }
 
@@ -139,6 +142,12 @@ void ACheeseStrikeHUD::LookForEnemies(const ACheeseStrikePlayerController* Contr
 				break;
 			}
 		}
+		// Seen, or revealed here: their mark moves to where they are, at most once a second.
+		const float* Seen = LastSeen.Find(Other);
+		if ((Seen != nullptr && *Seen == Now) || AreEnemiesRevealed())
+		{
+			NoteEnemy(Other, AreEnemiesRevealed());
+		}
 	}
 	for (auto Seen = LastSeen.CreateIterator(); Seen; ++Seen)
 	{
@@ -147,6 +156,7 @@ void ACheeseStrikeHUD::LookForEnemies(const ACheeseStrikePlayerController* Contr
 			Seen.RemoveCurrent();
 		}
 	}
+	EnemyMarks.Prune(Now);
 }
 
 void ACheeseStrikeHUD::DrawMinimap(const ACheeseStrikePlayerController* Controller, const ACheeseStrikeCharacter* Character, float FieldOfView)
@@ -235,33 +245,28 @@ void ACheeseStrikeHUD::DrawMap(const ACheeseStrikePlayerController* Controller, 
 			}
 			MapDot(Shapes, At, (bBeyond ? 3.5f : 4.5f) * U, HudDraw::Faded(HudDraw::SideColour(Their != nullptr ? Their->GetTeam() : 0), bBeyond ? 0.7f : 1.0f), Facing, !bBeyond);
 		}
-		else if (ShowsOnMinimap(Other) && CheeseStrikeHUD::InsideRoundedRect(At, Min, Max, Corner) > 0.0f)
+		else if (const CheeseStrikeHUD::FEnemyMark* Mark = EnemyMark(Other))
 		{
-			const float* Seen = LastSeen.Find(Other);
-			const float Fade = AreEnemiesRevealed() || Seen == nullptr ? 1.0f : FMath::Clamp(1.0f - (World->GetTimeSeconds() - *Seen) / SeenLife, 0.0f, 1.0f) * 0.6f + 0.4f;
-			MapDot(Shapes, At, 4.5f * U, HudDraw::Faded(HudDraw::Danger, Fade), Facing, false);
+			// Never where they are now: where they were last known to be (seen, firing, swept), moved at most once a second
+			// and fading until the next. A swept one further than the minimap reaches is held to its frame, smaller.
+			FVector2D Known = OnMap(Mark->Where);
+			const bool bBeyond = CheeseStrikeHUD::InsideRoundedRect(Known, InsetMin, InsetMax, InsetCorner) < 0.0f;
+			if (bBeyond && !Mark->bSwept)
+			{
+				continue;
+			}
+			if (bBeyond)
+			{
+				Known = CheeseStrikeHUD::HoldInsideRoundedRect(Known, InsetMin, InsetMax, InsetCorner);
+			}
+			const float Fade = CheeseStrikeHUD::EnemyMarkFade(World->GetTimeSeconds() - Mark->At);
+			MapDot(Shapes, Known, (bBeyond ? 3.0f : 4.5f) * U, HudDraw::Faded(HudDraw::Danger, Fade * (bBeyond ? 0.75f : 1.0f)), 0.0f, false);
 		}
 	}
 
-	// The side's Unmanned Aerial Cheese: every enemy where its last sweep saw them, strong at the sweep and fading towards the
-	// next, and a ring going out from the middle as each sweep comes.
+	// The side's Unmanned Aerial Cheese: a ring going out from the middle as each sweep comes (what it saw is in the marks).
 	if (Sweep.Index != INDEX_NONE)
 	{
-		const ACheeseStrikePlayerState* Mine = Controller->GetPlayerState<ACheeseStrikePlayerState>();
-		if (Mine != nullptr)
-		{
-			// Those further than the minimap reaches are held to its frame, smaller, the way they are.
-			for (const FVector& Mark : Mine->SweepMarks)
-			{
-				FVector2D At = OnMap(Mark);
-				const bool bBeyond = CheeseStrikeHUD::InsideRoundedRect(At, InsetMin, InsetMax, InsetCorner) < 0.0f;
-				if (bBeyond)
-				{
-					At = CheeseStrikeHUD::HoldInsideRoundedRect(At, InsetMin, InsetMax, InsetCorner);
-				}
-				MapDot(Shapes, At, (bBeyond ? 3.0f : 4.5f) * U, HudDraw::Faded(HudDraw::Danger, Sweep.Fade * (bBeyond ? 0.75f : 1.0f)), 0.0f, false);
-			}
-		}
 		const float Ping = Sweep.Since / 0.7f;
 		if (Ping < 1.0f && Half * 0.95f * Ping > 4.0f * U)
 		{
@@ -272,10 +277,10 @@ void ACheeseStrikeHUD::DrawMap(const ACheeseStrikePlayerController* Controller, 
 	// King of the Hill: the hill, and where it goes next while it warns.
 	CheeseStrikeHillHUD::DrawOnMinimap(World, Me, Shapes, OnMap, Centre, Half, Scale, U);
 
-	// The player: a wedge of cheese in the middle, its point up, the way they face.
+	// The player: a wedge of cheese, its point the way they face: up in the minimap's middle, turned on the strike map.
 	if (bPlayerOn)
 	{
-		CheeseWedge(Shapes, PlayerAt, U);
+		CheeseWedge(Shapes, PlayerAt, U, FRotator::NormalizeAxis(Controller->PlayerCameraManager->GetCameraRotation().Yaw - ViewYaw));
 	}
 
 	// Where the player is, by the map's names for its places, under the minimap.

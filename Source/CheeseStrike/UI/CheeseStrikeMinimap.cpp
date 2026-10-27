@@ -216,9 +216,18 @@ void FCheeseStrikeMinimap::Gather(UWorld* World)
 	}
 	Pieces.Sort([](const FPiece& A, const FPiece& B) { return A.Top < B.Top; });
 	Bounds = FBox2D(ForceInit);
+	// By the pieces' own outlines, not the circles round them, which reach far past a long wall's ends and sides and left the
+	// strike map's level small in its square.
 	for (const FPiece& Piece : Pieces)
 	{
-		Bounds += FBox2D(Piece.Middle - FVector2D(Piece.Radius, Piece.Radius), Piece.Middle + FVector2D(Piece.Radius, Piece.Radius));
+		for (const FVector2D& Point : Piece.Outline)
+		{
+			Bounds += Point;
+		}
+		if (Piece.Outline.Num() == 0)
+		{
+			Bounds += FBox2D(Piece.Middle - FVector2D(Piece.Radius, Piece.Radius), Piece.Middle + FVector2D(Piece.Radius, Piece.Radius));
+		}
 	}
 	UE_LOG(LogCheeseStrike, Display, TEXT("Minimap: %d pieces and %d blocks of cheese"), Pieces.Num(), Cheese.Num());
 }

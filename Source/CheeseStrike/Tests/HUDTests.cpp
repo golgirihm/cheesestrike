@@ -139,6 +139,57 @@ bool FTheAerialCheeseSweepsInPulses::RunTest(const FString& Parameters)
 	const FSweep Next = SweepAt(102.1f, 125.0f, 25.0f, 2.0f);
 	TestTrue(TEXT("then the next sweep, full again"), Next.Index == 1 && Next.Fade > 0.95f && FMath::IsNearlyEqual(Next.Since, 0.1f, 0.001f));
 	TestEqual(TEXT("the last sweep"), SweepAt(124.9f, 125.0f, 25.0f, 2.0f).Index, 12);
+	TestTrue(TEXT("the side's Unmanned Aerial Cheese sweeps once a second"), FMath::IsNearlyEqual(CheeseStrikeStreaks::SweepPeriod, EnemyMarkRefresh));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEnemiesShowWhereTheyWereLastKnown, "CheeseStrike.HUD.EnemiesShowWhereTheyWereLastKnown", HUDTests::Flags)
+
+bool FEnemiesShowWhereTheyWereLastKnown::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	FEnemyMarks Marks;
+	TestNull(TEXT("an enemy nobody knows of shows nowhere"), Marks.Find(7, 10.0f));
+	// Firing (or seen, or swept) at 10: the mark goes where they were then.
+	TestTrue(TEXT("a first shot places a mark"), Marks.Note(7, FVector(100, 0, 0), 10.0f));
+	TestTrue(TEXT("where they fired from"), Marks.Find(7, 10.2f) != nullptr && Marks.Find(7, 10.2f)->Where.Equals(FVector(100, 0, 0)));
+	// Firing on, running: the mark stays where it was until a second has passed.
+	TestFalse(TEXT("a shot a moment later doesn't move it"), Marks.Note(7, FVector(200, 0, 0), 10.3f));
+	TestFalse(TEXT("nor one just before the second is up"), Marks.Note(7, FVector(250, 0, 0), 10.85f));
+	TestTrue(TEXT("still where the first shot was"), Marks.Find(7, 10.85f)->Where.Equals(FVector(100, 0, 0)));
+	TestTrue(TEXT("a second on, the next shot moves it"), Marks.Note(7, FVector(300, 0, 0), 11.0f));
+	TestTrue(TEXT("to where that one was fired"), Marks.Find(7, 11.0f)->Where.Equals(FVector(300, 0, 0)));
+	// Each enemy is limited alone.
+	TestTrue(TEXT("another enemy's shot places theirs at once"), Marks.Note(8, FVector(0, 500, 0), 11.1f));
+	// Swept once a second by the side's drone, every sweep moves it (a sweep found a frame early too).
+	TestTrue(TEXT("a sweep a second (less a frame) later moves it"), Marks.Note(7, FVector(400, 0, 0), 11.98f, true));
+	TestTrue(TEXT("and says it was swept"), Marks.Find(7, 11.98f)->bSwept);
+	// Fading from the moment it is placed until it is gone.
+	TestEqual(TEXT("full as it is placed"), EnemyMarkFade(0.0f), 1.0f);
+	TestTrue(TEXT("fading towards the next refresh"), EnemyMarkFade(0.5f) < 1.0f && EnemyMarkFade(0.5f) > EnemyMarkFade(EnemyMarkRefresh));
+	TestTrue(TEXT("still there at the next refresh"), EnemyMarkFade(EnemyMarkRefresh) > 0.3f);
+	TestTrue(TEXT("and on fading after it"), EnemyMarkFade(EnemyMarkRefresh + 0.5f) < EnemyMarkFade(EnemyMarkRefresh));
+	TestEqual(TEXT("gone at its life's end"), EnemyMarkFade(EnemyMarkLife), 0.0f);
+	TestNull(TEXT("unheard and unseen, the mark is gone"), Marks.Find(8, 11.1f + EnemyMarkLife));
+	Marks.Prune(11.1f + EnemyMarkLife);
+	TestEqual(TEXT("and pruned"), Marks.Num(), 1);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheStrikeMapIsNorthUpAndFillsItsSquare, "CheeseStrike.HUD.TheStrikeMapIsNorthUpAndFillsItsSquare", HUDTests::Flags)
+
+bool FTheStrikeMapIsNorthUpAndFillsItsSquare::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	// A level 8000 cm east to west and 6000 north to south, on a square of 600 pixels with a margin of 10.
+	const FVector2D Min(-4000, -2000);
+	const FVector2D Max(4000, 4000);
+	const FMapFit Fit = FitMap(Min, Max, NorthYaw, 600.0f, 10.0f);
+	const FVector2D NorthEdge = MapPoint(FVector2D(0, Max.Y) - Fit.Middle, NorthYaw, Fit.Scale);
+	const FVector2D EastWest = MapPoint(FVector2D(Min.X, 0) - Fit.Middle, NorthYaw, Fit.Scale);
+	TestTrue(FString::Printf(TEXT("north is up (%.1f, %.1f)"), NorthEdge.X, NorthEdge.Y), FMath::IsNearlyZero(NorthEdge.X, 0.01f) && NorthEdge.Y < 0.0f);
+	TestTrue(FString::Printf(TEXT("its longer side reaches the margin (%.1f of 290)"), FMath::Abs(EastWest.X)), FMath::IsNearlyEqual(FMath::Abs(EastWest.X), 290.0f, 0.1f));
+	TestTrue(TEXT("its shorter side fills it by the level's shape"), FMath::IsNearlyEqual(FMath::Abs(NorthEdge.Y), 290.0f * 6000.0f / 8000.0f, 0.1f));
 	return true;
 }
 

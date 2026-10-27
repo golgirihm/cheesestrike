@@ -112,6 +112,44 @@ namespace CheeseStrikeHUD
 	};
 	FSweep SweepAt(float Now, float Ends, float RevealTime, float Period);
 
+	/**
+	 * Enemies on the minimap are never shown in real time: each is a mark
+	 * where they were last known to be (seen, fired an unsuppressed shot, or
+	 * swept by the side's Unmanned Aerial Cheese), moved at most once every
+	 * EnemyMarkRefresh seconds (less EnemyMarkSlack, for sweeps found a frame
+	 * early), fading from the moment it is placed until it is gone
+	 * EnemyMarkLife seconds later (EnemyMarkFade). Kept by the HUD on each
+	 * player's machine; bots know what they know without it.
+	 */
+	constexpr float EnemyMarkRefresh = 1.0f;
+	constexpr float EnemyMarkSlack = 0.1f;
+	constexpr float EnemyMarkLife = 2.0f;
+	/** How strongly a mark placed `Since` seconds ago shows: 1 as it is placed, 0.45 by the next refresh, nothing at EnemyMarkLife. */
+	float EnemyMarkFade(float Since);
+	struct FEnemyMark
+	{
+		FVector Where = FVector::ZeroVector;
+		float At = 0.0f;
+		/** Placed by a sweep: shown at the minimap's edge when further than it reaches. */
+		bool bSwept = false;
+	};
+	class CHEESESTRIKE_API FEnemyMarks
+	{
+	public:
+		/** `Who` is known to be at `Where` at `Now`: moves their mark there unless it was moved within the last refresh; whether it moved. */
+		bool Note(uint32 Who, const FVector& Where, float Now, bool bSwept = false);
+		/** Their mark if it still shows at `Now`, else null. */
+		const FEnemyMark* Find(uint32 Who, float Now) const;
+		/** Drops the marks gone by `Now`. */
+		void Prune(float Now);
+		void Forget(uint32 Who) { Marks.Remove(Who); }
+		void Reset() { Marks.Reset(); }
+		int32 Num() const { return Marks.Num(); }
+
+	private:
+		TMap<uint32, FEnemyMark> Marks;
+	};
+
 	// ---------------------------------------------------------------- rounded shapes
 
 	/**

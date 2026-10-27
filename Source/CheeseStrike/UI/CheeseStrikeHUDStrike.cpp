@@ -2,12 +2,14 @@
 
 // Choosing where a Cheese Strike goes: while its player marks it
 // (ACheeseStrikePlayerState::IsMarkingStrike), the minimap comes big into
-// the middle of the screen, turned as the view was when they began, and the
+// the middle of the screen, north up whichever way the player faces, and the
 // look (the mouse or the right stick) moves a mark over it instead of the
-// view (ACheeseStrikeCharacter::MoveStrikeMark). Round the mark, the area
-// the wheels fall on (CheeseStrikeStreaks::StrikeRadius) and where each will
-// land. The map shows the whole level at once, fitted to its square
-// (CheeseStrikeHUD::FitMap), and never pans. Fire calls the strike in there;
+// view (ACheeseStrikeCharacter::MoveStrikeMark: right on the screen for right,
+// up for up). Round the mark, the area the wheels fall on
+// (CheeseStrikeStreaks::StrikeRadius) and where each will land. The map shows
+// the whole level at once, filling its square to a small margin
+// (CheeseStrikeHUD::FitMap, by the level's pieces' own outlines), and never
+// pans. Fire calls the strike in there;
 // the Streak key or Escape calls it off.
 
 #include "CheeseStrikeHUD.h"
@@ -37,7 +39,9 @@ bool ACheeseStrikeHUD::DrawStrikeMap(const ACheeseStrikePlayerController* Contro
 	UWorld* World = GetWorld();
 	Minimap.Gather(World);
 	const float U = Unit();
+	// The wheels' line follows the way the player faced; the map is north up.
 	const float Yaw = Mine->GetStrikeYaw();
+	const float MapYaw = CheeseStrikeHUD::NorthYaw;
 	const FVector At = Character->GetActorLocation();
 
 	// The mark kept over the level.
@@ -62,11 +66,11 @@ bool ACheeseStrikeHUD::DrawStrikeMap(const ACheeseStrikePlayerController* Contro
 	FMapFrame Frame;
 	Frame.Min = Centre - FVector2D(Side, Side) / 2.0f;
 	Frame.Max = Centre + FVector2D(Side, Side) / 2.0f;
-	// The whole level, turned as the view was, fitted to the square; a level that can't be read is shown round the player.
-	const CheeseStrikeHUD::FMapFit Fit = Level.bIsValid ? CheeseStrikeHUD::FitMap(Level.Min, Level.Max, Yaw, Side, 12.0f * U) : CheeseStrikeHUD::FMapFit{FVector2D(At), Side / 2.0f / 3500.0f};
+	// The whole level, north up, filling the square to a small margin; a level that can't be read is shown round the player.
+	const CheeseStrikeHUD::FMapFit Fit = Level.bIsValid ? CheeseStrikeHUD::FitMap(Level.Min, Level.Max, MapYaw, Side, StrikeMapBorder * U) : CheeseStrikeHUD::FMapFit{FVector2D(At), Side / 2.0f / 3500.0f};
 	StrikeMapMiddle = Fit.Middle;
 	Frame.Middle = Fit.Middle;
-	Frame.ViewYaw = Yaw;
+	Frame.ViewYaw = MapYaw;
 	Frame.Scale = Fit.Scale;
 	Frame.Corner = 24.0f * U;
 	Frame.bStrike = true;
