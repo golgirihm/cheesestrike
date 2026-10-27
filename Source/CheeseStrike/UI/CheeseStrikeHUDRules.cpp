@@ -506,6 +506,19 @@ namespace CheeseStrikeHUD
 		return FMath::Max(Full * LeastShare, Full * Width / WidthAtFull);
 	}
 
+	float PodiumPlateWidth(const TArray<float>& FeetX, float Unit)
+	{
+		float Width = PodiumPlateMost * Unit;
+		for (int32 First = 0; First < FeetX.Num(); ++First)
+		{
+			for (int32 Second = First + 1; Second < FeetX.Num(); ++Second)
+			{
+				Width = FMath::Min(Width, FMath::Abs(FeetX[First] - FeetX[Second]) - PodiumPlateGap * Unit);
+			}
+		}
+		return FMath::Max(Width, PodiumPlateLeast * Unit);
+	}
+
 	FString FitName(const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure)
 	{
 		if (Measure(Name) <= Width)
@@ -716,16 +729,12 @@ namespace CheeseStrikeHUD
 		{
 			return 1.0f;
 		}
-		// Wave 10: the count and its tile grow together to about the minimap's size, hold, and ease back.
-		if (Seconds < StreakPopGrow)
-		{
-			return 1.0f + (StreakPopPeak - 1.0f) * Ease(Seconds / StreakPopGrow);
-		}
-		if (Seconds < StreakPopGrow + StreakPopHold)
+		// The count and its tile are about the minimap's size at once, hold, and ease back.
+		if (Seconds < StreakPopHold)
 		{
 			return StreakPopPeak;
 		}
-		return 1.0f + (StreakPopPeak - 1.0f) * (1.0f - Ease((Seconds - StreakPopGrow - StreakPopHold) / StreakPopShrink));
+		return 1.0f + (StreakPopPeak - 1.0f) * (1.0f - Ease((Seconds - StreakPopHold) / StreakPopShrink));
 	}
 
 	float FallFlashAlpha(float Seconds)

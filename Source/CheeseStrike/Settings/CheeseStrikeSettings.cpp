@@ -83,6 +83,16 @@ namespace CheeseStrikeSettings
 		return Best;
 	}
 
+	bool CanStepDown(int32 Index, int32 Count)
+	{
+		return Count > 1 && Index > 0 && Index < Count;
+	}
+
+	bool CanStepUp(int32 Index, int32 Count)
+	{
+		return Count > 1 && Index >= 0 && Index < Count - 1;
+	}
+
 	float ScreenPercentageFor(FIntPoint Resolution, FIntPoint Screen)
 	{
 		if (Resolution.X <= 0 || Resolution.Y <= 0 || Screen.X <= 0 || Screen.Y <= 0)

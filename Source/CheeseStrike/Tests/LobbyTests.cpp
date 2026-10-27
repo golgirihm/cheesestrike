@@ -439,6 +439,10 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	TestTrue(TEXT("and the screen's own, whatever it is"), Resolutions(Supported, FIntPoint(1680, 1050)).Contains(FIntPoint(1680, 1050)));
 	TestEqual(TEXT("the one set is found"), ResolutionIndex(Offered, FIntPoint(1920, 1080)), 1);
 	TestEqual(TEXT("or the biggest below it"), ResolutionIndex(Offered, FIntPoint(2000, 1200)), 1);
+	TestTrue(TEXT("at the lowest resolution only + can be pressed"), !CanStepDown(0, Offered.Num()) && CanStepUp(0, Offered.Num()));
+	TestTrue(TEXT("at the highest only -"), CanStepDown(Offered.Num() - 1, Offered.Num()) && !CanStepUp(Offered.Num() - 1, Offered.Num()));
+	TestTrue(TEXT("between, both"), CanStepDown(1, Offered.Num()) && CanStepUp(1, Offered.Num()));
+	TestTrue(TEXT("with one resolution, neither"), !CanStepDown(0, 1) && !CanStepUp(0, 1));
 
 	// The settings object keeps each to its range, and the engine keeps the game's.
 	// (Starting from the defaults: a settings file a previous run left must not decide what these check.)

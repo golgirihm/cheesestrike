@@ -247,6 +247,18 @@ namespace CheeseStrikeHUD
 	/** `Name` as it fits `Width`: whole if it does, else cut and ended with "...", by `Measure` (its width as drawn). */
 	FString FitName(const FString& Name, float Width, TFunctionRef<float(const FString&)> Measure);
 	/**
+	 * The podium's name plates: the name's size (in units) and the least share of it a long name may shrink to before it is cut,
+	 * small enough that Steam's longest names fit a plate whole; the widest a plate is, the gap kept between neighbours' plates,
+	 * and the narrowest (all in units).
+	 */
+	constexpr float PodiumNameSize = 22.0f;
+	constexpr float PodiumNameLeastShare = 0.32f;
+	constexpr float PodiumPlateMost = 460.0f;
+	constexpr float PodiumPlateGap = 20.0f;
+	constexpr float PodiumPlateLeast = 60.0f;
+	/** How wide every podium plate is, its places' feet at `FeetX` across the screen (pixels) and `Unit` pixels a unit: as wide as the nearest two allow with PodiumPlateGap between them, up to PodiumPlateMost, never under PodiumPlateLeast. */
+	float PodiumPlateWidth(const TArray<float>& FeetX, float Unit);
+	/**
 	 * `Line` with the name `Name` in it cut to fit `Width` (FitName), the
 	 * rest of the line kept whole: an announcement or a death screen's line
 	 * naming a player, whose name may be as long as Steam's (32 letters,
@@ -327,16 +339,15 @@ namespace CheeseStrikeHUD
 	/** What the panel says is next: "CHEESE STRIKE IN 2", one kill off "CHEESE STRIKE NEXT KILL"; past the last streak "EVERY STREAK EARNED". `bShort` names it as under its pip ("DRONE IN 3"). */
 	FString StreakNext(int32 Kills);
 	/**
-	 * The count's pop after a kill, with its tile behind it growing together: up over StreakPopGrow, held at StreakPopPeak (about the
-	 * minimap's side, MapSide over the tile's) for StreakPopHold, then back to size over StreakPopShrink, both moves eased.
+	 * The count's pop after a kill, with its tile behind it: at StreakPopPeak (about the minimap's side, MapSide over the tile's) at
+	 * once, with no growing in, held for StreakPopHold, then back to size over StreakPopShrink, eased.
 	 */
-	constexpr float StreakPopGrow = 0.2f;
 	constexpr float StreakPopHold = 0.5f;
 	constexpr float StreakPopShrink = 0.5f;
 	/** Seconds the whole pop takes after a kill. */
-	constexpr float StreakPopTime = StreakPopGrow + StreakPopHold + StreakPopShrink;
+	constexpr float StreakPopTime = StreakPopHold + StreakPopShrink;
 	constexpr float StreakPopPeak = 250.0f / 58.0f;
-	/** How big the count and its tile are drawn `Seconds` after a kill (1 at rest, and before 0): eased up to StreakPopPeak, held, eased down to 1 by StreakPopTime. */
+	/** How big the count and its tile are drawn `Seconds` after a kill (1 at rest, and before 0): StreakPopPeak from the kill, held, eased down to 1 by StreakPopTime. */
 	float StreakPop(float Seconds);
 	/** How long the red flash for a fall lasts, and its strongest. */
 	constexpr float FallFlashTime = 0.6f;

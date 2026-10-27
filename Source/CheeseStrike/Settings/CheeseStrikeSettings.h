@@ -51,6 +51,9 @@ namespace CheeseStrikeSettings
 	TArray<FIntPoint> Resolutions(const TArray<FIntPoint>& Supported, FIntPoint Desktop);
 	/** Which of `Choices` is `Resolution`, or the biggest no bigger than it (the first if none). */
 	int32 ResolutionIndex(const TArray<FIntPoint>& Choices, FIntPoint Resolution);
+	/** Whether a stepper at choice `Index` of `Count` can step down (its - button) or up (its +): not past either end, so the button at an end is greyed out. */
+	bool CanStepDown(int32 Index, int32 Count);
+	bool CanStepUp(int32 Index, int32 Count);
 	/**
 	 * Full screen (Fullscreen or Borderless), the window is the screen's own
 	 * size, and a resolution picked is what the game is drawn at, the menus

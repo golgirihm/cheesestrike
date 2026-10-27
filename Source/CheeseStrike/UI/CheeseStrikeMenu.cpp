@@ -1609,13 +1609,23 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePartyPermission(bool bHost, UCheeseSt
 	using namespace CheeseStrikeFriends;
 	const TArray<FString> Choices = { PermissionLabel(EPermission::InviteOnly), PermissionLabel(EPermission::InvitesAndFriends) };
 	const TWeakObjectPtr<UCheeseStrikeSessionSubsystem> Weak = Sessions;
-	// A dropdown like the lobby's rules, the host's to change; the others see the choice in a plain box.
+	// A dropdown like the lobby's rules, the host's to change; the others see the choice in a plain box. Under it, always, what
+	// the chosen one means, read as it is drawn (apart from the session's status note above, which comes and goes).
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("Who can join the party"), true, false) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 4.0f, 0.0f, 0.0f))
 		[
 			MakeDropdown(Choices, [Weak]() { return Weak.IsValid() && Weak->FriendsMayJoinHere() ? 1 : 0; }, bHost,
 				[Weak](int32 Picked) { if (Weak.IsValid()) Weak->SetFriendsMayJoin(Picked == 1); })
+		]
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			SNew(STextBlock).Font(Font(16)).ColorAndOpacity(Muted).Margin(FMargin(0.0f, 4.0f))
+			.Text_Lambda([Weak]()
+			{
+				const bool bFriends = !Weak.IsValid() || Weak->FriendsMayJoinHere();
+				return FText::FromString(PermissionDescription(bFriends ? EPermission::InvitesAndFriends : EPermission::InviteOnly));
+			})
 		];
 }
 
@@ -1827,13 +1837,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSeatColumns(bool bTeams)
 	return Columns;
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const FString& Value, bool bCanPick, TFunction<void()> Less, TFunction<void()> More)
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const FString& Value, bool bCanLess, bool bCanMore, TFunction<void()> Less, TFunction<void()> More)
 {
-	const auto Button = [this, bCanPick](const FString& Text, TFunction<void()> Do)
+	// Each button greyed out at its end (CheeseStrikeSettings::CanStepDown, CanStepUp).
+	const auto Button = [this](const FString& Text, bool bCanPress, TFunction<void()> Do)
 	{
 		return Focusable(Text, SNew(SCheeseStrikeButton)
 			.ButtonStyle(&ButtonStyle(EButtonKind::Plain))
-			.IsEnabled(bCanPick)
+			.IsEnabled(bCanPress)
 			.ContentPadding(FMargin(14.0f, 6.0f))
 			.OnClicked_Lambda([Do]() { Do(); return FReply::Handled(); })
 			[
@@ -1841,7 +1852,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const F
 			]);
 	};
 	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("-"), Less) ]
+		+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("-"), bCanLess, Less) ]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(16.0f, 0.0f))
 		[
 			SNew(SBox).MinDesiredWidth(150.0f)
@@ -1849,7 +1860,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const F
 				SNew(STextBlock).Text(FText::FromString(Value)).Font(Font(18, FName("Bold"))).ColorAndOpacity(Ink).Justification(ETextJustify::Center)
 			]
 		]
-		+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("+"), More) ];
+		+ SHorizontalBox::Slot().AutoWidth() [ Button(TEXT("+"), bCanMore, More) ];
 	if (Label.IsEmpty())
 	{
 		return Row;
@@ -2590,7 +2601,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			}
 			Refresh();
 		};
-		Add(MakeOptionRow(TEXT("Resolution"), MakeStepper(FString(), FString::Printf(TEXT("%d x %d"), Shown.X, Shown.Y), Resolutions.Num() > 1,
+		Add(MakeOptionRow(TEXT("Resolution"), MakeStepper(FString(), FString::Printf(TEXT("%d x %d"), Shown.X, Shown.Y),
+			CheeseStrikeSettings::CanStepDown(ResolutionChosen, Resolutions.Num()), CheeseStrikeSettings::CanStepUp(ResolutionChosen, Resolutions.Num()),
 			[PickResolution, ResolutionChosen]() { PickResolution(FMath::Max(0, ResolutionChosen - 1)); },
 			[PickResolution, ResolutionChosen, Resolutions]() { PickResolution(FMath::Min(Resolutions.Num() - 1, ResolutionChosen + 1)); })));
 		if (bFullScreen)

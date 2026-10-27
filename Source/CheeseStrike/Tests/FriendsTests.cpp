@@ -90,6 +90,8 @@ bool FAFriendsStatusAndPermissionRoundTrip::RunTest(const FString& Parameters)
 	TestEqual(TEXT("invite only reads back"), PermissionFromValue(PermissionValue(EPermission::InviteOnly)), EPermission::InviteOnly);
 	TestEqual(TEXT("invites + friends reads back"), PermissionFromValue(PermissionValue(EPermission::InvitesAndFriends)), EPermission::InvitesAndFriends);
 	TestEqual(TEXT("no value: friends may join, as a new game"), PermissionFromValue(FString()), EPermission::InvitesAndFriends);
+	TestEqual(TEXT("invite only says what it means"), PermissionDescription(EPermission::InviteOnly), FString(TEXT("Only invitations let players in")));
+	TestEqual(TEXT("and so do invites + friends"), PermissionDescription(EPermission::InvitesAndFriends), FString(TEXT("Friends can join")));
 	TestFalse(TEXT("a host that picked invite only shows it, whatever the session still says"), FriendsMayJoinShown(true, TOptional<bool>(false), true));
 	TestTrue(TEXT("a host that picked friends shows it"), FriendsMayJoinShown(true, TOptional<bool>(true), false));
 	TestFalse(TEXT("a host that hasn't picked shows the session's"), FriendsMayJoinShown(true, TOptional<bool>(), false));

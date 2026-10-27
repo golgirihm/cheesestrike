@@ -282,6 +282,12 @@ bool FTheScoreboardShowsStatusAndWhoPlays::RunTest(const FString& Parameters)
 	TestTrue(TEXT("a little wider shrinks a little"), FMath::IsNearlyEqual(ShrinkToFit(125.0f, 100.0f, 26.0f, 0.55f), 26.0f * 0.8f, 0.001f));
 	TestTrue(TEXT("never below the least share: cut instead"), FMath::IsNearlyEqual(ShrinkToFit(1000.0f, 100.0f, 26.0f, 0.55f), 26.0f * 0.55f, 0.001f));
 	TestEqual(TEXT("never less than a letter"), FitName(TEXT("Cheddar"), 5.0f, Measure), FString(TEXT("C...")));
+	// The podium's plates: as wide as the nearest neighbours allow, never touching.
+	TestEqual(TEXT("one place: the widest plate"), PodiumPlateWidth({500.0f}, 1.0f), PodiumPlateMost);
+	TestEqual(TEXT("neighbours 400 apart: the gap kept between them"), PodiumPlateWidth({100.0f, 500.0f, 900.0f}, 1.0f), 400.0f - PodiumPlateGap);
+	TestEqual(TEXT("the nearest pair decides, in any order"), PodiumPlateWidth({900.0f, 100.0f, 400.0f}, 1.0f), 300.0f - PodiumPlateGap);
+	TestEqual(TEXT("and scales with the unit"), PodiumPlateWidth({0.0f}, 2.0f), 2.0f * PodiumPlateMost);
+	TestEqual(TEXT("never narrower than the least"), PodiumPlateWidth({100.0f, 110.0f}, 1.0f), PodiumPlateLeast);
 	return true;
 }
 

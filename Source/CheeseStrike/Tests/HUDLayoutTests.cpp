@@ -153,13 +153,12 @@ bool FTheStreakPanelCountsToEachStreak::RunTest(const FString& Parameters)
 	TestEqual(TEXT("after the last"), StreakNext(10), FString(TEXT("EVERY STREAK EARNED")));
 	TestEqual(TEXT("the UAC one off"), StreakNext(1), FString(TEXT("UAC in 2")));
 	TestEqual(TEXT("the names as the panel says them"), StreakShortName(EStreak::CheeseStrike), FString(TEXT("Cheese Strike")));
-	// The pop: the count and its tile grow to about the minimap's size, hold half a second, and shrink back over half a second.
-	TestTrue(TEXT("at rest before a kill"), StreakPop(-1.0f) == 1.0f && StreakPop(0.0f) == 1.0f);
-	TestTrue(TEXT("grows, eased"), StreakPop(StreakPopGrow * 0.5f) > 1.0f && StreakPop(StreakPopGrow * 0.5f) < StreakPopPeak && StreakPop(StreakPopGrow * 0.25f) < 1.0f + (StreakPopPeak - 1.0f) * 0.25f);
-	TestTrue(TEXT("about the minimap's size: its side over the tile's"), FMath::IsNearlyEqual(StreakPopPeak * 58.0f, 250.0f, 1.0f) && StreakPop(StreakPopGrow) == StreakPopPeak);
-	TestTrue(TEXT("held for half a second"), FMath::IsNearlyEqual(StreakPopHold, 0.5f) && StreakPop(StreakPopGrow + 0.01f) == StreakPopPeak && StreakPop(StreakPopGrow + StreakPopHold - 0.01f) == StreakPopPeak);
-	TestTrue(TEXT("then shrinks over half a second"), FMath::IsNearlyEqual(StreakPopShrink, 0.5f) && FMath::IsNearlyEqual(StreakPopTime, StreakPopGrow + 1.0f));
-	const float ShrinkStart = StreakPopGrow + StreakPopHold;
+	// The pop: the count and its tile are about the minimap's size at once (no growing in), hold half a second, and shrink back over half a second.
+	TestTrue(TEXT("at rest before a kill"), StreakPop(-1.0f) == 1.0f && StreakPop(-0.001f) == 1.0f);
+	TestTrue(TEXT("about the minimap's size from the kill itself: its side over the tile's"), FMath::IsNearlyEqual(StreakPopPeak * 58.0f, 250.0f, 1.0f) && StreakPop(0.0f) == StreakPopPeak && StreakPop(0.02f) == StreakPopPeak);
+	TestTrue(TEXT("held for half a second"), FMath::IsNearlyEqual(StreakPopHold, 0.5f) && StreakPop(StreakPopHold - 0.01f) == StreakPopPeak);
+	TestTrue(TEXT("then shrinks over half a second"), FMath::IsNearlyEqual(StreakPopShrink, 0.5f) && FMath::IsNearlyEqual(StreakPopTime, 1.0f));
+	const float ShrinkStart = StreakPopHold;
 	TestTrue(TEXT("easing down, steady through the middle, gentle at both ends"), StreakPop(ShrinkStart + 0.05f) > StreakPopPeak - 0.1f * (StreakPopPeak - 1.0f) && StreakPop(ShrinkStart + 0.25f) < StreakPop(ShrinkStart + 0.1f) && StreakPop(ShrinkStart + 0.25f) > StreakPop(ShrinkStart + 0.4f) && StreakPop(ShrinkStart + 0.45f) < 1.0f + 0.1f * (StreakPopPeak - 1.0f));
 	TestTrue(TEXT("halfway down at the middle"), FMath::IsNearlyEqual(StreakPop(ShrinkStart + 0.25f), (1.0f + StreakPopPeak) / 2.0f, 0.01f));
 	TestTrue(TEXT("and settled"), StreakPop(StreakPopTime) == 1.0f && FMath::IsNearlyEqual(StreakPop(StreakPopTime * 0.999f), 1.0f, 0.02f));
