@@ -51,8 +51,6 @@ public:
 	static constexpr float CrosshairGap = 5.0f;
 	/** Seconds a hit mark shows. */
 	static constexpr float HitMarkLife = 0.2f;
-	/** Seconds an enemy stays on the minimap after they were last known to be somewhere (CheeseStrikeHUD::EnemyMarkLife). */
-	static constexpr float SeenLife = CheeseStrikeHUD::EnemyMarkLife;
 	/** The margin from the screen's edges, and the minimap's side, in design pixels (Unit). */
 	static constexpr float Margin = 28.0f;
 	static constexpr float MapSide = 250.0f;
@@ -80,7 +78,7 @@ public:
 	static bool AreTeammates(const APlayerState* A, const APlayerState* B);
 
 	/**
-	 * Shows every enemy on the minimap for `Seconds`, seen or not, on this
+	 * Shows every enemy on the minimap for `Seconds`, wherever they are, on this
 	 * machine: what the Unmanned Aerial Cheese does for its team's players.
 	 */
 	void RevealEnemies(float Seconds);
@@ -93,9 +91,10 @@ public:
 	void CheeseStrikeHitFrom(float Degrees);
 	/**
 	 * Whether `Enemy` shows on the minimap now: revealed here (RevealEnemies),
-	 * or with a mark where they were last known to be (EnemyMark): seen,
-	 * heard firing (NoteShot) or swept by the side's Unmanned Aerial Cheese
-	 * (UpdateSweep), each moving the mark at most once a second.
+	 * or with a mark where they were last known to be (EnemyMark): heard
+	 * firing (NoteShot) or swept by the side's Unmanned Aerial Cheese
+	 * (UpdateSweep), each moving the mark at most once a second. Being in
+	 * sight puts nobody on it.
 	 */
 	bool ShowsOnMinimap(const ACheeseStrikeCharacter* Enemy) const;
 	/** Where the minimap shows `Enemy` (their last known place), or null while it shows them nowhere. */
@@ -233,8 +232,6 @@ protected:
 	TObjectPtr<UCheeseStrikeAvatars> Avatars;
 	FCheeseStrikeMinimap Minimap;
 	TArray<FDamageArc> DamageArcs;
-	/** When each enemy was last seen (the world's time). */
-	TMap<TWeakObjectPtr<const ACheeseStrikeCharacter>, float> LastSeen;
 	/** Where each enemy was last known to be, by their character's unique id: what the minimap shows of them. */
 	CheeseStrikeHUD::FEnemyMarks EnemyMarks;
 	/** `Enemy` is known to be where they are now (swept: by the Unmanned Aerial Cheese). */

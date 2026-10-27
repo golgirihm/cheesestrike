@@ -180,6 +180,57 @@ private:
 };
 
 /**
+ * A grenade in hand, on either body (CheeseStrikeGrenades::HeldHand,
+ * ThrowHand): the right hand up with the grenade in its palm, placed from
+ * the eyes in the frame of the aim (its own player's view, or the way the
+ * body faces tipped by its aim), its fingers and palm turned as the throw has
+ * them at its phase, the elbow out and down, its fingers closed round the
+ * grenade; and the left arm let go of the
+ * weapon and lowered by the side. Blended in by Alpha (the switch to the
+ * grenade, or a throw under way), bone by bone, over the hold of the weapon,
+ * which is put away meanwhile.
+ */
+struct FCheeseStrikeGrenadeHold : public FAnimNode_Base
+{
+	FComponentSpacePoseLink ComponentPose;
+
+	/** How much the arms hold the grenade (0 to 1). */
+	float Alpha = 0.0f;
+	/** The throw's phase (none below 0: held). */
+	float ThrowPhase = -1.0f;
+	/** Its own player's body: placed in the view's frame (View, the camera at CameraAtHead in the head bone's space); else in the body's. */
+	bool bInView = false;
+	FQuat View = FQuat::Identity;
+	FVector CameraAtHead = FVector::ZeroVector;
+	/** The way the body faces in component space, and its aim's pitch (degrees). */
+	FVector Forward = FVector(0.0, 1.0, 0.0);
+	float AimPitch = 0.0f;
+
+	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
+	virtual void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;
+	virtual void Update_AnyThread(const FAnimationUpdateContext& Context) override;
+	virtual void EvaluateComponentSpace_AnyThread(FComponentSpacePoseContext& Output) override;
+
+private:
+	void PoseArms(FCSPose<FCompactPose>& Pose) const;
+	FBoneReference Head;
+	FBoneReference UpperArm;
+	FBoneReference LowerArm;
+	FBoneReference Hand;
+	FBoneReference Index;
+	FBoneReference Middle;
+	FBoneReference Pinky;
+	/** Each finger's three joints, index to little, closed round the grenade. */
+	FBoneReference Curl[4][3];
+	bool bCurl = false;
+	FBoneReference OtherUpperArm;
+	FBoneReference OtherLowerArm;
+	FBoneReference OtherHand;
+	bool bBones = false;
+	bool bFingers = false;
+};
+
+/**
  * A slide (crouching at a sprint), on either body: the hips dropped near the
  * floor and laid back, the chest coming up over them, the right leg out
  * ahead along the floor and the left folded under it, knee up; blended in

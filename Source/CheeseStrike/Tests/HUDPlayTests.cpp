@@ -2,7 +2,7 @@
 
 // The HUD in a match over the network (see PlayTesting.h): a hit reaches the
 // hurt player's machine as an arc pointing at the shooter, the minimap reads
-// the level and shows an enemy while they are seen, and the row of players
+// the level and shows an enemy where they fired or were swept, never just for being seen, and the row of players
 // says who is coming back.
 
 #include "Misc/AutomationTest.h"
@@ -81,9 +81,13 @@ bool FTheHUDShowsWhereHitsComeFrom::RunTest(const FString& Parameters)
 		TestFalse(TEXT("the two are on different sides"), ACheeseStrikeHUD::AreTeammates(Controller(0)->PlayerState, Controller(1)->PlayerState));
 		TestTrue(TEXT("and each is their own side"), ACheeseStrikeHUD::AreTeammates(Controller(1)->PlayerState, Controller(1)->PlayerState));
 	});
-	// Facing the host 4 m away, the joiner sees them, and the minimap shows them.
-	WaitUntil(TEXT("the joiner seeing the host"), 5.0f, []() { const ACheeseStrikeHUD* Hud = HUDPlayTests::HUD(1); return Hud != nullptr && Hud->ShowsOnMinimap(CharacterOf(0, 1)); });
+	// Facing the host 4 m away, the joiner sees them, but the minimap doesn't show them for that: only a shot or a sweep does.
 	Wait(CheeseStrikeRules::SpawnProtection);
+	Then([this]()
+	{
+		const ACheeseStrikeHUD* Hud = HUDPlayTests::HUD(1);
+		TestFalse(TEXT("an enemy merely in sight is not on the minimap"), Hud == nullptr || Hud->ShowsOnMinimap(CharacterOf(0, 1)));
+	});
 	Then([this]() { TestEqual(TEXT("no arcs before a hit"), HUDPlayTests::HUD(1)->GetDamageArcs().Num(), 0); });
 	// The host shoots the joiner once; the joiner's machine hears where from.
 	Play(0, TEXT("tap Fire"));
@@ -110,15 +114,15 @@ bool FTheHUDShowsWhereHitsComeFrom::RunTest(const FString& Parameters)
 		const float Angle = HUDPlayTests::ArcAngle(1);
 		TestTrue(FString::Printf(TEXT("turned right, the arc points left (%.0f degrees)"), Angle), FMath::Abs(Angle + 90.0f) < 15.0f);
 	});
-	Wait(ACheeseStrikeHUD::SeenLife + 0.5f);
+	Wait(CheeseStrikeHUD::EnemyMarkLife + 0.5f);
 	Then([this]()
 	{
 		ACheeseStrikeHUD* Hud = HUDPlayTests::HUD(1);
 		const ACheeseStrikeCharacter* HostSeen = CharacterOf(0, 1);
-		TestFalse(TEXT("out of sight, the host leaves the minimap"), Hud->ShowsOnMinimap(HostSeen));
+		TestFalse(TEXT("firing no more, the host leaves the minimap"), Hud->ShowsOnMinimap(HostSeen));
 		TestEqual(TEXT("the arc is gone with its time"), Hud->GetDamageArcs().Num(), 0);
 	});
-	// Unseen, the host fires: the joiner's minimap shows them where they fired from, not following them after.
+	// The host fires again: the joiner's minimap shows them where they fired from, not following them after.
 	Play(0, TEXT("tap Fire"));
 	WaitUntil(TEXT("the host's shot putting them on the joiner's minimap"), 3.0f, []() { return HUDPlayTests::HUD(1)->EnemyMark(CharacterOf(0, 1)) != nullptr; });
 	Then([this]()

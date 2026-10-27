@@ -118,9 +118,6 @@ struct FCheeseStrikeAnimSet
 	TObjectPtr<UAnimSequence> Equip;
 	UPROPERTY()
 	TObjectPtr<UAnimSequence> Guard;
-	/** Throwing a grenade over the weapon held (Lyra's toss, the same for every way of holding); may be missing. */
-	UPROPERTY()
-	TObjectPtr<UAnimSequence> Throw;
 
 	/** Whether every animation it can't do without was found. */
 	bool IsComplete() const;
@@ -158,6 +155,16 @@ struct FCheeseStrikeAnimInstanceView
 	bool bSprinting = false;
 };
 
+/** A grenade in hand (FCheeseStrikeGrenadeHold), read from the character's UCheeseStrikeGrenades each frame. */
+struct FCheeseStrikeAnimInstanceGrenade
+{
+	/** How far the grenade hand is up (0 to 1), and the throw's phase (none below 0). */
+	float Up = 0.0f;
+	float ThrowPhase = -1.0f;
+	/** Placed in its own player's view (its first-person body, played by them). */
+	bool bInView = false;
+};
+
 /**
  * The body's animation, composed in code rather than in an animation
  * Blueprint, so that it can be read and changed as text and works for any
@@ -169,7 +176,8 @@ struct FCheeseStrikeAnimInstanceView
  * (FCheeseStrikeSlidePose), the knife's fist, guard and swipe
  * (FCheeseStrikeKnifeHold) and, for its own player's body, the weapon hand
  * placed in view (FCheeseStrikeViewHold); then the left hand held on the
- * weapon (FCheeseStrikeGripIK) except while a montage moves it; and last,
+ * weapon (FCheeseStrikeGripIK) except while a montage moves it; a grenade
+ * in the right hand, held and thrown, the left let go (FCheeseStrikeGrenadeHold); and last,
  * for a player down in Execution's last stand, the pose of one lying hurt on
  * their back, propped up, the pistol out (FCheeseStrikeDownedPose), blended
  * in and out. The animations are
@@ -228,6 +236,8 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	FCheeseStrikeAnimInstanceView View;
 	float SprintBlend = 0.0f;
 	float SlideBlend = 0.0f;
+	/** A grenade in hand (UCheeseStrikeAnimInstance's). */
+	FCheeseStrikeAnimInstanceGrenade Grenade;
 	/** Down: how far (0 to 1, at an even pace; the pose takes it smoothed), how much the legs scoot, where they are in their pushes and the breath's phase (radians). */
 	float DownLinear = 0.0f;
 	float ScootBlend = 0.0f;
@@ -308,6 +318,8 @@ protected:
 	/** Two guns: the hands apart, the left the mirror of the right. */
 	FCheeseStrikeDualHold DualHold;
 	FCheeseStrikeGripIK LeftHand;
+	/** A grenade in the right hand, held and thrown, the left let go: over the weapon's hold, which is put away meanwhile. */
+	FCheeseStrikeGrenadeHold GrenadeHold;
 	/** Down in Execution's last stand: on their back, propped on the elbow, the pistol out. */
 	FCheeseStrikeDownedPose Downed;
 	/** In an execution (CheeseStrikeExecution): the executor's blow, or the one down's last moments. */
@@ -402,6 +414,8 @@ public:
 	float SwipePhase = -1.0f;
 	/** The arms in view, for its own player's body. */
 	FCheeseStrikeAnimInstanceView View;
+	/** A grenade in hand. */
+	FCheeseStrikeAnimInstanceGrenade Grenade;
 
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 

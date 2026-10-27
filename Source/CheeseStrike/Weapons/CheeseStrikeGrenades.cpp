@@ -1,11 +1,12 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeGrenades.h"
-#include "Animation/AnimMontage.h"
+#include "Algo/Find.h"
+#include "AnimationRuntime.h"
 #include "Camera/CameraComponent.h"
-#include "Animation/AnimSequence.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
@@ -14,7 +15,6 @@
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
-#include "Animation/CheeseStrikeAnimInstance.h"
 #include "CheeseStrike.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGrenade.h"
@@ -24,27 +24,12 @@
 namespace
 {
 
-	/** Where a grenade leaves the hand from the eyes: ahead, to the right and down (cm), along the aim. */
-	constexpr float ThrowFromAhead = 35.0f;
-	constexpr float ThrowFromRight = 14.0f;
-	constexpr float ThrowFromDown = 10.0f;
-	/** The hand the throw is made with (Lyra's toss throws with the left, the weapon kept in the right), and how the grenade sits in it. */
-	const FName ThrowHandBone(TEXT("hand_l"));
-	const FVector ThrowInHandAt(9.0f, 3.0f, -1.0f);
-	const FRotator ThrowInHandTurn(0.0f, 0.0f, 90.0f);
-	/** A throw held, with no arms to hold it in: the grenade low on the left of its player's view (cm from the eye: ahead, right, up), its spoon toward them. */
-	const FVector HeldInViewAt(40.0f, -17.0f, -14.0f);
-	const FRotator HeldInViewTurn(-15.0f, 200.0f, 10.0f);
-	/**
-	 * A throw held, with arms: in the right hand, the one the weapon is in (the arms' pose with the gun away has their
-	 * hands low and near, below what the first-person view shows, and the grenade sat there in the left, unseen in waves
-	 * 9 and 10). Where the grenade is wanted in its player's view (cm from the eye: ahead, right, up), low on the right,
-	 * and how it turns there; it is set in the hand's own space from where that hand is as the throw is taken up, so that it
-	 * is held by the right hand and moves with it.
-	 */
-	const FName HeldHandBone(TEXT("hand_r"));
-	const FVector HeldInHandViewAt(46.0f, 12.0f, -12.0f);
-	const FRotator HeldInHandViewTurn(-15.0f, 160.0f, -10.0f);
+	/** The hand a grenade is held and thrown with, and how deep in its palm it sits (cm from the palm's middle, out of it). */
+	const FName GrenadeHandBone(TEXT("hand_r"));
+	constexpr float GrenadeInPalmDepth = 4.0f;
+	/** A grenade held, with no arms to hold it in: low on the right of its player's view (cm from the eye: ahead, right, up). */
+	const FVector GrenadeInViewAt(40.0f, 14.0f, -10.0f);
+	const FRotator GrenadeInViewTurn(-15.0f, 160.0f, -10.0f);
 	/** The grenade (tools/art/weapon_models.py) and its materials (tools/art/weapon_materials.py), as ACheeseStrikeGrenade has them. */
 	const TCHAR* ThrowRoundPath = TEXT("/Game/CheeseStrike/Weapons/Grenade/SM_FragGrenade.SM_FragGrenade");
 	const TCHAR* const ThrowMaterialPaths[] = {TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeCheese.MI_GrenadeCheese"),
@@ -67,6 +52,7 @@ void UCheeseStrikeGrenades::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(UCheeseStrikeGrenades, Count, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UCheeseStrikeGrenades, bHoldShown, COND_SkipOwner);
 }
 
 ACheeseStrikeCharacter* UCheeseStrikeGrenades::Holder() const
@@ -91,6 +77,15 @@ void UCheeseStrikeGrenades::SetCount(int32 InCount)
 bool UCheeseStrikeGrenades::IsThrowing() const
 {
 	return GetWorld() != nullptr && GetWorld()->GetTimeSeconds() < ThrowingUntil;
+}
+
+float UCheeseStrikeGrenades::ThrowPhase() const
+{
+	if (!IsThrowing())
+	{
+		return -1.0f;
+	}
+	return FMath::Clamp(1.0f - (ThrowingUntil - GetWorld()->GetTimeSeconds()) / CheeseStrikeGrenades::ThrowTime, 0.0f, 1.0f);
 }
 
 bool UCheeseStrikeGrenades::CanThrow() const
@@ -144,8 +139,8 @@ void UCheeseStrikeGrenades::BeginHold()
 		Weapon->StopFiring();
 		Weapon->StopAiming();
 	}
-	// The grenade taken up in the free hand, low on the left of the view.
-	ShowHeldInView(true);
+	// The weapon goes down and the grenade comes up in the right hand (the switch, each tick), for the others to see too.
+	ShowHold(true);
 	UpdateHold();
 }
 
@@ -163,7 +158,6 @@ void UCheeseStrikeGrenades::EndHold(const FVector& Aim)
 	}
 	bHolding = false;
 	ShowPreview(false);
-	ShowHeldInView(false);
 	ShowThrow();
 	if (Character->HasAuthority())
 	{
@@ -183,7 +177,29 @@ void UCheeseStrikeGrenades::CancelHold()
 	}
 	bHolding = false;
 	ShowPreview(false);
-	ShowHeldInView(false);
+	ShowHold(false);
+}
+
+void UCheeseStrikeGrenades::ShowHold(bool bShow)
+{
+	const ACheeseStrikeCharacter* Character = Holder();
+	if (Character == nullptr)
+	{
+		return;
+	}
+	if (Character->HasAuthority())
+	{
+		bHoldShown = bShow;
+	}
+	else
+	{
+		ServerShowHold(bShow);
+	}
+}
+
+void UCheeseStrikeGrenades::ServerShowHold_Implementation(bool bShow)
+{
+	bHoldShown = bShow;
 }
 
 void UCheeseStrikeGrenades::ServerThrow_Implementation(FVector_NetQuantizeNormal Aim)
@@ -194,6 +210,8 @@ void UCheeseStrikeGrenades::ServerThrow_Implementation(FVector_NetQuantizeNormal
 void UCheeseStrikeGrenades::ServerThrowNow(const FVector& Aim)
 {
 	ACheeseStrikeCharacter* Character = Holder();
+	// Thrown or not, the grenade is no longer held up.
+	bHoldShown = false;
 	// A throw arrives no sooner than the last one's hands are free, allowing for the network.
 	if (Character == nullptr || Count <= 0 || !Character->CanAct() || Character->IsDowned() || ServerNow() - LastThrowAt < CheeseStrikeGrenades::ThrowTime * 0.8f || Aim.IsNearlyZero())
 	{
@@ -218,138 +236,123 @@ void UCheeseStrikeGrenades::MulticastThrow_Implementation()
 
 void UCheeseStrikeGrenades::ShowThrow()
 {
-	ACheeseStrikeCharacter* Character = Holder();
-	if (Character == nullptr)
+	if (Holder() == nullptr)
 	{
 		return;
 	}
+	// Both bodies throw with the right hand (FCheeseStrikeGrenadeHold, by ThrowPhase), the grenade in it until it goes.
 	const float Time = GetWorld()->GetTimeSeconds();
 	ThrowingUntil = Time + CheeseStrikeGrenades::ThrowTime;
 	InHandUntil = Time + CheeseStrikeGrenades::ReleaseDelay;
-	if (GetNetMode() == NM_DedicatedServer)
-	{
-		return;
-	}
-	// Each body plays its own skeleton's toss, over the weapon it holds, the throw made in ThrowTime.
-	const ACheeseStrikeWeapon* Weapon = Character->GetWeapon();
-	const ECheeseStrikeHold Hold = Weapon != nullptr ? Weapon->GetHold() : ECheeseStrikeHold::Rifle;
-	for (USkeletalMeshComponent* Body : {Character->GetFirstPersonMesh(), Character->GetMesh()})
-	{
-		UCheeseStrikeAnimInstance* Instance = Body != nullptr ? Cast<UCheeseStrikeAnimInstance>(Body->GetAnimInstance()) : nullptr;
-		UAnimSequence* Toss = Instance != nullptr ? Instance->GetSet(Hold).Throw.Get() : nullptr;
-		if (Toss != nullptr)
-		{
-			const float Rate = FMath::Max(1.0f, Toss->GetPlayLength() / CheeseStrikeGrenades::ThrowTime);
-			Instance->PlaySlotAnimationAsDynamicMontage(Toss, UCheeseStrikeAnimInstance::SlotName(), 0.08f, 0.15f, Rate);
-		}
-	}
-	ShowInHand();
 }
 
-void UCheeseStrikeGrenades::ShowHeldInView(bool bShow)
+bool UCheeseStrikeGrenades::InPalm(const USkeletalMeshComponent* Body, FTransform& OutInHand)
+{
+	const USkeletalMesh* Mesh = Body != nullptr ? Body->GetSkeletalMeshAsset() : nullptr;
+	if (Mesh == nullptr)
+	{
+		return false;
+	}
+	const FReferenceSkeleton& Skeleton = Mesh->GetRefSkeleton();
+	const int32 Hand = Skeleton.FindBoneIndex(GrenadeHandBone);
+	const int32 Knuckles[] = {Skeleton.FindBoneIndex(TEXT("index_01_r")), Skeleton.FindBoneIndex(TEXT("middle_01_r")), Skeleton.FindBoneIndex(TEXT("ring_01_r")),
+		Skeleton.FindBoneIndex(TEXT("pinky_01_r"))};
+	if (Hand == INDEX_NONE || Algo::Find(Knuckles, INDEX_NONE) != nullptr)
+	{
+		return false;
+	}
+	// The knuckles from the wrist, in the hand bone's space, as the skeleton's own pose has them.
+	const FTransform HandAt = FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, Hand);
+	FVector From[4];
+	for (int32 Each = 0; Each < 4; ++Each)
+	{
+		From[Each] = HandAt.InverseTransformPositionNoScale(FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, Knuckles[Each]).GetLocation());
+	}
+	const FVector Fingers = From[1].GetSafeNormal();
+	// The palm faces the way the fingers cross the index's side (FCheeseStrikeGrenadeHold turns the hand by the same).
+	const FVector Palm = FVector::CrossProduct(Fingers, (From[0] - From[3]).GetSafeNormal()).GetSafeNormal();
+	if (Fingers.IsNearlyZero() || Palm.IsNearlyZero())
+	{
+		return false;
+	}
+	// In the palm, most of the way to the knuckles where the fingers close round it, and out of it by the grenade's depth;
+	// its fuse along the fingers.
+	const FVector Middle = (From[0] + From[1] + From[2] + From[3]) * 0.25f * 0.85f;
+	OutInHand = FTransform(FRotationMatrix::MakeFromZX(Fingers, Palm).ToQuat(), Middle + Palm * GrenadeInPalmDepth);
+	return true;
+}
+
+UStaticMeshComponent* UCheeseStrikeGrenades::MakeInHand(USkeletalMeshComponent* Body, bool bFirstPerson)
 {
 	ACheeseStrikeCharacter* Character = Holder();
-	if (Character == nullptr || GetNetMode() == NM_DedicatedServer || !Character->IsPlayerControlled())
+	UStaticMesh* Round = LoadObject<UStaticMesh>(nullptr, ThrowRoundPath);
+	if (Character == nullptr || Round == nullptr)
 	{
-		return;
+		return nullptr;
 	}
-	if (bShow && HeldInView == nullptr && Character->GetFirstPersonCameraComponent() != nullptr)
+	// The frag, in its cheese and steel.
+	UStaticMeshComponent* Mesh = NewObject<UStaticMeshComponent>(GetOwner());
+	Mesh->SetStaticMesh(Round);
+	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(ThrowMaterialPaths); ++Slot)
 	{
-		HeldInView = NewObject<UStaticMeshComponent>(GetOwner());
-		HeldInView->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, ThrowRoundPath));
-		for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(ThrowMaterialPaths); ++Slot)
+		if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, ThrowMaterialPaths[Slot]))
 		{
-			if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, ThrowMaterialPaths[Slot]))
-			{
-				HeldInView->SetMaterial(Slot, Material);
-			}
+			Mesh->SetMaterial(Slot, Material);
 		}
-		HeldInView->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		HeldInView->SetCastShadow(false);
-		HeldInView->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
-		HeldInView->bOnlyOwnerSee = true;
-		HeldInView->RegisterComponent();
 	}
-	if (HeldInView != nullptr)
+	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Mesh->SetCastShadow(!bFirstPerson);
+	Mesh->SetFirstPersonPrimitiveType(bFirstPerson ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
+	Mesh->bOnlyOwnerSee = bFirstPerson;
+	Mesh->bOwnerNoSee = !bFirstPerson;
+	Mesh->SetVisibility(false);
+	Mesh->RegisterComponent();
+	// In the right palm; without a hand to hold it (or fingers to find the palm by), in the view or at the hand.
+	FTransform InHand;
+	const bool bHand = Body != nullptr && Body->GetSkeletalMeshAsset() != nullptr && Body->GetBoneIndex(GrenadeHandBone) != INDEX_NONE;
+	if (bHand)
 	{
-		if (bShow)
+		Mesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, GrenadeHandBone);
+		if (InPalm(Body, InHand))
 		{
-			PutHeldInHand();
+			Mesh->SetRelativeTransform(InHand);
 		}
-		HeldInView->SetVisibility(bShow);
 	}
+	else if (bFirstPerson && Character->GetFirstPersonCameraComponent() != nullptr)
+	{
+		Mesh->AttachToComponent(Character->GetFirstPersonCameraComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		Mesh->SetRelativeLocationAndRotation(GrenadeInViewAt, GrenadeInViewTurn);
+	}
+	Mesh->SetWorldScale3D(FVector(1.0f));
+	return Mesh;
 }
 
-void UCheeseStrikeGrenades::PutHeldInHand()
-{
-	ACheeseStrikeCharacter* Character = Holder();
-	UCameraComponent* Camera = Character != nullptr ? Character->GetFirstPersonCameraComponent() : nullptr;
-	if (HeldInView == nullptr || Camera == nullptr)
-	{
-		return;
-	}
-	// In the right hand of the arms, set where the view wants it from where that hand is now (the hand itself is below the
-	// view with the gun away); without that hand, in the view.
-	USkeletalMeshComponent* Arms = Character->GetFirstPersonMesh();
-	const bool bInHand = Arms != nullptr && Arms->GetSkeletalMeshAsset() != nullptr && Arms->GetBoneIndex(HeldHandBone) != INDEX_NONE;
-	if (bInHand)
-	{
-		const FTransform Hand = Arms->GetSocketTransform(HeldHandBone);
-		const FTransform Eye(Camera->GetComponentRotation(), Camera->GetComponentLocation());
-		const FVector Where = Eye.TransformPosition(HeldInHandViewAt);
-		const FQuat Turn = Eye.GetRotation() * HeldInHandViewTurn.Quaternion();
-		HeldInView->AttachToComponent(Arms, FAttachmentTransformRules::SnapToTargetNotIncludingScale, HeldHandBone);
-		HeldInView->SetRelativeLocationAndRotation(Hand.InverseTransformPositionNoScale(Where), Hand.GetRotation().Inverse() * Turn);
-		HeldInView->SetWorldScale3D(FVector(1.0f));
-	}
-	else
-	{
-		HeldInView->AttachToComponent(Camera, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-		HeldInView->SetRelativeLocationAndRotation(HeldInViewAt, HeldInViewTurn);
-	}
-}
-
-void UCheeseStrikeGrenades::ShowInHand()
+void UCheeseStrikeGrenades::UpdateInHand()
 {
 	ACheeseStrikeCharacter* Character = Holder();
 	if (Character == nullptr || GetNetMode() == NM_DedicatedServer)
 	{
 		return;
 	}
-	// The grenade in the throwing hand until it goes: the frag, in its cheese and steel.
-	UStaticMesh* Round = LoadObject<UStaticMesh>(nullptr, ThrowRoundPath);
-	const auto InHand = [this, Round](TObjectPtr<UStaticMeshComponent>& Mesh, USkeletalMeshComponent* Body, bool bFirstPerson)
+	// Up in the right hand once the weapon is down, and through a throw until it goes.
+	const bool bShow = Character->IsAlive() && ((IsHoldShown() && Switch >= 1.0f) || GetWorld()->GetTimeSeconds() < InHandUntil);
+	const auto Show = [this, bShow](TObjectPtr<UStaticMeshComponent>& Mesh, USkeletalMeshComponent* Body, bool bFirstPerson)
 	{
-		if (Body == nullptr || Round == nullptr)
+		if (bShow && Mesh == nullptr)
 		{
-			return;
+			Mesh = MakeInHand(Body, bFirstPerson);
 		}
-		if (Mesh == nullptr)
+		if (Mesh != nullptr && Mesh->IsVisible() != bShow)
 		{
-			Mesh = NewObject<UStaticMeshComponent>(GetOwner());
-			Mesh->SetStaticMesh(Round);
-			for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(ThrowMaterialPaths); ++Slot)
-			{
-				if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, ThrowMaterialPaths[Slot]))
-				{
-					Mesh->SetMaterial(Slot, Material);
-				}
-			}
-			Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Mesh->SetCastShadow(!bFirstPerson);
-			Mesh->SetFirstPersonPrimitiveType(bFirstPerson ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
-			Mesh->bOnlyOwnerSee = bFirstPerson;
-			Mesh->bOwnerNoSee = !bFirstPerson;
-			Mesh->RegisterComponent();
-			Mesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, ThrowHandBone);
-			Mesh->SetRelativeLocation(ThrowInHandAt);
-			Mesh->SetRelativeRotation(ThrowInHandTurn);
-			Mesh->SetWorldScale3D(FVector(1.0f));
+			Mesh->SetVisibility(bShow);
 		}
-		Mesh->SetVisibility(true);
 	};
-	InHand(InHandFirst, Character->GetFirstPersonMesh(), true);
-	InHand(InHandThird, Character->GetMesh(), false);
+	// The view's only for its own player.
+	if (Character->IsLocallyControlled() && Character->IsPlayerControlled())
+	{
+		Show(HeldInView, Character->GetFirstPersonMesh(), true);
+	}
+	Show(InHandThird, Character->GetMesh(), false);
 }
 
 bool UCheeseStrikeGrenades::PredictPath(const FVector& Aim, FPredictProjectilePathResult& OutResult, float SimFrequency) const
@@ -489,7 +492,9 @@ FVector UCheeseStrikeGrenades::ReleasePoint(const FVector& Aim) const
 	}
 	const FVector Eyes = Character->GetEyes()->GetComponentLocation();
 	const FRotator Facing(0.0f, Aim.Rotation().Yaw, 0.0f);
-	const FVector Wanted = Eyes + Aim * ThrowFromAhead + Facing.RotateVector(FVector::RightVector) * ThrowFromRight - FVector(0.0f, 0.0f, ThrowFromDown);
+	// Where the right hand lets it go (CheeseStrikeGrenades::ThrowHand at ReleasePhase), on every machine alike.
+	const FVector Wanted = Eyes + Aim * CheeseStrikeGrenades::ReleaseAhead + Facing.RotateVector(FVector::RightVector) * CheeseStrikeGrenades::ReleaseRight
+		- FVector(0.0f, 0.0f, CheeseStrikeGrenades::ReleaseDown);
 	// Never through a wall right in front: short of it.
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeGrenadeRelease), false, Character);
 	FHitResult Hit;
@@ -523,18 +528,18 @@ void UCheeseStrikeGrenades::Release(FVector Aim)
 void UCheeseStrikeGrenades::UpdateGunAway()
 {
 	const ACheeseStrikeCharacter* Character = Holder();
-	// The gun is put away from its player's view for as long as a grenade is held or being thrown, and comes back after.
-	ACheeseStrikeWeapon* Wanted = Character != nullptr && Character->IsLocallyControlled() && Character->IsAlive() && IsBusy() ? Character->GetWeapon() : nullptr;
+	// The weapon is out of sight, on both bodies, from when it has gone down until the grenade hand is down again after.
+	ACheeseStrikeWeapon* Wanted = Character != nullptr && Character->IsAlive() && CheeseStrikeGrenades::IsWeaponAway(Switch, IsThrowing()) ? Character->GetWeapon() : nullptr;
 	ACheeseStrikeWeapon* Was = AwayGun.Get();
 	if (Was != Wanted)
 	{
 		if (Was != nullptr)
 		{
-			Was->SetFirstPersonAway(false);
+			Was->SetAway(false);
 		}
 		if (Wanted != nullptr)
 		{
-			Wanted->SetFirstPersonAway(true);
+			Wanted->SetAway(true);
 		}
 		AwayGun = Wanted;
 	}
@@ -544,25 +549,20 @@ void UCheeseStrikeGrenades::TickComponent(float DeltaTime, ELevelTick TickType, 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	UpdateHold();
+	// The weapon down and the grenade up while it is held or thrown, and back after.
+	const ACheeseStrikeCharacter* Character = Holder();
+	const bool bBusy = Character != nullptr && Character->IsAlive() && (IsHoldShown() || IsThrowing());
+	Switch = CheeseStrikeGrenades::SwitchStep(Switch, bBusy, DeltaTime);
 	UpdateGunAway();
-	// The round in hand goes as it is let go (or the throw is cut short by death).
-	const bool bShow = GetWorld()->GetTimeSeconds() < InHandUntil && Holder() != nullptr && Holder()->IsAlive();
-	for (UStaticMeshComponent* Mesh : {InHandFirst.Get(), InHandThird.Get()})
-	{
-		if (Mesh != nullptr && Mesh->IsVisible() != bShow)
-		{
-			Mesh->SetVisibility(bShow);
-		}
-	}
+	UpdateInHand();
 }
 
 void UCheeseStrikeGrenades::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (ACheeseStrikeWeapon* Gun = AwayGun.Get())
 	{
-		Gun->SetFirstPersonAway(false);
+		Gun->SetAway(false);
 	}
 	ShowPreview(false);
-	ShowHeldInView(false);
 	Super::EndPlay(EndPlayReason);
 }

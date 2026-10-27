@@ -64,8 +64,8 @@ public:
 	/** Which weapon of the arsenal it is: before it is spawned (SpawnActorDeferred), on the server. */
 	void SetWeapon(FName Id);
 	FName GetWeaponId() const { return WeaponId; }
-	/** Puts the weapon away from its own player's view (while a grenade is held or thrown), or brings it back; others still see it. */
-	void SetFirstPersonAway(bool bAway);
+	/** Puts the weapon out of sight on both bodies (while a grenade is in the right hand), or brings it back. */
+	void SetAway(bool bAway);
 	const FWeaponStats& GetStats() const { return *Stats; }
 	/** The numbers it fires by now: its own, or worse in the hand of someone down (CheeseStrikeModes::DownedWeapon). */
 	const FWeaponStats& FiringStats() const;

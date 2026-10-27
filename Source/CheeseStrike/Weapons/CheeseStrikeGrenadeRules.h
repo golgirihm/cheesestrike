@@ -72,6 +72,50 @@ namespace CheeseStrikeGrenades
 	 */
 	EHeld HeldThrow(bool bKeyHeld, bool bCanThrow, bool bChangedWeapon);
 
+	/**
+	 * Taking a grenade in hand and putting it back, on every machine: the
+	 * weapon in hand goes down out of view (as a weapon drawn comes up), then
+	 * the grenade comes up in the right hand, the left let go; after the throw,
+	 * or a throw put away, the reverse. One number runs it, the switch: from 0
+	 * (the weapon up) through 1 (the weapon gone, the hand still down) to 2
+	 * (the grenade up).
+	 */
+	constexpr float PutDownSeconds = 0.15f;
+	constexpr float TakeUpSeconds = 0.15f;
+	/** The switch `DeltaSeconds` on from `Switch`: toward 2 while the hands are busy with a grenade, else toward 0. */
+	float SwitchStep(float Switch, bool bBusy, float DeltaSeconds);
+	/** At `Switch`, how far the weapon in hand is down (0 up, 1 out of view) and the grenade hand up (0 to 1). */
+	float WeaponDown(float Switch);
+	float GrenadeUp(float Switch);
+	/** Whether the weapon in hand is put out of sight: from the switch, and for as long as a throw goes on. */
+	bool IsWeaponAway(float Switch, bool bThrowing);
+
+	/** Where a grenade leaves the hand, from the eyes along the aim (cm: ahead, right, down). */
+	constexpr float ReleaseAhead = 35.0f;
+	constexpr float ReleaseRight = 14.0f;
+	constexpr float ReleaseDown = 10.0f;
+	/** The share of a throw at which the grenade leaves the hand. */
+	constexpr float ReleasePhase = ReleaseDelay / ThrowTime;
+	/** The right hand with the grenade in it: where it is from the eyes (cm: ahead, right, up, in the frame of the aim), which way its fingers point and its palm faces (in the same axes). */
+	struct FHandAt
+	{
+		FVector At = FVector::ZeroVector;
+		FVector Fingers = FVector::UpVector;
+		FVector Palm = FVector::ForwardVector;
+	};
+	/** Held up ready, low on the right ahead of the eyes, the palm turned in so that the grenade in it shows. */
+	FHandAt HeldHand();
+	/**
+	 * At `Phase` (0 to 1, over ThrowTime) of a throw: wound back by the ear,
+	 * brought over and forward to let go at ReleasePhase where the grenade
+	 * leaves the hand (ReleaseAhead, ReleaseRight, ReleaseDown: the hand a
+	 * little short of it, the grenade in its palm), then on down across the
+	 * body and out of sight.
+	 */
+	FHandAt ThrowHand(float Phase);
+	/** How much a throw has the arm `Phase` into it: all of it in its first tenth, whether the hand was up yet or not. */
+	float ThrowWeight(float Phase);
+
 	/** The arc shown while a throw is held: a dot every PreviewSpacing cm of its flight, none in its first PreviewSkip (too near the eyes), at most PreviewDots. */
 	constexpr float PreviewSpacing = 30.0f;
 	constexpr float PreviewSkip = 20.0f;

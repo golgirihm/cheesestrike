@@ -116,44 +116,17 @@ void ACheeseStrikeHUD::LookForEnemies(const ACheeseStrikePlayerController* Contr
 		return;
 	}
 	NextLook = Now + 0.1f;
-	const FVector Eye = Controller->PlayerCameraManager->GetCameraLocation();
-	const FVector Ahead = Controller->PlayerCameraManager->GetCameraRotation().Vector();
-	const float HalfView = FMath::DegreesToRadians(FMath::Min(170.0f, Controller->PlayerCameraManager->GetFOVAngle()) / 2.0f + 5.0f);
-	FCollisionQueryParams Query(SCENE_QUERY_STAT(CheeseStrikeHUDSight), false, Controller->GetPawn());
-	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+	// An enemy merely in sight is no mark: only a shot (NoteShot) or a sweep is. Revealed here, every enemy's mark moves to
+	// where they are, at most once a second.
+	if (AreEnemiesRevealed())
 	{
-		const ACheeseStrikeCharacter* Other = *It;
-		if (Other == Controller->GetPawn() || !Other->IsAlive() || AreTeammates(Controller->PlayerState, Other->GetPlayerState()))
+		for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
 		{
-			continue;
-		}
-		// In front, within the view, and with nothing between: the head, or failing that the middle.
-		for (const FVector& Part : {Other->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f), Other->GetActorLocation()})
-		{
-			const FVector Way = (Part - Eye).GetSafeNormal();
-			if (FVector::DotProduct(Way, Ahead) < FMath::Cos(HalfView))
+			const ACheeseStrikeCharacter* Other = *It;
+			if (Other != Controller->GetPawn() && Other->IsAlive() && !AreTeammates(Controller->PlayerState, Other->GetPlayerState()))
 			{
-				continue;
+				NoteEnemy(Other, true);
 			}
-			FHitResult Hit;
-			if (!World->LineTraceSingleByChannel(Hit, Eye, Part, ECC_Visibility, Query) || Hit.GetActor() == Other)
-			{
-				LastSeen.Add(Other, Now);
-				break;
-			}
-		}
-		// Seen, or revealed here: their mark moves to where they are, at most once a second.
-		const float* Seen = LastSeen.Find(Other);
-		if ((Seen != nullptr && *Seen == Now) || AreEnemiesRevealed())
-		{
-			NoteEnemy(Other, AreEnemiesRevealed());
-		}
-	}
-	for (auto Seen = LastSeen.CreateIterator(); Seen; ++Seen)
-	{
-		if (!Seen.Key().IsValid() || Now - Seen.Value() > SeenLife)
-		{
-			Seen.RemoveCurrent();
 		}
 	}
 	EnemyMarks.Prune(Now);
@@ -224,7 +197,7 @@ void ACheeseStrikeHUD::DrawMap(const ACheeseStrikePlayerController* Controller, 
 	// The weapons' stands, under the players.
 	CheeseStrikePickupHUD::DrawOnMap(Shapes, World, OnMap, Min, Max, U);
 
-	// Teammates always, held to the edge when further than it reaches; enemies only when seen, or revealed.
+	// Teammates always, held to the edge when further than it reaches; enemies only where last heard firing or swept.
 	const APlayerState* Me = Controller->PlayerState;
 	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
 	{
@@ -247,7 +220,7 @@ void ACheeseStrikeHUD::DrawMap(const ACheeseStrikePlayerController* Controller, 
 		}
 		else if (const CheeseStrikeHUD::FEnemyMark* Mark = EnemyMark(Other))
 		{
-			// Never where they are now: where they were last known to be (seen, firing, swept), moved at most once a second
+			// Never where they are now: where they were last known to be (firing, swept), moved at most once a second
 			// and fading until the next. A swept one further than the minimap reaches is held to its frame, smaller.
 			FVector2D Known = OnMap(Mark->Where);
 			const bool bBeyond = CheeseStrikeHUD::InsideRoundedRect(Known, InsetMin, InsetMax, InsetCorner) < 0.0f;

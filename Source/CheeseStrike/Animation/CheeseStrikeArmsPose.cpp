@@ -4,6 +4,7 @@
 #include "Animation/AnimInstanceProxy.h"
 #include "TwoBoneIK.h"
 #include "Movement/CheeseStrikeMovement.h"
+#include "Weapons/CheeseStrikeGrenadeRules.h"
 
 namespace CheeseStrikeArms
 {
@@ -379,6 +380,143 @@ void FCheeseStrikeKnifeHold::EvaluateComponentSpace_AnyThread(FComponentSpacePos
 			}
 		}
 	});
+}
+
+// A grenade in hand.
+
+void FCheeseStrikeGrenadeHold::Initialize_AnyThread(const FAnimationInitializeContext& Context)
+{
+	FAnimNode_Base::Initialize_AnyThread(Context);
+	ComponentPose.Initialize(Context);
+}
+
+void FCheeseStrikeGrenadeHold::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context)
+{
+	ComponentPose.CacheBones(Context);
+	const FBoneContainer& Bones = Context.AnimInstanceProxy->GetRequiredBones();
+	bBones = ArmsBone(Head, TEXT("head"), Bones);
+	bBones &= ArmsBone(UpperArm, TEXT("upperarm_r"), Bones);
+	bBones &= ArmsBone(LowerArm, TEXT("lowerarm_r"), Bones);
+	bBones &= ArmsBone(Hand, TEXT("hand_r"), Bones);
+	bBones &= ArmsBone(OtherUpperArm, TEXT("upperarm_l"), Bones);
+	bBones &= ArmsBone(OtherLowerArm, TEXT("lowerarm_l"), Bones);
+	bBones &= ArmsBone(OtherHand, TEXT("hand_l"), Bones);
+	bFingers = ArmsBone(Index, TEXT("index_01_r"), Bones);
+	bFingers &= ArmsBone(Middle, TEXT("middle_01_r"), Bones);
+	bFingers &= ArmsBone(Pinky, TEXT("pinky_01_r"), Bones);
+	const TCHAR* const FingerNames[] = {TEXT("index"), TEXT("middle"), TEXT("ring"), TEXT("pinky")};
+	bCurl = true;
+	for (int32 Finger = 0; Finger < 4; ++Finger)
+	{
+		for (int32 Joint = 0; Joint < 3; ++Joint)
+		{
+			bCurl &= ArmsBone(Curl[Finger][Joint], *FString::Printf(TEXT("%s_0%d_r"), FingerNames[Finger], Joint + 1), Bones);
+		}
+	}
+}
+
+void FCheeseStrikeGrenadeHold::Update_AnyThread(const FAnimationUpdateContext& Context)
+{
+	ComponentPose.Update(Context);
+}
+
+void FCheeseStrikeGrenadeHold::EvaluateComponentSpace_AnyThread(FComponentSpacePoseContext& Output)
+{
+	ComponentPose.EvaluateComponentSpace(Output);
+	if (Alpha <= 0.001f || !bBones)
+	{
+		return;
+	}
+	ArmsBlendIn(Output.Pose, Alpha, [this](FCSPose<FCompactPose>& Posed) { PoseArms(Posed); });
+}
+
+void FCheeseStrikeGrenadeHold::PoseArms(FCSPose<FCompactPose>& Pose) const
+{
+	const FBoneContainer& Bones = Pose.GetPose().GetBoneContainer();
+	const auto IndexOf = [&Bones](const FBoneReference& Reference) { return Reference.GetCompactPoseIndex(Bones); };
+	const auto At = [&Pose, &IndexOf](const FBoneReference& Bone) { return Pose.GetComponentSpaceTransform(IndexOf(Bone)).GetLocation(); };
+	const FVector Up = FVector::UpVector;
+	const FVector Ahead = FVector(Forward.X, Forward.Y, 0.0).GetSafeNormal();
+	if (Ahead.IsNearlyZero())
+	{
+		return;
+	}
+	const FVector Right = FVector::CrossProduct(Up, Ahead);
+	// The frame of the aim and the eyes: its own player's view, or the way the body faces, tipped by its aim, from its face.
+	FQuat Aim;
+	FVector Eye;
+	const FTransform HeadNow = Pose.GetComponentSpaceTransform(IndexOf(Head));
+	if (bInView)
+	{
+		Aim = View;
+		Eye = HeadNow.TransformPosition(CameraAtHead);
+	}
+	else
+	{
+		const FQuat Tip(Right, FMath::DegreesToRadians(-FMath::Clamp(AimPitch, -60.0f, 60.0f) * 0.7f));
+		Aim = Tip * FRotationMatrix::MakeFromXZ(Ahead, Up).ToQuat();
+		Eye = HeadNow.GetLocation() + Ahead * 10.0f + Up * 4.0f;
+	}
+
+	// The right hand: where the throw has it, turned as its fingers and palm are wanted (found from its fingers' bones, so
+	// whatever way a skeleton's hand bone is turned).
+	const CheeseStrikeGrenades::FHandAt Wanted = ThrowPhase >= 0.0f ? CheeseStrikeGrenades::ThrowHand(ThrowPhase) : CheeseStrikeGrenades::HeldHand();
+	const FCompactPoseBoneIndex HandIndex = IndexOf(Hand);
+	const FTransform HandNow = Pose.GetComponentSpaceTransform(HandIndex);
+	FQuat Turn = HandNow.GetRotation();
+	if (bFingers)
+	{
+		const FVector Fingers = (At(Middle) - HandNow.GetLocation()).GetSafeNormal();
+		const FVector Palm = FVector::CrossProduct(Fingers, (At(Index) - At(Pinky)).GetSafeNormal()).GetSafeNormal();
+		const FQuat Now = FRotationMatrix::MakeFromXZ(Fingers, Palm).ToQuat();
+		const FQuat Then = FRotationMatrix::MakeFromXZ(Aim.RotateVector(Wanted.Fingers), Aim.RotateVector(Wanted.Palm)).ToQuat();
+		Turn = (Then * Now.Inverse() * Turn).GetNormalized();
+	}
+	// On the body others see, held nearer the shoulder (ahead of the eyes is for the view, where it must show), until the
+	// throw winds back.
+	const float NearShoulder = bInView ? 0.0f : (ThrowPhase < 0.0f ? 1.0f : 1.0f - FMath::SmoothStep(0.0f, 0.28f, ThrowPhase));
+	const FVector Target = Eye + Aim.RotateVector(Wanted.At + FVector(-22.0f, 4.0f, 0.0f) * NearShoulder);
+	const FVector Shoulder = At(UpperArm);
+	// The elbow out to the right and down.
+	const FVector Pole = (Shoulder + Target) * 0.5 + Aim.RotateVector(FVector(-10.0, 40.0, -30.0));
+	ArmsReach(Pose, IndexOf(UpperArm), IndexOf(LowerArm), HandIndex, Target, Turn, Pole);
+	// The fingers closed round the grenade in the palm: each joint as the skeleton's own (open) pose has it, then bent toward the palm.
+	if (bFingers && bCurl)
+	{
+		const FVector Fingers = (At(Middle) - At(Hand)).GetSafeNormal();
+		const FVector Palm = FVector::CrossProduct(Fingers, (At(Index) - At(Pinky)).GetSafeNormal()).GetSafeNormal();
+		const FVector Across = FVector::CrossProduct(Fingers, Palm).GetSafeNormal();
+		const float Bends[3] = {35.0f, 45.0f, 30.0f};
+		for (int32 Finger = 0; Finger < 4; ++Finger)
+		{
+			for (int32 Joint = 0; Joint < 3; ++Joint)
+			{
+				const FCompactPoseBoneIndex Bone = IndexOf(Curl[Finger][Joint]);
+				const FTransform Open = Bones.GetRefPoseTransform(Bone) * Pose.GetComponentSpaceTransform(Bones.GetParentBoneIndex(Bone));
+				const FBoneTransform Set(Bone, Open);
+				Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
+				ArmsTurn(Pose, Bone, FQuat(Across, FMath::DegreesToRadians(Bends[Joint])));
+			}
+		}
+	}
+
+	// The left arm let go and lowered by the side, the hand turned on the forearm as the skeleton's own pose has it.
+	{
+		const FCompactPoseBoneIndex UpperIndex = IndexOf(OtherUpperArm);
+		const FCompactPoseBoneIndex LowerIndex = IndexOf(OtherLowerArm);
+		const FCompactPoseBoneIndex EndIndex = IndexOf(OtherHand);
+		const FVector OtherShoulder = At(OtherUpperArm);
+		const float Length = FVector::Dist(OtherShoulder, At(OtherLowerArm)) + FVector::Dist(At(OtherLowerArm), At(OtherHand));
+		const FVector Low = OtherShoulder - Up * (Length * 0.9f) + Ahead * 8.0f - Right * 7.0f;
+		const FVector OtherPole = (OtherShoulder + Low) * 0.5 - Ahead * 40.0f - Right * 10.0f;
+		FTransform UpperNow = Pose.GetComponentSpaceTransform(UpperIndex);
+		FTransform LowerNow = Pose.GetComponentSpaceTransform(LowerIndex);
+		FTransform EndNow = Pose.GetComponentSpaceTransform(EndIndex);
+		AnimationCore::SolveTwoBoneIK(UpperNow, LowerNow, EndNow, OtherPole, Low, false, 1.0, 1.0);
+		EndNow.SetRotation((LowerNow.GetRotation() * Bones.GetRefPoseTransform(EndIndex).GetRotation()).GetNormalized());
+		const FBoneTransform Set[] = {FBoneTransform(UpperIndex, UpperNow), FBoneTransform(LowerIndex, LowerNow), FBoneTransform(EndIndex, EndNow)};
+		Pose.SafeSetCSBoneTransforms(Set);
+	}
 }
 
 // The slide.

@@ -112,11 +112,9 @@ bool FTheBodyHasEveryAnimation::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("%s fires and reloads the shotgun its own way"), *Who), Shotgun.Fire != nullptr && Shotgun.Fire != Rifle.Fire && Shotgun.Reload != nullptr && Shotgun.Reload != Rifle.Reload);
 		const FCheeseStrikeAnimSet& Knife = Body.For(ECheeseStrikeHold::Knife);
 		TestTrue(FString::Printf(TEXT("%s holds the knife as the pistol, the free arm on guard"), *Who), Knife.Guard != nullptr && Knife.Idle == Pistol.Idle);
-		TestTrue(FString::Printf(TEXT("%s throws a grenade with whatever it holds"), *Who), Rifle.Throw != nullptr && Pistol.Throw == Rifle.Throw && Shotgun.Throw == Rifle.Throw && Knife.Throw == Rifle.Throw);
 		for (const UAnimationAsset* Each : {static_cast<const UAnimationAsset*>(Pistol.Idle.Get()), static_cast<const UAnimationAsset*>(Pistol.AimHip.Get()),
 			static_cast<const UAnimationAsset*>(Pistol.Equip.Get()), static_cast<const UAnimationAsset*>(Rifle.Equip.Get()), static_cast<const UAnimationAsset*>(Shotgun.Fire.Get()),
-			static_cast<const UAnimationAsset*>(Shotgun.Reload.Get()), static_cast<const UAnimationAsset*>(Knife.Guard.Get()),
-			static_cast<const UAnimationAsset*>(Rifle.Throw.Get())})
+			static_cast<const UAnimationAsset*>(Shotgun.Reload.Get()), static_cast<const UAnimationAsset*>(Knife.Guard.Get())})
 		{
 			TestTrue(FString::Printf(TEXT("%s's are all on its skeleton"), *Who), Each != nullptr && Rifle.Idle != nullptr && Each->GetSkeleton() == Rifle.Idle->GetSkeleton());
 		}
@@ -247,6 +245,11 @@ bool FTheRagdollBendsAsABodyDoes::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("%s: a body for %s"), Hero.Name, Bone), Ragdoll->FindBodyIndex(Bone) != INDEX_NONE);
 		}
 		const FReferenceSkeleton& Skeleton = Body->GetRefSkeleton();
+		// The fingers a grenade in the right hand is turned and set in the palm by (FCheeseStrikeGrenadeHold, UCheeseStrikeGrenades).
+		for (const TCHAR* Finger : {TEXT("index_01_r"), TEXT("middle_01_r"), TEXT("ring_01_r"), TEXT("pinky_01_r")})
+		{
+			TestTrue(FString::Printf(TEXT("%s has the finger %s"), Hero.Name, Finger), Skeleton.FindBoneIndex(Finger) != INDEX_NONE);
+		}
 		const int32 Head = Skeleton.FindBoneIndex(TEXT("head"));
 		for (const USkeletalBodySetup* Part : Ragdoll->SkeletalBodySetups)
 		{
