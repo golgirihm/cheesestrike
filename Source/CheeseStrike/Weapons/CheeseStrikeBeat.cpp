@@ -77,58 +77,40 @@ namespace CheeseStrikeBeat
 		return Result;
 	}
 
-	FSoundBeat::FPlan FSoundBeat::Plan(double Now, double NewInterval)
+	void FSoundBeat::SetGrid(double NewOrigin, double NewInterval)
 	{
-		FPlan Result;
-		const double Last = bRunning ? Origin + LastSlot * Interval : 0.0;
-		if (!bRunning || NewInterval != Interval || Now - Last > EndsAfterIntervals * Interval)
+		if (NewInterval != Interval)
 		{
-			Interval = NewInterval;
-			bRunning = true;
-			LastSlot = 0;
-			bStarted = false;
-			Origin = Now + LeadShare * Interval;
-			Result.bStartsRun = true;
-			Result.Slot = 0;
-			Result.CallAt = Origin;
-			Result.BeatTime = Origin;
-			return Result;
+			LastSlot = -1;
 		}
-		// The first tick that can still be had for a sound handed over now.
-		int64 Slot = static_cast<int64>(FMath::FloorToDouble((Now + Guard - Origin) / Interval)) + 1;
-		Slot = FMath::Max<int64>(Slot, 1);
-		Result.CallAt = Now;
-		if (Slot <= LastSlot)
-		{
-			// That tick has a sound: this one takes the next, handed over in the middle of the tick before it.
-			Slot = LastSlot + 1;
-			Result.CallAt = FMath::Max(Now, Origin + (Slot - 1) * Interval + 0.5 * Interval);
-		}
-		if (!bStarted)
-		{
-			Result.CallAt = FMath::Max(Result.CallAt, Origin + 0.001);
-		}
-		LastSlot = Slot;
-		Result.Slot = Slot;
-		Result.BeatTime = Origin + Slot * Interval;
-		return Result;
+		Origin = NewOrigin;
+		Interval = NewInterval;
 	}
 
-	void FSoundBeat::Started(double At)
+	double FSoundBeat::LeadFor(double FrameSeconds)
 	{
-		Origin = At;
-		bStarted = true;
+		// Measured: 22 to 54 ms at 60 frames a second, 35 to 65 ms at 30; the end of the frame, the audio thread's
+		// update, then the next audio buffer (21 ms).
+		return FMath::Clamp(0.036 + 1.5 * FrameSeconds, 0.05, 0.12);
 	}
 
-	void FSoundBeat::Reset()
+	int64 FSoundBeat::Take(double Now, double Lead)
 	{
-		bRunning = false;
-		LastSlot = -1;
+		const int64 Ahead = static_cast<int64>(FMath::CeilToDouble((Now + Lead - Origin) / Interval));
+		LastSlot = FMath::Max<int64>(FMath::Max<int64>(LastSlot + 1, Ahead), 0);
+		return LastSlot;
 	}
 
-	FQuartzQuantizationBoundary NextTick()
+	FQuartzQuantizationBoundary AtTick(int64 Slot)
 	{
-		return FQuartzQuantizationBoundary(EQuartzCommandQuantization::Tick, 1.0f, EQuarztQuantizationReference::CurrentTimeRelative);
+		FQuartzQuantizationBoundary Boundary(EQuartzCommandQuantization::Tick, static_cast<float>(Slot + 1), EQuarztQuantizationReference::TransportRelative);
+		Boundary.bFireOnClockStart = false;
+		return Boundary;
+	}
+
+	FQuartzQuantizationBoundary AtOnce()
+	{
+		return FQuartzQuantizationBoundary(EQuartzCommandQuantization::None);
 	}
 
 	double PaceShow(double Arrival, double LastShown, double Interval, double Lead, double Behind)

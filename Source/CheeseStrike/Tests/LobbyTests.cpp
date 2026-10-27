@@ -234,12 +234,42 @@ bool FTheMenuHasItsMusic::RunTest(const FString& Parameters)
 	TestFalse(TEXT("its pause menu"), IsWanted(EMenuPage::Pause, true, false, false, false));
 	TestFalse(TEXT("and the options opened from it"), IsWanted(EMenuPage::Options, true, false, false, false));
 	TestFalse(TEXT("and while the results are held up on the way back"), IsWanted(EMenuPage::Lobby, false, false, false, true));
-	// The loop: the whole of an electric guitar track (tools/art/menu_music.py), looping.
-	const USoundWave* Loop = LoadObject<USoundWave>(nullptr, CheeseStrikeMusic::Track);
-	if (TestNotNull(TEXT("the music is there"), Loop))
+	// The songs: the six of Fab's "FREE Cyber Metal Music Pack", each a whole song of minutes.
+	TestEqual(TEXT("six songs"), CheeseStrikeMusic::NumSongs(), 6);
+	for (int32 Index = 0; Index < CheeseStrikeMusic::NumSongs(); ++Index)
 	{
-		TestTrue(TEXT("and loops"), Loop->bLooping);
-		TestTrue(FString::Printf(TEXT("all 65 bars of it at 172 a minute (%.2f s)"), Loop->Duration), FMath::IsNearlyEqual(Loop->Duration, 65.0f * 4.0f * 60.0f / 172.0f, 0.05f));
+		const USoundWave* Wave = LoadObject<USoundWave>(nullptr, CheeseStrikeMusic::Songs[Index]);
+		if (TestNotNull(FString::Printf(TEXT("%s is there"), CheeseStrikeMusic::Songs[Index]), Wave))
+		{
+			TestTrue(FString::Printf(TEXT("and is a song (%.0f s)"), Wave->Duration), Wave->Duration > 90.0f && Wave->Duration < 300.0f);
+		}
+	}
+	// Chosen at random, one after another, never the one just played; every one can come.
+	{
+		using CheeseStrikeMusic::NextSong;
+		TSet<int32> First;
+		for (int32 Roll = 0; Roll < 6; ++Roll)
+		{
+			First.Add(NextSong(6, -1, Roll));
+		}
+		TestEqual(TEXT("any song can come first"), First.Num(), 6);
+		bool bRepeats = false;
+		bool bOutside = false;
+		for (int32 Last = 0; Last < 6; ++Last)
+		{
+			TSet<int32> After;
+			for (int32 Roll = 0; Roll < 5; ++Roll)
+			{
+				const int32 Next = NextSong(6, Last, Roll);
+				bRepeats |= Next == Last;
+				bOutside |= Next < 0 || Next >= 6;
+				After.Add(Next);
+			}
+			TestEqual(FString::Printf(TEXT("after song %d, any of the other five"), Last), After.Num(), 5);
+		}
+		TestFalse(TEXT("never the same song twice running"), bRepeats);
+		TestFalse(TEXT("and always one of the songs"), bOutside);
+		TestEqual(TEXT("one song only repeats"), NextSong(1, 0, 0), 0);
 	}
 	// Its volume is its own, kept with the others.
 	UCheeseStrikeSettings* Settings = NewObject<UCheeseStrikeSettings>(GetTransientPackage());

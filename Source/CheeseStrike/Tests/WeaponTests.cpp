@@ -145,38 +145,95 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FShotSoundsFallOnTheSoundBeat, "CheeseStrike.We
 bool FShotSoundsFallOnTheSoundBeat::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeBeat;
-	// A Munster's shots shown on frames of 46 ms with a hitch now and then: the sounds still come exactly an interval apart.
-	const double Interval = 0.085;
-	FSoundBeat Beat;
-	TArray<double> Heard;
-	const FSoundBeat::FPlan First = Beat.Plan(10.0, Interval);
-	TestTrue(TEXT("the first sound starts the run, held back a lead"), First.bStartsRun && FMath::IsNearlyEqual(First.CallAt, 10.0 + FSoundBeat::LeadShare * Interval));
-	Beat.Started(First.CallAt);
-	Heard.Add(First.CallAt);
-	double Shown = 10.0;
-	for (int32 Shot = 1; Shot < 40; ++Shot)
+	// Automatic fire held for 4 s, the shots shown on the game's frames (a long frame now and then), each shot's sound
+	// given a tick (FSoundBeat::Take, as the weapon does), and the audio engine modelled as it was measured: it takes a
+	// queued sound at the start of an audio buffer (1024 samples at 48 kHz), 15 ms to 20 ms and a frame after it was
+	// handed over (22 to 54 ms at 60 frames a second, 35 to 65 ms at 30), and plays it on the tick named if that is
+	// still ahead (else on a later multiple of it, a stray). Every shot's sound must be heard, each on a tick of its
+	// own and the one planned: two on one tick are heard as one shot, the Munster's and the Blaster's skipped shots.
+	struct FCase
 	{
-		// The shot is shown on the first frame at or after its time; a long frame every seventh shot.
-		const double Frame = Shot % 7 == 0 ? 0.075 : 0.046;
-		Shown = 10.0 + FMath::CeilToDouble(Shot * Interval / Frame) * Frame;
-		const FSoundBeat::FPlan Plan = Beat.Plan(Shown, Interval);
-		TestFalse(TEXT("only the first starts the run"), Plan.bStartsRun);
-		TestTrue(TEXT("and it is heard after it is asked for"), Plan.BeatTime >= Shown);
-		Heard.Add(Plan.BeatTime);
-	}
-	bool bExact = true;
-	for (int32 Index = 1; Index < Heard.Num(); ++Index)
+		const TCHAR* Name;
+		double Interval;
+		double Frame;
+	};
+	const FCase Cases[] = {
+		{TEXT("the Munster at 120 fps"), 0.085, 1.0 / 120.0},
+		{TEXT("the Munster at 60 fps"), 0.085, 1.0 / 60.0},
+		{TEXT("the Munster at 30 fps"), 0.085, 1.0 / 30.0},
+		{TEXT("the Munster at 20 fps"), 0.085, 1.0 / 20.0},
+		{TEXT("the Cheddar Blaster at 60 fps"), 0.12, 1.0 / 60.0},
+		{TEXT("the Cheddar Blaster at 30 fps"), 0.12, 1.0 / 30.0},
+		{TEXT("the Grater at 30 fps"), 0.065, 1.0 / 30.0},
+	};
+	const double Buffer = 1024.0 / 48000.0;
+	for (const FCase& Case : Cases)
 	{
-		const double Beats = (Heard[Index] - Heard[Index - 1]) / Interval;
-		bExact = bExact && FMath::Abs(Beats - FMath::RoundToDouble(Beats)) * Interval < 0.001 && Beats > 0.5;
+		for (int32 Seed = 1; Seed <= 4; ++Seed)
+		{
+			FRandomStream Random(Seed * 7919);
+			FSoundBeat Beat;
+			const double Interval = Case.Interval;
+			// The clock was set a while ago; the game's estimate of its tick 0 is off by a few milliseconds.
+			const double ClockOrigin = 3.0 + Random.FRandRange(0.0, Buffer);
+			Beat.SetGrid(ClockOrigin + Random.FRandRange(-0.004, 0.004), Interval);
+			const int32 Shots = FMath::FloorToInt(4.0 / Interval);
+			TArray<int64> Planned;
+			TArray<int64> Heard;
+			double Furthest = 0.0;
+			int32 Fired = 0;
+			int32 Frames = 0;
+			double Time = 10.0;
+			while (Fired < Shots && Frames < 100000)
+			{
+				const double Frame = (++Frames % 11 == 0) ? Case.Frame * 2.5 : Case.Frame;
+				Time += Frame;
+				while (Fired < Shots && 10.0 + Fired * Interval <= Time)
+				{
+					++Fired;
+					Beat.SetGrid(ClockOrigin + Random.FRandRange(-0.004, 0.004), Interval);
+					const int64 Slot = Beat.Take(Time, FSoundBeat::LeadFor(Frame));
+					Planned.Add(Slot);
+					// When the audio thread takes it, and where Quartz puts it: tick Slot, or if that has gone, the next multiple of Slot + 1.
+					const double Taken = FMath::CeilToDouble((Time + Random.FRandRange(0.015, 0.02 + Frame) - ClockOrigin) / Buffer) * Buffer + ClockOrigin;
+					const int64 Come = static_cast<int64>(FMath::FloorToDouble((Taken - ClockOrigin) / Interval));
+					const int64 Tick = Come < Slot ? Slot : (Come / (Slot + 1) + 1) * (Slot + 1) + Slot;
+					Heard.Add(Tick);
+					Furthest = FMath::Max(Furthest, ClockOrigin + Tick * Interval - Time);
+				}
+			}
+			const FString Name = FString::Printf(TEXT("%s (run %d)"), Case.Name, Seed);
+			TestEqual(FString::Printf(TEXT("%s: every shot's sound is heard, none dropped"), *Name), Heard.Num(), Shots);
+			TestTrue(FString::Printf(TEXT("%s: each on the tick planned"), *Name), Heard == Planned);
+			int32 Shared = 0;
+			int32 OneBeat = 0;
+			for (int32 Index = 1; Index < Heard.Num(); ++Index)
+			{
+				Shared += Heard[Index] <= Heard[Index - 1] ? 1 : 0;
+				OneBeat += Heard[Index] - Heard[Index - 1] == 1 ? 1 : 0;
+			}
+			TestEqual(FString::Printf(TEXT("%s: no two shots on one tick"), *Name), Shared, 0);
+			TestTrue(FString::Printf(TEXT("%s: nearly all one beat apart (%d of %d)"), *Name, OneBeat, Heard.Num() - 1), OneBeat >= FMath::CeilToInt((Heard.Num() - 1) * 0.85));
+			TestTrue(FString::Printf(TEXT("%s: none heard long after it was shown (%.0f ms)"), *Name, Furthest * 1000.0), Furthest < FSoundBeat::LeadFor(Case.Frame * 2.5) + 2.0 * Interval + Case.Frame * 2.5);
+		}
 	}
-	TestTrue(TEXT("every sound is on the beat, none on another's"), bExact);
-	TestTrue(TEXT("a run that stops starts again"), Beat.Plan(Shown + 1.0, Interval).bStartsRun);
-	// Quartz queues each on the clock's next tick from now, not the bar's first tick (the next bar line, 32 ticks off,
-	// which held every sound of a run back and played them together).
-	const FQuartzQuantizationBoundary Next = NextTick();
-	TestTrue(TEXT("a sound is queued for the next tick from now"), Next.Quantization == EQuartzCommandQuantization::Tick && Next.Multiplier == 1.0f
-		&& Next.CountingReferencePoint == EQuarztQuantizationReference::CurrentTimeRelative);
+	{
+		FSoundBeat Beat;
+		Beat.SetGrid(10.0, 0.1);
+		TestEqual(TEXT("a sound takes the first tick far enough ahead"), Beat.Take(10.0, 0.05), static_cast<int64>(1));
+		TestEqual(TEXT("and the next the one after, however soon it comes"), Beat.Take(10.001, 0.05), static_cast<int64>(2));
+		TestEqual(TEXT("or a later one"), Beat.Take(10.6, 0.05), static_cast<int64>(7));
+		Beat.SetGrid(10.6, 0.085);
+		TestEqual(TEXT("a new interval counts afresh"), Beat.Take(10.6, 0.05), static_cast<int64>(1));
+		TestTrue(TEXT("the lead grows with the frame"), FSoundBeat::LeadFor(1.0 / 30.0) > FSoundBeat::LeadFor(1.0 / 60.0) && FSoundBeat::LeadFor(1.0 / 60.0) >= 0.055);
+	}
+	// Quartz is told the tick by its count from when the clock was set (transport-relative: the next multiple of Slot + 1,
+	// which is tick Slot while it is ahead), not the next tick from whenever the audio thread takes it, nor the bar's
+	// first tick (the next bar line, 32 ticks off); and the clock's count starts again at once, not at the next bar.
+	const FQuartzQuantizationBoundary Boundary = AtTick(5);
+	TestTrue(TEXT("a sound is queued for its tick by number"), Boundary.Quantization == EQuartzCommandQuantization::Tick && Boundary.Multiplier == 6.0f
+		&& Boundary.CountingReferencePoint == EQuarztQuantizationReference::TransportRelative && !Boundary.bFireOnClockStart);
+	TestTrue(TEXT("the clock is set at once"), AtOnce().Quantization == EQuartzCommandQuantization::None);
 	return true;
 }
 

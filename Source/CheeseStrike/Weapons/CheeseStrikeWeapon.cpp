@@ -741,14 +741,21 @@ UQuartzClockHandle* ACheeseStrikeWeapon::GetShotClock(double Interval)
 	{
 		return nullptr;
 	}
+	const double Now = FPlatformTime::Seconds();
 	if (ShotClockInterval != Interval)
 	{
-		// One tick is one shot; the rate changes at once.
+		// One tick is one shot; the rate changes at once, and the count starts again from now (tick 0).
 		UQuartzClockHandle* Handle = ShotClock;
-		ShotClock->SetSecondsPerTick(this, FQuartzQuantizationBoundary(EQuartzCommandQuantization::None), FOnQuartzCommandEventBP(), Handle, static_cast<float>(Interval));
+		ShotClock->SetSecondsPerTick(this, CheeseStrikeBeat::AtOnce(), FOnQuartzCommandEventBP(), Handle, static_cast<float>(Interval));
 		ShotClock->StartClock(this, Handle);
+		ShotClock->ResetTransportQuantized(this, CheeseStrikeBeat::AtOnce(), FOnQuartzCommandEventBP(), Handle);
 		ShotClockInterval = Interval;
+		ShotClockSetAt = Now;
 	}
+	// Tick 0 is when the clock was set: as the clock itself has it once it has run a little (it is set on the audio
+	// thread, a moment after it was asked), until then from when it was asked.
+	const double RunTime = Now - ShotClockSetAt > 0.25 ? static_cast<double>(ShotClock->GetEstimatedRunTime(this)) : -1.0;
+	SoundBeat.SetGrid(RunTime >= 0.0 ? Now - RunTime : ShotClockSetAt + 0.01, Interval);
 	return ShotClock;
 }
 
@@ -789,28 +796,22 @@ void ACheeseStrikeWeapon::PlayShotSound(USoundBase* Sound)
 	const double Interval = FiringStats().FireInterval;
 	if (!Stats->bAutomatic || Stats->IsMelee() || Interval <= 0.0)
 	{
-		StartShotSound(Sound, false, false, 0);
+		StartShotSound(Sound, -1);
 		return;
 	}
-	// Automatic fire's sounds go on the sound beat. Where there is no Quartz (no sound device) the beat is still planned,
-	// so that it is the same on every machine, and the sound plays when it is handed over.
-	GetShotClock(Interval);
+	// Automatic fire's sounds go on the sound beat, each on a tick of its own. Where there is no Quartz (no sound device)
+	// the beat is still planned, on a grid of its own, and the sound plays at once.
 	const double Now = FPlatformTime::Seconds();
-	const CheeseStrikeBeat::FSoundBeat::FPlan Plan = SoundBeat.Plan(Now, Interval);
-	if (Plan.CallAt <= Now + 0.0005)
+	if (GetShotClock(Interval) == nullptr && SoundBeat.Interval != Interval)
 	{
-		StartShotSound(Sound, !Plan.bStartsRun, Plan.bStartsRun, Plan.Slot);
-		return;
+		SoundBeat.SetGrid(Now, Interval);
 	}
-	// The run's first sound is held back a little, and a late one waits for the tick after the one a sound is queued for.
-	FTimerHandle Later;
-	GetWorldTimerManager().SetTimer(Later, FTimerDelegate::CreateWeakLambda(this, [this, Sound, Plan]()
-	{
-		StartShotSound(Sound, !Plan.bStartsRun, Plan.bStartsRun, Plan.Slot);
-	}), static_cast<float>(Plan.CallAt - Now), false);
+	const int64 Slot = SoundBeat.Take(Now, CheeseStrikeBeat::FSoundBeat::LeadFor(GetWorld()->GetDeltaSeconds()));
+	CheeseStrikeBeat::NoteAt(this, CheeseStrikeBeat::EEvent::Scheduled, SoundBeat.TickTime(Slot));
+	StartShotSound(Sound, Slot);
 }
 
-void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, bool bOnBeat, bool bStartsRun, int64 Slot)
+void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, int64 Slot)
 {
 	UWorld* World = GetWorld();
 	if (Sound == nullptr || World == nullptr)
@@ -818,21 +819,7 @@ void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, bool bOnBeat, bool b
 		return;
 	}
 	NoteBeat(CheeseStrikeBeat::EEvent::Sounded);
-	if (bStartsRun)
-	{
-		// The sound is heard now: it is the clock's tick 0.
-		SoundBeat.Started(FPlatformTime::Seconds());
-		CheeseStrikeBeat::NoteAt(this, CheeseStrikeBeat::EEvent::Scheduled, SoundBeat.Origin);
-		if (ShotClock != nullptr)
-		{
-			ShotClock->ResetTransport(this, FOnQuartzCommandEventBP());
-		}
-	}
-	else if (bOnBeat)
-	{
-		// Its tick, by the run's start as it was in the end.
-		CheeseStrikeBeat::NoteAt(this, CheeseStrikeBeat::EEvent::Scheduled, SoundBeat.Origin + Slot * SoundBeat.Interval);
-	}
+	const bool bOnBeat = Slot >= 0;
 	const bool bOwn = Holder != nullptr && Holder->IsLocallyControlled() && Holder->IsPlayerControlled();
 	UAudioComponent* Player = nullptr;
 	const FVector From = Holder != nullptr ? Holder->GetActorLocation() : GetActorLocation();
@@ -863,7 +850,7 @@ void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, bool bOnBeat, bool b
 	{
 		if (bOnBeat && ShotClock != nullptr)
 		{
-			FQuartzQuantizationBoundary Boundary = CheeseStrikeBeat::NextTick();
+			FQuartzQuantizationBoundary Boundary = CheeseStrikeBeat::AtTick(Slot);
 			UQuartzClockHandle* Handle = ShotClock;
 			FOnQuartzCommandEventBP Told;
 			Told.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(ACheeseStrikeWeapon, OnShotSoundEvent));
@@ -877,7 +864,7 @@ void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, bool bOnBeat, bool b
 	if (CVarTraceGunfire.GetValueOnGameThread() != 0)
 	{
 		UE_LOG(LogCheeseStrike, Display, TEXT("Gunfire: %s's shot sound %s (slot %lld)%s"), Holder != nullptr ? *Holder->DisplayName() : *GetName(),
-			Player == nullptr ? TEXT("not made") : bOnBeat && ShotClock != nullptr ? TEXT("queued on the beat") : bStartsRun ? TEXT("played, starting the run") : TEXT("played at once"),
+			Player == nullptr ? TEXT("not made") : bOnBeat && ShotClock != nullptr ? TEXT("queued on the beat") : TEXT("played at once"),
 			Slot, ShotClock != nullptr && !ShotClock->IsClockRunning(this) ? TEXT(", the clock not running") : TEXT(""));
 	}
 	if (!bOwn && CVarTraceGunfire.GetValueOnGameThread() != 0)

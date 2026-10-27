@@ -228,9 +228,12 @@ protected:
 	 * don't move them.
 	 */
 	void PlayShotSound(USoundBase* Sound);
-	/** Starts a shot's sound (`bOnBeat`: queued for the clock's next tick; `bStartsRun`: the clock is reset to this moment first). */
-	void StartShotSound(USoundBase* Sound, bool bOnBeat, bool bStartsRun, int64 Slot);
-	/** The weapon's Quartz clock, made and set to `Interval` seconds a tick when needed; null if the machine has no Quartz (no sound, a server). */
+	/** Starts a shot's sound: at once, or (`Slot` >= 0) queued on the clock for that tick. */
+	void StartShotSound(USoundBase* Sound, int64 Slot);
+	/**
+	 * The weapon's Quartz clock, made and set to `Interval` seconds a tick when needed (its count started again then);
+	 * null if the machine has no Quartz (no sound, a server). Keeps the sound beat's grid on the clock's ticks.
+	 */
 	UQuartzClockHandle* GetShotClock(double Interval);
 	/** Whether the server can allow a shot now: in hand and drawn, the rate, and the magazine. */
 	bool ServerAllowsShot(float Now);
@@ -349,6 +352,8 @@ protected:
 	TObjectPtr<UQuartzClockHandle> ShotClock;
 	FName ShotClockName;
 	double ShotClockInterval = 0.0;
+	/** When (real clock) the clock was last set, its count started again. */
+	double ShotClockSetAt = 0.0;
 	/** What Quartz said of the shot sounds queued on the beat (failed, queued, canceled, about to start, started), counted; logged too with CheeseStrike.TraceGunfire 1. */
 	int32 ShotSoundEvents[static_cast<int32>(EQuartzCommandDelegateSubType::Count)] = {};
 	UFUNCTION()
