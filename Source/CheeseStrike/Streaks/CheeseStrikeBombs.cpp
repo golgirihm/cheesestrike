@@ -237,7 +237,14 @@ void ACheeseStrikeBombs::StartStrike(ACheeseStrikePlayerState* InCaller, const F
 	{
 		FCheeseStrikeDrop Drop;
 		FVector Impact;
-		if (!StrikeLanding(GetWorld(), Overhead, Line[Index], Impact, Drop.Roof))
+		// A wheel whose place is off the map (the area is wide enough to reach past a small one's edge) comes down nearer the
+		// middle instead, so the strike always drops all its wheels where there is ground.
+		bool bLands = false;
+		for (float Share = 1.0f; Share > 0.1f && !bLands; Share *= 0.75f)
+		{
+			bLands = StrikeLanding(GetWorld(), Overhead, FMath::Lerp(Spot, Line[Index], Share), Impact, Drop.Roof);
+		}
+		if (!bLands)
 		{
 			continue;
 		}
