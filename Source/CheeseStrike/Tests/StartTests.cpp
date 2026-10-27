@@ -42,6 +42,16 @@ bool FTheMatchCountsInAndProtectionEndsOnAttackOrTime::RunTest(const FString& Pa
 	TestTrue(TEXT("held while it counts"), IsFrozen(100.0f, 103.0f));
 	TestFalse(TEXT("free once it is over"), IsFrozen(103.0f, 103.0f));
 	TestFalse(TEXT("and with none"), IsFrozen(100.0f, 0.0f));
+	// Nobody acts while it counts, nor once the round or the match is over; the dead never.
+	TestTrue(TEXT("a living character acts while play is on"), MayAct(true, false, false, false));
+	TestFalse(TEXT("not while it counts"), MayAct(true, true, false, false));
+	TestFalse(TEXT("not once its round is over"), MayAct(true, false, true, false));
+	TestFalse(TEXT("nor the match"), MayAct(true, false, false, true));
+	TestFalse(TEXT("the dead never"), MayAct(false, false, false, false));
+	// For a moment after a player is held the server takes their machine's word for where they are, then its own again.
+	TestFalse(TEXT("not before it is held"), TakesClientWord(-1.0f));
+	TestTrue(TEXT("as it is held"), TakesClientWord(0.0f) && TakesClientWord(HoldGrace * 0.9f));
+	TestFalse(TEXT("and no longer after the grace"), TakesClientWord(HoldGrace));
 	// The round's clock stands still through it.
 	TestEqual(TEXT("the round's clock stands at its time through the count"), RoundLeft(100.0f, 102.0f, 222.0f), 120.0f);
 	TestEqual(TEXT("and runs after"), RoundLeft(132.0f, 102.0f, 222.0f), 90.0f);

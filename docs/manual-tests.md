@@ -411,3 +411,10 @@ Setup: the packaged or `-game` build (the loading screen is not drawn in the edi
 | W10-GP-06 | Mice later and slower | Start a match; watch the clock and the cheese. | Vermin countdown at 2:30, mice at 3:00; the map is bare about eight minutes after (see W9-PLAY-01). |
 | W10-GP-07 | Held grenade in the right hand | Hold the grenade key (G) with the rifle, the pistol and the knife out. | The grenade is seen low on the right of the view, held by the right hand (it moves with it), not out of sight below the screen; it goes with the throw. (The throw itself still starts from the left hand, as Lyra's toss does.) |
 | W10-GP-08 | Podium emotes loop smoothly | Reach a podium (`CheeseStrikeEndMatch`) and watch each hero through two or three loops of its emote. | The end of each emote runs into its start; no pop or jump at the seam, on any hero. |
+
+## Changes from wave 11
+
+| ID | Test | Steps | Expected |
+|---|---|---|---|
+| W11-GP-01 | Every automatic shot is heard | With sound on, hold fire for a few seconds with the Munster Machine Gun and the Cheddar Blaster, alone, on a listen host and as a client; also listen to someone else fire. `tools/play.ps1 -Script tools/play/gunfire_sound.txt -Tag gunfire_sound -Sound` counts them: in `Saved/Logs/gunfire_sound.log`, every "queued on the beat" has a "Quartz says CommandOnStarted" and none "CommandOnCanceled". | Every shot sounds, on an even beat, from the first to the last of a burst: none silent, none bunched together after the trigger is let go. |
+| W11-GP-02 | Play stops at the end | End a round of Elimination and a match (any mode, `CheeseStrikeEndMatch`) while running, sprinting, sliding and firing, as host and as a client, with bots. | The moment the round or the match ends everyone stops where they stand (bots too), no shot, grenade or streak goes off after it, and a client's view doesn't jump back; looking round still works. |

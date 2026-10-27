@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "CheeseStrikeBeat.h"
 #include "CheeseStrikeShot.h"
+#include "Sound/QuartzQuantizationUtilities.h"
 #include "CheeseStrikeWeapon.generated.h"
 
 class ACheeseStrikeCharacter;
@@ -348,6 +349,10 @@ protected:
 	TObjectPtr<UQuartzClockHandle> ShotClock;
 	FName ShotClockName;
 	double ShotClockInterval = 0.0;
+	/** What Quartz said of the shot sounds queued on the beat (failed, queued, canceled, about to start, started), counted; logged too with CheeseStrike.TraceGunfire 1. */
+	int32 ShotSoundEvents[static_cast<int32>(EQuartzCommandDelegateSubType::Count)] = {};
+	UFUNCTION()
+	void OnShotSoundEvent(EQuartzCommandDelegateSubType EventType, FName Name);
 	FTimerHandle BurstTimer;
 	/** A pull of the trigger while the weapon was coming up, to fire once it is. */
 	FTimerHandle PendingShotTimer;

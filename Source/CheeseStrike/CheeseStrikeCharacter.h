@@ -213,7 +213,7 @@ public:
 
 	float GetHealth() const { return Health; }
 	bool IsAlive() const { return Health > 0.0f; }
-	/** Whether it can do anything but look: alive, in a match still on, and not held by the count before it or its round. */
+	/** Whether it can do anything but look: alive, not held by the count before the match or its round, and the round and the match not over (CheeseStrikeStart::MayAct). */
 	bool CanAct() const;
 	/** Whether the count before the match or its round holds it where it stands (ACheeseStrikeGameState::IsFrozen). */
 	bool IsFrozen() const;

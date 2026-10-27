@@ -172,6 +172,11 @@ bool FShotSoundsFallOnTheSoundBeat::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("every sound is on the beat, none on another's"), bExact);
 	TestTrue(TEXT("a run that stops starts again"), Beat.Plan(Shown + 1.0, Interval).bStartsRun);
+	// Quartz queues each on the clock's next tick from now, not the bar's first tick (the next bar line, 32 ticks off,
+	// which held every sound of a run back and played them together).
+	const FQuartzQuantizationBoundary Next = NextTick();
+	TestTrue(TEXT("a sound is queued for the next tick from now"), Next.Quantization == EQuartzCommandQuantization::Tick && Next.Multiplier == 1.0f
+		&& Next.CountingReferencePoint == EQuarztQuantizationReference::CurrentTimeRelative);
 	return true;
 }
 

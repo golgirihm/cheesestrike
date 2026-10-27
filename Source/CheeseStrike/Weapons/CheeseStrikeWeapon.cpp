@@ -750,6 +750,21 @@ UQuartzClockHandle* ACheeseStrikeWeapon::GetShotClock(double Interval)
 	return ShotClock;
 }
 
+void ACheeseStrikeWeapon::OnShotSoundEvent(EQuartzCommandDelegateSubType EventType, FName Name)
+{
+	const int32 Index = static_cast<int32>(EventType);
+	if (Index >= 0 && Index < UE_ARRAY_COUNT(ShotSoundEvents))
+	{
+		++ShotSoundEvents[Index];
+	}
+	if (CVarTraceGunfire.GetValueOnGameThread() != 0)
+	{
+		const UEnum* Types = StaticEnum<EQuartzCommandDelegateSubType>();
+		UE_LOG(LogCheeseStrike, Display, TEXT("Gunfire: Quartz says %s of %s's shot sound (%s)"), Types != nullptr ? *Types->GetNameStringByValue(Index) : TEXT("?"),
+			Holder != nullptr ? *Holder->DisplayName() : *GetName(), *Name.ToString());
+	}
+}
+
 void ACheeseStrikeWeapon::EndPlay(const EEndPlayReason::Type Reason)
 {
 	if (ShotClock != nullptr && GetWorld() != nullptr)
@@ -846,14 +861,22 @@ void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, bool bOnBeat, bool b
 	{
 		if (bOnBeat && ShotClock != nullptr)
 		{
-			FQuartzQuantizationBoundary Boundary(EQuartzCommandQuantization::Tick, 1.0f);
+			FQuartzQuantizationBoundary Boundary = CheeseStrikeBeat::NextTick();
 			UQuartzClockHandle* Handle = ShotClock;
-			Player->PlayQuantized(this, Handle, Boundary, FOnQuartzCommandEventBP());
+			FOnQuartzCommandEventBP Told;
+			Told.BindUFunction(this, GET_FUNCTION_NAME_CHECKED(ACheeseStrikeWeapon, OnShotSoundEvent));
+			Player->PlayQuantized(this, Handle, Boundary, Told);
 		}
 		else
 		{
 			Player->Play();
 		}
+	}
+	if (CVarTraceGunfire.GetValueOnGameThread() != 0)
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Gunfire: %s's shot sound %s (slot %lld)%s"), Holder != nullptr ? *Holder->DisplayName() : *GetName(),
+			Player == nullptr ? TEXT("not made") : bOnBeat && ShotClock != nullptr ? TEXT("queued on the beat") : bStartsRun ? TEXT("played, starting the run") : TEXT("played at once"),
+			Slot, ShotClock != nullptr && !ShotClock->IsClockRunning(this) ? TEXT(", the clock not running") : TEXT(""));
 	}
 	if (!bOwn && CVarTraceGunfire.GetValueOnGameThread() != 0)
 	{

@@ -29,6 +29,8 @@ namespace CheeseStrikeMovement
 	 * way or let go.
 	 */
 	constexpr float AirSteer = 467.0f;
+	/** The braking of a character held where it stands (the round or the match over): it stops within a frame. */
+	constexpr float HoldBraking = 100000.0f;
 	/** Ground acceleration, the engine's usual. */
 	constexpr float Acceleration = 2048.0f;
 	/** Upward speed of a jump, in cm/s: at the engine's gravity, about half a metre up, quickly. */

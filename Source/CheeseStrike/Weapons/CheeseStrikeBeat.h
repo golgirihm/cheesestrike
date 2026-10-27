@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Sound/QuartzQuantizationUtilities.h"
 
 class UObject;
 
@@ -107,6 +108,12 @@ namespace CheeseStrikeBeat
 		/** Forgets the run. */
 		void Reset();
 	};
+
+	/**
+	 * The Quartz boundary a shot sound is queued on: the clock's next tick (one tick a shot), counted from now. Quartz's
+	 * default counts from the bar, where a multiplier of 1 is the bar's first tick: the next bar line, 32 ticks off.
+	 */
+	FQuartzQuantizationBoundary NextTick();
 
 	double PaceShow(double Arrival, double LastShown, double Interval, double Lead, double Behind);
 }

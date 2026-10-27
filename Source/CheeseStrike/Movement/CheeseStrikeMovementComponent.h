@@ -50,10 +50,18 @@ public:
 	/** Whether the ground just ahead, going `Going` (flat), is near enough below the feet that stepping off can't hurt. */
 	bool IsDropAheadSafe(const FVector& Going) const;
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
+	/** On the server: for a moment after a player's character is held (CheeseStrikeStart::HoldGrace), takes their machine's word for where it is. */
+	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 
 protected:
+	/** Whether its character is alive and held where it stands: the count before the match or its round, or the round or the match over (CheeseStrikeStart::MayAct). */
+	bool IsHeldHere() const;
+	/** The world time the server saw its character held, or -1 while it isn't. */
+	float HeldSince = -1.0f;
+	/** Whether the server is taking the player's machine's word for where it is. */
+	bool bTakingClientWord = false;
 	/** Whether its character is down in a last stand: it scoots, slowly (CheeseStrikeDowned). */
 	bool IsDownedHere() const;
 	/** Begins a slide from the ground speed the character has. */

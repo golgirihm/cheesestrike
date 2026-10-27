@@ -109,6 +109,45 @@ namespace ModePlayTests
 	TWeakObjectPtr<ACheeseStrikeCharacter> Remembered;
 	/** When the host was killed, by the server's clock. */
 	float KilledAt = 0.0f;
+	/** Where the joiner's character was, on its own machine and on the server, as it was held. */
+	FVector HeldOwn = FVector::ZeroVector;
+	FVector HeldServer = FVector::ZeroVector;
+
+	/**
+	 * Queues: once play has stopped, the joiner (player 1) holds a move forward for a second, and its character stays
+	 * where it stood on its own machine and on the server (not moved, nor snapped back).
+	 */
+	void HoldingAMoveGoesNowhere(FAutomationTestBase* Test, const FString& When)
+	{
+		using namespace PlayTesting;
+		PlayTesting::Then([Test, When]()
+		{
+			const ACheeseStrikeCharacter* Own = Character(1);
+			const ACheeseStrikeCharacter* Served = CharacterOf(1, 0);
+			if (Test->TestTrue(When + TEXT(": the joiner is alive on both machines"), Own != nullptr && Served != nullptr && Own->IsAlive()))
+			{
+				Test->TestFalse(When + TEXT(": the joiner can't act on its own machine"), Own->CanAct());
+				Test->TestFalse(When + TEXT(": nor on the server"), Served->CanAct());
+				HeldOwn = Own->GetActorLocation();
+				HeldServer = Served->GetActorLocation();
+			}
+		});
+		Play(1, TEXT("hold Move 0 1\nwait 1\nrelease Move"));
+		PlayTesting::Then([Test, When]()
+		{
+			const ACheeseStrikeCharacter* Own = Character(1);
+			const ACheeseStrikeCharacter* Served = CharacterOf(1, 0);
+			if (Own != nullptr && Served != nullptr)
+			{
+				const float OwnMoved = FVector::Dist2D(Own->GetActorLocation(), HeldOwn);
+				const float ServerMoved = FVector::Dist2D(Served->GetActorLocation(), HeldServer);
+				Test->TestTrue(FString::Printf(TEXT("%s: a held move doesn't move the joiner on its machine (%.1f cm)"), *When, OwnMoved), OwnMoved < 5.0f);
+				Test->TestTrue(FString::Printf(TEXT("%s: nor on the server (%.1f cm)"), *When, ServerMoved), ServerMoved < 5.0f);
+				Test->TestTrue(FString::Printf(TEXT("%s: and the two agree (%.1f cm apart)"), *When, FVector::Dist2D(Own->GetActorLocation(), Served->GetActorLocation())),
+					FVector::Dist2D(Own->GetActorLocation(), Served->GetActorLocation()) < 5.0f);
+			}
+		});
+	}
 
 	/** How high a bone of the body others see is above the character's feet, on the machine it is seen on (cm). */
 	float BoneHeight(const ACheeseStrikeCharacter* Character, const TCHAR* Bone)
@@ -238,6 +277,8 @@ bool FAnEliminationRoundEndsWhenASideIsOut::RunTest(const FString& Parameters)
 		KilledAt = Now(0);
 	});
 	WaitUntil(TEXT("the joiner hearing the host is out"), 5.0f, []() { const ACheeseStrikePlayerState* Host = StateOf(0, 1); return Host != nullptr && Host->IsOut(); });
+	// The round over, the side left standing stands still till the next.
+	HoldingAMoveGoesNowhere(this, TEXT("between rounds"));
 	// Past the respawn delay, between rounds, nobody comes back yet.
 	WaitUntil(TEXT("the respawn delay passing"), CheeseStrikeRules::RespawnDelay + 1.0f, []() { return Now(0) > KilledAt + CheeseStrikeRules::RespawnDelay + 0.5f; });
 	Then([this]()
@@ -272,6 +313,8 @@ bool FAnEliminationRoundEndsWhenASideIsOut::RunTest(const FString& Parameters)
 		TestEqual(TEXT("which wins"), Match->GetWinningTeam(), 1);
 		TestEqual(TEXT("by name"), Match->GetWinnerName(), FString(CheeseStrikeRules::TeamNames[1]));
 	});
+	WaitUntil(TEXT("the joiner hearing the match is over"), 5.0f, []() { const ACheeseStrikeGameState* Match = GameState(1); return Match != nullptr && Match->HasMatchEnded(); });
+	HoldingAMoveGoesNowhere(this, TEXT("after the match"));
 	StopPlaying();
 	return true;
 }
