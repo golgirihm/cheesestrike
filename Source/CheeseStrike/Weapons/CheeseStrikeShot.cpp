@@ -273,6 +273,23 @@ float FHitHistory::RayHitsBody(const FVector& Origin, const FVector& Direction, 
 	return Torso < 0.0f ? Legs : (Legs < 0.0f ? Torso : FMath::Min(Torso, Legs));
 }
 
+float FHitHistory::RayHitsHead(const FVector& Origin, const FVector& Direction, const FSample& Sample)
+{
+	return CheeseStrikeWeapons::RayHitsSegment(Origin, Direction, Sample.HeadLow, Sample.HeadHigh, Sample.HeadRadius);
+}
+
+float FHitHistory::RayHitsPlayer(const FVector& Origin, const FVector& Direction, const FSample& Sample, bool& bOutHead)
+{
+	const float Head = RayHitsHead(Origin, Direction, Sample);
+	const float Body = RayHitsBody(Origin, Direction, Sample);
+	bOutHead = Head >= 0.0f && (Body < 0.0f || Head <= Body + Sample.Radius + Sample.HeadRadius);
+	if (bOutHead)
+	{
+		return Body >= 0.0f ? FMath::Min(Head, Body) : Head;
+	}
+	return Body;
+}
+
 void FHitHistory::Add(const FSample& Sample)
 {
 	Samples.Add(Sample);
@@ -307,7 +324,10 @@ FHitHistory::FSample FHitHistory::At(float Time) const
 			FSample Between = After;
 			Between.Time = Time;
 			Between.Feet = FMath::Lerp(Before.Feet, After.Feet, Through);
-			Between.Head = FMath::Lerp(Before.Head, After.Head, Through);
+			Between.Eyes = FMath::Lerp(Before.Eyes, After.Eyes, Through);
+			Between.HeadLow = FMath::Lerp(Before.HeadLow, After.HeadLow, Through);
+			Between.HeadHigh = FMath::Lerp(Before.HeadHigh, After.HeadHigh, Through);
+			Between.HeadRadius = FMath::Lerp(Before.HeadRadius, After.HeadRadius, Through);
 			Between.Yaw = Before.Yaw + FMath::FindDeltaAngleDegrees(Before.Yaw, After.Yaw) * Through;
 			Between.Radius = FMath::Lerp(Before.Radius, After.Radius, Through);
 			Between.Height = FMath::Lerp(Before.Height, After.Height, Through);

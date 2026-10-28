@@ -22,6 +22,8 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
+#include "Sound/SoundWave.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Streaks/CheeseStrikeSynth.h"
 #include "CheeseStrikeBotController.h"
@@ -283,6 +285,13 @@ void ACheeseStrikePlayerController::UpdatePodium()
 	{
 		SetViewTarget(Podium);
 	}
+	if (PodiumMusic != nullptr && Match != nullptr)
+	{
+		// Toward the countdown's volume, never jumping (a skip brings the lobby near at once).
+		const float Target = CheeseStrikePodiums::MusicVolume(Match->GetLobbyAt(), Match->GetServerWorldTimeSeconds());
+		PodiumMusicVolume = FMath::FInterpConstantTo(PodiumMusicVolume, Target, GetWorld()->GetDeltaSeconds(), 1.5f);
+		PodiumMusic->SetVolumeMultiplier(FMath::Max(PodiumMusicVolume, 0.001f));
+	}
 }
 
 void ACheeseStrikePlayerController::ShowPodium()
@@ -302,10 +311,27 @@ void ACheeseStrikePlayerController::ShowPodium()
 	{
 		PlayerCameraManager->StartCameraFade(1.0f, 0.0f, 0.6f, FLinearColor::Black, false, false);
 	}
-	// A quick electric guitar riff as the results come up.
-	if (IsLocalController())
+	// RiffFuel's Aggression over the podium, at the music's volume, fading out as it counts down to the lobby.
+	if (IsLocalController() && PodiumMusic == nullptr)
 	{
-		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::GuitarRiff()), 0.7f);
+		if (USoundWave* Wave = LoadObject<USoundWave>(nullptr, CheeseStrikePodiums::Music))
+		{
+			Wave->bLooping = true;
+			Wave->SoundClassObject = UCheeseStrikeSettings::MusicSoundClass();
+			PodiumMusic = UGameplayStatics::CreateSound2D(this, Wave, 1.0f, 1.0f, 0.0f, nullptr, false, false);
+			if (PodiumMusic != nullptr)
+			{
+				PodiumMusic->bIsUISound = true;
+				PodiumMusicVolume = 0.0f;
+				PodiumMusic->SetVolumeMultiplier(0.001f);
+				PodiumMusic->Play();
+				UCheeseStrikeSettings::ApplySound();
+			}
+		}
+		else
+		{
+			UE_LOG(LogCheeseStrike, Warning, TEXT("Podium: %s isn't there"), CheeseStrikePodiums::Music);
+		}
 	}
 	FString Who;
 	for (const FPodiumPlace& Placed : Podium->GetPlaces())
@@ -370,6 +396,12 @@ void ACheeseStrikePlayerController::HidePodium()
 	{
 		Podium->Destroy();
 		Podium = nullptr;
+	}
+	if (PodiumMusic != nullptr)
+	{
+		PodiumMusic->Stop();
+		PodiumMusic->DestroyComponent();
+		PodiumMusic = nullptr;
 	}
 }
 

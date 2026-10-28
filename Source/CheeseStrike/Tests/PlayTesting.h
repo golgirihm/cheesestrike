@@ -31,8 +31,8 @@ class UWorld;
  */
 namespace PlayTesting
 {
-	/** The map tests time some walks (forward for so many seconds) at the old walking speed; walking is a fifth slower since 26 Oct 2026, so they walk this much longer. */
-	constexpr float WalkTimeScale = 1.25f;
+	/** The map tests time some walks (forward for so many seconds) at the old walking speed of 450 cm/s; walking is slower (a fifth since 26 Oct 2026, and a fifth again since 27 Oct), so they walk this much longer. */
+	constexpr float WalkTimeScale = 450.0f / 288.0f;
 
 	/** A session: how many play, the host's options for the map's URL, and whether they start apart (each alone, to find one another through the online service) rather than already in one match. */
 	struct FSession

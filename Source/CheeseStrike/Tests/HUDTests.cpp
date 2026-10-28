@@ -480,17 +480,33 @@ bool FTheDeathScreenShowsForEveryDeath::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheDronesMarksHideUnderEveryPanel, "CheeseStrike.HUD.TheDronesMarksHideUnderEveryPanel", HUDTests::Flags)
-bool FTheDronesMarksHideUnderEveryPanel::RunTest(const FString& Parameters)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheDronesMarksFollowTheEnemiesUnderThePanels, "CheeseStrike.HUD.TheDronesMarksFollowTheEnemiesUnderThePanels", HUDTests::Flags)
+bool FTheDronesMarksFollowTheEnemiesUnderThePanels::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeHUD;
-	// ShowsMarksInView(bAlive, bStrikeMap, bScoreboard, bMenu, bOver)
-	TestTrue(TEXT("in play, the UAC's diamonds show over the enemies seen"), ShowsMarksInView(true, false, false, false, false));
-	TestFalse(TEXT("not while choosing a Cheese Strike's spot: the strike map shows them as its own dots"), ShowsMarksInView(true, true, false, false, false));
-	TestFalse(TEXT("not under the scoreboard"), ShowsMarksInView(true, false, true, false, false));
-	TestFalse(TEXT("not killed, under the death screen"), ShowsMarksInView(false, false, false, false, false));
-	TestFalse(TEXT("not paused, under the menu"), ShowsMarksInView(true, false, false, true, false));
-	TestFalse(TEXT("not once the match is over"), ShowsMarksInView(true, false, false, false, true));
+	// ShowsMarksInView(bRevealing, bOver): drawn before the panels, which cover them (the strike map, the scoreboard, the death
+	// screen, the pause menu), rather than hidden while one is up.
+	TestTrue(TEXT("while the side's UAC is up, its diamonds show"), ShowsMarksInView(true, false));
+	TestFalse(TEXT("none without it"), ShowsMarksInView(false, false));
+	TestFalse(TEXT("nor once the match is over"), ShowsMarksInView(true, true));
+	// Where each goes: over the enemy if on the screen, else pinned to the edge the way they are.
+	const FVector2D Size(1920.0f, 1080.0f);
+	const float Margin = 20.0f;
+	bool bPinned = true;
+	const FVector2D Ahead = MarkInView(FVector(1000.0f, 100.0f, 0.0f), FVector2D(1100.0f, 540.0f), Size, Margin, bPinned);
+	TestTrue(TEXT("an enemy ahead: over them"), !bPinned && Ahead.Equals(FVector2D(1100.0f, 540.0f)));
+	const FVector2D Right = MarkInView(FVector(300.0f, 1000.0f, 0.0f), FVector2D(5000.0f, 540.0f), Size, Margin, bPinned);
+	TestTrue(FString::Printf(TEXT("one off to the right: on the right edge (%.0f, %.0f)"), Right.X, Right.Y), bPinned && FMath::IsNearlyEqual(Right.X, Size.X - Margin, 0.01) && FMath::IsNearlyEqual(Right.Y, 540.0, 1.0));
+	const FVector2D Left = MarkInView(FVector(-300.0f, -1000.0f, 0.0f), FVector2D(800.0f, 500.0f), Size, Margin, bPinned);
+	TestTrue(FString::Printf(TEXT("one behind on the left: on the left edge, low (%.0f, %.0f)"), Left.X, Left.Y), bPinned && FMath::IsNearlyEqual(Left.X, Margin, 0.01) && Left.Y >= 540.0f);
+	const FVector2D Behind = MarkInView(FVector(-1000.0f, 0.0f, 0.0f), FVector2D(960.0f, 540.0f), Size, Margin, bPinned);
+	TestTrue(FString::Printf(TEXT("one straight behind: at the bottom's middle, though it projects to the middle (%.0f, %.0f)"), Behind.X, Behind.Y), bPinned && FMath::IsNearlyEqual(Behind.X, 960.0, 0.01) && FMath::IsNearlyEqual(Behind.Y, Size.Y - Margin, 0.01));
+	const FVector2D Above = MarkInView(FVector(200.0f, 0.0f, 2000.0f), FVector2D(960.0f, -3000.0f), Size, Margin, bPinned);
+	TestTrue(TEXT("one high above: on the top edge"), bPinned && FMath::IsNearlyEqual(Above.Y, Margin, 0.01) && FMath::IsNearlyEqual(Above.X, 960.0, 0.01));
+	for (const FVector2D& Pin : {Right, Left, Behind, Above})
+	{
+		TestTrue(TEXT("every pin on the screen"), Pin.X >= Margin - 0.01f && Pin.X <= Size.X - Margin + 0.01f && Pin.Y >= Margin - 0.01f && Pin.Y <= Size.Y - Margin + 0.01f);
+	}
 	return true;
 }
 

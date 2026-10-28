@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 // Footsteps: when a body sounds a step and how loudly (Rules/CheeseStrikeFootsteps.h),
-// and the sounds that are made in code for them and for the streaks and the post-game
-// riff (Streaks/CheeseStrikeSynth.h).
+// and the sounds that are made in code for them and for the streaks
+// (Streaks/CheeseStrikeSynth.h).
 
 #include "Misc/AutomationTest.h"
 #include "Movement/CheeseStrikeMovement.h"
@@ -57,7 +57,7 @@ bool FFootstepsComeOnTheStride::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeFootsteps;
 	const float Walk = CheeseStrikeMovement::WalkSpeed;
 	const float Sprint = Walk * CheeseStrikeMovement::SprintFactor;
-	// Ten seconds of walking covers 3600 cm: 18 strides of 190 (the first sooner, as a walk begins part way through one).
+	// Ten seconds of walking covers 2880 cm: 18 strides of 152 (the first sooner, as a walk begins part way through one).
 	const int32 Walking = FootstepTests::StepsIn(EGait::Walk, Walk, 10.0f);
 	TestTrue(TEXT("a walk steps about twice a second"), Walking >= 18 && Walking <= 20);
 	const int32 Sprinting = FootstepTests::StepsIn(EGait::Sprint, Sprint, 10.0f);
@@ -101,9 +101,6 @@ bool FSynthesisedSounds::RunTest(const FString& Parameters)
 	TestEqual(TEXT("an explosion lasts as asked"), Blast.Num(), 3 * SampleRate);
 	TestTrue(TEXT("it begins with its crack"), Peak(TArray<int16>(Blast.GetData(), SampleRate / 20)) > 20000);
 	TestTrue(TEXT("and has died down by the end"), Peak(TArray<int16>(Blast.GetData() + Blast.Num() * 9 / 10, Blast.Num() / 10)) < 4000);
-	const TArray<int16> Riff = GuitarRiff();
-	TestTrue(TEXT("the riff is two to three seconds"), Riff.Num() > 2 * SampleRate && Riff.Num() < 3.2f * SampleRate);
-	TestTrue(TEXT("and can be heard"), Peak(Riff) > 10000);
 	return true;
 }
 

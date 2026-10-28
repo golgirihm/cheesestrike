@@ -1,0 +1,23 @@
+# The UAC's red diamonds over the enemies in real time, pinned to the screen's
+# edge for those off to the side or behind, and under the scoreboard (covered,
+# not hidden). Run with tools/play.ps1 -Map /Game/CheeseStrike/Maps/Lvl_Creamery
+# -Bots -StartAt none -Extra "?Mode=Deathmatch?Bots=5".
+wait 4
+cmd CheeseStrikeGiveStreak 1
+wait 0.3
+tap Streak
+wait 2.5
+shot uac_1_ahead
+wait 1
+shot uac_2_a_second_on
+look 90 0
+wait 0.2
+shot uac_3_turned
+look 90 0
+wait 0.2
+shot uac_4_behind
+hold Scoreboard
+wait 0.3
+shot uac_5_scoreboard
+release Scoreboard
+quit

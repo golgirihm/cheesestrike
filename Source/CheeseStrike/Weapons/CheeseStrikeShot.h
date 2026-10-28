@@ -103,8 +103,12 @@ namespace CheeseStrikeWeapons
 
 	/** Aiming down the sights steadies the recoil to this share of it. */
 	constexpr float AimRecoilFactor = 0.6f;
-	/** How big a head is for a shot, and how big the body is: an upright capsule of the character's size. */
-	constexpr float HeadRadius = 16.0f;
+	/**
+	 * How thick a head is for a shot when its body's head isn't known (a mesh without a `head` bone): a ball round the eyes. A
+	 * hero's head is the shape its row of CheeseStrikeBodies gives, on its head bone as posed. The body is an upright capsule
+	 * of the character's size.
+	 */
+	constexpr float HeadRadius = 11.0f;
 	/** Health everyone starts with. */
 	constexpr float MaxHealth = 100.0f;
 	/** Seconds a shot may come early after a weapon is drawn, for the network's jitter: the server allows it so much sooner than the draw time. */
@@ -197,7 +201,7 @@ namespace CheeseStrikeWeapons
 
 /**
  * Where a player was lately, for the server to put them back to the moment
- * a shooter saw them: a few seconds of (time, feet, head) samples.
+ * a shooter saw them: a few seconds of (time, feet, eyes, head) samples.
  */
 struct FHitHistory
 {
@@ -205,7 +209,12 @@ struct FHitHistory
 	{
 		float Time = 0.0f;
 		FVector Feet = FVector::ZeroVector;
-		FVector Head = FVector::ZeroVector;
+		/** Where the eyes are: where their shots leave from. */
+		FVector Eyes = FVector::ZeroVector;
+		/** The head, as its body's head bone has it (standing, crouched or lying): a capsule round the segment from HeadLow to HeadHigh, HeadRadius thick. */
+		FVector HeadLow = FVector::ZeroVector;
+		FVector HeadHigh = FVector::ZeroVector;
+		float HeadRadius = CheeseStrikeWeapons::HeadRadius;
 		/** Which way they faced, in degrees about the vertical, for a stroke in the back. */
 		float Yaw = 0.0f;
 		float Radius = 34.0f;
@@ -225,6 +234,15 @@ struct FHitHistory
 	FSample At(float Time) const;
 	/** How far along a ray a body sampled as `Sample` is first touched, or -1: the upright capsule, or the torso and legs lying. */
 	static float RayHitsBody(const FVector& Origin, const FVector& Direction, const FSample& Sample);
+	/** How far along a ray its head is first touched, or -1. */
+	static float RayHitsHead(const FVector& Origin, const FVector& Direction, const FSample& Sample);
+	/**
+	 * How far along a ray the player sampled is first touched, or -1, and whether it is a shot to the head (`bOutHead`): a ray
+	 * through the head is, wherever it first touched the body round it (the head is inside the upright capsule, whose skin is
+	 * well in front of the face), unless it went further into the body than the body's and the head's radii before coming to the
+	 * head (up through the chest from below).
+	 */
+	static float RayHitsPlayer(const FVector& Origin, const FVector& Direction, const FSample& Sample, bool& bOutHead);
 	int32 Num() const { return Samples.Num(); }
 
 private:
