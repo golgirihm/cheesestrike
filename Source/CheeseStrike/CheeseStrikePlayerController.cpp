@@ -749,6 +749,14 @@ void ACheeseStrikePlayerController::CheeseStrikeMoveBot(int32 Bot)
 	MoveBotFromMenu(Bot);
 }
 
+void ACheeseStrikePlayerController::CheeseStrikeSampleFriends(int32 Show)
+{
+	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>() : nullptr)
+	{
+		Sessions->ShowSampleFriends(Show != 0);
+	}
+}
+
 void ACheeseStrikePlayerController::CheeseStrikeBots()
 {
 	for (TActorIterator<ACheeseStrikeBotController> It(GetWorld()); It; ++It)

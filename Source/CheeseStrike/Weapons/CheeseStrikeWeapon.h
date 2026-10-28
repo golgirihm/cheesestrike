@@ -254,6 +254,8 @@ protected:
 		bool bHead = false;
 		float Distance = 0.0f;
 		float VictimYaw = 0.0f;
+		/** Where the victim's feet were at the time of the shot: the hit's place on the body is from them. */
+		FVector VictimFeet = FVector::ZeroVector;
 		bool bWall = false;
 		FHitResult Wall;
 	};

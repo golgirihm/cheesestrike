@@ -51,6 +51,7 @@
 #include "Weapons/CheeseStrikeGrenades.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Modes/CheeseStrikeLastStand.h"
+#include "Effects/CheeseStrikeCheeseBlood.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeWeaponLooks.h"
 #include "Streaks/CheeseStrikeSynth.h"
@@ -108,6 +109,8 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	GetMesh()->SetRelativeLocationAndRotation(FVector(-10.0f, 0.0f, -CapsuleHalfHeight), FRotator(0.0f, -90.0f, 0.0f));
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
+	// The cheese bled on the floor (its splats and pools, Effects/CheeseStrikeCheeseBlood) stays on the floor, not on a body lying in it.
+	GetMesh()->SetReceivesDecals(false);
 
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 	FirstPersonMesh->SetupAttachment(GetMesh());
@@ -117,6 +120,7 @@ ACheeseStrikeCharacter::ACheeseStrikeCharacter(const FObjectInitializer& ObjectI
 	FirstPersonMesh->SetOnlyOwnerSee(true);
 	FirstPersonMesh->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
 	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
+	FirstPersonMesh->SetReceivesDecals(false);
 
 	// The eyes stand on the capsule at eye height, standing or crouched (the
 	// engine moves BaseEyeHeight between the two), and the view follows them
@@ -878,6 +882,30 @@ void ACheeseStrikeCharacter::MulticastHardLanding_Implementation(float Damage)
 	const float Hard = FMath::Clamp(Damage / CheeseStrikeFalls::DeadlyDamage, 0.0f, 1.0f);
 	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 	UGameplayStatics::PlaySoundAtLocation(this, Sound, Feet, FRotator::ZeroRotator, 0.8f + 0.7f * Hard, 0.62f - 0.2f * Hard, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
+}
+
+FVector ACheeseStrikeCharacter::FeetNow() const
+{
+	return GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+}
+
+void ACheeseStrikeCharacter::MulticastBleed_Implementation(FVector_NetQuantize10 FromFeet, FVector_NetQuantizeNormal Way, uint8 Damage)
+{
+	// Where the hit was on the body as the shooter saw it, put on the body where this machine has it now.
+	if (ACheeseStrikeCheeseBlood* Blood = ACheeseStrikeCheeseBlood::For(GetWorld()))
+	{
+		Blood->ShotSpray(FeetNow() + FVector(FromFeet), FVector(Way), static_cast<float>(Damage));
+	}
+}
+
+void ACheeseStrikeCharacter::CheeseStrikeBleed(float Damage, float Yaw)
+{
+#if !UE_BUILD_SHIPPING
+	// A shot from `Yaw` off ahead, level, into the chest: it goes out the other way.
+	const FVector Way = -FRotator(0.0f, GetActorRotation().Yaw + Yaw, 0.0f).Vector();
+	const FVector Chest = FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 1.45f) - Way * 12.0f;
+	MulticastBleed_Implementation(Chest, Way, static_cast<uint8>(FMath::Clamp(Damage, 0.0f, 255.0f)));
+#endif
 }
 
 void ACheeseStrikeCharacter::CheeseStrikeDie()

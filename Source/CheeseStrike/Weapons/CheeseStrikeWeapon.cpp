@@ -1281,6 +1281,7 @@ ACheeseStrikeWeapon::FRayHit ACheeseStrikeWeapon::TraceRay(const FVector& Origin
 			Hit.Victim = Player;
 			Hit.bHead = bThisHead;
 			Hit.VictimYaw = Then.Yaw;
+			Hit.VictimFeet = Then.Feet;
 		}
 	}
 	return Hit;
@@ -1321,6 +1322,9 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		bool bHead = false;
 		float Distance = 0.0f;
 		int32 Pellets = 0;
+		/** Where the first pellet to reach them hit, from their feet then, and the way it went: where the cheese sprays. */
+		FVector FromFeet = FVector::ZeroVector;
+		FVector Way = FVector::ForwardVector;
 	};
 	TMap<ACheeseStrikeCharacter*, FHurt> Hurt;
 	for (int32 Pellet = 0; Pellet < FMath::Max(Stats->Pellets, 1); ++Pellet)
@@ -1330,6 +1334,11 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		if (Hit.Victim != nullptr)
 		{
 			FHurt& Theirs = Hurt.FindOrAdd(Hit.Victim);
+			if (Theirs.Pellets == 0)
+			{
+				Theirs.FromFeet = FVector(Origin) + Direction * Hit.Distance - Hit.VictimFeet;
+				Theirs.Way = Direction;
+			}
 			Theirs.Damage += CheeseStrikeWeapons::DamageAt(FiringStats(), Hit.Distance, Hit.bHead);
 			Theirs.bHead |= Hit.bHead;
 			Theirs.Distance = Hit.Distance;
@@ -1354,6 +1363,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 		if (Victim->TakeShot(Theirs.Damage, Holder, Theirs.bHead))
 		{
 			ClientHit(Theirs.Damage, Theirs.bHead, !Victim->IsAlive());
+			Victim->MulticastBleed(Theirs.FromFeet, Theirs.Way, static_cast<uint8>(FMath::Clamp(Theirs.Damage, 1.0f, 255.0f)));
 			UE_LOG(LogCheeseStrike, Display, TEXT("Shot: %s hit %s with the %s%s at %.0f cm for %.0f%s (health %.0f)"), *Holder->GetName(), *Victim->GetName(), *Stats->DisplayName.ToString(),
 				Theirs.bHead ? TEXT(" on the head") : TEXT(""), Theirs.Distance, Theirs.Damage,
 				Stats->Pellets > 1 ? *FString::Printf(TEXT(", %d of %d pellets"), Theirs.Pellets, Stats->Pellets) : TEXT(""), Victim->GetHealth());
@@ -1405,6 +1415,7 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 			if (Struck->Victim->TakeShot(Damage, Holder, false))
 			{
 				ClientHit(Damage, false, !Struck->Victim->IsAlive());
+				Struck->Victim->MulticastBleed(FVector(Origin) + Fan[Ray] * Struck->Distance - Struck->VictimFeet, Fan[Ray], static_cast<uint8>(FMath::Clamp(Damage, 1.0f, 255.0f)));
 				UE_LOG(LogCheeseStrike, Display, TEXT("Stroke: %s cut %s%s at %.0f cm for %.0f (health %.0f)"), *Holder->GetName(), *Struck->Victim->GetName(), bBack ? TEXT(" in the back") : TEXT(""), Struck->Distance, Damage, Struck->Victim->GetHealth());
 			}
 		}

@@ -86,6 +86,40 @@ namespace CheeseStrikeFriends
 		}
 	}
 
+	FString RowStatus(EState State, EStatus Status, int32 Humans)
+	{
+		const bool bInAParty = Status == EStatus::InLobby || Status == EStatus::InMatch;
+		return bInAParty && (State == EState::Join || State == EState::Full) ? StateLine(State, Humans) : StatusLabel(Status);
+	}
+
+	FLinearColor StatusDotColour(EStatus Status)
+	{
+		switch (Status)
+		{
+		case EStatus::InMatch: return FLinearColor(0.3f, 0.82f, 0.36f);
+		case EStatus::InLobby: return FLinearColor(0.28f, 0.6f, 1.0f);
+		case EStatus::MainMenu: return FLinearColor(0.96f, 0.72f, 0.2f);
+		default: return FLinearColor(0.38f, 0.37f, 0.36f);
+		}
+	}
+
+	FString EmptySectionLine()
+	{
+		return TEXT("No one here");
+	}
+
+	FString Initials(const FString& Name)
+	{
+		TArray<FString> Words;
+		Name.TrimStartAndEnd().ParseIntoArrayWS(Words);
+		FString Letters;
+		for (int32 Index = 0; Index < Words.Num() && Letters.Len() < 2; ++Index)
+		{
+			Letters.AppendChar(FChar::ToUpper(Words[Index][0]));
+		}
+		return Letters.IsEmpty() ? FString(TEXT("?")) : Letters;
+	}
+
 	FString PermissionValue(EPermission Permission)
 	{
 		return Permission == EPermission::InviteOnly ? TEXT("Invite") : TEXT("Friends");
