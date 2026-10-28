@@ -255,65 +255,6 @@ namespace CheeseStrikeSynth
 		return Normalised(Values, 0.95f);
 	}
 
-	TArray<int16> GuitarRiff()
-	{
-		// An eighth note at 160 beats a minute is 0.1875 s. The riff in E: E E E G E A E D, then E ringing.
-		constexpr float Eighth = 0.1875f;
-		struct FNote
-		{
-			float Hertz;
-			float Length;
-			float Ring;
-		};
-		const FNote Riff[] = {
-			{82.41f, Eighth, 0.99f},
-			{82.41f, Eighth, 0.99f},
-			{82.41f, Eighth, 0.99f},
-			{98.00f, Eighth, 0.99f},
-			{82.41f, Eighth, 0.99f},
-			{110.00f, Eighth, 0.99f},
-			{82.41f, Eighth, 0.99f},
-			{73.42f, Eighth * 1.5f, 0.99f},
-			{82.41f, 1.3f, 0.9985f},
-		};
-		const float Total = Eighth * 7.0f + Eighth * 1.5f + 1.3f + 0.15f;
-		TArray<float> Mix;
-		Mix.SetNumZeroed(FMath::RoundToInt(Total * SampleRate));
-		uint32 Seed = 1357911u;
-		float Start = 0.0f;
-		for (const FNote& Note : Riff)
-		{
-			// A power chord: the root, a fifth over it and the octave. The short notes are palm-muted (they ring little).
-			const bool bMuted = Note.Length < 0.5f;
-			const float Length = bMuted ? Note.Length * 0.9f : Note.Length;
-			Pluck(Mix, Start, Length, Note.Hertz, 1.0f, Note.Ring, Seed);
-			Pluck(Mix, Start, Length, Note.Hertz * 1.4983f, 0.8f, Note.Ring, Seed);
-			Pluck(Mix, Start, Length, Note.Hertz * 2.0f, 0.6f, Note.Ring, Seed);
-			Start += Note.Length;
-		}
-		// Overdrive: pushed hard into a soft clip twice, with the lows thinned before and the cabinet's highs taken off after.
-		float Low = 0.0f;
-		float Cabinet = 0.0f;
-		float CabinetAgain = 0.0f;
-		const float LowPole = PoleFor(110.0f);
-		const float CabinetPole = PoleFor(3200.0f);
-		for (float& Value : Mix)
-		{
-			Low += (Value - Low) * LowPole;
-			float Driven = FMath::Tanh((Value - Low * 0.8f) * 6.0f);
-			Driven = FMath::Tanh(Driven * 3.0f);
-			Cabinet += (Driven - Cabinet) * CabinetPole;
-			CabinetAgain += (Cabinet - CabinetAgain) * CabinetPole;
-			Value = CabinetAgain;
-		}
-		// A short fade in, and out over the last tenth of a second.
-		for (int32 Index = 0; Index < Mix.Num(); ++Index)
-		{
-			Mix[Index] *= FMath::Min(1.0f, Index / (0.003f * SampleRate)) * FMath::Min(1.0f, (Mix.Num() - Index) / (0.12f * SampleRate));
-		}
-		return Normalised(Mix, 0.85f);
-	}
-
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples)
 	{
 		USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(Outer);

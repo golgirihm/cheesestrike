@@ -65,6 +65,13 @@ namespace CheeseStrikePodiums
 	/** The countdown's number: whole seconds until the lobby, rounded up; 0 once it is all but there. */
 	int32 SecondsLeft(float LobbyAt, float Now);
 
+	/** The music played over the podium: RiffFuel's Aggression combat loop, at the settings' music volume. */
+	extern const TCHAR* const Music;
+	/** Seconds over which the podium's music fades out, ending just before the lobby. */
+	constexpr float MusicFadeSeconds = 8.0f;
+	/** How loud the podium's music is (0 to 1) with the lobby at `LobbyAt` by the server's clock `Now`: whole, then fading out over the countdown's last MusicFadeSeconds, silent half a second before the lobby. */
+	float MusicVolume(float LobbyAt, float Now);
+
 	/** Where place `Place` (0 first) stands, counted from the camera's left: the second, the first in the middle, the third. */
 	int32 SlotOf(int32 Place);
 	/** How high its pedestal is, in centimetres: the first highest. */

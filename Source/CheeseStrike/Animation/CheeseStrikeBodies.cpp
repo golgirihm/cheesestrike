@@ -31,19 +31,29 @@ namespace CheeseStrikeBodies
 		const TCHAR* const WraithTeamSlots[] = {TEXT("M00_lowerbody"), TEXT("M01_upperbody"), TEXT("M02_backpackhead")};
 		const TCHAR* const TwinblastTeamSlots[] = {TEXT("M00_Head"), TEXT("M01_cloth"), TEXT("M03_Arms"), TEXT("M04_LowerBody")};
 
+		/**
+		 * The heads' shapes (FBody::HeadLow, HeadHigh, HeadRadius) are fitted to their vertices in the head bone's space (the
+		 * smallest capsule, leaning forward or back as the head does, within a centimetre and a half of all but a few in a
+		 * hundred: CheeseStrike.Animation.TheHeadShapeFitsEachHero), then reaching on along its lean down to the head bone,
+		 * so that its round end is the neck.
+		 */
 		const FBody Bodies[] = {
 			{TEXT("Lt. Belica"), TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Meshes/Belica.Belica"),
 				TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Animations/Rifle/"), nullptr, 0, BelicaGrip, nullptr, 0,
-				TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Materials/Teams/"), BelicaTeamSlots, UE_ARRAY_COUNT(BelicaTeamSlots)},
+				TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Materials/Teams/"), BelicaTeamSlots, UE_ARRAY_COUNT(BelicaTeamSlots),
+				FVector(0.0f, 2.3f, -0.6f), FVector(7.0f, -0.3f, -0.6f), 11.5f},
 			{TEXT("Murdock"), TEXT("/Game/ParagonMurdock/Characters/Heroes/Murdock/Meshes/Murdock.Murdock"),
 				TEXT("/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Rifle/"), MurdockWeapons, UE_ARRAY_COUNT(MurdockWeapons), MurdockGrip, MurdockFirstPersonHidden, UE_ARRAY_COUNT(MurdockFirstPersonHidden),
-				TEXT("/Game/ParagonMurdock/Characters/Heroes/Murdock/Materials/Teams/"), MurdockTeamSlots, UE_ARRAY_COUNT(MurdockTeamSlots)},
+				TEXT("/Game/ParagonMurdock/Characters/Heroes/Murdock/Materials/Teams/"), MurdockTeamSlots, UE_ARRAY_COUNT(MurdockTeamSlots),
+				FVector(0.0f, 4.9f, -0.7f), FVector(5.3f, 1.2f, -0.7f), 10.0f},
 			{TEXT("Wraith"), TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Meshes/Wraith.Wraith"),
 				TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Rifle/"), WraithWeapons, UE_ARRAY_COUNT(WraithWeapons), WraithGrip, nullptr, 0,
-				TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Materials/Teams/"), WraithTeamSlots, UE_ARRAY_COUNT(WraithTeamSlots)},
+				TEXT("/Game/ParagonWraith/Characters/Heroes/Wraith/Materials/Teams/"), WraithTeamSlots, UE_ARRAY_COUNT(WraithTeamSlots),
+				FVector(0.0f, 4.8f, 0.0f), FVector(5.5f, 0.3f, 0.0f), 9.0f},
 			{TEXT("Twinblast"), TEXT("/Game/ParagonTwinblast/Characters/Heroes/TwinBlast/Meshes/TwinBlast.TwinBlast"),
 				TEXT("/Game/ParagonTwinblast/Characters/Heroes/TwinBlast/Animations/Rifle/"), TwinblastWeapons, UE_ARRAY_COUNT(TwinblastWeapons), TwinblastGrip, nullptr, 0,
-				TEXT("/Game/ParagonTwinblast/Characters/Heroes/TwinBlast/Materials/Teams/"), TwinblastTeamSlots, UE_ARRAY_COUNT(TwinblastTeamSlots)},
+				TEXT("/Game/ParagonTwinblast/Characters/Heroes/TwinBlast/Materials/Teams/"), TwinblastTeamSlots, UE_ARRAY_COUNT(TwinblastTeamSlots),
+				FVector(0.0f, 2.6f, 0.1f), FVector(8.5f, 0.3f, 0.1f), 9.0f},
 		};
 
 		/** The Gouda Guys are Murdock and Twinblast, the Mozza Radicals Lt. Belica and Wraith. */

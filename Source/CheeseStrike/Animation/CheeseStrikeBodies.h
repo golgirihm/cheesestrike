@@ -42,6 +42,14 @@ namespace CheeseStrikeBodies
 		const TCHAR* TeamLooks;
 		const TCHAR* const* TeamSlots;
 		int32 NumTeamSlots;
+		/**
+		 * Its head for shots: a capsule round the segment from HeadLow to HeadHigh, HeadRadius thick, in the space of its `head`
+		 * bone (X up the head), from the neck to the top of the head, fitted to the vertices on the head and every bone under it
+		 * (the face, the hair, a helmet; CheeseStrike.Animation.TheHeadShapeFitsEachHero measures them).
+		 */
+		FVector HeadLow;
+		FVector HeadHigh;
+		float HeadRadius;
 	};
 
 	/** Every body. */

@@ -329,7 +329,7 @@ namespace CheeseStrikeModeHUD
 		const APlayerController* Owner = Hud != nullptr ? Hud->GetOwningPlayerController() : nullptr;
 		const ACheeseStrikePlayerState* Mine = Owner != nullptr ? Owner->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
 		const ACheeseStrikeGameState* Match = Hud != nullptr && Hud->GetWorld() != nullptr ? Hud->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-		if (Canvas == nullptr || Mine == nullptr || Match == nullptr || !Match->HasMatchStarted() || Match->HasMatchEnded() || Mine->IsOut())
+		if (Canvas == nullptr || Mine == nullptr || Match == nullptr || !Match->HasMatchStarted() || Match->HasMatchEnded() || Owner->PlayerCameraManager == nullptr)
 		{
 			return;
 		}
@@ -340,18 +340,35 @@ namespace CheeseStrikeModeHUD
 		{
 			return;
 		}
+		// In and out over a moment as the drone comes and goes; steady between (the marks follow the enemies every frame).
+		const float Alpha = FMath::Clamp((Until - Now) / 0.5f, 0.0f, 1.0f);
 		const float U = HudDraw::Unit(Canvas);
+		const FVector Eye = Owner->PlayerCameraManager->GetCameraLocation();
+		const FRotator Look = Owner->PlayerCameraManager->GetCameraRotation();
+		const FVector2D Screen(Canvas->SizeX, Canvas->SizeY);
 		HudDraw::FShapes Shapes;
-		for (const FVector& Mark : Mine->SweepMarks)
+		for (TActorIterator<ACheeseStrikeCharacter> It(Hud->GetWorld()); It; ++It)
 		{
-			FVector2D At;
-			if (ModeHudOnScreen(Hud, Mark + FVector(0.0f, 0.0f, 40.0f), At))
+			if (!It->IsAlive() || !Match->AreEnemies(Mine, It->GetPlayerState()))
 			{
-				// A small red diamond, with a dark rim, where each enemy was.
-				const float Size = 8.0f * U;
-				const float Rim = Size + 2.0f * U;
-				Shapes.SmoothPolygon({At + FVector2D(0, -Rim), At + FVector2D(Rim, 0), At + FVector2D(0, Rim), At + FVector2D(-Rim, 0)}, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Sweep.Fade));
-				Shapes.SmoothPolygon({At + FVector2D(0, -Size), At + FVector2D(Size, 0), At + FVector2D(0, Size), At + FVector2D(-Size, 0)}, HudDraw::Faded(HudDraw::Danger, Sweep.Fade));
+				continue;
+			}
+			// Over the head, where the enemy is now.
+			const FVector Over = It->GetActorLocation() + FVector(0.0f, 0.0f, It->GetSimpleCollisionHalfHeight() + 25.0f);
+			const FVector Projected = Hud->Project(Over, true);
+			bool bPinned = false;
+			const float Size = 8.0f * U;
+			const float Rim = Size + 2.0f * U;
+			const FVector2D At = CheeseStrikeHUD::MarkInView(Look.UnrotateVector(Over - Eye), FVector2D(Projected.X, Projected.Y), Screen, Rim + 6.0f * U, bPinned);
+			// A small red diamond, with a dark rim, over each enemy; off the screen, at its edge the way they are, pointing there.
+			Shapes.SmoothPolygon({At + FVector2D(0, -Rim), At + FVector2D(Rim, 0), At + FVector2D(0, Rim), At + FVector2D(-Rim, 0)}, FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Alpha));
+			Shapes.SmoothPolygon({At + FVector2D(0, -Size), At + FVector2D(Size, 0), At + FVector2D(0, Size), At + FVector2D(-Size, 0)}, HudDraw::Faded(HudDraw::Danger, Alpha));
+			if (bPinned)
+			{
+				const FVector2D Out = (At - Screen * 0.5f).GetSafeNormal();
+				const FVector2D Side(-Out.Y, Out.X);
+				const FVector2D Tip = At + Out * (Rim + 5.0f * U);
+				Shapes.Triangle(Tip, At + Out * (Rim + 0.5f * U) + Side * 4.0f * U, At + Out * (Rim + 0.5f * U) - Side * 4.0f * U, HudDraw::Faded(HudDraw::Danger, Alpha));
 			}
 		}
 		Shapes.Draw(Canvas);

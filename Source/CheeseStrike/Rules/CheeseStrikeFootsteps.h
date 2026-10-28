@@ -27,10 +27,10 @@ namespace CheeseStrikeFootsteps
 
 	/** Slower than this across the ground (cm/s) is standing still, a crouch-still included. */
 	constexpr float MinSpeed = 40.0f;
-	/** The ground covered between one step and the next (cm), by gait. */
-	constexpr float CrouchStride = 110.0f;
-	constexpr float WalkStride = 190.0f;
-	constexpr float SprintStride = 230.0f;
+	/** The ground covered between one step and the next (cm), by gait: shorter as the walk slowed, so that the steps keep the animations' pace. */
+	constexpr float CrouchStride = 88.0f;
+	constexpr float WalkStride = 152.0f;
+	constexpr float SprintStride = 184.0f;
 	/** How loud a step is, by gait, as a share of the sound's full volume. */
 	constexpr float CrouchVolume = 0.2f;
 	constexpr float WalkVolume = 0.5f;

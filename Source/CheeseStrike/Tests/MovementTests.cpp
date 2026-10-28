@@ -25,8 +25,8 @@ bool FSpeedsKeepTheirRatios::RunTest(const FString& Parameters)
 	TestEqual(TEXT("aiming is six tenths"), Speed(false, true, false), WalkSpeed * 0.6f);
 	TestEqual(TEXT("and rules out sprinting too"), Speed(true, true, false), WalkSpeed * 0.6f);
 	TestEqual(TEXT("crouched and aiming, both"), Speed(false, true, true), WalkSpeed * 0.3f);
-	// A shooter's pace at life size, a fifth slower than it first was: not the Godot game's 2 m/s scaled down.
-	TestTrue(TEXT("a steady walk"), WalkSpeed >= 340.0f && WalkSpeed <= 400.0f);
+	// A shooter's pace at life size, a fifth slower twice over than it first was (450): not the Godot game's 2 m/s scaled down.
+	TestTrue(TEXT("a steady walk"), WalkSpeed >= 270.0f && WalkSpeed <= 310.0f);
 	return true;
 }
 

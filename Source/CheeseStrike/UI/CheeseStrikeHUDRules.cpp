@@ -616,9 +616,30 @@ namespace CheeseStrikeHUD
 		return bOut ? FMath::Clamp((OutDeathScreen - Seconds) / 0.5f, 0.0f, 1.0f) : 1.0f;
 	}
 
-	bool ShowsMarksInView(bool bAlive, bool bStrikeMap, bool bScoreboard, bool bMenu, bool bOver)
+	bool ShowsMarksInView(bool bRevealing, bool bOver)
 	{
-		return bAlive && !bStrikeMap && !bScoreboard && !bMenu && !bOver;
+		return bRevealing && !bOver;
+	}
+
+	FVector2D MarkInView(const FVector& Local, const FVector2D& Projected, const FVector2D& Size, float Margin, bool& bOutPinned)
+	{
+		const FVector2D Half = Size * 0.5f;
+		const FVector2D Room(FMath::Max(Half.X - Margin, 1.0f), FMath::Max(Half.Y - Margin, 1.0f));
+		const FVector2D FromMiddle = Projected - Half;
+		if (Local.X > 0.0f && FMath::Abs(FromMiddle.X) <= Room.X && FMath::Abs(FromMiddle.Y) <= Room.Y)
+		{
+			bOutPinned = false;
+			return Projected;
+		}
+		bOutPinned = true;
+		// The way to it across the screen (right, down): ahead, as it projects; behind, toward the bottom the further behind.
+		FVector2D Way = Local.X > 0.0f ? FVector2D(Local.Y, -Local.Z) : FVector2D(Local.Y, FMath::Abs(Local.X) + FMath::Max(-Local.Z, 0.0f));
+		if (Way.IsNearlyZero())
+		{
+			Way = FVector2D(0.0f, 1.0f);
+		}
+		const float Scale = FMath::Min(FMath::Abs(Way.X) > UE_KINDA_SMALL_NUMBER ? Room.X / FMath::Abs(Way.X) : UE_BIG_NUMBER, FMath::Abs(Way.Y) > UE_KINDA_SMALL_NUMBER ? Room.Y / FMath::Abs(Way.Y) : UE_BIG_NUMBER);
+		return Half + Way * Scale;
 	}
 
 	uint64 SteamIdFrom(const FString& Type, const FString& Id)

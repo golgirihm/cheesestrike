@@ -9,7 +9,7 @@ class USoundWaveProcedural;
 /**
  * Sounds the streaks make that have no recording yet, made in code: a
  * falling bomb's whistle and an air-raid siren, a jet's fly-by and
- * heavy explosions, footsteps and the post-game guitar riff. Each is a few seconds of
+ * heavy explosions and footsteps. Each is a few seconds of
  * 16-bit mono at SampleRate, played once by a procedural sound wave made
  * for that one playing. Recorded, licensed sounds may replace them, as
  * the design's "Audio" says.
@@ -32,8 +32,6 @@ namespace CheeseStrikeSynth
 	TArray<int16> JetPass(float Seconds);
 	/** A heavy explosion lasting `Seconds`: the crack, a falling boom, a rumble dying away and falling debris. `Seed` varies it. */
 	TArray<int16> Explosion(float Seconds, int32 Seed);
-	/** A quick riff on an overdriven electric guitar, about two and a half seconds: palm-muted power chords and a long ringing last chord. */
-	TArray<int16> GuitarRiff();
 	/** A sound, owned by `Outer`, that plays `Samples` once. */
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples);
 }

@@ -20,6 +20,11 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "CheeseStrikeCharacter.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "AnimationRuntime.h"
+#if WITH_EDITOR
+#include "MeshUtilitiesCommon.h"
+#include "MeshUtilitiesEngine.h"
+#endif
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -361,6 +366,85 @@ bool FTheArmsKeepToTheirRules::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("deeper the faster"), bRising);
 	TestTrue(TEXT("the view leans into a slide a little"), SlideTilt < 0.0f && SlideTilt > -12.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheHeadShapeFitsEachHero, "CheeseStrike.Animation.TheHeadShapeFitsEachHero", AnimationTests::Flags)
+
+bool FTheHeadShapeFitsEachHero::RunTest(const FString& Parameters)
+{
+#if WITH_EDITOR
+	for (int32 Index = 0; Index < CheeseStrikeBodies::All().Num(); ++Index)
+	{
+		const CheeseStrikeBodies::FBody& Body = CheeseStrikeBodies::All()[Index];
+		USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, Body.Mesh);
+		if (!TestNotNull(FString::Printf(TEXT("%s has a mesh"), Body.Name), Mesh))
+		{
+			continue;
+		}
+		const FReferenceSkeleton& Skeleton = Mesh->GetRefSkeleton();
+		const int32 Head = Skeleton.FindBoneIndex(FName(TEXT("head")));
+		if (!TestTrue(TEXT("a head bone"), Head != INDEX_NONE))
+		{
+			continue;
+		}
+		// The vertices mostly on the head and every bone under it (the face, the jaw, the eyes, hair), in the head bone's space.
+		TArray<FBoneVertInfo> OnBone;
+		FMeshUtilitiesEngine::CalcBoneVertInfos(Mesh, OnBone, true, 0);
+		const FTransform HeadPose = FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, Head);
+		TArray<FVector> Points;
+		for (int32 Bone = 0; Bone < Skeleton.GetNum() && Bone < OnBone.Num(); ++Bone)
+		{
+			int32 Up = Bone;
+			while (Up != INDEX_NONE && Up != Head)
+			{
+				Up = Skeleton.GetParentIndex(Up);
+			}
+			if (Up == INDEX_NONE)
+			{
+				continue;
+			}
+			const FTransform ToHead = FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, Bone).GetRelativeTransform(HeadPose);
+			for (const FVector3f& Position : OnBone[Bone].Positions)
+			{
+				Points.Add(ToHead.TransformPosition(FVector(Position)));
+			}
+		}
+		TArray<float> Xs, Ys, Zs;
+		for (const FVector& P : Points)
+		{
+			Xs.Add(P.X);
+			Ys.Add(P.Y);
+			Zs.Add(P.Z);
+		}
+		Xs.Sort();
+		Ys.Sort();
+		Zs.Sort();
+		const auto Pct = [](const TArray<float>& Sorted, float Share) { return Sorted.Num() > 0 ? Sorted[FMath::Clamp(FMath::FloorToInt(Share * (Sorted.Num() - 1)), 0, Sorted.Num() - 1)] : 0.0f; };
+		const int32 Neck = Skeleton.FindBoneIndex(FName(TEXT("neck_01")));
+		const FVector NeckAt = Neck != INDEX_NONE ? FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, Neck).GetRelativeTransform(HeadPose).GetLocation() : FVector::ZeroVector;
+		// Its row's head: holding nearly every vertex of the head, no wider than the head, as high as its top and down to the neck.
+		const FVector Low = Body.HeadLow;
+		const FVector High = Body.HeadHigh;
+		int32 Inside = 0;
+		for (const FVector& P : Points)
+		{
+			Inside += FMath::PointDistToSegment(P, Low, High) <= Body.HeadRadius + 1.5f ? 1 : 0;
+		}
+		const float Share = Points.Num() > 0 ? static_cast<float>(Inside) / Points.Num() : 0.0f;
+		const float HalfWide = FMath::Max(Pct(Ys, 0.98f) - Pct(Ys, 0.02f), Pct(Zs, 0.98f) - Pct(Zs, 0.02f)) * 0.5f;
+		TestTrue(FString::Printf(TEXT("%s's head holds its vertices (%.0f%%)"), Body.Name, Share * 100.0f), Share >= 0.95f);
+		TestTrue(FString::Printf(TEXT("and is no thicker than the head (%.1f, the head %.1f)"), Body.HeadRadius, HalfWide), Body.HeadRadius <= HalfWide + 1.0f && Body.HeadRadius >= HalfWide - 2.5f);
+		const float ShapeTop = FMath::Max(Low.X, High.X) + Body.HeadRadius;
+		TestTrue(FString::Printf(TEXT("and reaches its top (%.1f, the top %.1f)"), ShapeTop, Pct(Xs, 0.98f)), FMath::Abs(ShapeTop - Pct(Xs, 0.98f)) <= 2.0f);
+		TestTrue(TEXT("down to the neck"), Low.X - Body.HeadRadius < 0.0f && Low.X - Body.HeadRadius > NeckAt.X - 6.0f);
+		AddInfo(FString::Printf(TEXT("%s: %d points; head in mesh (%.1f %.1f %.1f); neck_01 in head (%.1f %.1f %.1f); X %.1f/%.1f/%.1f/%.1f Y %.1f/%.1f/%.1f/%.1f Z %.1f/%.1f/%.1f/%.1f (min/2%%/98%%/max)"),
+			Body.Name, Points.Num(), HeadPose.GetLocation().X, HeadPose.GetLocation().Y, HeadPose.GetLocation().Z, NeckAt.X, NeckAt.Y, NeckAt.Z,
+			Xs.Num() ? Xs[0] : 0.0f, Pct(Xs, 0.02f), Pct(Xs, 0.98f), Xs.Num() ? Xs.Last() : 0.0f,
+			Ys.Num() ? Ys[0] : 0.0f, Pct(Ys, 0.02f), Pct(Ys, 0.98f), Ys.Num() ? Ys.Last() : 0.0f,
+			Zs.Num() ? Zs[0] : 0.0f, Pct(Zs, 0.02f), Pct(Zs, 0.98f), Zs.Num() ? Zs.Last() : 0.0f));
+	}
+#endif
 	return true;
 }
 

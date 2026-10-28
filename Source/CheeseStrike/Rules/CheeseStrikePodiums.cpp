@@ -127,6 +127,14 @@ namespace CheeseStrikePodiums
 		return FMath::Max(0, FMath::CeilToInt(LobbyAt - Now - 0.25f));
 	}
 
+	const TCHAR* const Music = TEXT("/Game/RiffFuel_Aggression/Audio/Aggression_Free_Combat_Loop_130BPM_Master.Aggression_Free_Combat_Loop_130BPM_Master");
+
+	float MusicVolume(float LobbyAt, float Now)
+	{
+		const float Share = FMath::Clamp((LobbyAt - Now - 0.5f) / MusicFadeSeconds, 0.0f, 1.0f);
+		return FMath::SmoothStep(0.0f, 1.0f, Share);
+	}
+
 	int32 SlotOf(int32 Place)
 	{
 		static const int32 PodiumSlots[Places] = {1, 0, 2};

@@ -517,6 +517,11 @@ void ACheeseStrikeCharacter::BeginPlay()
 	ACheeseStrikeWeapon::HideBuiltInWeapons(GetMesh());
 	FitFirstPersonBody();
 	FirstPersonBase = FirstPersonMesh->GetRelativeTransform();
+	// The server finds heads by the body's bones (SampleNow), so its copy of every body is posed whether or not it is drawn.
+	if (HasAuthority())
+	{
+		GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	}
 	// A fresh character can't be hurt for its first seconds, counted from the end of the count before the match or its
 	// round, unless it attacks.
 	if (HasAuthority())
@@ -642,8 +647,26 @@ FHitHistory::FSample ACheeseStrikeCharacter::SampleNow(float Time) const
 	Sample.Radius = GetCapsuleComponent()->GetScaledCapsuleRadius();
 	Sample.Height = GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 2.0f;
 	Sample.Feet = GetActorLocation() - FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
-	Sample.Head = Eyes->GetComponentLocation();
+	Sample.Eyes = Eyes->GetComponentLocation();
 	Sample.Yaw = GetActorRotation().Yaw;
+	// The head where the body's head bone is now (standing, crouched, lying or mid-fall), shaped as its hero's head; without
+	// one, a ball round the eyes.
+	static const FName HeadBone(TEXT("head"));
+	const int32 HeadIndex = CheeseStrikeBodies::All().IsValidIndex(BodyIndex) ? GetMesh()->GetBoneIndex(HeadBone) : INDEX_NONE;
+	if (HeadIndex != INDEX_NONE)
+	{
+		const CheeseStrikeBodies::FBody& Hero = CheeseStrikeBodies::All()[BodyIndex];
+		const FTransform Head = GetMesh()->GetBoneTransform(HeadIndex);
+		Sample.HeadLow = Head.TransformPosition(Hero.HeadLow);
+		Sample.HeadHigh = Head.TransformPosition(Hero.HeadHigh);
+		Sample.HeadRadius = Hero.HeadRadius * GetMesh()->GetComponentScale().GetMax();
+	}
+	else
+	{
+		Sample.HeadLow = Sample.Eyes;
+		Sample.HeadHigh = Sample.Eyes;
+		Sample.HeadRadius = CheeseStrikeWeapons::HeadRadius;
+	}
 	// Lying (most of the way down), shots find the body where it lies.
 	if (DownBlend > 0.5f)
 	{

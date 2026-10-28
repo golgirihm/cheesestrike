@@ -5,6 +5,7 @@
 // ray tests a hit is decided by, and where a player was put back to.
 
 #include "Misc/AutomationTest.h"
+#include "Animation/CheeseStrikeBodies.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Rules/CheeseStrikeDowned.h"
@@ -172,14 +173,17 @@ bool FAPlayerIsPutBackWhereTheyWere::RunTest(const FString& Parameters)
 		FHitHistory::FSample Sample;
 		Sample.Time = Tick * 0.1f;
 		Sample.Feet = FVector(Tick * 100.0f, 0.0f, 0.0f);
-		Sample.Head = Sample.Feet + FVector(0, 0, 160.0f);
+		Sample.Eyes = Sample.Feet + FVector(0, 0, 160.0f);
+		Sample.HeadLow = Sample.Eyes;
+		Sample.HeadHigh = Sample.Eyes + FVector(0, 0, 8.0f);
 		// Turning, through the back: from 170 degrees round to -170 is 20 degrees, not 340.
 		Sample.Yaw = Tick <= 15 ? 170.0f : -170.0f;
 		History.Add(Sample);
 	}
 	TestTrue(FString::Printf(TEXT("only the last second is kept (%d samples)"), History.Num()), History.Num() >= 10 && History.Num() <= 12);
 	TestTrue(TEXT("between two samples, between their places"), History.At(1.55f).Feet.Equals(FVector(1550.0f, 0.0f, 0.0f), 0.01f));
-	TestTrue(TEXT("the head too"), History.At(1.55f).Head.Equals(FVector(1550.0f, 0.0f, 160.0f), 0.01f));
+	TestTrue(TEXT("the eyes too"), History.At(1.55f).Eyes.Equals(FVector(1550.0f, 0.0f, 160.0f), 0.01f));
+	TestTrue(TEXT("and the head"), History.At(1.55f).HeadHigh.Equals(FVector(1550.0f, 0.0f, 168.0f), 0.01f));
 	TestTrue(FString::Printf(TEXT("and which way they faced, the short way round (%.1f)"), History.At(1.55f).Yaw), FMath::IsNearlyEqual(FRotator::NormalizeAxis(History.At(1.55f).Yaw), 180.0f, 0.1f) || FMath::IsNearlyEqual(FRotator::NormalizeAxis(History.At(1.55f).Yaw), -180.0f, 0.1f));
 	TestTrue(TEXT("on a sample, that sample"), History.At(1.5f).Feet.Equals(FVector(1500.0f, 0.0f, 0.0f), 0.01f));
 	TestTrue(TEXT("past the end, the latest"), History.At(5.0f).Feet.Equals(FVector(2000.0f, 0.0f, 0.0f), 0.01f));
@@ -206,7 +210,9 @@ bool FAShotFindsABodyLyingDown::RunTest(const FString& Parameters)
 	FHitHistory::FSample Lying;
 	Lying.bLying = true;
 	Lying.Feet = FVector::ZeroVector;
-	Lying.Head = Body.Head;
+	Lying.Eyes = Body.Head;
+	Lying.HeadLow = Body.Head;
+	Lying.HeadHigh = Body.Head;
 	Lying.Hips = Body.Hips;
 	Lying.Shoulders = Body.Shoulders;
 	Lying.LegsTo = Body.Feet;
@@ -230,6 +236,55 @@ bool FAShotFindsABodyLyingDown::RunTest(const FString& Parameters)
 	History.Add(After);
 	TestFalse(TEXT("nearer the standing sample, standing"), History.At(0.04f).bLying);
 	TestTrue(TEXT("nearer the lying one, lying where it lay"), History.At(0.06f).bLying && History.At(0.06f).Hips.Equals(Body.Hips, 0.01f));
+	// Lying, the head is where the raised head is: a shot at it from the side is to the head.
+	bool bHead = false;
+	TestTrue(TEXT("lying, a shot at the raised head hits"), FHitHistory::RayHitsPlayer(FVector(Body.Head.X, -500, Body.Head.Z), Side, Lying, bHead) > 0.0f);
+	TestTrue(TEXT("and is to the head"), bHead);
+	FHitHistory::RayHitsPlayer(FVector(Body.Hips.X, -500, Body.Hips.Z), Side, Lying, bHead);
+	TestFalse(TEXT("one at the hips isn't"), bHead);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAShotToTheVisibleHeadIsAHeadshot, "CheeseStrike.Shot.AShotToTheVisibleHeadIsAHeadshot", ShotTests::Flags)
+
+bool FAShotToTheVisibleHeadIsAHeadshot::RunTest(const FString& Parameters)
+{
+	// Lt. Belica standing 10 m ahead facing the shooter: her head bone 170 cm up (as her mesh has it), its X up the head and its
+	// Y the way she faces; her head her row's capsule on it.
+	const CheeseStrikeBodies::FBody& Belica = CheeseStrikeBodies::All()[CheeseStrikeBodies::IndexOf(TEXT("Lt. Belica"))];
+	const FVector Feet(1000.0f, 0.0f, 0.0f);
+	const FTransform HeadBone(FRotationMatrix::MakeFromXY(FVector::UpVector, FVector::BackwardVector).ToQuat(), Feet + FVector(0.0f, 0.0f, 170.0f));
+	FHitHistory::FSample Standing;
+	Standing.Feet = Feet;
+	Standing.Radius = 34.0f;
+	Standing.Height = 192.0f;
+	Standing.Eyes = Feet + FVector(0.0f, 0.0f, 165.0f);
+	Standing.HeadLow = HeadBone.TransformPosition(Belica.HeadLow);
+	Standing.HeadHigh = HeadBone.TransformPosition(Belica.HeadHigh);
+	Standing.HeadRadius = Belica.HeadRadius;
+	const float Top = Standing.HeadHigh.Z + Standing.HeadRadius;
+	TestTrue(FString::Printf(TEXT("the top of the head about her height (%.0f cm)"), Top), Top > 180.0f && Top < 195.0f);
+	bool bHead = false;
+	const auto Shot = [&Standing, &bHead](const FVector& From, const FVector& Along)
+	{
+		return FHitHistory::RayHitsPlayer(From, Along.GetSafeNormal(), Standing, bHead);
+	};
+	TestTrue(TEXT("a shot at the face hits"), Shot(FVector(0.0f, 0.0f, 165.0f), FVector::ForwardVector) > 0.0f);
+	TestTrue(TEXT("and is to the head, though the body's capsule is touched first"), bHead);
+	Shot(FVector(0.0f, 0.0f, Top - 3.0f), FVector::ForwardVector);
+	TestTrue(TEXT("through the top of the head, to the head"), bHead);
+	Shot(FVector(2000.0f, 0.0f, 172.0f), FVector::BackwardVector);
+	TestTrue(TEXT("through the back of the head, to the head"), bHead);
+	Shot(FVector(1000.0f, -800.0f, 176.0f), FVector::RightVector);
+	TestTrue(TEXT("through its side, to the head"), bHead);
+	Shot(FVector(0.0f, 0.0f, Top + 298.0f), FVector(1000.0f, 0.0f, -300.0f));
+	TestTrue(TEXT("from above onto the crown, to the head"), bHead);
+	TestTrue(TEXT("a shot through the shoulder hits"), Shot(FVector(0.0f, 20.0f, 150.0f), FVector::ForwardVector) > 0.0f);
+	TestFalse(TEXT("but not the head"), bHead);
+	TestTrue(TEXT("nor does one past the side of the head, over the shoulder"), Shot(FVector(0.0f, 16.0f, 172.0f), FVector::ForwardVector) > 0.0f && !bHead);
+	Shot(FVector(0.0f, 0.0f, 120.0f), FVector::ForwardVector);
+	TestFalse(TEXT("nor one at the chest"), bHead);
+	TestEqual(TEXT("over the head is a miss"), Shot(FVector(0.0f, 0.0f, 200.0f), FVector::ForwardVector), -1.0f);
 	return true;
 }
 

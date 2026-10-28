@@ -11,6 +11,7 @@
 class ACameraActor;
 class ACheeseStrikeMenuFigure;
 class ACheeseStrikePodium;
+class UAudioComponent;
 struct FPodiumPlace;
 class UCheeseStrikePlayScript;
 class UInputMappingContext;
@@ -265,6 +266,10 @@ protected:
 	/** The host's button over it. */
 	TSharedPtr<SWidget> PodiumSkip;
 	float PodiumShownAt = 0.0f;
+	/** The podium's music (CheeseStrikePodiums::Music) on this machine, fading out as it counts down to the lobby. */
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> PodiumMusic;
+	float PodiumMusicVolume = 0.0f;
 	/** CheeseStrikePodiumBodies' heroes by place (INDEX_NONE: the place's own). */
 	TArray<int32> PodiumBodies;
 	/** Who stands on the podium now, with CheeseStrikePodiumBodies' heroes. */

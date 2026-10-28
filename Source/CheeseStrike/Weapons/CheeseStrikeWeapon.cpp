@@ -1240,7 +1240,7 @@ bool ACheeseStrikeWeapon::ServerAllowsShot(float Now)
 bool ACheeseStrikeWeapon::ServerTrustsOrigin(const FVector& Origin, float When) const
 {
 	const FHitHistory::FSample ShooterThen = Holder->GetHitHistory().At(When);
-	const FVector EyesThen = Holder->GetHitHistory().Num() > 0 ? ShooterThen.Head : Holder->GetFirstPersonCameraComponent()->GetComponentLocation();
+	const FVector EyesThen = Holder->GetHitHistory().Num() > 0 ? ShooterThen.Eyes : Holder->GetFirstPersonCameraComponent()->GetComponentLocation();
 	if (FVector::Dist(Origin, EyesThen) > OriginTolerance)
 	{
 		UE_LOG(LogCheeseStrike, Warning, TEXT("Shot from %s refused: from %.0f cm away from them"), *Holder->GetName(), FVector::Dist(Origin, EyesThen));
@@ -1273,19 +1273,8 @@ ACheeseStrikeWeapon::FRayHit ACheeseStrikeWeapon::TraceRay(const FVector& Origin
 			continue;
 		}
 		const FHitHistory::FSample Then = Player->GetHitHistory().Num() > 0 ? Player->GetHitHistory().At(When) : Player->SampleNow(When);
-		const float HeadHit = CheeseStrikeWeapons::RayHitsSphere(Origin, Direction, Then.Head, CheeseStrikeWeapons::HeadRadius);
-		const float BodyHit = FHitHistory::RayHitsBody(Origin, Direction, Then);
-		float Nearest = -1.0f;
 		bool bThisHead = false;
-		if (HeadHit >= 0.0f && (BodyHit < 0.0f || HeadHit <= BodyHit + CheeseStrikeWeapons::HeadRadius))
-		{
-			Nearest = HeadHit;
-			bThisHead = true;
-		}
-		else if (BodyHit >= 0.0f)
-		{
-			Nearest = BodyHit;
-		}
+		const float Nearest = FHitHistory::RayHitsPlayer(Origin, Direction, Then, bThisHead);
 		if (Nearest >= 0.0f && Nearest < Hit.Distance)
 		{
 			Hit.Distance = Nearest;

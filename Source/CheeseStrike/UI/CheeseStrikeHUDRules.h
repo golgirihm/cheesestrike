@@ -457,12 +457,19 @@ namespace CheeseStrikeHUD
 	/** How solid the death screen is then: whole, but fading over its last half second when out of the round. */
 	float DeathScreenAlpha(bool bOut, float Seconds);
 	/**
-	 * Whether the marks drawn on the view over things in the world (the Unmanned Aerial Cheese's red diamonds where its sweep saw
-	 * each enemy) show: only in play, alive, with nothing covering the view: not while choosing a Cheese Strike's spot on the strike
-	 * map, with the scoreboard up, killed (the death screen), in a menu (paused) or once the match is over. They are drawn before
-	 * the HUD's panels, so that any panel covers them.
+	 * Whether the marks drawn on the view over things in the world (the Unmanned Aerial Cheese's red diamonds over each enemy, where
+	 * they are now) show: while the side's drone is up (`bRevealing`) until the match is over (`bOver`), whatever else is up. They
+	 * are drawn before the HUD's panels, so that the strike map, the scoreboard, the death screen and the pause menu cover them
+	 * rather than hide them.
 	 */
-	bool ShowsMarksInView(bool bAlive, bool bStrikeMap, bool bScoreboard, bool bMenu, bool bOver);
+	bool ShowsMarksInView(bool bRevealing, bool bOver);
+	/**
+	 * Where on a screen of `Size` a mark over a thing in the world goes, kept `Margin` in from its edges: at `Projected` (its place
+	 * on the screen) if it is ahead and on the screen; otherwise pinned to the edge in its direction, as an indicator of something off
+	 * the screen (`bOutPinned`), from `Local`, where it is from the view (X ahead, Y right, Z up). One to the side goes to that side's
+	 * edge, up or down as it is; one behind goes toward the bottom (straight behind, the bottom's middle), to the side it is on.
+	 */
+	FVector2D MarkInView(const FVector& Local, const FVector2D& Projected, const FVector2D& Size, float Margin, bool& bOutPinned);
 
 	/** Seconds the cheese takes to run down when the player is killed. */
 	constexpr float MeltTime = 1.6f;

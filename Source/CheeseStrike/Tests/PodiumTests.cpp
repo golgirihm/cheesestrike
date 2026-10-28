@@ -115,6 +115,13 @@ bool FThePodiumComesAfterTheResultsAndCountsDown::RunTest(const FString& Paramet
 	TestTrue(TEXT("then fades"), CheeseStrikePodiumHUD::CountdownAlpha(0.7f) > 0.0f && CheeseStrikePodiumHUD::CountdownAlpha(0.7f) < 1.0f);
 	TestEqual(TEXT("gone before the last frame is held, a quarter second before the lobby"), CheeseStrikePodiumHUD::CountdownAlpha(0.3f), 0.0f);
 	TestTrue(TEXT("a skip leaves a moment for everyone to hear of it"), SkipSeconds > 0.2f && SkipSeconds < 2.0f);
+	// The music over it: whole as it comes up, fading out as it counts down, silent by the lobby.
+	TestTrue(TEXT("the podium's music is RiffFuel's Aggression"), FString(Music).Contains(TEXT("Aggression_Free_Combat_Loop_130BPM_Master")));
+	TestEqual(TEXT("the music whole as the podium comes up"), MusicVolume(LobbyAt, LobbyAt - Seconds), 1.0f);
+	TestTrue(TEXT("fading as it counts down"), MusicVolume(LobbyAt, LobbyAt - 4.0f) > 0.0f && MusicVolume(LobbyAt, LobbyAt - 4.0f) < 1.0f);
+	TestTrue(TEXT("ever softer"), MusicVolume(LobbyAt, LobbyAt - 2.0f) < MusicVolume(LobbyAt, LobbyAt - 4.0f));
+	TestEqual(TEXT("and silent just before the lobby"), MusicVolume(LobbyAt, LobbyAt - 0.3f), 0.0f);
+	TestTrue(TEXT("the fade is part of the countdown"), MusicFadeSeconds > 3.0f && MusicFadeSeconds < Seconds);
 	// The places: the first in the middle and highest, the second on the left, the third on the right.
 	TestEqual(TEXT("the first in the middle"), SlotOf(0), 1);
 	TestEqual(TEXT("the second to its left"), SlotOf(1), 0);
