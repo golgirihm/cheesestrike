@@ -197,6 +197,9 @@ public:
 	/** From the console or a play script: the host moves the lobby's nth bot (0 the first added) to the other side. */
 	UFUNCTION(Exec)
 	void CheeseStrikeMoveBot(int32 Bot = 0);
+	/** From the console or a play script: the friends panel lists made-up friends in every state (1), or the service's again (0), for looking at it. */
+	UFUNCTION(Exec)
+	void CheeseStrikeSampleFriends(int32 Show = 1);
 
 	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
 	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */

@@ -369,8 +369,44 @@ void UCheeseStrikeSessionSubsystem::RefreshFriends()
 	FriendsInterface->ReadFriendsList(0, EFriendsLists::ToString(EFriendsLists::Default), FOnReadFriendsListComplete::CreateUObject(this, &UCheeseStrikeSessionSubsystem::OnFriendsRead));
 }
 
+void UCheeseStrikeSessionSubsystem::ShowSampleFriends(bool bShow)
+{
+#if !UE_BUILD_SHIPPING
+	using namespace CheeseStrikeFriends;
+	bSampleFriends = bShow;
+	Friends.Empty();
+	if (!bShow)
+	{
+		return;
+	}
+	const auto Add = [this](const TCHAR* Name, EStatus Status, EState State, int32 Humans, EPermission Permission, bool bPlayed)
+	{
+		FCheeseStrikeFriend Friend;
+		Friend.Name = Name;
+		Friend.Status = Status;
+		Friend.State = State;
+		Friend.Humans = Humans;
+		Friend.Permission = Permission;
+		Friend.bInGame = State != EState::NotPlaying;
+		Friend.bRunningThisGame = bPlayed;
+		Friend.bPublishesStatus = bPlayed;
+		Friends.Add(Friend);
+	};
+	Add(TEXT("Gorgon Zola"), EStatus::InLobby, EState::Join, 3, EPermission::InvitesAndFriends, true);
+	Add(TEXT("Brie Larson-Camembert the Thirty-Second"), EStatus::InMatch, EState::Join, 9, EPermission::InvitesAndFriends, true);
+	Add(TEXT("Halloumi Hal"), EStatus::InMatch, EState::Full, MaxHumans, EPermission::InvitesAndFriends, true);
+	Add(TEXT("Feta Fiona"), EStatus::MainMenu, EState::NotPlaying, -1, EPermission::InvitesAndFriends, true);
+	Add(TEXT("Paneer"), EStatus::InLobby, EState::InviteOnly, 2, EPermission::InviteOnly, true);
+	Add(TEXT("Mozz Arella"), EStatus::NotInGame, EState::NotPlaying, -1, EPermission::InvitesAndFriends, false);
+#endif
+}
+
 void UCheeseStrikeSessionSubsystem::OnFriendsRead(int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
 {
+	if (bSampleFriends)
+	{
+		return;
+	}
 	Friends.Empty();
 	IOnlineSubsystem* Service = Online::GetSubsystem(GetWorld());
 	IOnlineFriendsPtr FriendsInterface = Service != nullptr ? Service->GetFriendsInterface() : nullptr;

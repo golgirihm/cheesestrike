@@ -106,3 +106,34 @@ bool FAFriendsStatusAndPermissionRoundTrip::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the tooltip says not in game"), Tooltip(false, EStatus::NotInGame, EPermission::InviteOnly, true, -1).Contains(TEXT("Status: Not in game")));
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAFriendsRowSaysWhereTheyAre, "CheeseStrike.Friends.RowSaysWhereTheyAre", FriendsTests::Flags)
+
+bool FAFriendsRowSaysWhereTheyAre::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeFriends;
+	TestEqual(TEXT("a friend in a lobby that can be joined: how full it is"), RowStatus(EState::Join, EStatus::InLobby, 3), FString(TEXT("Join (3 of 16)")));
+	TestEqual(TEXT("in a full match: full"), RowStatus(EState::Full, EStatus::InMatch, MaxHumans), FString(TEXT("Full (16 of 16)")));
+	TestEqual(TEXT("in an invite-only match: where they are"), RowStatus(EState::InviteOnly, EStatus::InMatch, 4), FString(TEXT("In a match")));
+	TestEqual(TEXT("on the menu"), RowStatus(EState::NotPlaying, EStatus::MainMenu, -1), FString(TEXT("Main menu")));
+	TestEqual(TEXT("not in the game"), RowStatus(EState::NotPlaying, EStatus::NotInGame, -1), FString(TEXT("Not in game")));
+	// Each status its own dot, and not in the game the dimmest.
+	const TArray<EStatus> All = { EStatus::NotInGame, EStatus::MainMenu, EStatus::InLobby, EStatus::InMatch };
+	for (int32 One = 0; One < All.Num(); ++One)
+	{
+		for (int32 Other = One + 1; Other < All.Num(); ++Other)
+		{
+			TestFalse(TEXT("every status has a dot of its own colour"), StatusDotColour(All[One]).Equals(StatusDotColour(All[Other]), 0.05f));
+		}
+		if (All[One] != EStatus::NotInGame)
+		{
+			TestTrue(TEXT("offline is the dimmest"), StatusDotColour(All[One]).GetLuminance() > StatusDotColour(EStatus::NotInGame).GetLuminance());
+		}
+	}
+	TestFalse(TEXT("an empty section says so"), EmptySectionLine().IsEmpty());
+	TestEqual(TEXT("initials of two words"), Initials(TEXT("gorgon zola")), FString(TEXT("GZ")));
+	TestEqual(TEXT("of one"), Initials(TEXT("Brie")), FString(TEXT("B")));
+	TestEqual(TEXT("never more than two"), Initials(TEXT("The Big Cheese")), FString(TEXT("TB")));
+	TestEqual(TEXT("none for no name"), Initials(TEXT("  ")), FString(TEXT("?")));
+	return true;
+}

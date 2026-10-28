@@ -124,4 +124,16 @@ namespace CheeseStrikeFriends
 
 	/** What the hover tooltip of a friend's row says. `Humans` is -1 when not known. */
 	FString Tooltip(bool bOwns, EStatus Status, EPermission Permission, bool bHasSpace, int32 Humans);
+
+	/**
+	 * The line under a friend's name, in a softer colour: their game's state while they are in a lobby or match that can be
+	 * joined or is full ("Join (3 of 16)", "Full (16 of 16)"), else what they are doing ("In a lobby", "Main menu").
+	 */
+	FString RowStatus(EState State, EStatus Status, int32 Humans);
+	/** The colour of the dot before that line: in a match green, in a lobby blue, on the menu cheese, not in the game grey. */
+	FLinearColor StatusDotColour(EStatus Status);
+	/** What a section with nobody in it says, faintly, so that it still looks meant. */
+	FString EmptySectionLine();
+	/** The letters shown for a friend with no picture: the first of their name's first two words, in capitals ("?" for none). */
+	FString Initials(const FString& Name);
 }

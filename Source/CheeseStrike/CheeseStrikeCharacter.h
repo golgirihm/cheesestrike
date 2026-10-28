@@ -91,6 +91,17 @@ public:
 	 */
 	UFUNCTION(Exec)
 	void CheeseStrikeOutside(float Distance = 0.0f, float Yaw = 0.0f, float Height = 30.0f, float Rise = 20.0f);
+	/**
+	 * Every machine that draws: it was hit for `Damage` at `FromFeet` (where the hit was, from its feet then) by a shot going
+	 * `Way`: cheese sprays from there along it (Effects/CheeseStrikeCheeseBlood). Sent by the server with the hit.
+	 */
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastBleed(FVector_NetQuantize10 FromFeet, FVector_NetQuantizeNormal Way, uint8 Damage);
+	/** Where its feet are now: the bottom of its capsule. */
+	FVector FeetNow() const;
+	/** For looking at it, on this machine only: it bleeds as if shot in the chest for `Damage` from `Yaw` degrees off where it faces. */
+	UFUNCTION(Exec)
+	void CheeseStrikeBleed(float Damage = 40.0f, float Yaw = 0.0f);
 	/** Shows its player the body and its weapons as others see them, the first-person body hidden (`bOutside`), or as in play: for a view from outside it (an execution's, CheeseStrikeOutside's). */
 	void SeeOwnBody(bool bOutside);
 	/** For looking at a map (development): puts the view at X, Y, Z facing Pitch and Yaw, the character left where it is; CheeseStrikeOutside with no distance puts it back. */

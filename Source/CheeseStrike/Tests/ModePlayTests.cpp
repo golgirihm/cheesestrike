@@ -33,11 +33,15 @@
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "Effects/CheeseStrikeCheeseBlood.h"
+#include "Rules/CheeseStrikeBlood.h"
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 namespace ModePlayTests
 {
+	/** How many drops of cheese each machine had thrown before the stab (ExecutionAllDownIsNotOut). */
+	TArray<int32> SprayedBeforeStab;
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
 	/** Two spots facing each other across 4 m of clear ground on the shooter level, and somewhere out of the way. */
 	const FVector HostSpot(-231.0f, -300.0f, 100.0f);
@@ -884,6 +888,34 @@ bool FExecutionAllDownIsNotOut::RunTest(const FString& Parameters)
 		}
 		return true;
 	});
+	// And gushes cheese, which pools under them, on every machine.
+	WaitUntil(TEXT("the stomped body gushing cheese into a pool, on every machine"), CheeseStrikeBlood::HoseSeconds, []()
+	{
+		for (int32 Seen = 0; Seen < 3; ++Seen)
+		{
+			const ACheeseStrikeCheeseBlood* Blood = ACheeseStrikeCheeseBlood::Find(World(Seen));
+			if (Blood == nullptr || Blood->GetPoolCount() < 1 || Blood->GetSprayed() < 100)
+			{
+				return false;
+			}
+		}
+		return true;
+	});
+	Then([this]()
+	{
+		ModePlayTests::SprayedBeforeStab.Reset();
+		for (int32 Seen = 0; Seen < 3; ++Seen)
+		{
+			const ACheeseStrikeCheeseBlood* Blood = ACheeseStrikeCheeseBlood::Find(World(Seen));
+			ModePlayTests::SprayedBeforeStab.Add(Blood != nullptr ? Blood->GetSprayed() : 0);
+			if (Blood == nullptr)
+			{
+				continue;
+			}
+			TestTrue(FString::Printf(TEXT("machine %d keeps to its caps (%d drops, %d splats)"), Seen, Blood->GetDropCount(), Blood->GetSplatCount() - Blood->GetPoolCount()),
+				Blood->GetDropCount() <= CheeseStrikeBlood::MostDrops && Blood->GetSplatCount() - Blood->GetPoolCount() <= CheeseStrikeBlood::MostSplats);
+		}
+	});
 	Then([this]()
 	{
 		TestFalse(TEXT("the host, down alone, keeps the round going"), GameState(0)->IsRoundBreak() || GameState(0)->HasMatchEnded());
@@ -921,6 +953,13 @@ bool FExecutionAllDownIsNotOut::RunTest(const FString& Parameters)
 		TestEqual(TEXT("the other side wins"), GameState(0)->GetWinningTeam(), 1);
 		TestEqual(TEXT("the enemy scores both"), StateOf(1, 0)->GetKills(), 2);
 		TestTrue(TEXT("both executed"), CharacterOf(2, 0)->GetLastStand()->WasExecuted() && CharacterOf(0, 0)->GetLastStand()->WasExecuted());
+		// The stab's wound spurted, and gushed as the knife came out, on every machine.
+		for (int32 Seen = 0; Seen < 3 && Seen < ModePlayTests::SprayedBeforeStab.Num(); ++Seen)
+		{
+			const ACheeseStrikeCheeseBlood* Blood = ACheeseStrikeCheeseBlood::Find(World(Seen));
+			const int32 Stabbed = Blood != nullptr ? Blood->GetSprayed() - ModePlayTests::SprayedBeforeStab[Seen] : 0;
+			TestTrue(FString::Printf(TEXT("machine %d saw the stab bleed cheese (%d drops)"), Seen, Stabbed), Stabbed > 40);
+		}
 	});
 	StopPlaying();
 	return true;

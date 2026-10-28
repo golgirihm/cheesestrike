@@ -32,6 +32,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "Effects/CheeseStrikeCheeseBlood.h"
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
@@ -481,6 +482,15 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 		TestFalse(TEXT("and the match goes on"), Match->HasMatchEnded());
 	});
 	WaitUntil(TEXT("the kill reaching the joiner"), 5.0f, []() { PlayTests::WatchTheHostComeBack(); const ACheeseStrikeGameState* Match = GameState(1); return Match != nullptr && Match->GetKillFeed().Num() == 1; });
+	Then([this]()
+	{
+		// Each hit sprayed cheese from the host, on both machines.
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			const ACheeseStrikeCheeseBlood* Blood = ACheeseStrikeCheeseBlood::Find(World(Machine));
+			TestTrue(FString::Printf(TEXT("machine %d saw the hits spray cheese (%d drops)"), Machine, Blood != nullptr ? Blood->GetSprayed() : 0), Blood != nullptr && Blood->GetSprayed() > 0);
+		}
+	});
 	// The host comes back two seconds after dying, which on a busy PC may be before the kill reaches the joiner: look at the body.
 	WaitUntil(TEXT("the joiner seeing the host dead"), 5.0f, []() { PlayTests::WatchTheHostComeBack(); return PlayTests::FallenBodyOf(0, 1) != nullptr; });
 	Then([this]()

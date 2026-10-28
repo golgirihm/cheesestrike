@@ -87,6 +87,8 @@ public:
 	const TArray<FCheeseStrikeFriend>& GetFriends() const { return Friends; }
 	/** Reads the friends list again, and looks up each joinable friend's game. */
 	void RefreshFriends();
+	/** For looking at the friends panel (not in a shipping game): made-up friends, one in each state, in place of the service's; or none (`bShow` off). */
+	void ShowSampleFriends(bool bShow);
 	/** Invites the friend `Index` (of GetFriends()) to the lobby or match we are in. */
 	void InviteFriend(int32 Index);
 	/** Joins the game of the friend `Index`. */
@@ -185,6 +187,8 @@ protected:
 	FOnlineSessionSearchResult Joining;
 	/** The friends as last read, and the next one whose game is to be looked up. */
 	TArray<FCheeseStrikeFriend> Friends;
+	/** Whether the friends shown are ShowSampleFriends's, which a reading of the service's list leaves alone. */
+	bool bSampleFriends = false;
 	int32 NextFriendLookup = 0;
 	FDelegateHandle FriendSessionHandle;
 	/** The presence last published, so that it is sent again only when it changes. */

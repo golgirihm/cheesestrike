@@ -1,0 +1,61 @@
+# The cheese players bleed (Effects/CheeseStrikeCheeseBlood), for looking at
+# it: a hit's spray seen from outside the body (CheeseStrikeBleed, a light hit
+# and a heavy one from the side), then a stab and a stomp on the bot, watched
+# from off its feet (CheeseStrikeWatchDown) as anyone near sees them: the
+# stab's spurts and the gush as the knife comes out, the stomp's firehose and
+# the pool it leaves spreading and fading. One bot, rounds to spare:
+# tools/play.ps1 -Script tools/play/cheese_blood.txt -Bots -Extra "?Mode=Execution?Bots=1?Rounds=5" -FixedFps 30 -Res 1600x900 -Tag cheese_blood
+wait 4
+cmd CheeseStrikeProtect 120
+cmd CheeseStrikeOutside 200 60 10 10
+wait 0.5
+cmd CheeseStrikeBleed 30 -20
+wait 0.1
+shot blood_shot_light_010
+wait 0.15
+shot blood_shot_light_025
+wait 1.5
+cmd CheeseStrikeBleed 100 -70
+wait 0.08
+shot blood_shot_heavy_008
+wait 0.17
+shot blood_shot_heavy_025
+wait 1.5
+shot blood_shot_splats
+cmd CheeseStrikeOutside
+wait 1
+cmd CheeseStrikeDown enemy
+wait 1.5
+cmd CheeseStrikeExecute 1
+wait 0.05
+cmd CheeseStrikeWatchDown -60 260 140
+wait 1.25
+shot blood_stab_130
+wait 0.3
+shot blood_stab_160
+wait 0.3
+shot blood_stab_190
+wait 0.2
+shot blood_stab_210
+wait 0.4
+shot blood_stab_250
+wait 9
+cmd CheeseStrikeProtect 120
+cmd CheeseStrikeDown enemy
+wait 1.5
+cmd CheeseStrikeExecute 2
+wait 0.05
+cmd CheeseStrikeWatchDown 0 110 330
+wait 1.2
+shot blood_stomp_125
+wait 0.3
+shot blood_stomp_155
+wait 0.5
+shot blood_stomp_205
+wait 0.8
+shot blood_stomp_285
+wait 1.5
+shot blood_stomp_435
+wait 1.2
+shot blood_stomp_555
+quit

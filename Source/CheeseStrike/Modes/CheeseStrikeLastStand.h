@@ -146,8 +146,12 @@ protected:
 	void KeepDown();
 	/** Its own player's machine: the view, out to watch an execution it is in and back; down, dark, blurred and swaying. */
 	void UpdateView(float DeltaTime);
-	/** Every machine: the blows' sounds, and the stomp's burst of the head into cheese, once (played by the one executed's). */
-	void UpdateBurst();
+	/**
+	 * Every machine: the blows' sounds, and the stomp's burst of the head into cheese, once (played by the one executed's);
+	 * and the cheese the wound bleeds (CheeseStrikeBlood): the stab's spurts and gush, the stomp's firehose and its pool.
+	 */
+	void UpdateBurst(float DeltaTime);
+	void Bleed(float DeltaTime);
 	/** Server, the executor: logs where its hands and knife are in the body of the one down (CheeseStrike.TraceExecution). */
 	void TraceExecution() const;
 	/** The executor (on the machine that moves it): where the execution has it stand. */
@@ -188,6 +192,9 @@ protected:
 	float ViewBackAt = -1.0f;
 	bool bBurst = false;
 	int32 BeatsDone = 0;
+	/** The drops the wound owes (its rate times the time, the fraction carried on), and whether the stomp's pool is down. */
+	float BleedOwed = 0.0f;
+	bool bPooled = false;
 	TWeakObjectPtr<class APlayerController> ViewPlayer;
 	/** This machine: the sway last put on the view while down, and its clock. */
 	FRotator SwayShown = FRotator::ZeroRotator;

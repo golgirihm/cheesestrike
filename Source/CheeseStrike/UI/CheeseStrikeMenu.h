@@ -235,7 +235,7 @@ public:
 	TSharedRef<SWidget> MakeFriendRow(int32 Index);
 	/** The host's choice of who can join the party (read-only for everyone else). */
 	TSharedRef<SWidget> MakePartyPermission(bool bHost, UCheeseStrikeSessionSubsystem* Sessions);
-	/** A friends section's header: its name and count, which a click folds away or opens again (remembered while the menu lasts). */
+	/** A friends section's header: a chevron, its name and a count, which a click folds away or opens again (remembered while the menu lasts). */
 	TSharedRef<SWidget> MakeSectionHeader(CheeseStrikeFriends::ESection Section, int32 Count);
 	void AskBefore(EMenuAsk Question);
 	bool IsConfirmingBackToLobby() const { return bConfirmingBackToLobby; }
@@ -284,6 +284,21 @@ private:
 	/** How wide the current page's content is, less room for a scroll bar: what a line of text there wraps at. */
 	float WrapWidth() const;
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain, TSharedPtr<SWidget> Inside = nullptr);
+	/** The friends panel folded to its tab: a chevron, the friends' figure, the word and how many are online. */
+	TSharedRef<SWidget> MakeFriendsTab(UCheeseStrikeSessionSubsystem* Sessions);
+	/**
+	 * A row of the friends panel: a rounded card, lit under the mouse, with `Picture` on the left, `Name` over `Under`
+	 * (cut with an ellipsis, never wrapped) and `Action` on the right; `Hover` as its tooltip.
+	 */
+	TSharedRef<SWidget> MakeFriendCard(TSharedRef<SWidget> Picture, const FString& Name, TSharedRef<SWidget> Under, TSharedRef<SWidget> Action, const FString& Hover);
+	/** A player's picture, rounded, `Size` across: Steam's (`Texture`) or their initials on a colour of their name's. */
+	TSharedRef<SWidget> MakeAvatar(class UTexture2D* Texture, const FString& Name, float Size);
+	/** A count in a pill, as a section's header has it. */
+	TSharedRef<SWidget> MakeCountPill(int32 Count);
+	/** A faint line between sections. */
+	TSharedRef<SWidget> MakeDivider();
+	/** A small button in the menu's looks (its kinds and rounding), for a row: Join, Invite, Kick, Refresh. */
+	TSharedRef<SWidget> MakeSmallButton(const FString& Text, const FString& ItemName, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain);
 	/**
 	 * A dropdown: the chosen one of `Choices` (`GetChosen`, read as it is
 	 * drawn and as its list opens) on a button that opens the

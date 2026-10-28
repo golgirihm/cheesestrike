@@ -22,6 +22,8 @@
 #include "CheeseStrikePlayerState.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 #include "Weapons/CheeseStrikeGunfire.h"
+#include "Effects/CheeseStrikeCheeseBlood.h"
+#include "Rules/CheeseStrikeBlood.h"
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -715,7 +717,68 @@ void UCheeseStrikeLastStand::OnRep_Execution()
 	}
 }
 
-void UCheeseStrikeLastStand::UpdateBurst()
+void UCheeseStrikeLastStand::Bleed(float DeltaTime)
+{
+	ACheeseStrikeCharacter* Me = Body();
+	ACheeseStrikeCheeseBlood* Blood = ACheeseStrikeCheeseBlood::For(GetWorld());
+	if (Me == nullptr || Blood == nullptr || DeltaTime <= 0.0f)
+	{
+		return;
+	}
+	const EKind Kind = Execution.GetKind();
+	const float Elapsed = ExecutionElapsed();
+	const USkeletalMeshComponent* Mesh = Me->GetMesh();
+	const ACheeseStrikeCharacter* Executor = Execution.Other.Get();
+	if (Kind == EKind::Stab)
+	{
+		const float Rate = CheeseStrikeBlood::StabRate(Elapsed);
+		BleedOwed += Rate * DeltaTime;
+		const int32 Now = FMath::FloorToInt32(BleedOwed);
+		if (Now <= 0)
+		{
+			return;
+		}
+		BleedOwed -= Now;
+		// From the chest where the knife went in (on the body as it lies, or falls), up out of it; the gush as the knife
+		// comes out leans toward the executor, who draws it.
+		const FVector Wound = FMath::Lerp(Mesh->GetBoneLocation(TEXT("spine_03")), Mesh->GetBoneLocation(TEXT("pelvis")), 0.2f) + FVector(0.0f, 0.0f, 8.0f);
+		const bool bGush = Elapsed >= CheeseStrikeExecution::StabOut;
+		FVector Way = FVector::UpVector;
+		if (bGush && IsValid(Executor))
+		{
+			Way += (Executor->GetActorLocation() - Wound).GetSafeNormal2D() * 0.5f;
+		}
+		Blood->Spray(Wound, Way, Now, CheeseStrikeBlood::StabSpeed(Elapsed), 0.35f, bGush ? 30.0f : 22.0f, bGush ? 1.5f : 1.1f);
+		return;
+	}
+	if (Kind != EKind::Stomp)
+	{
+		return;
+	}
+	// The stomp: a firehose from the neck, the way the head was, whipping about as it throbs, and a pool spreading under it.
+	const FVector Neck = Mesh->GetBoneLocation(TEXT("neck_01"));
+	const FVector Head = Mesh->GetBoneLocation(TEXT("head"));
+	const FVector Out = (Head - Neck).GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector);
+	if (!bPooled && Elapsed >= CheeseStrikeExecution::StompLands)
+	{
+		bPooled = true;
+		Blood->Pool(Neck + Out.GetSafeNormal2D() * 25.0f + FVector(0.0f, 0.0f, 40.0f), Me);
+	}
+	const float Rate = CheeseStrikeBlood::StompRate(Elapsed);
+	BleedOwed += Rate * DeltaTime;
+	const int32 Now = FMath::FloorToInt32(BleedOwed);
+	if (Now <= 0)
+	{
+		return;
+	}
+	BleedOwed -= Now;
+	const float Since = Elapsed - CheeseStrikeExecution::StompLands;
+	const FVector Side = FVector::CrossProduct(Out, FVector::UpVector).GetSafeNormal(UE_SMALL_NUMBER, FVector::RightVector);
+	const FVector Way = (Out * 0.7f + FVector(0.0f, 0.0f, 0.75f) + Side * 0.45f * FMath::Sin(Since * 5.3f)).GetSafeNormal();
+	Blood->Spray(Neck + Out * 6.0f, Way, Now, CheeseStrikeBlood::StompSpeed(Elapsed), 0.3f, 16.0f, CheeseStrikeBlood::StompDropSize(Elapsed));
+}
+
+void UCheeseStrikeLastStand::UpdateBurst(float DeltaTime)
 {
 	ACheeseStrikeCharacter* Me = Body();
 	UWorld* World = GetWorld();
@@ -755,6 +818,7 @@ void UCheeseStrikeLastStand::UpdateBurst()
 		}
 		BurstIntoCheese(World, Head + FVector(0.0f, 0.0f, 6.0f));
 	}
+	Bleed(DeltaTime);
 }
 
 void UCheeseStrikeLastStand::UpdateView(float DeltaTime)
@@ -906,7 +970,7 @@ void UCheeseStrikeLastStand::TickComponent(float DeltaTime, ELevelTick TickType,
 		return;
 	}
 	KeepDown();
-	UpdateBurst();
+	UpdateBurst(DeltaTime);
 	UpdateView(DeltaTime);
 	if (!Me->HasAuthority())
 	{
