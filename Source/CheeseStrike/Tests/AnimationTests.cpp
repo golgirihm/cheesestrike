@@ -230,6 +230,40 @@ bool FTheSidesHaveBodiesOfTheirOwn::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAPickedHeroIsWornOnEitherSide, "CheeseStrike.Animation.APickedHeroIsWornOnEitherSide", AnimationTests::Flags)
+
+bool FAPickedHeroIsWornOnEitherSide::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeBodies;
+	// None picked: the usual, by rank.
+	for (int32 Rank = 0; Rank < 6; ++Rank)
+	{
+		TestEqual(TEXT("none picked is the usual with sides"), BodyFor(INDEX_NONE, true, 1, Rank), For(true, 1, Rank));
+		TestEqual(TEXT("and without"), BodyFor(INDEX_NONE, false, 0, Rank), For(false, 0, Rank));
+		TestEqual(TEXT("a pick that is no hero is none"), BodyFor(All().Num(), true, 0, Rank), For(true, 0, Rank));
+	}
+	// A hero picked is worn whatever the side and rank, so both sides may wear the same one.
+	for (int32 Pick = 0; Pick < All().Num(); ++Pick)
+	{
+		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
+		{
+			TestEqual(FString::Printf(TEXT("%s on side %d"), All()[Pick].Name, Team), BodyFor(Pick, true, Team, 3), Pick);
+		}
+		TestEqual(TEXT("and without sides"), BodyFor(Pick, false, 0, 2), Pick);
+		// Its word in the settings names it again, and every side has its colours for it.
+		TestEqual(FString::Printf(TEXT("%s's word"), HeroKey(Pick)), HeroFromKey(HeroKey(Pick)), Pick);
+		TestEqual(TEXT("its name too, in any case"), HeroFromKey(FString(All()[Pick].Name).ToUpper()), Pick);
+		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
+		{
+			TestTrue(TEXT("dressed in either side's colours"), TeamLook(Pick, Team, TEXT("M")).Contains(TeamWord(Team)));
+		}
+	}
+	TestEqual(TEXT("auto is none"), HeroFromKey(TEXT("auto")), INDEX_NONE);
+	TestEqual(TEXT("and none's word is auto"), FString(HeroKey(INDEX_NONE)), FString(TEXT("auto")));
+	TestEqual(TEXT("anything else is none"), HeroFromKey(TEXT("Shrek")), INDEX_NONE);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheRagdollBendsAsABodyDoes, "CheeseStrike.Animation.TheRagdollBendsAsABodyDoes", AnimationTests::Flags)
 
 bool FTheRagdollBendsAsABodyDoes::RunTest(const FString& Parameters)

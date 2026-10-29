@@ -10,7 +10,7 @@
 #include "Sound/SoundMix.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UObjectIterator.h"
-#include "UObject/UObjectIterator.h"
+#include "Animation/CheeseStrikeBodies.h"
 
 namespace CheeseStrikeSettings
 {
@@ -251,6 +251,17 @@ void UCheeseStrikeSettings::SetToDefaults()
 	EffectsVolume = CheeseStrikeSettings::DefaultVolume;
 	MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
 	FullscreenResolution = FIntPoint::ZeroValue;
+	Hero = TEXT("auto");
+}
+
+int32 UCheeseStrikeSettings::GetHero() const
+{
+	return CheeseStrikeBodies::HeroFromKey(Hero);
+}
+
+void UCheeseStrikeSettings::SetHero(int32 Body)
+{
+	Hero = CheeseStrikeBodies::HeroKey(Body);
 }
 
 FIntPoint UCheeseStrikeSettings::GetResolutionShown() const

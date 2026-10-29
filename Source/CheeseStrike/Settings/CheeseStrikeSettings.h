@@ -107,6 +107,9 @@ public:
 	/** The menu's music (CheeseStrikeMusic). */
 	float GetMusicVolume() const { return MusicVolume; }
 	void SetMusicVolume(float Value);
+	/** The hero this player plays (an index of CheeseStrikeBodies::All), or INDEX_NONE for "auto", the usual by player id; kept by its word (CheeseStrikeBodies::HeroKey). */
+	int32 GetHero() const;
+	void SetHero(int32 Body);
 
 	/** The field of view top to bottom the camera has now, from the settings if there are any. */
 	static float FieldOfViewNow();
@@ -139,4 +142,7 @@ protected:
 	float MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
 	UPROPERTY(config)
 	FIntPoint FullscreenResolution = FIntPoint::ZeroValue;
+	/** The hero picked, by its word ("auto" for none). */
+	UPROPERTY(config)
+	FString Hero = TEXT("auto");
 };

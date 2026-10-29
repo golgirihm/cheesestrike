@@ -525,6 +525,11 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	Settings->SetFullscreenMode(EWindowMode::Windowed);
 	Settings->SetToDefaults();
 	TestTrue(TEXT("a fresh install plays borderless"), Settings->GetFullscreenMode() == EWindowMode::WindowedFullscreen && DefaultWindowMode == EWindowMode::WindowedFullscreen);
+	TestEqual(TEXT("and the heroes as they come"), Settings->GetHero(), INDEX_NONE);
+	Settings->SetHero(2);
+	TestEqual(TEXT("a hero picked is kept"), Settings->GetHero(), 2);
+	Settings->SetToDefaults();
+	TestEqual(TEXT("until the defaults"), Settings->GetHero(), INDEX_NONE);
 	TestNotNull(TEXT("the engine keeps the game's settings (Config/DefaultEngine.ini)"), UCheeseStrikeSettings::Get());
 	return true;
 }
