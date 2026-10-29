@@ -274,6 +274,40 @@ bool FBotsKeepOutOfTheDownedsAim::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBotsSwerveOnlyWhereThereIsRoom, "CheeseStrike.Bots.SwerveOnlyWhereThereIsRoom", BotTests::Flags)
+
+bool FBotsSwerveOnlyWhereThereIsRoom::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeBots;
+	// The swerve fits the floor either side: the whole width in the open, less in a narrower place, none in a hallway.
+	TestEqual(TEXT("in the open, the whole swerve"), SwerveWidth(TNumericLimits<float>::Max()), ZigzagWidth);
+	TestEqual(TEXT("with just room for it, the whole swerve"), SwerveWidth(ZigzagWidth + SwerveClearance), ZigzagWidth);
+	const float Some = SwerveWidth(SwerveClearance + 70.0f);
+	TestTrue(FString::Printf(TEXT("a little room, a little swerve (%.0f)"), Some), Some > 0.0f && Some <= 70.0f);
+	TestEqual(TEXT("a hallway, none"), SwerveWidth(SwerveClearance + LeastSwerve - 1.0f), 0.0f);
+	TestEqual(TEXT("no room, none"), SwerveWidth(0.0f), 0.0f);
+
+	// In someone's aim in a hallway 1.2 m wide (60 cm either side), it comes on with no step to the side at all.
+	const FVector Downed(0.0f, 0.0f, 0.0f);
+	const FVector Ahead(1000.0f, 150.0f, 0.0f);
+	const FVector Straight = FinishApproach(Ahead, Downed, 0.0f, 0.0f, 1.0f, 60.0f);
+	const FVector Later = FinishApproach(Ahead, Downed, 0.0f, ZigzagPeriod * 0.75f, 1.0f, 60.0f);
+	TestTrue(FString::Printf(TEXT("the same step whichever way the swerve is (%s, %s)"), *Straight.ToCompactString(), *Later.ToCompactString()), FVector::Dist2D(Straight, Later) < 1.0f);
+	TestTrue(TEXT("and a step, not a stand"), FVector::Dist2D(Straight, Ahead) > 100.0f);
+	// In the open it swerves one way and the other, as wide as the swerve.
+	const FVector Open = FinishApproach(Ahead, Downed, 0.0f, 0.0f);
+	const FVector OpenLater = FinishApproach(Ahead, Downed, 0.0f, ZigzagPeriod * 0.75f);
+	TestTrue(TEXT("in the open, it swerves"), FVector::Dist2D(Open, OpenLater) > ZigzagWidth);
+
+	// A path to the same moving goal is asked for no more than every RepathEvery seconds.
+	TestFalse(TEXT("not again at once, though it has moved"), ShouldRepath(true, 500.0f, 0.1f));
+	TestFalse(TEXT("not again at once, though not following one"), ShouldRepath(false, 0.0f, RepathEvery * 0.5f));
+	TestTrue(TEXT("again once the goal has moved and a moment has gone"), ShouldRepath(true, 500.0f, RepathEvery));
+	TestFalse(TEXT("not while following one to where it still is"), ShouldRepath(true, 50.0f, 5.0f));
+	TestTrue(TEXT("when it has none"), ShouldRepath(false, 0.0f, RepathEvery));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBotsExecuteAndSpreadOut, "CheeseStrike.Bots.ExecuteAndSpreadOut", BotTests::Flags)
 
 bool FBotsExecuteAndSpreadOut::RunTest(const FString& Parameters)

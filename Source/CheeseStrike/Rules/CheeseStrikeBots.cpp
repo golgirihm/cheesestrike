@@ -193,7 +193,22 @@ namespace CheeseStrikeBots
 		return FMath::Abs(BearingFromDowned(At, Downed, Yaw)) <= CheeseStrikeDowned::ConeYaw + Margin;
 	}
 
-	FVector FinishApproach(const FVector& At, const FVector& Downed, float Yaw, float Now, float Way)
+	float SwerveWidth(float Room)
+	{
+		const float Fits = FMath::Min(ZigzagWidth, Room - SwerveClearance);
+		return Fits < LeastSwerve ? 0.0f : Fits;
+	}
+
+	bool ShouldRepath(bool bFollowing, float GoalMoved, float SinceAsked)
+	{
+		if (SinceAsked < RepathEvery)
+		{
+			return false;
+		}
+		return !bFollowing || GoalMoved > 100.0f;
+	}
+
+	FVector FinishApproach(const FVector& At, const FVector& Downed, float Yaw, float Now, float Way, float Room)
 	{
 		const float Bearing = BearingFromDowned(At, Downed, Yaw);
 		const float Safe = CheeseStrikeDowned::ConeYaw + FlankMargin;
@@ -221,7 +236,7 @@ namespace CheeseStrikeBots
 		const float Swerve = FMath::Sin(2.0f * PI * Now / ZigzagPeriod) >= 0.0f ? 1.0f : -1.0f;
 		const float Ahead = FMath::Min(Left, ZigzagStep);
 		// The swerve dies down as the edge comes near, so as not to swing back into the aim.
-		return FVector(At.X, At.Y, Downed.Z) + Along * Ahead + Across * Swerve * ZigzagWidth * FMath::Min(1.0f, Left / ZigzagStep);
+		return FVector(At.X, At.Y, Downed.Z) + Along * Ahead + Across * Swerve * SwerveWidth(Room) * FMath::Min(1.0f, Left / ZigzagStep);
 	}
 
 	bool GoesToExecute(float DownedDistance, bool bSeesEnemy, float EnemyDistance)

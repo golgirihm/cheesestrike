@@ -169,6 +169,13 @@ protected:
 	FVector MovedFrom = FVector::ZeroVector;
 	/** Which way round it goes to finish someone down (CheeseStrikeBots::FinishApproach): changed when it gets stuck going one way. */
 	float FlankSide = 1.0f;
+	/** The navigable room either side of it across its way to someone down (CheeseStrikeBots::SwerveWidth), and when it was measured. */
+	float ApproachRoom = TNumericLimits<float>::Max();
+	float RoomMeasuredAt = -1000.0f;
+	/** When it last asked for a path to someone down (CheeseStrikeBots::ShouldRepath). */
+	float ApproachAskedAt = -1000.0f;
+	/** The floor's room either side of `At`, across the way to `Toward`, along the navigation mesh (at most what a swerve needs). */
+	float MeasureRoomAcross(const FVector& At, const FVector& Toward) const;
 
 	/** Where it wants to look; the view turns toward this each frame. */
 	FRotator Wanted = FRotator::ZeroRotator;
