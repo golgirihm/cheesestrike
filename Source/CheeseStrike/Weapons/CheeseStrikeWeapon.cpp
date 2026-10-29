@@ -71,7 +71,7 @@ namespace
 	 */
 	const FTransform HandGrip(FRotator(-0.6f, 87.3f, 7.7f), FVector(-1.2f, 1.3f, -0.5f));
 	/** The bones Belica's own guns are skinned to. */
-	const TCHAR* const BuiltInWeaponBones[] = {TEXT("weapon"), TEXT("weapon_l"), TEXT("pistol")};
+	const TCHAR* const BuiltInWeaponBones[] = {TEXT("weapon"), TEXT("weapon_l"), TEXT("pistol"), TEXT("bot_hand")};
 	/** How long a muzzle flash shows, and how bright its light is (lumens) and how far it reaches. */
 	constexpr float FlashTime = 0.05f;
 	constexpr float FlashBrightness = 300.0f;
