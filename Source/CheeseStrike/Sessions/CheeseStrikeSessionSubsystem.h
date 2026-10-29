@@ -14,6 +14,7 @@
 class UNetDriver;
 class UWorld;
 class UCheeseStrikeAvatars;
+class APlayerState;
 
 /** What the player has set going that ends in a level change: the front end shows it, and takes no more clicks until it is over. */
 enum class ESessionPending : uint8
@@ -47,6 +48,10 @@ struct FCheeseStrikeFriend
 	CheeseStrikeFriends::EPermission Permission = CheeseStrikeFriends::EPermission::InvitesAndFriends;
 	/** Whether Steam puts them in the lobby we are in. */
 	bool bInMyParty = false;
+	/** Where they are on Steam (its persona state). */
+	CheeseStrikeFriends::EOnline Online = CheeseStrikeFriends::EOnline::Offline;
+	/** What Steam says they are playing. */
+	CheeseStrikeFriends::EPlaying Playing = CheeseStrikeFriends::EPlaying::Nothing;
 };
 
 /**
@@ -95,6 +100,10 @@ public:
 	void JoinFriend(int32 Index);
 	/** The picture of the friend `Index`, if Steam has one yet (asked for, else). */
 	UTexture2D* AvatarOf(int32 Index);
+	/** This player's own Steam picture (by the identity's id, so on the front end too), if Steam has it yet (asked for, else). */
+	UTexture2D* MyAvatar();
+	/** The Steam picture of a player in our game, if Steam has it yet; none for a bot or without Steam. */
+	UTexture2D* AvatarOfPlayer(const APlayerState* Player);
 	/** Whether friends may join this game (the host's choice; true with no game). */
 	bool FriendsMayJoinHere() const;
 	/** Whether this game is the server, so its player the host. */
@@ -198,6 +207,7 @@ protected:
 	/** Pictures of friends, by Steam id (created when first asked for). */
 	UPROPERTY()
 	TObjectPtr<UCheeseStrikeAvatars> Avatars;
+	UCheeseStrikeAvatars* GetAvatars();
 
 	FDelegateHandle CreatedHandle;
 	FDelegateHandle FoundHandle;

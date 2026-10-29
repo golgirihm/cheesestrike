@@ -77,7 +77,7 @@ namespace CheeseStrikeFriends
 	 * is not in the game whatever stale value is left.
 	 */
 	EStatus StatusFromValue(const FString& Value, bool bRunningThisGame);
-	/** The words for a status: "Not in game", "Main menu", "In a lobby", "In a match". */
+	/** The words for a status: "Not playing CheeseStrike", "Main menu", "In a lobby", "In a match". */
 	FString StatusLabel(EStatus Status);
 
 	/**
@@ -94,44 +94,76 @@ namespace CheeseStrikeFriends
 	/** What a permission means, under the party's dropdown while it is chosen: "Only invitations let players in" or "Friends can join". */
 	FString PermissionDescription(EPermission Permission);
 
-	/**
-	 * Whether a friend has played the game before (has run CheeseStrike). Steam can't report who owns it for a friend, so this is
-	 * what can be told: running our app or publishing our presence says yes; anyone else is unknown, and treated as not.
-	 */
-	bool PlayedBefore(bool bRunningThisGame, bool bPublishesStatus);
+	/** Where a friend is on Steam (its persona state: Snooze counts as Away, Looking to play/trade as Online). */
+	enum class EOnline : uint8
+	{
+		Online,
+		Away,
+		Busy,
+		Offline,
+	};
+	/** "Online", "Away", "Busy" or "Offline". */
+	FString OnlineLabel(EOnline Online);
+
+	/** What a friend is playing, as Steam says (the app id of their game: ours, another, or none). */
+	enum class EPlaying : uint8
+	{
+		Nothing,
+		CheeseStrike,
+		/** Another game: Steam no longer gives other apps' names, so it is only "another game". */
+		AnotherGame,
+	};
+	/** "CheeseStrike", "another game" or "nothing". */
+	FString PlayingLabel(EPlaying Playing);
 
 	/** Whether a party with `Humans` players (-1 when not known) has room for one more. */
 	bool HasSpace(int32 Humans);
 
-	/** The collapsible sections of the friends panel, in the order shown. */
+	/** The collapsible sections of the friends panel, in the order shown, all open to begin with. */
 	enum class ESection : uint8
 	{
-		/** In the lobby or match we are in. */
+		/** Ourself first, then everyone in the lobby or match we are in. */
 		YourParty,
-		/** In a lobby or match that lets friends in and has room: a click joins. */
+		/** In a lobby or match that lets friends in and has room: JOIN. */
 		Joinable,
-		/** Played the game before, and can be invited. */
-		Invitable,
-		/** Everyone else. */
+		/** Everyone else, in the order of OthersRank. */
 		Others,
 	};
-	constexpr int32 NumSections = 4;
+	constexpr int32 NumSections = 3;
 
 	/** The section a friend is listed in; the first that fits, in the order of ESection. */
-	ESection SectionFor(bool bInMyParty, EStatus Status, EPermission Permission, bool bHasSpace, bool bOwns);
+	ESection SectionFor(bool bInMyParty, EStatus Status, EPermission Permission, bool bHasSpace);
 	/** The header of a section. */
 	FString SectionTitle(ESection Section);
+	/**
+	 * Where a friend comes in Others, the lower first: online and playing CheeseStrike (0), online in another game (1), online
+	 * (2), away or busy (3), offline (4). Friends of the same rank are listed by name.
+	 */
+	int32 OthersRank(EOnline Online, EPlaying Playing);
 
-	/** What the hover tooltip of a friend's row says. `Humans` is -1 when not known. */
-	FString Tooltip(bool bOwns, EStatus Status, EPermission Permission, bool bHasSpace, int32 Humans);
+	/**
+	 * What the hover tooltip of a friend's row says, a line each: "Steam: Online" (Steam gives no time last online for a friend,
+	 * so offline is "Offline" alone), "Playing: CheeseStrike / another game / nothing", "Status: ..." (StatusLabel), and the party's
+	 * permission, space and players, "N/A" while they are not in a lobby or match. `Humans` is -1 when not known.
+	 */
+	FString Tooltip(EOnline Online, EPlaying Playing, EStatus Status, EPermission Permission, bool bHasSpace, int32 Humans);
+	/**
+	 * Why INVITE can't be pressed for a friend, for its tooltip; empty when it can. We must be in a lobby or match
+	 * (`bWeAreInAGame`) and they online.
+	 */
+	FString WhyNoInvite(bool bWeAreInAGame, EOnline Them);
 
 	/**
 	 * The line under a friend's name, in a softer colour: their game's state while they are in a lobby or match that can be
-	 * joined or is full ("Join (3 of 16)", "Full (16 of 16)"), else what they are doing ("In a lobby", "Main menu").
+	 * joined or is full ("Join (3 of 16)", "Full (16 of 16)"), what they are doing in CheeseStrike ("In a lobby", "Main menu"),
+	 * and otherwise where they are on Steam ("Playing another game", "Online", "Away", "Offline").
 	 */
-	FString RowStatus(EState State, EStatus Status, int32 Humans);
-	/** The colour of the dot before that line: in a match green, in a lobby blue, on the menu cheese, not in the game grey. */
-	FLinearColor StatusDotColour(EStatus Status);
+	FString RowStatus(EState State, EStatus Status, int32 Humans, EOnline Online, EPlaying Playing);
+	/**
+	 * The colour of the dot before that line: in a match green, in a lobby blue, on the menu cheese; not in the game, a pale grey
+	 * online, a dull amber away or busy, and dark grey offline.
+	 */
+	FLinearColor StatusDotColour(EStatus Status, EOnline Online);
 	/** What a section with nobody in it says, faintly, so that it still looks meant. */
 	FString EmptySectionLine();
 	/** The letters shown for a friend with no picture: the first of their name's first two words, in capitals ("?" for none). */
