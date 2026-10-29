@@ -20,6 +20,8 @@
 #include "Movement/CheeseStrikeMovement.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 #include "PlayTesting.h"
+#include "Engine/GameInstance.h"
+#include "Records/CheeseStrikeRecords.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeInventory.h"
@@ -253,7 +255,16 @@ bool FWeaponsWorkOverTheNetwork::RunTest(const FString& Parameters)
 			TestTrue(TEXT("and leaves them standing"), Host->IsAlive());
 		}
 	});
-	// And in the back, it kills.
+	// And in the back, it kills. The joiner's records (on the joiner's machine) count the kill and its badge.
+	const TSharedRef<TPair<int32, int32>> RecordsBefore = MakeShared<TPair<int32, int32>>(0, 0);
+	Then([RecordsBefore]()
+	{
+		const UWorld* JoinerWorld = World(1);
+		if (const UCheeseStrikeRecordsSubsystem* Records = JoinerWorld != nullptr && JoinerWorld->GetGameInstance() != nullptr ? JoinerWorld->GetGameInstance()->GetSubsystem<UCheeseStrikeRecordsSubsystem>() : nullptr)
+		{
+			*RecordsBefore = TPair<int32, int32>(Records->GetStat(CheeseStrikeAchievements::Stat::Kills), Records->GetStat(CheeseStrikeAchievements::Stat::Assassinations));
+		}
+	});
 	PutAt(0, HostSpot, JoinerYaw);
 	PutAt(1, BesideHost, JoinerYaw);
 	Play(1, TEXT("wait 0.5\ntap Fire\nwait 0.4"));
@@ -275,6 +286,12 @@ bool FWeaponsWorkOverTheNetwork::RunTest(const FString& Parameters)
 		}
 		const ACheeseStrikePlayerState* Theirs = Joiner != nullptr ? Joiner->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
 		TestTrue(TEXT("and the joiner's player state counts it"), Theirs != nullptr && Theirs->GetBadgeCount(CheeseStrikeBadges::EBadge::Assassination) == 1);
+	});
+	WaitUntil(TEXT("the joiner's records counting the kill and the assassination"), 3.0f, [RecordsBefore]()
+	{
+		const UWorld* JoinerWorld = World(1);
+		const UCheeseStrikeRecordsSubsystem* Records = JoinerWorld != nullptr && JoinerWorld->GetGameInstance() != nullptr ? JoinerWorld->GetGameInstance()->GetSubsystem<UCheeseStrikeRecordsSubsystem>() : nullptr;
+		return Records != nullptr && Records->GetStat(CheeseStrikeAchievements::Stat::Kills) == RecordsBefore->Key + 1 && Records->GetStat(CheeseStrikeAchievements::Stat::Assassinations) == RecordsBefore->Value + 1;
 	});
 	// The modes' calls, on the server: one slot only (Execution's sidearm), then one weapon only (Gun Game's).
 	Then([this]()

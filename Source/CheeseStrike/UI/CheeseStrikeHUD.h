@@ -205,6 +205,8 @@ protected:
 	void DrawMice(const ACheeseStrikeGameState* Match);
 	/** The count before the match and its rounds, big in the middle (UI/CheeseStrikeHUDCountdown.cpp). */
 	void DrawCountdown(const ACheeseStrikeGameState* Match);
+	/** The toast of an achievement just unlocked on this machine ("ACHIEVEMENT: HEAD CHEESE", UCheeseStrikeRecordsSubsystem::GetToast), at the top in the middle for a few seconds. */
+	void DrawAchievementToast();
 	/** The countdown's `Word` (3, 2, 1, FIGHT) in cheese, loaded as it is first shown; null where there is none. */
 	UTexture2D* CountdownPicture(const FString& Word);
 	UPROPERTY(Transient)

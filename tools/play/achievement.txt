@@ -1,0 +1,14 @@
+﻿# An achievement's toast (wave 14): this machine's records given a headshot
+# (CheeseStrikeRecord), which unlocks Head Cheese; and CheeseStrikeStats.
+# Run with tools/play.ps1 -Map /Game/CheeseStrike/Maps/Lvl_Creamery -StartAt none
+# -Extra "?Mode=Deathmatch". (It writes to the editor's own Records slot, in Saved/SaveGames.)
+wait 3
+cmd CheeseStrikeRecord Headshots 1
+wait 0.5
+shot achievement_1_toast
+wait 2
+shot achievement_2_toast
+cmd CheeseStrikeStats
+wait 2.5
+shot achievement_3_gone
+quit

@@ -52,6 +52,7 @@
 #include "Rules/CheeseStrikePodiums.h"
 #include "Rules/CheeseStrikeSounds.h"
 #include "Rules/CheeseStrikeVoice.h"
+#include "Records/CheeseStrikeRecords.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 {
@@ -1019,6 +1020,50 @@ void ACheeseStrikePlayerController::ClientHostLeft_Implementation(bool bInMatch)
 	{
 		ClientTravel(CheeseStrikeSessions::Level, TRAVEL_Absolute);
 	}
+}
+
+void ACheeseStrikePlayerController::ClientRecord_Implementation(uint8 Record, uint8 Detail)
+{
+	if (UCheeseStrikeRecordsSubsystem* Records = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeRecordsSubsystem>() : nullptr)
+	{
+		Records->Record(static_cast<CheeseStrikeAchievements::ERecord>(Record), Detail);
+	}
+}
+
+void ACheeseStrikePlayerController::Record(const APlayerState* Player, uint8 Record, uint8 Detail)
+{
+	if (Player == nullptr || Player->IsABot())
+	{
+		return;
+	}
+	if (ACheeseStrikePlayerController* Controller = Cast<ACheeseStrikePlayerController>(Player->GetPlayerController()))
+	{
+		Controller->ClientRecord(Record, Detail);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeStats()
+{
+	const UCheeseStrikeRecordsSubsystem* Records = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeRecordsSubsystem>() : nullptr;
+	if (Records == nullptr)
+	{
+		return;
+	}
+	for (const FString& Line : Records->Describe())
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Stats: %s"), *Line);
+		ClientMessage(Line);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeRecord(const FString& Stat, int32 Amount)
+{
+#if !UE_BUILD_SHIPPING
+	if (UCheeseStrikeRecordsSubsystem* Records = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeRecordsSubsystem>() : nullptr)
+	{
+		Records->Add(Stat, Amount);
+	}
+#endif
 }
 
 void ACheeseStrikePlayerController::ClientKicked_Implementation()
