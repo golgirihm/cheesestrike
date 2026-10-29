@@ -229,6 +229,7 @@ bool FTheMenuHasItsMusic::RunTest(const FString& Parameters)
 	TestTrue(TEXT("its options"), IsWanted(EMenuPage::Options, false, false, false, false));
 	TestTrue(TEXT("and the lobby"), IsWanted(EMenuPage::Lobby, false, false, false, false));
 	TestFalse(TEXT("but fades out over the countdown, into the match"), IsWanted(EMenuPage::Lobby, false, true, false, false));
+	TestFalse(TEXT("the settings opened over it too"), IsWanted(EMenuPage::Options, false, true, false, false));
 	TestFalse(TEXT("and is gone while the match leaves for its level"), IsWanted(EMenuPage::Lobby, false, false, true, false));
 	TestFalse(TEXT("over the match"), IsWanted(EMenuPage::None, false, false, false, false));
 	TestFalse(TEXT("its pause menu"), IsWanted(EMenuPage::Pause, true, false, false, false));
@@ -447,8 +448,21 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the options open from the front end"), PageFor(false, false, false, false, EMenuPage::Options) == EMenuPage::Options);
 	TestTrue(TEXT("and from the pause menu, the match going on"), PageFor(true, false, true, true, EMenuPage::Options) == EMenuPage::Options);
 	TestTrue(TEXT("but not over the match when it isn't paused"), PageFor(true, false, true, false, EMenuPage::Options) == EMenuPage::None);
-	TestTrue(TEXT("nor in the lobby"), PageFor(false, false, true, false, EMenuPage::Options) == EMenuPage::Lobby);
+	TestTrue(TEXT("and over the lobby"), PageFor(false, false, true, false, EMenuPage::Options) == EMenuPage::Options);
+	TestTrue(TEXT("where any other page chosen is the lobby"), PageFor(false, false, true, false, EMenuPage::Find) == EMenuPage::Lobby && PageFor(false, false, true, false, EMenuPage::Credits) == EMenuPage::Lobby);
+	TestTrue(TEXT("but not while going to another level"), PageFor(false, false, true, false, EMenuPage::Options, true) == EMenuPage::Lobby);
 	TestTrue(TEXT("a joiner following the host to another level sees the lobby, not the front end"), PageFor(false, false, true, false, EMenuPage::Find, true) == EMenuPage::Lobby);
+	// Escape (or the pad's Menu) in the lobby opens the settings, and from them goes back to the lobby.
+	using CheeseStrikeMenu::LobbyMenuKey;
+	TestTrue(TEXT("Escape in the lobby opens the settings"), LobbyMenuKey(EMenuPage::Main) == EMenuPage::Options && LobbyMenuKey(EMenuPage::Find) == EMenuPage::Options);
+	TestTrue(TEXT("and Escape in them goes back to the lobby"), PageFor(false, false, true, false, LobbyMenuKey(EMenuPage::Options)) == EMenuPage::Lobby);
+	// The host's Close Lobby can't be pressed once the countdown has begun.
+	using CheeseStrikeMenu::CanCloseLobby;
+	using CheeseStrikeMenu::ELobbyStatus;
+	TestTrue(TEXT("the host can close the lobby before the countdown"), CanCloseLobby(ELobbyStatus::CanStart));
+	TestFalse(TEXT("but not while it counts down"), CanCloseLobby(ELobbyStatus::Counting));
+	TestFalse(TEXT("nor as the match starts"), CanCloseLobby(ELobbyStatus::Starting));
+	TestFalse(TEXT("nor on the way to its level"), CanCloseLobby(ELobbyStatus::Travelling));
 
 	using namespace CheeseStrikeSettings;
 	TestEqual(TEXT("the design's field of view"), DefaultFieldOfView, 75.0f);
@@ -485,6 +499,9 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	TestEqual(TEXT("so does the sensitivity"), Settings->GetMouseSensitivity(), MinSensitivity);
 	Settings->SetToDefaults();
 	TestEqual(TEXT("and the defaults are the defaults"), Settings->GetFieldOfView(), DefaultFieldOfView);
+	Settings->SetFullscreenMode(EWindowMode::Windowed);
+	Settings->SetToDefaults();
+	TestTrue(TEXT("a fresh install plays borderless"), Settings->GetFullscreenMode() == EWindowMode::WindowedFullscreen && DefaultWindowMode == EWindowMode::WindowedFullscreen);
 	TestNotNull(TEXT("the engine keeps the game's settings (Config/DefaultEngine.ini)"), UCheeseStrikeSettings::Get());
 	return true;
 }
@@ -545,6 +562,28 @@ namespace LobbyTests
 		}
 	}
 
+	/** Whether the button saying `Text` under `Root` can be pressed (it and everything it is in enabled); unset if there is none. */
+	TOptional<bool> CanPress(const TSharedRef<SWidget>& Root, const FString& Text)
+	{
+		TArray<TSharedRef<SWidget>> Widgets;
+		AllWidgets(Root, Widgets);
+		for (const TSharedRef<SWidget>& Widget : Widgets)
+		{
+			if (Widget->GetType() == FName(TEXT("STextBlock")) && StaticCastSharedRef<STextBlock>(Widget)->GetText().ToString() == Text)
+			{
+				for (TSharedPtr<SWidget> At = Widget; At.IsValid(); At = At->GetParentWidget())
+				{
+					if (!At->IsEnabled())
+					{
+						return false;
+					}
+				}
+				return true;
+			}
+		}
+		return {};
+	}
+
 	/** Looks at both players this frame; true once both are in the match on The Creamery, seeing it. */
 	bool LookAtEveryone()
 	{
@@ -600,6 +639,12 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 	using LobbyTests::Watched;
 	// A host and a joiner in the lobby, with the bots a hosted match starts with, and The Creamery picked.
 	StartPlaying({2, TEXT("?KillLimit=50?Map=0"), false, true});
+	// Escape in the lobby opens the settings over it, and Escape in them goes back to it.
+	WaitUntil(TEXT("the host's lobby"), 10.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::Lobby; });
+	Then([]() { Controller(0)->MenuPressed(); });
+	WaitUntil(TEXT("Escape opening the settings over the lobby"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::Options; });
+	Then([]() { Controller(0)->MenuPressed(); });
+	WaitUntil(TEXT("Escape going back to the lobby"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::Lobby; });
 	Then([this]()
 	{
 		Watched = LobbyTests::FWatched();
@@ -658,8 +703,34 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 			TestFalse(FString::Printf(TEXT("%s lobby has nothing to scroll"), *Who), bScrolls);
 			TestTrue(FString::Printf(TEXT("%s lobby shows the rules"), *Who), bRules);
 			TestFalse(TEXT("and doesn't say everyone sees them"), bOldNote);
+			if (Each == 0)
+			{
+				TestTrue(TEXT("the host can close the lobby before the countdown"), LobbyTests::CanPress(Menu, TEXT("CLOSE LOBBY")).Get(false));
+			}
+		}
+		// The front end's masthead, in the menu's units at the smallest window: clear of the pages' panel on its left, and
+		// over the figure's head.
+		{
+			const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(Controller(0));
+			Menu->Show(EMenuPage::Main);
+			Menu->SlatePrepass(1.0f);
+			const FVector2D Masthead = Menu->MastheadWants();
+			const FIntPoint Screen(CheeseStrikeMenu::MinWindowWidth, CheeseStrikeMenu::MinWindowHeight);
+			const float Scale = GetDefault<UUserInterfaceSettings>()->GetDPIScaleBasedOnSize(Screen);
+			const FVector2D Room(Screen.X / Scale, Screen.Y / Scale);
+			const double PanelRight = Menu->PanelWants().X;
+			AddInfo(FString::Printf(TEXT("the masthead wants %.0f x %.0f, the panel %.0f across, in %.0f x %.0f"), Masthead.X, Masthead.Y, PanelRight, Room.X, Room.Y));
+			TestTrue(TEXT("the masthead is drawn"), Masthead.X > 600.0 && Masthead.Y > 100.0);
+			TestTrue(TEXT("and clear of the panel at the smallest window"), (Room.X - Masthead.X) / 2.0 >= PanelRight + 16.0);
+			TestTrue(TEXT("and over the figure's head (the top quarter of the view)"), CheeseStrikeMenu::MastheadTop + Masthead.Y <= Room.Y * 0.26);
 		}
 		World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->AskToStart(false);
+		// Counting down, the host's Close Lobby can't be pressed.
+		const TSharedRef<SCheeseStrikeMenu> Counting = SNew(SCheeseStrikeMenu).Controller(Controller(0));
+		Counting->Show(EMenuPage::Lobby);
+		TestTrue(TEXT("the host's lobby counts down"), GameState(0) != nullptr && GameState(0)->IsCountingDown());
+		TestFalse(TEXT("and its Close Lobby can't be pressed"), LobbyTests::CanPress(Counting, TEXT("CLOSE LOBBY")).Get(true));
+		TestFalse(TEXT("nor take the focus"), Counting->GetFocusName() == TEXT("CLOSE LOBBY"));
 	});
 	WaitUntil(TEXT("everyone in the match on The Creamery, seeing it"), CheeseStrikeRules::MatchCountdown + 90.0f, &LobbyTests::LookAtEveryone);
 	Then([this]()

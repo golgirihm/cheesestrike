@@ -32,6 +32,8 @@ namespace CheeseStrikeSettings
 	constexpr float DefaultVolume = 1.0f;
 	/** The music's, below the sounds' so that it sits under the menu's tones. */
 	constexpr float DefaultMusicVolume = 0.6f;
+	/** The window a fresh install plays in: borderless at the screen's own size (the engine's WindowedFullscreen), as most games do. */
+	constexpr EWindowMode::Type DefaultWindowMode = EWindowMode::WindowedFullscreen;
 
 	/** The field of view across a view `Aspect` (width over height) wide whose field of view top to bottom is `Vertical`: what the engine's camera takes. */
 	float HorizontalFieldOfView(float Vertical, float Aspect);

@@ -1,0 +1,19 @@
+# The front end's mouse: brought at once, seen walking in behind the figure,
+# sniffing, looking back at its cheese and walking off. Run with tools/play.ps1
+# -Lobby -Res 1280x720 (the front end, at the smallest window).
+wait 3
+shot menu_mouse_0_title
+cmd CheeseStrikeMenuMouse now
+wait 2
+shot menu_mouse_1_walking
+wait 2.5
+shot menu_mouse_2_sniffing
+cmd CheeseStrikeMenuMouse
+wait 1.6
+shot menu_mouse_3_looking
+wait 3
+shot menu_mouse_4_leaving
+wait 8
+shot menu_mouse_5_gone
+cmd CheeseStrikeMenuMouse
+quit

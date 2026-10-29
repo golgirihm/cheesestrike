@@ -10,6 +10,7 @@
 
 class ACameraActor;
 class ACheeseStrikeMenuFigure;
+class ACheeseStrikeMenuMouse;
 class ACheeseStrikePodium;
 class UAudioComponent;
 struct FPodiumPlace;
@@ -264,6 +265,9 @@ protected:
 	TObjectPtr<ACameraActor> MenuCamera;
 	UPROPERTY()
 	TObjectPtr<ACheeseStrikeMenuFigure> MenuFigure;
+	/** The mouse that now and then crosses the front end behind the figure (on the front end's level only). */
+	UPROPERTY()
+	TObjectPtr<ACheeseStrikeMenuMouse> MenuMouse;
 	UPROPERTY()
 	TObjectPtr<ACheeseStrikePodium> Podium;
 	/** The host's button over it. */

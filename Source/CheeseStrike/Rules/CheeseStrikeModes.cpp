@@ -18,7 +18,8 @@ namespace CheeseStrikeModes
 		{EMode::SoloKingOfTheHill, TEXT("Solo King of the Hill"), TEXT("SoloKingOfTheHill"), TEXT("Everyone for themself: a point a second while you stand in the hill alone; it moves every minute."), false, EWinBy::Hill, true, CheeseStrikeHills::SoloTarget, false, true},
 	};
 
-	const EMode LobbyOrder[NumModes] = {EMode::Deathmatch, EMode::Elimination, EMode::Execution, EMode::GunGame, EMode::KingOfTheHill, EMode::SoloKingOfTheHill, EMode::FreeForAll};
+	// Solo King of the Hill is not offered: it stays in the game for ?Mode=SoloKingOfTheHill and its tests.
+	const EMode LobbyOrder[NumLobbyModes] = {EMode::Deathmatch, EMode::Elimination, EMode::Execution, EMode::GunGame, EMode::KingOfTheHill, EMode::FreeForAll};
 
 	const FModeInfo& Info(EMode Mode)
 	{

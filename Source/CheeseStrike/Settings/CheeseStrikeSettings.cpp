@@ -237,6 +237,11 @@ void UCheeseStrikeSettings::ApplySound()
 void UCheeseStrikeSettings::SetToDefaults()
 {
 	Super::SetToDefaults();
+	// A fresh install plays borderless at the screen's own size, as most games do; a settings file already written keeps
+	// the player's choice (the engine reads it over these).
+	FullscreenMode = CheeseStrikeSettings::DefaultWindowMode;
+	LastConfirmedFullscreenMode = CheeseStrikeSettings::DefaultWindowMode;
+	PreferredFullscreenMode = 1;
 	MouseSensitivity = CheeseStrikeSettings::DefaultSensitivity;
 	AimedSensitivity = CheeseStrikeSettings::DefaultAimedSensitivity;
 	bInvertLook = false;

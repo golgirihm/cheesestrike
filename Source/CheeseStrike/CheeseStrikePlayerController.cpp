@@ -43,6 +43,7 @@
 #include "UI/CheeseStrikeMenu.h"
 #include "UI/CheeseStrikeCurtain.h"
 #include "UI/CheeseStrikeMenuFigure.h"
+#include "UI/CheeseStrikeMenuMouse.h"
 #include "UI/CheeseStrikeMusic.h"
 #include "UI/CheeseStrikePostGame.h"
 #include "Animation/CheeseStrikeBodies.h"
@@ -136,6 +137,11 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	const UCheeseStrikePostGameSubsystem* PostGame = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>() : nullptr;
 	const bool bResultsHeld = PostGame != nullptr && PostGame->IsHeld();
 	PublishPresence(bStarted);
+	// Settings left open over the lobby as the match began are gone: back in the lobby later, it shows, not them.
+	if (bStarted && !bPaused && ChosenPage == EMenuPage::Options)
+	{
+		ChosenPage = EMenuPage::Main;
+	}
 	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch() || bLeaving, bPaused, ChosenPage, bTravelling, bResultsHeld);
 	if (Wanted != ShownPage)
 	{
@@ -579,6 +585,11 @@ void ACheeseStrikePlayerController::ShowMenuCamera()
 	Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	const FVector Pedestal(-231.0f, -500.0f, 2.0f + ACheeseStrikeMenuFigure::PedestalHeight / 2.0f);
 	MenuFigure = GetWorld()->SpawnActor<ACheeseStrikeMenuFigure>(ACheeseStrikeMenuFigure::StaticClass(), Pedestal, FRotator(0.0f, -90.0f, 0.0f), Parameters);
+	// The mouse crosses behind it now and then, on the front end's level only: the path is picked for its floor and cheese.
+	if (UWorld::RemovePIEPrefix(GetWorld()->GetOutermost()->GetName()) == CheeseStrikeSessions::Level)
+	{
+		MenuMouse = GetWorld()->SpawnActor<ACheeseStrikeMenuMouse>(ACheeseStrikeMenuMouse::StaticClass(), Pedestal, FRotator::ZeroRotator, Parameters);
+	}
 	MenuCamera = GetWorld()->SpawnActor<ACameraActor>(Pedestal + FVector(0.0f, -470.0f, 175.0f), FRotator(-7.0f, 90.0f, 0.0f), Parameters);
 	if (MenuCamera != nullptr)
 	{
@@ -593,6 +604,11 @@ void ACheeseStrikePlayerController::HideMenuCamera()
 	{
 		MenuFigure->Destroy();
 		MenuFigure = nullptr;
+	}
+	if (MenuMouse != nullptr)
+	{
+		MenuMouse->Destroy();
+		MenuMouse = nullptr;
 	}
 	if (MenuCamera == nullptr)
 	{
@@ -1039,6 +1055,11 @@ void ACheeseStrikePlayerController::MenuPressed()
 		{
 			TogglePause();
 		}
+	}
+	else if (IsInAMatch() || bLeaving)
+	{
+		// In the lobby: the settings over it, and from them back to it.
+		ChosenPage = CheeseStrikeMenu::LobbyMenuKey(ChosenPage);
 	}
 	else if (ChosenPage != EMenuPage::Main)
 	{

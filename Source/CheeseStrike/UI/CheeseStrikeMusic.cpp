@@ -48,8 +48,9 @@ namespace CheeseStrikeMusic
 		case EMenuPage::Main:
 		case EMenuPage::Find:
 		case EMenuPage::Credits:
-		case EMenuPage::Options:
 			return true;
+		// The settings, from the front end or over the lobby (whose countdown fades it out as the lobby's does).
+		case EMenuPage::Options:
 		case EMenuPage::Lobby:
 			return !bCountingDown;
 		default:

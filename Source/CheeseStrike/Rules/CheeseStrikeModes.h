@@ -73,8 +73,9 @@ namespace CheeseStrikeModes
 		bool bStreaks;
 	};
 	extern const FModeInfo Modes[NumModes];
-	/** The modes in the order the lobby lists them: the teams' first, free-for-all last. */
-	extern const EMode LobbyOrder[NumModes];
+	/** The modes the lobby offers, in its order: the teams' first, free-for-all last. Solo King of the Hill isn't among them, though a URL may still name it. */
+	constexpr int32 NumLobbyModes = NumModes - 1;
+	extern const EMode LobbyOrder[NumLobbyModes];
 	const FModeInfo& Info(EMode Mode);
 	/** The mode with number `Index` (as replicated), or free-for-all for one there isn't. */
 	EMode ModeAt(int32 Index);

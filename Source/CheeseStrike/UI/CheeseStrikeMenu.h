@@ -62,8 +62,9 @@ namespace CheeseStrikeMenu
 	 * it is over (the scoreboard is up), the lobby while a hosted or joined
 	 * match waits or goes to another level (but none while the results are
 	 * held up on the way back to the lobby, `bResultsHeld`:
-	 * UCheeseStrikePostGameSubsystem), and otherwise the page the player
-	 * chose among the front end's.
+	 * UCheeseStrikePostGameSubsystem) or the settings opened over it with
+	 * Escape (LobbyMenuKey), and otherwise the page the player chose among
+	 * the front end's.
 	 */
 	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling = false, bool bResultsHeld = false);
 
@@ -119,8 +120,29 @@ namespace CheeseStrikeMenu
 	 * (travelling, starting), which outweighs any choice being made.
 	 */
 	bool ShouldRedrawLobby(bool bChanged, bool bStatusChanged, bool bDropdownOpen);
+	/**
+	 * Whether the host's Close Lobby can be pressed with the lobby's bottom
+	 * saying `Status`: not once the countdown has begun (nothing in the lobby
+	 * can change then, ACheeseStrikeGameMode::CanChangeLobby), nor while it
+	 * goes to another level; it shows faded, takes no click and no focus.
+	 */
+	bool CanCloseLobby(ELobbyStatus Status);
+	/**
+	 * The page chosen after the menu key (Escape, a pad's Menu or B) in the
+	 * lobby, from the one chosen now: the settings over the lobby, and from
+	 * them back to it (the lobby's own page, which PageFor shows for anything
+	 * but the settings).
+	 */
+	EMenuPage LobbyMenuKey(EMenuPage Chosen);
 	/** Corners, in Slate units. */
 	constexpr float Rounding = 6.0f;
+	/** The front end's masthead: the game's name and under it the subtitle, their font sizes, and how far down from the top. */
+	constexpr int32 TitleSize = 84;
+	constexpr int32 SubtitleSize = 40;
+	constexpr float MastheadTop = 24.0f;
+	/** Seconds a new page (not one drawn again) and a dialog take to fade in, and how big a dialog starts (it grows to its size meanwhile). Only drawn so: they take presses at once. */
+	constexpr float FadeSeconds = 0.15f;
+	constexpr float DialogFromScale = 0.94f;
 	/** A confirmation dialog's card: how wide, and how far its content is in from its sides. */
 	constexpr float DialogWidth = 480.0f;
 	constexpr float DialogPadding = 32.0f;
@@ -245,6 +267,9 @@ public:
 	bool IsLobbyReady() const;
 	/** The room the lobby needs, laid out in full with its margins: in less (a small window), it is shrunk to fit, never clipped. */
 	FVector2D LobbyWants() const;
+	/** The room the front end's masthead (the game's name and its subtitle) needs, and the pages' panel on the left. */
+	FVector2D MastheadWants() const;
+	FVector2D PanelWants() const;
 	/** Shuts any dropdown open, giving the focus back to its button; true if one was. */
 	bool CloseDropdowns();
 
@@ -399,6 +424,8 @@ private:
 	TWeakPtr<SScrollBox> CreditsScroll;
 
 	EMenuPage Page = EMenuPage::None;
+	/** The page last built afresh: a page shown in its place fades in, the same one drawn again doesn't. */
+	EMenuPage BuiltPage = EMenuPage::None;
 	EOptionsTab OptionsTab = EOptionsTab::Controls;
 	FString ShownLobbyKey;
 	int32 ShownLobbyStatus = INDEX_NONE;
