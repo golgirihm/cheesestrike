@@ -7,6 +7,7 @@
 #include "Rules/CheeseStrikeDowned.h"
 #include "Rules/CheeseStrikeFalls.h"
 #include "Rules/CheeseStrikeStart.h"
+#include "Rules/CheeseStrikeStreaks.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 
@@ -36,7 +37,24 @@ void UCheeseStrikeMovementComponent::SetWantsToSprint(bool bWants)
 
 bool UCheeseStrikeMovementComponent::IsSprinting() const
 {
-	return bWantsToSprint && IsMovingOnGround() && !IsCrouching() && !IsSliding() && !Velocity.IsNearlyZero(1.0f);
+	return bWantsToSprint && MaySprint() && IsMovingOnGround() && !IsCrouching() && !IsSliding() && !Velocity.IsNearlyZero(1.0f);
+}
+
+float UCheeseStrikeMovementComponent::GooFactor() const
+{
+	const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(CharacterOwner);
+	return Body != nullptr ? Body->GooFactorNow() : 1.0f;
+}
+
+float UCheeseStrikeMovementComponent::HasteFactor() const
+{
+	const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(CharacterOwner);
+	return Body != nullptr ? Body->HasteFactorNow() : 1.0f;
+}
+
+bool UCheeseStrikeMovementComponent::MaySprint() const
+{
+	return CheeseStrikeStreaks::MaySprintInGoo(GooFactor());
 }
 
 bool UCheeseStrikeMovementComponent::IsDownedHere() const
@@ -113,7 +131,8 @@ float UCheeseStrikeMovementComponent::GetMaxSpeed() const
 	case MOVE_Walking:
 	case MOVE_NavWalking:
 	case MOVE_Falling:
-		return CheeseStrikeMovement::WithWeapon(CheeseStrikeMovement::Speed(bWantsToSprint, false, IsCrouching()), bCarryingHeavy);
+		// Slowed by the Overload's gouda (no sprint while it holds them back much), or hastened as its caller.
+		return CheeseStrikeMovement::WithWeapon(CheeseStrikeMovement::Speed(bWantsToSprint && MaySprint(), false, IsCrouching()), bCarryingHeavy) * GooFactor() * HasteFactor();
 	default:
 		return Super::GetMaxSpeed();
 	}
@@ -197,7 +216,7 @@ void UCheeseStrikeMovementComponent::UpdateCharacterStateBeforeMovement(float De
 	{
 		SinceSlide += DeltaSeconds;
 		const float GroundSpeed = Velocity.Size2D();
-		if (bWantsToCrouch && bWantsToSprint && IsMovingOnGround() && !IsCrouching() && !IsHeldHere()
+		if (bWantsToCrouch && bWantsToSprint && MaySprint() && IsMovingOnGround() && !IsCrouching() && !IsHeldHere()
 			&& SinceSlide >= CheeseStrikeMovement::SlideRest && CheeseStrikeMovement::CanSlide(GroundSpeed))
 		{
 			StartSlide();

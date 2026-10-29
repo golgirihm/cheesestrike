@@ -34,6 +34,7 @@
 #include "CheeseStrike.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "Weapons/CheeseStrikeWeaponLooks.h"
 #include "Engine/GameInstance.h"
 #include "HAL/PlatformTime.h"
 #include "Records/CheeseStrikeRecords.h"
@@ -406,6 +407,7 @@ void ACheeseStrikeHUD::DrawHUD()
 	}
 	if (bAlive)
 	{
+		DrawGoo(Character);
 		DrawVignette(Character);
 		DrawFallFlash(Character);
 		DrawDamageArcs(Character);
@@ -625,7 +627,9 @@ UTexture2D* ACheeseStrikeHUD::WeaponIcon(FName Id)
 	{
 		return Known->Get();
 	}
-	const FString Name = FString::Printf(TEXT("T_Icon_%s"), *Id.ToString());
+	// A weapon may borrow another's picture until it has its own (the Gouda Gatling the Munster's).
+	const TCHAR* Borrowed = CheeseStrikeWeaponLooks::For(Id).IconOf;
+	const FString Name = FString::Printf(TEXT("T_Icon_%s"), Borrowed != nullptr ? Borrowed : *Id.ToString());
 	UTexture2D* Icon = LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("/Game/CheeseStrike/Weapons/Icons/%s.%s"), *Name, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
 	WeaponIcons.Add(Id, Icon);
 	return Icon;
@@ -856,7 +860,12 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 	const FSlateFontInfo Small = HudDraw::Font(18.0f * U);
 	const FSlateFontInfo Label = HudDraw::Font(13.0f * U);
 	const FString Name = Stats.DisplayName.ToString().ToUpper();
-	const FString Reserve = bRounds ? CheeseStrikeWeapons::ReserveLabel(Weapon->GetReserve()) : FString();
+	// A streak's weapon has no reserve: the time it has left instead (the Gouda Gatling's).
+	const UCheeseStrikeInventory* Arms = Character->GetInventory();
+	const ACheeseStrikeGameState* Match = GetWorld()->GetGameState<ACheeseStrikeGameState>();
+	const bool bTimed = bRounds && Stats.bSpecial && Arms != nullptr && Arms->GetSpecialUntil() > 0.0f && Match != nullptr;
+	const FString Reserve = bTimed ? CheeseStrikeStreaks::GatlingTimeLeft(Arms->GetSpecialUntil() - Match->GetServerWorldTimeSeconds())
+		: bRounds ? CheeseStrikeWeapons::ReserveLabel(Weapon->GetReserve()) : FString();
 	const FString Rounds = bRounds ? FString::FromInt(Magazine) : FString();
 	const FVector2D ReserveSize = Reserve.IsEmpty() ? FVector2D::ZeroVector : HudDraw::Measure(Reserve, Small);
 	const FVector2D Line = HudDraw::Measure(TEXT("0"), Big);
@@ -914,13 +923,13 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 		HudDraw::Text(Canvas, Rounds, FVector2D(RoundsRight, RoundsTop), Big, bLow ? HudDraw::Danger : HudDraw::Ink, 1.0f);
 		if (!Reserve.IsEmpty())
 		{
-			HudDraw::Text(Canvas, Reserve, FVector2D(ReserveLeft, Baseline - ReserveSize.Y * 0.84f), Small, HudDraw::Soft);
+			HudDraw::Text(Canvas, Reserve, FVector2D(ReserveLeft, Baseline - ReserveSize.Y * 0.84f), Small, bTimed ? HudDraw::Accent : HudDraw::Soft);
 		}
 		if (bReloading)
 		{
 			HudDraw::Text(Canvas, TEXT("RELOADING"), FVector2D(Right, NameTop), Label, HudDraw::Accent, 1.0f);
 		}
-		else if (Weapon->IsDry())
+		else if (Weapon->IsDry() && !Stats.bSpecial)
 		{
 			HudDraw::Text(Canvas, TEXT("NO ROUNDS"), FVector2D(Right, NameTop), Label, HudDraw::Danger, 1.0f);
 		}
@@ -963,6 +972,63 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 			Y += Row;
 		}
 	}
+}
+
+void ACheeseStrikeHUD::DrawGoo(const ACheeseStrikeCharacter* Character)
+{
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const float Now = Match != nullptr ? Match->GetServerWorldTimeSeconds() : 0.0f;
+	const float Wash = CheeseStrikeStreaks::GooWash(Now, Character->GetSplatAt(), Character->GetGooUntil());
+	if (Wash <= 0.0f)
+	{
+		return;
+	}
+	const float Since = Now - Character->GetSplatAt();
+	const float Width = Canvas->SizeX;
+	const float Height = Canvas->SizeY;
+	const float U = Unit();
+	const FLinearColor Gouda(0.98f, 0.74f, 0.12f, 1.0f);
+	const FLinearColor Darker(0.86f, 0.55f, 0.05f, 1.0f);
+	HudDraw::FShapes Shapes;
+	// A thin yellow film over everything, and the gouda thick round the edges, where it landed: blobs that thin out and
+	// shrink as it clears, the middle of the view left clear enough to fight through.
+	Shapes.Rect(0.0f, 0.0f, Width, Height, HudDraw::Faded(Gouda, 0.3f * Wash));
+	// The same splat on every frame: a fixed scatter from a seed of its own.
+	FRandomStream Splat(7919);
+	constexpr int32 GooBlobs = 44;
+	for (int32 Index = 0; Index < GooBlobs; ++Index)
+	{
+		// Round the edge: along one of the four sides, a little in from it.
+		const int32 Side = Index % 4;
+		const float Along = Splat.FRandRange(0.0f, 1.0f);
+		const float In = Splat.FRandRange(-0.06f, 0.09f);
+		FVector2D Middle = Side == 0 ? FVector2D(Along * Width, In * Height)
+			: Side == 1 ? FVector2D(Along * Width, (1.0f - In) * Height)
+			: Side == 2 ? FVector2D(In * Width, Along * Height)
+			: FVector2D((1.0f - In) * Width, Along * Height);
+		const float Radius = Splat.FRandRange(55.0f, 150.0f) * U * (0.55f + 0.45f * Wash);
+		const FLinearColor Colour = HudDraw::Faded(Index % 3 == 0 ? Darker : Gouda, FMath::Min(1.0f, 0.85f * Wash + 0.1f));
+		Shapes.Disc(Middle, Radius, Colour, 24);
+		// A smaller lump or two on its rim.
+		for (int32 Lump = 0; Lump < 2; ++Lump)
+		{
+			const FVector2D Off = FVector2D(Splat.FRandRange(-1.0f, 1.0f), Splat.FRandRange(-1.0f, 1.0f)).GetSafeNormal() * Radius * 0.9f;
+			Shapes.Disc(Middle + Off, Radius * Splat.FRandRange(0.3f, 0.5f), Colour, 16);
+		}
+		// From the top, it runs: a drip down from the blob, growing for a few seconds, a drop at its end.
+		if (Side == 0)
+		{
+			const float Speed = Splat.FRandRange(25.0f, 90.0f) * U;
+			const float Long = FMath::Min(Speed * Since, Splat.FRandRange(0.25f, 0.55f) * Height);
+			const float Thick = Radius * Splat.FRandRange(0.18f, 0.3f);
+			if (Long > 1.0f)
+			{
+				Shapes.RoundedRect(Middle.X - Thick / 2.0f, Middle.Y, Thick, Long + Radius * 0.5f, Thick / 2.0f, Colour);
+				Shapes.Disc(FVector2D(Middle.X, Middle.Y + Radius * 0.5f + Long), Thick * 0.8f, Colour, 16);
+			}
+		}
+	}
+	Shapes.Draw(Canvas);
 }
 
 void ACheeseStrikeHUD::DrawFallFlash(const ACheeseStrikeCharacter* Character)

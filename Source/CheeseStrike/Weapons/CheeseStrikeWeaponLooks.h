@@ -50,6 +50,10 @@ struct FWeaponLook
 	const TCHAR* ReloadSounds[3] = {nullptr, nullptr, nullptr};
 	float ShotVolume = 1.0f;
 	float ShotPitch = 1.0f;
+	/** The colour of the streak of light each shot leaves (a tracer, M_Tracer); none where its alpha is 0. */
+	FLinearColor Tracer = FLinearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	/** The weapon whose HUD picture it borrows (tools/art/weapon_icons.py's), if not its own. */
+	const TCHAR* IconOf = nullptr;
 };
 
 namespace CheeseStrikeWeaponLooks
@@ -75,4 +79,11 @@ namespace CheeseStrikeWeaponLooks
 	extern const TCHAR* const FlashModel;
 	extern const TCHAR* const FlashMaterial;
 	extern const TCHAR* const FlashFrontMaterial;
+	/** A tracer's material (tools/art/weapon_materials.py): unlit and additive, its Colour and Brightness set by the weapon. */
+	extern const TCHAR* const TracerMaterial;
+	/** How long a tracer is (cm), how fast it flies (cm/s), and how long it is seen (s). */
+	constexpr float TracerLength = 500.0f;
+	constexpr float TracerSpeed = 25000.0f;
+	constexpr float TracerLife = 0.15f;
+	constexpr float TracerThickness = 4.0f;
 }

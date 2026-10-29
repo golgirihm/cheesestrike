@@ -188,6 +188,18 @@ namespace
 			Look.ShotPitch = 1.06f;
 			Looks.Add(Look);
 		}
+		// The Gouda Gatling: for now the Munster's DP-28 made all gouda (its pan in red wax), firing yellow tracers of molten
+		// cheese, faster and higher-pitched; group 9's rotary barrel of gouda wheels will take its place.
+		{
+			FWeaponLook Look = *Looks.FindByPredicate([](const FWeaponLook& Each) { return FCString::Strcmp(Each.Id, TEXT("munster")) == 0; });
+			Look.Id = TEXT("gatling");
+			Look.Materials[0] = Material(TEXT("MI_Gatling"));
+			Look.FlashSize = 1.0f;
+			Look.Tracer = FLinearColor(1.0f, 0.72f, 0.08f, 1.0f);
+			Look.IconOf = TEXT("munster");
+			RifleSounds(Look, 0.8f, 1.25f);
+			Looks.Add(Look);
+		}
 		// The Cheese Knife: our own (tools/art/weapon_models.py), its handle in red wax. It came in pointing back.
 		{
 			FWeaponLook Look;
@@ -242,6 +254,7 @@ namespace CheeseStrikeWeaponLooks
 	const TCHAR* const FlashModel = TEXT("/Game/CheeseStrike/Weapons/Flash/SM_MuzzleFlash.SM_MuzzleFlash");
 	const TCHAR* const FlashMaterial = TEXT("/Game/CheeseStrike/Weapons/Materials/MI_MuzzleFlash.MI_MuzzleFlash");
 	const TCHAR* const FlashFrontMaterial = TEXT("/Game/CheeseStrike/Weapons/Materials/MI_MuzzleFlashFront.MI_MuzzleFlashFront");
+	const TCHAR* const TracerMaterial = TEXT("/Game/CheeseStrike/Weapons/Materials/M_Tracer.M_Tracer");
 
 	const FWeaponLook& For(FName Id)
 	{

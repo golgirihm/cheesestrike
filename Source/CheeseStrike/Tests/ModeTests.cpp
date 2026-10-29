@@ -291,14 +291,69 @@ bool FTheWheelsFallAndBurst::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the edge the least"), BlastDamage(StrikeBlast, StrikeBlast.Radius), StrikeBlast.Edge);
 	TestTrue(TEXT("falling off between"), FMath::IsNearlyEqual(BlastDamage(StrikeBlast, StrikeBlast.Radius / 2.0f), (StrikeBlast.Centre + StrikeBlast.Edge) / 2.0f, 0.01f));
 	TestEqual(TEXT("and nothing past it"), BlastDamage(StrikeBlast, StrikeBlast.Radius + 1.0f), 0.0f);
-	TestTrue(TEXT("one Overload wheel doesn't kill: it takes two"), OverloadBlast.Centre < 100.0f && OverloadBlast.Centre * 2.0f >= 100.0f);
 	const float Fall = FallTime();
 	TestTrue(FString::Printf(TEXT("a wheel falls in about a second (%.2f s)"), Fall), Fall > 0.6f && Fall < 1.6f);
 	TestTrue(TEXT("from its height"), FMath::IsNearlyEqual(HeightBefore(Fall), DropHeight, 1.0f));
 	TestTrue(TEXT("to the ground"), FMath::IsNearlyEqual(HeightBefore(0.0f), 0.0f, 0.01f));
 	TestTrue(TEXT("faster as it goes: more of the way in its last quarter second than its first"), DropHeight - HeightBefore(Fall * 0.75f) < HeightBefore(Fall * 0.25f));
 	TestTrue(TEXT("the whistle gives time to move before the first lands"), StrikeWarning > Fall);
-	TestTrue(TEXT("the Overload's warning longer"), OverloadWarning >= 3.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheGoudaOverloadSlowsTheEnemyAndArmsItsCaller, "CheeseStrike.Rules.TheGoudaOverloadSlowsTheEnemyAndArmsItsCaller", ModeTests::Flags)
+
+bool FTheGoudaOverloadSlowsTheEnemyAndArmsItsCaller::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeStreaks;
+	// Who is splatted: every living enemy (down in a last stand is alive), wherever they are; never the caller's side.
+	TestTrue(TEXT("an enemy is splatted"), IsSplatted(true, true));
+	TestFalse(TEXT("a teammate never"), IsSplatted(false, true));
+	TestFalse(TEXT("nor the dead"), IsSplatted(true, false));
+	TestEqual(TEXT("the warning gives them three seconds"), OverloadWarning, 3.0f);
+
+	// The goo: a quarter of their speed at once, all of it back in a straight line over fifteen seconds.
+	const float At = 100.0f;
+	const float Until = At + GooSeconds;
+	TestEqual(TEXT("fifteen seconds of it"), GooSeconds, 15.0f);
+	TestEqual(TEXT("never splatted, full speed"), GooFactor(50.0f, 0.0f, 0.0f), 1.0f);
+	TestEqual(TEXT("a moment before it, on a machine whose clock is behind, as at the splat"), GooFactor(At - 0.1f, At, Until), GooSlowest);
+	TestEqual(TEXT("splatted: a quarter"), GooFactor(At, At, Until), 0.25f);
+	TestTrue(TEXT("halfway: halfway back"), FMath::IsNearlyEqual(GooFactor(At + GooSeconds / 2.0f, At, Until), 0.625f, 0.001f));
+	TestTrue(TEXT("rising steadily"), FMath::IsNearlyEqual(GooFactor(At + 3.0f, At, Until) - GooFactor(At + 2.0f, At, Until), 0.75f / GooSeconds, 0.001f));
+	TestEqual(TEXT("all of it back at the end"), GooFactor(Until, At, Until), 1.0f);
+	TestEqual(TEXT("and after"), GooFactor(Until + 5.0f, At, Until), 1.0f);
+	// No sprint or slide under 60%: the first seven seconds.
+	TestFalse(TEXT("no sprint just splatted"), MaySprintInGoo(GooFactor(At + 0.5f, At, Until)));
+	TestFalse(TEXT("nor at six seconds"), MaySprintInGoo(GooFactor(At + 6.0f, At, Until)));
+	TestTrue(TEXT("but from seven (60% of the way from a quarter)"), MaySprintInGoo(GooFactor(At + 7.01f, At, Until)));
+	TestTrue(TEXT("and without goo"), MaySprintInGoo(1.0f));
+	// The smear over the view: thick at once, clearing as the goo does.
+	TestEqual(TEXT("the smear thick at the splat"), GooWash(At, At, Until), 1.0f);
+	TestTrue(TEXT("thinner as it goes"), GooWash(At + 10.0f, At, Until) < GooWash(At + 5.0f, At, Until));
+	TestEqual(TEXT("gone with the goo"), GooWash(Until, At, Until), 0.0f);
+	TestEqual(TEXT("none unsplatted"), GooWash(At, 0.0f, 0.0f), 0.0f);
+
+	// The caller: half as fast again for thirty seconds, and the Gatling for as long.
+	TestEqual(TEXT("the caller runs 1.5 times as fast"), HasteAt(10.0f, 10.0f + HasteSeconds), 1.5f);
+	TestEqual(TEXT("for thirty seconds"), HasteSeconds, 30.0f);
+	TestEqual(TEXT("then as before"), HasteAt(10.0f + HasteSeconds, 10.0f + HasteSeconds), 1.0f);
+	TestEqual(TEXT("the Gatling for thirty seconds too"), GatlingSeconds, 30.0f);
+	TestEqual(TEXT("its time left as the HUD shows it"), GatlingTimeLeft(24.2f), FString(TEXT("0:25")));
+	TestEqual(TEXT("to the end"), GatlingTimeLeft(0.0f), FString(TEXT("0:00")));
+
+	// The Gouda Gatling's numbers.
+	const FWeaponStats& Gatling = CheeseStrikeWeapons::Gatling();
+	TestTrue(TEXT("the Gatling is a special primary"), Gatling.bSpecial && Gatling.Slot == EWeaponSlot::Primary);
+	TestEqual(TEXT("firing every 0.05 s"), Gatling.FireInterval, 0.05f);
+	TestTrue(TEXT("held down"), Gatling.bAutomatic);
+	TestEqual(TEXT("12 a hit"), Gatling.Damage, 12.0f);
+	TestEqual(TEXT("200 rounds"), Gatling.MagazineSize, 200);
+	TestTrue(TEXT("and no reload"), Gatling.Reserve == 0 && Gatling.ReserveMax == 0);
+	TestEqual(TEXT("spinning up for 0.4 s"), Gatling.SpinUp, 0.4f);
+	TestTrue(TEXT("wide from the hip, tighter aimed"), Gatling.HipSpreadDegrees >= 10.0f && Gatling.SpreadDegrees < Gatling.HipSpreadDegrees / 3.0f);
+	TestTrue(TEXT("found by its id"), CheeseStrikeArsenal::Find(Gatling.Id) == &Gatling);
+	TestFalse(TEXT("but never picked"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Primary).Contains(Gatling.Id) || CheeseStrikeArsenal::IsPickable(Gatling.Id, EWeaponSlot::Primary));
+	TestFalse(TEXT("nor on Gun Game's ladder"), CheeseStrikeArsenal::GunGameLadder().Contains(Gatling.Id));
 	return true;
 }
 

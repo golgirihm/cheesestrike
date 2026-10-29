@@ -1283,6 +1283,15 @@ bool ACheeseStrikeGameMode::CallStreak(ACheeseStrikePlayerState* Caller, CheeseS
 		{
 			Bombs->StartOverload(Caller);
 		}
+		// Its caller, at once: faster on their feet, and the Gouda Gatling in hand (their primary kept for after).
+		if (ACheeseStrikeCharacter* CallerBody = Caller->GetPawn<ACheeseStrikeCharacter>())
+		{
+			CallerBody->Hasten(Now + ACheeseStrikeBombs::OverloadTime(CheeseStrikeStreaks::HasteSeconds));
+			if (UCheeseStrikeInventory* Arms = CallerBody->GetInventory())
+			{
+				Arms->GiveSpecial(CheeseStrikeWeapons::Gatling().Id, ACheeseStrikeBombs::OverloadTime(CheeseStrikeStreaks::GatlingSeconds));
+			}
+		}
 		break;
 	default:
 		return false;

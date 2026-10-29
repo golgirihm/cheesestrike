@@ -31,16 +31,20 @@ namespace CheeseStrikeWeapons
 	const FWeaponStats& Pistol();
 	/** The Cheese Knife: a short swipe across the aim, deadly in the back. */
 	const FWeaponStats& Knife();
+	/** The Gouda Gatling: the Gouda Overload's minigun of molten cheese (bSpecial), spun up, 200 rounds and no reload. */
+	const FWeaponStats& Gatling();
 }
 
 namespace CheeseStrikeArsenal
 {
-	/** Every weapon, in the order a picker lists them: the primaries, the sidearm, the knife. */
+	/** Every weapon, in the order a picker lists them: the primaries, the sidearm, the knife; then the streaks' own (bSpecial), which no picker lists. */
 	const TArray<const FWeaponStats*>& All();
 	/** The weapon whose id is `Id` (any case), or null. */
 	const FWeaponStats* Find(FName Id);
-	/** The ids of the weapons that go in `Slot`, in order. */
+	/** The ids of the weapons that go in `Slot` that a player may pick, in order: never a special one. */
 	TArray<FName> InSlot(EWeaponSlot Slot);
+	/** Whether `Id` is a weapon a player may pick for `Slot` (a loadout, a stand): one of InSlot's. */
+	bool IsPickable(FName Id, EWeaponSlot Slot);
 	/** The primary everyone comes in with (the Colby Carbine, the weakest: the maps' stands hold the rest), the sidearm and the knife. */
 	FName DefaultPrimary();
 	FName Sidearm();
