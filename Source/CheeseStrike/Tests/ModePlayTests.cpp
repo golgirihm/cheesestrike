@@ -914,6 +914,9 @@ bool FExecutionAllDownIsNotOut::RunTest(const FString& Parameters)
 			}
 			TestTrue(FString::Printf(TEXT("machine %d keeps to its caps (%d drops, %d splats)"), Seen, Blood->GetDropCount(), Blood->GetSplatCount() - Blood->GetPoolCount()),
 				Blood->GetDropCount() <= CheeseStrikeBlood::MostDrops && Blood->GetSplatCount() - Blood->GetPoolCount() <= CheeseStrikeBlood::MostSplats);
+			// A jet of liquid: streaks drawn out along their flight, and a sheath of mist where it leaves the body.
+			TestTrue(FString::Printf(TEXT("machine %d draws the jet's drops drawn out (the longest %.1f cm) with mist (%d puffs)"), Seen, Blood->GetLongestDrop(), Blood->GetMistCount()),
+				Blood->GetLongestDrop() > 2.0f && Blood->GetMistCount() > 0);
 		}
 	});
 	Then([this]()

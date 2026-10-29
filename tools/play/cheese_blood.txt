@@ -1,21 +1,22 @@
 # The cheese players bleed (Effects/CheeseStrikeCheeseBlood), for looking at
 # it: a hit's spray seen from outside the body (CheeseStrikeBleed, a light hit
-# and a heavy one from the side), then a stab and a stomp on the bot, watched
+# from just off ahead, its puff toward the camera, and a heavy one from the
+# side, the spray across the view), then a stab and a stomp on the bot, watched
 # from off its feet (CheeseStrikeWatchDown) as anyone near sees them: the
 # stab's spurts and the gush as the knife comes out, the stomp's firehose and
 # the pool it leaves spreading and fading. One bot, rounds to spare:
 # tools/play.ps1 -Script tools/play/cheese_blood.txt -Bots -Extra "?Mode=Execution?Bots=1?Rounds=5" -FixedFps 30 -Res 1600x900 -Tag cheese_blood
 wait 4
 cmd CheeseStrikeProtect 120
-cmd CheeseStrikeOutside 200 60 10 10
+cmd CheeseStrikeOutside 220 0 10 10
 wait 0.5
-cmd CheeseStrikeBleed 30 -20
+cmd CheeseStrikeBleed 12 25
 wait 0.1
 shot blood_shot_light_010
 wait 0.15
 shot blood_shot_light_025
 wait 1.5
-cmd CheeseStrikeBleed 100 -70
+cmd CheeseStrikeBleed 100 -90
 wait 0.08
 shot blood_shot_heavy_008
 wait 0.17

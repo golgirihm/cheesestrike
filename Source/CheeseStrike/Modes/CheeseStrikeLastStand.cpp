@@ -727,20 +727,15 @@ void UCheeseStrikeLastStand::Bleed(float DeltaTime)
 	}
 	const EKind Kind = Execution.GetKind();
 	const float Elapsed = ExecutionElapsed();
+	const float Before = BledTo;
+	BledTo = Elapsed;
 	const USkeletalMeshComponent* Mesh = Me->GetMesh();
 	const ACheeseStrikeCharacter* Executor = Execution.Other.Get();
 	if (Kind == EKind::Stab)
 	{
-		const float Rate = CheeseStrikeBlood::StabRate(Elapsed);
-		BleedOwed += Rate * DeltaTime;
-		const int32 Now = FMath::FloorToInt32(BleedOwed);
-		if (Now <= 0)
-		{
-			return;
-		}
-		BleedOwed -= Now;
 		// From the chest where the knife went in (on the body as it lies, or falls), up out of it; the gush as the knife
-		// comes out leans toward the executor, who draws it.
+		// comes out leans toward the executor, who draws it. A big fan of fine spray, a puff of mist at each spurt, and a
+		// pool spreading under the body.
 		const FVector Wound = FMath::Lerp(Mesh->GetBoneLocation(TEXT("spine_03")), Mesh->GetBoneLocation(TEXT("pelvis")), 0.2f) + FVector(0.0f, 0.0f, 8.0f);
 		const bool bGush = Elapsed >= CheeseStrikeExecution::StabOut;
 		FVector Way = FVector::UpVector;
@@ -748,14 +743,31 @@ void UCheeseStrikeLastStand::Bleed(float DeltaTime)
 		{
 			Way += (Executor->GetActorLocation() - Wound).GetSafeNormal2D() * 0.5f;
 		}
-		Blood->Spray(Wound, Way, Now, CheeseStrikeBlood::StabSpeed(Elapsed), 0.35f, bGush ? 30.0f : 22.0f, bGush ? 1.5f : 1.1f);
+		if (!bPooled && Elapsed >= CheeseStrikeExecution::StabLands)
+		{
+			bPooled = true;
+			Blood->Pool(Wound + FVector(0.0f, 0.0f, 30.0f), Me);
+		}
+		if (CheeseStrikeBlood::StabMistDue(Before, Elapsed))
+		{
+			Blood->Puff(Wound + Way.GetSafeNormal() * 6.0f, Way.GetSafeNormal() * 90.0f, CheeseStrikeBlood::StabMist());
+		}
+		BleedOwed += CheeseStrikeBlood::StabRate(Elapsed) * DeltaTime;
+		const int32 Now = FMath::FloorToInt32(BleedOwed);
+		if (Now <= 0)
+		{
+			return;
+		}
+		BleedOwed -= Now;
+		Blood->Spray(Wound, Way, Now, CheeseStrikeBlood::StabSpeed(Elapsed), 0.4f, CheeseStrikeBlood::StabCone(Elapsed), CheeseStrikeBlood::StabDropSize(Elapsed), CheeseStrikeBlood::DropLife, DeltaTime);
 		return;
 	}
 	if (Kind != EKind::Stomp)
 	{
 		return;
 	}
-	// The stomp: a firehose from the neck, the way the head was, whipping about as it throbs, and a pool spreading under it.
+	// The stomp: a fire-hydrant jet from where the head was, out the way it was and up, swaying a little as it throbs, a
+	// sheath of mist where it leaves the body, and a pool spreading under it.
 	const FVector Neck = Mesh->GetBoneLocation(TEXT("neck_01"));
 	const FVector Head = Mesh->GetBoneLocation(TEXT("head"));
 	const FVector Out = (Head - Neck).GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector);
@@ -764,18 +776,28 @@ void UCheeseStrikeLastStand::Bleed(float DeltaTime)
 		bPooled = true;
 		Blood->Pool(Neck + Out.GetSafeNormal2D() * 25.0f + FVector(0.0f, 0.0f, 40.0f), Me);
 	}
-	const float Rate = CheeseStrikeBlood::StompRate(Elapsed);
-	BleedOwed += Rate * DeltaTime;
+	const float Since = Elapsed - CheeseStrikeExecution::StompLands;
+	if (Since < 0.0f || Since >= CheeseStrikeBlood::HoseSeconds)
+	{
+		return;
+	}
+	const FVector Side = FVector::CrossProduct(Out, FVector::UpVector).GetSafeNormal(UE_SMALL_NUMBER, FVector::RightVector);
+	const FVector Way = (Out.GetSafeNormal2D() * 0.9f + FVector(0.0f, 0.0f, 0.5f) + Side * 0.08f * FMath::Sin(Since * 5.3f)).GetSafeNormal();
+	const FVector Source = Neck + Out * 8.0f;
+	MistOwed += DeltaTime;
+	if (MistOwed >= CheeseStrikeBlood::HoseMistEvery)
+	{
+		MistOwed -= CheeseStrikeBlood::HoseMistEvery;
+		Blood->Puff(Source + Way * 10.0f, Way * 150.0f, CheeseStrikeBlood::HoseMist());
+	}
+	BleedOwed += CheeseStrikeBlood::StompRate(Elapsed) * DeltaTime;
 	const int32 Now = FMath::FloorToInt32(BleedOwed);
 	if (Now <= 0)
 	{
 		return;
 	}
 	BleedOwed -= Now;
-	const float Since = Elapsed - CheeseStrikeExecution::StompLands;
-	const FVector Side = FVector::CrossProduct(Out, FVector::UpVector).GetSafeNormal(UE_SMALL_NUMBER, FVector::RightVector);
-	const FVector Way = (Out * 0.7f + FVector(0.0f, 0.0f, 0.75f) + Side * 0.45f * FMath::Sin(Since * 5.3f)).GetSafeNormal();
-	Blood->Spray(Neck + Out * 6.0f, Way, Now, CheeseStrikeBlood::StompSpeed(Elapsed), 0.3f, 16.0f, CheeseStrikeBlood::StompDropSize(Elapsed));
+	Blood->Spray(Source, Way, Now, CheeseStrikeBlood::StompSpeed(Elapsed), 0.12f, CheeseStrikeBlood::HoseCone, CheeseStrikeBlood::StompDropSize(Elapsed), CheeseStrikeBlood::DropLife, DeltaTime);
 }
 
 void UCheeseStrikeLastStand::UpdateBurst(float DeltaTime)
