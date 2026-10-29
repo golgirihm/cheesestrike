@@ -444,6 +444,8 @@ void ACheeseStrikePlayerController::PlayMusic()
 	const bool bWanted = CheeseStrikeMusic::IsWanted(ShownPage, bPaused, bCounting, bLeavingNow, PostGame != nullptr && PostGame->IsHeld());
 	// Out over the countdown, into the match; otherwise quicker.
 	Music->Want(GetWorld(), bWanted, bCounting && Match != nullptr ? FMath::Max(Match->SecondsToStart(), 0.5f) : CheeseStrikeMusic::FadeOutSeconds);
+	// In a session, everyone hears the host's song at the host's point in it.
+	Music->Follow(GetWorld());
 }
 
 bool ACheeseStrikePlayerController::CanSayReady() const

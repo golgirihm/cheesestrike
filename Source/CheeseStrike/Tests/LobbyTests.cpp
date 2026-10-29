@@ -283,6 +283,29 @@ bool FTheMenuHasItsMusic::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEveryoneHearsTheHostsSongInStep, "CheeseStrike.Rules.EveryoneHearsTheHostsSongInStep", LobbyTests::Flags)
+
+bool FEveryoneHearsTheHostsSongInStep::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeMusic;
+	// How far into the host's song it is, by the server's clock: from its start to its length, never past either.
+	TestEqual(TEXT("40 s after it began, 40 s in"), OffsetFor(1040.0, 1000.0, 200.0f), 40.0f);
+	TestEqual(TEXT("not before its start (a clock a little behind)"), OffsetFor(999.5, 1000.0, 200.0f), 0.0f);
+	TestEqual(TEXT("nor past its end"), OffsetFor(1300.0, 1000.0, 200.0f), 200.0f);
+	// The handover to a new level, whose clock starts again: the song 40 s in began 40 s before that clock's now.
+	TestEqual(TEXT("handed over to a level 3 s old"), HandOver(3.0, 40.0f), -37.0);
+	TestEqual(TEXT("and there it is still 40 s in"), OffsetFor(3.0, HandOver(3.0, 40.0f), 200.0f), 40.0f);
+	// A joiner follows the host: another song, or the same out of step by more than a quarter of a second.
+	TestTrue(TEXT("nothing playing: the host's song comes on"), ShouldFollow(-1, 0.0f, 2, 40.0f, 200.0f));
+	TestTrue(TEXT("another song: switched to the host's"), ShouldFollow(1, 40.0f, 2, 40.0f, 200.0f));
+	TestFalse(TEXT("the same within a quarter second: left alone"), ShouldFollow(2, 40.2f, 2, 40.0f, 200.0f) || ShouldFollow(2, 39.8f, 2, 40.0f, 200.0f));
+	TestTrue(TEXT("the same but out of step: put back"), ShouldFollow(2, 41.0f, 2, 40.0f, 200.0f) && ShouldFollow(2, 39.5f, 2, 40.0f, 200.0f));
+	TestFalse(TEXT("nothing from the host yet: wait"), ShouldFollow(-1, 0.0f, -1, 0.0f, 0.0f));
+	TestFalse(TEXT("a song the host is about to end is left to end"), ShouldFollow(-1, 0.0f, 2, 199.8f, 200.0f));
+	TestTrue(TEXT("quarter of a second is the step"), FMath::IsNearlyEqual(InStep, 0.25f));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheControlsPageSaysWhatEveryKeyDoes, "CheeseStrike.Rules.TheControlsPageSaysWhatEveryKeyDoes", LobbyTests::Flags)
 
 bool FTheControlsPageSaysWhatEveryKeyDoes::RunTest(const FString& Parameters)
@@ -1069,6 +1092,54 @@ bool FAJoinerIsToldWhenTheConnectionIsLost::RunTest(const FString& Parameters)
 		Mode->AskToStart(true);
 	});
 	WaitUntil(TEXT("the match started at once all the same"), 10.0f, []() { return GameState(0) != nullptr && GameState(0)->HasMatchStarted(); });
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEveryoneInTheLobbyHearsTheSameSong, "CheeseStrike.Play.EveryoneInTheLobbyHearsTheSameSong", LobbyTests::PlayFlags)
+
+bool FEveryoneInTheLobbyHearsTheSameSong::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	struct FHeard
+	{
+		static UCheeseStrikeMusicSubsystem* Music(int32 Player)
+		{
+			UWorld* Theirs = World(Player);
+			return Theirs != nullptr && Theirs->GetGameInstance() != nullptr ? Theirs->GetGameInstance()->GetSubsystem<UCheeseStrikeMusicSubsystem>() : nullptr;
+		}
+		static bool InStep()
+		{
+			const UCheeseStrikeMusicSubsystem* Host = Music(0);
+			const UCheeseStrikeMusicSubsystem* Joiner = Music(1);
+			return Host != nullptr && Joiner != nullptr && Host->GetSong() >= 0 && Joiner->GetSong() == Host->GetSong() && FMath::Abs(Joiner->GetElapsed() - Host->GetElapsed()) <= 0.25f;
+		}
+	};
+	StartPlaying({2, TEXT("?Bots=0"), false, true});
+	WaitUntil(TEXT("the joiner playing the host's song, in step"), 15.0f, []() { return FHeard::InStep(); });
+	Wait(2.0f);
+	Then([this]()
+	{
+		const UCheeseStrikeMusicSubsystem* Host = FHeard::Music(0);
+		const UCheeseStrikeMusicSubsystem* Joiner = FHeard::Music(1);
+		TestTrue(TEXT("both machines want the lobby's music"), Host->IsWanted() && Joiner->IsWanted());
+		TestEqual(TEXT("the same song on both"), Joiner->GetSong(), Host->GetSong());
+		TestTrue(FString::Printf(TEXT("at the same point (host %.2f s, joiner %.2f s)"), Host->GetElapsed(), Joiner->GetElapsed()), FMath::Abs(Joiner->GetElapsed() - Host->GetElapsed()) <= 0.25f);
+		// What the joiner's game state says is the host's point too.
+		const float Said = CheeseStrikeMusic::OffsetFor(GameState(1)->GetServerWorldTimeSeconds(), GameState(1)->GetMusicStartedAt(), 1000.0f);
+		TestTrue(FString::Printf(TEXT("the game state carries it (%.2f s against the host's %.2f s)"), Said, Host->GetElapsed()), GameState(1)->GetMusicSong() == Host->GetSong() && FMath::Abs(Said - Host->GetElapsed()) <= 0.25f);
+		// The host puts on another song: the joiner switches with it.
+		FHeard::Music(0)->SkipSong();
+	});
+	WaitUntil(TEXT("the joiner switched with the host"), 10.0f, []() { return FHeard::InStep() && FHeard::Music(0)->GetElapsed() < 5.0f; });
+	Then([this]()
+	{
+		TestEqual(TEXT("the joiner's song is the host's new one"), FHeard::Music(1)->GetSong(), FHeard::Music(0)->GetSong());
+		// A joiner that skips puts on nothing of its own: the host's songs are the ones heard.
+		const int32 Before = FHeard::Music(1)->GetSong();
+		FHeard::Music(1)->SkipSong();
+		TestEqual(TEXT("a joiner can't change the song"), FHeard::Music(1)->GetSong(), Before);
+	});
 	StopPlaying();
 	return true;
 }

@@ -34,6 +34,8 @@ void ACheeseStrikeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeGameState, GoAt);
 	DOREPLIFETIME(ACheeseStrikeGameState, PlayersExpected);
 	DOREPLIFETIME(ACheeseStrikeGameState, PlayersReady);
+	DOREPLIFETIME(ACheeseStrikeGameState, MusicSong);
+	DOREPLIFETIME(ACheeseStrikeGameState, MusicStartedAt);
 	DOREPLIFETIME(ACheeseStrikeGameState, Mode);
 	DOREPLIFETIME(ACheeseStrikeGameState, TeamScores);
 	DOREPLIFETIME(ACheeseStrikeGameState, WinningTeam);

@@ -146,6 +146,16 @@ public:
 	const FString& GetHostName() const { return HostName; }
 	void SetHostName(const FString& Name) { HostName = Name; }
 
+	/**
+	 * The menu's music as the host's machine plays it (UCheeseStrikeMusicSubsystem): the song, an index into
+	 * CheeseStrikeMusic::Songs (-1 for none yet), and the server's time it began, so that every joiner plays the
+	 * same song at the same point (CheeseStrikeMusic::OffsetFor).
+	 */
+	int32 GetMusicSong() const { return MusicSong; }
+	float GetMusicStartedAt() const { return MusicStartedAt; }
+	/** Server only. */
+	void SetMusic(int32 Song, float StartedAt) { MusicSong = Song; MusicStartedAt = StartedAt; }
+
 	/** Server only. */
 	void SetLimits(int32 InKillLimit, float InRespawnDelay);
 	/** Server only: tells every machine at once, so that the feed is never behind. `How` names a streak that did it. */
@@ -183,7 +193,7 @@ public:
 
 	/** What the match plays to, in words ("first team to 50 kills"), for the scoreboard and the HUD. */
 	FString GoalText() const { return CheeseStrikeModes::Goal(GetMode(), KillLimit, RoundLimit); }
-	/** One line on how it stands, for the top of the HUD: the teams' scores in a team mode ("The Gouda Guys 12 · 9 Mozza Radicals"), with the round in Elimination and Execution; the leader's kills in free-for-all; the leader's weapon in Gun Game ("Ash on the Roquefort Rifle, 6 of 8"). */
+	/** One line on how it stands, for the top of the HUD: the teams' scores in a team mode ("The Gouda Guys 12 Â· 9 Mozza Radicals"), with the round in Elimination and Execution; the leader's kills in free-for-all; the leader's weapon in Gun Game ("Ash on the Roquefort Rifle, 6 of 8"). */
 	FString ScoreSummary() const;
 
 	// Elimination's rounds.
@@ -267,6 +277,10 @@ protected:
 	int32 PlayersExpected = 0;
 	UPROPERTY(Replicated)
 	int32 PlayersReady = 0;
+	UPROPERTY(Replicated)
+	int32 MusicSong = -1;
+	UPROPERTY(Replicated)
+	float MusicStartedAt = 0.0f;
 
 	/** CheeseStrikeModes::EMode. */
 	UPROPERTY(Replicated)
