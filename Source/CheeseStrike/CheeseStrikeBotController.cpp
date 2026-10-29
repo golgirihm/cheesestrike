@@ -415,10 +415,24 @@ bool ACheeseStrikeBotController::ThinkAboutTheDown()
 	{
 		const float Yaw = Nearest->GetActorRotation().Yaw;
 		bInAim = CheeseStrikeBots::InDownedAim(Me->GetActorLocation(), Where, Yaw, CheeseStrikeBots::FlankMargin);
-		Where = CheeseStrikeBots::FinishApproach(Me->GetActorLocation(), Where, Yaw, Now(), FlankSide);
+		// The room to swerve in, measured now and then (in a hallway a goal to the side is off the mesh, and asking for it
+		// each tick has it stand and jitter).
+		if (Now() - RoomMeasuredAt > 1.0f)
+		{
+			ApproachRoom = MeasureRoomAcross(Me->GetActorLocation(), Where);
+			RoomMeasuredAt = Now();
+		}
+		Where = CheeseStrikeBots::FinishApproach(Me->GetActorLocation(), Where, Yaw, Now(), FlankSide, ApproachRoom);
+		// On the mesh, or straight to them.
+		if (UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
+		{
+			FNavLocation OnMesh;
+			Where = Navigation->ProjectPointToNavigation(Where, OnMesh, FVector(60.0f, 60.0f, 200.0f)) ? OnMesh.Location : Nearest->GetActorLocation();
+		}
 	}
-	if (!bGoing || FVector::Dist(Goal, Where) > 100.0f)
+	if (CheeseStrikeBots::ShouldRepath(bGoing, FVector::Dist(Goal, Where), Now() - ApproachAskedAt))
 	{
+		ApproachAskedAt = Now();
 		// Somewhere it can't get to: straight to them after all.
 		if (!GoTo(Where, bInAim, true))
 		{
@@ -581,6 +595,33 @@ void ACheeseStrikeBotController::Perceive()
 		LastSeenWhere = Lead->GetActorLocation();
 		bSearching = false;
 	}
+}
+
+float ACheeseStrikeBotController::MeasureRoomAcross(const FVector& At, const FVector& Toward) const
+{
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	const FVector Way = FVector(Toward.X - At.X, Toward.Y - At.Y, 0.0f).GetSafeNormal();
+	if (Navigation == nullptr || Way.IsNearlyZero())
+	{
+		return TNumericLimits<float>::Max();
+	}
+	FNavLocation From;
+	if (!Navigation->ProjectPointToNavigation(At, From, FVector(60.0f, 60.0f, 200.0f)))
+	{
+		return 0.0f;
+	}
+	const FVector Across(-Way.Y, Way.X, 0.0f);
+	const float Reach = CheeseStrikeBots::ZigzagWidth + CheeseStrikeBots::SwerveClearance;
+	float Room = Reach;
+	for (const float Side : {1.0f, -1.0f})
+	{
+		FVector Hit;
+		if (UNavigationSystemV1::NavigationRaycast(GetWorld(), From.Location, From.Location + Across * Side * Reach, Hit))
+		{
+			Room = FMath::Min(Room, static_cast<float>(FVector::Dist2D(From.Location, Hit)));
+		}
+	}
+	return Room;
 }
 
 bool ACheeseStrikeBotController::GoTo(const FVector& Where, bool bSprint, bool bRightThere)

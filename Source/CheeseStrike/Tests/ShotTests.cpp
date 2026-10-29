@@ -34,6 +34,33 @@ bool FDamageFallsOffWithDistanceAndDoublesOnTheHead::RunTest(const FString& Para
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAHeadHitTakesTheHeadsShareAtAnyRange, "CheeseStrike.Shot.AHeadHitTakesTheHeadsShareAtAnyRange", ShotTests::Flags)
+
+bool FAHeadHitTakesTheHeadsShareAtAnyRange::RunTest(const FString& Parameters)
+{
+	// Every gun's head hit is its body hit times its head multiplier, however far; only the Roquefort's takes a whole health
+	// (100) everywhere: any other's head hit that leaves someone standing is the weapon's numbers, not a shot gone wrong.
+	for (const FWeaponStats* Weapon : CheeseStrikeArsenal::All())
+	{
+		if (Weapon->IsMelee())
+		{
+			continue;
+		}
+		bool bMultiplied = true;
+		float Least = TNumericLimits<float>::Max();
+		for (float Distance = 0.0f; Distance <= Weapon->MaxRange; Distance += 100.0f)
+		{
+			const float Head = CheeseStrikeWeapons::DamageAt(*Weapon, Distance, true);
+			bMultiplied &= FMath::IsNearlyEqual(Head, CheeseStrikeWeapons::DamageAt(*Weapon, Distance, false) * Weapon->HeadMultiplier, 0.01f);
+			Least = FMath::Min(Least, Head * FMath::Max(Weapon->Pellets, 1));
+		}
+		TestTrue(FString::Printf(TEXT("the %s's head hit is its body hit times %.2f at every range"), *Weapon->DisplayName.ToString(), Weapon->HeadMultiplier), bMultiplied);
+		const bool bRoquefort = Weapon->Id == CheeseStrikeWeapons::Roquefort().Id;
+		TestEqual(FString::Printf(TEXT("the %s's head hit is a sure kill only for the Roquefort (the least %.0f)"), *Weapon->DisplayName.ToString(), Least), Least >= 100.0f, bRoquefort);
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAScopedRifleSwaysWithTheBreath, "CheeseStrike.Shot.AScopedRifleSwaysWithTheBreath", ShotTests::Flags)
 
 bool FAScopedRifleSwaysWithTheBreath::RunTest(const FString& Parameters)

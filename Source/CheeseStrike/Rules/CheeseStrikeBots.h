@@ -165,7 +165,27 @@ namespace CheeseStrikeBots
 	 * round by the nearer edge, or with `Way` -1 (having got stuck that
 	 * way) by the further.
 	 */
-	FVector FinishApproach(const FVector& At, const FVector& Downed, float Yaw, float Now, float Way = 1.0f);
+	FVector FinishApproach(const FVector& At, const FVector& Downed, float Yaw, float Now, float Way = 1.0f, float Room = TNumericLimits<float>::Max());
+	/** How far a swerve keeps from a wall: the capsule's radius and a little more. */
+	constexpr float SwerveClearance = 50.0f;
+	/** A swerve narrower than this is no swerve: it comes straight. */
+	constexpr float LeastSwerve = 30.0f;
+	/**
+	 * How wide the swerve is with `Room` (cm of navigable floor either side of the
+	 * bot, across its way, the less of the two: measured with a navigation
+	 * raycast): ZigzagWidth where there is room for it, as much as fits in a
+	 * narrower place, and none (straight on) in a hallway too narrow for even a
+	 * small one, where a goal to the side would be off the mesh.
+	 */
+	float SwerveWidth(float Room);
+	/** A bot asks for a new path to the same moving goal at most this often (s): asked every tick, it stands and jitters. */
+	constexpr float RepathEvery = 0.3f;
+	/**
+	 * Whether a bot going to finish someone down asks for a path afresh: when it
+	 * isn't following one or the goal has moved by more than a metre, and never
+	 * sooner than RepathEvery after it last asked.
+	 */
+	bool ShouldRepath(bool bFollowing, float GoalMoved, float SinceAsked);
 
 	/**
 	 * Execution: someone left down gets up by themself before long, so a bot

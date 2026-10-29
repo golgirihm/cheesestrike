@@ -9,7 +9,9 @@
 
 #include "Misc/AutomationTest.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Camera/CameraComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikePlayerController.h"
@@ -292,6 +294,139 @@ bool FWeaponsWorkOverTheNetwork::RunTest(const FString& Parameters)
 	});
 	Play(1, TEXT("tap Knife\nwait 0.3"));
 	Then([this]() { TestEqual(TEXT("a slot with nothing in it can't be drawn"), HeldId(Character(1)), CheeseStrikeWeapons::Roquefort().Id); });
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAHeadIsWhereTheShooterSawIt, "CheeseStrike.Play.AHeadIsWhereTheShooterSawIt", WeaponPlayTests::Flags)
+
+namespace WeaponPlayTests
+{
+	/** The middle of a sample's head. */
+	FVector HeadOf(const FHitHistory::FSample& Sample)
+	{
+		return (Sample.HeadLow + Sample.HeadHigh) * 0.5f;
+	}
+	/** For each way back the server might look (0 to 0.2 s more), the sum of how far its head was from the one the joiner saw. */
+	TArray<float> HeadMisses;
+	int32 HeadSamples = 0;
+	float StrafeStartedAt = 0.0f;
+}
+
+bool FAHeadIsWhereTheShooterSawIt::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace WeaponPlayTests;
+	StartPlaying({2, TEXT("?RespawnDelay=1")});
+	// 40 ms each way, as a player across a country has: the joiner's clock and what it sees of the host both lag by it.
+	Then([]()
+	{
+		GEngine->Exec(World(0), TEXT("NetEmulation.PktLag 40"));
+		GEngine->Exec(World(1), TEXT("NetEmulation.PktLag 40"));
+	});
+	PutAt(0, HostSpot, HostYaw);
+	PutAt(1, JoinerSpot, JoinerYaw);
+	Wait(3.0f);
+	Then([]()
+	{
+		HeadMisses.Init(0.0f, 16);
+		HeadSamples = 0;
+		StrafeStartedAt = Now(0);
+		// The joiner's copy of the host is posed every frame, as the server's is, though nothing draws it here.
+		if (ACheeseStrikeCharacter* Seen = CharacterOf(0, 1))
+		{
+			Seen->GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		}
+	});
+	// The host runs from side to side across the joiner's view; every frame, where the joiner sees the host's head at the
+	// server's time as the joiner has it (what a shot fired then says), against where the server had it at that time.
+	WaitUntil(TEXT("the host strafed"), 10.0f, []()
+	{
+		ACheeseStrikeCharacter* Host = Character(0);
+		const ACheeseStrikeCharacter* Seen = CharacterOf(0, 1);
+		if (Host == nullptr || Seen == nullptr)
+		{
+			return false;
+		}
+		const float Since = Now(0) - StrafeStartedAt;
+		const float Way = FMath::Fmod(Since, 1.4f) < 0.7f ? 1.0f : -1.0f;
+		Host->AddMovementInput(FVector(Way, 0.0f, 0.0f), 1.0f);
+		const float Then = Now(1);
+		if (Since > 0.5f)
+		{
+			const FVector Saw = HeadOf(Seen->SampleNow(Then));
+			for (int32 Back = 0; Back < HeadMisses.Num(); ++Back)
+			{
+				HeadMisses[Back] += FVector::Dist(Saw, HeadOf(Host->GetHitHistory().At(Then - (Back - 5) * 0.02f)));
+			}
+			++HeadSamples;
+		}
+		return Since > 4.0f;
+	});
+	Then([this]()
+	{
+		FString Line;
+		int32 Best = 0;
+		for (int32 Back = 0; Back < HeadMisses.Num(); ++Back)
+		{
+			Line += FString::Printf(TEXT(" %.0f ms: %.1f cm;"), (Back - 5) * 20.0f, HeadMisses[Back] / FMath::Max(1, HeadSamples));
+			Best = HeadMisses[Back] < HeadMisses[Best] ? Back : Best;
+		}
+		AddInfo(FString::Printf(TEXT("the head the joiner saw against the server's, looking back further by:%s (%d frames)"), *Line, HeadSamples));
+		GEngine->Exec(World(0), TEXT("NetEmulation.PktLag 0"));
+		GEngine->Exec(World(1), TEXT("NetEmulation.PktLag 0"));
+		const float Miss = HeadMisses[5] / FMath::Max(1, HeadSamples);
+		TestTrue(TEXT("measured"), HeadSamples > 30);
+		TestTrue(FString::Printf(TEXT("the server's head is within a head's radius of the one the joiner saw at the time its shot names (%.1f cm on average)"), Miss), Miss < CheeseStrikeWeapons::HeadRadius);
+	});
+	// Standing still, a shot at the head the joiner sees takes the head's damage, and the joiner's hit marker says head; one at
+	// the chest takes the body's, and the marker doesn't.
+	const auto AimAt = [](bool bHead)
+	{
+		ACheeseStrikeCharacter* Joiner = Character(1);
+		const ACheeseStrikeCharacter* Seen = CharacterOf(0, 1);
+		if (Joiner == nullptr || Seen == nullptr || Controller(1) == nullptr)
+		{
+			return;
+		}
+		const FVector Eye = Joiner->GetFirstPersonCameraComponent()->GetComponentLocation();
+		const FVector Target = bHead ? HeadOf(Seen->SampleNow(Now(1))) : Seen->GetActorLocation() + FVector(0.0f, 0.0f, 30.0f);
+		Controller(1)->SetControlRotation((Target - Eye).Rotation());
+		if (ACheeseStrikeCharacter* Host = Character(0))
+		{
+			Host->EndProtection();
+			HealthBefore = Host->GetHealth();
+		}
+	};
+	PutAt(0, HostSpot, HostYaw);
+	Wait(1.0f);
+	Then([AimAt]() { AimAt(true); });
+	Play(1, TEXT("wait 0.2\ntap Fire\nwait 0.6"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		const ACheeseStrikeCharacter* Joiner = Character(1);
+		const FWeaponStats& Held = Joiner != nullptr && Joiner->GetWeapon() != nullptr ? Joiner->GetWeapon()->GetStats() : CheeseStrikeWeapons::Blaster();
+		const float Head = CheeseStrikeWeapons::DamageAt(Held, 400.0f, true);
+		if (Host != nullptr && Joiner != nullptr && Joiner->GetWeapon() != nullptr)
+		{
+			TestTrue(FString::Printf(TEXT("a shot at the head takes the head's damage (%.1f, the head's %.1f)"), HealthBefore - Host->GetHealth(), Head), FMath::IsNearlyEqual(HealthBefore - Host->GetHealth(), Head, 0.5f));
+			TestTrue(TEXT("and the joiner's marker says head"), Joiner->GetWeapon()->HitsConfirmed > 0 && Joiner->GetWeapon()->bLastHitHead);
+		}
+	});
+	Then([AimAt]() { AimAt(false); });
+	Play(1, TEXT("wait 0.4\ntap Fire\nwait 0.6"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		const ACheeseStrikeCharacter* Joiner = Character(1);
+		if (Host != nullptr && Joiner != nullptr && Joiner->GetWeapon() != nullptr)
+		{
+			const float Body = CheeseStrikeWeapons::DamageAt(Joiner->GetWeapon()->GetStats(), 400.0f, false);
+			TestTrue(FString::Printf(TEXT("a shot at the chest takes the body's damage (%.1f, the body's %.1f)"), HealthBefore - Host->GetHealth(), Body), FMath::IsNearlyEqual(HealthBefore - Host->GetHealth(), Body, 0.5f));
+			TestFalse(TEXT("and the marker doesn't say head"), Joiner->GetWeapon()->bLastHitHead);
+		}
+	});
 	StopPlaying();
 	return true;
 }
