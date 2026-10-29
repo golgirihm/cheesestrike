@@ -195,6 +195,9 @@ protected:
 	/** The drops the wound owes (its rate times the time, the fraction carried on), and whether the stomp's pool is down. */
 	float BleedOwed = 0.0f;
 	bool bPooled = false;
+	/** How far into the execution it had bled last frame (for the stab's puffs of mist), and the time owed to the jet's next puff. */
+	float BledTo = 0.0f;
+	float MistOwed = 0.0f;
 	TWeakObjectPtr<class APlayerController> ViewPlayer;
 	/** This machine: the sway last put on the view while down, and its clock. */
 	FRotator SwayShown = FRotator::ZeroRotator;
