@@ -126,9 +126,24 @@ namespace
 		// The keys as the player plays: the keyboard's, or the gamepad's if they last used one.
 		const FString StreakKey = UCheeseStrikeInputSet::Prompt(Hud->PlayerOwner, &UCheeseStrikeInputSet::Streak);
 		const float SinceEarned = Match->GetServerWorldTimeSeconds() - Mine->GetLastEarnedAt();
+		// The streaks' icons in cheese (ACheeseStrikeHUD::StreakIcon), where the HUD has them.
+		ACheeseStrikeHUD* CheeseHud = Cast<ACheeseStrikeHUD>(Hud);
 		if (!Mine->IsMarkingStrike() && Mine->GetLastEarned() != CheeseStrikeStreaks::EStreak::None && Mine->GetLastEarnedAt() > 0.0f && SinceEarned < ModeHudEarnedLife && Ready.Contains(Mine->GetLastEarned()))
 		{
-			HudDraw::Text(Canvas, FString::Printf(TEXT("%s READY  ·  PRESS %s"), CheeseStrikeStreaks::Info(Mine->GetLastEarned()).Name, *StreakKey).ToUpper(), FVector2D(Middle, Canvas->SizeY * 0.62f), HudDraw::Font(30.0f * U), HudDraw::Accent, 0.5f);
+			// The word of it, its icon before it, lit, the two together in the middle.
+			const FString Words = FString::Printf(TEXT("%s READY  ·  PRESS %s"), CheeseStrikeStreaks::Info(Mine->GetLastEarned()).Name, *StreakKey).ToUpper();
+			const FSlateFontInfo Big = HudDraw::Font(30.0f * U);
+			const FVector2D WordsSize = HudDraw::Measure(Words, Big);
+			const float Top = Canvas->SizeY * 0.62f;
+			UTexture2D* Icon = CheeseHud != nullptr ? CheeseHud->StreakIcon(Mine->GetLastEarned()) : nullptr;
+			const float IconSide = Icon != nullptr ? 64.0f * U : 0.0f;
+			const float IconGap = Icon != nullptr ? 10.0f * U : 0.0f;
+			const float Left = Middle - (IconSide + IconGap + WordsSize.X) / 2.0f;
+			if (Icon != nullptr)
+			{
+				HudDraw::Picture(Canvas, Icon, FVector2D(Left, Top + WordsSize.Y / 2.0f - IconSide / 2.0f), FVector2D(IconSide, IconSide), CheeseStrikeHUD::StreakIconTint(true));
+			}
+			HudDraw::Text(Canvas, Words, FVector2D(Left + IconSide + IconGap, Top), Big, HudDraw::Accent);
 		}
 		float Y = Bottom;
 		if (Ready.Num() > 0)
@@ -144,7 +159,11 @@ namespace
 			// The key's box fits its label: "Q", or the d-pad's down.
 			const float Key = FMath::Max(NameSize.Y * 0.95f, static_cast<float>(HudDraw::Measure(StreakKey, Line).X) + 10.0f * U);
 			const float KeyHigh = NameSize.Y * 0.95f;
-			const float Width = Key + 10.0f * U + NameSize.X;
+			// The streak's icon between the key and its name.
+			UTexture2D* Icon = CheeseHud != nullptr ? CheeseHud->StreakIcon(Ready[0]) : nullptr;
+			const float IconSide = Icon != nullptr ? KeyHigh * 1.6f : 0.0f;
+			const float IconRoom = Icon != nullptr ? IconSide + 6.0f * U : 0.0f;
+			const float Width = Key + 10.0f * U + IconRoom + NameSize.X;
 			Y -= KeyHigh;
 			const float Left = Middle - Width / 2.0f;
 			HudDraw::FShapes Shapes;
@@ -152,7 +171,11 @@ namespace
 			Shapes.RoundedFrame(Left, Y, Key, KeyHigh, 4.0f * U, FMath::Max(1.0f, 1.5f * U), HudDraw::Accent);
 			Shapes.Draw(Canvas);
 			HudDraw::Text(Canvas, StreakKey, FVector2D(Left + Key / 2.0f, Y + (KeyHigh - HudDraw::Measure(StreakKey, Line).Y) / 2.0f), Line, HudDraw::Accent, 0.5f);
-			HudDraw::Text(Canvas, Name, FVector2D(Left + Key + 10.0f * U, Y + (KeyHigh - NameSize.Y) / 2.0f), Line, HudDraw::Accent);
+			if (Icon != nullptr)
+			{
+				HudDraw::Picture(Canvas, Icon, FVector2D(Left + Key + 10.0f * U, Y + KeyHigh / 2.0f - IconSide / 2.0f), FVector2D(IconSide, IconSide), CheeseStrikeHUD::StreakIconTint(true));
+			}
+			HudDraw::Text(Canvas, Name, FVector2D(Left + Key + 10.0f * U + IconRoom, Y + (KeyHigh - NameSize.Y) / 2.0f), Line, HudDraw::Accent);
 			Y -= 10.0f * U;
 		}
 		// The run of kills and the streak it is on its way to are the HUD's streak panel (ACheeseStrikeHUD::DrawStreak); choosing

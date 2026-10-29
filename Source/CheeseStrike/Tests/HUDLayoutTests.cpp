@@ -13,6 +13,7 @@
 #include "Rules/CheeseStrikeStreaks.h"
 #include "UI/CheeseStrikeHUDRules.h"
 #include "UI/CheeseStrikeLoader.h"
+#include "Engine/Texture2D.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -185,6 +186,38 @@ bool FTheStreakPanelCountsToEachStreak::RunTest(const FString& Parameters)
 	Fill = StreakFillToward(10.0f, 0, StreakDrainTime / 2.0f);
 	TestTrue(TEXT("a whole track drains halfway in half the time"), FMath::IsNearlyEqual(Fill, 5.0f, 0.01f));
 	TestEqual(TEXT("and empty in all of it"), StreakFillToward(Fill, 0, StreakDrainTime / 2.0f), 0.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEveryStreakHasAnIconInCheese, "CheeseStrike.HUD.EveryStreakHasAnIconInCheese", HUDLayoutTests::Flags)
+bool FEveryStreakHasAnIconInCheese::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	using namespace CheeseStrikeStreaks;
+	TestTrue(TEXT("no streak, no icon"), StreakIconPath(EStreak::None).IsEmpty());
+	TSet<FString> Seen;
+	for (int32 Index = 1; Index <= NumStreaks; ++Index)
+	{
+		const EStreak Kind = StreakAt(Index);
+		const FString Path = StreakIconPath(Kind);
+		TestTrue(FString::Printf(TEXT("%s's icon is in the streaks' folder"), Info(Kind).Name), Path.StartsWith(TEXT("/Game/CheeseStrike/UI/Streaks/T_Streak_")));
+		TestFalse(FString::Printf(TEXT("%s's icon is its own"), Info(Kind).Name), Seen.Contains(Path));
+		Seen.Add(Path);
+		// Rendered by tools/art/streak_icons.py and imported by import_streak_icons.py: 128 pixels square, with a clear background.
+		const UTexture2D* Picture = LoadObject<UTexture2D>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (TestNotNull(FString::Printf(TEXT("%s's icon is there"), Info(Kind).Name), Picture))
+		{
+#if WITH_EDITORONLY_DATA
+			// The source picture's size (the headless editor may not have built the texture for the renderer).
+			TestTrue(FString::Printf(TEXT("%s's icon is 128 pixels square"), Info(Kind).Name), Picture->Source.GetSizeX() == 128 && Picture->Source.GetSizeY() == 128);
+#endif
+			TestFalse(FString::Printf(TEXT("%s's icon keeps its alpha"), Info(Kind).Name), Picture->CompressionNoAlpha);
+		}
+	}
+	// Lit once made, dim until then.
+	TestEqual(TEXT("made, in its own colours"), StreakIconTint(true), FLinearColor::White);
+	const FLinearColor Dim = StreakIconTint(false);
+	TestTrue(TEXT("not yet, darkened and faded"), Dim.R < 0.6f && Dim.A < 0.7f);
 	return true;
 }
 

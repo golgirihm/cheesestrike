@@ -1,0 +1,16 @@
+﻿# The streaks' icons in cheese (wave 14): the kill-streak panel at three kills
+# (the drone's lit, the others dim), at ten (all lit), and the streak-ready
+# prompt with its icon. Run with tools/play.ps1 -Map /Game/CheeseStrike/Maps/Lvl_Creamery
+# -StartAt none -Extra "?Mode=Deathmatch" -Res 1920x1080.
+wait 3
+cmd CheeseStrike.HUD.Streak 3
+wait 1.2
+shot streak_icons_1_three
+cmd CheeseStrike.HUD.Streak 10
+wait 1.2
+shot streak_icons_2_ten
+cmd CheeseStrike.HUD.Streak 6
+cmd CheeseStrikeGiveStreak 2
+wait 0.4
+shot streak_icons_3_ready
+quit
