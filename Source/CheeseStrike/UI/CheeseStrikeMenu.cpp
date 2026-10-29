@@ -214,6 +214,13 @@ namespace CheeseStrikeMenu
 	}
 }
 
+/** Whether this player's level is a lobby or match with others: a level with a connection of its own (as the controller's IsInAMatch). */
+static bool IsInAGameHere(const APlayerController* Player)
+{
+	const UWorld* World = Player != nullptr ? Player->GetWorld() : nullptr;
+	return World != nullptr && World->GetNetMode() != NM_Standalone && World->GetNetDriver() != nullptr;
+}
+
 static TAutoConsoleVariable<int32> CVarFriendsOpen(TEXT("CheeseStrike.FriendsOpen"), 0,
 	TEXT("1: the friends panel stays open in the lobby as if hovered, for looking at it."));
 
@@ -401,47 +408,66 @@ namespace
 		TAttribute<bool> Open;
 	};
 
-	/** A chevron drawn in its colour, 20 across: down (a friends section open), right (folded), or left (the friends tab, which opens that way). */
-	enum class EChevron : uint8 { Down, Right, Left };
+	/**
+	 * The friends panel's chevron, drawn as a polyline (not a character), 12 across in a 16 box: pointing down while what it
+	 * folds is open, turned a quarter turn to the right (or to the left, `FoldsLeft`: the panel's tab, which opens that way) while
+	 * folded. `Turning`: it has just changed, so it turns from the other way over a few frames.
+	 */
 	class SCheeseStrikeChevron : public SLeafWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SCheeseStrikeChevron) : _Way(EChevron::Down), _Colour(FLinearColor::White) {}
-			SLATE_ARGUMENT(EChevron, Way)
+		SLATE_BEGIN_ARGS(SCheeseStrikeChevron) : _Open(true), _FoldsLeft(false), _Turning(false), _Colour(FLinearColor::White) {}
+			SLATE_ARGUMENT(bool, Open)
+			SLATE_ARGUMENT(bool, FoldsLeft)
+			SLATE_ARGUMENT(bool, Turning)
 			SLATE_ARGUMENT(FLinearColor, Colour)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
 		{
-			Way = InArgs._Way;
 			Colour = InArgs._Colour;
+			const float Folded = InArgs._FoldsLeft ? 90.0f : -90.0f;
+			Target = InArgs._Open ? 0.0f : Folded;
+			Angle = InArgs._Turning ? (InArgs._Open ? Folded : 0.0f) : Target;
+			LastTime = FPlatformTime::Seconds();
 		}
 
 		virtual FVector2D ComputeDesiredSize(float) const override
 		{
-			return FVector2D(20.0, 20.0);
+			return FVector2D(16.0, 16.0);
 		}
 
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
 		{
+			// Eased to where it points, 900 degrees a second: a tenth of a second for the quarter turn.
+			const double Now = FPlatformTime::Seconds();
+			Angle = FMath::FixedTurn(Angle, Target, static_cast<float>(FMath::Min(0.1, Now - LastTime)) * 900.0f);
+			LastTime = Now;
+			const FVector2f Centre = FVector2f(AllottedGeometry.GetLocalSize()) * 0.5f;
+			const float Radians = FMath::DegreesToRadians(Angle);
+			const float Cos = FMath::Cos(Radians);
+			const float Sin = FMath::Sin(Radians);
+			// Pointing down: 12 across and 6 high, its middle on the box's.
+			const FVector2f Down[] = { {-6.0f, -3.0f}, {0.0f, 3.0f}, {6.0f, -3.0f} };
 			TArray<FVector2f> Points;
-			switch (Way)
+			for (const FVector2f& Each : Down)
 			{
-			case EChevron::Right: Points = {{7.0f, 3.0f}, {14.0f, 10.0f}, {7.0f, 17.0f}}; break;
-			case EChevron::Left: Points = {{13.0f, 3.0f}, {6.0f, 10.0f}, {13.0f, 17.0f}}; break;
-			default: Points = {{3.0f, 7.0f}, {10.0f, 14.0f}, {17.0f, 7.0f}}; break;
+				Points.Add(Centre + FVector2f(Each.X * Cos - Each.Y * Sin, Each.X * Sin + Each.Y * Cos));
 			}
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), MoveTemp(Points), ESlateDrawEffect::None, Colour * InWidgetStyle.GetColorAndOpacityTint(), true, 2.6f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), MoveTemp(Points), ESlateDrawEffect::None, Colour * InWidgetStyle.GetColorAndOpacityTint(), true, 2.4f);
 			return LayerId;
 		}
 
 	private:
-		EChevron Way = EChevron::Down;
 		FLinearColor Colour = FLinearColor::White;
+		float Target = 0.0f;
+		mutable float Angle = 0.0f;
+		mutable double LastTime = 0.0;
 	};
-	TSharedRef<SWidget> MakeChevron(EChevron Way, const FLinearColor& Colour)
+	/** The one chevron of the friends panel: its sections' headers and its tab (`bFoldsLeft`). */
+	TSharedRef<SWidget> MakeChevron(bool bOpen, const FLinearColor& Colour, bool bTurning = false, bool bFoldsLeft = false)
 	{
-		return SNew(SCheeseStrikeChevron).Way(Way).Colour(Colour);
+		return SNew(SCheeseStrikeChevron).Open(bOpen).Colour(Colour).Turning(bTurning).FoldsLeft(bFoldsLeft);
 	}
 
 	/** A round dot 8 across in its colour: where a friend is (CheeseStrikeFriends::StatusDotColour). */
@@ -830,7 +856,7 @@ void SCheeseStrikeMenu::Refresh()
 		FriendsBox->SetVisibility(bPanel ? EVisibility::Visible : EVisibility::Collapsed);
 		// Eased open and shut, rather than snapping: a fifth of a second to the width it wants.
 		const double Now = FPlatformTime::Seconds();
-		FriendsWidth = FMath::FInterpConstantTo(FriendsWidth, bOpen ? 380.0f : CheeseStrikeMenu::FriendsTabWidth, static_cast<float>(FMath::Min(0.1, Now - FriendsWidthAt)), 1500.0f);
+		FriendsWidth = FMath::FInterpConstantTo(FriendsWidth, bOpen ? 410.0f : CheeseStrikeMenu::FriendsTabWidth, static_cast<float>(FMath::Min(0.1, Now - FriendsWidthAt)), 1500.0f);
 		FriendsWidthAt = Now;
 		FriendsBox->SetWidthOverride(FriendsWidth);
 		// Asked for when it opens, and again every 20 s while it is open, so that a friend who joins a game shows.
@@ -846,7 +872,7 @@ void SCheeseStrikeMenu::Refresh()
 		{
 			for (const FCheeseStrikeFriend& Each : Sessions->GetFriends())
 			{
-				Key += FString::Printf(TEXT("%s/%d/%d/%d/%d/%d;"), *Each.Name, static_cast<int32>(Each.State), Each.Humans, static_cast<int32>(Each.Status), static_cast<int32>(Each.Permission), Each.bInMyParty ? 1 : 0);
+				Key += FString::Printf(TEXT("%s/%d/%d/%d/%d/%d/%d/%d;"), *Each.Name, static_cast<int32>(Each.State), Each.Humans, static_cast<int32>(Each.Status), static_cast<int32>(Each.Permission), Each.bInMyParty ? 1 : 0, static_cast<int32>(Each.Online), static_cast<int32>(Each.Playing));
 			}
 		}
 		if (Sessions != nullptr)
@@ -857,6 +883,7 @@ void SCheeseStrikeMenu::Refresh()
 				Key += Sessions->AvatarOf(Index) != nullptr ? TEXT("a") : TEXT("-");
 			}
 			Key += Sessions->FriendsMayJoinHere() ? TEXT("J") : TEXT("I");
+			Key += Sessions->IsInAMatch() || IsInAGameHere(Controller.Get()) ? TEXT("G") : TEXT("F");
 			for (int32 Section = 0; Section < CheeseStrikeFriends::NumSections; ++Section)
 			{
 				Key += ClosedFriendSections.Contains(static_cast<uint8>(Section)) ? TEXT("c") : TEXT("o");
@@ -866,8 +893,17 @@ void SCheeseStrikeMenu::Refresh()
 		{
 			for (const APlayerState* Each : State->PlayerArray)
 			{
-				Key += FString::Printf(TEXT("%s%s;"), *Each->GetPlayerName(), Each->IsABot() ? TEXT("*") : TEXT(""));
+				Key += FString::Printf(TEXT("%s%s%s;"), *Each->GetPlayerName(), Each->IsABot() ? TEXT("*") : TEXT(""), Sessions != nullptr && bOpen && Sessions->AvatarOfPlayer(Each) != nullptr ? TEXT("a") : TEXT(""));
 			}
+		}
+		// Our own picture (asked for each frame until Steam has downloaded it), and who we are.
+		if (Sessions != nullptr && bOpen)
+		{
+			Key += Sessions->MyAvatar() != nullptr ? TEXT("|me") : TEXT("|-");
+		}
+		if (const APlayerState* Mine = Controller.IsValid() ? Controller->PlayerState.Get() : nullptr)
+		{
+			Key += Mine->GetPlayerName();
 		}
 		// (Not while a dropdown is open, which drawing the panel again would close.)
 		if (Key != ShownFriendsKey && FriendsContent.IsValid() && !IsDropdownOpen())
@@ -1687,102 +1723,88 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 		return MakeFriendsTab(Sessions);
 	}
 	FriendBrushes.Reset();
+	const bool bHost = Player.IsValid() && Player->IsLocalController() && Player->HasAuthority();
+	// In a lobby or match: a session of ours, or a level with a connection (a listen server reached by travel has no session).
+	const bool bInGame = (Sessions != nullptr && Sessions->IsInAMatch()) || IsInAGameHere(Player.Get());
 	// Everything in it on one left edge: the sections' headers, their cards and their empty lines.
 	TSharedRef<SVerticalBox> Friends = SNew(SVerticalBox);
 	if (Sessions != nullptr)
 	{
+		using namespace CheeseStrikeFriends;
 		const TArray<FCheeseStrikeFriend>& List = Sessions->GetFriends();
-		// In sections, each with a header that folds it. Who is in our party is by Steam's lobby id, or by name among the players here.
+		TArray<TSharedRef<SWidget>> Rows[NumSections];
+		// Your party: ourself first, then everyone else in the lobby or match we are in.
+		const APlayerState* Mine = Player.IsValid() ? Player->PlayerState.Get() : nullptr;
+		Rows[static_cast<int32>(ESection::YourParty)].Add(MakePartyRow(Mine, true, bHost));
 		TArray<FString> HereNames;
-		if (const ACheeseStrikeGameState* State = Player.IsValid() ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr)
+		if (const ACheeseStrikeGameState* State = bInGame && Player.IsValid() ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr)
 		{
 			for (const APlayerState* Each : State->PlayerArray)
 			{
 				if (Each != nullptr && !Each->IsABot())
 				{
 					HereNames.Add(Each->GetPlayerName());
+					if (Each != Mine)
+					{
+						Rows[static_cast<int32>(ESection::YourParty)].Add(MakePartyRow(Each, false, bHost));
+					}
 				}
 			}
 		}
-		TArray<int32> Listed[CheeseStrikeFriends::NumSections];
+		// The friends: in our party (by Steam's lobby id) and not yet here, then the joinable, then the others in their order.
+		TArray<int32> Listed[NumSections];
 		for (int32 Index = 0; Index < List.Num(); ++Index)
 		{
 			const FCheeseStrikeFriend& Each = List[Index];
-			const bool bParty = Each.bInMyParty || (Sessions->IsInAMatch() && HereNames.Contains(Each.Name));
-			const CheeseStrikeFriends::ESection Section = CheeseStrikeFriends::SectionFor(bParty, Each.Status, Each.Permission, CheeseStrikeFriends::HasSpace(Each.Humans), CheeseStrikeFriends::PlayedBefore(Each.bRunningThisGame, Each.bPublishesStatus));
-			Listed[static_cast<int32>(Section)].Add(Index);
+			if (bInGame && HereNames.Contains(Each.Name))
+			{
+				continue;
+			}
+			Listed[static_cast<int32>(SectionFor(Each.bInMyParty && bInGame, Each.Status, Each.Permission, HasSpace(Each.Humans)))].Add(Index);
 		}
-		for (int32 Section = 0; Section < CheeseStrikeFriends::NumSections; ++Section)
+		Listed[static_cast<int32>(ESection::Others)].StableSort([&List](int32 A, int32 B)
+		{
+			const int32 RankA = OthersRank(List[A].Online, List[A].Playing);
+			const int32 RankB = OthersRank(List[B].Online, List[B].Playing);
+			return RankA != RankB ? RankA < RankB : List[A].Name < List[B].Name;
+		});
+		for (int32 Section = 0; Section < NumSections; ++Section)
+		{
+			for (const int32 Index : Listed[Section])
+			{
+				Rows[Section].Add(MakeFriendRow(Index, static_cast<ESection>(Section)));
+			}
+		}
+		for (int32 Section = 0; Section < NumSections; ++Section)
 		{
 			// Every section shows, with a count of 0 and a faint line when nobody is in it, a faint rule between them.
 			if (Section > 0)
 			{
 				Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ MakeDivider() ];
 			}
-			Friends->AddSlot().AutoHeight() [ MakeSectionHeader(static_cast<CheeseStrikeFriends::ESection>(Section), Listed[Section].Num()) ];
+			Friends->AddSlot().AutoHeight() [ MakeSectionHeader(static_cast<ESection>(Section), Rows[Section].Num()) ];
 			if (ClosedFriendSections.Contains(static_cast<uint8>(Section)))
 			{
 				continue;
 			}
-			if (Listed[Section].IsEmpty())
+			if (Rows[Section].IsEmpty())
 			{
 				Friends->AddSlot().AutoHeight().Padding(FMargin(26.0f, 2.0f, 0.0f, 4.0f))
 				[
-					SNew(STextBlock).Text(FText::FromString(CheeseStrikeFriends::EmptySectionLine())).Font(Font(14)).ColorAndOpacity(Shade(Muted, 1.0f, 0.55f))
+					SNew(STextBlock).Text(FText::FromString(EmptySectionLine())).Font(Font(14)).ColorAndOpacity(Shade(Muted, 1.0f, 0.55f))
 				];
 			}
-			for (const int32 Index : Listed[Section])
+			for (const TSharedRef<SWidget>& Row : Rows[Section])
 			{
-				Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ MakeFriendRow(Index) ];
+				Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ Row ];
 			}
 		}
+		// The chevron just turned has turned.
+		TurningFriendSection = INDEX_NONE;
 	}
 	else
 	{
 		Friends->AddSlot().AutoHeight() [ MakeLine(TEXT("No online service"), true, false) ];
-	}
-	// In the game (a lobby or a match): who is in it, and the host's Kick.
-	const bool bHost = Player.IsValid() && Player->IsLocalController() && Player->HasAuthority();
-	const bool bInGame = Sessions != nullptr && Sessions->IsInAMatch();
-	if (bInGame)
-	{
-		if (const ACheeseStrikeGameState* State = Player.IsValid() ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr)
-		{
-			TArray<const APlayerState*> Humans;
-			for (const APlayerState* Each : State->PlayerArray)
-			{
-				if (Each != nullptr && !Each->IsABot())
-				{
-					Humans.Add(Each);
-				}
-			}
-			Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 8.0f)) [ MakeDivider() ];
-			Friends->AddSlot().AutoHeight()
-			[
-				SNew(SBox).Padding(FMargin(26.0f, 5.0f, 6.0f, 5.0f))
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-					[
-						SNew(STextBlock).Text(FText::FromString(TEXT("IN THIS GAME"))).Font(Font(14, FName("Bold"))).ColorAndOpacity(Muted)
-					]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ MakeCountPill(Humans.Num()) ]
-				]
-			];
-			for (const APlayerState* Each : Humans)
-			{
-				const bool bSelf = Each == Player->PlayerState;
-				TSharedRef<SWidget> Action = SNew(SSpacer);
-				if (CheeseStrikeFriends::CanKick(bHost, bSelf))
-				{
-					const ACheeseStrikePlayerState* Who = Cast<ACheeseStrikePlayerState>(Each);
-					Action = MakeSmallButton(TEXT("KICK"), TEXT("Kick ") + Each->GetPlayerName(), [Player, Who]() { if (Player.IsValid() && Who != nullptr) Player->KickFromMenu(const_cast<ACheeseStrikePlayerState*>(Who)); }, EButtonKind::Danger);
-				}
-				const FString Under = bSelf ? FString(TEXT("You")) : (State->GetHostName() == Each->GetPlayerName() ? FString(TEXT("Host")) : FString(TEXT("Player")));
-				TSharedRef<SWidget> Line = SNew(STextBlock).Text(FText::FromString(Under)).Font(Font(13)).ColorAndOpacity(Muted);
-				Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ MakeFriendCard(MakeAvatar(nullptr, Each->GetPlayerName(), 32.0f), Each->GetPlayerName(), Line, Action, FString()) ];
-			}
-		}
 	}
 	// Nearly opaque: open over the lobby's seats, they would show through its rows.
 	return SNew(SBorder).BorderImage(&FriendsCardBrush).BorderBackgroundColor(FLinearColor(PanelColour.R, PanelColour.G, PanelColour.B, 0.96f)).Padding(FMargin(20.0f, 24.0f))
@@ -1814,7 +1836,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsTab(UCheeseStrikeSessionSubsys
 	{
 		for (const FCheeseStrikeFriend& Each : Sessions->GetFriends())
 		{
-			Online += Each.Status != CheeseStrikeFriends::EStatus::NotInGame ? 1 : 0;
+			Online += Each.Online != CheeseStrikeFriends::EOnline::Offline ? 1 : 0;
 		}
 	}
 	// A card at the top of the edge, as high as the lobby's page starts: it opens to the left as it is hovered.
@@ -1823,7 +1845,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsTab(UCheeseStrikeSessionSubsys
 		SNew(SBorder).BorderImage(&FriendsTabBrush).BorderBackgroundColor(PanelColour).Padding(FMargin(10.0f, 16.0f, 10.0f, 18.0f)).HAlign(HAlign_Center)
 		[
 			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center) [ MakeChevron(EChevron::Left, Ink) ]
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center) [ MakeChevron(false, Ink, false, true) ]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, 10.0f, 0.0f, 6.0f))
 			[
 				SNew(SBox).WidthOverride(30.0f).HeightOverride(30.0f) [ SNew(SImage).Image(Looks().PlayerIcon.Get()).ColorAndOpacity(Cheese) ]
@@ -1837,7 +1859,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsTab(UCheeseStrikeSessionSubsys
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 6.0f, 0.0f))
 				[
-					SNew(SCheeseStrikeDot).Colour(Online > 0 ? CheeseStrikeFriends::StatusDotColour(CheeseStrikeFriends::EStatus::InMatch) : CheeseStrikeFriends::StatusDotColour(CheeseStrikeFriends::EStatus::NotInGame))
+					SNew(SCheeseStrikeDot).Colour(Online > 0 ? CheeseStrikeFriends::StatusDotColour(CheeseStrikeFriends::EStatus::InMatch, CheeseStrikeFriends::EOnline::Online) : CheeseStrikeFriends::StatusDotColour(CheeseStrikeFriends::EStatus::NotInGame, CheeseStrikeFriends::EOnline::Offline))
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
@@ -1893,7 +1915,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSectionHeader(CheeseStrikeFriends::ES
 			{
 				ClosedFriendSections.Add(Id);
 			}
-			// Drawn again at the next refresh.
+			// Drawn again at the next refresh, its chevron turning.
+			TurningFriendSection = Id;
 			ShownFriendsKey.Reset();
 			return FReply::Handled();
 		})
@@ -1901,7 +1924,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSectionHeader(CheeseStrikeFriends::ES
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(2.0f, 0.0f, 8.0f, 0.0f))
 			[
-				MakeChevron(bClosed ? EChevron::Right : EChevron::Down, Muted)
+				MakeChevron(!bClosed, Muted, TurningFriendSection == Id)
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 			[
@@ -1998,8 +2021,30 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendCard(TSharedRef<SWidget> Pictur
 	return Card.ToSharedRef();
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeRowButton(const FString& Text, const FString& ItemName, TFunction<void()> Do, EButtonKind Kind, const FString& WhyNot, const FString& Hover)
 {
+	const FString Says = WhyNot.IsEmpty() ? Hover : WhyNot;
+	// The tooltip on a box round the button, which shows it faded too; the button itself enabled or not (no click, no focus).
+	return SNew(SBox).ToolTipText(Says.IsEmpty() ? FText() : FText::FromString(Says))
+	[
+		SNew(SBox).IsEnabled(WhyNot.IsEmpty())
+		[
+			Focusable(ItemName, SNew(SCheeseStrikeButton)
+				.ButtonStyle(&ButtonStyle(Kind))
+				.ContentPadding(FMargin(8.0f, 5.0f))
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
+				.OnClicked_Lambda([Do]() { Do(); return FReply::Handled(); })
+				[
+					SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(13, FName("Bold")))
+				])
+		]
+	];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index, CheeseStrikeFriends::ESection Section)
+{
+	using namespace CheeseStrikeFriends;
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
 	if (Sessions == nullptr || !Sessions->GetFriends().IsValidIndex(Index))
@@ -2007,30 +2052,61 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index)
 		return SNullWidget::NullWidget;
 	}
 	const FCheeseStrikeFriend& Friend = Sessions->GetFriends()[Index];
-	const bool bInAGame = Sessions->IsInAMatch();
-	TSharedRef<SWidget> Action = SNew(SSpacer);
-	if (Friend.State == CheeseStrikeFriends::EState::Join)
+	const bool bInAGame = Sessions->IsInAMatch() || IsInAGameHere(Player.Get());
+	// Joinable: JOIN and INVITE; the others INVITE; the party nothing. Right-aligned, the name before them cut to fit.
+	TSharedRef<SHorizontalBox> Action = SNew(SHorizontalBox);
+	if (Section == ESection::Joinable)
 	{
-		Action = MakeSmallButton(TEXT("JOIN"), TEXT("Join ") + Friend.Name, [Sessions, Index]() { Sessions->JoinFriend(Index); }, EButtonKind::Primary);
+		const FString WhyNotJoin = Friend.State == EState::Join ? FString() : FString(TEXT("Their game is still being looked up: REFRESH"));
+		Action->AddSlot().AutoWidth() [ MakeRowButton(TEXT("JOIN"), TEXT("Join ") + Friend.Name, [Sessions, Index]() { Sessions->JoinFriend(Index); }, EButtonKind::Primary, WhyNotJoin, TEXT("Join ") + Friend.Name + TEXT("'s game")) ];
 	}
-	else if (bInAGame && !Friend.bInMyParty && CheeseStrikeFriends::PlayedBefore(Friend.bRunningThisGame, Friend.bPublishesStatus) && CheeseStrikeFriends::CanInvite(true, false) && Friend.State != CheeseStrikeFriends::EState::Full)
+	if (Section != ESection::YourParty)
 	{
-		Action = MakeSmallButton(TEXT("INVITE"), TEXT("Invite ") + Friend.Name, [Sessions, Index]() { Sessions->InviteFriend(Index); });
+		Action->AddSlot().AutoWidth().Padding(FMargin(Section == ESection::Joinable ? 6.0f : 0.0f, 0.0f, 0.0f, 0.0f))
+		[
+			MakeRowButton(TEXT("INVITE"), TEXT("Invite ") + Friend.Name, [Sessions, Index]() { Sessions->InviteFriend(Index); }, EButtonKind::Plain,
+				WhyNoInvite(bInAGame, Friend.Online), TEXT("Invite ") + Friend.Name + TEXT(" to your game"))
+		];
 	}
-	// Hovering the row says what the panel knows of them. Whether they have played before is what their presence shows (see PlayedBefore).
-	const bool bOwns = CheeseStrikeFriends::PlayedBefore(Friend.bRunningThisGame, Friend.bPublishesStatus);
-	const FString Hover = CheeseStrikeFriends::Tooltip(bOwns, Friend.Status, Friend.Permission, CheeseStrikeFriends::HasSpace(Friend.Humans), Friend.Humans);
+	// Hovering the row says what the panel knows of them.
+	const FString Hover = Tooltip(Friend.Online, Friend.Playing, Friend.Status, Friend.Permission, HasSpace(Friend.Humans), Friend.Humans);
 	// Under the name, softer: a dot in the colour of where they are, and what the panel says of it.
 	TSharedRef<SWidget> Under = SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 1.0f, 6.0f, 0.0f))
 		[
-			SNew(SCheeseStrikeDot).Colour(CheeseStrikeFriends::StatusDotColour(Friend.Status))
+			SNew(SCheeseStrikeDot).Colour(StatusDotColour(Friend.Status, Friend.Online))
 		]
 		+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 		[
-			SNew(STextBlock).Text(FText::FromString(CheeseStrikeFriends::RowStatus(Friend.State, Friend.Status, Friend.Humans))).Font(Font(13)).ColorAndOpacity(Muted).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
+			SNew(STextBlock).Text(FText::FromString(Section == ESection::YourParty ? StatusLabel(Friend.Status) : RowStatus(Friend.State, Friend.Status, Friend.Humans, Friend.Online, Friend.Playing))).Font(Font(13)).ColorAndOpacity(Muted).OverflowPolicy(ETextOverflowPolicy::Ellipsis)
 		];
 	return MakeFriendCard(MakeAvatar(Sessions->AvatarOf(Index), Friend.Name, 36.0f), Friend.Name, Under, Action, Hover);
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakePartyRow(const APlayerState* Who, bool bSelf, bool bHost)
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
+	const ACheeseStrikeGameState* State = Player.IsValid() ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const bool bInGame = (Sessions != nullptr && Sessions->IsInAMatch()) || IsInAGameHere(Player.Get());
+	const FString Name = Who != nullptr ? Who->GetPlayerName() : FString(TEXT("You"));
+	TSharedRef<SWidget> Action = SNew(SSpacer);
+	if (!bSelf && CheeseStrikeFriends::CanKick(bHost, bSelf))
+	{
+		const ACheeseStrikePlayerState* Kicked = Cast<ACheeseStrikePlayerState>(Who);
+		Action = MakeRowButton(TEXT("KICK"), TEXT("Kick ") + Name, [Player, Kicked]() { if (Player.IsValid() && Kicked != nullptr) Player->KickFromMenu(const_cast<ACheeseStrikePlayerState*>(Kicked)); }, EButtonKind::Danger, FString(), TEXT("Put ") + Name + TEXT(" out of the game"));
+	}
+	const bool bTheHost = bInGame && State != nullptr && State->GetHostName() == Name;
+	const FString Under = bSelf ? (bInGame && bHost ? FString(TEXT("You, the host")) : FString(TEXT("You"))) : (bTheHost ? FString(TEXT("Host")) : FString(TEXT("Player")));
+	TSharedRef<SWidget> Line = SNew(STextBlock).Text(FText::FromString(Under)).Font(Font(13)).ColorAndOpacity(Muted).OverflowPolicy(ETextOverflowPolicy::Ellipsis);
+	// Our own Steam picture by the identity's id (on the front end too), else by the player's.
+	UTexture2D* Picture = nullptr;
+	if (Sessions != nullptr)
+	{
+		Picture = bSelf ? Sessions->MyAvatar() : nullptr;
+		Picture = Picture != nullptr ? Picture : Sessions->AvatarOfPlayer(Who);
+	}
+	return MakeFriendCard(MakeAvatar(Picture, Name, 36.0f), Name, Line, Action, FString());
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const CheeseStrikeRules::FRosterEntry& Seat, bool bHost, const FLinearColor& Colour, bool bMine, TFunction<void()> Click)

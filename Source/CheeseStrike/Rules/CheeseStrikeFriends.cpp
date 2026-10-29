@@ -82,24 +82,64 @@ namespace CheeseStrikeFriends
 		case EStatus::MainMenu: return TEXT("Main menu");
 		case EStatus::InLobby: return TEXT("In a lobby");
 		case EStatus::InMatch: return TEXT("In a match");
-		default: return TEXT("Not in game");
+		default: return TEXT("Not playing CheeseStrike");
 		}
 	}
 
-	FString RowStatus(EState State, EStatus Status, int32 Humans)
+	FString OnlineLabel(EOnline Online)
 	{
-		const bool bInAParty = Status == EStatus::InLobby || Status == EStatus::InMatch;
-		return bInAParty && (State == EState::Join || State == EState::Full) ? StateLine(State, Humans) : StatusLabel(Status);
+		switch (Online)
+		{
+		case EOnline::Online: return TEXT("Online");
+		case EOnline::Away: return TEXT("Away");
+		case EOnline::Busy: return TEXT("Busy");
+		default: return TEXT("Offline");
+		}
 	}
 
-	FLinearColor StatusDotColour(EStatus Status)
+	FString PlayingLabel(EPlaying Playing)
+	{
+		switch (Playing)
+		{
+		case EPlaying::CheeseStrike: return TEXT("CheeseStrike");
+		case EPlaying::AnotherGame: return TEXT("another game");
+		default: return TEXT("nothing");
+		}
+	}
+
+	FString RowStatus(EState State, EStatus Status, int32 Humans, EOnline Online, EPlaying Playing)
+	{
+		const bool bInAParty = Status == EStatus::InLobby || Status == EStatus::InMatch;
+		if (bInAParty && (State == EState::Join || State == EState::Full))
+		{
+			return StateLine(State, Humans);
+		}
+		if (Status != EStatus::NotInGame)
+		{
+			return StatusLabel(Status);
+		}
+		if (Online != EOnline::Offline && Playing == EPlaying::AnotherGame)
+		{
+			return TEXT("Playing another game");
+		}
+		return OnlineLabel(Online);
+	}
+
+	FLinearColor StatusDotColour(EStatus Status, EOnline Online)
 	{
 		switch (Status)
 		{
 		case EStatus::InMatch: return FLinearColor(0.3f, 0.82f, 0.36f);
 		case EStatus::InLobby: return FLinearColor(0.28f, 0.6f, 1.0f);
 		case EStatus::MainMenu: return FLinearColor(0.96f, 0.72f, 0.2f);
-		default: return FLinearColor(0.38f, 0.37f, 0.36f);
+		default: break;
+		}
+		switch (Online)
+		{
+		case EOnline::Online: return FLinearColor(0.72f, 0.71f, 0.68f);
+		case EOnline::Away:
+		case EOnline::Busy: return FLinearColor(0.62f, 0.42f, 0.24f);
+		default: return FLinearColor(0.3f, 0.29f, 0.28f);
 		}
 	}
 
@@ -145,17 +185,12 @@ namespace CheeseStrikeFriends
 		return Permission == EPermission::InviteOnly ? TEXT("Only invitations let players in") : TEXT("Friends can join");
 	}
 
-	bool PlayedBefore(bool bRunningThisGame, bool bPublishesStatus)
-	{
-		return bRunningThisGame || bPublishesStatus;
-	}
-
 	bool HasSpace(int32 Humans)
 	{
 		return Humans < MaxHumans;
 	}
 
-	ESection SectionFor(bool bInMyParty, EStatus Status, EPermission Permission, bool bHasSpace, bool bOwns)
+	ESection SectionFor(bool bInMyParty, EStatus Status, EPermission Permission, bool bHasSpace)
 	{
 		if (bInMyParty)
 		{
@@ -166,7 +201,7 @@ namespace CheeseStrikeFriends
 		{
 			return ESection::Joinable;
 		}
-		return bOwns ? ESection::Invitable : ESection::Others;
+		return ESection::Others;
 	}
 
 	FString SectionTitle(ESection Section)
@@ -175,20 +210,51 @@ namespace CheeseStrikeFriends
 		{
 		case ESection::YourParty: return TEXT("Your party");
 		case ESection::Joinable: return TEXT("Joinable");
-		case ESection::Invitable: return TEXT("Invitable");
 		default: return TEXT("Others");
 		}
 	}
 
-	FString Tooltip(bool bOwns, EStatus Status, EPermission Permission, bool bHasSpace, int32 Humans)
+	int32 OthersRank(EOnline Online, EPlaying Playing)
+	{
+		if (Online == EOnline::Offline)
+		{
+			return 4;
+		}
+		if (Playing == EPlaying::CheeseStrike)
+		{
+			return 0;
+		}
+		if (Playing == EPlaying::AnotherGame)
+		{
+			return 1;
+		}
+		return Online == EOnline::Online ? 2 : 3;
+	}
+
+	FString Tooltip(EOnline Online, EPlaying Playing, EStatus Status, EPermission Permission, bool bHasSpace, int32 Humans)
 	{
 		const bool bInAParty = Status == EStatus::InLobby || Status == EStatus::InMatch;
-		const FString Players = bInAParty && Humans >= 0 ? FString::Printf(TEXT("%d/%d"), Humans, MaxHumans) : FString(TEXT("-"));
-		return FString::Printf(TEXT("Played before: %s\nStatus: %s\nParty permission: %s\nSpace in party: %s\nPlayers: %s"),
-			bOwns ? TEXT("Yes") : TEXT("No"),
+		const TCHAR* const None = TEXT("N/A");
+		const FString Players = !bInAParty ? FString(None) : (Humans >= 0 ? FString::Printf(TEXT("%d/%d"), Humans, MaxHumans) : FString(TEXT("?")));
+		return FString::Printf(TEXT("Steam: %s\nPlaying: %s\nStatus: %s\nParty permission: %s\nSpace in party: %s\nPlayers: %s"),
+			*OnlineLabel(Online),
+			*PlayingLabel(Online == EOnline::Offline ? EPlaying::Nothing : Playing),
 			*StatusLabel(Status),
-			bInAParty ? *PermissionLabel(Permission) : TEXT("None"),
-			bInAParty && bHasSpace ? TEXT("Yes") : TEXT("No"),
+			bInAParty ? *PermissionLabel(Permission) : None,
+			bInAParty ? (bHasSpace ? TEXT("Yes") : TEXT("No")) : None,
 			*Players);
+	}
+
+	FString WhyNoInvite(bool bWeAreInAGame, EOnline Them)
+	{
+		if (!bWeAreInAGame)
+		{
+			return TEXT("Host or join a lobby first: an invitation is to the lobby or match you are in");
+		}
+		if (Them == EOnline::Offline)
+		{
+			return TEXT("They are offline");
+		}
+		return FString();
 	}
 }

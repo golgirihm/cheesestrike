@@ -51,7 +51,9 @@ UTexture2D* UCheeseStrikeAvatars::ForUniqueId(const FString& Type, const FString
 	{
 		return nullptr;
 	}
-	AskAgainAt.Add(Id, Now + 2.0);
+	// Asked again soon: Steam has no picture (0) until it has downloaded it, and the panel and the HUD ask each frame, so this
+	// polls until it is there (AvatarImageLoaded_t would say when, but the asking is cheap).
+	AskAgainAt.Add(Id, Now + 0.5);
 #if CHEESESTRIKE_STEAM
 	ISteamFriends* Friends = SteamFriends();
 	ISteamUtils* Utilities = SteamUtils();
@@ -63,7 +65,7 @@ UTexture2D* UCheeseStrikeAvatars::ForUniqueId(const FString& Type, const FString
 	const int Image = Friends->GetMediumFriendAvatar(Steam);
 	if (Image <= 0)
 	{
-		// 0: Steam doesn't have them yet (someone not a friend), so ask it to fetch them; -1: on its way.
+		// 0: Steam doesn't have them yet (someone not a friend, or the picture not downloaded), so ask it to fetch them; -1: on its way.
 		if (Image == 0)
 		{
 			Friends->RequestUserInformation(Steam, false);

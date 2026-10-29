@@ -379,7 +379,7 @@ void UCheeseStrikeSessionSubsystem::ShowSampleFriends(bool bShow)
 	{
 		return;
 	}
-	const auto Add = [this](const TCHAR* Name, EStatus Status, EState State, int32 Humans, EPermission Permission, bool bPlayed)
+	const auto Add = [this](const TCHAR* Name, EStatus Status, EState State, int32 Humans, EPermission Permission, EOnline Online, EPlaying Playing, bool bParty)
 	{
 		FCheeseStrikeFriend Friend;
 		Friend.Name = Name;
@@ -388,16 +388,29 @@ void UCheeseStrikeSessionSubsystem::ShowSampleFriends(bool bShow)
 		Friend.Humans = Humans;
 		Friend.Permission = Permission;
 		Friend.bInGame = State != EState::NotPlaying;
-		Friend.bRunningThisGame = bPlayed;
-		Friend.bPublishesStatus = bPlayed;
+		Friend.bRunningThisGame = Playing == EPlaying::CheeseStrike;
+		Friend.bPublishesStatus = Playing == EPlaying::CheeseStrike;
+		Friend.Online = Online;
+		Friend.Playing = Playing;
+		Friend.bInMyParty = bParty;
 		Friends.Add(Friend);
 	};
-	Add(TEXT("Gorgon Zola"), EStatus::InLobby, EState::Join, 3, EPermission::InvitesAndFriends, true);
-	Add(TEXT("Brie Larson-Camembert the Thirty-Second"), EStatus::InMatch, EState::Join, 9, EPermission::InvitesAndFriends, true);
-	Add(TEXT("Halloumi Hal"), EStatus::InMatch, EState::Full, MaxHumans, EPermission::InvitesAndFriends, true);
-	Add(TEXT("Feta Fiona"), EStatus::MainMenu, EState::NotPlaying, -1, EPermission::InvitesAndFriends, true);
-	Add(TEXT("Paneer"), EStatus::InLobby, EState::InviteOnly, 2, EPermission::InviteOnly, true);
-	Add(TEXT("Mozz Arella"), EStatus::NotInGame, EState::NotPlaying, -1, EPermission::InvitesAndFriends, false);
+	// One in our party when we are in a game, so that the party shows a friend beside the players here.
+	const bool bParty = IsInAMatch() || (GetWorld() != nullptr && GetWorld()->GetNetMode() != NM_Standalone);
+	const EPermission Open = EPermission::InvitesAndFriends;
+	Add(TEXT("Gorgon Zola"), EStatus::InLobby, EState::Join, 3, Open, EOnline::Online, EPlaying::CheeseStrike, false);
+	Add(TEXT("Brie Larson-Camembert the Thirty-Second"), EStatus::InMatch, EState::Join, 9, Open, EOnline::Online, EPlaying::CheeseStrike, false);
+	Add(TEXT("Halloumi Hal"), EStatus::InMatch, EState::Full, MaxHumans, Open, EOnline::Online, EPlaying::CheeseStrike, false);
+	Add(TEXT("Feta Fiona"), EStatus::MainMenu, EState::NotPlaying, -1, Open, EOnline::Away, EPlaying::CheeseStrike, false);
+	Add(TEXT("Paneer"), EStatus::InLobby, EState::InviteOnly, 2, EPermission::InviteOnly, EOnline::Online, EPlaying::CheeseStrike, false);
+	Add(TEXT("Mozz Arella"), EStatus::NotInGame, EState::NotPlaying, -1, Open, EOnline::Online, EPlaying::AnotherGame, false);
+	Add(TEXT("Ricotta Rita"), EStatus::NotInGame, EState::NotPlaying, -1, Open, EOnline::Busy, EPlaying::Nothing, false);
+	Add(TEXT("Emmental Emil"), EStatus::NotInGame, EState::NotPlaying, -1, Open, EOnline::Online, EPlaying::Nothing, false);
+	Add(TEXT("Stilton Stan"), EStatus::NotInGame, EState::NotPlaying, -1, Open, EOnline::Offline, EPlaying::Nothing, false);
+	if (bParty)
+	{
+		Add(TEXT("Cheddar Charlie"), EStatus::InLobby, EState::Join, 2, Open, EOnline::Online, EPlaying::CheeseStrike, true);
+	}
 #endif
 }
 
@@ -437,6 +450,22 @@ void UCheeseStrikeSessionSubsystem::OnFriendsRead(int32 LocalUserNum, bool bWasS
 		Friend.bRunningThisGame = Presence.bIsPlayingThisGame;
 		Friend.bPublishesStatus = Published != nullptr;
 		Friend.Status = CheeseStrikeFriends::StatusFromValue(Value, Friend.bRunningThisGame || Friend.bPublishesStatus);
+		// Where they are on Steam, and what they play (Steam gives no other app's name, nor when a friend was last online).
+		using CheeseStrikeFriends::EOnline;
+		switch (Presence.Status.State)
+		{
+		case EOnlinePresenceState::Offline: Friend.Online = EOnline::Offline; break;
+		case EOnlinePresenceState::Away:
+		case EOnlinePresenceState::ExtendedAway: Friend.Online = EOnline::Away; break;
+		case EOnlinePresenceState::DoNotDisturb: Friend.Online = EOnline::Busy; break;
+		default: Friend.Online = EOnline::Online; break;
+		}
+		if (!Presence.bIsOnline)
+		{
+			Friend.Online = EOnline::Offline;
+		}
+		Friend.Playing = Presence.bIsPlayingThisGame ? CheeseStrikeFriends::EPlaying::CheeseStrike
+			: (Presence.bIsPlaying ? CheeseStrikeFriends::EPlaying::AnotherGame : CheeseStrikeFriends::EPlaying::Nothing);
 		FString Access;
 		if (const FVariantData* Shut = Presence.Status.Properties.Find(CheeseStrikeFriends::PermissionKey))
 		{
@@ -515,11 +544,29 @@ UTexture2D* UCheeseStrikeSessionSubsystem::AvatarOf(int32 Index)
 	{
 		return nullptr;
 	}
+	return GetAvatars()->ForUniqueId(Friends[Index].Id->GetType().ToString(), Friends[Index].Id->ToString(), GetWorld());
+}
+
+UCheeseStrikeAvatars* UCheeseStrikeSessionSubsystem::GetAvatars()
+{
 	if (Avatars == nullptr)
 	{
 		Avatars = NewObject<UCheeseStrikeAvatars>(this);
 	}
-	return Avatars->ForUniqueId(Friends[Index].Id->GetType().ToString(), Friends[Index].Id->ToString(), GetWorld());
+	return Avatars;
+}
+
+UTexture2D* UCheeseStrikeSessionSubsystem::MyAvatar()
+{
+	IOnlineSubsystem* Service = Online::GetSubsystem(GetWorld());
+	const IOnlineIdentityPtr Identity = Service != nullptr ? Service->GetIdentityInterface() : nullptr;
+	const FUniqueNetIdPtr Me = Identity.IsValid() ? Identity->GetUniquePlayerId(0) : nullptr;
+	return Me.IsValid() ? GetAvatars()->ForUniqueId(Me->GetType().ToString(), Me->ToString(), GetWorld()) : nullptr;
+}
+
+UTexture2D* UCheeseStrikeSessionSubsystem::AvatarOfPlayer(const APlayerState* Player)
+{
+	return GetAvatars()->For(Player);
 }
 
 bool UCheeseStrikeSessionSubsystem::IsServerHere() const

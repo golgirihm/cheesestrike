@@ -11,6 +11,7 @@
 
 class ACheeseStrikePlayerController;
 class UCheeseStrikeSessionSubsystem;
+class APlayerState;
 class SBox;
 class SScrollBox;
 struct FButtonStyle;
@@ -252,9 +253,13 @@ public:
 	TSharedRef<SWidget> MakeQuitButton();
 	/** The dialog over the whole menu, for what `Asking` is: its question, and what to press. */
 	TSharedRef<SWidget> MakeDialog();
-	/** The friends panel, open or as its tab; and a friend's row in it, with Join or Invite. */
+	/**
+	 * The friends panel, open or as its tab; a friend's row in it, in `Section` (JOIN and INVITE in Joinable, INVITE in Others,
+	 * nothing in the party); and a player of our game's row in the party (ourself, or another with the host's KICK).
+	 */
 	TSharedRef<SWidget> MakeFriendsPanel(bool bOpen);
-	TSharedRef<SWidget> MakeFriendRow(int32 Index);
+	TSharedRef<SWidget> MakeFriendRow(int32 Index, CheeseStrikeFriends::ESection Section);
+	TSharedRef<SWidget> MakePartyRow(const APlayerState* Who, bool bSelf, bool bHost);
 	/** The host's choice of who can join the party (read-only for everyone else). */
 	TSharedRef<SWidget> MakePartyPermission(bool bHost, UCheeseStrikeSessionSubsystem* Sessions);
 	/** A friends section's header: a chevron, its name and a count, which a click folds away or opens again (remembered while the menu lasts). */
@@ -324,6 +329,11 @@ private:
 	TSharedRef<SWidget> MakeDivider();
 	/** A small button in the menu's looks (its kinds and rounding), for a row: Join, Invite, Kick, Refresh. */
 	TSharedRef<SWidget> MakeSmallButton(const FString& Text, const FString& ItemName, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain);
+	/**
+	 * A friend row's button, smaller than MakeSmallButton so that two fit beside a name: faded, with no click and no focus,
+	 * when `WhyNot` says why it can't be pressed (its tooltip); else `Hover` is.
+	 */
+	TSharedRef<SWidget> MakeRowButton(const FString& Text, const FString& ItemName, TFunction<void()> Do, EButtonKind Kind, const FString& WhyNot, const FString& Hover);
 	/**
 	 * A dropdown: the chosen one of `Choices` (`GetChosen`, read as it is
 	 * drawn and as its list opens) on a button that opens the
@@ -450,8 +460,9 @@ private:
 	/** When the friends were last asked for, the panel's width now and when it was last set (to ease it open and shut). */
 	double FriendsReadAt = -1000.0;
 	float FriendsWidth = 120.0f;
-	/** The friends sections folded shut (remembered while the menu lasts). */
+	/** The friends sections folded shut (remembered while the menu lasts), and the one just folded or opened, whose chevron turns. */
 	TSet<uint8> ClosedFriendSections;
+	int32 TurningFriendSection = INDEX_NONE;
 	double FriendsWidthAt = 0.0;
 	/** The pictures of the friends in the rows drawn (kept while they are). */
 	TArray<TSharedPtr<FSlateBrush>> FriendBrushes;
