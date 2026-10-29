@@ -113,21 +113,22 @@ void ACheeseStrikeGameState::SetLimits(int32 InKillLimit, float InRespawnDelay)
 	RespawnDelay = InRespawnDelay;
 }
 
-void ACheeseStrikeGameState::AddKill(const FString& Killer, const FString& Victim, bool bHead, const FString& How)
+void ACheeseStrikeGameState::AddKill(const FString& Killer, const FString& Victim, bool bHead, const FString& How, uint8 Badges)
 {
 	if (HasAuthority())
 	{
-		MulticastKill(Killer, Victim, bHead, How);
+		MulticastKill(Killer, Victim, bHead, How, Badges);
 	}
 }
 
-void ACheeseStrikeGameState::MulticastKill_Implementation(const FString& Killer, const FString& Victim, bool bHead, const FString& How)
+void ACheeseStrikeGameState::MulticastKill_Implementation(const FString& Killer, const FString& Victim, bool bHead, const FString& How, uint8 Badges)
 {
 	FKillFeedEntry Entry;
 	Entry.Killer = Killer;
 	Entry.Victim = Victim;
 	Entry.bHead = bHead;
 	Entry.How = How;
+	Entry.Badges = Badges;
 	Entry.At = GetServerWorldTimeSeconds();
 	KillFeed.Add(Entry);
 	while (KillFeed.Num() > CheeseStrikeRules::KillFeedLength)

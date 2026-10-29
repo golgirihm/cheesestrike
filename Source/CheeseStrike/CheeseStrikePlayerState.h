@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
+#include "Rules/CheeseStrikeBadges.h"
 #include "CheeseStrikePlayerState.generated.h"
 
 class ACheeseStrikeWatchCamera;
@@ -44,6 +45,13 @@ public:
 	CheeseStrikeStreaks::EStreak AddKill(bool bCountsForStreak = true);
 	/** Server only: killed, which ends the run of kills. */
 	void AddDeath();
+	/** How many kills of theirs have earned `Badge` (CheeseStrikeBadges), on every machine: for the achievements. */
+	int32 GetBadgeCount(CheeseStrikeBadges::EBadge Badge) const;
+	/** Server only: a kill of theirs earned `Badges` (as bits). */
+	void AddBadges(uint8 Badges);
+	/** Server only: the player id of who last killed them and hasn't been paid back for it since (-1 for nobody), for REVENGE. */
+	int32 GetLastKilledBy() const { return LastKilledBy; }
+	void SetLastKilledBy(int32 KillerId) { LastKilledBy = KillerId; }
 	void SetTeam(int32 InTeam) { Team = InTeam; }
 	/** When this player first joined the match, against the others (0 the first; kept across its levels): the lobby seats them in this order. */
 	int32 GetJoinOrder() const { return JoinOrder; }
@@ -163,6 +171,10 @@ protected:
 	int32 HillPoints = 0;
 	UPROPERTY(Replicated)
 	int32 HillSeconds = 0;
+	/** Kills that earned each badge (CheeseStrikeBadges::EBadge's order). */
+	UPROPERTY(Replicated)
+	TArray<int32> BadgeCounts;
+	int32 LastKilledBy = -1;
 	/** The server's count of the time in the hill, to the part of a second. */
 	float HillTime = 0.0f;
 

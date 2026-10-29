@@ -28,6 +28,9 @@ struct FKillFeedEntry
 	/** What did it when it wasn't the killer's weapon: a streak's name ("Cheese Strike"); empty otherwise. */
 	UPROPERTY()
 	FString How;
+	/** The kill's badges (CheeseStrikeBadges, as bits): HEADSHOT, REVENGE and the rest. */
+	UPROPERTY()
+	uint8 Badges = 0;
 	/** The server's time it happened. */
 	UPROPERTY()
 	float At = 0.0f;
@@ -146,7 +149,7 @@ public:
 	/** Server only. */
 	void SetLimits(int32 InKillLimit, float InRespawnDelay);
 	/** Server only: tells every machine at once, so that the feed is never behind. `How` names a streak that did it. */
-	void AddKill(const FString& Killer, const FString& Victim, bool bHead, const FString& How = FString());
+	void AddKill(const FString& Killer, const FString& Victim, bool bHead, const FString& How = FString(), uint8 Badges = 0);
 	void SetWinnerName(const FString& Name) { WinnerName = Name; }
 
 	// The mode.
@@ -226,7 +229,7 @@ public:
 
 protected:
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastKill(const FString& Killer, const FString& Victim, bool bHead, const FString& How);
+	void MulticastKill(const FString& Killer, const FString& Victim, bool bHead, const FString& How, uint8 Badges);
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastAnnounce(const FString& Text, uint8 Streak, int32 Team, const FString& Who);
 	/** On this machine: the voice that tells of a streak called in, if it has one (the Unmanned Aerial Cheese). */

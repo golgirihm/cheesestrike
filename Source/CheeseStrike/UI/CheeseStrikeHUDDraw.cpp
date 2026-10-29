@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeHUDDraw.h"
+#include "Rules/CheeseStrikeBadges.h"
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
@@ -55,6 +56,46 @@ namespace CheeseStrikeHUDDraw
 			return FVector2D::ZeroVector;
 		}
 		return FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text, InFont, 1.0f);
+	}
+
+	float BadgePills(UCanvas* Canvas, uint8 Badges, const FVector2D& At, float Size, float Align, float Alpha, bool bMeasureOnly)
+	{
+		const TArray<CheeseStrikeBadges::EBadge> List = CheeseStrikeBadges::List(Badges);
+		if (List.Num() == 0 || Canvas == nullptr)
+		{
+			return 0.0f;
+		}
+		const FSlateFontInfo Word = Font(Size * 0.68f);
+		const float Pad = Size * 0.45f;
+		const float Gap = Size * 0.3f;
+		TArray<float> Widths;
+		float Total = 0.0f;
+		for (const CheeseStrikeBadges::EBadge Badge : List)
+		{
+			Widths.Add(static_cast<float>(Measure(CheeseStrikeBadges::Word(Badge), Word).X) + 2.0f * Pad);
+			Total += Widths.Last();
+		}
+		Total += Gap * (List.Num() - 1);
+		if (bMeasureOnly || Alpha <= 0.0f)
+		{
+			return Total;
+		}
+		float X = At.X - Total * Align;
+		FShapes Pills;
+		for (const float Width : Widths)
+		{
+			Pills.RoundedRect(X, At.Y, Width, Size, Size / 2.0f, Faded(Accent, Alpha));
+			X += Width + Gap;
+		}
+		Pills.Draw(Canvas);
+		X = At.X - Total * Align;
+		const FLinearColor Dark(0.12f, 0.07f, 0.0f, Alpha);
+		for (int32 Index = 0; Index < List.Num(); ++Index)
+		{
+			Text(Canvas, CheeseStrikeBadges::Word(List[Index]), FVector2D(X + Widths[Index] / 2.0f, At.Y + (Size - static_cast<float>(Measure(TEXT("A"), Word).Y)) / 2.0f), Word, Dark, 0.5f, false);
+			X += Widths[Index] + Gap;
+		}
+		return Total;
 	}
 
 	void Text(UCanvas* Canvas, const FString& InText, const FVector2D& At, const FSlateFontInfo& InFont, const FLinearColor& Colour, float Align, bool bShadow, const FVector2D& Stretch)

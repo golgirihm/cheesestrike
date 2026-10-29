@@ -9,6 +9,7 @@
 // StreakPop, StreakFillToward), tested without a world.
 
 #include "CheeseStrikeHUD.h"
+#include "CheeseStrikeGameState.h"
 #include "Engine/Canvas.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
@@ -18,6 +19,9 @@
 
 /** The HUD's drawing, named through an alias rather than used as a whole: the packaged game's unity build would carry a using-directive into the files after this one. */
 namespace HudDraw = CheeseStrikeHUDDraw;
+
+/** How long a kill's badges show over the streak panel. */
+static constexpr float BadgeShowSeconds = 2.5f;
 
 static TAutoConsoleVariable<int32> CVarStreakShown(TEXT("CheeseStrike.HUD.Streak"), -1, TEXT("Show this run of kills in the kill-streak panel instead of the player's, for judging it and its pop (-1: the player's)."));
 
@@ -179,4 +183,16 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	TileShapes.RoundedFrame(GrownLeft, GrownTop, Grown, Grown, GrownRound, FMath::Max(1.0f, 1.5f * U) * FMath::Sqrt(Pop), bRunning ? HudDraw::Faded(HudDraw::Accent, 0.55f + 0.45f * Flash) : HudDraw::Rule);
 	TileShapes.Draw(Canvas);
 	HudDraw::Text(Canvas, Number, FVector2D(Middle.X, Middle.Y - NumberSize.Y / 2.0f), Count, NumberColour, 0.5f, true, FVector2D(Stretch, Stretch));
+
+	// The kill's badges (HEADSHOT, REVENGE ...), over the count's tile as it pops and comes down into place, for a couple of seconds.
+	if (const ACheeseStrikeGameState* Match = GetWorld()->GetGameState<ACheeseStrikeGameState>())
+	{
+		float BadgeSince = 0.0f;
+		const uint8 Badges = LatestKillBadges(Match, Mine->GetPlayerName(), Match->GetServerWorldTimeSeconds(), BadgeShowSeconds, BadgeSince);
+		if (Badges != 0)
+		{
+			const float BadgeAlpha = FMath::Clamp((BadgeShowSeconds - BadgeSince) / 0.4f, 0.0f, 1.0f) * FMath::Clamp(BadgeSince / 0.08f, 0.0f, 1.0f);
+			HudDraw::BadgePills(Canvas, Badges, FVector2D(GrownLeft, GrownTop - 30.0f * U), 22.0f * U, 0.0f, BadgeAlpha);
+		}
+	}
 }

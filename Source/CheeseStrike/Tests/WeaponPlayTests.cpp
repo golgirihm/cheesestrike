@@ -15,6 +15,8 @@
 #include "Engine/World.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikePlayerController.h"
+#include "CheeseStrikePlayerState.h"
+#include "CheeseStrikeGameState.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 #include "PlayTesting.h"
@@ -264,6 +266,15 @@ bool FWeaponsWorkOverTheNetwork::RunTest(const FString& Parameters)
 		{
 			TestEqual(TEXT("by the joiner"), Host->GetKilledBy(), Joiner->DisplayName());
 		}
+		// An ASSASSINATION, in the feed on both machines and counted for the joiner.
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			const ACheeseStrikeGameState* Match = GameState(Machine);
+			const uint8 Badges = Match != nullptr && Match->GetKillFeed().Num() > 0 ? Match->GetKillFeed().Last().Badges : 0;
+			TestTrue(FString::Printf(TEXT("machine %d's feed calls it an assassination (badges %d)"), Machine, Badges), CheeseStrikeBadges::Has(Badges, CheeseStrikeBadges::EBadge::Assassination));
+		}
+		const ACheeseStrikePlayerState* Theirs = Joiner != nullptr ? Joiner->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+		TestTrue(TEXT("and the joiner's player state counts it"), Theirs != nullptr && Theirs->GetBadgeCount(CheeseStrikeBadges::EBadge::Assassination) == 1);
 	});
 	// The modes' calls, on the server: one slot only (Execution's sidearm), then one weapon only (Gun Game's).
 	Then([this]()

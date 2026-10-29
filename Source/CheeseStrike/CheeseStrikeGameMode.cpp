@@ -707,8 +707,25 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 	{
 		VictimState->AddDeath();
 	}
+	// The kill's badges (CheeseStrikeBadges): from the blow's facts, and who last killed whom.
+	CheeseStrikeBadges::FKillFacts Facts = Victim->GetDeathFacts();
+	Facts.bByAnother = KillerState != nullptr && KillerState != VictimState;
+	Facts.bRevenge = Facts.bByAnother && VictimState != nullptr && KillerState->GetLastKilledBy() == VictimState->GetPlayerId();
+	const uint8 Badges = CheeseStrikeBadges::BadgesFor(Facts);
+	if (Facts.bByAnother)
+	{
+		KillerState->AddBadges(Badges);
+		if (Facts.bRevenge)
+		{
+			KillerState->SetLastKilledBy(-1);
+		}
+		if (VictimState != nullptr)
+		{
+			VictimState->SetLastKilledBy(KillerState->GetPlayerId());
+		}
+	}
 	const FString KillerName = KillerState != nullptr ? KillerState->GetPlayerName() : (Killer != nullptr ? Killer->DisplayName() : FString());
-	State->AddKill(KillerName, Victim->DisplayName(), bHead, How);
+	State->AddKill(KillerName, Victim->DisplayName(), bHead, How, Badges);
 	if (KillerName.IsEmpty() && !How.IsEmpty())
 	{
 		// Nobody did it: a fall into a map's fondue ("fell into the fondue").

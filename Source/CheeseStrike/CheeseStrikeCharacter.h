@@ -9,6 +9,7 @@
 #include "Weapons/CheeseStrikeShot.h"
 #include "Rules/CheeseStrikeDowned.h"
 #include "Input/CheeseStrikeAimAssist.h"
+#include "Rules/CheeseStrikeBadges.h"
 #include "CheeseStrikeCharacter.generated.h"
 
 class ACheeseStrikeGameState;
@@ -258,6 +259,10 @@ public:
 	 * (friendly fire is off), or between rounds.
 	 */
 	bool TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead);
+	/** Server: what the next TakeShot is (the weapon firing it says just before): its weapon, from how far, in the back; for a kill's badges. */
+	void NoteHit(FName Weapon, float Distance, bool bFromBehind);
+	/** Server: what the blow that killed it was, for the kill's badges (CheeseStrikeBadges), as the game mode is told of the death. */
+	const CheeseStrikeBadges::FKillFacts& GetDeathFacts() const { return DeathFacts; }
 	/**
 	 * Takes `Damage` off the health from a streak (server only): `By`
 	 * called it in, and has the kill even if their character has since
@@ -400,6 +405,11 @@ protected:
 	TObjectPtr<UCheeseStrikeGrenades> Grenades;
 	UPROPERTY(ReplicatedUsing=OnRep_Health)
 	float Health = 100.0f;
+	/** The next shot's facts (NoteHit), and the fatal blow's (GetDeathFacts), fresh until the game mode has had them. */
+	CheeseStrikeBadges::FKillFacts NotedHit;
+	bool bHitNoted = false;
+	CheeseStrikeBadges::FKillFacts DeathFacts;
+	bool bDeathFactsFresh = false;
 	/** Who killed it, and when, in the server's time; set by the server as it dies. */
 	UPROPERTY(Replicated)
 	FString KilledBy;
