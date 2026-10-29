@@ -43,6 +43,12 @@ namespace CheeseStrikeHUDDraw
 	 * false; `Stretch` scales it.
 	 */
 	void Text(UCanvas* Canvas, const FString& Text, const FVector2D& At, const FSlateFontInfo& InFont, const FLinearColor& Colour, float Align = 0.0f, bool bShadow = true, const FVector2D& Stretch = FVector2D(1.0f, 1.0f));
+	/**
+	 * Draws a kill's badges (CheeseStrikeBadges, as bits) as a row of small cheese-gold pills, `Size` pixels high, their
+	 * tops at `At.Y` and the row's left (`Align` 0), middle (0.5) or right (1) at `At.X`, `Alpha` as solid; returns the
+	 * row's width (0 for none). With `bMeasureOnly`, draws nothing.
+	 */
+	float BadgePills(UCanvas* Canvas, uint8 Badges, const FVector2D& At, float Size, float Align = 0.0f, float Alpha = 1.0f, bool bMeasureOnly = false);
 	/** Draws `Texture` over the rectangle at `At`, `Size` big, tinted `Colour`, blended by its alpha. */
 	void Picture(UCanvas* Canvas, UTexture2D* Texture, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour);
 	/** Draws `Texture` over the rectangle at `At`, `Size` big, its corners rounded to `Radius` (CheeseStrikeHUD::RoundedRect), tinted `Colour`. */

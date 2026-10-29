@@ -194,6 +194,10 @@ protected:
 	/** The death screen; out of the round (`bOut`), only for a few seconds (CheeseStrikeHUD::ShowsDeathScreen), and without the seconds to coming back. */
 	void DrawDeath(const ACheeseStrikeCharacter* Character, const ACheeseStrikeGameState* Match, bool bOut);
 	void DrawKillFeed(const ACheeseStrikeGameState* Match);
+	/** The badges of the kill feed's entry for `Victim`'s death at `DiedAt` (CheeseStrikeBadges, as bits), or none. */
+	uint8 DeathBadges(const ACheeseStrikeGameState* Match, const FString& Victim, float DiedAt) const;
+	/** The badges of `Killer`'s latest kill in the feed within `Within` seconds of `Now`, and how long ago it was (`OutSince`). */
+	uint8 LatestKillBadges(const ACheeseStrikeGameState* Match, const FString& Killer, float Now, float Within, float& OutSince) const;
 	void DrawScoreboard(const ACheeseStrikeGameState* Match, bool bOver);
 	/** The mice's countdown, red, and word of their coming. */
 	void DrawMice(const ACheeseStrikeGameState* Match);

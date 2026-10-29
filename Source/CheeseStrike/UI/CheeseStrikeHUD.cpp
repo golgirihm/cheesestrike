@@ -1129,6 +1129,43 @@ FString ACheeseStrikeHUD::KillPlace(const FKillFeedEntry& Kill, float Now)
 	return Now - Kill.At > 1.0f ? KillPlaces.Add(Key, FString()) : FString();
 }
 
+uint8 ACheeseStrikeHUD::DeathBadges(const ACheeseStrikeGameState* Match, const FString& Victim, float DiedAt) const
+{
+	if (Match == nullptr)
+	{
+		return 0;
+	}
+	// The newest entry for them, from about when they died (the feed's time is when it reached this machine).
+	for (int32 Index = Match->GetKillFeed().Num() - 1; Index >= 0; --Index)
+	{
+		const FKillFeedEntry& Kill = Match->GetKillFeed()[Index];
+		if (Kill.Victim == Victim && FMath::Abs(Kill.At - DiedAt) < 2.0f)
+		{
+			return Kill.Badges;
+		}
+	}
+	return 0;
+}
+
+uint8 ACheeseStrikeHUD::LatestKillBadges(const ACheeseStrikeGameState* Match, const FString& Killer, float Now, float Within, float& OutSince) const
+{
+	OutSince = TNumericLimits<float>::Max();
+	if (Match == nullptr || Killer.IsEmpty())
+	{
+		return 0;
+	}
+	for (int32 Index = Match->GetKillFeed().Num() - 1; Index >= 0; --Index)
+	{
+		const FKillFeedEntry& Kill = Match->GetKillFeed()[Index];
+		if (Kill.Killer == Killer && Kill.Victim != Killer)
+		{
+			OutSince = Now - Kill.At;
+			return OutSince >= 0.0f && OutSince <= Within ? Kill.Badges : 0;
+		}
+	}
+	return 0;
+}
+
 void ACheeseStrikeHUD::DrawKillFeed(const ACheeseStrikeGameState* Match)
 {
 	if (Match == nullptr)
@@ -1166,8 +1203,11 @@ void ACheeseStrikeHUD::DrawKillFeed(const ACheeseStrikeGameState* Match)
 		const float MiddleWidth = Middle.IsEmpty() ? 0.0f : HudDraw::Measure(Middle, Line).X;
 		const float KillerWidth = HudDraw::Measure(Killer, Line).X;
 		const float Height = HudDraw::Measure(TEXT("A"), Line).Y;
+		// The kill's badges, small cheese-gold pills before the killer's name.
+		const float PillGap = 8.0f * U;
+		const float PillsWidth = HudDraw::BadgePills(Canvas, Kill.Badges, FVector2D::ZeroVector, Height, 0.0f, 1.0f, true);
 		HudDraw::FShapes Shapes;
-		const float Total = PlaceWidth + VictimWidth + MiddleWidth + KillerWidth;
+		const float Total = PlaceWidth + VictimWidth + MiddleWidth + KillerWidth + (PillsWidth > 0.0f ? PillsWidth + PillGap : 0.0f);
 		Shapes.RoundedRect(Right - Total - 16.0f * U, Y - 2.0f * U, Total + 16.0f * U, Height + 4.0f * U, 5.0f * U, HudDraw::Panel);
 		Shapes.Draw(Canvas);
 		float X = Right - 8.0f * U;
@@ -1184,6 +1224,11 @@ void ACheeseStrikeHUD::DrawKillFeed(const ACheeseStrikeGameState* Match)
 			X -= MiddleWidth;
 		}
 		HudDraw::Text(Canvas, Killer, FVector2D(X, Y), Line, (bNobody ? Kill.Victim : Kill.Killer) == Me ? HudDraw::Accent : HudDraw::Ink, 1.0f);
+		X -= KillerWidth;
+		if (PillsWidth > 0.0f)
+		{
+			HudDraw::BadgePills(Canvas, Kill.Badges, FVector2D(X - PillGap, Y), Height, 1.0f);
+		}
 		Y += Height + 8.0f * U;
 	}
 	// Forget the places of kills gone from the feed.

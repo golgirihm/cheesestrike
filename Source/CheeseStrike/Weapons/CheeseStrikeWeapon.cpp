@@ -1360,6 +1360,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 	{
 		ACheeseStrikeCharacter* Victim = Each.Key;
 		const FHurt& Theirs = Each.Value;
+		Victim->NoteHit(WeaponId, Theirs.Distance, false);
 		if (Victim->TakeShot(Theirs.Damage, Holder, Theirs.bHead))
 		{
 			ClientHit(Theirs.Damage, Theirs.bHead, !Victim->IsAlive());
@@ -1412,6 +1413,7 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 			Struck = &Hits[Ray];
 			const float Damage = CheeseStrikeWeapons::StrokeDamage(*Stats, Fan[Ray], Struck->VictimYaw);
 			const bool bBack = CheeseStrikeWeapons::FromBehind(Fan[Ray], Struck->VictimYaw);
+			Struck->Victim->NoteHit(WeaponId, Struck->Distance, bBack);
 			if (Struck->Victim->TakeShot(Damage, Holder, false))
 			{
 				ClientHit(Damage, false, !Struck->Victim->IsAlive());

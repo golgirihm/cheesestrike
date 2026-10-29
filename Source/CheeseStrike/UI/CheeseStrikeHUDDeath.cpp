@@ -390,11 +390,15 @@ void ACheeseStrikeHUD::DrawDeath(const ACheeseStrikeCharacter* Character, const 
 		const FSlateFontInfo ByFont = HudDraw::Font(30.0f * U);
 		const FString Fitted = CheeseStrikeHUD::FitNameIn(By, Character->GetKilledBy().ToUpper(), 480.0f * U, [&ByFont](const FString& Text) { return static_cast<float>(HudDraw::Measure(Text, ByFont).X); });
 		HudDraw::Text(Canvas, Fitted, FVector2D(Width / 2.0f, Below), ByFont, HudDraw::Faded(HudDraw::Ink, Under), 0.5f);
+		// The killing blow's badges, as the feed has them (HEADSHOT, REVENGE ...), under the line.
+		const uint8 Badges = DeathBadges(Match, Character->DisplayName(), Character->GetDiedAt());
+		const float PillsAt = Below + HudDraw::Measure(Fitted, ByFont).Y + 4.0f * U;
+		const float PillsHeight = HudDraw::BadgePills(Canvas, Badges, FVector2D(Width / 2.0f, PillsAt), 20.0f * U, 0.5f, Under) > 0.0f ? 26.0f * U : 0.0f;
 		// Out of the round there is no coming back until the next: the mode's notice says so.
 		if (Match != nullptr && !bOut)
 		{
 			const int32 Back = CheeseStrikeHUD::SecondsToComeBack(Match->GetRespawnDelay(), Now, Character->GetDiedAt());
-			HudDraw::Text(Canvas, FString::Printf(TEXT("BACK IN %d"), Back), FVector2D(Width / 2.0f, Below + 44.0f * U), HudDraw::Font(20.0f * U), HudDraw::Faded(HudDraw::Soft, Under), 0.5f);
+			HudDraw::Text(Canvas, FString::Printf(TEXT("BACK IN %d"), Back), FVector2D(Width / 2.0f, Below + 44.0f * U + PillsHeight), HudDraw::Font(20.0f * U), HudDraw::Faded(HudDraw::Soft, Under), 0.5f);
 		}
 	}
 }

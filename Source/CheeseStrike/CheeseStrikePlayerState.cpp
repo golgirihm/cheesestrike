@@ -33,6 +33,7 @@ void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	DOREPLIFETIME(ACheeseStrikePlayerState, RevealFrom);
 	DOREPLIFETIME(ACheeseStrikePlayerState, HillPoints);
 	DOREPLIFETIME(ACheeseStrikePlayerState, HillSeconds);
+	DOREPLIFETIME(ACheeseStrikePlayerState, BadgeCounts);
 }
 
 void ACheeseStrikePlayerState::AddHillTime(float Seconds)
@@ -280,5 +281,24 @@ void ACheeseStrikePlayerState::ServerCallStreak_Implementation(uint8 Kind, FVect
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
 	{
 		Mode->CallStreak(this, CheeseStrikeStreaks::StreakAt(Kind), Spot, Yaw);
+	}
+}
+
+int32 ACheeseStrikePlayerState::GetBadgeCount(CheeseStrikeBadges::EBadge Badge) const
+{
+	const int32 Index = static_cast<int32>(Badge);
+	return BadgeCounts.IsValidIndex(Index) ? BadgeCounts[Index] : 0;
+}
+
+void ACheeseStrikePlayerState::AddBadges(uint8 Badges)
+{
+	if (Badges == 0)
+	{
+		return;
+	}
+	BadgeCounts.SetNumZeroed(CheeseStrikeBadges::NumBadges);
+	for (const CheeseStrikeBadges::EBadge Badge : CheeseStrikeBadges::List(Badges))
+	{
+		++BadgeCounts[static_cast<int32>(Badge)];
 	}
 }

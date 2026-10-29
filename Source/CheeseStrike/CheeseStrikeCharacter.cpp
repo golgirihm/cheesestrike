@@ -699,8 +699,22 @@ bool ACheeseStrikeCharacter::CanBeHurtBy(const ACheeseStrikeCharacter* From, con
 	return Mode == nullptr || Mode->CanHurt(By != nullptr ? By : (From != nullptr ? From->GetPlayerState<ACheeseStrikePlayerState>() : nullptr), GetPlayerState<ACheeseStrikePlayerState>(), From == this);
 }
 
+void ACheeseStrikeCharacter::NoteHit(FName Weapon, float Distance, bool bFromBehind)
+{
+	NotedHit = CheeseStrikeBadges::FKillFacts();
+	NotedHit.Weapon = Weapon;
+	NotedHit.Distance = Distance;
+	NotedHit.bFromBehind = bFromBehind;
+	bHitNoted = true;
+}
+
 bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From, bool bHead)
 {
+	// What this shot is, for the kill's badges if it kills: the weapon's note, if it sent one.
+	CheeseStrikeBadges::FKillFacts Facts = bHitNoted ? NotedHit : CheeseStrikeBadges::FKillFacts();
+	bHitNoted = false;
+	Facts.bHead = bHead;
+	const float HealthBefore = Health;
 	if (!HasAuthority() || !CanAct() || IsProtected() || !CanBeHurtBy(From, nullptr))
 	{
 		return false;
@@ -727,6 +741,9 @@ bool ACheeseStrikeCharacter::TakeShot(float Damage, ACheeseStrikeCharacter* From
 	}
 	if (!IsAlive())
 	{
+		Facts.bOneHit = HealthBefore >= CheeseStrikeWeapons::MaxHealth - 0.01f;
+		DeathFacts = Facts;
+		bDeathFactsFresh = true;
 		Die(From, bHead);
 	}
 	return true;
@@ -751,6 +768,9 @@ bool ACheeseStrikeCharacter::TakeBlast(float Damage, ACheeseStrikePlayerState* B
 	LastHurtAt = ServerNow();
 	if (!IsAlive())
 	{
+		DeathFacts = CheeseStrikeBadges::FKillFacts();
+		DeathFacts.bExecuted = LastStand != nullptr && LastStand->WasExecuted();
+		bDeathFactsFresh = true;
 		Die(From, false, By, How);
 	}
 	return true;
@@ -770,10 +790,16 @@ void ACheeseStrikeCharacter::Die(ACheeseStrikeCharacter* From, bool bHead, AChee
 		UE_LOG(LogCheeseStrike, Display, TEXT("%s is killed by %s%s"), *DisplayName(), KilledBy.IsEmpty() ? TEXT("nobody") : *KilledBy, How.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("'s %s"), *How));
 	}
 	ShowDeath();
+	// A death by anything but a shot or a blast (a fall) has no blow's facts.
+	if (!bDeathFactsFresh)
+	{
+		DeathFacts = CheeseStrikeBadges::FKillFacts();
+	}
 	if (ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
 	{
 		Mode->Killed(From, this, bHead, By, How);
 	}
+	bDeathFactsFresh = false;
 }
 
 void ACheeseStrikeCharacter::FellOutOfWorld(const UDamageType& DamageType)
