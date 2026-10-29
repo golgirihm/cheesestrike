@@ -44,6 +44,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
 #include "CheeseStrikePlayerState.h"
+#include "Animation/CheeseStrikeBodies.h"
 
 namespace CheeseStrikeMenu
 {
@@ -798,6 +799,11 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 				SAssignNew(FriendsContent, SBox)
 			]
 		]
+		// The hero to play, under the figure on the front end's main page.
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0.0f, 0.0f, 0.0f, 22.0f))
+		[
+			SAssignNew(HeroBox, SBox)
+		]
 		// The question before closing the host's lobby or quitting: over everything, and it takes every press.
 		// Modal: a layer over the whole screen that blurs and darkens all that is behind it, other UI too, and is hit
 		// itself, so that nothing under it can be clicked.
@@ -938,7 +944,7 @@ void SCheeseStrikeMenu::Refresh()
 		}
 		// While the question is up nothing behind it can take a press, a click or the focus: the pad and the keys stay in the dialog.
 		const bool bBehind = Asking == EMenuAsk::None;
-		for (const TSharedPtr<SWidget>& Each : TArray<TSharedPtr<SWidget>>{ Panel, FriendsBox, Lobby })
+		for (const TSharedPtr<SWidget>& Each : TArray<TSharedPtr<SWidget>>{ Panel, FriendsBox, Lobby, HeroBox })
 		{
 			if (Each.IsValid() && Each->IsEnabled() != bBehind)
 			{
@@ -968,6 +974,10 @@ void SCheeseStrikeMenu::Refresh()
 	if (Masthead.IsValid())
 	{
 		Masthead->SetVisibility(bFrontEnd ? EVisibility::HitTestInvisible : EVisibility::Collapsed);
+	}
+	if (HeroBox.IsValid())
+	{
+		HeroBox->SetVisibility(Page == EMenuPage::Main ? EVisibility::Visible : EVisibility::Collapsed);
 	}
 	if (Panel.IsValid())
 	{
@@ -1008,6 +1018,11 @@ void SCheeseStrikeMenu::Refresh()
 			const bool bFade = BuiltPage != Page;
 			BuiltPage = Page;
 			Content->SetContent(bFade ? MenuFadeIn(MakePage()) : MakePage());
+			// Its items after the page's, so that the page's first item takes the focus first.
+			if (HeroBox.IsValid())
+			{
+				HeroBox->SetContent(Page == EMenuPage::Main ? MakeHeroPicker() : SNullWidget::NullWidget);
+			}
 		}
 	}
 	KeepFocus();
@@ -1627,6 +1642,44 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
 			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeQuitButton() ]
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeHeroPicker()
+{
+	const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+	if (Settings == nullptr)
+	{
+		return SNullWidget::NullWidget;
+	}
+	TArray<FString> Names = {TEXT("AUTO")};
+	for (int32 Body = 0; Body < CheeseStrikeBodies::All().Num(); ++Body)
+	{
+		Names.Add(FString(CheeseStrikeBodies::HeroKey(Body)).ToUpper());
+	}
+	static const FSlateRoundedBoxBrush HeroPanelBrush(FLinearColor::White, 14.0f);
+	return SNew(SBorder)
+		.BorderImage(&HeroPanelBrush)
+		.BorderBackgroundColor(PanelColour)
+		.Padding(FMargin(18.0f, 10.0f, 12.0f, 10.0f))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 14.0f, 0.0f))
+			[
+				SNew(STextBlock).Text(FText::FromString(TEXT("HERO"))).Font(Font(15, FName("Bold"))).ColorAndOpacity(Muted)
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				MakeChoiceButtons(Names, Settings->GetHero() + 1, true, [this](int32 Index)
+				{
+					if (UCheeseStrikeSettings* Kept = UCheeseStrikeSettings::Get())
+					{
+						Kept->SetHero(Index - 1);
+						Kept->SaveSettings();
+					}
+					Refresh();
+				})
+			]
 		];
 }
 
@@ -2542,6 +2595,12 @@ FString SCheeseStrikeMenu::PageKey() const
 			Key += TEXT("|") + Found;
 		}
 	}
+	if (Page == EMenuPage::Main || Page == EMenuPage::Options)
+	{
+		// The hero picked lights its button.
+		const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+		Key += FString::Printf(TEXT("|hero %d"), Settings != nullptr ? Settings->GetHero() : INDEX_NONE);
+	}
 	if (Page == EMenuPage::Options)
 	{
 		// What is pressed rather than slid: the sliders show their values by themselves, and drawing the page again would drop one being dragged.
@@ -2822,7 +2881,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSlider(float Min, float Max, float St
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 {
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
-	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS")};
+	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS"), TEXT("HERO")};
 	const bool bInMatch = Page == EMenuPage::Options && Player.IsValid() && Player->IsPaused();
 	const bool bControls = OptionsTab == EOptionsTab::Controls;
 	// The controls are a table that scrolls under its heading; the other tabs' rows scroll as one.
@@ -3068,6 +3127,25 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			}
 			Refresh();
 		})));
+		break;
+	}
+	case EOptionsTab::Hero:
+	{
+		TArray<FString> Names = {TEXT("AUTO")};
+		for (int32 Body = 0; Body < CheeseStrikeBodies::All().Num(); ++Body)
+		{
+			Names.Add(FString(CheeseStrikeBodies::HeroKey(Body)).ToUpper());
+		}
+		Add(MakeOptionRow(TEXT("Hero"), MakeChoiceButtons(Names, Settings->GetHero() + 1, true, [this, Kept](int32 Index)
+		{
+			if (Kept.IsValid())
+			{
+				Kept->SetHero(Index - 1);
+				Kept->SaveSettings();
+			}
+			Refresh();
+		})));
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("Worn in your side's colours whichever side you are on; without sides, in the hero's own. Auto gives the heroes in turn."), true, true, WrapWidth() - OptionLabelWidth) ];
 		break;
 	}
 	}

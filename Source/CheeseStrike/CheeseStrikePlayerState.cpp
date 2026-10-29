@@ -23,6 +23,7 @@ void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	DOREPLIFETIME(ACheeseStrikePlayerState, Downs);
 	DOREPLIFETIME(ACheeseStrikePlayerState, Team);
 	DOREPLIFETIME(ACheeseStrikePlayerState, JoinOrder);
+	DOREPLIFETIME(ACheeseStrikePlayerState, Hero);
 	DOREPLIFETIME(ACheeseStrikePlayerState, GunLevel);
 	DOREPLIFETIME(ACheeseStrikePlayerState, StreakKills);
 	DOREPLIFETIME(ACheeseStrikePlayerState, ReadyStreaks);

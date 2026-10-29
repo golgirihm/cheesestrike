@@ -1,0 +1,20 @@
+# The hero picked on the front end: the row of heroes under the figure, and
+# the figure wearing each in turn (CheeseStrikeHero picks for this player as
+# the row's buttons do, without changing the settings), then the settings'
+# Hero tab. Run with tools/play.ps1 -Lobby -Res 1280x720.
+wait 3
+shot hero_0_auto
+cmd CheeseStrikeHero Murdock
+wait 1.5
+shot hero_1_murdock
+cmd CheeseStrikeHero Wraith
+wait 1.5
+shot hero_2_wraith
+cmd CheeseStrikeHero Twinblast
+wait 1.5
+shot hero_3_twinblast
+cmd CheeseStrikeHero
+cmd CheeseStrikePage Settings Hero
+wait 1
+shot hero_4_settings
+quit

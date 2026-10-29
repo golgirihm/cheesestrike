@@ -68,6 +68,16 @@ namespace CheeseStrikeBodies
 	 * one of its heroes in turn; without sides, one of every hero in turn.
 	 */
 	int32 For(bool bTeams, int32 Team, int32 Rank);
+	/**
+	 * The body a player has who picked hero `Pick` (an index of All; INDEX_NONE, the usual, for none: For's by `Rank`). A
+	 * hero picked is worn whatever side the player is on, dressed in that side's colours (so both sides may show the same
+	 * hero, told apart by colour), or in its own without sides. Bots pick none.
+	 */
+	int32 BodyFor(int32 Pick, bool bTeams, int32 Team, int32 Rank);
+	/** The word a hero is kept by in the settings and passed by (UCheeseStrikeSettings' Hero): "Belica", "Murdock", "Wraith", "Twinblast"; "auto" for INDEX_NONE. */
+	const TCHAR* HeroKey(int32 Body);
+	/** Which of All `Key` names (HeroKey's word, or the hero's name, either case); INDEX_NONE for "auto" or anything else. */
+	int32 HeroFromKey(const FString& Key);
 	/** Which side's heroes a body is (INDEX_NONE for none). */
 	int32 TeamOf(int32 Body);
 	/** The short name of a side, as its materials are named: "Gouda", "Mozza". */

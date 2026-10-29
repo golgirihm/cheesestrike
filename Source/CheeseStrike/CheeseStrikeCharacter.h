@@ -309,8 +309,8 @@ public:
 	float GetFallFlashAt() const { return FallFlashAt; }
 
 	/**
-	 * The body `State`'s player has in `Match` (CheeseStrikeBodies::For, by their rank by player id on their side, or in
-	 * the match without sides), and in `OutTeam` the side whose colours it wears (INDEX_NONE for its own): what their
+	 * The body `State`'s player has in `Match` (CheeseStrikeBodies::BodyFor: the hero they picked, else by their rank by
+	 * player id on their side, or in the match without sides), and in `OutTeam` the side whose colours it wears (INDEX_NONE for its own): what their
 	 * character puts on, for anything else that shows them (the podium).
 	 */
 	static int32 BodyOf(const ACheeseStrikeGameState* Match, const ACheeseStrikePlayerState* State, int32& OutTeam);

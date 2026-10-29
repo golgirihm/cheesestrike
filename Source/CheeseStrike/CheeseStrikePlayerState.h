@@ -58,6 +58,11 @@ public:
 	/** Server only. */
 	void SetJoinOrder(int32 Order) { JoinOrder = Order; }
 
+	/** The hero this player picked (an index of CheeseStrikeBodies::All), or INDEX_NONE for the usual by player id: set by their own machine from its settings (ACheeseStrikePlayerController::ServerPickHero); bots pick none. */
+	int32 GetHero() const { return Hero; }
+	/** Server only. */
+	void SetHero(int32 InHero) { Hero = InHero; }
+
 	/** In Gun Game, the step of the ladder this player is on (CheeseStrikeArsenal::GunGameLadder), 0 the first. */
 	int32 GetGunLevel() const { return GunLevel; }
 	/** Server only. */
@@ -150,6 +155,8 @@ protected:
 	int32 Team = 0;
 	UPROPERTY(Replicated)
 	int32 JoinOrder = 0;
+	UPROPERTY(Replicated)
+	int32 Hero = INDEX_NONE;
 	UPROPERTY(Replicated)
 	int32 GunLevel = 0;
 	UPROPERTY(Replicated)

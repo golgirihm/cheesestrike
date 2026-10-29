@@ -591,6 +591,65 @@ bool FTheSidesLookDifferent::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAPickedHeroIsSeenByEveryone, "CheeseStrike.Play.APickedHeroIsSeenByEveryone", PlayTests::Flags)
+
+bool FAPickedHeroIsSeenByEveryone::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	StartPlaying({2, TEXT("?Mode=Deathmatch")});
+	// Both pick one hero of the joiner's foes' side: each wears it in their own side's colours, so both show the same hero.
+	TSharedRef<int32> Pick = MakeShared<int32>(INDEX_NONE);
+	Then([this, Pick]()
+	{
+		const ACheeseStrikeGameState* Match = GameState(0);
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		if (!TestNotNull(TEXT("a match"), Match) || !TestNotNull(TEXT("with the joiner"), Joiner))
+		{
+			return;
+		}
+		*Pick = CheeseStrikeBodies::ForTeam(1 - Match->TeamOf(Joiner->GetPlayerState()), 0);
+		Controller(1)->CheeseStrikeHero(CheeseStrikeBodies::HeroKey(*Pick));
+		Controller(0)->CheeseStrikeHero(CheeseStrikeBodies::HeroKey(*Pick));
+	});
+	WaitUntil(TEXT("the joiner's pick on the host's machine and the host's on the joiner's"), 5.0f, [Pick]()
+	{
+		const ACheeseStrikeCharacter* JoinerOnHost = CharacterOf(1, 0);
+		const ACheeseStrikeCharacter* HostOnJoiner = CharacterOf(0, 1);
+		return JoinerOnHost != nullptr && HostOnJoiner != nullptr && JoinerOnHost->GetBody() == *Pick && HostOnJoiner->GetBody() == *Pick;
+	});
+	Then([this, Pick]()
+	{
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			const ACheeseStrikeGameState* Match = GameState(Machine);
+			for (int32 Player = 0; Player < 2; ++Player)
+			{
+				const ACheeseStrikeCharacter* Body = CharacterOf(Player, Machine);
+				if (Body == nullptr || Match == nullptr)
+				{
+					continue;
+				}
+				const int32 Side = Match->TeamOf(Body->GetPlayerState());
+				TestEqual(FString::Printf(TEXT("machine %d shows player %d as the hero picked"), Machine, Player), Body->GetBody(), *Pick);
+				TestEqual(TEXT("in their own side's colours"), Body->GetBodyTeam(), Side);
+				const UMaterialInterface* Dress = Body->GetMesh()->GetMaterial(0);
+				TestTrue(FString::Printf(TEXT("worn in them (%s)"), Dress != nullptr ? *Dress->GetName() : TEXT("none")), Dress != nullptr && Side >= 0 && Dress->GetName().Contains(CheeseStrikeBodies::TeamWord(Side)));
+			}
+		}
+		// Back to the usual: the heroes by player id again.
+		Controller(0)->CheeseStrikeHero(TEXT("auto"));
+		Controller(1)->CheeseStrikeHero(TEXT("auto"));
+	});
+	WaitUntil(TEXT("the usual heroes again"), 5.0f, []()
+	{
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 1);
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		return Host != nullptr && Joiner != nullptr && Host->GetBody() != Joiner->GetBody();
+	});
+	StopPlaying();
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMatchEndsAtTheKillLimit, "CheeseStrike.Play.TheMatchEndsAtTheKillLimit", PlayTests::Flags)
 
 bool FTheMatchEndsAtTheKillLimit::RunTest(const FString& Parameters)
