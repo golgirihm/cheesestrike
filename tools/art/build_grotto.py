@@ -456,7 +456,7 @@ def tunnel():
     side onto the landing where the south bridge comes down."""
     kit.tunnel("RindTunnel", "RindTunnel", (-TUNNEL_X, TUNNEL_Y), (TUNNEL_X, TUNNEL_Y), width=400, height=300, wall=60, bottom=L1,
                openings=[("L", TUNNEL_X - 150, TUNNEL_X + 150)], lamps=600)
-    kit.door("RindTunnel_Door", "Tunnels/RindTunnel", (0, TUNNEL_Y + 230, L1), 90, 260, 220)
+    kit.door("RindTunnel_Door", "Tunnels/RindTunnel", (0, TUNNEL_Y + 230, L1), 90, 260, 220, attach_to="RindTunnel")
 
 
 def spans():

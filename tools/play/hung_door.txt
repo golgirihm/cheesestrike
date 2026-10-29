@@ -1,0 +1,12 @@
+# A door hung in cheese goes with it: Gruyère Grotto's Rind Tunnel and its
+# door, eaten at once, the door shrinking and falling away. Run with
+# tools/play.ps1 -Map /Game/CheeseStrike/Maps/Lvl_Grotto -StartAt 0,-1650,520,-90
+wait 3
+shot hung_door_0_before
+cmd CheeseStrikeEatCheese 1 RindTunnel
+wait 0.3
+shot hung_door_1_going
+wait 1.5
+shot hung_door_2_gone
+state
+quit
