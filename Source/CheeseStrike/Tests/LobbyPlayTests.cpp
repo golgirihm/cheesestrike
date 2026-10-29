@@ -46,15 +46,18 @@ bool FTheLobbyStartsWithTheUsualRules::RunTest(const FString& Parameters)
 	const int32 Skill = CheeseStrikeBots::SkillFrom(Options, INDEX_NONE);
 	TestTrue(TEXT("of normal skill"), Skill >= 0 && FString(CheeseStrikeBots::Skill(Skill).Name) == TEXT("Normal"));
 
-	// The modes in the lobby: every one once, the teams' first, free-for-all at the bottom.
+	// The modes in the lobby: every one but Solo King of the Hill once, the teams' first, free-for-all at the bottom.
 	TSet<EMode> Seen;
 	for (const EMode Each : LobbyOrder)
 	{
 		Seen.Add(Each);
 	}
-	TestEqual(TEXT("every mode is offered once"), Seen.Num(), NumModes);
+	TestEqual(TEXT("every mode offered is offered once"), Seen.Num(), NumLobbyModes);
+	TestEqual(TEXT("every mode but one is offered"), NumLobbyModes, NumModes - 1);
+	TestFalse(TEXT("Solo King of the Hill is not offered"), Seen.Contains(EMode::SoloKingOfTheHill));
+	TestTrue(TEXT("but a URL still names it"), ModeFrom(TEXT("?Mode=SoloKingOfTheHill")) == EMode::SoloKingOfTheHill);
 	TestTrue(TEXT("Deathmatch first"), LobbyOrder[0] == EMode::Deathmatch);
-	TestTrue(TEXT("free-for-all last"), LobbyOrder[NumModes - 1] == EMode::FreeForAll);
+	TestTrue(TEXT("free-for-all last"), LobbyOrder[NumLobbyModes - 1] == EMode::FreeForAll);
 	return true;
 }
 

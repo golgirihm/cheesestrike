@@ -68,7 +68,8 @@ namespace CheeseStrikeMenu
 		}
 		if (bInAMatch)
 		{
-			return EMenuPage::Lobby;
+			// The settings open over the lobby with Escape (LobbyMenuKey); any other page chosen is the front end's.
+			return Chosen == EMenuPage::Options ? EMenuPage::Options : EMenuPage::Lobby;
 		}
 		return FrontEnd;
 	}
@@ -110,6 +111,16 @@ namespace CheeseStrikeMenu
 		// A dropdown the host has open would close as the lobby is drawn again: wait for it, unless the lobby itself has
 		// moved on (travelling, starting), which nothing in the dropdown could matter to.
 		return bChanged && (!bDropdownOpen || bStatusChanged);
+	}
+
+	bool CanCloseLobby(ELobbyStatus Status)
+	{
+		return Status == ELobbyStatus::CanStart || Status == ELobbyStatus::Waiting || Status == ELobbyStatus::Joining;
+	}
+
+	EMenuPage LobbyMenuKey(EMenuPage Chosen)
+	{
+		return Chosen == EMenuPage::Options ? EMenuPage::Main : EMenuPage::Options;
 	}
 
 	int32 FocusAfterRedraw(const TArray<FString>& Names, const FString& Name, int32 Index)
@@ -503,6 +514,62 @@ namespace
 		}
 	};
 
+	/**
+	 * What it holds, fading in over CheeseStrikeMenu::FadeSeconds from
+	 * clear, and growing from `FromScale` to its size about its middle: drawn
+	 * so, never laid out so, and hit and pressed as it is at once, so that
+	 * nothing waits on it.
+	 */
+	class SCheeseStrikeFadeIn : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SCheeseStrikeFadeIn) : _FromScale(1.0f) {}
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+			SLATE_ARGUMENT(float, FromScale)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			FromScale = InArgs._FromScale;
+			StartedAt = FPlatformTime::Seconds();
+			SetRenderTransformPivot(FVector2D(0.5, 0.5));
+			ChildSlot [ InArgs._Content.Widget ];
+			Show(0.0f);
+		}
+
+		virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override
+		{
+			SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+			if (!bDone)
+			{
+				Show(static_cast<float>(FPlatformTime::Seconds() - StartedAt));
+			}
+		}
+
+	private:
+		void Show(float Since)
+		{
+			const float Along = FMath::Clamp(Since / CheeseStrikeMenu::FadeSeconds, 0.0f, 1.0f);
+			// Eased out: quick at first, settling.
+			const float Eased = 1.0f - FMath::Square(1.0f - Along);
+			SetRenderOpacity(Eased);
+			if (FromScale != 1.0f)
+			{
+				SetRenderTransform(FSlateRenderTransform(FMath::Lerp(FromScale, 1.0f, Eased)));
+			}
+			bDone = Along >= 1.0f;
+		}
+
+		float FromScale = 1.0f;
+		double StartedAt = 0.0;
+		bool bDone = false;
+	};
+
+	TSharedRef<SWidget> MenuFadeIn(TSharedRef<SWidget> Widget, float FromScale = 1.0f)
+	{
+		return SNew(SCheeseStrikeFadeIn).FromScale(FromScale) [ Widget ];
+	}
+
 	/** Whether the item with the focus is ringed: not while the player uses the mouse, which has its hover. */
 	bool MenuFocusRingsShown = true;
 
@@ -671,18 +738,19 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 			]
 		]
 		// The game's name over the front end, at the top in the middle.
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(FMargin(0.0f, 36.0f, 0.0f, 0.0f))
+		// Big enough to read from across a room: the subtitle twice what it was, the name still clearly the larger.
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(FMargin(0.0f, CheeseStrikeMenu::MastheadTop, 0.0f, 0.0f))
 		[
 			SAssignNew(Masthead, SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("CHEESESTRIKE"))).Font(Font(56, FName("Bold"))).ColorAndOpacity(Cheese)
-				.ShadowOffset(FVector2D(2.0f, 2.0f)).ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.8f))
+				SNew(STextBlock).Text(FText::FromString(TEXT("CHEESESTRIKE"))).Font(Font(CheeseStrikeMenu::TitleSize, FName("Bold"))).ColorAndOpacity(Cheese)
+				.ShadowOffset(FVector2D(3.0f, 3.0f)).ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.8f))
 			]
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, -6.0f, 0.0f, 0.0f))
 			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("GOUDA OVERLOAD"))).Font(Font(20, FName("Bold"))).ColorAndOpacity(Ink)
-				.ShadowOffset(FVector2D(1.0f, 1.0f)).ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.8f))
+				SNew(STextBlock).Text(FText::FromString(TEXT("GOUDA OVERLOAD"))).Font(Font(CheeseStrikeMenu::SubtitleSize, FName("Bold"))).ColorAndOpacity(Ink)
+				.ShadowOffset(FVector2D(2.0f, 2.0f)).ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.8f))
 			]
 		]
 		// The pages' panel on the left.
@@ -808,6 +876,11 @@ void SCheeseStrikeMenu::Refresh()
 			FriendsContent->SetContent(MakeFriendsPanel(bOpen));
 		}
 	}
+	// The question whether to close the lobby goes once the countdown begins: it can't be closed then.
+	if (Asking == EMenuAsk::CloseLobby && Page == EMenuPage::Lobby && !CheeseStrikeMenu::CanCloseLobby(LobbyStatusNow()))
+	{
+		Asking = EMenuAsk::None;
+	}
 	if (Dialog.IsValid())
 	{
 		Dialog->SetVisibility(Asking != EMenuAsk::None ? EVisibility::Visible : EVisibility::Collapsed);
@@ -817,7 +890,8 @@ void SCheeseStrikeMenu::Refresh()
 			ShownAsk = Asking;
 			DialogFocusables.Reset();
 			bBuildingDialog = true;
-			DialogContent->SetContent(Asking != EMenuAsk::None ? MakeDialog() : SNullWidget::NullWidget);
+			// The question comes in fading and growing a little, at once ready for a press.
+			DialogContent->SetContent(Asking != EMenuAsk::None ? MenuFadeIn(MakeDialog(), CheeseStrikeMenu::DialogFromScale) : SNullWidget::NullWidget);
 			bBuildingDialog = false;
 			if (Asking == EMenuAsk::None && bWasAsking)
 			{
@@ -878,7 +952,10 @@ void SCheeseStrikeMenu::Refresh()
 			Focusables.Reset();
 			bFocusPending = true;
 			++LobbyBuilds;
-			LobbyContent->SetContent(MakeLobby());
+			// Faded in when the lobby comes from another page, never when it is drawn again.
+			const bool bFade = BuiltPage != Page;
+			BuiltPage = Page;
+			LobbyContent->SetContent(bFade ? MenuFadeIn(MakeLobby()) : MakeLobby());
 		}
 	}
 	else if (Content.IsValid())
@@ -891,7 +968,10 @@ void SCheeseStrikeMenu::Refresh()
 			ShownPageKey = Key;
 			Focusables.Reset();
 			bFocusPending = true;
-			Content->SetContent(MakePage());
+			// A new page fades in; the same page drawn again (a tab, what was found) does not.
+			const bool bFade = BuiltPage != Page;
+			BuiltPage = Page;
+			Content->SetContent(bFade ? MenuFadeIn(MakePage()) : MakePage());
 		}
 	}
 	KeepFocus();
@@ -1121,7 +1201,13 @@ FReply SCheeseStrikeMenu::OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& 
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeCloseLobbyButton()
 {
-	return MakeButton(TEXT("CLOSE LOBBY"), [this]() { AskBefore(EMenuAsk::CloseLobby); }, EButtonKind::Danger);
+	return MakeButton(TEXT("CLOSE LOBBY"), [this]()
+	{
+		if (CheeseStrikeMenu::CanCloseLobby(LobbyStatusNow()))
+		{
+			AskBefore(EMenuAsk::CloseLobby);
+		}
+	}, EButtonKind::Danger);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeQuitButton()
@@ -1191,7 +1277,7 @@ void SCheeseStrikeMenu::ConfirmBackToLobby(bool bAsk)
 FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
 	// Escape and B go back (closing an open dropdown first, or the host's question about going back to the lobby), and so
-	// does the gamepad's Menu button, as Escape in a match.
+	// does the gamepad's Menu button, as Escape in a match; in the lobby, Escape and Menu open the settings over it.
 	const FKey Key = InKeyEvent.GetKey();
 	if (Key == EKeys::Escape || Key == EKeys::Gamepad_FaceButton_Right || Key == EKeys::Gamepad_Special_Right)
 	{
@@ -1208,6 +1294,11 @@ FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 		if (Page == EMenuPage::Pause && bConfirmingBackToLobby)
 		{
 			ConfirmBackToLobby(false);
+			return FReply::Handled();
+		}
+		// In the lobby, B has nothing to go back to: Escape and Menu open the settings over it.
+		if (Page == EMenuPage::Lobby && Key == EKeys::Gamepad_FaceButton_Right)
+		{
 			return FReply::Handled();
 		}
 		if (Controller.IsValid())
@@ -1512,8 +1603,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFarewell()
 		return SNullWidget::NullWidget;
 	}
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
-	// A red-edged note over the buttons, until it is dismissed (or the player hosts or joins again).
-	return SNew(SBox).Padding(FMargin(0.0f, 0.0f, 0.0f, 20.0f))
+	// A red-edged note over the buttons, until it is dismissed (or the player hosts or joins again), fading and growing in.
+	return MenuFadeIn(SNew(SBox).Padding(FMargin(0.0f, 0.0f, 0.0f, 20.0f))
 		[
 			SNew(SBorder)
 			.BorderImage(Looks().Chip(FLinearColor(0.2f, 0.05f, 0.045f, 0.95f), FLinearColor(0.85f, 0.24f, 0.2f)))
@@ -1536,7 +1627,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFarewell()
 					})
 				]
 			]
-		];
+		], CheeseStrikeMenu::DialogFromScale);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeCredits()
@@ -2161,13 +2252,23 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	const auto RespawnDelayNow = [Now]() { const ACheeseStrikeGameState* State = Now(); return State != nullptr ? State->GetRespawnDelay() : CheeseStrikeRules::RespawnDelay; };
 	const CheeseStrikeModes::EMode ModeNow = Match != nullptr ? Match->GetMode() : CheeseStrikeModes::EMode::FreeForAll;
 	const CheeseStrikeModes::FModeInfo& ModeRules = CheeseStrikeModes::Info(ModeNow);
-	// The modes in the lobby's order, free-for-all last.
+	// The modes the lobby offers, in its order, free-for-all last; and a mode the URL named that it doesn't offer (Solo King
+	// of the Hill), shown as it is, last.
 	TArray<FString> ModeNames;
+	TArray<CheeseStrikeModes::EMode> ModesListed;
 	int32 ModeChosen = INDEX_NONE;
-	for (int32 Index = 0; Index < CheeseStrikeModes::NumModes; ++Index)
+	for (int32 Index = 0; Index < CheeseStrikeModes::NumLobbyModes; ++Index)
 	{
-		ModeNames.Add(Upper(CheeseStrikeModes::Info(CheeseStrikeModes::LobbyOrder[Index]).Name));
-		ModeChosen = CheeseStrikeModes::LobbyOrder[Index] == ModeNow ? Index : ModeChosen;
+		ModesListed.Add(CheeseStrikeModes::LobbyOrder[Index]);
+	}
+	if (!ModesListed.Contains(ModeNow))
+	{
+		ModesListed.Add(ModeNow);
+	}
+	for (int32 Index = 0; Index < ModesListed.Num(); ++Index)
+	{
+		ModeNames.Add(Upper(CheeseStrikeModes::Info(ModesListed[Index]).Name));
+		ModeChosen = ModesListed[Index] == ModeNow ? Index : ModeChosen;
 	}
 	TArray<FString> RoundNames;
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(CheeseStrikeModes::RoundLimitChoices); ++Index)
@@ -2259,11 +2360,11 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
 	const auto Row = [this, &Rows](const FString& Label, TSharedRef<SWidget> Setter) { Rows->AddSlot().AutoHeight() [ MakeRuleRow(Label, Setter) ]; };
 	Row(TEXT("Map"), MakeDropdown(MapNames, MapChosen, bCanPick, [Player, KillLimitNow, RespawnDelayNow](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimitNow(), RespawnDelayNow(), Index); }, MapPictures));
-	Row(TEXT("Mode"), MakeDropdown(ModeNames, [ModeChosen]() { return ModeChosen; }, bCanPick, [Player](int32 Index)
+	Row(TEXT("Mode"), MakeDropdown(ModeNames, [ModeChosen]() { return ModeChosen; }, bCanPick, [Player, ModesListed](int32 Index)
 	{
-		if (Player.IsValid() && Index >= 0 && Index < CheeseStrikeModes::NumModes)
+		if (Player.IsValid() && ModesListed.IsValidIndex(Index))
 		{
-			Player->SetModeFromMenu(static_cast<int32>(CheeseStrikeModes::LobbyOrder[Index]));
+			Player->SetModeFromMenu(static_cast<int32>(ModesListed[Index]));
 		}
 	}));
 	// Wrapped at the width it has, not at the width it had last drawn (AutoWrapText), which a lobby drawn afresh doesn't
@@ -2403,6 +2504,16 @@ FVector2D SCheeseStrikeMenu::LobbyWants() const
 	return LobbyContent.IsValid() ? LobbyContent->GetDesiredSize() + FVector2D(2.0 * 56.0, 2.0 * 40.0) : FVector2D::ZeroVector;
 }
 
+FVector2D SCheeseStrikeMenu::MastheadWants() const
+{
+	return Masthead.IsValid() ? Masthead->GetDesiredSize() : FVector2D::ZeroVector;
+}
+
+FVector2D SCheeseStrikeMenu::PanelWants() const
+{
+	return Panel.IsValid() ? Panel->GetDesiredSize() : FVector2D::ZeroVector;
+}
+
 bool SCheeseStrikeMenu::IsLobbyReady() const
 {
 	const CheeseStrikeMenu::ELobbyStatus Status = LobbyStatusNow();
@@ -2430,8 +2541,13 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 	const TSharedRef<SWidget> Rules = MakeLobbyRules();
 
 	// The host's lobby is the match: leaving it closes it for everyone.
+	// Once the countdown has begun it can't be closed: faded, with no click and no focus (KeepFocus and the moves skip it).
 	TSharedRef<SHorizontalBox> Bottom = SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ bHost ? MakeCloseLobbyButton() : MakeButton(TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); }) ];
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+		[
+			bHost ? StaticCastSharedRef<SWidget>(SNew(SBox).IsEnabled(CheeseStrikeMenu::CanCloseLobby(Status)) [ MakeCloseLobbyButton() ])
+				: MakeButton(TEXT("LEAVE"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); })
+		];
 	// In a mode of sides, until the countdown: over to the other side (clicking a seat there does the same).
 	const ACheeseStrikePlayerState* Mine = Player.IsValid() ? Player->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
 	if (Match != nullptr && Match->HasTeams() && Mine != nullptr && (Status == CheeseStrikeMenu::ELobbyStatus::CanStart || Status == CheeseStrikeMenu::ELobbyStatus::Waiting))
