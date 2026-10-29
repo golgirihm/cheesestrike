@@ -384,6 +384,10 @@ namespace CheeseStrikeHUD
 	TArray<FStreakPip> StreakPips(int32 Kills);
 	/** What the panel says is next: "CHEESE STRIKE IN 2", one kill off "CHEESE STRIKE NEXT KILL"; past the last streak "EVERY STREAK EARNED". `bShort` names it as under its pip ("DRONE IN 3"). */
 	FString StreakNext(int32 Kills);
+	/** The asset path of `Kind`'s icon, a picture of cheese rendered in Blender (tools/art/streak_icons.py) into /Game/CheeseStrike/UI/Streaks; empty for None. */
+	FString StreakIconPath(CheeseStrikeStreaks::EStreak Kind);
+	/** How a streak's icon is tinted: in its own colours once its kill is made (`bMade`), dim (darkened and faded) until then. */
+	FLinearColor StreakIconTint(bool bMade);
 	/**
 	 * The count's pop after a kill, with its tile behind it: at StreakPopPeak (about the minimap's side, MapSide over the tile's) at
 	 * once, with no growing in, held for StreakPopHold, then back to size over StreakPopShrink, eased.

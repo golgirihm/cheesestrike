@@ -140,6 +140,8 @@ public:
 	static CheeseStrikeHUD::EStatus StatusOf(const ACheeseStrikePlayerState* Player, const ACheeseStrikeCharacter* Body);
 	/** The character that is `Player`'s now (the live one if there is one), or null. */
 	static ACheeseStrikeCharacter* BodyOf(const APlayerState* Player);
+	/** `Kind`'s icon in cheese (CheeseStrikeHUD::StreakIconPath), loaded as it is first shown, for the streak panel and the streak-ready prompt; null where there is none. */
+	UTexture2D* StreakIcon(CheeseStrikeStreaks::EStreak Kind);
 
 protected:
 	/** Pixels for a design pixel at 1080 lines: the HUD is laid out for 1920 by 1080 and scales with the height. */
@@ -207,6 +209,9 @@ protected:
 	UTexture2D* CountdownPicture(const FString& Word);
 	UPROPERTY(Transient)
 	TMap<FString, TObjectPtr<UTexture2D>> CountdownPictures;
+	/** The streaks' icons loaded so far, by EStreak (StreakIcon). */
+	UPROPERTY(Transient)
+	TMap<uint8, TObjectPtr<UTexture2D>> StreakIcons;
 	/** The health the HUD shows: the character's, or CheeseStrike.HUD.Health's for judging the red edges (development). */
 	static float HealthShown(const ACheeseStrikeCharacter* Character);
 	/**

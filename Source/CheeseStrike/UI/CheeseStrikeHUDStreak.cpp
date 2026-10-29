@@ -11,6 +11,7 @@
 #include "CheeseStrikeHUD.h"
 #include "CheeseStrikeGameState.h"
 #include "Engine/Canvas.h"
+#include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
 #include "CheeseStrikeCharacter.h"
@@ -24,6 +25,23 @@ namespace HudDraw = CheeseStrikeHUDDraw;
 static constexpr float BadgeShowSeconds = 2.5f;
 
 static TAutoConsoleVariable<int32> CVarStreakShown(TEXT("CheeseStrike.HUD.Streak"), -1, TEXT("Show this run of kills in the kill-streak panel instead of the player's, for judging it and its pop (-1: the player's)."));
+
+UTexture2D* ACheeseStrikeHUD::StreakIcon(CheeseStrikeStreaks::EStreak Kind)
+{
+	const uint8 Key = static_cast<uint8>(Kind);
+	UTexture2D* Picture = nullptr;
+	if (const TObjectPtr<UTexture2D>* Known = StreakIcons.Find(Key))
+	{
+		Picture = Known->Get();
+	}
+	else
+	{
+		const FString Path = CheeseStrikeHUD::StreakIconPath(Kind);
+		Picture = Path.IsEmpty() ? nullptr : LoadObject<UTexture2D>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
+		StreakIcons.Add(Key, Picture);
+	}
+	return Picture != nullptr && Picture->GetResource() != nullptr ? Picture : nullptr;
+}
 
 float ACheeseStrikeHUD::StreakPanelTop() const
 {
@@ -78,9 +96,20 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	const float TrackRight = Left + Width - 12.0f * U;
 	const float PipGap = 4.0f * U;
 	const float PipWidth = (TrackRight - TrackLeft - PipGap * (Pips.Num() - 1)) / FMath::Max(1, Pips.Num());
-	const float PipMiddle = Top + 31.0f * U;
+	// Low in the panel, so that the streaks' icons have room under the captions.
+	const float PipMiddle = Top + 38.0f * U;
 	const float Small = 8.0f * U;
 	const float Tall = 14.0f * U;
+	// The streaks' icons, pictures of cheese, drawn after the shapes (over them), as tall as the panel has room for under its captions.
+	struct FIconDraw
+	{
+		UTexture2D* Picture = nullptr;
+		FVector2D At = FVector2D::ZeroVector;
+		float Side = 0.0f;
+		bool bMade = false;
+	};
+	TArray<FIconDraw> Icons;
+	const float IconSide = 34.0f * U;
 	for (int32 Index = 0; Index < Pips.Num(); ++Index)
 	{
 		const CheeseStrikeHUD::FStreakPip& Pip = Pips[Index];
@@ -92,12 +121,26 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 		const float Swell = bNewest ? (FMath::Min(Pop, 1.8f) - 1.0f) * 3.0f * U : 0.0f;
 		if (bStreak)
 		{
-			// A streak's kill is an orange icon of the streak (lit once made), where the plain pips have a bubble.
-			const float IconRadius = (Tall / 2.0f + Swell) * 0.95f;
+			// A streak's kill is the streak's icon (lit once made, dim until then), where the plain pips have a bubble: its picture in
+			// cheese, on a soft gold glow once made; without the picture, a drawn one in the cheese's orange.
 			const FVector2D Centre(X + PipWidth / 2.0f, PipMiddle);
-			const FLinearColor IconColour = HudDraw::Faded(HudDraw::Accent, Pip.bMade ? 1.0f : 0.3f);
-			switch (Pip.Earns)
+			UTexture2D* Picture = StreakIcon(Pip.Earns);
+			if (Picture != nullptr)
 			{
+				const float Side = IconSide + 2.0f * Swell;
+				if (Pip.bMade)
+				{
+					Shapes.RoundedRect(Centre.X - Side * 0.5f, Centre.Y - Side * 0.5f, Side, Side, Side * 0.5f, HudDraw::Faded(HudDraw::Accent, 0.28f));
+				}
+				Icons.Add({Picture, Centre - FVector2D(Side, Side) * 0.5f, Side, Pip.bMade});
+			}
+			const float IconRadius = (Tall / 2.0f + Swell) * 0.95f;
+			const FLinearColor IconColour = HudDraw::Faded(HudDraw::Accent, Pip.bMade ? 1.0f : 0.3f);
+			switch (Picture != nullptr ? CheeseStrikeStreaks::EStreak::None : Pip.Earns)
+			{
+			case CheeseStrikeStreaks::EStreak::None:
+				// Its picture is drawn, after the shapes.
+				break;
 			case CheeseStrikeStreaks::EStreak::AerialCheese:
 				// The drone: a ring with a hub and four arms.
 				Shapes.Arc(Centre, IconRadius * 0.45f, 1.6f * U, 0.0f, 360.0f, IconColour, false);
@@ -126,7 +169,7 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 			if (Pip.bMade && Index == Kills - 1 && Ring >= 0.0f && Ring < 1.0f)
 			{
 				const float Eased = 1.0f - FMath::Square(1.0f - Ring);
-				Shapes.Arc(Centre, (10.0f + 26.0f * Eased) * U, (3.0f - 2.0f * Ring) * U, 0.0f, 360.0f, HudDraw::Faded(HudDraw::Accent, 0.9f * (1.0f - Ring)), false);
+				Shapes.Arc(Centre, (16.0f + 22.0f * Eased) * U, (3.0f - 2.0f * Ring) * U, 0.0f, 360.0f, HudDraw::Faded(HudDraw::Accent, 0.9f * (1.0f - Ring)), false);
 			}
 			continue;
 		}
@@ -140,6 +183,10 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 		}
 	}
 	Shapes.Draw(Canvas);
+	for (const FIconDraw& Icon : Icons)
+	{
+		HudDraw::Picture(Canvas, Icon.Picture, Icon.At, FVector2D(Icon.Side, Icon.Side), CheeseStrikeHUD::StreakIconTint(Icon.bMade));
+	}
 
 	// Over the track: what it is, and what comes next; under the streaks' pips, their names.
 	const FSlateFontInfo Caption = HudDraw::Font(12.0f * U);

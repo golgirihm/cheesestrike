@@ -758,6 +758,21 @@ namespace CheeseStrikeHUD
 		return Pips;
 	}
 
+	FString StreakIconPath(CheeseStrikeStreaks::EStreak Kind)
+	{
+		using namespace CheeseStrikeStreaks;
+		const TCHAR* Name = Kind == EStreak::AerialCheese ? TEXT("T_Streak_AerialCheese")
+			: Kind == EStreak::CheeseStrike ? TEXT("T_Streak_CheeseStrike")
+			: Kind == EStreak::GoudaOverload ? TEXT("T_Streak_GoudaOverload")
+			: nullptr;
+		return Name != nullptr ? FString::Printf(TEXT("/Game/CheeseStrike/UI/Streaks/%s.%s"), Name, Name) : FString();
+	}
+
+	FLinearColor StreakIconTint(bool bMade)
+	{
+		return bMade ? FLinearColor::White : FLinearColor(0.42f, 0.42f, 0.42f, 0.5f);
+	}
+
 	FString StreakNext(int32 Kills)
 	{
 		using namespace CheeseStrikeStreaks;
