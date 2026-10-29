@@ -174,6 +174,43 @@ Everything is kept in the player's own save (Steam Cloud later), unchecked.
 
 **Achievements** (Steam achievements later): First Crumb, Top of the Board, Mouser (100 kills), Well Aged (50 matches), Untouched Rind (win 5–0), Three in a Row, Sharpshooter (60 % of 20+ shots), From the Next County, Back from the Board, No Hard Feelings, Tour of the Dairy (every arena), Every Flavour (every mode), The Whole Board (every weapon), Long Maturing (10 hours).
 
+### Achievements as built (wave 14)
+
+The first set is in the game, kept as records on the player's own machine (`UCheeseStrikeRecordsSubsystem`, the save game slot "Records"), counted as the server tells each machine what its player did (a kill and its badges, a streak called in, a teammate revived, a match played to its end and won), and unlocked when a stat reaches its threshold: for now that logs it and shows "ACHIEVEMENT: <NAME>" on the HUD. The table is `Rules/CheeseStrikeAchievements.h` (`CheeseStrike.Achievements.*`); `CheeseStrikeStats` on the console lists them with their progress.
+
+Steam can't hold them until the game has its own App ID. Then, on Steamworks (App Admin, Stats & Achievements, Achievements), create one achievement for each row below with the **API name exactly as the id**, its display name and description, and an icon (achieved and unachieved, 256 x 256 JPG), publish, and fill in `UCheeseStrikeRecordsSubsystem::SetOnSteam` (`SteamUserStats()->SetAchievement(Id)` and `StoreStats()` once `RequestCurrentStats` has answered). No Steam stats are needed: the counts stay in the game's own records.
+
+| API name | Name | Description |
+| --- | --- | --- |
+| ACH_KILLS_1 | First Bite | Score your first kill. |
+| ACH_KILLS_10 | Cheesemonger | Score 10 kills. |
+| ACH_KILLS_100 | Big Cheese | Score 100 kills. |
+| ACH_KILLS_1000 | Cheese Legend | Score 1,000 kills. |
+| ACH_HEADSHOTS_1 | Head Cheese | Kill with a headshot. |
+| ACH_HEADSHOTS_10 | Sharp Cheddar | Kill with 10 headshots. |
+| ACH_HEADSHOTS_100 | Aged to Perfection | Kill with 100 headshots. |
+| ACH_HEADSHOTS_1000 | Grand Cru | Kill with 1,000 headshots. |
+| ACH_ASSASSINATIONS_1 | Quiet as a Mouse | Kill someone with the knife from behind. |
+| ACH_ASSASSINATIONS_10 | Behind the Rind | Kill 10 with the knife from behind. |
+| ACH_ASSASSINATIONS_100 | Cellar Shadow | Kill 100 with the knife from behind. |
+| ACH_ASSASSINATIONS_1000 | Phantom of the Fromagerie | Kill 1,000 with the knife from behind. |
+| ACH_MODE_DEATHMATCH | A Taste of Deathmatch | Play a match of Deathmatch to its end. |
+| ACH_MODE_ELIMINATION | A Taste of Elimination | Play a match of Elimination to its end. |
+| ACH_MODE_EXECUTION | A Taste of Execution | Play a match of Execution to its end. |
+| ACH_MODE_GUNGAME | A Taste of Gun Game | Play a match of Gun Game to its end. |
+| ACH_MODE_KINGOFTHEHILL | A Taste of King of the Hill | Play a match of King of the Hill to its end. |
+| ACH_MODE_FREEFORALL | A Taste of Free-for-all | Play a match of Free-for-all to its end. |
+| ACH_ALL_MODES | The Whole Cheese Board | Play a match of every mode to its end. |
+| ACH_STREAK_UAC | Eye in the Sky | Call in an Unmanned Aerial Cheese. |
+| ACH_STREAK_STRIKE | Special Delivery | Call in a Cheese Strike. |
+| ACH_STREAK_OVERLOAD | Gouda Overload | Call in the Gouda Overload. |
+| ACH_EXECUTION_1 | Final Slice | Execute an enemy who is down. |
+| ACH_REVIVE_1 | Back on the Board | Revive a teammate who is down. |
+| ACH_WINS_1 | Say Cheese | Win a match. |
+| ACH_WINS_10 | Cheese Champion | Win 10 matches. |
+
+The modes' rows follow the lobby's modes (`CheeseStrikeModes::LobbyOrder`): a mode added to the lobby adds a row here and on Steamworks.
+
 **Challenges:** three a day (150 XP), two a week (500), one long (1000): kill N, kill N with a weapon, win N on an arena, play N of a mode, earn N medals, deal N damage, N assists.
 
 **Unlocks** by level, achievement or challenge: camouflage patterns (cheese kinds), helmet and head gear, a thing held in the off hand, titles, weapon finishes, emotes (wave, dance, shrug, cheer). The hats, balloons and lollipops of the Godot game are replaced by serious equivalents: camo, helmet covers, patches, charms.

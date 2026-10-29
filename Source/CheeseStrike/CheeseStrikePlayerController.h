@@ -148,6 +148,22 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientKicked();
 
+	/**
+	 * The records (Records/CheeseStrikeRecords.h): the server tells the
+	 * player's machine what they did, a CheeseStrikeAchievements::ERecord with
+	 * its detail, which their records count. `Record` sends it to `Player`'s
+	 * machine, if a person plays them (bots keep none).
+	 */
+	UFUNCTION(Client, Reliable)
+	void ClientRecord(uint8 Record, uint8 Detail);
+	static void Record(const APlayerState* Player, uint8 Record, uint8 Detail = 0);
+	/** From the console: every achievement, whether it is unlocked and how near, from this machine's records. */
+	UFUNCTION(Exec)
+	void CheeseStrikeStats();
+	/** From the console (development): adds `Amount` to the record `Stat` ("Kills", "Mode.Deathmatch"), unlocking what it earns, for looking at the toast. */
+	UFUNCTION(Exec)
+	void CheeseStrikeRecord(const FString& Stat, int32 Amount = 1);
+
 	/** The host asks the server to remove `Who` (the friends panel's Kick); only the host's own controller can. */
 	UFUNCTION(Server, Reliable)
 	void ServerKick(ACheeseStrikePlayerState* Who);

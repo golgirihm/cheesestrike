@@ -34,6 +34,9 @@
 #include "CheeseStrike.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "Engine/GameInstance.h"
+#include "HAL/PlatformTime.h"
+#include "Records/CheeseStrikeRecords.h"
 
 /** The HUD's drawing, named through an alias rather than used as a whole: the packaged game's unity build would carry a using-directive into the files after this one. */
 namespace HudDraw = CheeseStrikeHUDDraw;
@@ -380,6 +383,7 @@ void ACheeseStrikeHUD::DrawHUD()
 	// After the match, the podium: its own words over it, and nothing else.
 	if (CheeseStrikePodiumHUD::Draw(this, Canvas))
 	{
+		DrawAchievementToast();
 		return;
 	}
 	const ACheeseStrikeCharacter* Character = Cast<ACheeseStrikeCharacter>(Controller->GetPawn());
@@ -441,6 +445,37 @@ void ACheeseStrikeHUD::DrawHUD()
 	{
 		DrawScoreboard(Match, bOver);
 	}
+	DrawAchievementToast();
+}
+
+void ACheeseStrikeHUD::DrawAchievementToast()
+{
+	const UCheeseStrikeRecordsSubsystem* Records = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeRecordsSubsystem>() : nullptr;
+	float Since = 0.0f;
+	const CheeseStrikeAchievements::FAchievement* Achievement = Records != nullptr ? Records->GetToast(FPlatformTime::Seconds(), Since) : nullptr;
+	if (Achievement == nullptr || Canvas == nullptr)
+	{
+		return;
+	}
+	// A small panel at the top in the middle, under the players' row: sliding down and fading in, and fading out at the end.
+	const float Alpha = FMath::Clamp(Since / CheeseStrikeAchievements::ToastFade, 0.0f, 1.0f) * FMath::Clamp((CheeseStrikeAchievements::ToastSeconds - Since) / CheeseStrikeAchievements::ToastFade, 0.0f, 1.0f);
+	const float U = Unit();
+	const FString Title = CheeseStrikeAchievements::Toast(*Achievement);
+	const FSlateFontInfo TitleFont = CheeseStrikeHUDDraw::Font(22.0f * U);
+	const FSlateFontInfo LineFont = CheeseStrikeHUDDraw::Font(14.0f * U);
+	const FVector2D TitleSize = CheeseStrikeHUDDraw::Measure(Title, TitleFont);
+	const FVector2D LineSize = CheeseStrikeHUDDraw::Measure(Achievement->Description, LineFont);
+	const float Pad = 14.0f * U;
+	const float Width = FMath::Max(TitleSize.X, LineSize.X) + 2.0f * Pad;
+	const float Height = TitleSize.Y + LineSize.Y + 2.0f * Pad;
+	const float Middle = Canvas->SizeX / 2.0f;
+	const float Top = (Margin + 84.0f) * U - (1.0f - FMath::Clamp(Since / CheeseStrikeAchievements::ToastFade, 0.0f, 1.0f)) * 12.0f * U;
+	CheeseStrikeHUDDraw::FShapes Shapes;
+	Shapes.RoundedRect(Middle - Width / 2.0f, Top, Width, Height, 10.0f * U, FLinearColor(0.03f, 0.028f, 0.02f, 0.82f * Alpha));
+	Shapes.RoundedFrame(Middle - Width / 2.0f, Top, Width, Height, 10.0f * U, FMath::Max(1.0f, 2.0f * U), CheeseStrikeHUDDraw::Faded(CheeseStrikeHUDDraw::Accent, Alpha));
+	Shapes.Draw(Canvas);
+	CheeseStrikeHUDDraw::Text(Canvas, Title, FVector2D(Middle, Top + Pad), TitleFont, CheeseStrikeHUDDraw::Faded(CheeseStrikeHUDDraw::Accent, Alpha), 0.5f);
+	CheeseStrikeHUDDraw::Text(Canvas, Achievement->Description, FVector2D(Middle, Top + Pad + TitleSize.Y), LineFont, CheeseStrikeHUDDraw::Faded(CheeseStrikeHUDDraw::Soft, Alpha), 0.5f);
 }
 
 void ACheeseStrikeHUD::DrawMice(const ACheeseStrikeGameState* Match)

@@ -3,6 +3,8 @@
 
 #include "CheeseStrikeGameMode.h"
 #include "Rules/CheeseStrikeCredit.h"
+#include "Rules/CheeseStrikeAchievements.h"
+#include "Rules/CheeseStrikeBadges.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/NetConnection.h"
@@ -569,6 +571,23 @@ void ACheeseStrikeGameMode::HandleMatchHasEnded()
 	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 	{
 		State->SetLobbyAt(State->GetServerWorldTimeSeconds() + CheeseStrikeRules::ResultsTime);
+		// Everyone's records: a match of this mode played to its end, and won by the winning side or player (as HearTheMatch tells it).
+		const bool bTeams = CheeseStrikeModes::Info(Mode).bTeams;
+		for (APlayerState* Each : State->PlayerArray)
+		{
+			const ACheeseStrikePlayerState* Player = Cast<ACheeseStrikePlayerState>(Each);
+			if (Player == nullptr || Player->IsABot())
+			{
+				continue;
+			}
+			const bool bWon = bTeams ? State->GetWinningTeam() != CheeseStrikeModes::NoTeam && State->GetWinningTeam() == Player->GetTeam() : State->GetWinnerName() == Player->GetPlayerName();
+			if (bWon)
+			{
+				ACheeseStrikePlayerController::Record(Player, static_cast<uint8>(CheeseStrikeAchievements::ERecord::Win));
+			}
+			// Last, as it saves the records.
+			ACheeseStrikePlayerController::Record(Player, static_cast<uint8>(CheeseStrikeAchievements::ERecord::MatchPlayed), static_cast<uint8>(Mode));
+		}
 	}
 }
 
@@ -715,6 +734,12 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 	if (Facts.bByAnother)
 	{
 		KillerState->AddBadges(Badges);
+		// The killer's records, on their machine (the achievements).
+		ACheeseStrikePlayerController::Record(KillerState, static_cast<uint8>(CheeseStrikeAchievements::ERecord::Kill));
+		for (const CheeseStrikeBadges::EBadge Badge : CheeseStrikeBadges::List(Badges))
+		{
+			ACheeseStrikePlayerController::Record(KillerState, static_cast<uint8>(CheeseStrikeAchievements::ERecord::Badge), static_cast<uint8>(Badge));
+		}
 		if (Facts.bRevenge)
 		{
 			KillerState->SetLastKilledBy(-1);
@@ -1226,6 +1251,7 @@ bool ACheeseStrikeGameMode::CallStreak(ACheeseStrikePlayerState* Caller, CheeseS
 		return false;
 	}
 	Caller->TakeStreak(Kind);
+	ACheeseStrikePlayerController::Record(Caller, static_cast<uint8>(CheeseStrikeAchievements::ERecord::StreakCalled), static_cast<uint8>(Kind));
 	// Calling one in is an attack: it gives up the protection of a fresh spawn.
 	if (ACheeseStrikeCharacter* CallerBody = Caller->GetPawn<ACheeseStrikeCharacter>())
 	{

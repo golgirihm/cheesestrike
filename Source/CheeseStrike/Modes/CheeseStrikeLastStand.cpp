@@ -20,6 +20,8 @@
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
+#include "CheeseStrikePlayerController.h"
+#include "Rules/CheeseStrikeAchievements.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 #include "Weapons/CheeseStrikeGunfire.h"
 #include "Effects/CheeseStrikeCheeseBlood.h"
@@ -639,6 +641,7 @@ void UCheeseStrikeLastStand::DoWork(float DeltaTime)
 	{
 		UE_LOG(LogCheeseStrike, Display, TEXT("%s revives %s"), *Body()->DisplayName(), *Target->DisplayName());
 		Theirs->Revive();
+		ACheeseStrikePlayerController::Record(Body()->GetPlayerState(), static_cast<uint8>(CheeseStrikeAchievements::ERecord::Revive));
 	}
 }
 
