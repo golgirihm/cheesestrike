@@ -1,0 +1,107 @@
+# The slide as others see it: the host sprints and slides back and forth (ten times) while a joiner, 4 m off and
+# facing it, takes a picture every 0.3 s (slide_watch_client.txt). Run with
+# tools/play.ps1 -Script tools/play/slide_watch.txt -ClientScript tools/play/slide_watch_client.txt -Res 1280x720 -Tag slidewatch -TimeoutSeconds 240
+wait 30
+cmd CheeseStrikeArm blaster
+look 90 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+hold Sprint
+hold Move 0 1
+wait 0.8
+hold Crouch
+wait 0.9
+release Crouch
+release Move
+release Sprint
+wait 0.4
+look 180 0
+quit

@@ -1,0 +1,17 @@
+# How steadily the view and the weapon in it turn: the weapon's place in view and the eye traced every frame
+# (CheeseStrike.TraceView 1) standing still, then turning slowly, then fast. Compare frame rates:
+# tools/play.ps1 -Script tools/play/view_jitter.txt -FixedFps 60 -Tag jitter60 (and -FixedFps 144 -Tag jitter144),
+# then read the "View:" lines in Saved/Logs/jitter60.log: the weapon's place in view should change by hundredths of a
+# centimetre and a degree from frame to frame however fast the view turns.
+wait 2
+cmd CheeseStrike.TraceView 1
+wait 0.5
+hold Look 0.3 0
+wait 2
+release Look
+wait 0.5
+hold Look 2 0
+wait 1.5
+release Look
+cmd CheeseStrike.TraceView 0
+quit
