@@ -2610,7 +2610,7 @@ FString SCheeseStrikeMenu::PageKey() const
 			const FIntPoint Resolution = Settings->GetScreenResolution();
 			const FIntPoint Drawn = Settings->GetResolutionShown();
 			Key += FString::Printf(TEXT("|%d %d %dx%d %dx%d %d %.0f %d"), Settings->GetOverallScalabilityLevel(), static_cast<int32>(Settings->GetFullscreenMode()), Resolution.X, Resolution.Y, Drawn.X, Drawn.Y,
-				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0) + (Settings->IsAimAssistOn() ? TEXT(" assist") : TEXT(""));
+				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0) + (Settings->IsAimAssistOn() ? TEXT(" assist") : TEXT("")) + FString::Printf(TEXT(" glyphs %d"), Settings->GetGamepadGlyphs());
 		}
 	}
 	return Key;
@@ -2896,7 +2896,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 				Refresh();
 			})
 		]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 20.0f, 6.0f)) [ bControls ? ControlsRow(TEXT("ACTION"), TEXT("KEYBOARD AND MOUSE"), TEXT("XBOX"), TEXT("NINTENDO"), true) : SNullWidget::NullWidget ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 20.0f, 6.0f)) [ bControls ? ControlsRow(TEXT("ACTION"), TEXT("KEYBOARD AND MOUSE"), TEXT("XBOX"), TEXT("PLAYSTATION"), TEXT("NINTENDO"), true) : SNullWidget::NullWidget ]
 		// Clear of the scroll bar on the right.
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SAssignNew(Scroll, SScrollBox).ScrollWhenFocusChanges(EScrollWhenFocusChanges::AnimatedScroll) + SScrollBox::Slot().Padding(FMargin(0.0f, 0.0f, bControls ? 20.0f : 0.0f, 0.0f)) [ bControls ? MakeControls() : MakeOptionsTab() ] ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f))
@@ -2912,10 +2912,12 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 	return SettingsPage;
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const FString& Keys, const FString& Xbox, const FString& Nintendo, bool bHeading) const
+TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const FString& Keys, const FString& Xbox, const FString& PlayStation, const FString& Nintendo, bool bHeading) const
 {
-	// The action, then its keys, then each pad's buttons, the column of what the player uses now lit.
+	// The action, then its keys, then each pad's buttons, the column of what the player uses now lit: the keys, or the
+	// pad whose buttons the prompts name (CheeseStrikeInput::GlyphsOf).
 	const bool bPadLit = CheeseStrikeInput::IsUsingGamepad(Controller.Get());
+	const CheeseStrikeControls::EPad PadInUse = CheeseStrikeControls::PadFor(CheeseStrikeInput::GlyphsOf(Controller.Get()));
 	// Each column is a fixed width (880 across: the page less the clear of the scroll bar), its text wrapped inside it. Fill
 	// widths with the wrapping set from outside re-flowed the text a frame after the table was laid out, which was the
 	// flicker side to side that remained after the up and down one (waves 8 and 9).
@@ -2931,12 +2933,13 @@ TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const 
 	const FSlateFontInfo KeyLook = bHeading ? Font(14, FName("Bold")) : Font(17, FName("Bold"));
 	const FLinearColor Name = bHeading ? Muted : Ink;
 	const FLinearColor KeysColour = bHeading ? Muted : (bPadLit ? Muted : Cheese);
-	const FLinearColor PadColour = bHeading ? Muted : (bPadLit ? Cheese : Muted);
+	const auto PadColour = [bHeading, bPadLit, PadInUse](CheeseStrikeControls::EPad Pad) { return bHeading || !bPadLit || Pad != PadInUse ? Muted : Cheese; };
 	return SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Action, Look, Name, 317.0f, 12.0f) ]
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Keys, KeyLook, KeysColour, 229.0f, 12.0f) ]
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Xbox, KeyLook, PadColour, 167.0f, 12.0f) ]
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour, 167.0f, 4.0f) ];
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Action, Look, Name, 250.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Keys, KeyLook, KeysColour, 200.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Xbox, KeyLook, PadColour(CheeseStrikeControls::EPad::Xbox), 143.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(PlayStation, KeyLook, PadColour(CheeseStrikeControls::EPad::PlayStation), 143.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour(CheeseStrikeControls::EPad::Nintendo), 144.0f, 4.0f) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeControls()
@@ -2951,7 +2954,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeControls()
 	for (const CheeseStrikeControls::FRow& Each : CheeseStrikeControls::Rows(*Set))
 	{
 		const auto Or = [](const FString& Text) { return Text.IsEmpty() ? FString(TEXT("-")) : Text; };
-		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ ControlsRow(Each.Action, Or(Each.Keyboard), Or(Each.Xbox), Or(Each.Nintendo), false) ];
+		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ ControlsRow(Each.Action, Or(Each.Keyboard), Or(Each.Xbox), Or(Each.PlayStation), Or(Each.Nintendo), false) ];
 	}
 	return List;
 }
@@ -3000,6 +3003,23 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			Refresh();
 		})));
 		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("A gamepad's: the stick turns slower over an enemy, and a little toward them. Never the mouse."), true, true, WrapWidth() - OptionLabelWidth) ];
+		{
+			TArray<FString> Glyphs;
+			for (int32 Index = 0; Index < CheeseStrikeInput::NumGlyphs; ++Index)
+			{
+				Glyphs.Add(CheeseStrikeInput::GlyphsName(static_cast<CheeseStrikeInput::EGlyphs>(Index)));
+			}
+			Add(MakeOptionRow(TEXT("Gamepad buttons"), MakeChoiceButtons(Glyphs, Settings->GetGamepadGlyphs(), true, [this, Kept](int32 Index)
+			{
+				if (Kept.IsValid())
+				{
+					Kept->SetGamepadGlyphs(static_cast<uint8>(Index));
+					Kept->SaveSettings();
+				}
+				Refresh();
+			})));
+			Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("What the prompts and the controls call a pad's buttons. Auto goes by the pad when it can be told; through Steam Input every pad looks like an Xbox one, so pick yours."), true, true, WrapWidth() - OptionLabelWidth) ];
+		}
 		break;
 	case EOptionsTab::Sound:
 		Add(MakeOptionRow(TEXT("Master volume"), MakeSlider(0.0f, 1.0f, 0.01f,

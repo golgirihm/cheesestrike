@@ -7,8 +7,10 @@
 #include "Framework/Application/IInputProcessor.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
+#include "GameFramework/InputDeviceSubsystem.h"
 #include "GameFramework/PlayerController.h"
 #include "InputAction.h"
+#include "Settings/CheeseStrikeSettings.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
 
@@ -175,13 +177,13 @@ TArray<FKey> UCheeseStrikeInputSet::KeysFor(const UInputAction* Action) const
 	return Keys;
 }
 
-FString UCheeseStrikeInputSet::PromptFor(const UInputAction* Action, bool bGamepad) const
+FString UCheeseStrikeInputSet::PromptFor(const UInputAction* Action, bool bGamepad, CheeseStrikeInput::EGlyphs Glyphs) const
 {
 	for (const FKey& Key : KeysFor(Action))
 	{
 		if (Key.IsGamepadKey() == bGamepad)
 		{
-			return CheeseStrikeInput::KeyLabel(Key);
+			return CheeseStrikeInput::KeyLabel(Key, Glyphs);
 		}
 	}
 	return FString();
@@ -190,7 +192,8 @@ FString UCheeseStrikeInputSet::PromptFor(const UInputAction* Action, bool bGamep
 FString UCheeseStrikeInputSet::Prompt(const APlayerController* Player, TObjectPtr<UInputAction> UCheeseStrikeInputSet::* Action)
 {
 	const UCheeseStrikeInputSet* Set = Get(Player);
-	return Set != nullptr ? Set->PromptFor(Set->*Action, CheeseStrikeInput::IsUsingGamepad(Player)) : FString();
+	const bool bGamepad = CheeseStrikeInput::IsUsingGamepad(Player);
+	return Set != nullptr ? Set->PromptFor(Set->*Action, bGamepad, bGamepad ? CheeseStrikeInput::GlyphsOf(Player) : CheeseStrikeInput::EGlyphs::Xbox) : FString();
 }
 
 namespace CheeseStrikeInput
@@ -256,6 +259,90 @@ namespace CheeseStrikeInput
 		}
 		// The letter keys by their letter: "E", "Q".
 		return Key.GetDisplayName(false).ToString().ToUpper();
+	}
+
+	const TCHAR* GlyphsName(EGlyphs Glyphs)
+	{
+		static const TCHAR* const Names[NumGlyphs] = {TEXT("AUTO"), TEXT("XBOX"), TEXT("PLAYSTATION"), TEXT("NINTENDO")};
+		return Names[FMath::Clamp(static_cast<int32>(Glyphs), 0, NumGlyphs - 1)];
+	}
+
+	FString KeyLabel(const FKey& Key, EGlyphs Glyphs)
+	{
+		// The same place on each pad: a PlayStation pad's shapes and numbered shoulders, a Nintendo pad's letters swapped
+		// round, its triggers ZL and ZR, its bumpers L and R, and View and Menu − and +.
+		static const TMap<FKey, FString> PlayStation = {
+			{EKeys::Gamepad_FaceButton_Bottom, TEXT("CROSS")}, {EKeys::Gamepad_FaceButton_Right, TEXT("CIRCLE")},
+			{EKeys::Gamepad_FaceButton_Left, TEXT("SQUARE")}, {EKeys::Gamepad_FaceButton_Top, TEXT("TRIANGLE")},
+			{EKeys::Gamepad_LeftShoulder, TEXT("L1")}, {EKeys::Gamepad_RightShoulder, TEXT("R1")},
+			{EKeys::Gamepad_LeftTrigger, TEXT("L2")}, {EKeys::Gamepad_RightTrigger, TEXT("R2")},
+			{EKeys::Gamepad_LeftThumbstick, TEXT("L3")}, {EKeys::Gamepad_RightThumbstick, TEXT("R3")},
+			{EKeys::Gamepad_Special_Left, TEXT("TOUCHPAD")}, {EKeys::Gamepad_Special_Right, TEXT("OPTIONS")},
+		};
+		static const TMap<FKey, FString> Nintendo = {
+			{EKeys::Gamepad_FaceButton_Bottom, TEXT("B")}, {EKeys::Gamepad_FaceButton_Right, TEXT("A")},
+			{EKeys::Gamepad_FaceButton_Left, TEXT("Y")}, {EKeys::Gamepad_FaceButton_Top, TEXT("X")},
+			{EKeys::Gamepad_LeftShoulder, TEXT("L")}, {EKeys::Gamepad_RightShoulder, TEXT("R")},
+			{EKeys::Gamepad_LeftTrigger, TEXT("ZL")}, {EKeys::Gamepad_RightTrigger, TEXT("ZR")},
+			{EKeys::Gamepad_Special_Left, TEXT("−")}, {EKeys::Gamepad_Special_Right, TEXT("+")},
+		};
+		const TMap<FKey, FString>* Own = Glyphs == EGlyphs::PlayStation ? &PlayStation : (Glyphs == EGlyphs::Nintendo ? &Nintendo : nullptr);
+		if (const FString* Label = Own != nullptr ? Own->Find(Key) : nullptr)
+		{
+			return *Label;
+		}
+		return KeyLabel(Key);
+	}
+
+	EGlyphs GlyphsOfDevice(const FString& DeviceName)
+	{
+		for (const TCHAR* Word : {TEXT("DualSense"), TEXT("DualShock"), TEXT("PlayStation"), TEXT("PS4"), TEXT("PS5"), TEXT("Sony")})
+		{
+			if (DeviceName.Contains(Word, ESearchCase::IgnoreCase))
+			{
+				return EGlyphs::PlayStation;
+			}
+		}
+		for (const TCHAR* Word : {TEXT("Nintendo"), TEXT("Switch"), TEXT("Pro Controller"), TEXT("Joy-Con")})
+		{
+			if (DeviceName.Contains(Word, ESearchCase::IgnoreCase))
+			{
+				return EGlyphs::Nintendo;
+			}
+		}
+		return EGlyphs::Xbox;
+	}
+
+	EGlyphs GlyphsToShow(EGlyphs Setting, EGlyphs Detected)
+	{
+		if (Setting != EGlyphs::Auto)
+		{
+			return Setting;
+		}
+		return Detected == EGlyphs::Auto ? EGlyphs::Xbox : Detected;
+	}
+
+	EGlyphs GlyphsOf(const APlayerController* Player)
+	{
+		const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+		// (The tests read the prompts as they come, whatever this PC's player picked.)
+		const EGlyphs Setting = Settings != nullptr && !GIsAutomationTesting ? static_cast<EGlyphs>(FMath::Clamp<int32>(Settings->GetGamepadGlyphs(), 0, NumGlyphs - 1)) : EGlyphs::Auto;
+		if (Setting != EGlyphs::Auto)
+		{
+			return Setting;
+		}
+		// The pad last used, as the engine knows it: XInput (and Steam Input, which shows every pad as an Xbox one) can't tell.
+		EGlyphs Detected = EGlyphs::Xbox;
+		const ULocalPlayer* Local = Player != nullptr ? Player->GetLocalPlayer() : nullptr;
+		if (const UInputDeviceSubsystem* Devices = Local != nullptr ? UInputDeviceSubsystem::Get() : nullptr)
+		{
+			const FHardwareDeviceIdentifier Hardware = Devices->GetMostRecentlyUsedHardwareDevice(Local->GetPlatformUserId());
+			if (Hardware.IsValid())
+			{
+				Detected = GlyphsOfDevice(Hardware.HardwareDeviceIdentifier.ToString() + TEXT(" ") + Hardware.InputClassName.ToString());
+			}
+		}
+		return GlyphsToShow(Setting, Detected);
 	}
 
 	EDevice DeviceOf(const APlayerController* Player)

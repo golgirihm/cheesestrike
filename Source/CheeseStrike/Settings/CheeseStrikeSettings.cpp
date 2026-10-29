@@ -252,6 +252,7 @@ void UCheeseStrikeSettings::SetToDefaults()
 	MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
 	FullscreenResolution = FIntPoint::ZeroValue;
 	Hero = TEXT("auto");
+	GamepadGlyphs = 0;
 }
 
 int32 UCheeseStrikeSettings::GetHero() const

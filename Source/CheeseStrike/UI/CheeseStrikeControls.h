@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "InputCoreTypes.h"
+#include "Input/CheeseStrikeInput.h"
 
 class UCheeseStrikeInputSet;
 class UInputAction;
@@ -22,12 +23,16 @@ namespace CheeseStrikeControls
 	enum class EPad : uint8
 	{
 		Xbox,
+		PlayStation,
 		Nintendo,
 	};
+	/** The prompts' glyphs for a pad, and the pad for the prompts' glyphs (Auto as Xbox). */
+	CheeseStrikeInput::EGlyphs GlyphsFor(EPad Pad);
+	EPad PadFor(CheeseStrikeInput::EGlyphs Glyphs);
 
 	/** A key on the keyboard or the mouse as the page writes it: "W", "SPACE", "LMB", "WHEEL DOWN", "MOUSE". */
 	FString KeyboardLabel(const FKey& Key);
-	/** A gamepad's button or stick as `Pad` has it: "A" or "B", "RT" or "ZR", "LEFT STICK", "PRESS LS". */
+	/** A gamepad's button or stick as `Pad` has it: "A", "CROSS" or "B", "RT", "R2" or "ZR", "LEFT STICK", "PRESS LS", "L3". */
 	FString PadLabel(const FKey& Key, EPad Pad);
 	/** Several keys in a cell, in a sensible order (WASD before the arrows), one way of each written once. */
 	FString JoinLabels(TArray<FString> Labels);
@@ -38,6 +43,7 @@ namespace CheeseStrikeControls
 		FString Action;
 		FString Keyboard;
 		FString Xbox;
+		FString PlayStation;
 		FString Nintendo;
 		/** The actions it shows (a held key on the keyboard and a pressed button on a pad can be two). */
 		TArray<const UInputAction*> Actions;
