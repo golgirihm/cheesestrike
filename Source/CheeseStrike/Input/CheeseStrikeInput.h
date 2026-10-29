@@ -69,6 +69,30 @@ namespace CheeseStrikeInput
 	/** A key as a prompt on the screen names it: "E", "4", "ESC", or a gamepad's button as an Xbox pad has it ("A", "LB", "RT", "VIEW", the d-pad's arrows). */
 	FString KeyLabel(const FKey& Key);
 
+	/** Whose names a gamepad's buttons go by on the screen: the pad's own if it can be told (Auto), or the one the settings pick. */
+	enum class EGlyphs : uint8
+	{
+		Auto,
+		Xbox,
+		PlayStation,
+		Nintendo,
+	};
+	constexpr int32 NumGlyphs = 4;
+	/** The settings' names for them: "AUTO", "XBOX", "PLAYSTATION", "NINTENDO". */
+	const TCHAR* GlyphsName(EGlyphs Glyphs);
+	/**
+	 * A key as a prompt names it with `Glyphs`' buttons: a DualShock's or DualSense's CROSS, CIRCLE, SQUARE, TRIANGLE, L1, R1,
+	 * L2, R2, L3, R3, TOUCHPAD and OPTIONS; a Nintendo pad's B, A, Y, X (the same places), L, R, ZL, ZR, −, +; an Xbox pad's
+	 * as KeyLabel (Auto too). The keyboard's and mouse's are KeyLabel's whatever the glyphs.
+	 */
+	FString KeyLabel(const FKey& Key, EGlyphs Glyphs);
+	/** The pad a device's name says it is (the engine's hardware device identifier, or a name): PlayStation for a DualShock or DualSense, Nintendo for a Switch Pro pad, else Xbox (Steam Input shows every pad as one). */
+	EGlyphs GlyphsOfDevice(const FString& DeviceName);
+	/** The glyphs shown: the setting's, or with Auto the pad's (`Detected`, Xbox if it couldn't be told). */
+	EGlyphs GlyphsToShow(EGlyphs Setting, EGlyphs Detected);
+	/** The glyphs `Player`'s prompts use: the settings' Gamepad buttons, or for Auto the pad they last used, as far as the engine can tell it (UInputDeviceSubsystem). */
+	EGlyphs GlyphsOf(const APlayerController* Player);
+
 	/** The device `Player`'s player last used (Keyboard until they have used any), from the game's input subsystem. */
 	EDevice DeviceOf(const APlayerController* Player);
 	/** Whether `Player`'s player is playing with a gamepad: they used one last. */
@@ -103,8 +127,8 @@ public:
 	 * gamepad key's label when `bGamepad`, else its first key on the keyboard
 	 * or mouse (CheeseStrikeInput::KeyLabel); empty if it has none.
 	 */
-	FString PromptFor(const UInputAction* Action, bool bGamepad) const;
-	/** The same for `Player`'s player, by the device they last used: `Prompt(Player, &UCheeseStrikeInputSet::Interact)`. */
+	FString PromptFor(const UInputAction* Action, bool bGamepad, CheeseStrikeInput::EGlyphs Glyphs = CheeseStrikeInput::EGlyphs::Xbox) const;
+	/** The same for `Player`'s player, by the device they last used and their pad's buttons (CheeseStrikeInput::GlyphsOf): `Prompt(Player, &UCheeseStrikeInputSet::Interact)`. */
 	static FString Prompt(const APlayerController* Player, TObjectPtr<UInputAction> UCheeseStrikeInputSet::* Action);
 
 	/** Moving: a 2D axis, X right and Y forward. */

@@ -82,6 +82,7 @@ namespace CheeseStrikeControls
 			Row.Actions = Actions;
 			TArray<FString> Keyboard;
 			TArray<FString> Xbox;
+			TArray<FString> PlayStation;
 			TArray<FString> Nintendo;
 			for (const UInputAction* Action : Actions)
 			{
@@ -90,6 +91,7 @@ namespace CheeseStrikeControls
 					if (Key.IsGamepadKey())
 					{
 						Xbox.Add(PadLabel(Key, EPad::Xbox));
+						PlayStation.Add(PadLabel(Key, EPad::PlayStation));
 						Nintendo.Add(PadLabel(Key, EPad::Nintendo));
 					}
 					else
@@ -100,6 +102,7 @@ namespace CheeseStrikeControls
 			}
 			Row.Keyboard = JoinLabels(Keyboard);
 			Row.Xbox = JoinLabels(Xbox);
+			Row.PlayStation = JoinLabels(PlayStation);
 			Row.Nintendo = JoinLabels(Nintendo);
 			return Row;
 		}
@@ -123,27 +126,36 @@ namespace CheeseStrikeControls
 
 	FString PadLabel(const FKey& Key, EPad Pad)
 	{
-		// The same place on both pads: the face buttons' letters are swapped round on a Nintendo one, the triggers are ZL
-		// and ZR, the bumpers L and R, and View and Menu are − and +.
+		// The sticks, pressed and moved, as the table writes them; the buttons as the prompts on the screen do, each pad's
+		// in the same place (CheeseStrikeInput::KeyLabel: a PlayStation pad's shapes, a Nintendo pad's letters swapped round).
 		static const TMap<FKey, FString> Nintendo = {
-			{EKeys::Gamepad_FaceButton_Bottom, TEXT("B")}, {EKeys::Gamepad_FaceButton_Right, TEXT("A")},
-			{EKeys::Gamepad_FaceButton_Left, TEXT("Y")}, {EKeys::Gamepad_FaceButton_Top, TEXT("X")},
-			{EKeys::Gamepad_LeftShoulder, TEXT("L")}, {EKeys::Gamepad_RightShoulder, TEXT("R")},
-			{EKeys::Gamepad_LeftTrigger, TEXT("ZL")}, {EKeys::Gamepad_RightTrigger, TEXT("ZR")},
 			{EKeys::Gamepad_LeftThumbstick, TEXT("PRESS L STICK")}, {EKeys::Gamepad_RightThumbstick, TEXT("PRESS R STICK")},
-			{EKeys::Gamepad_Special_Left, TEXT("−")}, {EKeys::Gamepad_Special_Right, TEXT("+")},
 			{EKeys::Gamepad_Left2D, TEXT("L STICK")}, {EKeys::Gamepad_Right2D, TEXT("R STICK")},
+		};
+		static const TMap<FKey, FString> PlayStation = {
+			{EKeys::Gamepad_Left2D, TEXT("LEFT STICK")}, {EKeys::Gamepad_Right2D, TEXT("RIGHT STICK")},
 		};
 		static const TMap<FKey, FString> Xbox = {
 			{EKeys::Gamepad_LeftThumbstick, TEXT("PRESS LS")}, {EKeys::Gamepad_RightThumbstick, TEXT("PRESS RS")},
 			{EKeys::Gamepad_Left2D, TEXT("LEFT STICK")}, {EKeys::Gamepad_Right2D, TEXT("RIGHT STICK")},
 		};
-		if (const FString* Label = (Pad == EPad::Nintendo ? Nintendo : Xbox).Find(Key))
+		if (const FString* Label = (Pad == EPad::Nintendo ? Nintendo : (Pad == EPad::PlayStation ? PlayStation : Xbox)).Find(Key))
 		{
 			return *Label;
 		}
-		// The d-pad's arrows, and the rest, as the prompts on the screen write them (an Xbox pad's).
-		return CheeseStrikeInput::KeyLabel(Key);
+		return CheeseStrikeInput::KeyLabel(Key, GlyphsFor(Pad));
+	}
+
+	CheeseStrikeInput::EGlyphs GlyphsFor(EPad Pad)
+	{
+		using CheeseStrikeInput::EGlyphs;
+		return Pad == EPad::Nintendo ? EGlyphs::Nintendo : (Pad == EPad::PlayStation ? EGlyphs::PlayStation : EGlyphs::Xbox);
+	}
+
+	EPad PadFor(CheeseStrikeInput::EGlyphs Glyphs)
+	{
+		using CheeseStrikeInput::EGlyphs;
+		return Glyphs == EGlyphs::Nintendo ? EPad::Nintendo : (Glyphs == EGlyphs::PlayStation ? EPad::PlayStation : EPad::Xbox);
 	}
 
 	FString JoinLabels(TArray<FString> Labels)

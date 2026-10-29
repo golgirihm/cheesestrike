@@ -123,6 +123,46 @@ bool FThePromptsFollowTheDeviceInUse::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThePromptsNameEachPadsButtons, "CheeseStrike.Input.ThePromptsNameEachPadsButtons", GamepadTests::Flags)
+
+bool FThePromptsNameEachPadsButtons::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeInput;
+	UCheeseStrikeInputSet* Set = UCheeseStrikeInputSet::Build(GetTransientPackage());
+	const auto Pad = [Set](const UInputAction* Action, EGlyphs Glyphs) { return Set->PromptFor(Action, true, Glyphs); };
+	// A DualShock's or DualSense's: the shapes, the numbered shoulders, Options and the touchpad.
+	TestEqual(TEXT("Cross jumps"), Pad(Set->Jump, EGlyphs::PlayStation), FString(TEXT("CROSS")));
+	TestEqual(TEXT("Circle crouches"), Pad(Set->CrouchToggle, EGlyphs::PlayStation), FString(TEXT("CIRCLE")));
+	TestEqual(TEXT("Square reloads"), Pad(Set->Reload, EGlyphs::PlayStation), FString(TEXT("SQUARE")));
+	TestEqual(TEXT("Triangle changes weapon"), Pad(Set->NextWeapon, EGlyphs::PlayStation), FString(TEXT("TRIANGLE")));
+	TestEqual(TEXT("L2 aims"), Pad(Set->Aim, EGlyphs::PlayStation), FString(TEXT("L2")));
+	TestEqual(TEXT("R2 fires"), Pad(Set->Fire, EGlyphs::PlayStation), FString(TEXT("R2")));
+	TestEqual(TEXT("L1 interacts"), Pad(Set->Interact, EGlyphs::PlayStation), FString(TEXT("L1")));
+	TestEqual(TEXT("R1 throws"), Pad(Set->Grenade, EGlyphs::PlayStation), FString(TEXT("R1")));
+	TestEqual(TEXT("L3 sprints"), Pad(Set->SprintToggle, EGlyphs::PlayStation), FString(TEXT("L3")));
+	TestEqual(TEXT("the touchpad shows the scoreboard"), Pad(Set->Scoreboard, EGlyphs::PlayStation), FString(TEXT("TOUCHPAD")));
+	TestEqual(TEXT("Options pauses"), Pad(Set->Menu, EGlyphs::PlayStation), FString(TEXT("OPTIONS")));
+	TestEqual(TEXT("the d-pad is the d-pad"), Pad(Set->Streak, EGlyphs::PlayStation), FString(TEXT("↓")));
+	// A Nintendo pad's: the same places, its own letters.
+	TestEqual(TEXT("B jumps on a Nintendo pad"), Pad(Set->Jump, EGlyphs::Nintendo), FString(TEXT("B")));
+	TestEqual(TEXT("ZR fires"), Pad(Set->Fire, EGlyphs::Nintendo), FString(TEXT("ZR")));
+	TestEqual(TEXT("+ pauses"), Pad(Set->Menu, EGlyphs::Nintendo), FString(TEXT("+")));
+	// An Xbox pad's, and Auto's, as ever; the keyboard's whatever the pad.
+	TestEqual(TEXT("A jumps on an Xbox pad"), Pad(Set->Jump, EGlyphs::Xbox), FString(TEXT("A")));
+	TestEqual(TEXT("and with Auto"), Pad(Set->Jump, EGlyphs::Auto), FString(TEXT("A")));
+	TestEqual(TEXT("E is E"), Set->PromptFor(Set->Interact, false, EGlyphs::PlayStation), FString(TEXT("E")));
+	// Which pad it is, by its name, when the engine can tell; the setting first.
+	TestEqual(TEXT("a DualSense"), GlyphsOfDevice(TEXT("DualSense Wireless Controller")), EGlyphs::PlayStation);
+	TestEqual(TEXT("a DualShock 4"), GlyphsOfDevice(TEXT("PS4 DualShock4")), EGlyphs::PlayStation);
+	TestEqual(TEXT("a Switch Pro pad"), GlyphsOfDevice(TEXT("Nintendo Switch Pro Controller")), EGlyphs::Nintendo);
+	TestEqual(TEXT("XInput is an Xbox pad"), GlyphsOfDevice(TEXT("XInputController Gamepad")), EGlyphs::Xbox);
+	TestEqual(TEXT("Auto shows the pad's"), GlyphsToShow(EGlyphs::Auto, EGlyphs::PlayStation), EGlyphs::PlayStation);
+	TestEqual(TEXT("or an Xbox pad's if it can't be told"), GlyphsToShow(EGlyphs::Auto, EGlyphs::Auto), EGlyphs::Xbox);
+	TestEqual(TEXT("a pick shows what is picked"), GlyphsToShow(EGlyphs::Nintendo, EGlyphs::PlayStation), EGlyphs::Nintendo);
+	TestEqual(TEXT("the settings' names"), FString(GlyphsName(EGlyphs::PlayStation)), FString(TEXT("PLAYSTATION")));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheLookStickTurnsOnACurve, "CheeseStrike.Input.TheLookStickTurnsOnACurve", GamepadTests::Flags)
 
 bool FTheLookStickTurnsOnACurve::RunTest(const FString& Parameters)

@@ -1,0 +1,12 @@
+# The controls' table with each pad's buttons (Xbox, PlayStation, Nintendo),
+# the column of the pad in use lit, and the Aiming tab's Gamepad buttons.
+# Run with tools/play.ps1 -Lobby -Res 1280x720.
+wait 2
+device gamepad
+cmd CheeseStrikePage Settings Controls
+wait 1
+shot pad_glyphs_0_controls
+cmd CheeseStrikePage Settings Aiming
+wait 1
+shot pad_glyphs_1_aiming
+quit

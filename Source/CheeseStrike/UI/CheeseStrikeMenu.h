@@ -294,10 +294,10 @@ private:
 	TSharedRef<SWidget> MakeCredits();
 	/** The settings: a tab for each kind (EOptionsTab), each setting on a row, applied as it changes and kept. */
 	TSharedRef<SWidget> MakeOptions();
-	/** The settings' Controls tab: a row an action, its keys on the keyboard and mouse, and its buttons on an Xbox and a Nintendo pad (CheeseStrikeControls::Rows). */
+	/** The settings' Controls tab: a row an action, its keys on the keyboard and mouse, and its buttons on an Xbox, a PlayStation and a Nintendo pad (CheeseStrikeControls::Rows). */
 	TSharedRef<SWidget> MakeControls();
 	/** A row of the controls' table, or its heading. */
-	TSharedRef<SWidget> ControlsRow(const FString& Action, const FString& Keys, const FString& Xbox, const FString& Nintendo, bool bHeading) const;
+	TSharedRef<SWidget> ControlsRow(const FString& Action, const FString& Keys, const FString& Xbox, const FString& PlayStation, const FString& Nintendo, bool bHeading) const;
 	TSharedRef<SWidget> MakeOptionsTab();
 	/** A row of the options: its name on the left, then what sets it. */
 	TSharedRef<SWidget> MakeOptionRow(const FString& Label, TSharedRef<SWidget> Setter);

@@ -110,6 +110,9 @@ public:
 	/** The hero this player plays (an index of CheeseStrikeBodies::All), or INDEX_NONE for "auto", the usual by player id; kept by its word (CheeseStrikeBodies::HeroKey). */
 	int32 GetHero() const;
 	void SetHero(int32 Body);
+	/** The buttons a gamepad's prompts and the controls' table name (CheeseStrikeInput::EGlyphs): Auto (the pad's, as far as it can be told), Xbox, PlayStation or Nintendo. */
+	uint8 GetGamepadGlyphs() const { return GamepadGlyphs; }
+	void SetGamepadGlyphs(uint8 Value) { GamepadGlyphs = Value; }
 
 	/** The field of view top to bottom the camera has now, from the settings if there are any. */
 	static float FieldOfViewNow();
@@ -145,4 +148,7 @@ protected:
 	/** The hero picked, by its word ("auto" for none). */
 	UPROPERTY(config)
 	FString Hero = TEXT("auto");
+	/** CheeseStrikeInput::EGlyphs, Auto by default. */
+	UPROPERTY(config)
+	uint8 GamepadGlyphs = 0;
 };
