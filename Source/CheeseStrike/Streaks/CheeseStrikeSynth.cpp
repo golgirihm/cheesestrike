@@ -45,56 +45,6 @@ namespace CheeseStrikeSynth
 		return Samples;
 	}
 
-	TArray<int16> Grunt(float Seconds, float Pitch)
-	{
-		const int32 Count = FMath::Max(1, FMath::RoundToInt(Seconds * SampleRate));
-		TArray<int16> Samples;
-		Samples.SetNumUninitialized(Count);
-		double Phase = 0.0;
-		// A small fixed noise, so that the breath is the same each time: a rough sequence from a seed.
-		uint32 Seed = 1234567u;
-		for (int32 Index = 0; Index < Count; ++Index)
-		{
-			const float Along = static_cast<float>(Index) / Count;
-			// The voice falls a little over the grunt, from a low note, with a quick vibrato.
-			const float Frequency = Pitch * FMath::Lerp(180.0f, 120.0f, Along) * (1.0f + 0.02f * FMath::Sin(2.0f * PI * 9.0f * Index / SampleRate));
-			Phase += 2.0 * PI * Frequency / SampleRate;
-			// Harmonics, the middle ones loudest, as a throat's are: the vowel's shape.
-			const float Voice = FMath::Sin(Phase) + 0.6f * FMath::Sin(2.0 * Phase) + 0.5f * FMath::Sin(3.0 * Phase) + 0.3f * FMath::Sin(4.0 * Phase) + 0.15f * FMath::Sin(5.0 * Phase);
-			Seed = Seed * 1664525u + 1013904223u;
-			const float Breath = (static_cast<float>(Seed >> 8) / 16777216.0f - 0.5f) * 0.12f;
-			// A sharp start, a push and a fall away.
-			const float Envelope = FMath::Min(1.0f, Along * Seconds / 0.02f) * FMath::Pow(1.0f - Along, 1.5f);
-			const float Value = (Voice * 0.22f + Breath) * Envelope;
-			Samples[Index] = static_cast<int16>(FMath::Clamp(Value, -1.0f, 1.0f) * 32767.0f);
-		}
-		return Samples;
-	}
-
-	TArray<int16> Thump(float Weight)
-	{
-		const int32 Count = FMath::RoundToInt(0.06f * SampleRate);
-		TArray<int16> Samples;
-		Samples.SetNumUninitialized(Count);
-		uint32 Seed = 987654u;
-		float Low = 0.0f;
-		for (int32 Index = 0; Index < Count; ++Index)
-		{
-			const float Along = static_cast<float>(Index) / Count;
-			Seed = Seed * 1664525u + 1013904223u;
-			const float Noise = static_cast<float>(Seed >> 8) / 16777216.0f - 0.5f;
-			// A one-pole low-pass keeps the noise dull; a falling low tone gives it body.
-			Low += (Noise - Low) * 0.18f;
-			// Wave 9: the old thump was a quiet 140 Hz tone that died within a few milliseconds (a squared envelope), so it was lost under the
-			// shots. The tone is higher (laptop speakers show it), fuller, and the envelope falls away more slowly.
-			const float Body = FMath::Sin(2.0f * PI * FMath::Lerp(220.0f, 100.0f, Along) * Index / SampleRate);
-			const float Envelope = FMath::Min(1.0f, Along * 0.06f / 0.004f) * FMath::Pow(1.0f - Along, 1.3f);
-			const float Value = (Low * 2.4f + Body * 0.9f) * Envelope * 0.7f * Weight;
-			Samples[Index] = static_cast<int16>(FMath::Clamp(Value, -1.0f, 1.0f) * 32767.0f);
-		}
-		return Samples;
-	}
-
 	namespace
 	{
 		/** The next noise value, from -1 to 1, of a small fixed generator, so that a sound made twice is the same. */
@@ -156,31 +106,84 @@ namespace CheeseStrikeSynth
 		}
 	}
 
-	TArray<int16> Footstep(int32 Variant)
+	TArray<int16> Thump(float Weight)
 	{
-		const int32 Count = FMath::RoundToInt(0.14f * SampleRate);
+		// Wave 14: a pillow thud and nothing else, unlike the hurt "oof": noise through two low-pass poles at 260 Hz
+		// (so no pitch to it), a soft start and a quick fall, about 80 ms.
+		const int32 Count = FMath::RoundToInt(0.08f * SampleRate);
 		TArray<float> Values;
 		Values.SetNumUninitialized(Count);
-		const int32 Kind = FMath::Abs(Variant) % 4;
-		uint32 Seed = 40503u + static_cast<uint32>(Kind) * 7919u;
-		const float HeelPole = PoleFor(700.0f + 180.0f * Kind);
-		float Heel = 0.0f;
-		float Previous = 0.0f;
+		uint32 Seed = 987654u;
+		const float Pole = PoleFor(260.0f);
+		float A = 0.0f;
+		float B = 0.0f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const float Time = static_cast<float>(Index) / SampleRate;
+			A += (Noise(Seed) - A) * Pole;
+			B += (A - B) * Pole;
+			const float Envelope = FMath::Min(1.0f, Time / 0.006f) * FMath::Exp(-Time / 0.022f) * FMath::Min(1.0f, (Count - Index) / (0.01f * SampleRate));
+			Values[Index] = B * Envelope;
+		}
+		return Normalised(Values, FMath::Clamp(0.55f * Weight, 0.05f, 0.9f));
+	}
+
+	TArray<int16> KaChing(bool bAssist)
+	{
+		// A cash register: the "ka" of its drawer's catch (a short clack of mid noise and a low knock), then the "ching"
+		// of its bell, struck twice in quick succession, inharmonic partials ringing down over half a second, with a
+		// rattle of coins. An assist is the bell alone, once, higher and shorter.
+		const float Seconds = bAssist ? 0.35f : 0.7f;
+		const int32 Count = FMath::RoundToInt(Seconds * SampleRate);
+		TArray<float> Values;
+		Values.SetNumZeroed(Count);
+		uint32 Seed = bAssist ? 31337u : 7331u;
+		const float BellAt = bAssist ? 0.0f : 0.06f;
+		const float Base = bAssist ? 2640.0f : 2093.0f;
+		const float Partials[] = {1.0f, 2.32f, 4.25f, 6.63f};
+		const float Shares[] = {1.0f, 0.55f, 0.3f, 0.18f};
+		const float Rings[] = {0.32f, 0.18f, 0.1f, 0.06f};
+		float A = 0.0f;
+		float B = 0.0f;
+		const float ClackHigh = PoleFor(3500.0f);
+		const float ClackLow = PoleFor(900.0f);
 		for (int32 Index = 0; Index < Count; ++Index)
 		{
 			const float Time = static_cast<float>(Index) / SampleRate;
 			const float White = Noise(Seed);
-			// The heel: dull noise that dies in a few hundredths of a second, with a low thud under it.
-			Heel += (White - Heel) * HeelPole;
-			const float Attack = FMath::Min(1.0f, Time / 0.002f);
-			const float Thud = FMath::Sin(2.0f * PI * FMath::Lerp(95.0f, 55.0f, FMath::Min(1.0f, Time / 0.08f)) * Time) * FMath::Exp(-Time / 0.05f) * 0.7f;
-			const float Body = Heel * 2.2f * FMath::Exp(-Time / 0.028f);
-			// The scuff of the sole, a hiss in the first few thousandths.
-			const float Scuff = (White - Previous) * 0.25f * FMath::Exp(-Time / 0.012f);
-			Previous = White;
-			Values[Index] = (Body + Thud + Scuff) * Attack;
+			float Value = 0.0f;
+			if (!bAssist)
+			{
+				// The clack: band-limited noise over in 15 ms, and a knock at 180 Hz.
+				A += (White - A) * ClackHigh;
+				B += (A - B) * ClackLow;
+				Value += (A - B) * 2.2f * FMath::Exp(-Time / 0.006f);
+				Value += FMath::Sin(2.0f * PI * 180.0f * Time) * 0.35f * FMath::Exp(-Time / 0.012f);
+			}
+			// The bell, struck at BellAt and again 45 ms later, a little softer.
+			for (int32 Strike = 0; Strike < (bAssist ? 1 : 2); ++Strike)
+			{
+				const float Since = Time - BellAt - Strike * 0.045f;
+				if (Since < 0.0f)
+				{
+					continue;
+				}
+				const float Struck = (Strike == 0 ? 1.0f : 0.7f) * FMath::Min(1.0f, Since / 0.0015f);
+				for (int32 Partial = 0; Partial < UE_ARRAY_COUNT(Partials); ++Partial)
+				{
+					const float Ring = Rings[Partial] * (bAssist ? 0.6f : 1.0f);
+					Value += FMath::Sin(2.0f * PI * Base * Partials[Partial] * Since) * Shares[Partial] * Struck * FMath::Exp(-Since / Ring) * 0.35f;
+				}
+			}
+			// Coins: sparse ticks for a quarter of a second after the bell.
+			if (!bAssist && Time > BellAt && Time < BellAt + 0.3f && FMath::Abs(Noise(Seed)) > 0.993f)
+			{
+				Value += Noise(Seed) * 0.4f * FMath::Exp(-(Time - BellAt) / 0.15f);
+			}
+			// Out over the last tenth.
+			Values[Index] = Value * FMath::Min(1.0f, (Count - Index) / (0.1f * Count));
 		}
-		return Normalised(Values, 0.9f);
+		return Normalised(Values, bAssist ? 0.5f : 0.8f);
 	}
 
 	TArray<int16> JetPass(float Seconds)

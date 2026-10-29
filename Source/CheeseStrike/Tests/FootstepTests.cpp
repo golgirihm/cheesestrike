@@ -1,13 +1,14 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
-// Footsteps: when a body sounds a step and how loudly (Rules/CheeseStrikeFootsteps.h),
-// and the sounds that are made in code for them and for the streaks
+// Footsteps: when a body sounds a step, how loudly and with which recording
+// (Rules/CheeseStrikeFootsteps.h), and the sounds that are made in code
 // (Streaks/CheeseStrikeSynth.h).
 
 #include "Misc/AutomationTest.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Rules/CheeseStrikeFootsteps.h"
 #include "Streaks/CheeseStrikeSynth.h"
+#include "Sound/SoundWave.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -74,6 +75,39 @@ bool FFootstepsComeOnTheStride::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFootstepsAreRecordings, "CheeseStrike.Rules.FootstepsAreRecordings", FootstepTests::Flags)
+
+bool FFootstepsAreRecordings::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeFootsteps;
+	// Six recorded steps for a walk and six for a sprint, a crouch's the walk's; any number picks one, in turn.
+	TSet<FString> Walks;
+	TSet<FString> Sprints;
+	for (int32 Variant = 0; Variant < Variants; ++Variant)
+	{
+		Walks.Add(SoundPath(EGait::Walk, Variant));
+		Sprints.Add(SoundPath(EGait::Sprint, Variant));
+		TestEqual(TEXT("a crouch steps as a walk does"), SoundPath(EGait::Crouch, Variant), SoundPath(EGait::Walk, Variant));
+	}
+	TestEqual(TEXT("six walking steps"), Walks.Num(), 6);
+	TestEqual(TEXT("six sprinting steps"), Sprints.Num(), 6);
+	TestFalse(TEXT("a sprint's steps are their own"), Walks.Contains(SoundPath(EGait::Sprint, 0)));
+	TestEqual(TEXT("any number picks one, in turn"), SoundPath(EGait::Walk, Variants + 1), SoundPath(EGait::Walk, 1));
+	TestEqual(TEXT("negative too"), SoundPath(EGait::Walk, -1), SoundPath(EGait::Walk, 1));
+	for (const TSet<FString>* Set : {&Walks, &Sprints})
+	{
+		for (const FString& Path : *Set)
+		{
+			const USoundWave* Wave = LoadObject<USoundWave>(nullptr, *Path);
+			if (TestNotNull(FString::Printf(TEXT("%s is there"), *Path), Wave))
+			{
+				TestTrue(FString::Printf(TEXT("and is a step's moment long (%.2f s)"), Wave->Duration), Wave->Duration > 0.05f && Wave->Duration < 0.35f);
+			}
+		}
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSynthesisedSounds, "CheeseStrike.Rules.SynthesisedSoundsAreWhole", FootstepTests::Flags)
 
 bool FSynthesisedSounds::RunTest(const FString& Parameters)
@@ -88,11 +122,14 @@ bool FSynthesisedSounds::RunTest(const FString& Parameters)
 		}
 		return Loudest;
 	};
-	const TArray<int16> Step = Footstep(0);
-	TestTrue(TEXT("a footstep is a moment long"), Step.Num() > SampleRate / 20 && Step.Num() < SampleRate / 4);
-	TestTrue(TEXT("and can be heard"), Peak(Step) > 10000);
-	TestTrue(TEXT("and clipped never"), Peak(Step) < 32767);
-	TestTrue(TEXT("the variants differ"), Footstep(0) != Footstep(1));
+	const TArray<int16> Ching = KaChing(false);
+	TestTrue(TEXT("a kill's ka-ching is under a second"), Ching.Num() > SampleRate / 2 && Ching.Num() < SampleRate);
+	TestTrue(TEXT("and can be heard"), Peak(Ching) > 20000);
+	TestTrue(TEXT("and clipped never"), Peak(Ching) < 32767);
+	const TArray<int16> Assist = KaChing(true);
+	TestTrue(TEXT("an assist's is shorter"), Assist.Num() < Ching.Num());
+	TestTrue(TEXT("and softer"), Peak(Assist) < Peak(Ching));
+	TestTrue(TEXT("and has died away by its end"), Peak(TArray<int16>(Ching.GetData() + Ching.Num() * 19 / 20, Ching.Num() / 20)) < 3000);
 	const TArray<int16> Jet = JetPass(3.0f);
 	TestEqual(TEXT("a jet pass lasts as asked"), Jet.Num(), 3 * SampleRate);
 	TestTrue(TEXT("and can be heard"), Peak(Jet) > 10000);

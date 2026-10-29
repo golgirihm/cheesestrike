@@ -405,6 +405,7 @@ bool UCheeseStrikeInventory::TakePickup(ACheeseStrikePickup* Pickup)
 	UE_LOG(LogCheeseStrike, Display, TEXT("%s takes the %s from %s%s"), *Character->DisplayName(), *Pickup->GetWeaponName().ToString(), Pickup->IsDropped() ? TEXT("the floor") : *Pickup->GetName(),
 		How == ETake::TopUp ? TEXT(", for its rounds") : TEXT(""));
 	Pickup->Take();
+	Character->MulticastPickedUp();
 	return true;
 }
 

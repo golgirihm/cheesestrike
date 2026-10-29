@@ -8,6 +8,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStart.h"
 #include "Rules/CheeseStrikeStreaks.h"
+#include "Rules/CheeseStrikeVoice.h"
 #include "CheeseStrikeGameState.generated.h"
 
 class ACheeseStrikePlayerState;
@@ -229,6 +230,8 @@ public:
 
 	/** The last few announcements, as this machine heard them, oldest first. */
 	const TArray<FAnnouncement>& GetAnnouncements() const { return Announcements; }
+	/** On this machine: says `Line` (CheeseStrikeVoice) to its own player, over everything. */
+	void Say(CheeseStrikeVoice::ELine Line) const;
 	/** Server only: tells every machine. */
 	void Announce(const FString& Text, CheeseStrikeStreaks::EStreak Streak = CheeseStrikeStreaks::EStreak::None, int32 Team = CheeseStrikeModes::NoTeam, const FString& Who = FString());
 	/** Seconds an announcement shows, and how many at most. */
@@ -242,8 +245,14 @@ protected:
 	void MulticastKill(const FString& Killer, const FString& Victim, bool bHead, const FString& How, uint8 Badges);
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastAnnounce(const FString& Text, uint8 Streak, int32 Team, const FString& Who);
-	/** On this machine: the voice that tells of a streak called in, if it has one (the Unmanned Aerial Cheese). */
+	/** On this machine: the voice that tells of a streak called in (CheeseStrikeVoice::ForStreak). */
 	void SpeakStreak(const FAnnouncement& Entry);
+	/** This machine's own player, who hears the voice; null on a dedicated server. */
+	const APlayerState* Listener() const;
+	/** The player of that name, or null. */
+	const APlayerState* PlayerNamed(const FString& Name) const;
+	/** When "Enemy down" was last said here (the world's time). */
+	float EnemyDownSaidAt = -100.0f;
 
 	UPROPERTY(Replicated)
 	int32 KillLimit = CheeseStrikeRules::KillLimit;

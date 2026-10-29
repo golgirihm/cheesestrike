@@ -216,8 +216,9 @@ protected:
 	/** Tells every other machine of a shot or a reload the server allowed, to show it. */
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastShot();
+	/** `bCallOut`: the reloader calls it out to teammates near by (CheeseStrikeVoice::CallsReload). */
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastReload();
+	void MulticastReload(bool bCallOut);
 	/** Plays each body's own copy of an animation of the set (`Which` picks it), at `PlayRate` (from `RateFor` its length, if given). */
 	void PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAnimSet::* Which, TFunction<float(const UAnimSequence*)> RateFor = nullptr);
 	/** Plays one of its sounds: the reload's and the dry click from the weapon, as heard there. */

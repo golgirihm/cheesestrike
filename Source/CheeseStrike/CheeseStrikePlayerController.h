@@ -250,6 +250,19 @@ protected:
 	void PublishPresence(bool bMatchStarted);
 	/** The menu's music, as the page wants it (CheeseStrikeMusic::IsWanted). */
 	void PlayMusic();
+	/** A kill of this player's own rings the till, an assist a softer ching (CheeseStrikeSounds::ScoreSound). */
+	void HearScore();
+	/** The voice for what this player sees happen in the match: the vermin coming, a round and the match won or lost (CheeseStrikeVoice). */
+	void HearTheMatch();
+	/** The kills and assists last heard, and whose. */
+	TWeakObjectPtr<const APlayerState> ScoreHeardOf;
+	int32 KillsHeard = 0;
+	int32 AssistsHeard = 0;
+	/** The game state last heard, and what of it has been said: the vermin's coming (their time), the round, the match's end. */
+	TWeakObjectPtr<const AGameStateBase> MatchHeard;
+	float VerminSaidFor = 0.0f;
+	int32 RoundSaid = 0;
+	bool bEndSaid = false;
 	void ShowMenuCamera();
 	void HideMenuCamera();
 	/** Puts the podium up when it is time, keeps the view on it, and takes it down. */

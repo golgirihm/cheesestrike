@@ -981,11 +981,16 @@ void ACheeseStrikeWeapon::MulticastShot_Implementation()
 	ShowShot();
 }
 
-void ACheeseStrikeWeapon::MulticastReload_Implementation()
+void ACheeseStrikeWeapon::MulticastReload_Implementation(bool bCallOut)
 {
 	if (Holder != nullptr && !Holder->IsLocallyControlled())
 	{
 		ShowReload();
+	}
+	// "Reloading!", heard by teammates near by.
+	if (bCallOut && Holder != nullptr)
+	{
+		Holder->HearReloadCall();
 	}
 }
 
@@ -1440,7 +1445,7 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 
 void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead, bool bKill)
 {
-	// A soft thump, like a smack on a pillow, for a hit by this machine's own player.
+	// A muted thud, like a smack on a pillow, for a hit by this machine's own player (a kill's ka-ching is the player controller's).
 	if (!Stats->IsMelee() && Holder != nullptr && Holder->IsLocallyControlled())
 	{
 		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Thump(bKill ? 1.3f : 1.0f)), 0.6f);
@@ -1501,7 +1506,7 @@ void ACheeseStrikeWeapon::ServerReload_Implementation()
 	}
 	ReloadEndsAt = ServerTime(GetWorld()) + Stats->ReloadTime;
 	GetWorldTimerManager().SetTimer(ReloadTimer, this, &ACheeseStrikeWeapon::FinishReload, Stats->ReloadTime, false);
-	MulticastReload();
+	MulticastReload(Holder != nullptr && Holder->TakeReloadCall());
 }
 
 void ACheeseStrikeWeapon::FinishReload()
