@@ -278,6 +278,35 @@ namespace CheeseStrikeWeapons
 		}();
 		return Stats;
 	}
+
+	const FWeaponStats& Gatling()
+	{
+		static const FWeaponStats Stats = []
+		{
+			// The Gouda Overload's (wave 14): a minigun of molten cheese, twenty a second once its barrels have spun up, a
+			// belt of 200 and no reload; wide from the hip, tighter aimed; the caller's for half a minute.
+			FWeaponStats Weapon = MakeWeapon(TEXT("gatling"), NSLOCTEXT("CheeseStrike", "Gatling", "Gouda Gatling"), EWeaponSlot::Primary);
+			Weapon.bSpecial = true;
+			Weapon.Damage = 12.0f;
+			Weapon.HeadMultiplier = 1.5f;
+			Weapon.FireInterval = 0.05f;
+			Weapon.bAutomatic = true;
+			Weapon.SpinUp = 0.4f;
+			Weapon.MagazineSize = 200;
+			Weapon.ReloadTime = 0.0f;
+			Weapon.Reserve = 0;
+			Weapon.ReserveMax = 0;
+			SetReach(Weapon, 100.0f, 25.0f, 60.0f, 0.5f);
+			Weapon.SpreadDegrees = 3.0f;
+			Weapon.HipSpreadDegrees = 14.0f;
+			Weapon.BloomShots = 10;
+			SetKick(Weapon, 0.12f, 20.0f, 0.3f, 0.3f);
+			Weapon.AimZoom = 0.8f;
+			Weapon.DrawTime = 0.3f;
+			return Weapon;
+		}();
+		return Stats;
+	}
 }
 
 namespace CheeseStrikeArsenal
@@ -285,7 +314,7 @@ namespace CheeseStrikeArsenal
 	const TArray<const FWeaponStats*>& All()
 	{
 		namespace W = CheeseStrikeWeapons;
-		static const TArray<const FWeaponStats*> Weapons = {&W::Blaster(), &W::Carbine(), &W::Grater(), &W::Munster(), &W::Shotgun(), &W::Burratas(), &W::Roquefort(), &W::Pistol(), &W::Knife()};
+		static const TArray<const FWeaponStats*> Weapons = {&W::Blaster(), &W::Carbine(), &W::Grater(), &W::Munster(), &W::Shotgun(), &W::Burratas(), &W::Roquefort(), &W::Pistol(), &W::Knife(), &W::Gatling()};
 		return Weapons;
 	}
 
@@ -307,12 +336,18 @@ namespace CheeseStrikeArsenal
 		TArray<FName> Ids;
 		for (const FWeaponStats* Weapon : All())
 		{
-			if (Weapon->Slot == Slot)
+			if (Weapon->Slot == Slot && !Weapon->bSpecial)
 			{
 				Ids.Add(Weapon->Id);
 			}
 		}
 		return Ids;
+	}
+
+	bool IsPickable(FName Id, EWeaponSlot Slot)
+	{
+		const FWeaponStats* Weapon = Find(Id);
+		return Weapon != nullptr && Weapon->Slot == Slot && !Weapon->bSpecial;
 	}
 
 	FName DefaultPrimary()

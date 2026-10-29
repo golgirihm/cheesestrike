@@ -15,14 +15,18 @@
  *   - five: the Cheese Strike, gouda wheels dropped over an area the
  *     player chooses on the minimap, after a falling whistle;
  *   - ten: the Gouda Overload, a siren and a warning to everyone, then
- *     wheels raining on every enemy for eight seconds; cover overhead saves
- *     them, and so does keeping on the move.
+ *     melted gouda splatted on every enemy at once, wherever they are: their
+ *     view smeared yellow and their legs slowed to a quarter, coming back
+ *     over fifteen seconds; and its caller runs faster for thirty and has
+ *     the Gouda Gatling in hand, a minigun of molten cheese, until its
+ *     rounds or its time run out.
  *
  * What a streak's wheels kill counts to the earner, but not toward their
  * next streak: only their own weapon's kills make a run. Earned streaks are
  * kept, in the order they came, until they are called in, through deaths
  * and rounds. ACheeseStrikePlayerState keeps a player's count;
- * ACheeseStrikeGameMode calls them in; ACheeseStrikeBombs drops the wheels.
+ * ACheeseStrikeGameMode calls them in; ACheeseStrikeBombs drops the wheels
+ * and splats the Overload's gouda.
  */
 namespace CheeseStrikeStreaks
 {
@@ -140,11 +144,32 @@ namespace CheeseStrikeStreaks
 	/** How far the strike's mark on the minimap moves for a degree the view would have turned (cm), the mouse's and the stick's alike. */
 	constexpr float StrikeCursorPerDegree = 35.0f;
 
-	/** Gouda Overload: the warning before the rain, how long it rains, how often a wheel falls on each enemy, and how far from them it may land. */
-	constexpr float OverloadWarning = 4.0f;
-	constexpr float OverloadRain = 8.0f;
-	constexpr float OverloadInterval = 0.7f;
-	constexpr float OverloadScatter = 200.0f;
+	/**
+	 * Gouda Overload: the warning (the siren) before the gouda splats. Splatted, a player is slowed to GooSlowest of their
+	 * speed at once, coming back in a straight line to all of it over GooSeconds, and can't sprint or slide while under
+	 * GooNoSprint of it (CheeseStrikeMovement's speeds times GooFactor). Its caller runs HasteFactor faster for
+	 * HasteSeconds, and has the Gouda Gatling (CheeseStrikeWeapons::Gatling) in hand for GatlingSeconds or until its rounds
+	 * are spent.
+	 */
+	constexpr float OverloadWarning = 3.0f;
+	constexpr float GooSeconds = 15.0f;
+	constexpr float GooSlowest = 0.25f;
+	constexpr float GooNoSprint = 0.6f;
+	constexpr float HasteFactor = 1.5f;
+	constexpr float HasteSeconds = 30.0f;
+	constexpr float GatlingSeconds = 30.0f;
+	/** Whether the Overload splats a character: every living enemy of its caller, standing or down in a last stand, wherever they are. */
+	bool IsSplatted(bool bEnemy, bool bAlive);
+	/** The share of its speed a character splatted at `SplatAt` until `GooUntil` (the server's times) has at `Now`: GooSlowest at the splat, all of it (1) by GooUntil, and 1 if never splatted. */
+	float GooFactor(float Now, float SplatAt, float GooUntil);
+	/** Whether a character at `Factor` of its speed may sprint or slide. */
+	bool MaySprintInGoo(float Factor);
+	/** How much faster the Overload's caller runs at `Now`, hastened until `HasteUntil`: HasteFactor until then, 1 after. */
+	float HasteAt(float Now, float HasteUntil);
+	/** How thick the yellow smear over a splatted player's view is (0 none, 1 just splatted), clearing as the goo does. */
+	float GooWash(float Now, float SplatAt, float GooUntil);
+	/** The Gatling's time left, as the HUD shows it beside its rounds: "0:24", whole seconds rounded up. */
+	FString GatlingTimeLeft(float Seconds);
 
 	/** What a wheel does where it lands: harm out to a radius, from so much at the middle down to so much at the edge, on whoever the burst can see. */
 	struct FBlast
@@ -155,7 +180,6 @@ namespace CheeseStrikeStreaks
 	};
 	/** A full-health player (100) is killed, or downed in Execution, by any hit of a strike's wheel, at the edge of its burst too. The area and the bursts are twice as wide as they first were (750 and 500 cm). */
 	constexpr FBlast StrikeBlast{1000.0f, 150.0f, 100.0f};
-	constexpr FBlast OverloadBlast{450.0f, 70.0f, 10.0f};
 	/** The harm `Blast` does `Distance` from where it lands: falling off in a straight line to its edge, none past it. */
 	float BlastDamage(const FBlast& Blast, float Distance);
 

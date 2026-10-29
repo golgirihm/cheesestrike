@@ -1,7 +1,10 @@
 # The streaks in a team match with bots, for looking at what they show: the
 # host calls in an Unmanned Aerial Cheese (its sweeps mark the enemy) and
 # looks up at the drone; then an enemy bot is given the Gouda Overload,
-# which it calls in on the host's side (the siren, the warning, the rain).
+# which it calls in on the host's side (the siren, the warning, then the
+# gouda smeared over the host's view, clearing); then the host calls in
+# their own and fires the Gouda Gatling (its yellow tracers, the HUD's
+# rounds and time left).
 # Run with tools/play.ps1 -Map /Game/CheeseStrike/Maps/Lvl_Creamery -Bots
 # -StartAt none -Extra "?Mode=Deathmatch?Bots=5".
 wait 4
@@ -20,16 +23,27 @@ wait 1
 cmd CheeseStrikeGiveStreak 3 enemy
 wait 2
 shot streaks_5_overload_warning
-wait 1.5
-shot streaks_6_overload_warning
-wait 2
-shot streaks_7_rain
-wait 1.5
-shot streaks_8_rain
+wait 3.5
+shot streaks_6_goo_splat
+wait 4
+shot streaks_7_goo_clearing
+wait 6
+shot streaks_8_goo_thin
 hold Scoreboard
 wait 0.3
 shot streaks_9_scoreboard
 release Scoreboard
 wait 4
 shot streaks_10_after
+cmd CheeseStrikeGiveStreak 3
+wait 0.3
+tap Streak
+wait 0.6
+shot streaks_11_gatling
+hold Fire
+wait 0.8
+shot streaks_12_gatling_firing
+wait 0.4
+shot streaks_13_gatling_firing
+release Fire
 quit

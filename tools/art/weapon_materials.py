@@ -7,8 +7,8 @@ import unreal
 #
 # Builds the weapons' materials in /Game/CheeseStrike/Weapons/Materials/: M_CheeseWeapon, which draws a weapon from
 # its own maps (colour, normal, AORM) and turns parts of it into cheese, and an instance for each weapon's every slot;
-# and M_MuzzleFlash with its two instances. The weapons load them by path (CheeseStrikeWeaponLooks), never in a
-# constructor, so this can rebuild them.
+# M_MuzzleFlash with its two instances, and M_Tracer, a shot's streak of light. The weapons load them by path
+# (CheeseStrikeWeaponLooks), never in a constructor, so this can rebuild them.
 #
 # What turns to cheese: a channel of the weapon's mask (the red of a Fab gun's cheese mask, made by
 # weapon_textures.py from its wooden or green parts; the blue of a Lyra gun's own mask, its painted panels), or a box
@@ -18,7 +18,7 @@ import unreal
 # moves with the weapon, skinned or not.
 #
 # With instance names after the script ("py weapon_materials.py MI_Burratas MI_BurratasCream"), only those are made,
-# over the M_CheeseWeapon already there, and nothing else is touched.
+# over the M_CheeseWeapon already there, and nothing else is touched; "M_Tracer" among them makes the tracer's too.
 MATERIALS = "/Game/CheeseStrike/Weapons/Materials"
 OUT = unreal.Paths.project_saved_dir() + "weapon_materials.txt"
 ONLY = [a for a in sys.argv[1:] if a]
@@ -304,6 +304,23 @@ def build_flash_material():
     lib.save_asset(front.get_path_name(), False)
 
 
+def build_tracer_material():
+    # A tracer: a thin rod drawn unlit and additive in the colour the weapon gives it, bright enough to read in daylight.
+    m = material("M_Tracer")
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    m.set_editor_property("used_with_skeletal_mesh", False)
+    node, link = builder(m)
+    colour = node(unreal.MaterialExpressionVectorParameter, -600, 0, parameter_name="Colour", default_value=unreal.LinearColor(1.0, 0.72, 0.08, 1.0))
+    bright = node(unreal.MaterialExpressionScalarParameter, -600, 200, parameter_name="Brightness", default_value=12.0)
+    lit = node(unreal.MaterialExpressionMultiply, -300, 100)
+    link(colour, lit, "A")
+    link(bright, lit, "B")
+    mel.connect_material_property(lit, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(m)
+    lines.append("M_Tracer saved " + str(lib.save_asset(m.get_path_name(), False)))
+
+
 def texture(path):
     t = unreal.load_asset(path)
     if t is None:
@@ -353,6 +370,8 @@ try:
     else:
         parent = build_weapon_material()
         build_flash_material()
+    if not ONLY or "M_Tracer" in ONLY:
+        build_tracer_material()
     # The Cheddar Blaster: Lyra's rifle, its painted panels a deep cheddar orange.
     weapon_instance("MI_Blaster", parent, lyra("Rifle/Textures", "Rifle", "T_Rifle_Masks"),
                     {"MottleScale": 2.5, "Marble": 1.5, "CheeseRoughness": 0.5},
@@ -373,6 +392,11 @@ try:
     weapon_instance("MI_Munster", parent, fab("/Game/Fab/Max3d/DP28", "DP28"),
                     {"MottleScale": 1.5, "Marble": 1.5, "CheeseRoughness": 0.5, "RindRoughness": 0.45},
                     {"CheeseColor": (0.9, 0.74, 0.34, 1.0), "CheeseColorB": (0.84, 0.6, 0.2, 1.0), "RindColor": (0.8, 0.3, 0.05, 1.0)})
+    # The Gouda Gatling (the Overload's, on the DP-28 until it has a model of its own): all of it young gouda, glossy and
+    # golden with a few small eyes, its pan in red wax.
+    weapon_instance("MI_Gatling", parent, fab("/Game/Fab/Max3d/DP28", "DP28"),
+                    {"CheeseAll": 1.0, "MottleScale": 1.2, "Marble": 1.4, "Holes": 0.18, "HoleSize": 0.7, "CheeseRoughness": 0.32, "RindRoughness": 0.28},
+                    {"CheeseColor": (0.98, 0.7, 0.1, 1.0), "CheeseColorB": (0.92, 0.58, 0.06, 1.0), "RindColor": (0.62, 0.03, 0.03, 1.0)})
     # The Swiss Shotgun: Lyra's shotgun, its panels Emmental, holed right through forward of the grip.
     weapon_instance("MI_Shotgun", parent, lyra("Shotgun/Texture", "Shotgun", "T_Shotgun_Mask"),
                     {"MottleScale": 3.0, "Marble": 1.0, "Holes": 0.55, "HoleSize": 1.1, "CutHoles": 1.0, "CheeseRoughness": 0.45},

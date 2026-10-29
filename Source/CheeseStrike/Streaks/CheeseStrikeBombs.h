@@ -36,18 +36,23 @@ struct FCheeseStrikeDrop
 };
 
 /**
- * Gouda wheels falling from the sky: a Cheese Strike's over an area,
- * or the Gouda Overload's rain on every enemy (CheeseStrikeStreaks). The
+ * The Cheese Strike and the Gouda Overload (CheeseStrikeStreaks).
+ *
+ * A Cheese Strike is gouda wheels falling from the sky over an area. The
  * server plans each wheel (where it lands, the first thing it meets coming
- * straight down, and when; indoors, a Cheese Strike's wheels come through
- * the roof onto the floor under it) and every machine is told; each shows the wheel
+ * straight down, and when; indoors, its wheels come through the roof onto
+ * the floor under it) and every machine is told; each shows the wheel
  * falling, tumbling, then where it lands a flash, a thump, a shockwave
  * swelling to exactly where its harm stops, and a scorch, while the
  * server harms whoever the burst can see within its radius (a wall or a
- * roof between them saves them), as the caller's kill. A Cheese Strike is
- * heralded by a falling whistle where it was marked; the Overload by a
- * siren everyone hears, and then a whistle over each wheel. Gone once the
- * last has landed.
+ * roof between them saves them), as the caller's kill. It is heralded by
+ * a falling whistle where it was marked. Gone once the last has landed.
+ *
+ * The Gouda Overload is heralded by a siren everyone hears, and as its
+ * warning ends the server splats every living enemy of its caller with
+ * melted gouda, wherever they are (ACheeseStrikeCharacter::Splat: slowed,
+ * their view smeared). The caller's haste and Gatling are the game mode's,
+ * at the call.
  */
 UCLASS(NotPlaceable)
 class CHEESESTRIKE_API ACheeseStrikeBombs : public AActor
@@ -59,17 +64,16 @@ public:
 
 	/** Server only: `Caller`'s Cheese Strike, over the area round `Spot` (CheeseStrikeStreaks::StrikeArea), its ring of wheels turned to `Yaw`. */
 	void StartStrike(ACheeseStrikePlayerState* Caller, const FVector& Spot, float Yaw);
-	/** Server only: `Caller`'s Gouda Overload: the warning, then the rain on their enemies. */
+	/** Server only: `Caller`'s Gouda Overload: the warning, then the gouda on their enemies. */
 	void StartOverload(ACheeseStrikePlayerState* Caller);
 
 	CheeseStrikeStreaks::EStreak GetKind() const { return static_cast<CheeseStrikeStreaks::EStreak>(Kind); }
 	const TArray<FCheeseStrikeDrop>& GetDrops() const { return Drops; }
-	/** Server only: how many wheels have landed, and how many players they have harmed. */
+	/** Server only: how many wheels have landed, and how many players they have harmed (or the Overload splatted). */
 	int32 GetLanded() const { return Landed; }
 	int32 GetHits() const { return Hits; }
-	/** The server's time the rain of the Overload begins and ends; 0 for a Cheese Strike. */
-	float GetRainFrom() const { return RainFrom; }
-	float GetRainUntil() const { return RainUntil; }
+	/** The server's time the Overload's gouda splats; 0 for a Cheese Strike. */
+	float GetSplatAt() const { return SplatAt; }
 
 	/** Where a wheel dropped over `Over` lands: the first thing it meets coming straight down from high above. False over nothing. */
 	static bool Landing(UWorld* World, const FVector& Over, FVector& OutImpact);
@@ -96,8 +100,12 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-	/** Server only: a wheel over `Over` that lands at `LandsAt`. */
-	void AddDrop(const FVector& Over, float LandsAt);
+	/** Server only: the Overload's gouda on every living enemy of its caller, now. */
+	void SplatEnemies();
+public:
+	/** How long one of the Overload's effects lasts: `Usual` (CheeseStrikeStreaks' GooSeconds, HasteSeconds, GatlingSeconds), or every one of them CheeseStrike.OverloadSeconds when that is set (the play tests). */
+	static float OverloadTime(float Usual);
+protected:
 	/** Every machine: a wheel bursting through the roof at `At`: a puff, a crack, and a scorch left on the roof's underside. */
 	void ShowThroughRoof(const FVector& At);
 	/** Server only: the harm a wheel does where it lands. */
@@ -119,13 +127,11 @@ protected:
 	UPROPERTY(Replicated)
 	FVector_NetQuantize WarnWhere = FVector::ZeroVector;
 	UPROPERTY(Replicated)
-	float RainFrom = 0.0f;
-	UPROPERTY(Replicated)
-	float RainUntil = 0.0f;
+	float SplatAt = 0.0f;
 
 	/** Server only: whose it is, and what it has done. */
 	TWeakObjectPtr<ACheeseStrikePlayerState> Caller;
-	float NextRainAt = 0.0f;
+	bool bSplatted = false;
 	int32 Landed = 0;
 	int32 Hits = 0;
 	/** The server's time it is done with, once everything is planned. */

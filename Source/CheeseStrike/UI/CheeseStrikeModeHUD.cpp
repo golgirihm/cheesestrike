@@ -77,12 +77,12 @@ namespace
 			const FString Text = CheeseStrikeHUD::FitNameIn(Word.Text.ToUpper(), Word.Who.ToUpper(), 360.0f * U, [&Line](const FString& Part) { return static_cast<float>(HudDraw::Measure(Part, Line).X); });
 			HudDraw::Text(Canvas, Text, FVector2D(Canvas->SizeX / 2.0f, Y), Line, HudDraw::Faded(Colour, Fade), 0.5f);
 			Y += HudDraw::Measure(Word.Text, Line).Y + 6.0f * U;
-			if (bAgainstMe && Age < CheeseStrikeStreaks::OverloadWarning + CheeseStrikeStreaks::OverloadRain)
+			if (bAgainstMe && Age < CheeseStrikeStreaks::OverloadWarning)
 			{
-				// Blinking while the warning lasts.
-				if (Age > CheeseStrikeStreaks::OverloadWarning || FMath::Fmod(Age, 0.6f) < 0.4f)
+				// Blinking while the warning lasts; no cover saves anyone from the gouda.
+				if (FMath::Fmod(Age, 0.6f) < 0.4f)
 				{
-					HudDraw::Text(Canvas, TEXT("GOUDA OVERLOAD INCOMING  ·  TAKE COVER"), FVector2D(Canvas->SizeX / 2.0f, Y), HudDraw::Font(34.0f * U), HudDraw::Danger, 0.5f);
+					HudDraw::Text(Canvas, TEXT("GOUDA OVERLOAD INCOMING"), FVector2D(Canvas->SizeX / 2.0f, Y), HudDraw::Font(34.0f * U), HudDraw::Danger, 0.5f);
 				}
 				Y += 52.0f * U;
 			}

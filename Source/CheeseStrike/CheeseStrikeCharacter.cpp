@@ -47,6 +47,7 @@
 #include "Rules/CheeseStrikeVoice.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStart.h"
+#include "Rules/CheeseStrikeStreaks.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Weapons/CheeseStrikeGunfire.h"
@@ -322,6 +323,9 @@ void ACheeseStrikeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(ACheeseStrikeCharacter, DiedHow);
 	DOREPLIFETIME(ACheeseStrikeCharacter, DiedAt);
 	DOREPLIFETIME(ACheeseStrikeCharacter, ProtectedUntil);
+	DOREPLIFETIME(ACheeseStrikeCharacter, SplatAt);
+	DOREPLIFETIME(ACheeseStrikeCharacter, GooUntil);
+	DOREPLIFETIME(ACheeseStrikeCharacter, HasteUntil);
 	DOREPLIFETIME_CONDITION(ACheeseStrikeCharacter, DownAimYawSent, COND_SkipOwner);
 }
 
@@ -587,6 +591,46 @@ bool ACheeseStrikeCharacter::IsProtected() const
 void ACheeseStrikeCharacter::EndProtection()
 {
 	ProtectedUntil = CheeseStrikeStart::AfterAttack(ProtectedUntil, ServerNow());
+}
+
+void ACheeseStrikeCharacter::Splat(float Until)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	SplatAt = ServerNow();
+	GooUntil = Until;
+	ForceNetUpdate();
+	OnRep_Splat();
+}
+
+void ACheeseStrikeCharacter::Hasten(float Until)
+{
+	if (HasAuthority())
+	{
+		HasteUntil = Until;
+		ForceNetUpdate();
+	}
+}
+
+float ACheeseStrikeCharacter::GooFactorNow() const
+{
+	return CheeseStrikeStreaks::GooFactor(ServerNow(), SplatAt, GooUntil);
+}
+
+float ACheeseStrikeCharacter::HasteFactorNow() const
+{
+	return CheeseStrikeStreaks::HasteAt(ServerNow(), HasteUntil);
+}
+
+void ACheeseStrikeCharacter::OnRep_Splat()
+{
+	// Heard by the one splatted only, at once and close: a heavy, wet slap, low and dull.
+	if (IsLocallyControlled() && IsPlayerControlled() && GetNetMode() != NM_DedicatedServer && SplatAt > 0.0f)
+	{
+		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Thump(1.8f)), 0.9f, 0.6f);
+	}
 }
 
 void ACheeseStrikeCharacter::UpdateGhost()

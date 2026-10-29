@@ -14,6 +14,8 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikePickup.h"
 #include "CheeseStrikeWeapon.h"
+#include "Rules/CheeseStrikeStreaks.h"
+#include "TimerManager.h"
 
 namespace
 {
@@ -26,7 +28,7 @@ FCheeseStrikeLoadout FCheeseStrikeLoadout::Usual(FName Primary)
 {
 	const FWeaponStats* Chosen = CheeseStrikeArsenal::Find(Primary);
 	FCheeseStrikeLoadout Loadout;
-	Loadout.Primary = Chosen != nullptr && Chosen->Slot == EWeaponSlot::Primary ? Chosen->Id : CheeseStrikeArsenal::DefaultPrimary();
+	Loadout.Primary = Chosen != nullptr && CheeseStrikeArsenal::IsPickable(Chosen->Id, EWeaponSlot::Primary) ? Chosen->Id : CheeseStrikeArsenal::DefaultPrimary();
 	Loadout.Sidearm = CheeseStrikeArsenal::Sidearm();
 	Loadout.Knife = CheeseStrikeArsenal::Knife();
 	return Loadout;
@@ -72,6 +74,8 @@ void UCheeseStrikeInventory::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(UCheeseStrikeInventory, HeldSlot);
 	DOREPLIFETIME_CONDITION(UCheeseStrikeInventory, AllowedSlots, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UCheeseStrikeInventory, Answered, COND_OwnerOnly);
+	DOREPLIFETIME(UCheeseStrikeInventory, KeptPrimary);
+	DOREPLIFETIME(UCheeseStrikeInventory, SpecialUntil);
 }
 
 ACheeseStrikeCharacter* UCheeseStrikeInventory::Holder() const
@@ -154,6 +158,11 @@ void UCheeseStrikeInventory::Show(uint8 Slot, bool bAtOnce)
 		{
 			Weapon->SetInHand(Index == ShownSlot);
 		}
+	}
+	// The primary a special weapon took the place of is out of sight until it comes back.
+	if (KeptPrimary != nullptr && !Weapons.Contains(KeptPrimary))
+	{
+		KeptPrimary->SetInHand(false);
 	}
 }
 
@@ -307,6 +316,16 @@ void UCheeseStrikeInventory::DestroyWeapons()
 		}
 		Weapon = nullptr;
 	}
+	if (KeptPrimary != nullptr)
+	{
+		KeptPrimary->Destroy();
+		KeptPrimary = nullptr;
+	}
+	SpecialUntil = 0.0f;
+	if (GetWorld() != nullptr)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(SpecialTimer);
+	}
 	HeldSlot = NoSlot;
 	ShownSlot = NoSlot;
 	LastSlot = NoSlot;
@@ -330,15 +349,11 @@ void UCheeseStrikeInventory::GiveInternal(const FCheeseStrikeLoadout& Loadout, b
 		{
 			continue;
 		}
-		// Owned by the character, so that its player's machine may fire it, and spawned as that weapon.
-		const FTransform Where = Character->GetActorTransform();
-		ACheeseStrikeWeapon* Weapon = World->SpawnActorDeferred<ACheeseStrikeWeapon>(ACheeseStrikeWeapon::StaticClass(), Where, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		ACheeseStrikeWeapon* Weapon = SpawnWeapon(Character, *Stats);
 		if (Weapon == nullptr)
 		{
 			continue;
 		}
-		Weapon->SetWeapon(Stats->Id);
-		UGameplayStatics::FinishSpawningActor(Weapon, Where);
 		Weapons[Slot] = Weapon;
 		if (First == NoSlot)
 		{
@@ -352,6 +367,156 @@ void UCheeseStrikeInventory::GiveInternal(const FCheeseStrikeLoadout& Loadout, b
 		At(0) != nullptr ? *At(0)->GetStats().DisplayName.ToString() : TEXT("no primary"),
 		At(1) != nullptr ? *At(1)->GetStats().DisplayName.ToString() : TEXT("no sidearm"),
 		At(2) != nullptr ? *At(2)->GetStats().DisplayName.ToString() : TEXT("no knife"));
+}
+
+ACheeseStrikeWeapon* UCheeseStrikeInventory::SpawnWeapon(ACheeseStrikeCharacter* Character, const FWeaponStats& Stats) const
+{
+	UWorld* World = GetWorld();
+	if (Character == nullptr || World == nullptr)
+	{
+		return nullptr;
+	}
+	// Owned by the character, so that its player's machine may fire it, and spawned as that weapon.
+	const FTransform Where = Character->GetActorTransform();
+	ACheeseStrikeWeapon* Weapon = World->SpawnActorDeferred<ACheeseStrikeWeapon>(ACheeseStrikeWeapon::StaticClass(), Where, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (Weapon != nullptr)
+	{
+		Weapon->SetWeapon(Stats.Id);
+		UGameplayStatics::FinishSpawningActor(Weapon, Where);
+	}
+	return Weapon;
+}
+
+bool UCheeseStrikeInventory::HasSpecial() const
+{
+	const ACheeseStrikeWeapon* Primary = At(static_cast<uint8>(EWeaponSlot::Primary));
+	return Primary != nullptr && Primary->GetStats().bSpecial;
+}
+
+void UCheeseStrikeInventory::GiveSpecial(FName Weapon, float Seconds)
+{
+	ACheeseStrikeCharacter* Character = Holder();
+	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
+	if (Character == nullptr || GetWorld() == nullptr || !Character->HasAuthority() || Stats == nullptr || !Stats->bSpecial || Stats->Slot != EWeaponSlot::Primary)
+	{
+		return;
+	}
+	// Another while one is carried: the one carried goes, the primary under it kept as it was.
+	const uint8 Slot = static_cast<uint8>(EWeaponSlot::Primary);
+	Weapons.SetNum(NumWeaponSlots);
+	ACheeseStrikeWeapon* Carried = At(Slot);
+	if (HasSpecial())
+	{
+		if (ShownSlot == Slot)
+		{
+			Carried->PutAway();
+			ShownSlot = NoSlot;
+		}
+		Carried->Destroy();
+		Weapons[Slot] = nullptr;
+	}
+	else
+	{
+		if (Carried != nullptr && ShownSlot == Slot)
+		{
+			Carried->PutAway();
+			ShownSlot = NoSlot;
+		}
+		KeptPrimary = Carried;
+		Weapons[Slot] = nullptr;
+	}
+	ACheeseStrikeWeapon* Special = SpawnWeapon(Character, *Stats);
+	if (Special == nullptr)
+	{
+		EndSpecial();
+		return;
+	}
+	Weapons[Slot] = Special;
+	bSpawnLoadout = false;
+	SpecialUntil = ServerNow() + Seconds;
+	// In hand at once, unless the mode keeps the primary out of it (down in Execution, with the sidearm only).
+	if (IsAllowed(EWeaponSlot::Primary))
+	{
+		if (HeldSlot != Slot)
+		{
+			LastSlot = HeldSlot;
+		}
+		SetHeld(Slot, true);
+	}
+	else
+	{
+		SetHeld(HeldSlot, false);
+	}
+	GetWorld()->GetTimerManager().SetTimer(SpecialTimer, this, &UCheeseStrikeInventory::CheckSpecial, 0.1f, true);
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s has the %s for %.0f s, the %s kept"), *Character->DisplayName(), *Stats->DisplayName.ToString(), Seconds,
+		KeptPrimary != nullptr ? *KeptPrimary->GetStats().DisplayName.ToString() : TEXT("no primary"));
+}
+
+void UCheeseStrikeInventory::CheckSpecial()
+{
+	const ACheeseStrikeWeapon* Special = At(static_cast<uint8>(EWeaponSlot::Primary));
+	if (!HasSpecial())
+	{
+		EndSpecial();
+		return;
+	}
+	if (ServerNow() >= SpecialUntil || (Special->GetMagazine() <= 0 && !Special->HasEndlessReserve()))
+	{
+		EndSpecial();
+	}
+}
+
+void UCheeseStrikeInventory::EndSpecial()
+{
+	ACheeseStrikeCharacter* Character = Holder();
+	if (Character == nullptr || !Character->HasAuthority())
+	{
+		return;
+	}
+	if (GetWorld() != nullptr)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(SpecialTimer);
+	}
+	SpecialUntil = 0.0f;
+	const uint8 Slot = static_cast<uint8>(EWeaponSlot::Primary);
+	Weapons.SetNum(NumWeaponSlots);
+	if (!HasSpecial())
+	{
+		return;
+	}
+	ACheeseStrikeWeapon* Special = At(Slot);
+	const bool bWasHeld = HeldSlot == Slot;
+	if (ShownSlot == Slot)
+	{
+		Special->PutAway();
+		ShownSlot = NoSlot;
+	}
+	Special->Destroy();
+	Weapons[Slot] = KeptPrimary;
+	KeptPrimary = nullptr;
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s's %s is spent: the %s back"), *Character->DisplayName(), *Special->GetStats().DisplayName.ToString(),
+		Weapons[Slot] != nullptr ? *Weapons[Slot]->GetStats().DisplayName.ToString() : TEXT("nothing"));
+	if (bWasHeld)
+	{
+		if (Weapons[Slot] != nullptr && IsAllowed(EWeaponSlot::Primary))
+		{
+			SetHeld(Slot, true);
+		}
+		else
+		{
+			// Nothing to come back to: the first it carries and may draw.
+			uint8 Next = NoSlot;
+			for (uint8 Other = 0; Other < NumWeaponSlots && Next == NoSlot; ++Other)
+			{
+				Next = CanDraw(static_cast<EWeaponSlot>(Other)) ? Other : NoSlot;
+			}
+			SetHeld(Next, true);
+		}
+	}
+	else
+	{
+		SetHeld(HeldSlot, false);
+	}
 }
 
 void UCheeseStrikeInventory::Give(const FCheeseStrikeLoadout& Loadout)
@@ -510,7 +675,7 @@ void UCheeseStrikeInventory::ServerChoosePrimary_Implementation(FName Primary)
 	ACheeseStrikeCharacter* Character = Holder();
 	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Primary);
 	UCheeseStrikeLoadouts* Loadouts = GetWorld() != nullptr ? GetWorld()->GetSubsystem<UCheeseStrikeLoadouts>() : nullptr;
-	if (Character == nullptr || Stats == nullptr || Stats->Slot != EWeaponSlot::Primary || Loadouts == nullptr)
+	if (Character == nullptr || Stats == nullptr || !CheeseStrikeArsenal::IsPickable(Stats->Id, EWeaponSlot::Primary) || Loadouts == nullptr)
 	{
 		return;
 	}
@@ -532,7 +697,13 @@ void UCheeseStrikeInventory::ServerArm_Implementation(FName Weapon)
 	{
 		return;
 	}
-	if (Stats->Slot == EWeaponSlot::Primary)
+	if (Stats->bSpecial)
+	{
+		// The usual loadout under it, as the Overload's caller has.
+		Give(FCheeseStrikeLoadout::Usual());
+		GiveSpecial(Stats->Id, CheeseStrikeStreaks::GatlingSeconds);
+	}
+	else if (Stats->Slot == EWeaponSlot::Primary)
 	{
 		Give(FCheeseStrikeLoadout::Usual(Stats->Id));
 	}
@@ -598,7 +769,7 @@ FName UCheeseStrikeLoadouts::PrimaryFor(const AController* Controller) const
 		return *Found;
 	}
 	const FWeaponStats* Instead = CheeseStrikeArsenal::Find(FName(*CVarSpawnPrimary.GetValueOnGameThread()));
-	return Instead != nullptr && Instead->Slot == EWeaponSlot::Primary ? Instead->Id : CheeseStrikeArsenal::DefaultPrimary();
+	return Instead != nullptr && CheeseStrikeArsenal::IsPickable(Instead->Id, EWeaponSlot::Primary) ? Instead->Id : CheeseStrikeArsenal::DefaultPrimary();
 }
 
 bool UCheeseStrikeLoadouts::HasChosen(const AController* Controller) const
@@ -609,7 +780,7 @@ bool UCheeseStrikeLoadouts::HasChosen(const AController* Controller) const
 bool UCheeseStrikeLoadoutChoice::Choose(FName Weapon, UWorld* World)
 {
 	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
-	if (Stats == nullptr || Stats->Slot != EWeaponSlot::Primary)
+	if (Stats == nullptr || !CheeseStrikeArsenal::IsPickable(Stats->Id, EWeaponSlot::Primary))
 	{
 		return false;
 	}

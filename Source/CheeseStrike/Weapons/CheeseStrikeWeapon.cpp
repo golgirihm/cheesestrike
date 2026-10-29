@@ -23,6 +23,7 @@
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "AudioDevice.h"
 #include "Components/AudioComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -325,6 +326,7 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 			ShowShot();
 		}
 	}
+	UpdateTracers();
 	// The flash goes out.
 	if (FlashUntil > 0.0f && GetWorld()->GetTimeSeconds() >= FlashUntil)
 	{
@@ -913,7 +915,108 @@ void ACheeseStrikeWeapon::ShowShot()
 		}
 	}
 	Flash();
+	ShowTracer();
 	PlayShotSound(AnyOf(FireSounds));
+}
+
+void ACheeseStrikeWeapon::ShowTracer()
+{
+	UWorld* World = GetWorld();
+	if (Look == nullptr || Look->Tracer.A <= 0.0f || World == nullptr || GetNetMode() == NM_DedicatedServer || Holder == nullptr)
+	{
+		return;
+	}
+	if (TracerMesh == nullptr)
+	{
+		TracerMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	}
+	if (TracerLook == nullptr)
+	{
+		// Loaded here, by path, as tools/art/weapon_materials.py rebuilds it.
+		if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, CheeseStrikeWeaponLooks::TracerMaterial))
+		{
+			TracerLook = UMaterialInstanceDynamic::Create(Material, this);
+			TracerLook->SetVectorParameterValue(TEXT("Colour"), Look->Tracer);
+			// Bright enough to stand out in daylight, not so bright that it burns out to white.
+			TracerLook->SetScalarParameterValue(TEXT("Brightness"), 3.0f);
+		}
+	}
+	if (TracerMesh == nullptr || TracerLook == nullptr)
+	{
+		return;
+	}
+	// From the muzzle this machine shows (its own player's in view, else the body's), along the shooter's aim.
+	const bool bOwnView = Holder->IsLocallyControlled() && Holder->IsPlayerControlled();
+	const UStaticMeshComponent* Muzzle = bOwnView ? FirstPersonFlash.Get() : ThirdPersonFlash.Get();
+	FTracer Tracer;
+	Tracer.From = Muzzle->GetComponentLocation();
+	Tracer.Way = Holder->GetBaseAimRotation().Vector();
+	Tracer.At = World->GetTimeSeconds();
+	UStaticMeshComponent* Streak = nullptr;
+	// One of the spent ones again, rather than a new one each shot: twenty a second.
+	for (int32 Index = Tracers.Num() - 1; Index >= 0; --Index)
+	{
+		if (!Tracers[Index].Streak.IsValid())
+		{
+			Tracers.RemoveAt(Index);
+		}
+	}
+	for (UActorComponent* Part : GetComponents())
+	{
+		UStaticMeshComponent* Each = Cast<UStaticMeshComponent>(Part);
+		if (Each != nullptr && Each->ComponentHasTag(TEXT("Tracer")) && !Each->IsVisible())
+		{
+			Streak = Each;
+			break;
+		}
+	}
+	if (Streak == nullptr)
+	{
+		Streak = NewObject<UStaticMeshComponent>(this);
+		Streak->ComponentTags.Add(TEXT("Tracer"));
+		Streak->SetStaticMesh(TracerMesh);
+		Streak->SetMaterial(0, TracerLook);
+		Streak->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Streak->SetCastShadow(false);
+		Streak->SetUsingAbsoluteLocation(true);
+		Streak->SetUsingAbsoluteRotation(true);
+		Streak->SetUsingAbsoluteScale(true);
+		Streak->SetupAttachment(RootComponent);
+		Streak->RegisterComponent();
+	}
+	Streak->SetVisibility(true);
+	Tracer.Streak = Streak;
+	Tracers.Add(Tracer);
+	UpdateTracers();
+}
+
+void ACheeseStrikeWeapon::UpdateTracers()
+{
+	if (Tracers.Num() == 0 || GetWorld() == nullptr)
+	{
+		return;
+	}
+	const float Clock = GetWorld()->GetTimeSeconds();
+	for (int32 Index = Tracers.Num() - 1; Index >= 0; --Index)
+	{
+		const FTracer& Tracer = Tracers[Index];
+		UStaticMeshComponent* Streak = Tracer.Streak.Get();
+		const float Age = Clock - Tracer.At;
+		if (Streak == nullptr || Age > CheeseStrikeWeaponLooks::TracerLife)
+		{
+			if (Streak != nullptr)
+			{
+				Streak->SetVisibility(false);
+			}
+			Tracers.RemoveAt(Index);
+			continue;
+		}
+		// The engine's cylinder: 1 m tall along its Z, 1 m across, its middle at its origin; a thin rod along the way it flies.
+		const float Tail = CheeseStrikeWeaponLooks::TracerSpeed * Age;
+		const FVector Middle = Tracer.From + Tracer.Way * (Tail + CheeseStrikeWeaponLooks::TracerLength * 0.5f);
+		Streak->SetWorldLocationAndRotation(Middle, FRotationMatrix::MakeFromZ(Tracer.Way).ToQuat());
+		Streak->SetWorldScale3D(FVector(CheeseStrikeWeaponLooks::TracerThickness / 100.0f, CheeseStrikeWeaponLooks::TracerThickness / 100.0f, CheeseStrikeWeaponLooks::TracerLength / 100.0f));
+	}
 }
 
 void ACheeseStrikeWeapon::ShowReload()
@@ -1084,6 +1187,12 @@ void ACheeseStrikeWeapon::StartFiring()
 		return;
 	}
 	bTriggerHeld = true;
+	if (Stats->bAutomatic && Stats->SpinUp > 0.0f)
+	{
+		// A rotary barrel spins up first: the beat begins once it has, held all the while (Tick fires it).
+		AutoNextAt = GetWorld()->GetTimeSeconds() + Stats->SpinUp;
+		return;
+	}
 	FireOnce();
 	if (Stats->bAutomatic)
 	{

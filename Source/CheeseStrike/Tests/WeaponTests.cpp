@@ -362,7 +362,7 @@ bool FWeaponsAreLifeSizeAndComeUpInTime::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the Curd Pistol's rounds never run out"), Pistol().HasEndlessReserve());
 	for (const FWeaponStats* Weapon : CheeseStrikeArsenal::All())
 	{
-		if (Weapon->Slot == EWeaponSlot::Primary)
+		if (Weapon->Slot == EWeaponSlot::Primary && !Weapon->bSpecial)
 		{
 			TestTrue(FString::Printf(TEXT("the %s carries a magazine or three besides and holds at most about five"), *Weapon->DisplayName.ToString()),
 				Weapon->Reserve >= Weapon->MagazineSize && Weapon->Reserve <= 3 * Weapon->MagazineSize && Weapon->ReserveMax <= 6 * Weapon->MagazineSize);
@@ -376,7 +376,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheArsenalIsListedAndFound, "CheeseStrike.Weap
 bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 {
 	const TArray<const FWeaponStats*>& All = CheeseStrikeArsenal::All();
-	TestEqual(TEXT("nine weapons"), All.Num(), 9);
+	TestEqual(TEXT("ten weapons, the Gouda Gatling among them"), All.Num(), 10);
 	TSet<FName> Ids;
 	for (const FWeaponStats* Weapon : All)
 	{
@@ -387,13 +387,13 @@ bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("found whatever the case"), CheeseStrikeArsenal::Find(FName(TEXT("ShotGun"))) == &CheeseStrikeWeapons::Shotgun());
 	TestNull(TEXT("and nothing that isn't one"), CheeseStrikeArsenal::Find(FName(TEXT("bazooka"))));
-	TestEqual(TEXT("seven primaries"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Primary).Num(), 7);
+	TestEqual(TEXT("seven primaries to pick, the streak's Gatling not among them"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Primary).Num(), 7);
 	TestEqual(TEXT("the Curd Pistol is the sidearm"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Sidearm), TArray<FName>{CheeseStrikeArsenal::Sidearm()});
 	TestEqual(TEXT("everyone comes in with the Colby Carbine"), CheeseStrikeArsenal::DefaultPrimary(), CheeseStrikeWeapons::Carbine().Id);
 
 	// Gun Game: through the guns a kill at a time, the knife last.
 	const TArray<FName>& Ladder = CheeseStrikeArsenal::GunGameLadder();
-	TestEqual(TEXT("Gun Game works through every weapon"), Ladder.Num(), All.Num());
+	TestEqual(TEXT("Gun Game works through every weapon but the streaks'"), Ladder.Num(), All.FilterByPredicate([](const FWeaponStats* Weapon) { return !Weapon->bSpecial; }).Num());
 	TestEqual(TEXT("from the Cheddar Blaster"), CheeseStrikeArsenal::GunGameWeapon(0), CheeseStrikeWeapons::Blaster().Id);
 	TestEqual(TEXT("to the Curd Pistol"), CheeseStrikeArsenal::GunGameWeapon(Ladder.Num() - 2), CheeseStrikeWeapons::Pistol().Id);
 	TestEqual(TEXT("and last the knife"), CheeseStrikeArsenal::GunGameWeapon(Ladder.Num() - 1), CheeseStrikeWeapons::Knife().Id);
@@ -411,6 +411,7 @@ bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 	TestEqual(TEXT("and the knife"), Usual.Knife, CheeseStrikeArsenal::Knife());
 	TestEqual(TEXT("the primary chosen"), FCheeseStrikeLoadout::Usual(TEXT("roquefort")).Primary, CheeseStrikeWeapons::Roquefort().Id);
 	TestEqual(TEXT("which must be a primary"), FCheeseStrikeLoadout::Usual(TEXT("pistol")).Primary, CheeseStrikeArsenal::DefaultPrimary());
+	TestEqual(TEXT("one a player may pick"), FCheeseStrikeLoadout::Usual(TEXT("gatling")).Primary, CheeseStrikeArsenal::DefaultPrimary());
 	const FCheeseStrikeLoadout Only = FCheeseStrikeLoadout::Only(TEXT("knife"));
 	TestTrue(TEXT("one weapon alone, in its slot"), Only.Knife == CheeseStrikeArsenal::Knife() && Only.Primary.IsNone() && Only.Sidearm.IsNone());
 	return true;

@@ -79,6 +79,17 @@ public:
 	void HoldNow(EWeaponSlot Slot);
 	/** Server: gives the usual loadout with the primary chosen for `Controller` (as the character is possessed). */
 	void GiveSpawnLoadout(AController* Controller);
+	/**
+	 * Server: a streak's weapon (bSpecial: the Gouda Overload's Gouda Gatling) in the primary's slot, in hand at once, for
+	 * `Seconds` or until its rounds are spent; the primary carried is kept, out of sight, and comes back in its place then
+	 * (in hand, if the special was), with the rounds it had. Giving a loadout (a mode, Gun Game's next step) ends it.
+	 */
+	void GiveSpecial(FName Weapon, float Seconds);
+	/** Server: the special weapon goes now and the primary kept comes back, if there is a special. */
+	void EndSpecial();
+	/** Whether a special weapon is in the primary's slot, and the server's time it goes (0 for none). */
+	bool HasSpecial() const;
+	float GetSpecialUntil() const { return SpecialUntil; }
 
 	// Weapon pickups (ACheeseStrikePickup, Rules/CheeseStrikePickups.h).
 
@@ -154,6 +165,10 @@ protected:
 	void SetHeld(uint8 Slot, bool bAtOnce);
 	void DestroyWeapons();
 	void GiveInternal(const FCheeseStrikeLoadout& Loadout, bool bSpawnLoadout);
+	/** Server: spawns `Stats`'s weapon, owned by `Character`, for a slot. */
+	ACheeseStrikeWeapon* SpawnWeapon(ACheeseStrikeCharacter* Character, const struct FWeaponStats& Stats) const;
+	/** Server, now and then while a special is carried: ends it once its time is up or its rounds are spent. */
+	void CheckSpecial();
 	float ServerNow() const;
 
 	/** The weapons carried, by slot (null for none): the server's. */
@@ -165,6 +180,12 @@ protected:
 	/** The slots that may be drawn, as bits. */
 	UPROPERTY(Replicated)
 	uint8 AllowedSlots = EverySlot;
+	/** While a special weapon is in the primary's slot: the primary it took the place of (kept out of sight, on every machine), and the server's time it goes. */
+	UPROPERTY(ReplicatedUsing=OnRep_Carried)
+	TObjectPtr<ACheeseStrikeWeapon> KeptPrimary;
+	UPROPERTY(Replicated)
+	float SpecialUntil = 0.0f;
+	FTimerHandle SpecialTimer;
 	/** The last of its player's requests the server has answered: until it catches up with the player's last, the player's own machine shows its own choice. */
 	UPROPERTY(ReplicatedUsing=OnRep_Carried)
 	uint8 Answered = 0;

@@ -89,6 +89,15 @@ struct FWeaponStats
 	/** Two guns, one in each hand, firing in turn (the Dual Burratas): shot 0 from the right, 1 from the left, and so on (CheeseStrikeWeapons::DualHand). */
 	bool bDual = false;
 
+	/**
+	 * A streak's weapon (the Gouda Overload's Gouda Gatling), never one a player picks: no loadout, stand, floor, bot's
+	 * choice or Gun Game step offers it (CheeseStrikeArsenal::InSlot leaves it out). It is put in the primary's slot for a
+	 * while, the primary kept and given back after (UCheeseStrikeInventory::GiveSpecial).
+	 */
+	bool bSpecial = false;
+	/** Seconds the trigger is held before the first shot, as a rotary barrel spins up (0 for none). */
+	float SpinUp = 0.0f;
+
 	bool IsMelee() const { return Slot == EWeaponSlot::Knife; }
 	/** Whether it never runs out of rounds to reload with. */
 	bool HasEndlessReserve() const { return Reserve < 0; }

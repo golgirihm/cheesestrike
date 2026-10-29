@@ -246,6 +246,21 @@ public:
 	/** Server only: ends that, as firing, striking with the knife and calling in a streak do; its ghostly look fades from now on every machine. */
 	void EndProtection();
 	/**
+	 * Server only: the Gouda Overload's melted gouda splats it now, until `Until` (the server's time): slowed to a quarter
+	 * of its speed, coming back to all of it by then, no sprint or slide under GooNoSprint (CheeseStrikeStreaks::GooFactor,
+	 * worked out from the replicated times on every machine, so that its moves agree), and its player's view smeared yellow.
+	 */
+	void Splat(float Until);
+	/** Server only: the Overload's caller runs CheeseStrikeStreaks::HasteFactor faster until `Until`. */
+	void Hasten(float Until);
+	/** The share of its usual speed the gouda leaves it now (1 for none), and how much faster the Overload makes its caller (1 for none). */
+	float GooFactorNow() const;
+	float HasteFactorNow() const;
+	/** The server's times it was splatted and the gouda is gone (0 for never), and its haste ends. */
+	float GetSplatAt() const { return SplatAt; }
+	float GetGooUntil() const { return GooUntil; }
+	float GetHasteUntil() const { return HasteUntil; }
+	/**
 	 * How ghostly it looks on this machine (0 to 1, CheeseStrikeStart::GhostAmount):
 	 * while protected its body, its first-person arms and its weapons wear
 	 * M_Ghost as an overlay (pale, translucent, with a shimmer and a bright
@@ -430,6 +445,16 @@ protected:
 	/** The server's time its protection as a fresh spawn ends. */
 	UPROPERTY(Replicated)
 	float ProtectedUntil = 0.0f;
+	/** The Gouda Overload's: when it was splatted and the gouda is gone (Splat), and when its caller's haste ends (Hasten); the server's times. */
+	UPROPERTY(ReplicatedUsing=OnRep_Splat)
+	float SplatAt = 0.0f;
+	UPROPERTY(Replicated)
+	float GooUntil = 0.0f;
+	UPROPERTY(Replicated)
+	float HasteUntil = 0.0f;
+	/** Its own player's machine: a wet slap as the gouda lands. */
+	UFUNCTION()
+	void OnRep_Splat();
 	/** The ghost's overlay, made on first need, and how ghostly it was last shown. */
 	UPROPERTY(Transient)
 	TObjectPtr<class UMaterialInstanceDynamic> GhostMaterial;

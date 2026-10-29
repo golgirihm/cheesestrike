@@ -122,6 +122,46 @@ namespace CheeseStrikeStreaks
 		return Area;
 	}
 
+	bool IsSplatted(bool bEnemy, bool bAlive)
+	{
+		return bEnemy && bAlive;
+	}
+
+	float GooFactor(float Now, float SplatAt, float GooUntil)
+	{
+		if (GooUntil <= SplatAt || Now >= GooUntil)
+		{
+			return 1.0f;
+		}
+		const float Through = FMath::Clamp((Now - SplatAt) / (GooUntil - SplatAt), 0.0f, 1.0f);
+		return FMath::Lerp(GooSlowest, 1.0f, Through);
+	}
+
+	bool MaySprintInGoo(float Factor)
+	{
+		return Factor >= GooNoSprint;
+	}
+
+	float HasteAt(float Now, float HasteUntil)
+	{
+		return Now < HasteUntil ? HasteFactor : 1.0f;
+	}
+
+	float GooWash(float Now, float SplatAt, float GooUntil)
+	{
+		if (GooUntil <= SplatAt || Now >= GooUntil || Now < SplatAt)
+		{
+			return 0.0f;
+		}
+		return 1.0f - (Now - SplatAt) / (GooUntil - SplatAt);
+	}
+
+	FString GatlingTimeLeft(float Seconds)
+	{
+		const int32 Whole = FMath::Max(0, FMath::CeilToInt(Seconds));
+		return FString::Printf(TEXT("%d:%02d"), Whole / 60, Whole % 60);
+	}
+
 	float BlastDamage(const FBlast& Blast, float Distance)
 	{
 		if (Distance > Blast.Radius || Blast.Radius <= 0.0f)

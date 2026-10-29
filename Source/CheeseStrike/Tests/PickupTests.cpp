@@ -58,6 +58,12 @@ bool FEveryoneComesInWithTheWeakestPrimary::RunTest(const FString& Parameters)
 	TestFalse(TEXT("no sidearm on a stand"), CanLieOnAStand(CheeseStrikeArsenal::Sidearm()));
 	TestFalse(TEXT("nor the knife"), CanLieOnAStand(CheeseStrikeArsenal::Knife()));
 	TestFalse(TEXT("nor anything that isn't a weapon"), CanLieOnAStand(TEXT("bazooka")));
+	// The Gouda Overload's Gatling: never on a stand or the floor, and nothing is taken while it is carried.
+	const FName Gatling = CheeseStrikeWeapons::Gatling().Id;
+	TestFalse(TEXT("nor the Gouda Gatling"), CanLieOnAStand(Gatling) || CanBeDropped(Gatling));
+	TestTrue(TEXT("carrying it, nothing is taken from a stand"), HowToTake(Gatling, CheeseStrikeWeapons::Roquefort().Id, false) == ETake::None);
+	TestTrue(TEXT("or the floor"), HowToTake(Gatling, CheeseStrikeWeapons::Blaster().Id, false, true) == ETake::None);
+	TestEqual(TEXT("and a bot carrying it wants nothing better"), BotWants(Gatling, CheeseStrikeWeapons::Roquefort().Id, 300.0f), 0.0f);
 	return true;
 }
 

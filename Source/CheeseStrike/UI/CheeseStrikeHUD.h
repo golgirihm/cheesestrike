@@ -159,6 +159,8 @@ protected:
 	/** The outline of the weapon in `Slot` (a rifle, a pistol, a knife) in the box at `At`, `Size` big, facing left. */
 	void DrawWeaponIcon(CheeseStrikeHUDDraw::FShapes& Shapes, EWeaponSlot Slot, const FVector2D& At, const FVector2D& Size, const FLinearColor& Colour) const;
 	void DrawVignette(const ACheeseStrikeCharacter* Character);
+	/** The Gouda Overload's melted gouda over the view of a player it splatted: a yellow wash, blobs round the edges and drips running down from the top, clearing as the gouda wears off (CheeseStrikeStreaks::GooWash). */
+	void DrawGoo(const ACheeseStrikeCharacter* Character);
 	/** A red flash over the view for a moment after a fall: the fall has no direction to point at. */
 	void DrawFallFlash(const ACheeseStrikeCharacter* Character);
 	void DrawDamageArcs(const ACheeseStrikeCharacter* Character);
