@@ -34,6 +34,28 @@ namespace CheeseStrikeMusic
 	 * on the way back to the lobby (`bHeld`).
 	 */
 	bool IsWanted(EMenuPage Page, bool bPausedInAMatch, bool bCountingDown, bool bLeaving, bool bHeld);
+
+	/**
+	 * In a session everyone hears the host's song at the host's point in it:
+	 * the game state carries the song and the server's time it began
+	 * (ACheeseStrikeGameState::GetMusicSong, GetMusicStartedAt). How far into
+	 * a song of `Length` seconds it is at the server's `ServerNow`, the song
+	 * having begun at `StartedAt`: from 0 to its length.
+	 */
+	float OffsetFor(double ServerNow, double StartedAt, float Length);
+	/** The handover to a new level's game state (whose clock starts afresh): the server's time there the song `Elapsed` seconds in began at. */
+	double HandOver(double ServerNow, float Elapsed);
+	/** How far a joiner's song may be from the host's before it is put back in step, in seconds. */
+	constexpr float InStep = 0.25f;
+	/** A song this near its end is left to finish: the host is about to put on the next. */
+	constexpr float EndingSeconds = 0.5f;
+	/**
+	 * Whether a joiner playing `Playing` (-1 for nothing), `PlayingElapsed`
+	 * seconds into it, should put on the host's `HostSong` (-1 for none yet)
+	 * at `HostElapsed`, of `HostLength` seconds: when it is another song, or
+	 * the same out of step, but not for a song the host is about to end.
+	 */
+	bool ShouldFollow(int32 Playing, float PlayingElapsed, int32 HostSong, float HostElapsed, float HostLength);
 }
 
 /**
@@ -44,7 +66,10 @@ namespace CheeseStrikeMusic
  * lobby), fading out into the match as the lobby's countdown runs, and back
  * in with another song when the lobby is back. The player controller says
  * each frame whether it is wanted (CheeseStrikeMusic::IsWanted); this plays
- * it. Nothing without an audio device (-nosound).
+ * it. In a session the host's machine picks the songs and puts each on the
+ * game state, and every joiner plays that song from where the host is in it
+ * (`Follow`); the front end alone picks its own. Nothing is heard without an
+ * audio device (-nosound), though the songs are still chosen and timed.
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeMusicSubsystem : public UGameInstanceSubsystem
@@ -61,11 +86,28 @@ public:
 	bool IsPlaying() const;
 	/** The song playing or last played (an index into CheeseStrikeMusic::Songs; -1 for none yet). */
 	int32 GetSong() const { return Song; }
+	/** Seconds into that song now (by the clock, heard or not); 0 for none. */
+	float GetElapsed() const;
+	/**
+	 * Each frame, after Want: in a session, the host's machine puts its song
+	 * and when it began on `World`'s game state (again on each new level's),
+	 * and a joiner's plays the song there from the host's point in it,
+	 * switching when the host does. Alone, nothing.
+	 */
+	void Follow(UWorld* World);
+	/** The host's machine (or alone) puts on another song at once, as at a song's end. */
+	void SkipSong();
 
 private:
+	/** Loads the songs once; false if any is missing. */
+	bool LoadSongs();
 	/** Puts on the next song, coming in over `FadeSeconds` (0: at once). */
 	void PlayNextSong(float FadeSeconds);
+	/** Puts on song `Index` from `Offset` seconds into it, coming in over `FadeSeconds` (0: at once). */
+	void PlaySong(int32 Index, float Offset, float FadeSeconds);
 	void SongEnded(UAudioComponent* Ended);
+	/** Whether `World` is a joiner's in a session, whose songs are the host's. */
+	static bool FollowsTheHost(const UWorld* World);
 
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> Player;
@@ -73,5 +115,9 @@ private:
 	TArray<TObjectPtr<USoundWave>> Loaded;
 	TWeakObjectPtr<UWorld> LastWorld;
 	int32 Song = -1;
+	/** The clock's time (FPlatformTime::Seconds) the song playing would have begun at, heard from its start. */
+	double SongClock = 0.0;
 	bool bWanted = false;
+	/** Whether a song is on: put on and neither faded out nor ended. */
+	bool bOn = false;
 };
