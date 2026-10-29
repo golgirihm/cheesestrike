@@ -50,6 +50,8 @@
 #include "UI/CheeseStrikePodium.h"
 #include "UI/CheeseStrikePodiumHUD.h"
 #include "Rules/CheeseStrikePodiums.h"
+#include "Rules/CheeseStrikeSounds.h"
+#include "Rules/CheeseStrikeVoice.h"
 
 ACheeseStrikePlayerController::ACheeseStrikePlayerController()
 {
@@ -120,6 +122,8 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 		ServerReady();
 	}
 	SoundCountdown();
+	HearScore();
+	HearTheMatch();
 	UpdatePodium();
 	// The results stay up until the lobby they lead back to is there: a moment before the server takes everyone back.
 	if (const ACheeseStrikeGameState* Ended = GetWorld()->GetGameState<ACheeseStrikeGameState>();
@@ -446,6 +450,71 @@ void ACheeseStrikePlayerController::PlayMusic()
 	Music->Want(GetWorld(), bWanted, bCounting && Match != nullptr ? FMath::Max(Match->SecondsToStart(), 0.5f) : CheeseStrikeMusic::FadeOutSeconds);
 	// In a session, everyone hears the host's song at the host's point in it.
 	Music->Follow(GetWorld());
+}
+
+void ACheeseStrikePlayerController::HearScore()
+{
+	const ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>();
+	if (Mine == nullptr)
+	{
+		return;
+	}
+	// A new player state (a new level, a new match) starts from what it has, saying nothing for it.
+	if (ScoreHeardOf.Get() != Mine)
+	{
+		ScoreHeardOf = Mine;
+		KillsHeard = Mine->GetKills();
+		AssistsHeard = Mine->GetAssists();
+		return;
+	}
+	const CheeseStrikeSounds::EScore Sound = CheeseStrikeSounds::ScoreSound(KillsHeard, Mine->GetKills(), AssistsHeard, Mine->GetAssists());
+	KillsHeard = Mine->GetKills();
+	AssistsHeard = Mine->GetAssists();
+	if (Sound != CheeseStrikeSounds::EScore::None && GetNetMode() != NM_DedicatedServer)
+	{
+		const bool bAssist = Sound == CheeseStrikeSounds::EScore::Assist;
+		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::KaChing(bAssist)), bAssist ? 0.45f : 0.7f);
+	}
+}
+
+void ACheeseStrikePlayerController::HearTheMatch()
+{
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>();
+	if (Match == nullptr || Mine == nullptr)
+	{
+		return;
+	}
+	const float Now = static_cast<float>(Match->GetServerWorldTimeSeconds());
+	// Coming into a match (a new level, or joining late), nothing already over is said.
+	if (MatchHeard.Get() != Match)
+	{
+		MatchHeard = Match;
+		VerminSaidFor = Match->GetMiceAt() > 0.0f && Now >= Match->GetMiceAt() ? Match->GetMiceAt() : 0.0f;
+		RoundSaid = Match->IsRoundBreak() ? Match->GetRound() : 0;
+		bEndSaid = Match->HasMatchEnded();
+		return;
+	}
+	if (Match->GetMiceAt() > 0.0f && CheeseStrikeVoice::SaysVermin(Now - Match->GetMiceAt(), VerminSaidFor == Match->GetMiceAt()))
+	{
+		VerminSaidFor = Match->GetMiceAt();
+		Match->Say(CheeseStrikeVoice::ELine::VerminInbound);
+	}
+	if (!bEndSaid && Match->HasMatchEnded() && !Match->GetWinnerName().IsEmpty())
+	{
+		bEndSaid = true;
+		const bool bTeams = Match->HasTeams();
+		const bool bDraw = bTeams && Match->GetWinningTeam() == CheeseStrikeModes::NoTeam;
+		const bool bWon = bTeams ? Match->GetWinningTeam() == Mine->GetTeam() : Match->GetWinnerName() == Mine->GetPlayerName();
+		Match->Say(CheeseStrikeVoice::ForMatch(bDraw, bWon));
+		return;
+	}
+	// A round over that isn't the match's last (whose end says Victory or Defeat): during the break before the next.
+	if (Match->IsRoundBreak() && Match->GetRound() != RoundSaid && Match->GetLastRoundWinner() != -2 && !Match->HasMatchEnded())
+	{
+		RoundSaid = Match->GetRound();
+		Match->Say(CheeseStrikeVoice::ForRound(Match->GetLastRoundWinner(), Mine->GetTeam()));
+	}
 }
 
 bool ACheeseStrikePlayerController::CanSayReady() const

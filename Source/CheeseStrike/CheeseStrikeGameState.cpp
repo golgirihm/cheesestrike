@@ -8,6 +8,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundBase.h"
 #include "Weapons/CheeseStrikeArsenal.h"
+#include "Rules/CheeseStrikeVoice.h"
 
 ACheeseStrikeGameState::ACheeseStrikeGameState()
 {
@@ -136,6 +137,51 @@ void ACheeseStrikeGameState::MulticastKill_Implementation(const FString& Killer,
 	while (KillFeed.Num() > CheeseStrikeRules::KillFeedLength)
 	{
 		KillFeed.RemoveAt(0);
+	}
+	// A teammate's kill of an enemy, now and then: "Enemy down".
+	const APlayerState* Hearing = Listener();
+	const APlayerState* By = PlayerNamed(Killer);
+	const APlayerState* Of = PlayerNamed(Victim);
+	const float Now = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (Hearing != nullptr && By != nullptr && Of != nullptr && How.IsEmpty()
+		&& CheeseStrikeVoice::SaysEnemyDown(HasTeams(), By == Hearing, AreTeammates(Hearing, By), AreEnemies(Hearing, Of), Now - EnemyDownSaidAt))
+	{
+		EnemyDownSaidAt = Now;
+		Say(CheeseStrikeVoice::ELine::EnemyDown);
+	}
+}
+
+const APlayerState* ACheeseStrikeGameState::Listener() const
+{
+	if (GetNetMode() == NM_DedicatedServer || GetWorld() == nullptr)
+	{
+		return nullptr;
+	}
+	const APlayerController* Local = GetWorld()->GetFirstPlayerController();
+	return Local != nullptr ? Local->PlayerState.Get() : nullptr;
+}
+
+const APlayerState* ACheeseStrikeGameState::PlayerNamed(const FString& Name) const
+{
+	for (const APlayerState* Each : PlayerArray)
+	{
+		if (Each != nullptr && Each->GetPlayerName() == Name)
+		{
+			return Each;
+		}
+	}
+	return nullptr;
+}
+
+void ACheeseStrikeGameState::Say(CheeseStrikeVoice::ELine Line) const
+{
+	if (Line == CheeseStrikeVoice::ELine::None || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	if (USoundBase* Voice = LoadObject<USoundBase>(nullptr, *CheeseStrikeVoice::PathOf(Line)))
+	{
+		UGameplayStatics::PlaySound2D(this, Voice, CheeseStrikeVoice::Volume);
 	}
 }
 
@@ -318,30 +364,13 @@ void ACheeseStrikeGameState::MulticastAnnounce_Implementation(const FString& Tex
 
 void ACheeseStrikeGameState::SpeakStreak(const FAnnouncement& Entry)
 {
-	// The Unmanned Aerial Cheese is spoken of: "UAC is online" for the caller's own side, "Enemy UAC online" for any other.
-	if (Entry.Streak != static_cast<uint8>(CheeseStrikeStreaks::EStreak::AerialCheese) || GetNetMode() == NM_DedicatedServer || GetWorld() == nullptr)
-	{
-		return;
-	}
-	const APlayerController* Listener = GetWorld()->GetFirstPlayerController();
-	const APlayerState* Hearing = Listener != nullptr ? Listener->PlayerState.Get() : nullptr;
-	const APlayerState* Caller = nullptr;
-	for (const APlayerState* Each : PlayerArray)
-	{
-		if (Each != nullptr && Each->GetPlayerName() == Entry.Who)
-		{
-			Caller = Each;
-			break;
-		}
-	}
+	// A streak called in is spoken of: "UAC online", "Cheese Strike inbound", "Gouda Overload incoming" for the caller's own
+	// side (or the caller alone), with "Enemy" before it for any other.
+	const APlayerState* Hearing = Listener();
+	const APlayerState* Caller = PlayerNamed(Entry.Who);
 	if (Hearing == nullptr || Caller == nullptr)
 	{
 		return;
 	}
-	const bool bOurs = AreTeammates(Hearing, Caller);
-	const TCHAR* Path = bOurs ? TEXT("/Game/CheeseStrike/Voice/SW_UacOnline.SW_UacOnline") : TEXT("/Game/CheeseStrike/Voice/SW_UacEnemy.SW_UacEnemy");
-	if (USoundBase* Voice = LoadObject<USoundBase>(nullptr, Path))
-	{
-		UGameplayStatics::PlaySound2D(this, Voice, 1.0f);
-	}
+	Say(CheeseStrikeVoice::ForStreak(static_cast<CheeseStrikeStreaks::EStreak>(Entry.Streak), AreTeammates(Hearing, Caller)));
 }

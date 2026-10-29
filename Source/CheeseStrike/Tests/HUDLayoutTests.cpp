@@ -259,7 +259,7 @@ bool FTheVerminWordsComeInBigAndAHitThumpsSoftly::RunTest(const FString& Paramet
 	{
 		Loudest = FMath::Max(Loudest, FMath::Abs(static_cast<int32>(Sample)));
 	}
-	TestTrue(TEXT("about 60 ms"), FMath::Abs(Thump.Num() - CheeseStrikeSynth::SampleRate * 6 / 100) <= 2);
+	TestTrue(TEXT("about 80 ms"), FMath::Abs(Thump.Num() - CheeseStrikeSynth::SampleRate * 8 / 100) <= 2);
 	TestTrue(TEXT("audible but not loud"), Loudest > 2000 && Loudest < 30000);
 	return true;
 }

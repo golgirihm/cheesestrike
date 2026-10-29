@@ -22,6 +22,7 @@ class UCheeseStrikeInventory;
 class UCheeseStrikeLastStand;
 class UCheeseStrikeMovementComponent;
 class USkeletalMeshComponent;
+class USoundAttenuation;
 struct FInputActionValue;
 
 /**
@@ -100,6 +101,15 @@ public:
 	void MulticastBleed(FVector_NetQuantize10 FromFeet, FVector_NetQuantizeNormal Way, uint8 Damage);
 	/** Where its feet are now: the bottom of its capsule. */
 	FVector FeetNow() const;
+	/** Every machine: it took a weapon from a stand or the floor, which sounds where it stands (CheeseStrikeSounds::PickupPath). */
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPickedUp();
+	/** Server: whether a reload begun now is called out ("Reloading!"), at most once every few seconds (CheeseStrikeVoice::CallsReload). */
+	bool TakeReloadCall();
+	/** On every machine: this character called out a reload; its teammates within earshot hear it from it, never its own player. */
+	void HearReloadCall();
+	/** How a sound close by is heard: in full within a step or two, fading to nothing by 20 m (footsteps, a weapon taken, a teammate's call). */
+	static USoundAttenuation* NearbyAttenuation();
 	/** For looking at it, on this machine only: it bleeds as if shot in the chest for `Damage` from `Yaw` degrees off where it faces. */
 	UFUNCTION(Exec)
 	void CheeseStrikeBleed(float Damage = 40.0f, float Yaw = 0.0f);
@@ -436,9 +446,12 @@ protected:
 	float LastHurtAt = -1000.0f;
 	/** On this machine: when the character last fell hard, for the red flash (the local player only). */
 	float FallFlashAt = -1000.0f;
-	/** On this machine: the health it last heard, so that losing any of it gives a grunt. */
+	/** On this machine: the health it last heard, so that losing any of it gives an "oof", and when the last was. */
 	float HeardHealth = 100.0f;
-	/** Gives the grunt for any health lost since last heard, to the local player alone. */
+	float LastOofAt = -100.0f;
+	/** Server: when it last called out a reload (the world's time). */
+	float ReloadCalledAt = -100.0f;
+	/** Gives the "oof" for health lost since last heard, to the local player alone (CheeseStrikeSounds::ShouldOof). */
 	void HearHealth();
 	/** Where it has lately been: the server's record. */
 	FHitHistory HitHistory;
@@ -538,7 +551,7 @@ protected:
 	/** Its own player's machine: it was just hurt by `By`, standing at `From`, for the HUD's damage arc. */
 	UFUNCTION(Client, Unreliable)
 	void ClientHurtFrom(FVector_NetQuantize From, ACheeseStrikeCharacter* By);
-	/** Every machine: a landing that hurt, a thud and a grunt where it landed, louder the more it hurt. */
+	/** Every machine: a landing that hurt, a thud where it landed, louder the more it hurt. */
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHardLanding(float Damage);
 	/** Who a fall's kill goes to: whoever hurt it lately and may, or nobody. */

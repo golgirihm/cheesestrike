@@ -43,6 +43,8 @@
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeFalls.h"
 #include "Rules/CheeseStrikeFootsteps.h"
+#include "Rules/CheeseStrikeSounds.h"
+#include "Rules/CheeseStrikeVoice.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStart.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -1089,7 +1091,17 @@ void ACheeseStrikeCharacter::UpdateFootsteps(float DeltaSeconds)
 	{
 		return;
 	}
-	// Heard from the feet, fading with distance (the listener's own too, which are right under them); a few sounds, varied a little in pitch.
+	// Heard from the feet, fading with distance (the listener's own too, which are right under them); the recordings in turn, varied a little in pitch.
+	USoundBase* Step = LoadObject<USoundBase>(nullptr, *CheeseStrikeFootsteps::SoundPath(Gait, StepsTaken));
+	++StepsTaken;
+	if (Step != nullptr)
+	{
+		UGameplayStatics::SpawnSoundAtLocation(this, Step, FeetNow(), FRotator::ZeroRotator, CheeseStrikeFootsteps::Volume(Gait), FMath::FRandRange(0.95f, 1.05f), 0.0f, NearbyAttenuation());
+	}
+}
+
+USoundAttenuation* ACheeseStrikeCharacter::NearbyAttenuation()
+{
 	static USoundAttenuation* Attenuation = nullptr;
 	if (Attenuation == nullptr)
 	{
@@ -1106,19 +1118,67 @@ void ACheeseStrikeCharacter::UpdateFootsteps(float DeltaSeconds)
 		Attenuation->Attenuation.NonSpatializedRadiusEnd = 30.0f;
 		Attenuation->AddToRoot();
 	}
-	const FVector Feet = GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
-	UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Footstep(StepsTaken)), Feet, FRotator::ZeroRotator, CheeseStrikeFootsteps::Volume(Gait), FMath::FRandRange(0.92f, 1.08f), 0.0f, Attenuation);
-	++StepsTaken;
+	return Attenuation;
+}
+
+bool ACheeseStrikeCharacter::TakeReloadCall()
+{
+	const float Now = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (!HasAuthority() || !CheeseStrikeVoice::CallsReload(Now - ReloadCalledAt))
+	{
+		return false;
+	}
+	ReloadCalledAt = Now;
+	return true;
+}
+
+void ACheeseStrikeCharacter::HearReloadCall()
+{
+	UWorld* World = GetWorld();
+	const APlayerController* Local = World != nullptr && GetNetMode() != NM_DedicatedServer ? World->GetFirstPlayerController() : nullptr;
+	const ACheeseStrikeGameState* Match = World != nullptr ? World->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	if (Local == nullptr || Match == nullptr || Local->PlayerState == nullptr || GetPlayerState() == nullptr)
+	{
+		return;
+	}
+	const FVector Ears = Local->PlayerCameraManager != nullptr ? Local->PlayerCameraManager->GetCameraLocation() : (Local->GetPawn() != nullptr ? Local->GetPawn()->GetActorLocation() : GetActorLocation());
+	const bool bMe = Local->PlayerState == GetPlayerState();
+	if (!CheeseStrikeVoice::HearsReload(bMe, Match->AreTeammates(Local->PlayerState, GetPlayerState()), FVector::Dist(Ears, GetActorLocation())))
+	{
+		return;
+	}
+	if (USoundBase* Call = LoadObject<USoundBase>(nullptr, *CheeseStrikeVoice::PathOf(CheeseStrikeVoice::ELine::Reloading)))
+	{
+		UGameplayStatics::SpawnSoundAtLocation(this, Call, GetActorLocation() + FVector(0.0f, 0.0f, 60.0f), FRotator::ZeroRotator, 0.9f, FMath::FRandRange(0.95f, 1.05f), 0.0f, NearbyAttenuation());
+	}
+}
+
+void ACheeseStrikeCharacter::MulticastPickedUp_Implementation()
+{
+	// Lyra's weapon swap, from the hands, as near footsteps are heard.
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	if (USoundBase* Swap = LoadObject<USoundBase>(nullptr, *CheeseStrikeSounds::PickupPath(FMath::RandHelper(CheeseStrikeSounds::Pickups))))
+	{
+		UGameplayStatics::SpawnSoundAtLocation(this, Swap, GetActorLocation(), FRotator::ZeroRotator, 0.8f, 1.0f, 0.0f, NearbyAttenuation());
+	}
 }
 
 void ACheeseStrikeCharacter::HearHealth()
 {
-	// A grunt for any damage taken, by a shot, a blast, a fall or anything else: heard by the one hurt, whose health it is.
+	// A quiet "oof" for damage taken, by a shot, a blast, a fall or anything else, one for a burst of hits: heard by the one hurt, whose health it is.
 	const float Lost = HeardHealth - Health;
 	HeardHealth = Health;
-	if (Lost > 0.0f && IsAlive() && IsLocallyControlled())
+	const float Now = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (IsAlive() && IsLocallyControlled() && CheeseStrikeSounds::ShouldOof(Lost, Now - LastOofAt))
 	{
-		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Grunt(0.3f, FMath::FRandRange(0.9f, 1.1f))), 0.8f);
+		LastOofAt = Now;
+		if (USoundBase* Oof = LoadObject<USoundBase>(nullptr, *CheeseStrikeSounds::OofPath(FMath::RandHelper(CheeseStrikeSounds::Oofs))))
+		{
+			UGameplayStatics::PlaySound2D(this, Oof, CheeseStrikeSounds::OofVolume, FMath::FRandRange(0.96f, 1.04f));
+		}
 	}
 }
 

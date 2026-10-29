@@ -64,4 +64,11 @@ namespace CheeseStrikeFootsteps
 		}
 		return false;
 	}
+
+	FString SoundPath(EGait Gait, int32 Variant)
+	{
+		const int32 Number = FMath::Abs(Variant) % Variants + 1;
+		const TCHAR* Kind = Gait == EGait::Sprint ? TEXT("Sprint") : TEXT("Walk");
+		return FString::Printf(TEXT("/Game/OpenGameArt/Footsteps/SW_Footstep%s%d.SW_Footstep%s%d"), Kind, Number, Kind, Number);
+	}
 }

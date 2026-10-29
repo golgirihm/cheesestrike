@@ -53,4 +53,14 @@ namespace CheeseStrikeFootsteps
 	 * StartProgress, ready for the first step of its next walk. Never more than one step comes of one call.
 	 */
 	bool Advance(float& Progress, EGait Gait, float Distance);
+
+	/**
+	 * The steps are recordings (OpenGameArt's "Footsteps" by GboxMikeFozzy,
+	 * CC0: shoes on concrete, imported by tools/art/wave14_sounds.py), six
+	 * of each: a walk's, and a sprint's (the same steps quicker and harder).
+	 * The sound of step `Variant` (any number) in `Gait`: a crouch's is a
+	 * walk's, heard more softly (Volume).
+	 */
+	constexpr int32 Variants = 6;
+	FString SoundPath(EGait Gait, int32 Variant);
 }

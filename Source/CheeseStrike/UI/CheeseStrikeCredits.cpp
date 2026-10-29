@@ -21,6 +21,9 @@ namespace CheeseStrikeCredits
 		{TEXT("The music"), TEXT("\"FREE Cyber Metal Music Pack\" by Intersonic Sound (Fab). \"Aggression - Adaptive Metal Combat Loop (Free Demo)\" by RiffFuel (Fab).")},
 		{TEXT("The knife's stab"), TEXT("From \"8 Wet Squish, Slurp Impacts\" by Independent.nu, from OpenGameArt.org, CC0.")},
 		{TEXT("The Swiss Shotgun's shots"), TEXT("From \"The Free Firearm Sound Library\" by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney, from OpenGameArt.org, CC0.")},
+		{TEXT("Footsteps"), TEXT("From \"Footsteps\" by GboxMikeFozzy, from OpenGameArt.org, CC0.")},
+		{TEXT("Hurt"), TEXT("From \"Hurt Sound Effects\" by EZduzziteh, from OpenGameArt.org, CC0.")},
+		{TEXT("The voice"), TEXT("Spoken by Piper (piper-tts) with its \"norman\" voice by Bryce Beattie, trained on public-domain LibriVox recordings.")},
 		{TEXT("Online play"), TEXT("Steamworks, by Valve.")},
 	};
 
