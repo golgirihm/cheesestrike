@@ -174,4 +174,21 @@ namespace CheeseStrikeMice
 	constexpr float HeldMargin = 0.1f;
 	constexpr float HeldThinnest = 15.0f;
 	bool IsHeld(const FBox2D& Footprint, TConstArrayView<FBox2D> Contacts);
+
+	/**
+	 * Things hung in cheese (a door in a wall of it, a lamp under its roof, a sign on it): a map's script tags them with
+	 * the structure they belong to (tools/art/map_kit.py, `attach_to`: the tag HungOnTag followed by the structure's
+	 * name), and once every block of that structure is eaten they shrink and fall away on every machine
+	 * (UCheeseStrikeHungSubsystem), by the cheese that every machine already has.
+	 */
+	inline const TCHAR* const HungOnTag = TEXT("HungOn:");
+	/** The structure a tag hangs its actor on, or none if it is another tag. */
+	FName StructureOfTag(FName Tag);
+	/** Whether a thing hung on `Structure` is gone: it names one, and no block of it (`BlocksLeft`) is left. */
+	bool IsHungOnEatenCheese(FName Structure, int32 BlocksLeft);
+	/** How long it takes to go (s), and its size meanwhile, `Seconds` after it began: a quick shrink to nothing, eased in. */
+	constexpr float VanishSeconds = 0.5f;
+	float VanishScale(float Seconds);
+	/** How far it drops meanwhile (cm), falling away as it shrinks. */
+	float VanishDrop(float Seconds);
 }

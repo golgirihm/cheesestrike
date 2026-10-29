@@ -183,4 +183,28 @@ namespace CheeseStrikeMice
 		}
 		return true;
 	}
+
+	FName StructureOfTag(FName Tag)
+	{
+		const FString Text = Tag.ToString();
+		return Text.StartsWith(HungOnTag, ESearchCase::CaseSensitive) && Text.Len() > FCString::Strlen(HungOnTag) ? FName(*Text.RightChop(FCString::Strlen(HungOnTag))) : NAME_None;
+	}
+
+	bool IsHungOnEatenCheese(FName Structure, int32 BlocksLeft)
+	{
+		return !Structure.IsNone() && BlocksLeft <= 0;
+	}
+
+	float VanishScale(float Seconds)
+	{
+		const float Share = FMath::Clamp(Seconds / VanishSeconds, 0.0f, 1.0f);
+		return 1.0f - Share * Share;
+	}
+
+	float VanishDrop(float Seconds)
+	{
+		// As a fall from rest under gravity, for as long as it shrinks.
+		const float Falling = FMath::Clamp(Seconds, 0.0f, VanishSeconds);
+		return 0.5f * 980.0f * Falling * Falling;
+	}
 }

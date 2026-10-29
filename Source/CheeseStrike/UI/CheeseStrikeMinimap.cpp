@@ -311,7 +311,8 @@ void FCheeseStrikeMinimap::Draw(CheeseStrikeHUDDraw::FShapes& Shapes, const FVec
 	for (const TWeakObjectPtr<AActor>& Door : Doors)
 	{
 		const AActor* Live = Door.Get();
-		if (Live == nullptr || FVector2D::Distance(FVector2D(Live->GetActorLocation()), Middle) > Reach + 1000.0f)
+		// (A door gone with the cheese it hung in is hidden: UCheeseStrikeHungSubsystem.)
+		if (Live == nullptr || Live->IsHidden() || FVector2D::Distance(FVector2D(Live->GetActorLocation()), Middle) > Reach + 1000.0f)
 		{
 			continue;
 		}
