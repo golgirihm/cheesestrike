@@ -1,6 +1,7 @@
 # Looks at every weapon in hand (CheeseStrikeArm puts each in hand at once): in first person from the hip and down the
-# sights, and on the body from its right side, for checking how each is held and how its cheese looks.
-wait 2
+# sights, and on the body from its right side, for checking how each is held and how its cheese looks; the streak's
+# Gouda Gatling and the Cheese Stick's swing too.
+wait 3.5
 cmd CheeseStrikeArm blaster
 wait 0.8
 shot looks_blaster_1
@@ -66,6 +67,39 @@ release Aim
 cmd CheeseStrikeOutside 130 75 45
 wait 0.6
 shot looks_roquefort_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm babybomb
+wait 1
+shot looks_babybomb_1
+hold Aim
+wait 0.7
+shot looks_babybomb_2
+release Aim
+cmd CheeseStrikeOutside 130 75 45
+wait 0.6
+shot looks_babybomb_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm gatling
+wait 1
+shot looks_gatling_1
+hold Aim
+wait 0.7
+shot looks_gatling_2
+release Aim
+cmd CheeseStrikeOutside 140 75 45
+wait 0.6
+shot looks_gatling_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm stick
+wait 1
+shot looks_stick_1
+tap Fire
+wait 0.35
+shot looks_stick_2
+wait 1
+cmd CheeseStrikeOutside 160 75 45
+wait 0.6
+shot looks_stick_3
 cmd CheeseStrikeOutside
 tap Sidearm
 wait 0.8
