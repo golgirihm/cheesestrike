@@ -26,6 +26,7 @@
 #include "CheeseStrikeWeapon.h"
 #include "CheeseStrikeWeaponLooks.h"
 #include "Map/CheeseStrikeMouse.h"
+#include "Map/CheeseStrikeTarget.h"
 #include "Modes/CheeseStrikeLastStand.h"
 
 namespace
@@ -316,7 +317,7 @@ void ACheeseStrikeProjectile::Fly(float DeltaSeconds)
 		SetActorLocation(Wall.ImpactPoint - Way * 3.0f);
 		// A mouse, or anything else of the engine's that takes damage, takes a hit's.
 		AActor* Thing = Wall.GetActor();
-		if (Thing != nullptr && (Thing->IsA<APawn>() || Thing->IsA<ACheeseStrikeMouse>()))
+		if (Thing != nullptr && (Thing->IsA<APawn>() || Thing->IsA<ACheeseStrikeMouse>() || Thing->IsA<ACheeseStrikeTarget>()))
 		{
 			ACheeseStrikeCharacter* Firer = Shooter.Get();
 			UGameplayStatics::ApplyPointDamage(Thing, Stats->Damage, Way, Wall, Firer != nullptr ? Firer->GetController() : nullptr, this, nullptr);

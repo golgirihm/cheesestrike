@@ -135,6 +135,7 @@ void ACheeseStrikePickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(ACheeseStrikePickup, Weapon, COND_InitialOnly);
 	DOREPLIFETIME(ACheeseStrikePickup, BackAt);
+	DOREPLIFETIME_CONDITION(ACheeseStrikePickup, bInstant, COND_InitialOnly);
 	DOREPLIFETIME_CONDITION(ACheeseStrikePickup, bDropped, COND_InitialOnly);
 }
 
@@ -240,7 +241,7 @@ void ACheeseStrikePickup::Take()
 		return;
 	}
 	const float Seconds = CVarPickupSeconds.GetValueOnGameThread() > 0.0f ? CVarPickupSeconds.GetValueOnGameThread() : CheeseStrikePickups::RespawnSeconds;
-	BackAt = ServerNow() + Seconds;
+	BackAt = CheeseStrikePickups::BackAt(ServerNow(), Seconds, bInstant);
 	ForceNetUpdate();
 	UpdateLook();
 }

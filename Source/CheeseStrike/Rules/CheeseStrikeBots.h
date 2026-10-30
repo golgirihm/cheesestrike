@@ -37,6 +37,14 @@ namespace CheeseStrikeBots
 	const FSkill& Skill(int32 Index);
 	/** The skill a map URL's `?BotSkill=` picks, or `Otherwise`. */
 	int32 SkillFrom(const FString& Options, int32 Otherwise = DefaultSkill);
+	/**
+	 * `?BotSkill=dummy`: the bots are the Practice Range's dummies
+	 * (CheeseStrikeRange), apart from the skills a lobby offers: each stands
+	 * at its spot and never moves, aims or fires, and comes back there.
+	 */
+	extern const TCHAR* const DummyKey;
+	/** Whether a map URL's `?BotSkill=` makes the bots dummies. */
+	bool DummiesFrom(const FString& Options);
 
 	/** Seconds of tracking over which a bot's aim steadies. */
 	constexpr float SteadyTime = 1.5f;

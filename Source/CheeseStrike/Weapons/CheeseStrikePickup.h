@@ -61,6 +61,8 @@ public:
 	static ACheeseStrikePickup* Drop(ACheeseStrikeCharacter* From, FName Weapon, int32 Magazine, int32 Reserve);
 	/** Whether it is a weapon on the floor, not a stand. */
 	bool IsDropped() const { return bDropped; }
+	/** Whether, taken, its weapon is back at once (the Practice Range's stands, never empty), as the map sets it. */
+	bool IsInstant() const { return bInstant; }
 	/** A weapon on the floor's rounds, as it was dropped (server only). */
 	int32 GetDroppedMagazine() const { return DroppedMagazine; }
 	int32 GetDroppedReserve() const { return DroppedReserve; }
@@ -87,7 +89,7 @@ public:
 	/** How it is shown on this machine, for the log (`CheeseStrikePickups`). */
 	FString DescribeLook() const;
 
-	/** Server: its weapon has been taken; a stand's is back after RespawnSeconds, one on the floor is gone. */
+	/** Server: its weapon has been taken; a stand's is back after RespawnSeconds (at once if it is instant), one on the floor is gone. */
 	void Take();
 	/** Server: its weapon back at once. */
 	void PutBack();
@@ -104,6 +106,9 @@ protected:
 	/** The weapon it holds, as the map names it. */
 	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_Weapon, Category = "Pickup")
 	FName Weapon;
+	/** Taken, its weapon is back at once: the stand is never empty (the Practice Range's; map_kit's `pickup(instant=True)`). */
+	UPROPERTY(EditAnywhere, Replicated, Category = "Pickup")
+	bool bInstant = false;
 	/** When its weapon is back, by the server's clock; 0 while it is there. */
 	UPROPERTY(ReplicatedUsing=OnRep_BackAt)
 	float BackAt = 0.0f;

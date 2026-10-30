@@ -29,6 +29,10 @@ bool FBotSkillsAreTheDesigns::RunTest(const FString& Parameters)
 	TestEqual(TEXT("as the URL says"), SkillFrom(TEXT("?BotSkill=2")), 2);
 	TestEqual(TEXT("within the table"), SkillFrom(TEXT("?BotSkill=7")), 2);
 	TestEqual(TEXT("a skill past the table is its last"), FString(Skill(9).Name), FString(TEXT("Hard")));
+	// The Practice Range's dummies: not a skill of the table (the lobby never offers it), but a word of their own.
+	TestTrue(TEXT("?BotSkill=dummy makes the bots dummies"), DummiesFrom(TEXT("?Bots=4?BotSkill=dummy")));
+	TestFalse(TEXT("a skill doesn't"), DummiesFrom(TEXT("?BotSkill=2")) || DummiesFrom(TEXT("?listen")));
+	TestEqual(TEXT("and the dummies' skill is the usual, for anything that asks"), SkillFrom(TEXT("?BotSkill=dummy")), DefaultSkill);
 	return true;
 }
 

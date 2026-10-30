@@ -97,6 +97,8 @@ namespace CheeseStrikePickups
 	int32 Worth(FName Weapon);
 	/** The colour of a weapon's stand pad, prompt and label: the same green (not the cheese yellow) for every weapon, whatever it is worth. */
 	FLinearColor WorthColour(int32 Worth);
+	/** When a stand taken at `Now` is back, its weapon gone for `Seconds`: never gone (0, there) if it is `bInstant`, as the Practice Range's are. */
+	float BackAt(float Now, float Seconds, bool bInstant);
 	/** Seconds until a stand taken until `BackAt` is back, at `Now` (both the server's); 0 if it is there. */
 	float SecondsLeft(float Now, float BackAt);
 	/** The seconds the HUD shows over a stand with `Left` to go: whole seconds, rounded up. */

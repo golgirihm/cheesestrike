@@ -29,6 +29,13 @@ namespace CheeseStrikeBots
 		return FMath::Clamp(FCString::Atoi(*Value), 0, NumSkills - 1);
 	}
 
+	const TCHAR* const DummyKey = TEXT("dummy");
+
+	bool DummiesFrom(const FString& Options)
+	{
+		return UGameplayStatics::ParseOption(Options, TEXT("BotSkill")).Equals(DummyKey, ESearchCase::IgnoreCase);
+	}
+
 	float AimError(const FSkill& Skill, float Tracking)
 	{
 		const float Through = FMath::Clamp(Tracking / SteadyTime, 0.0f, 1.0f);

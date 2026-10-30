@@ -144,6 +144,7 @@ void ACheeseStrikeBotController::OnPossess(APawn* InPawn)
 	if (const ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
 	{
 		SkillIndex = Mode->GetBotSkill();
+		bDummy = Mode->AreBotsDummies();
 	}
 	if (InPawn != nullptr)
 	{
@@ -233,7 +234,8 @@ bool ACheeseStrikeBotController::CanSeeInto(const ACheeseStrikeCharacter* Other)
 void ACheeseStrikeBotController::Tick(float DeltaSeconds)
 {
 	ACheeseStrikeCharacter* Me = Body();
-	if (Me == nullptr || !Me->CanAct())
+	// A dummy stands where it came in, facing the way it came in, and does nothing: it is there to be shot.
+	if (Me == nullptr || !Me->CanAct() || bDummy)
 	{
 		if (bTriggerHeld)
 		{

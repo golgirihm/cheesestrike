@@ -50,6 +50,7 @@
 #include "UI/CheeseStrikePodium.h"
 #include "UI/CheeseStrikePodiumHUD.h"
 #include "Rules/CheeseStrikePodiums.h"
+#include "Rules/CheeseStrikeRange.h"
 #include "Rules/CheeseStrikeSounds.h"
 #include "Rules/CheeseStrikeVoice.h"
 #include "Records/CheeseStrikeRecords.h"
@@ -769,6 +770,13 @@ void ACheeseStrikePlayerController::HostFromMenu()
 	{
 		Sessions->Host(CheeseStrikeRules::HostOptions(), Sessions->ServiceName() != TEXT("STEAM"));
 	}
+}
+
+void ACheeseStrikePlayerController::PracticeFromMenu()
+{
+	// Alone and offline: no match is offered, so Leave the Match travels straight back to the front end.
+	UE_LOG(LogCheeseStrike, Display, TEXT("Practice: %s"), *CheeseStrikeRange::PracticeUrl());
+	ClientTravel(CheeseStrikeRange::PracticeUrl(), TRAVEL_Absolute);
 }
 
 void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map)

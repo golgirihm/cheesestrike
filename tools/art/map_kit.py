@@ -1111,20 +1111,60 @@ def mouse_entries(x0, y0, x1, y1, top, xs=(), ys=()):
         mouse_entry(x1 + 50, y, top, 180)
 
 
-def pickup(weapon, x, y, z=0, name=""):
+def pickup(weapon, x, y, z=0, name="", instant=False):
     """A weapon's stand (ACheeseStrikePickup): a low plinth at (x, y) on the floor at `z`, its weapon (a primary's id:
     blaster, grater, munster, shotgun, burratas, roquefort, babybomb, stick; never the carbine everyone comes in with) floating
     over it, labelled Pickup_<weapon>_<name>. Four to eight a map, the better weapons at the riskier spots (the power weapons,
     roquefort, babybomb and stick, the riskiest),
     each side reaching them alike: on a mirrored map in pairs (x and -x) or on the middle line. It blocks nothing, so
     put it on open floor with room round it (a metre and a half across, two metres up), off the lanes' choke points
-    unless that is the risk; the cheese under it is kept (keep()), so that the mice never eat its floor away."""
+    unless that is the risk; the cheese under it is kept (keep()), so that the mice never eat its floor away.
+    `instant`: taken, its weapon is back at once, so that the stand is never empty (the Practice Range's)."""
     label = f"Pickup_{weapon.capitalize()}_{name or counts.get('pickups', 0)}"
     actor = place(unreal.CheeseStrikePickup, label, "Pickups", (x, y, z))
     actor.set_editor_property("weapon", weapon)
+    if instant:
+        actor.set_editor_property("instant", True)
     keep((x - 60, y - 60, z - 400), (x + 60, y + 60, z + 5))
     count("pickups")
     lines.append(f"pickup: {weapon} at ({x:.0f}, {y:.0f}, {z:.0f})")
+    return actor
+
+
+def dummy_spot(name, x, y, z=0, yaw=180):
+    """Where one of the Practice Range's dummies stands (a bot with `?BotSkill=dummy`: it never moves, aims or fires),
+    on the floor at (x, y, z), facing `yaw`: it comes in there and comes back there each time it is killed
+    (ACheeseStrikeGameMode::ChooseDummySpot, by the tag DummySpot). Not a start: no player ever comes in at one."""
+    spot = place(unreal.TargetPoint, f"DummySpot_{name}", "Dummies", (x, y, z + 100), (0, yaw, 0))
+    spot.set_editor_property("tags", ["DummySpot"])
+    count("dummy spots")
+    return spot
+
+
+def target(label, folder, x, y, z, yaw=180, diameter=60, thickness=16):
+    """A cheese target (ACheeseStrikeTarget): a wheel of cheese on its edge, its middle at (x, y, z), its face toward
+    `yaw` (the firing line), `diameter` across and `thickness` thick. Shots break it, and it grows back a few seconds
+    later. Not cheese the mice eat: it counts for none of the map's."""
+    actor = place(unreal.CheeseStrikeTarget, label, folder, (x, y, z), (0, yaw, 0))
+    actor.set_editor_property("diameter", float(diameter))
+    actor.set_editor_property("thickness", float(thickness))
+    count("targets")
+    return actor
+
+
+def text_sign(label, folder, text, at, yaw, size=60, colour=(255, 255, 255)):
+    """Words standing in the world (a range's distances, a sign), `size` cm high, facing `yaw`, centred on `at`."""
+    actor = place(unreal.TextRenderActor, label, folder, at, (0, yaw, 0))
+    component = actor.get_component_by_class(unreal.TextRenderComponent)
+    component.set_editor_property("text", text)
+    component.set_editor_property("world_size", float(size))
+    try:
+        component.set_editor_property("horizontal_alignment", unreal.HorizTextAligment.EHTA_CENTER)
+        component.set_editor_property("vertical_alignment", unreal.VerticalTextAligment.EVRTA_TEXT_CENTER)
+    except Exception as error:
+        lines.append(f"WARNING: {label}: not centred ({error})")
+    component.set_editor_property("text_render_color", unreal.Color(r=colour[0], g=colour[1], b=colour[2], a=255))
+    count("signs")
     return actor
 
 
