@@ -1,0 +1,73 @@
+# Looks at wave 14's new weapons (placeholders until group 9's models): each in hand in first person and from outside,
+# a BabyBomb's wheel in flight and its burst, the Cheese Grater's shards in flight, the Cheese Stick mid-swing, the
+# Munster Twin SMGs, and the BabyBomb and the Cheese Stick on stands. Run with tools/play.ps1 -StartAt 1150,-1450,100,117
+# (open ground on the shooter level).
+wait 3
+cmd CheeseStrikeArm babybomb
+wait 1.0
+shot new_babybomb_1
+hold Aim
+wait 0.7
+shot new_babybomb_2
+release Aim
+cmd CheeseStrikeOutside 130 75 45
+wait 0.6
+shot new_babybomb_3
+cmd CheeseStrikeOutside
+look 0 -6
+tap Fire
+wait 0.12
+shot new_babybomb_flight
+wait 0.5
+shot new_babybomb_burst
+wait 0.3
+look 0 6
+cmd CheeseStrikeArm grater
+wait 0.8
+shot new_grater_1
+cmd CheeseStrikeOutside 110 75 45
+wait 0.6
+shot new_grater_3
+cmd CheeseStrikeOutside
+hold Fire
+wait 0.45
+shot new_grater_shards
+release Fire
+wait 0.5
+cmd CheeseStrikeArm stick
+wait 0.9
+shot new_stick_1
+tap Fire
+wait 0.3
+shot new_stick_swing
+wait 0.9
+cmd CheeseStrikeOutside 140 75 45
+wait 0.5
+shot new_stick_3
+tap Fire
+wait 0.3
+shot new_stick_swing_outside
+wait 0.9
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 0.8
+shot new_munster_1
+hold Fire
+wait 0.2
+shot new_munster_fire
+release Fire
+cmd CheeseStrikeOutside 110 75 45
+wait 0.6
+shot new_munster_3
+cmd CheeseStrikeOutside
+tap Knife
+cmd CheeseStrikeStand babybomb 160
+wait 1.2
+look 0 -18
+shot new_stand_babybomb
+look 0 18
+cmd CheeseStrikeStand stick 160
+wait 1.2
+look 25 -18
+shot new_stand_stick
+quit

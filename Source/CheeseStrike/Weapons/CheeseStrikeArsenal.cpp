@@ -93,21 +93,36 @@ namespace CheeseStrikeWeapons
 	{
 		static const FWeaponStats Stats = []
 		{
-			FWeaponStats Weapon = MakeWeapon(TEXT("grater"), NSLOCTEXT("CheeseStrike", "Grater", "Parmesan Grater"), EWeaponSlot::Primary);
-			Weapon.Damage = 12.0f;
-			Weapon.HeadMultiplier = 1.5f;
-			Weapon.FireInterval = 0.065f;
+			// Wave 14: a needler (Halo's, in cheese). Shards of grated cheese flying at 40 m/s, ten a second, each turning
+			// toward the nearest enemy within 10 degrees of the aim it was fired along at up to 25 degrees a second (the
+			// server's choice); sixteen in one player within two seconds burst for a kill. The id stays the Parmesan
+			// Grater's it replaces.
+			FWeaponStats Weapon = MakeWeapon(TEXT("grater"), NSLOCTEXT("CheeseStrike", "Grater", "Cheese Grater"), EWeaponSlot::Primary);
+			Weapon.Damage = 8.0f;
+			Weapon.HeadMultiplier = 1.25f;
+			Weapon.FireInterval = 0.1f;
 			Weapon.bAutomatic = true;
-			Weapon.MagazineSize = 45;
-			Weapon.ReloadTime = 1.5f;
-			Weapon.Reserve = 135;
-			Weapon.ReserveMax = 225;
-			SetReach(Weapon, 80.0f, 15.0f, 45.0f, 0.4f);
-			Weapon.SpreadDegrees = 2.5f;
-			Weapon.HipSpreadDegrees = 12.0f;
-			Weapon.BloomShots = 12;
-			SetKick(Weapon, 0.28f, 12.0f, 0.5f, 0.25f);
-			Weapon.AimZoom = 0.75f;
+			Weapon.MagazineSize = 20;
+			Weapon.ReloadTime = 1.8f;
+			Weapon.Reserve = 60;
+			Weapon.ReserveMax = 100;
+			Weapon.ProjectileSpeed = 4000.0f;
+			Weapon.GravityShare = 0.0f;
+			Weapon.ProjectileLife = 1.5f;
+			// As far as a shard flies, its whole damage.
+			Weapon.MaxRange = Weapon.ProjectileSpeed * Weapon.ProjectileLife;
+			Weapon.FalloffStart = 0.0f;
+			Weapon.FalloffEnd = 0.0f;
+			Weapon.FalloffFloor = 1.0f;
+			Weapon.HomingTurn = 25.0f;
+			Weapon.HomingCone = 10.0f;
+			Weapon.SuperShards = 16;
+			Weapon.SuperWindow = 2.0f;
+			Weapon.SpreadDegrees = 1.5f;
+			Weapon.HipSpreadDegrees = 5.0f;
+			Weapon.BloomShots = 8;
+			SetKick(Weapon, 0.2f, 8.0f, 0.3f, 0.25f);
+			Weapon.AimZoom = 0.8f;
 			return Weapon;
 		}();
 		return Stats;
@@ -117,23 +132,25 @@ namespace CheeseStrikeWeapons
 	{
 		static const FWeaponStats Stats = []
 		{
-			FWeaponStats Weapon = MakeWeapon(TEXT("munster"), NSLOCTEXT("CheeseStrike", "Munster", "Munster Machine Gun"), EWeaponSlot::Primary);
-			Weapon.Damage = 16.0f;
+			// Wave 14: the Munster Machine Gun made two submachine guns, one in each hand (the Dual Burratas' two guns),
+			// automatic, firing in turn, a belt of 60 each; no sights, close and loose.
+			FWeaponStats Weapon = MakeWeapon(TEXT("munster"), NSLOCTEXT("CheeseStrike", "Munster", "Munster Twin SMGs"), EWeaponSlot::Primary);
+			Weapon.bDual = true;
+			Weapon.Damage = 13.0f;
 			Weapon.HeadMultiplier = 1.5f;
-			Weapon.FireInterval = 0.085f;
+			Weapon.FireInterval = 0.075f;
 			Weapon.bAutomatic = true;
-			Weapon.MagazineSize = 75;
-			Weapon.ReloadTime = 3.6f;
-			Weapon.Reserve = 75;
-			Weapon.ReserveMax = 150;
-			SetReach(Weapon, 120.0f, 25.0f, 70.0f, 0.5f);
-			Weapon.SpreadDegrees = 1.2f;
-			Weapon.HipSpreadDegrees = 13.0f;
-			Weapon.BloomShots = 14;
-			SetKick(Weapon, 0.4f, 14.0f, 0.6f, 0.3f);
-			Weapon.AimZoom = 0.75f;
-			Weapon.DrawTime = 0.9f;
-			Weapon.CarrySpeed = 0.85f;
+			Weapon.MagazineSize = 120;
+			Weapon.ReloadTime = 3.2f;
+			Weapon.Reserve = 120;
+			Weapon.ReserveMax = 240;
+			SetReach(Weapon, 80.0f, 15.0f, 45.0f, 0.45f);
+			Weapon.SpreadDegrees = 1.5f;
+			Weapon.HipSpreadDegrees = 8.0f;
+			Weapon.BloomShots = 12;
+			SetKick(Weapon, 0.3f, 10.0f, 0.5f, 0.3f);
+			Weapon.AimZoom = 0.8f;
+			Weapon.DrawTime = 0.5f;
 			return Weapon;
 		}();
 		return Stats;
@@ -143,9 +160,11 @@ namespace CheeseStrikeWeapons
 	{
 		static const FWeaponStats Stats = []
 		{
+			// Wave 14: twelve pellets of 14, the whole of them from 4 m in, falling to 0.15 of it at 12 m: a kill a shot up
+			// to about 4 m, weak past 8; a tighter cone, so that they land together that close.
 			FWeaponStats Weapon = MakeWeapon(TEXT("shotgun"), NSLOCTEXT("CheeseStrike", "Shotgun", "Swiss Shotgun"), EWeaponSlot::Primary);
-			Weapon.Damage = 10.0f;
-			Weapon.Pellets = 9;
+			Weapon.Damage = 14.0f;
+			Weapon.Pellets = 12;
 			Weapon.HeadMultiplier = 1.5f;
 			Weapon.FireInterval = 0.85f;
 			Weapon.bAutomatic = false;
@@ -153,9 +172,12 @@ namespace CheeseStrikeWeapons
 			Weapon.ReloadTime = 2.2f;
 			Weapon.Reserve = 18;
 			Weapon.ReserveMax = 30;
-			SetReach(Weapon, 40.0f, 8.0f, 25.0f, 0.3f);
-			Weapon.SpreadDegrees = 14.0f;
-			Weapon.HipSpreadDegrees = 32.0f;
+			Weapon.MaxRange = 40.0f * ArsenalGodotMetre;
+			Weapon.FalloffStart = 400.0f;
+			Weapon.FalloffEnd = 1200.0f;
+			Weapon.FalloffFloor = 0.15f;
+			Weapon.SpreadDegrees = 6.0f;
+			Weapon.HipSpreadDegrees = 10.0f;
 			Weapon.BloomShots = 1;
 			SetKick(Weapon, 3.0f, 2.0f, 0.6f, 1.0f);
 			Weapon.AimZoom = 0.8f;
@@ -216,6 +238,81 @@ namespace CheeseStrikeWeapons
 			Weapon.AimZoom = 0.3f;
 			Weapon.bScoped = true;
 			Weapon.DrawTime = 0.5f;
+			return Weapon;
+		}();
+		return Stats;
+	}
+
+	const FWeaponStats& BabyBomb()
+	{
+		static const FWeaponStats Stats = []
+		{
+			// Wave 14's power weapon: a launcher of red-waxed wheels, two in the tube and two more, a wheel a second at 25 m/s
+			// with a little drop; a direct hit 150, its burst 110 within 3 m falling to 30 at 5 m, its shooter not spared.
+			FWeaponStats Weapon = MakeWeapon(TEXT("babybomb"), NSLOCTEXT("CheeseStrike", "BabyBomb", "BabyBomb"), EWeaponSlot::Primary);
+			Weapon.Damage = 150.0f;
+			Weapon.HeadMultiplier = 1.0f;
+			Weapon.FireInterval = 1.0f;
+			Weapon.bAutomatic = false;
+			Weapon.MagazineSize = 2;
+			Weapon.ReloadTime = 2.5f;
+			Weapon.Reserve = 2;
+			Weapon.ReserveMax = 4;
+			Weapon.ProjectileSpeed = 2500.0f;
+			Weapon.GravityShare = 0.15f;
+			Weapon.ProjectileLife = 3.0f;
+			Weapon.MaxRange = Weapon.ProjectileSpeed * Weapon.ProjectileLife;
+			Weapon.FalloffStart = 0.0f;
+			Weapon.FalloffEnd = 0.0f;
+			Weapon.FalloffFloor = 1.0f;
+			Weapon.SplashRadius = 500.0f;
+			Weapon.SplashInner = 300.0f;
+			Weapon.SplashDamage = 110.0f;
+			Weapon.SplashEdgeDamage = 30.0f;
+			Weapon.BotLeast = 600.0f;
+			Weapon.SpreadDegrees = 0.0f;
+			Weapon.HipSpreadDegrees = 2.0f;
+			Weapon.BloomShots = 1;
+			SetKick(Weapon, 4.0f, 2.0f, 0.5f, 0.9f);
+			Weapon.AimZoom = 0.75f;
+			Weapon.DrawTime = 0.7f;
+			Weapon.CarrySpeed = 0.85f;
+			return Weapon;
+		}();
+		return Stats;
+	}
+
+	const FWeaponStats& Stick()
+	{
+		static const FWeaponStats Stats = []
+		{
+			// Wave 14's melee power weapon: a 1.2 m baton of string cheese, a slow heavy swing every 1.1 s that fells everyone
+			// within 3 m in a 120-degree arc in front (down in Execution), never a teammate; no rounds; a little slow to carry.
+			FWeaponStats Weapon = MakeWeapon(TEXT("stick"), NSLOCTEXT("CheeseStrike", "Stick", "Cheese Stick"), EWeaponSlot::Primary);
+			Weapon.Damage = 500.0f;
+			Weapon.BackstabDamage = 500.0f;
+			Weapon.HeadMultiplier = 1.0f;
+			Weapon.FireInterval = 1.1f;
+			Weapon.bAutomatic = false;
+			Weapon.MagazineSize = 0;
+			Weapon.Reserve = 0;
+			Weapon.ReserveMax = 0;
+			Weapon.ReloadTime = 0.0f;
+			Weapon.Reach = 300.0f;
+			Weapon.MaxRange = Weapon.Reach;
+			Weapon.FalloffStart = 0.0f;
+			Weapon.FalloffEnd = 0.0f;
+			Weapon.ArcDegrees = 120.0f;
+			Weapon.SwingTime = 0.5f;
+			Weapon.SwipeSeconds = 0.8f;
+			Weapon.SwipeSize = 1.25f;
+			Weapon.SpreadDegrees = 0.0f;
+			Weapon.HipSpreadDegrees = 0.0f;
+			Weapon.BloomShots = 1;
+			SetKick(Weapon, 0.0f, 1.0f, 0.0f, 0.3f);
+			Weapon.AimZoom = 1.0f;
+			Weapon.DrawTime = 0.6f;
+			Weapon.CarrySpeed = 0.9f;
 			return Weapon;
 		}();
 		return Stats;
@@ -314,7 +411,8 @@ namespace CheeseStrikeArsenal
 	const TArray<const FWeaponStats*>& All()
 	{
 		namespace W = CheeseStrikeWeapons;
-		static const TArray<const FWeaponStats*> Weapons = {&W::Blaster(), &W::Carbine(), &W::Grater(), &W::Munster(), &W::Shotgun(), &W::Burratas(), &W::Roquefort(), &W::Pistol(), &W::Knife(), &W::Gatling()};
+		static const TArray<const FWeaponStats*> Weapons = {&W::Blaster(), &W::Carbine(), &W::Grater(), &W::Munster(), &W::Shotgun(), &W::Burratas(), &W::Roquefort(), &W::BabyBomb(), &W::Stick(),
+			&W::Pistol(), &W::Knife(), &W::Gatling()};
 		return Weapons;
 	}
 
@@ -379,7 +477,10 @@ namespace CheeseStrikeArsenal
 	const TArray<FName>& GunGameLadder()
 	{
 		namespace W = CheeseStrikeWeapons;
-		static const TArray<FName> Ladder = {W::Blaster().Id, W::Shotgun().Id, W::Carbine().Id, W::Burratas().Id, W::Grater().Id, W::Munster().Id, W::Roquefort().Id, W::Pistol().Id, W::Knife().Id};
+		// The BabyBomb, which a near miss still kills with, after the Roquefort; the Cheese Stick, a swing up close, before the
+		// pistol and the knife.
+		static const TArray<FName> Ladder = {W::Blaster().Id, W::Shotgun().Id, W::Carbine().Id, W::Burratas().Id, W::Munster().Id, W::Grater().Id, W::Roquefort().Id, W::BabyBomb().Id,
+			W::Stick().Id, W::Pistol().Id, W::Knife().Id};
 		return Ladder;
 	}
 

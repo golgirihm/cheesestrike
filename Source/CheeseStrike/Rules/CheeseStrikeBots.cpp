@@ -81,13 +81,14 @@ namespace CheeseStrikeBots
 	TArray<TPair<FName, float>> PrimaryWeights(int32 SkillIndex)
 	{
 		using namespace CheeseStrikeWeapons;
-		// Blaster, Carbine, Grater, Munster, Shotgun, Burratas, Roquefort: an easy bot sprays, a hard one aims.
-		static const float Weights[NumSkills][7] = {
-			{3.0f, 1.0f, 3.0f, 2.0f, 2.0f, 2.0f, 0.0f},
-			{3.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 1.0f},
-			{2.0f, 3.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f},
+		// Blaster, Carbine, Grater, Munster, Shotgun, Burratas, Roquefort, BabyBomb, Stick: an easy bot sprays, a hard one
+		// aims; none comes in with a power weapon of the stands' (the BabyBomb, the Cheese Stick).
+		static const float Weights[NumSkills][9] = {
+			{3.0f, 1.0f, 3.0f, 2.0f, 2.0f, 2.0f, 0.0f, 0.0f, 0.0f},
+			{3.0f, 2.0f, 2.0f, 2.0f, 2.0f, 2.0f, 1.0f, 0.0f, 0.0f},
+			{2.0f, 3.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f, 0.0f, 0.0f},
 		};
-		const FWeaponStats* Order[] = {&Blaster(), &Carbine(), &Grater(), &Munster(), &Shotgun(), &Burratas(), &Roquefort()};
+		const FWeaponStats* Order[] = {&Blaster(), &Carbine(), &Grater(), &Munster(), &Shotgun(), &Burratas(), &Roquefort(), &BabyBomb(), &Stick()};
 		const int32 Row = FMath::Clamp(SkillIndex, 0, NumSkills - 1);
 		TArray<TPair<FName, float>> Out;
 		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Order); ++Index)
@@ -119,12 +120,28 @@ namespace CheeseStrikeBots
 
 	EWeaponSlot ChooseWeapon(const FArmed& Armed, bool bFighting, float Distance, EWeaponSlot Current)
 	{
+		if (Armed.bPrimary && Armed.bPrimaryMelee)
+		{
+			// The Cheese Stick: in hand up close (kept a little further once out); the sidearm meanwhile, if any.
+			const float Reach = FMath::Max(Armed.PrimaryReach, 1.0f);
+			const bool bClose = Distance < Reach * StickFrom || (Current == EWeaponSlot::Primary && Distance < Reach * StickLetGo);
+			if (!bFighting || bClose || !Armed.bSidearm)
+			{
+				return EWeaponSlot::Primary;
+			}
+			return EWeaponSlot::Sidearm;
+		}
 		const bool bPrimaryUsable = Armed.bPrimary && (Armed.PrimaryMagazine > 0 || Armed.bPrimaryReserve);
 		if (bFighting && Armed.bKnife && (Distance < KnifeFrom || (Current == EWeaponSlot::Knife && Distance < KnifeLetGo)))
 		{
 			return EWeaponSlot::Knife;
 		}
 		if (bFighting && Armed.bSidearm && Armed.PrimaryMagazine <= 0 && (Current == EWeaponSlot::Sidearm || Distance < SidearmWithin || !bPrimaryUsable))
+		{
+			return EWeaponSlot::Sidearm;
+		}
+		// Too close for the primary's burst: the sidearm.
+		if (bFighting && Armed.bSidearm && bPrimaryUsable && !FarEnoughFor(Distance, Armed.PrimaryLeast))
 		{
 			return EWeaponSlot::Sidearm;
 		}
@@ -146,6 +163,11 @@ namespace CheeseStrikeBots
 	bool WouldStrikeAt(float Distance, float Reach)
 	{
 		return Distance <= Reach * 0.95f;
+	}
+
+	bool FarEnoughFor(float Distance, float Least)
+	{
+		return Distance >= Least;
 	}
 
 	bool WouldFireAt(float Distance, float WeaponRange, bool bTheyShootMe)
