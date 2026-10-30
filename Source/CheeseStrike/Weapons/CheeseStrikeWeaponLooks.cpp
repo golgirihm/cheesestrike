@@ -86,23 +86,25 @@ namespace
 			RifleSounds(Look, 0.95f, 1.08f);
 			Looks.Add(Look);
 		}
-		// The Cheese Grater, a needler: for now a steel box grater (the engine's cube, 9 by 22 by 12 cm, ahead of the hand), its
-		// shards glowing slivers of grated cheese; group 9's model will take its place.
+		// The Cheese Grater, a needler: a steel box grater, its coarse face forward, held by the D handle over its top and down
+		// its back (the grip in red wax), Parmesan inside; its shards curled slivers of grated Parmesan, glowing.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("grater");
-			Look.PlainModel = TEXT("/Engine/BasicShapes/Cube.Cube");
-			Look.Model = FTransform(FRotator::ZeroRotator, FVector(0.0f, 8.0f, 6.0f), FVector(0.09f, 0.22f, 0.12f));
+			Look.PlainModel = Model(TEXT("Grater"), TEXT("CheeseGrater"));
 			Look.Materials[0] = Material(TEXT("MI_KnifeSteel"));
-			Look.Sight = FVector(0.0f, -100.0f, 80.0f);
-			Look.Muzzle = FVector(0.0f, 50.0f, 0.0f);
+			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
+			Look.Materials[2] = Material(TEXT("MI_Parmesan"));
+			// The eye beside its handle rather than over it, so that the box stands up in view to the right.
+			Look.Sight = FVector(6.5f, -16.0f, 10.0f);
+			Look.Muzzle = FVector(0.0f, 11.9f, -2.0f);
 			Look.FlashSize = 0.5f;
-			Look.LeftHand = FVector(0.0f, 30.0f, -40.0f);
+			// Under the box, holding it up.
+			Look.LeftHand = FVector(0.0f, 8.2f, -14.2f);
 			RifleSounds(Look, 0.7f, 1.5f);
-			Look.IconOf = TEXT("knife");
-			Look.ProjectileModel = TEXT("/Engine/BasicShapes/Cube.Cube");
-			Look.ProjectileMaterials[0] = Material(TEXT("MI_GrenadeCheese"));
-			Look.ProjectileShape = FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(0.09f, 0.015f, 0.02f));
+			Look.ProjectileModel = Model(TEXT("Grater"), TEXT("GraterShard"));
+			Look.ProjectileMaterials[0] = Material(TEXT("MI_Parmesan"));
+			Look.ProjectileShape = FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(1.2f));
 			Look.ProjectileGlow = FLinearColor(1.0f, 0.78f, 0.2f, 1.0f);
 			Looks.Add(Look);
 		}
@@ -226,17 +228,21 @@ namespace
 			RifleSounds(Look, 0.8f, 1.25f);
 			Looks.Add(Look);
 		}
-		// The BabyBomb: for now Lyra's grenade launcher all in red wax, firing red-waxed wheels (the engine's cylinder, 12 cm
-		// across); group 9's tube of three Babybel wheels will take its place.
+		// The BabyBomb: a shoulder tube of three red-waxed Babybel wheels, the white pull-strip spiralling round them, BABYBOMB
+		// embossed in the wax, a wheel waiting in its bore; it fires little red-waxed Babybels, spinning as they fly.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("babybomb");
-			Look.PlainModel = TEXT("/Game/Weapons/GrenadeLauncher/Meshes/SM_GrenadeLauncher.SM_GrenadeLauncher");
-			Look.Materials[0] = Material(TEXT("MI_KnifeWax"));
-			Look.Sight = FVector(0.0f, -26.0f, 22.0f);
-			Look.Muzzle = FVector(0.0f, 54.0f, 9.0f);
+			Look.PlainModel = Model(TEXT("BabyBomb"), TEXT("BabyBomb"));
+			Look.Materials[0] = Material(TEXT("MI_BabyWax"));
+			Look.Materials[1] = Material(TEXT("MI_BabyStrip"));
+			Look.Materials[2] = Material(TEXT("MI_GunBlack"));
+			Look.Materials[3] = Material(TEXT("MI_BabyCheese"));
+			Look.Sight = FVector(0.0f, -26.0f, 21.0f);
+			Look.Muzzle = FVector(0.0f, 26.0f, 9.0f);
 			Look.FlashSize = 1.6f;
-			Look.LeftHand = FVector(0.0f, 26.0f, 2.0f);
+			// On the fore-grip under the front wheel.
+			Look.LeftHand = FVector(0.0f, 17.5f, -4.0f);
 			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot1.SW_ShotgunShot1");
 			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot2.SW_ShotgunShot2");
 			Look.DryFire = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_DryFire_01.Weapons_Shotgun_DryFire_01");
@@ -245,11 +251,10 @@ namespace
 			Look.ReloadSounds[2] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Mech_01.Weapons_Shotgun_Mech_01");
 			Look.ShotVolume = 0.9f;
 			Look.ShotPitch = 0.6f;
-			Look.IconOf = TEXT("munster");
-			Look.ProjectileModel = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
-			Look.ProjectileMaterials[0] = Material(TEXT("MI_KnifeWax"));
-			// The wheel's face forward, spinning as it flies.
-			Look.ProjectileShape = FTransform(FRotator(90.0f, 0.0f, 0.0f), FVector::ZeroVector, FVector(0.12f, 0.12f, 0.07f));
+			Look.ProjectileModel = Model(TEXT("BabyBomb"), TEXT("BabyBombRound"));
+			Look.ProjectileMaterials[0] = Material(TEXT("MI_BabyWax"));
+			Look.ProjectileMaterials[1] = Material(TEXT("MI_BabyStrip"));
+			// Its faces fore and aft (it is made along X), spinning about its flight.
 			Look.ProjectileSpin = 720.0f;
 			Look.ProjectileGlow = FLinearColor(1.0f, 0.35f, 0.12f, 1.0f);
 			Looks.Add(Look);
