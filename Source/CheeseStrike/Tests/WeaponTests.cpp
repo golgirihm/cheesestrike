@@ -38,7 +38,7 @@ bool FEveryWeaponKillsInTheDesignsTime::RunTest(const FString& Parameters)
 	// Carbine, the spawn primary, is softened from it: three bursts to a kill. Wave 14: the Cheese Grater's shards (before
 	// the supercombine), the Munster Twin SMGs, the Swiss Shotgun's whole blast close, the BabyBomb's wheel and the Cheese
 	// Stick's swing.
-	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 13, 1.2f},
+	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 20, 1.9f},
 		FWanted{Munster(), 8, 0.525f}, FWanted{Shotgun(), 1, 0.0f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}, FWanted{Burratas(), 7, 0.6f},
 		FWanted{BabyBomb(), 1, 0.0f}, FWanted{Stick(), 1, 0.0f}})
 	{
@@ -544,7 +544,7 @@ bool FTheGratersShardsHomeAndBurstTogether::RunTest(const FString& Parameters)
 	const FWeaponStats& Grater = CheeseStrikeWeapons::Grater();
 	TestEqual(TEXT("the Cheese Grater"), Grater.DisplayName.ToString(), FString(TEXT("Cheese Grater")));
 	TestTrue(TEXT("20 shards a magazine, ten a second, held"), Grater.MagazineSize == 20 && FMath::IsNearlyEqual(Grater.FireInterval, 0.1f) && Grater.bAutomatic);
-	TestTrue(TEXT("8 a shard, at 40 m/s"), Grater.Damage == 8.0f && Grater.ProjectileSpeed == 4000.0f && Grater.GravityShare == 0.0f);
+	TestTrue(TEXT("5 a shard, at 40 m/s"), Grater.Damage == 5.0f && Grater.ProjectileSpeed == 4000.0f && Grater.GravityShare == 0.0f);
 	TestTrue(TEXT("homing at up to 25 degrees a second, on someone within 10 degrees of the aim"), Grater.HomingTurn == 25.0f && Grater.HomingCone == 10.0f);
 	// Whom it homes on: the nearest within the cone.
 	const FVector Eye = FVector::ZeroVector;
@@ -559,6 +559,8 @@ bool FTheGratersShardsHomeAndBurstTogether::RunTest(const FString& Parameters)
 	TestTrue(TEXT("straight at it once within the turn"), TurnToward(FVector(4000.0f, 0.0f, 0.0f), FVector(1.0f, 0.01f, 0.0f), 2.5f).GetSafeNormal().Equals(FVector(1.0f, 0.01f, 0.0f).GetSafeNormal(), 0.0001f));
 	// The supercombine: 16 in one player within 2 s burst; slower, they don't.
 	TestTrue(TEXT("16 shards (80% of a magazine) in two seconds"), Grater.SuperShards == 16 && Grater.SuperWindow == 2.0f && Grater.SuperShards * 5 == Grater.MagazineSize * 4);
+	TestTrue(TEXT("sixteen shards' damage leaves a full-health player standing, even to the head: the supercombine kills"),
+		Grater.SuperShards * Grater.Damage < MaxHealth && (Grater.SuperShards - 1) * Grater.Damage * Grater.HeadMultiplier < MaxHealth);
 	FShardTally Tally;
 	bool bBurst = false;
 	for (int32 Shard = 0; Shard < 15; ++Shard)

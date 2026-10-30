@@ -96,9 +96,10 @@ namespace CheeseStrikeWeapons
 			// Wave 14: a needler (Halo's, in cheese). Shards of grated cheese flying at 40 m/s, ten a second, each turning
 			// toward the nearest enemy within 10 degrees of the aim it was fired along at up to 25 degrees a second (the
 			// server's choice); sixteen in one player within two seconds burst for a kill. The id stays the Parmesan
-			// Grater's it replaces.
+			// Grater's it replaces. At 5 a shard sixteen (80) leave a full-health player standing, so the supercombine is
+			// what kills.
 			FWeaponStats Weapon = MakeWeapon(TEXT("grater"), NSLOCTEXT("CheeseStrike", "Grater", "Cheese Grater"), EWeaponSlot::Primary);
-			Weapon.Damage = 8.0f;
+			Weapon.Damage = 5.0f;
 			Weapon.HeadMultiplier = 1.25f;
 			Weapon.FireInterval = 0.1f;
 			Weapon.bAutomatic = true;
