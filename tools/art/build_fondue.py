@@ -440,10 +440,10 @@ def pickups():
     """The weapons' stands (kit.pickup), each on concrete, steel or wax the mice never eat, and clear of the hills (on
     the Stirrer's island and the pumps'): the Roquefort on the gantry's platform, the high ground over everything; a
     Munster on each side's middle path by the moat's plank; a Cheddar Blaster on each north path short of its pump; and a
-    Swiss Shotgun on each boiler's island, by the Rind Run; the Dual Burratas on the gantry's south span, under the
+    Swiss Shotgun on each boiler's island, by the Rind Run; the BabyBomb on the gantry's south span, under the
     Roquefort, over the moat."""
     kit.pickup("roquefort", 0, 205, GANTRY, "Gantry")
-    kit.pickup("burratas", 0, -850, GANTRY, "SouthSpan")
+    kit.pickup("babybomb", 0, -850, GANTRY, "SouthSpan")
     for s, side in ((-1, "West"), (1, "East")):
         x, y = centre(col(13, s), 9)
         kit.pickup("munster", x, y, 0, f"Middle{side}")

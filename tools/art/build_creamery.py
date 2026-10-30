@@ -498,10 +498,10 @@ def hills():
 
 def pickups():
     """The weapons' stands (kit.pickup), the better at the riskier spots: the Roquefort on the mezzanine's middle, over
-    the whole hall; the Munster in the Squeeze, the north lane's choke; a Cheddar Blaster in each half of the yard (off its hill), a
+    the whole hall; the Cheese Stick in the Squeeze, the north lane's choke, where a swing reaches across it; a Cheddar Blaster in each half of the yard (off its hill), a
     Swiss Shotgun in each Rind Tunnel and a Parmesan Grater in each Curing House, nearer a side's own dock."""
     kit.pickup("roquefort", 0, -1580, 400, "Mezzanine")
-    kit.pickup("munster", 0, 2200, 0, "Squeeze")
+    kit.pickup("stick", 0, 2200, 0, "Squeeze")
     for s, side in ((-1, "West"), (1, "East")):
         kit.pickup("blaster", s * 1950, 3350, 0, f"Yard{side}")
         kit.pickup("shotgun", s * 2300, TUNNEL_Y, 0, f"Tunnel{side}")

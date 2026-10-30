@@ -856,11 +856,11 @@ def hills():
 
 def pickups():
     """The weapons' stands (kit.pickup): the Roquefort in the belfry, seen from every house round the square; the
-    Munster in the Clock Passage, the choke between High Street and the square; a Cheddar Blaster on each side's gallery
+    Cheese Stick in the Clock Passage, the choke between High Street and the square; a Cheddar Blaster on each side's gallery
     over the arcade, a Swiss Shotgun in each side's store in the court, and the Dual Burratas on each side of the
     square, between the hills."""
     kit.pickup("roquefort", 0, -250, 700, "Belfry")
-    kit.pickup("munster", 0, 2350, 0, "ClockPassage")
+    kit.pickup("stick", 0, 2350, 0, "ClockPassage")
     for s, side in ((-1, "West"), (1, "East")):
         kit.pickup("blaster", s * 1100, 1680, STOREY, f"Gallery{side}")
         kit.pickup("shotgun", s * 2700, -2100, 0, f"Store{side}")

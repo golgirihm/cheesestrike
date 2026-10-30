@@ -42,7 +42,7 @@ Free-for-all has fourteen more starts (tagged "Free"), seven a side: High Street
 
 The mice come in at ten points (`MouseEntry`, in the `Mice` folder): over the rooftops into the square (off the balcony houses, the Inns and the Bakeries) and over the outer houses into High Street and the alleys. Twenty-four come, two or three at each. Each lands 5 m in, on open ground: what is raised above head height and walked on by nobody (the awnings, the roofs, the carts' loads) is kept off the navigation mesh, so that no mouse lands on top of it.
 
-The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`): the Roquefort Rifle in the belfry, seen from every house round the square; the Munster Machine Gun in the Clock Passage, the choke between High Street and the square; a Cheddar Blaster on each side's gallery over the arcade; a Swiss Shotgun in each side's store in the court; and the Dual Burratas on each side of the square, between the hills. Eight in all, mirrored like the map, none on a hill's spot (the belfry is above the square's).
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`): the Roquefort Rifle in the belfry, seen from every house round the square; the Cheese Stick (a power weapon, wave 14) in the Clock Passage, the choke between High Street and the square; a Cheddar Blaster on each side's gallery over the arcade; a Swiss Shotgun in each side's store in the court; and the Dual Burratas on each side of the square, between the hills. Eight in all, mirrored like the map, none on a hill's spot (the belfry is above the square's).
 
 ## The cheese, and what the mice change
 
