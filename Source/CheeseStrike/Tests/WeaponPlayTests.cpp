@@ -74,7 +74,9 @@ namespace WeaponPlayTests
 				continue;
 			}
 			const bool bHeld = Weapon == Character->GetWeapon();
-			const bool bShown = Weapon->GetStats().IsMelee() ? !Weapon->FindComponentByClass<UStaticMeshComponent>()->bHiddenInGame : !Weapon->GetThirdPersonMesh()->bHiddenInGame;
+			// Its model others see, skinned or plain.
+			const UPrimitiveComponent* Model = Weapon->GetModel(false);
+			const bool bShown = Model != nullptr && !Model->bHiddenInGame;
 			bRight &= bHeld == bShown && Weapon->IsInHand() == bHeld;
 		}
 		return bRight;
