@@ -147,32 +147,34 @@ namespace
 			Look.ReloadSounds[2] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Mech_01.Weapons_Shotgun_Mech_01");
 			Looks.Add(Look);
 		}
-		// The Roquefort Rifle: SpatialNeglect's SV-98, made in millimetres, its stock blue-veined.
+		// The Roquefort Rifle: a long thumbhole stock of blue-veined cheese, a steel action and barrel, and a scope dipped in
+		// dark red wax; the SV-98's sight, fore-end and muzzle where they were.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("roquefort");
-			Look.PlainModel = TEXT("/Game/Fab/SpatialNeglect/SV98/SM_SV98.SM_SV98");
-			Look.Model = Gripped(FVector(295.0f, -50.0f, -5.0f), 0.1f);
-			Look.Materials[0] = Material(TEXT("MI_Roquefort"));
-			Look.Materials[1] = Material(TEXT("MI_RoquefortScope"));
-			Look.Sight = FVector(295.0f, -130.0f, 75.0f);
-			Look.Muzzle = FVector(295.0f, 671.0f, 50.0f);
+			Look.PlainModel = Model(TEXT("Roquefort"), TEXT("RoquefortRifle"));
+			Look.Materials[0] = Material(TEXT("MI_RoquefortCheese"));
+			Look.Materials[1] = Material(TEXT("MI_GunSteel"));
+			Look.Materials[2] = Material(TEXT("MI_ScopeWax"));
+			Look.Materials[3] = Material(TEXT("MI_GunBlack"));
+			Look.Sight = FVector(0.0f, -8.0f, 8.0f);
+			Look.Muzzle = FVector(0.0f, 72.1f, 5.5f);
 			Look.FlashSize = 1.4f;
-			Look.LeftHand = FVector(295.0f, 200.0f, 12.0f);
+			Look.LeftHand = FVector(0.0f, 25.0f, 1.7f);
 			RifleSounds(Look, 1.25f, 0.62f);
 			Looks.Add(Look);
 		}
-		// The Curd Pistol: Lyra's pistol, its panels fresh white curd.
+		// The Curd Pistol: lumps of fresh curd melted into a pistol with a steel muzzle, sights and trigger guard; Lyra's
+		// pistol's sight line and grip where they were.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("pistol");
 			Look.Hold = ECheeseStrikeHold::Pistol;
-			Look.SkinnedModel = TEXT("/Game/Weapons/Pistol/Mesh/SK_Pistol.SK_Pistol");
-			Look.FireAnimation = TEXT("/Game/Weapons/Pistol/Animations/Weap_Pistol_Fire.Weap_Pistol_Fire");
-			Look.ReloadAnimation = TEXT("/Game/Weapons/Pistol/Animations/Weap_Pistol_Reload.Weap_Pistol_Reload");
-			Look.Materials[0] = Material(TEXT("MI_Pistol"));
+			Look.PlainModel = Model(TEXT("Pistol"), TEXT("CurdPistol"));
+			Look.Materials[0] = Material(TEXT("MI_Curd"));
+			Look.Materials[1] = Material(TEXT("MI_GunSteel"));
 			Look.Sight = FVector(0.0f, -32.0f, 10.6f);
-			Look.Muzzle = FVector(0.0f, 19.0f, 7.5f);
+			Look.Muzzle = FVector(0.0f, 20.8f, 7.6f);
 			Look.FlashSize = 0.6f;
 			Look.LeftHand = FVector(-3.0f, 9.5f, 1.5f);
 			Look.Shots[0] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_01.Weapons_Pistol_Punch-Close_01");
@@ -191,9 +193,6 @@ namespace
 		{
 			FWeaponLook Look = Looks.Last();
 			Look.Id = TEXT("burratas");
-			Look.SkinnedModel = nullptr;
-			Look.FireAnimation = nullptr;
-			Look.ReloadAnimation = nullptr;
 			Look.PlainModel = TEXT("/Game/Fab/Xeradev/M1911/SM_M1911.SM_M1911");
 			Look.Model = Gripped(FVector(0.0f, -3.4f, -3.5f), 1.0f);
 			Look.Materials[0] = Material(TEXT("MI_BurratasCream"));
