@@ -395,21 +395,16 @@ bool FTheNewWeaponsStrikeOverTheNetwork::RunTest(const FString& Parameters)
 	WaitUntil(TEXT("the joiner coming back"), 6.0f, []() { return CharacterOf(1, 0) != nullptr && CharacterOf(1, 0)->IsAlive() && Character(1) != nullptr; });
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, JoinerSpot, JoinerYaw);
-	// The Cheese Grater: shards that stick, and sixteen in two seconds burst the joiner, kept at full health meanwhile so as
-	// not to fall to them first (at 8 a shard, thirteen kill).
+	// The Cheese Grater: shards that stick, and sixteen in two seconds burst the joiner, who at 5 a shard is still standing
+	// after fifteen (75): the supercombine is what kills.
 	Then([]() { Arm(CheeseStrikeWeapons::Grater().Id); MostSeenByJoiner = 0; });
 	Wait(0.6f);
 	Play(0, TEXT("hold Fire\nwait 0.4"));
 	Then([]() { MostSeenByJoiner = Projectiles(1); });
 	WaitUntil(TEXT("the shards bursting the joiner"), 3.0f, []()
 	{
-		ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
-		if (Joiner == nullptr || !Joiner->IsAlive())
-		{
-			return true;
-		}
-		Joiner->SetHealth(CheeseStrikeWeapons::MaxHealth);
-		return false;
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		return Joiner == nullptr || !Joiner->IsAlive();
 	});
 	Play(0, TEXT("release Fire\nwait 0.3"));
 	Then([this]()
