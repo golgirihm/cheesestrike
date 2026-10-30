@@ -611,11 +611,21 @@ bool FAPickedHeroIsSeenByEveryone::RunTest(const FString& Parameters)
 		Controller(1)->CheeseStrikeHero(CheeseStrikeBodies::HeroKey(*Pick));
 		Controller(0)->CheeseStrikeHero(CheeseStrikeBodies::HeroKey(*Pick));
 	});
-	WaitUntil(TEXT("the joiner's pick on the host's machine and the host's on the joiner's"), 5.0f, [Pick]()
+	// Each pick goes to the server and comes back to every machine, the picker's own included (a round trip).
+	WaitUntil(TEXT("both picks on both machines"), 5.0f, [Pick]()
 	{
-		const ACheeseStrikeCharacter* JoinerOnHost = CharacterOf(1, 0);
-		const ACheeseStrikeCharacter* HostOnJoiner = CharacterOf(0, 1);
-		return JoinerOnHost != nullptr && HostOnJoiner != nullptr && JoinerOnHost->GetBody() == *Pick && HostOnJoiner->GetBody() == *Pick;
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			for (int32 Player = 0; Player < 2; ++Player)
+			{
+				const ACheeseStrikeCharacter* Body = CharacterOf(Player, Machine);
+				if (Body == nullptr || Body->GetBody() != *Pick)
+				{
+					return false;
+				}
+			}
+		}
+		return true;
 	});
 	Then([this, Pick]()
 	{
