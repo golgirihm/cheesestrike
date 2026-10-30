@@ -161,9 +161,12 @@ void ACheeseStrikeProjectile::ApplyLook()
 	UStaticMesh* Model = Look.ProjectileModel != nullptr ? LoadObject<UStaticMesh>(nullptr, Look.ProjectileModel) : nullptr;
 	Round->SetStaticMesh(Model != nullptr ? Model : SphereMesh.Get());
 	Round->SetRelativeTransform(Look.ProjectileShape);
-	if (UMaterialInterface* Material = Look.ProjectileMaterial != nullptr ? LoadObject<UMaterialInterface>(nullptr, Look.ProjectileMaterial) : nullptr)
+	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(Look.ProjectileMaterials); ++Slot)
 	{
-		Round->SetMaterial(0, Material);
+		if (UMaterialInterface* Material = Look.ProjectileMaterials[Slot] != nullptr ? LoadObject<UMaterialInterface>(nullptr, Look.ProjectileMaterials[Slot]) : nullptr)
+		{
+			Round->SetMaterial(Slot, Material);
+		}
 	}
 	Spin = Look.ProjectileSpin;
 	if (Look.ProjectileGlow.A > 0.0f && GetNetMode() != NM_DedicatedServer)
