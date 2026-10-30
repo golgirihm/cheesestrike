@@ -132,7 +132,7 @@ float UCheeseStrikeMovementComponent::GetMaxSpeed() const
 	case MOVE_NavWalking:
 	case MOVE_Falling:
 		// Slowed by the Overload's gouda (no sprint while it holds them back much), or hastened as its caller.
-		return CheeseStrikeMovement::WithWeapon(CheeseStrikeMovement::Speed(bWantsToSprint && MaySprint(), false, IsCrouching()), bCarryingHeavy) * GooFactor() * HasteFactor();
+		return CheeseStrikeMovement::WithWeapon(CheeseStrikeMovement::Speed(bWantsToSprint && MaySprint(), false, IsCrouching()), bCarryingHeavy, bCarryingLong) * GooFactor() * HasteFactor();
 	default:
 		return Super::GetMaxSpeed();
 	}
@@ -247,6 +247,7 @@ void UCheeseStrikeMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 	Super::UpdateFromCompressedFlags(Flags);
 	bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
 	bCarryingHeavy = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
+	bCarryingLong = (Flags & FSavedMove_Character::FLAG_Custom_2) != 0;
 }
 
 FNetworkPredictionData_Client* UCheeseStrikeMovementComponent::GetPredictionData_Client() const
@@ -268,6 +269,7 @@ void FSavedMove_CheeseStrike::Clear()
 	Super::Clear();
 	bSavedWantsToSprint = false;
 	bSavedCarryingHeavy = false;
+	bSavedCarryingLong = false;
 	SavedSlideElapsed = -1.0f;
 	SavedSlideFrom = 0.0f;
 	SavedSlideDirection = FVector::ForwardVector;
@@ -285,13 +287,17 @@ uint8 FSavedMove_CheeseStrike::GetCompressedFlags() const
 	{
 		Flags |= FLAG_Custom_1;
 	}
+	if (bSavedCarryingLong)
+	{
+		Flags |= FLAG_Custom_2;
+	}
 	return Flags;
 }
 
 bool FSavedMove_CheeseStrike::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
 	const FSavedMove_CheeseStrike* Other = static_cast<const FSavedMove_CheeseStrike*>(NewMove.Get());
-	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedCarryingHeavy != Other->bSavedCarryingHeavy || SavedSlideElapsed >= 0.0f || Other->SavedSlideElapsed >= 0.0f)
+	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedCarryingHeavy != Other->bSavedCarryingHeavy || bSavedCarryingLong != Other->bSavedCarryingLong || SavedSlideElapsed >= 0.0f || Other->SavedSlideElapsed >= 0.0f)
 	{
 		return false;
 	}
@@ -305,6 +311,7 @@ void FSavedMove_CheeseStrike::SetMoveFor(ACharacter* C, float InDeltaTime, FVect
 	{
 		bSavedWantsToSprint = Movement->bWantsToSprint;
 		bSavedCarryingHeavy = Movement->bCarryingHeavy;
+		bSavedCarryingLong = Movement->bCarryingLong;
 		SavedSlideElapsed = Movement->SlideElapsed;
 		SavedSlideFrom = Movement->SlideFrom;
 		SavedSlideDirection = Movement->SlideDirection;
@@ -319,6 +326,7 @@ void FSavedMove_CheeseStrike::PrepMoveFor(ACharacter* C)
 	{
 		Movement->bWantsToSprint = bSavedWantsToSprint;
 		Movement->bCarryingHeavy = bSavedCarryingHeavy;
+		Movement->bCarryingLong = bSavedCarryingLong;
 		Movement->SlideElapsed = SavedSlideElapsed;
 		Movement->SlideFrom = SavedSlideFrom;
 		Movement->SlideDirection = SavedSlideDirection;

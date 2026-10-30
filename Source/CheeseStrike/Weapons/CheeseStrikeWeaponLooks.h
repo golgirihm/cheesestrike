@@ -54,6 +54,16 @@ struct FWeaponLook
 	FLinearColor Tracer = FLinearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	/** The weapon whose HUD picture it borrows (tools/art/weapon_icons.py's), if not its own. */
 	const TCHAR* IconOf = nullptr;
+	/**
+	 * A projectile weapon's round in flight (ACheeseStrikeProjectile): its model, its material, and its size and turn,
+	 * its front along X; and how fast it spins about its flight (degrees a second).
+	 */
+	const TCHAR* ProjectileModel = nullptr;
+	const TCHAR* ProjectileMaterial = nullptr;
+	FTransform ProjectileShape = FTransform::Identity;
+	float ProjectileSpin = 0.0f;
+	/** The colour of the light it glows with as it flies (none where its alpha is 0). */
+	FLinearColor ProjectileGlow = FLinearColor(0.0f, 0.0f, 0.0f, 0.0f);
 };
 
 namespace CheeseStrikeWeaponLooks

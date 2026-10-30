@@ -54,6 +54,11 @@ public:
 
 	/** The harm its burst would do `Victim` from `At`, seen or not: none behind a wall (server only, for the burst and the tests). */
 	static float HarmAt(UWorld* World, const FVector& At, const ACheeseStrikeCharacter* Victim, float& OutDistance);
+	/**
+	 * Whether a burst at `At` can see any of `Victim` (their chest, head or feet: a wall, a floor or the cheese between
+	 * hides them), and how far the nearest of those is (`OutDistance`): any burst's, a BabyBomb's too.
+	 */
+	static bool BurstSees(UWorld* World, const FVector& At, const ACheeseStrikeCharacter* Victim, float& OutDistance);
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;

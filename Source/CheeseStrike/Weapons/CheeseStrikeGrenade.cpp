@@ -218,20 +218,20 @@ void ACheeseStrikeGrenade::OnBounce(const FHitResult& Hit, const FVector& Impact
 
 float ACheeseStrikeGrenade::HarmAt(UWorld* World, const FVector& At, const ACheeseStrikeCharacter* Victim, float& OutDistance)
 {
+	return BurstSees(World, At, Victim, OutDistance) ? CheeseStrikeGrenades::DamageAt(OutDistance) : 0.0f;
+}
+
+bool ACheeseStrikeGrenade::BurstSees(UWorld* World, const FVector& At, const ACheeseStrikeCharacter* Victim, float& OutDistance)
+{
 	OutDistance = TNumericLimits<float>::Max();
 	if (World == nullptr || Victim == nullptr || !Victim->IsAlive())
 	{
-		return 0.0f;
+		return false;
 	}
 	const FVector Head = Victim->GetEyes()->GetComponentLocation();
 	const FVector Chest = Victim->ChestAt();
 	const FVector Feet = Victim->IsDowned() ? Victim->GetDownShape().Feet : Victim->GetActorLocation() - FVector(0.0f, 0.0f, 70.0f);
 	OutDistance = FMath::Min3(FVector::Dist(At, Head), FVector::Dist(At, Chest), FVector::Dist(At, Feet));
-	const float Damage = CheeseStrikeGrenades::DamageAt(OutDistance);
-	if (Damage <= 0.0f)
-	{
-		return 0.0f;
-	}
 	// A wall, a floor or the cheese between them saves them: the burst must see some of them.
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeGrenadeBurst), false);
 	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
@@ -243,10 +243,10 @@ float ACheeseStrikeGrenade::HarmAt(UWorld* World, const FVector& At, const AChee
 		FHitResult Hit;
 		if (!World->LineTraceSingleByChannel(Hit, At, To, ECC_Visibility, Params))
 		{
-			return Damage;
+			return true;
 		}
 	}
-	return 0.0f;
+	return false;
 }
 
 void ACheeseStrikeGrenade::Burst()

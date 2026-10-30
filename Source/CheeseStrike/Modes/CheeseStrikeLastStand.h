@@ -72,6 +72,9 @@ class CHEESESTRIKE_API UCheeseStrikeLastStand : public UActorComponent
 public:
 	UCheeseStrikeLastStand();
 
+	/** Chunks of cheese flying from `At`, on this machine only, for show: a stomp's burst head, a supercombine's burst. */
+	static void ShowCheeseBurst(UWorld* World, const FVector& At);
+
 	bool IsDowned() const { return bDowned; }
 	/** The server's time it went down, and the seconds until it gets up by itself (CheeseStrikeModes::SelfReviveTime). */
 	float GetDownedAt() const { return DownedAt; }

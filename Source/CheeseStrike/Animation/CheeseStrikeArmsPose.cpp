@@ -244,7 +244,7 @@ void FCheeseStrikeViewHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	{
 		// On guard low on the right, or swiped across the view, the fist round the handle.
 		constexpr float ViewSize = 0.8f;
-		const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, ViewSize) : KnifeGuard();
+		const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, ViewSize * SwipeSize) : KnifeGuard();
 		TargetAt = KnifeHand + Knife.Hand + Bob;
 		const FQuat Laid = ArmsLaid(ModelAlong, FVector(0.0, 0.0, 1.0), Knife.Blade, Knife.Spine);
 		TargetTurn = (Swaying * Laid * RelTurn.Inverse()).GetNormalized();
@@ -351,7 +351,7 @@ void FCheeseStrikeKnifeHold::EvaluateComponentSpace_AnyThread(FComponentSpacePos
 			const FVector Up = Tip.RotateVector(FVector::UpVector);
 			const FVector Right = FVector::CrossProduct(Up, Ahead);
 			const auto InBody = [&](const FVector& V) { return Ahead * V.X + Right * V.Y + Up * V.Z; };
-			const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase) : KnifeGuard();
+			const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, SwipeSize) : KnifeGuard();
 			// On guard ahead of the chest, low on the right.
 			const FVector Guard(26.0f, 16.0f, 2.0f);
 			const FVector ChestAt = Posed.GetComponentSpaceTransform(IndexOf(Chest)).GetLocation();

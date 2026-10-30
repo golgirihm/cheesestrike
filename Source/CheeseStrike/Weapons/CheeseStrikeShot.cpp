@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeShot.h"
 #include "Rules/CheeseStrikeDowned.h"
+#include "Animation/CheeseStrikeArmsPose.h"
 
 namespace CheeseStrikeWeapons
 {
@@ -102,6 +103,108 @@ namespace CheeseStrikeWeapons
 	float StrokeDamage(const FWeaponStats& Knife, const FVector& Direction, float Yaw)
 	{
 		return FromBehind(Direction, Yaw) ? Knife.BackstabDamage : Knife.Damage;
+	}
+
+	bool InArc(const FWeaponStats& Weapon, const FVector& Aim, const FVector& ToThem)
+	{
+		if (ToThem.Size() > Weapon.Reach)
+		{
+			return false;
+		}
+		// Seen from above: a body right under the swing or over it is in it whichever way it points.
+		const FVector Flat(ToThem.X, ToThem.Y, 0.0f);
+		const FVector Ahead(Aim.X, Aim.Y, 0.0f);
+		if (Flat.SizeSquared() < 1.0f || Ahead.SizeSquared() < KINDA_SMALL_NUMBER)
+		{
+			return true;
+		}
+		return WithinCone(Ahead.GetSafeNormal(), Flat, Weapon.ArcDegrees * 0.5f);
+	}
+
+	float SwipeSecondsOf(const FWeaponStats& Weapon)
+	{
+		return Weapon.SwipeSeconds > 0.0f ? Weapon.SwipeSeconds : CheeseStrikeArms::SwipeSeconds;
+	}
+
+	float SplashAt(const FWeaponStats& Weapon, float Distance)
+	{
+		if (Weapon.SplashRadius <= 0.0f || Distance > Weapon.SplashRadius)
+		{
+			return 0.0f;
+		}
+		if (Distance <= Weapon.SplashInner)
+		{
+			return Weapon.SplashDamage;
+		}
+		const float Through = (Distance - Weapon.SplashInner) / FMath::Max(Weapon.SplashRadius - Weapon.SplashInner, 1.0f);
+		return FMath::Lerp(Weapon.SplashDamage, Weapon.SplashEdgeDamage, Through);
+	}
+
+	bool WithinCone(const FVector& Aim, const FVector& ToThem, float Degrees)
+	{
+		const FVector Way = ToThem.GetSafeNormal();
+		return !Way.IsZero() && FVector::DotProduct(Aim, Way) >= FMath::Cos(FMath::DegreesToRadians(Degrees));
+	}
+
+	int32 HomingPick(const FVector& From, const FVector& Aim, const TArray<FVector>& Targets, float Cone)
+	{
+		int32 Best = INDEX_NONE;
+		float Nearest = TNumericLimits<float>::Max();
+		for (int32 Index = 0; Index < Targets.Num(); ++Index)
+		{
+			const FVector ToThem = Targets[Index] - From;
+			if (WithinCone(Aim, ToThem, Cone) && ToThem.Size() < Nearest)
+			{
+				Nearest = ToThem.Size();
+				Best = Index;
+			}
+		}
+		return Best;
+	}
+
+	FVector TurnToward(const FVector& Velocity, const FVector& ToTarget, float MostDegrees)
+	{
+		const float Speed = Velocity.Size();
+		const FVector Way = Velocity.GetSafeNormal();
+		const FVector Want = ToTarget.GetSafeNormal();
+		if (Speed < KINDA_SMALL_NUMBER || Want.IsZero() || MostDegrees <= 0.0f)
+		{
+			return Velocity;
+		}
+		const float Between = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Way, Want), -1.0f, 1.0f)));
+		if (Between <= MostDegrees)
+		{
+			return Want * Speed;
+		}
+		// About the axis across the two, by as much as it may.
+		FVector Axis = FVector::CrossProduct(Way, Want);
+		if (Axis.IsNearlyZero())
+		{
+			Axis = FVector::CrossProduct(Way, FVector::UpVector).IsNearlyZero() ? FVector::RightVector : FVector::CrossProduct(Way, FVector::UpVector);
+		}
+		return Way.RotateAngleAxis(MostDegrees, Axis.GetSafeNormal()) * Speed;
+	}
+
+	bool FShardTally::Add(const FWeaponStats& Weapon, float Now)
+	{
+		Times.RemoveAll([&Weapon, Now](float Time) { return Time < Now - Weapon.SuperWindow; });
+		Times.Add(Now);
+		if (Weapon.SuperShards > 0 && Times.Num() >= Weapon.SuperShards)
+		{
+			Times.Reset();
+			return true;
+		}
+		return false;
+	}
+
+	int32 FShardTally::CountAt(const FWeaponStats& Weapon, float Now) const
+	{
+		int32 Count = 0;
+		for (const float Time : Times)
+		{
+			Count += Time >= Now - Weapon.SuperWindow ? 1 : 0;
+		}
+		return Count;
 	}
 
 	FVector2D ScopeSway(float Time)

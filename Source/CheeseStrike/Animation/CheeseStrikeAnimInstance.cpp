@@ -244,6 +244,7 @@ void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		ModelInHand = Model != nullptr ? Model->GetRelativeTransform() : FTransform::Identity;
 		ModelAlong = Weapon != nullptr ? Weapon->GetModelAlong() : FVector(0.0, 1.0, 0.0);
 		SwipePhase = Weapon != nullptr ? Weapon->SwipePhase() : -1.0f;
+		SwipeSize = Weapon != nullptr ? Weapon->GetStats().SwipeSize : 1.0f;
 		// Its own player's body: the arms placed in view.
 		const bool bOwnView = bFirstPersonBody && Character->IsLocallyControlled() && Character->IsAlive();
 		View.bPlace = bOwnView && Weapon != nullptr && CVarHipHold.GetValueOnGameThread() != 0;
@@ -485,6 +486,7 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		ModelInHand = Instance->ModelInHand;
 		ModelAlong = Instance->ModelAlong;
 		SwipePhase = Instance->SwipePhase;
+		SwipeSize = Instance->SwipeSize;
 		View = Instance->View;
 		Grenade = Instance->Grenade;
 		// A change of weapon to one held another way: its animations on the same nodes (and the left hand's grip on it,
@@ -609,6 +611,7 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	KnifeHold.ModelInHand = ModelInHand;
 	KnifeHold.ModelAlong = ModelAlong;
 	KnifeHold.SwipePhase = SwipePhase;
+	KnifeHold.SwipeSize = SwipeSize;
 	// Its own player's arms, placed in view.
 	SprintBlend = FMath::FInterpTo(SprintBlend, View.bSprinting ? 1.0f : 0.0f, DeltaSeconds, CheeseStrikeArms::HoldBlendRate);
 	ViewHold.Alpha = View.bPlace ? Up : 0.0f;
@@ -626,6 +629,7 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	ViewHold.Slide = SlideBlend;
 	ViewHold.bKnife = bKnife;
 	ViewHold.SwipePhase = SwipePhase;
+	ViewHold.SwipeSize = SwipeSize;
 	ViewHold.Montage = 1.0f - SourceWeight;
 	// A grenade in hand: as far as the switch has it up, or all of it as a throw goes on.
 	GrenadeHold.Alpha = FMath::Max(Grenade.Up, CheeseStrikeGrenades::ThrowWeight(Grenade.ThrowPhase)) * Up;
