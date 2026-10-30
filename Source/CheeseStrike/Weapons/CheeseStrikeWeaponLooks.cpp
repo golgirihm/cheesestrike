@@ -47,32 +47,42 @@ namespace
 			return *Kept.Add_GetRef(Materials + Name + TEXT(".") + Name);
 		};
 
-		// The Cheddar Blaster: Lyra's rifle, its panels cheddar.
+		// The cheese weapons are modelled in Blender by tools/art/cheese_weapons.py in the rifle's grip frame (the hand's grip at
+		// the origin, forward along Y), so that each sits in the hand as it was made; their cheeses are M_CheeseWeapon's
+		// (tools/art/weapon_materials.py), slot by slot.
+		const auto Model = [](const TCHAR* Folder, const TCHAR* Name) -> const TCHAR*
+		{
+			return *Kept.Add_GetRef(FString::Printf(TEXT("/Game/CheeseStrike/Weapons/%s/SM_%s.SM_%s"), Folder, Name, Name));
+		};
+
+		// The Cheddar Blaster: blocks of cheddar for its receiver, handguard and stock on a steel barrel, rail and sights; Lyra's
+		// rifle's length, and its sight line, fore-end and muzzle where the rifle's were.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("blaster");
-			Look.SkinnedModel = TEXT("/Game/Weapons/Rifle/Mesh/SK_Rifle.SK_Rifle");
-			Look.FireAnimation = TEXT("/Game/Weapons/Rifle/Animations/Weap_Rifle_Fire.Weap_Rifle_Fire");
-			Look.ReloadAnimation = TEXT("/Game/Weapons/Rifle/Animations/Weap_Rifle_Reload.Weap_Rifle_Reload");
-			Look.Materials[0] = Material(TEXT("MI_Blaster"));
+			Look.PlainModel = Model(TEXT("Blaster"), TEXT("CheddarBlaster"));
+			Look.Materials[0] = Material(TEXT("MI_Cheddar"));
+			Look.Materials[1] = Material(TEXT("MI_GunSteel"));
+			Look.Materials[2] = Material(TEXT("MI_GunBlack"));
+			Look.Sight = FVector(-0.25f, -13.0f, 16.2f);
 			Look.Muzzle = FVector(0.0f, 69.0f, 4.0f);
 			Look.LeftHand = FVector(0.0f, 33.0f, 3.5f);
 			RifleSounds(Look, 1.0f, 1.0f);
 			Looks.Add(Look);
 		}
-		// The Colby Carbine: SpatialNeglect's M4, its furniture Colby.
+		// The Colby Carbine: a steel receiver and barrel, its stock and handguard longhorns of marbled Colby; the M4's sights,
+		// fore-end and muzzle where they were.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("carbine");
-			Look.PlainModel = TEXT("/Game/Fab/SpatialNeglect/ClassicM4/SM_ClassicM4.SM_ClassicM4");
-			Look.Model = Gripped(FVector(0.0f, -7.0f, -4.0f), 1.12f);
-			Look.Materials[0] = Material(TEXT("MI_Carbine"));
-			Look.Materials[1] = Material(TEXT("MI_CarbineSling"));
-			Look.Materials[2] = Material(TEXT("MI_CarbineScope"));
-			// Its scope is taken off (MI_CarbineScope): aimed along the rail, the HUD's dot the sight.
-			Look.Sight = FVector(0.0f, -17.0f, 8.0f);
-			Look.Muzzle = FVector(0.0f, 34.4f, 0.0f);
-			Look.LeftHand = FVector(0.0f, 17.0f, 0.0f);
+			Look.PlainModel = Model(TEXT("Carbine"), TEXT("ColbyCarbine"));
+			Look.Materials[0] = Material(TEXT("MI_Colby"));
+			Look.Materials[1] = Material(TEXT("MI_GunSteel"));
+			Look.Materials[2] = Material(TEXT("MI_GunBlack"));
+			// Aimed along the rail, the HUD's dot the sight.
+			Look.Sight = FVector(0.0f, -11.2f, 13.4f);
+			Look.Muzzle = FVector(0.0f, 46.4f, 4.5f);
+			Look.LeftHand = FVector(0.0f, 26.9f, 4.5f);
 			RifleSounds(Look, 0.95f, 1.08f);
 			Looks.Add(Look);
 		}

@@ -136,10 +136,11 @@ namespace StartTests
 		}
 		if (const ACheeseStrikeWeapon* Weapon = Body->GetWeapon())
 		{
-			Check(Weapon->GetThirdPersonMesh() != nullptr && Weapon->GetThirdPersonMesh()->GetSkinnedAsset() != nullptr ? Weapon->GetThirdPersonMesh() : nullptr, TEXT("the weapon others see"));
+			// Its models, skinned or plain.
+			Check(Cast<UMeshComponent>(Weapon->GetModel(false)), TEXT("the weapon others see"));
 			if (bOwn)
 			{
-				Check(Weapon->GetFirstPersonMesh() != nullptr && Weapon->GetFirstPersonMesh()->GetSkinnedAsset() != nullptr ? Weapon->GetFirstPersonMesh() : nullptr, TEXT("the weapon in view"));
+				Check(Cast<UMeshComponent>(Weapon->GetModel(true)), TEXT("the weapon in view"));
 			}
 		}
 		else
@@ -158,7 +159,8 @@ namespace StartTests
 		}
 		const ACheeseStrikeWeapon* Weapon = Body->GetWeapon();
 		for (const UMeshComponent* Part : {static_cast<const UMeshComponent*>(Body->GetMesh()), static_cast<const UMeshComponent*>(Body->GetFirstPersonMesh()),
-			 Weapon != nullptr ? static_cast<const UMeshComponent*>(Weapon->GetFirstPersonMesh()) : nullptr, Weapon != nullptr ? static_cast<const UMeshComponent*>(Weapon->GetThirdPersonMesh()) : nullptr})
+			 Weapon != nullptr ? static_cast<const UMeshComponent*>(Cast<UMeshComponent>(Weapon->GetModel(true))) : nullptr,
+			 Weapon != nullptr ? static_cast<const UMeshComponent*>(Cast<UMeshComponent>(Weapon->GetModel(false))) : nullptr})
 		{
 			if (Part != nullptr && Part->GetOverlayMaterial() != nullptr)
 			{
