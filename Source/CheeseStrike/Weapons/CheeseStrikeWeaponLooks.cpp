@@ -106,37 +106,39 @@ namespace
 			Look.ProjectileGlow = FLinearColor(1.0f, 0.78f, 0.2f, 1.0f);
 			Looks.Add(Look);
 		}
-		// The Munster Twin SMGs: for now a pair of Max3d's PPSh-41s made small, one in each hand, in the Parmesan Grater's
-		// cheese it carried before; group 9's blocks of Munster will take their place.
+		// The Munster Twin SMGs: stubby blocks of Munster in their orange rind, a short steel barrel, a belt of cheese slices
+		// hanging from each; one in each hand (FCheeseStrikeDualHold).
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("munster");
 			Look.Hold = ECheeseStrikeHold::Pistol;
-			Look.PlainModel = TEXT("/Game/Fab/Max3d/PPSh41/SM_PPSh41.SM_PPSh41");
-			Look.Model = Gripped(FVector(-1.5f, -12.0f, 9.0f), 0.75f);
-			Look.Materials[0] = Material(TEXT("MI_Grater"));
-			Look.Sight = FVector(-1.5f, -23.0f, 18.6f);
-			Look.Muzzle = FVector(-1.5f, 32.3f, 15.0f);
+			Look.PlainModel = Model(TEXT("Munster"), TEXT("MunsterSMG"));
+			Look.Materials[0] = Material(TEXT("MI_MunsterCheese"));
+			Look.Materials[1] = Material(TEXT("MI_MunsterRind"));
+			Look.Materials[2] = Material(TEXT("MI_GunSteel"));
+			Look.Materials[3] = Material(TEXT("MI_GunBlack"));
+			Look.Sight = FVector(0.0f, -14.0f, 11.0f);
+			Look.Muzzle = FVector(0.0f, 25.3f, 6.0f);
 			Look.FlashSize = 0.7f;
-			// Each hand holds its own (FCheeseStrikeDualHold).
+			// Each hand holds its own.
 			Look.LeftHand.Reset();
 			RifleSounds(Look, 0.8f, 1.3f);
-			Look.IconOf = TEXT("grater");
 			Looks.Add(Look);
 		}
-		// The Swiss Shotgun: Lyra's shotgun, its shroud holed like Emmental.
+		// The Swiss Shotgun: a wedge of Swiss on its side, tip forward, holed through, its double barrel out of the tip, its
+		// rind the stock, the grip and the fore-end under the barrels.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("shotgun");
 			Look.Hold = ECheeseStrikeHold::Shotgun;
-			Look.SkinnedModel = TEXT("/Game/Weapons/Shotgun/Mesh/SKM_Shotgun.SKM_Shotgun");
-			Look.FireAnimation = TEXT("/Game/Weapons/Shotgun/Animations/Weap_Shotgun_Fire.Weap_Shotgun_Fire");
-			Look.ReloadAnimation = TEXT("/Game/Weapons/Shotgun/Animations/Weap_Shotgun_Reload.Weap_Shotgun_Reload");
-			Look.Materials[0] = Material(TEXT("MI_Shotgun"));
-			Look.Sight = FVector(0.0f, -12.0f, 15.5f);
-			Look.Muzzle = FVector(0.0f, 43.0f, 3.0f);
+			Look.PlainModel = Model(TEXT("Shotgun"), TEXT("SwissShotgun"));
+			Look.Materials[0] = Material(TEXT("MI_Swiss"));
+			Look.Materials[1] = Material(TEXT("MI_SwissRind"));
+			Look.Materials[2] = Material(TEXT("MI_GunSteel"));
+			Look.Sight = FVector(0.0f, -12.0f, 14.0f);
+			Look.Muzzle = FVector(0.0f, 48.0f, 3.0f);
 			Look.FlashSize = 1.5f;
-			Look.LeftHand = FVector(0.0f, 32.0f, 3.0f);
+			Look.LeftHand = FVector(0.0f, 40.0f, 0.8f);
 			// Real shotgun blasts (OpenGameArt, CC0; tools/art/wave8_sounds.py), not Lyra's.
 			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot1.SW_ShotgunShot1");
 			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot2.SW_ShotgunShot2");
