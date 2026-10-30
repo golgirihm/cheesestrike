@@ -55,8 +55,10 @@ bool FAHeadHitTakesTheHeadsShareAtAnyRange::RunTest(const FString& Parameters)
 			Least = FMath::Min(Least, Head * FMath::Max(Weapon->Pellets, 1));
 		}
 		TestTrue(FString::Printf(TEXT("the %s's head hit is its body hit times %.2f at every range"), *Weapon->DisplayName.ToString(), Weapon->HeadMultiplier), bMultiplied);
+		// The BabyBomb's wheel kills with any direct hit, head or not.
 		const bool bRoquefort = Weapon->Id == CheeseStrikeWeapons::Roquefort().Id;
-		TestEqual(FString::Printf(TEXT("the %s's head hit is a sure kill only for the Roquefort (the least %.0f)"), *Weapon->DisplayName.ToString(), Least), Least >= 100.0f, bRoquefort);
+		const bool bBurst = Weapon->SplashRadius > 0.0f;
+		TestEqual(FString::Printf(TEXT("the %s's head hit is a sure kill only for the Roquefort (the least %.0f)"), *Weapon->DisplayName.ToString(), Least), Least >= 100.0f, bRoquefort || bBurst);
 	}
 	return true;
 }

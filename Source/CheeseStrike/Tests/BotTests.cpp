@@ -105,6 +105,16 @@ bool FBotKeepsItsDistance::RunTest(const FString& Parameters)
 	TestTrue(TEXT("with the shotgun, closes in from 10 m"), MoveFor(1000.0f, Shotgun, 100.0f, true) == EMove::Approach);
 	TestTrue(TEXT("holds at 4 m"), MoveFor(400.0f, Shotgun, 100.0f, true) == EMove::Hold);
 	TestTrue(TEXT("backs off only from someone on top of it"), MoveFor(250.0f, Shotgun, 100.0f, true) == EMove::BackOff);
+	// The BabyBomb: never fired at anyone nearer than 6 m, whose burst would reach the bot too.
+	const float Least = CheeseStrikeWeapons::BabyBomb().BotLeast;
+	TestEqual(TEXT("the BabyBomb's nearest is 6 m"), Least, 600.0f);
+	TestFalse(TEXT("not at 5 m"), FarEnoughFor(500.0f, Least));
+	TestTrue(TEXT("at 8 m"), FarEnoughFor(800.0f, Least));
+	TestTrue(TEXT("any other weapon at any distance"), FarEnoughFor(10.0f, CheeseStrikeWeapons::Blaster().BotLeast));
+	// The Cheese Stick: right up to them, a swing in its reach.
+	const float StickReach = CheeseStrikeWeapons::Stick().Reach;
+	TestTrue(TEXT("with the stick, closes in from 4 m"), MoveFor(400.0f, CheeseStrikeWeapons::Stick().MaxRange, 100.0f, true) == EMove::Approach);
+	TestTrue(TEXT("swings at 2.5 m"), WouldStrikeAt(250.0f, StickReach));
 	// The knife: right up to them, and a stroke once they are in reach.
 	const float Reach = CheeseStrikeWeapons::Knife().Reach;
 	TestTrue(TEXT("with the knife, closes in from 2 m"), MoveFor(200.0f, Reach, 100.0f, true) == EMove::Approach);
@@ -164,6 +174,39 @@ bool FBotChoosesItsWeapons::RunTest(const FString& Parameters)
 	FArmed KnifeOnly;
 	KnifeOnly.bKnife = true;
 	TestTrue(TEXT("with only the knife, the knife, near or far"), ChooseWeapon(KnifeOnly, true, 3000.0f, EWeaponSlot::Knife) == EWeaponSlot::Knife);
+	// The Cheese Stick: up close it, further off the pistol, out of a fight the stick.
+	FArmed Stick;
+	Stick.bPrimary = true;
+	Stick.bSidearm = true;
+	Stick.bKnife = true;
+	Stick.bPrimaryMelee = true;
+	Stick.PrimaryReach = CheeseStrikeWeapons::Stick().Reach;
+	TestTrue(TEXT("the stick for someone close, not the knife"), ChooseWeapon(Stick, true, 200.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
+	TestTrue(TEXT("drawn as they come within a few metres"), ChooseWeapon(Stick, true, 400.0f, EWeaponSlot::Sidearm) == EWeaponSlot::Primary);
+	TestTrue(TEXT("kept out as they step back a little"), ChooseWeapon(Stick, true, 600.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
+	TestTrue(TEXT("the pistol for someone far off"), ChooseWeapon(Stick, true, 2000.0f, EWeaponSlot::Primary) == EWeaponSlot::Sidearm);
+	TestTrue(TEXT("and the stick again after the fight"), ChooseWeapon(Stick, false, 0.0f, EWeaponSlot::Sidearm) == EWeaponSlot::Primary);
+	Stick.bSidearm = false;
+	TestTrue(TEXT("with no pistol, the stick even far off, to close in with"), ChooseWeapon(Stick, true, 2000.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
+	// The BabyBomb: the pistol for someone too close for its burst.
+	FArmed Bomb = Armed;
+	Bomb.PrimaryMagazine = 2;
+	Bomb.bPrimaryReserve = true;
+	Bomb.PrimaryLeast = CheeseStrikeWeapons::BabyBomb().BotLeast;
+	TestTrue(TEXT("the BabyBomb at 10 m"), ChooseWeapon(Bomb, true, 1000.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
+	TestTrue(TEXT("the pistol at 4 m"), ChooseWeapon(Bomb, true, 400.0f, EWeaponSlot::Primary) == EWeaponSlot::Sidearm);
+	TestTrue(TEXT("and the knife on top of them"), ChooseWeapon(Bomb, true, 150.0f, EWeaponSlot::Primary) == EWeaponSlot::Knife);
+	// No bot comes in with a power weapon.
+	for (int32 SkillIndex = 0; SkillIndex < NumSkills; ++SkillIndex)
+	{
+		for (const TPair<FName, float>& Each : PrimaryWeights(SkillIndex))
+		{
+			if (Each.Key == CheeseStrikeWeapons::BabyBomb().Id || Each.Key == CheeseStrikeWeapons::Stick().Id)
+			{
+				TestEqual(FString::Printf(TEXT("no %s bot comes in with the %s"), Skill(SkillIndex).Name, *Each.Key.ToString()), Each.Value, 0.0f);
+			}
+		}
+	}
 	return true;
 }
 

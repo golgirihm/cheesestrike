@@ -9,24 +9,29 @@
  * Every weapon in the game, as plain numbers (FWeaponStats), and the lists
  * the game is played by: what a loadout chooses from, and Gun Game's ladder.
  * The numbers are the design's table (docs/unreal/design.md, "Weapons"),
- * its lengths divided by three for life size; projectile weapons and the
- * Twin Curds are still to come.
+ * its lengths divided by three for life size. Wave 14 brought projectiles
+ * (the BabyBomb's wheels, the Cheese Grater's shards: ACheeseStrikeProjectile)
+ * and a melee primary (the Cheese Stick).
  */
 namespace CheeseStrikeWeapons
 {
 	/** Primaries. The Cheddar Blaster (Blaster(), in CheeseStrikeShot.h) is the automatic rifle. */
 	/** The Colby Carbine: three-round bursts, a click a burst; the weak primary everyone comes in with. */
 	const FWeaponStats& Carbine();
-	/** The Parmesan Grater: a submachine gun, fast and close. */
+	/** The Cheese Grater (the Parmesan Grater's id, `grater`): a needler, homing shards; sixteen in one player burst for a kill. */
 	const FWeaponStats& Grater();
-	/** The Munster Machine Gun: a long belt, slow to draw and heavy to carry. */
+	/** The Munster Twin SMGs: two submachine guns, one in each hand, automatic, firing in turn, a belt of 60 each, no sights. */
 	const FWeaponStats& Munster();
-	/** The Swiss Shotgun: nine pellets a shot. */
+	/** The Swiss Shotgun: twelve pellets a shot, a kill up to about 4 m, weak past 8. */
 	const FWeaponStats& Shotgun();
 	/** The Dual Burratas: two cheese pistols, one in each hand, firing in turn, a shot a pull, fast; a long magazine and a long reload. */
 	const FWeaponStats& Burratas();
 	/** The Roquefort Rifle: a scoped rifle, a head shot a kill. */
 	const FWeaponStats& Roquefort();
+	/** The BabyBomb: a power weapon, a launcher of red-waxed wheels that burst, its shooter not spared. */
+	const FWeaponStats& BabyBomb();
+	/** The Cheese Stick: a melee power weapon, a slow swing that fells everyone in a wide arc in front. */
+	const FWeaponStats& Stick();
 	/** The Curd Pistol: the weak sidearm everyone carries, with rounds without end. */
 	const FWeaponStats& Pistol();
 	/** The Cheese Knife: a short swipe across the aim, deadly in the back. */

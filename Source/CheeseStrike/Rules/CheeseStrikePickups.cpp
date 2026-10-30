@@ -108,11 +108,12 @@ namespace CheeseStrikePickups
 		{
 			return 1;
 		}
-		if (Stats->Id == W::Roquefort().Id)
+		// The power weapons, at the riskiest stands: the Roquefort, the BabyBomb and the Cheese Stick.
+		if (Stats->Id == W::Roquefort().Id || Stats->Id == W::BabyBomb().Id || Stats->Id == W::Stick().Id)
 		{
 			return 3;
 		}
-		// Good at every range: the Blaster and the Munster.
+		// Good at every range, or nearly: the Blaster and the Munster Twin SMGs.
 		return 2;
 	}
 

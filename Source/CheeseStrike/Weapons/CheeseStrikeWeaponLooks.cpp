@@ -76,32 +76,42 @@ namespace
 			RifleSounds(Look, 0.95f, 1.08f);
 			Looks.Add(Look);
 		}
-		// The Parmesan Grater: Max3d's PPSh-41, its perforated jacket a grater, its stock Parmesan.
+		// The Cheese Grater, a needler: for now a steel box grater (the engine's cube, 9 by 22 by 12 cm, ahead of the hand), its
+		// shards glowing slivers of grated cheese; group 9's model will take its place.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("grater");
-			Look.PlainModel = TEXT("/Game/Fab/Max3d/PPSh41/SM_PPSh41.SM_PPSh41");
-			Look.Model = Gripped(FVector(-1.5f, -12.0f, 9.0f), 1.15f);
-			Look.Materials[0] = Material(TEXT("MI_Grater"));
-			Look.Sight = FVector(-1.5f, -23.0f, 18.6f);
-			Look.Muzzle = FVector(-1.5f, 32.3f, 15.0f);
-			Look.FlashSize = 0.8f;
-			Look.LeftHand = FVector(-1.5f, 14.0f, 13.0f);
-			RifleSounds(Look, 0.85f, 1.22f);
+			Look.PlainModel = TEXT("/Engine/BasicShapes/Cube.Cube");
+			Look.Model = FTransform(FRotator::ZeroRotator, FVector(0.0f, 8.0f, 6.0f), FVector(0.09f, 0.22f, 0.12f));
+			Look.Materials[0] = Material(TEXT("MI_KnifeSteel"));
+			Look.Sight = FVector(0.0f, -100.0f, 80.0f);
+			Look.Muzzle = FVector(0.0f, 50.0f, 0.0f);
+			Look.FlashSize = 0.5f;
+			Look.LeftHand = FVector(0.0f, 30.0f, -40.0f);
+			RifleSounds(Look, 0.7f, 1.5f);
+			Look.IconOf = TEXT("knife");
+			Look.ProjectileModel = TEXT("/Engine/BasicShapes/Cube.Cube");
+			Look.ProjectileMaterial = Material(TEXT("MI_GrenadeCheese"));
+			Look.ProjectileShape = FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(0.09f, 0.015f, 0.02f));
+			Look.ProjectileGlow = FLinearColor(1.0f, 0.78f, 0.2f, 1.0f);
 			Looks.Add(Look);
 		}
-		// The Munster Machine Gun: Max3d's DP-28, its pan magazine a wheel of Munster.
+		// The Munster Twin SMGs: for now a pair of Max3d's PPSh-41s made small, one in each hand, in the Parmesan Grater's
+		// cheese it carried before; group 9's blocks of Munster will take their place.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("munster");
-			Look.PlainModel = TEXT("/Game/Fab/Max3d/DP28/SM_DP28.SM_DP28");
-			Look.Model = Gripped(FVector(8.7f, -9.5f, 16.0f), 1.25f);
-			Look.Materials[0] = Material(TEXT("MI_Munster"));
-			Look.Sight = FVector(8.7f, -14.0f, 23.6f);
-			Look.Muzzle = FVector(8.7f, 48.0f, 20.3f);
-			Look.FlashSize = 1.2f;
-			Look.LeftHand = FVector(8.7f, 13.0f, 18.5f);
-			RifleSounds(Look, 1.1f, 0.85f);
+			Look.Hold = ECheeseStrikeHold::Pistol;
+			Look.PlainModel = TEXT("/Game/Fab/Max3d/PPSh41/SM_PPSh41.SM_PPSh41");
+			Look.Model = Gripped(FVector(-1.5f, -12.0f, 9.0f), 0.75f);
+			Look.Materials[0] = Material(TEXT("MI_Grater"));
+			Look.Sight = FVector(-1.5f, -23.0f, 18.6f);
+			Look.Muzzle = FVector(-1.5f, 32.3f, 15.0f);
+			Look.FlashSize = 0.7f;
+			// Each hand holds its own (FCheeseStrikeDualHold).
+			Look.LeftHand.Reset();
+			RifleSounds(Look, 0.8f, 1.3f);
+			Look.IconOf = TEXT("grater");
 			Looks.Add(Look);
 		}
 		// The Swiss Shotgun: Lyra's shotgun, its shroud holed like Emmental.
@@ -188,16 +198,68 @@ namespace
 			Look.ShotPitch = 1.06f;
 			Looks.Add(Look);
 		}
-		// The Gouda Gatling: for now the Munster's DP-28 made all gouda (its pan in red wax), firing yellow tracers of molten
+		// The Gouda Gatling: for now Max3d's DP-28 (the old Munster Machine Gun's) made all gouda (its pan in red wax), firing yellow tracers of molten
 		// cheese, faster and higher-pitched; group 9's rotary barrel of gouda wheels will take its place.
 		{
-			FWeaponLook Look = *Looks.FindByPredicate([](const FWeaponLook& Each) { return FCString::Strcmp(Each.Id, TEXT("munster")) == 0; });
+			FWeaponLook Look;
 			Look.Id = TEXT("gatling");
+			Look.PlainModel = TEXT("/Game/Fab/Max3d/DP28/SM_DP28.SM_DP28");
+			Look.Model = Gripped(FVector(8.7f, -9.5f, 16.0f), 1.25f);
 			Look.Materials[0] = Material(TEXT("MI_Gatling"));
+			Look.Sight = FVector(8.7f, -14.0f, 23.6f);
+			Look.Muzzle = FVector(8.7f, 48.0f, 20.3f);
+			Look.LeftHand = FVector(8.7f, 13.0f, 18.5f);
 			Look.FlashSize = 1.0f;
 			Look.Tracer = FLinearColor(1.0f, 0.72f, 0.08f, 1.0f);
 			Look.IconOf = TEXT("munster");
 			RifleSounds(Look, 0.8f, 1.25f);
+			Looks.Add(Look);
+		}
+		// The BabyBomb: for now Lyra's grenade launcher all in red wax, firing red-waxed wheels (the engine's cylinder, 12 cm
+		// across); group 9's tube of three Babybel wheels will take its place.
+		{
+			FWeaponLook Look;
+			Look.Id = TEXT("babybomb");
+			Look.PlainModel = TEXT("/Game/Weapons/GrenadeLauncher/Meshes/SM_GrenadeLauncher.SM_GrenadeLauncher");
+			Look.Materials[0] = Material(TEXT("MI_KnifeWax"));
+			Look.Sight = FVector(0.0f, -26.0f, 22.0f);
+			Look.Muzzle = FVector(0.0f, 54.0f, 9.0f);
+			Look.FlashSize = 1.6f;
+			Look.LeftHand = FVector(0.0f, 26.0f, 2.0f);
+			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot1.SW_ShotgunShot1");
+			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot2.SW_ShotgunShot2");
+			Look.DryFire = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_DryFire_01.Weapons_Shotgun_DryFire_01");
+			Look.ReloadSounds[0] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_ClipOut_01.Weapons_Shotgun_ClipOut_01");
+			Look.ReloadSounds[1] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_ClipIn_01.Weapons_Shotgun_ClipIn_01");
+			Look.ReloadSounds[2] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_Mech_01.Weapons_Shotgun_Mech_01");
+			Look.ShotVolume = 0.9f;
+			Look.ShotPitch = 0.6f;
+			Look.IconOf = TEXT("munster");
+			Look.ProjectileModel = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
+			Look.ProjectileMaterial = Material(TEXT("MI_KnifeWax"));
+			// The wheel's face forward, spinning as it flies.
+			Look.ProjectileShape = FTransform(FRotator(90.0f, 0.0f, 0.0f), FVector::ZeroVector, FVector(0.12f, 0.12f, 0.07f));
+			Look.ProjectileSpin = 720.0f;
+			Look.ProjectileGlow = FLinearColor(1.0f, 0.35f, 0.12f, 1.0f);
+			Looks.Add(Look);
+		}
+		// The Cheese Stick: for now the engine's cylinder made a 1.2 m baton of white string cheese, held as the knife is, its
+		// end forward; group 9's peeled string cheese will take its place.
+		{
+			FWeaponLook Look;
+			Look.Id = TEXT("stick");
+			Look.Hold = ECheeseStrikeHold::Knife;
+			Look.PlainModel = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
+			// Along -Y as the knife is (its axis turned from Z), gripped 15 cm from its end, then turned as the knife is.
+			Look.Model = FTransform(FQuat(FVector::XAxisVector, UE_HALF_PI), FVector(0.0f, -45.0f, 0.0f), FVector(0.045f, 0.045f, 1.2f))
+				* FTransform(FQuat(FRotator(0.0f, 180.0f, 0.0f)) * FQuat(FRotator(0.0f, 0.0f, 40.0f)) * FQuat(FRotator(60.0f, 0.0f, 0.0f)));
+			// Its end, the business end, is the cylinder's top (+Z as it was made).
+			Look.Along = FVector(0.0f, 0.0f, 1.0f);
+			Look.Materials[0] = Material(TEXT("MI_BurratasCream"));
+			Look.FlashSize = 0.0f;
+			Look.ShotVolume = 0.9f;
+			Look.ShotPitch = 0.7f;
+			Look.IconOf = TEXT("knife");
 			Looks.Add(Look);
 		}
 		// The Cheese Knife: our own (tools/art/weapon_models.py), its handle in red wax. It came in pointing back.

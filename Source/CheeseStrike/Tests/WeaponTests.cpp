@@ -35,9 +35,12 @@ bool FEveryWeaponKillsInTheDesignsTime::RunTest(const FString& Parameters)
 		float Seconds;
 	};
 	// The design's TTK column (docs/unreal/design.md, "Weapons"): body shots, close, holding the trigger. The Colby
-	// Carbine, the spawn primary, is softened from it: three bursts to a kill.
-	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 9, 0.52f},
-		FWanted{Munster(), 7, 0.51f}, FWanted{Shotgun(), 2, 0.85f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}, FWanted{Burratas(), 7, 0.6f}})
+	// Carbine, the spawn primary, is softened from it: three bursts to a kill. Wave 14: the Cheese Grater's shards (before
+	// the supercombine), the Munster Twin SMGs, the Swiss Shotgun's whole blast close, the BabyBomb's wheel and the Cheese
+	// Stick's swing.
+	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 13, 1.2f},
+		FWanted{Munster(), 8, 0.525f}, FWanted{Shotgun(), 1, 0.0f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}, FWanted{Burratas(), 7, 0.6f},
+		FWanted{BabyBomb(), 1, 0.0f}, FWanted{Stick(), 1, 0.0f}})
 	{
 		const FString Name = Wanted.Weapon.DisplayName.ToString();
 		TestEqual(FString::Printf(TEXT("%s kills in %d"), *Name, Wanted.Shots), ShotsToKill(Wanted.Weapon), Wanted.Shots);
@@ -246,16 +249,24 @@ bool FShotSoundsFallOnTheSoundBeat::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheShotgunFiresNinePellets, "CheeseStrike.Weapons.TheShotgunFiresNinePellets", WeaponTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheShotgunFiresTwelvePellets, "CheeseStrike.Weapons.TheShotgunFiresTwelvePellets", WeaponTests::Flags)
 
-bool FTheShotgunFiresNinePellets::RunTest(const FString& Parameters)
+bool FTheShotgunFiresTwelvePellets::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeWeapons;
 	const FWeaponStats& Shotgun = CheeseStrikeWeapons::Shotgun();
-	TestEqual(TEXT("nine pellets"), Shotgun.Pellets, 9);
-	TestEqual(TEXT("ten each, close"), DamageAt(Shotgun, 100.0f, false), 10.0f);
-	TestEqual(TEXT("three each far off"), DamageAt(Shotgun, 25.0f * WeaponTests::Metre, false), 3.0f);
-	// The pellets are spread by the shooter's seed, so the server makes the same nine.
+	TestEqual(TEXT("twelve pellets"), Shotgun.Pellets, 12);
+	TestEqual(TEXT("14 each, close"), DamageAt(Shotgun, 100.0f, false), 14.0f);
+	TestEqual(TEXT("and still at 4 m"), DamageAt(Shotgun, 400.0f, false), 14.0f);
+	TestTrue(TEXT("all twelve kill at 4 m"), DamageAt(Shotgun, 400.0f, false) * Shotgun.Pellets >= MaxHealth);
+	// At 4 m its cone is no wider than a body, aimed or from the hip, so they all land: a kill a shot.
+	const float Across4 = FMath::Tan(FMath::DegreesToRadians(Shotgun.HipSpreadDegrees * 0.5f)) * 400.0f;
+	TestTrue(FString::Printf(TEXT("from the hip its pellets are within %.0f cm of the aim at 4 m: a body's width"), Across4), Across4 <= CheeseStrikeMovement::CapsuleRadius * 1.1f);
+	TestTrue(FString::Printf(TEXT("not a kill past 8 m even if all twelve land (%.0f)"), DamageAt(Shotgun, 800.0f, false) * Shotgun.Pellets), DamageAt(Shotgun, 800.0f, false) * Shotgun.Pellets < MaxHealth);
+	const float Across8 = FMath::Tan(FMath::DegreesToRadians(Shotgun.HipSpreadDegrees * 0.5f)) * 800.0f;
+	TestTrue(FString::Printf(TEXT("and many miss there (%.0f cm across a body %.0f wide)"), Across8, CheeseStrikeMovement::CapsuleRadius), Across8 > CheeseStrikeMovement::CapsuleRadius * 1.5f);
+	TestTrue(TEXT("0.15 of it from 12 m"), FMath::IsNearlyEqual(DamageAt(Shotgun, 1200.0f, false), 14.0f * 0.15f, 0.01f) && FMath::IsNearlyEqual(DamageAt(Shotgun, 1300.0f, false), 14.0f * 0.15f, 0.01f));
+	// The pellets are spread by the shooter's seed, so the server makes the same twelve.
 	FRandomStream Shooter(1234);
 	FRandomStream Server(1234);
 	const float Cone = SpreadFor(Shotgun, 0, false);
@@ -336,27 +347,33 @@ bool FWeaponsAreLifeSizeAndComeUpInTime::RunTest(const FString& Parameters)
 		float FalloffEnd;
 	};
 	// The design's Godot metres, a third of a metre each here.
-	for (const FReach& Wanted : {FReach{Pistol(), 90, 25, 60}, FReach{Blaster(), 150, 40, 90}, FReach{Carbine(), 140, 35, 80}, FReach{Grater(), 80, 15, 45},
-		FReach{Munster(), 120, 25, 70}, FReach{Shotgun(), 40, 8, 25}, FReach{Roquefort(), 250, 0, 0}, FReach{Burratas(), 90, 20, 55}})
+	for (const FReach& Wanted : {FReach{Pistol(), 90, 25, 60}, FReach{Blaster(), 150, 40, 90}, FReach{Carbine(), 140, 35, 80},
+		FReach{Munster(), 80, 15, 45}, FReach{Roquefort(), 250, 0, 0}, FReach{Burratas(), 90, 20, 55}})
 	{
 		const FString Name = Wanted.Weapon.DisplayName.ToString();
 		TestTrue(FString::Printf(TEXT("%s reaches %.0f m (%.0f cm)"), *Name, Wanted.Range / 3.0f, Wanted.Weapon.MaxRange), FMath::IsNearlyEqual(Wanted.Weapon.MaxRange, Wanted.Range * WeaponTests::Metre, 1.0f));
 		TestTrue(FString::Printf(TEXT("%s falls off from %.0f to %.0f m"), *Name, Wanted.FalloffStart / 3.0f, Wanted.FalloffEnd / 3.0f),
 			FMath::IsNearlyEqual(Wanted.Weapon.FalloffStart, Wanted.FalloffStart * WeaponTests::Metre, 1.0f) && FMath::IsNearlyEqual(Wanted.Weapon.FalloffEnd, Wanted.FalloffEnd * WeaponTests::Metre, 1.0f));
 	}
-	// Coming up: the usual third of a second, the machine gun slow and the sniper's rifle slower than most.
-	TestEqual(TEXT("the Munster takes 0.9 s to draw"), Munster().DrawTime, 0.9f);
-	TestEqual(TEXT("and slows its carrier to 0.85"), Munster().CarrySpeed, CheeseStrikeMovement::HeavyFactor);
+	// The Swiss Shotgun: the whole of each pellet to 4 m, 0.15 of it from 12 m, nothing past 13 m (the design's 40 Godot metres).
+	TestTrue(TEXT("the Swiss Shotgun falls off from 4 m to 12 m"), Shotgun().FalloffStart == 400.0f && Shotgun().FalloffEnd == 1200.0f && Shotgun().FalloffFloor == 0.15f && FMath::IsNearlyEqual(Shotgun().MaxRange, 40.0f * WeaponTests::Metre, 1.0f));
+	// Coming up: the usual third of a second, the BabyBomb slow and the sniper's rifle slower than most.
+	TestEqual(TEXT("the BabyBomb takes 0.7 s to draw"), BabyBomb().DrawTime, 0.7f);
+	TestEqual(TEXT("and slows its carrier to 0.85"), BabyBomb().CarrySpeed, CheeseStrikeMovement::HeavyFactor);
+	TestEqual(TEXT("the Cheese Stick to 0.9"), Stick().CarrySpeed, CheeseStrikeMovement::LongFactor);
+	TestTrue(TEXT("which the moves carry as heavy and long"), CheeseStrikeMovement::IsHeavy(BabyBomb().CarrySpeed) && !CheeseStrikeMovement::IsLong(BabyBomb().CarrySpeed)
+		&& CheeseStrikeMovement::IsLong(Stick().CarrySpeed) && !CheeseStrikeMovement::IsHeavy(Stick().CarrySpeed) && !CheeseStrikeMovement::IsHeavy(1.0f) && !CheeseStrikeMovement::IsLong(1.0f));
 	TestEqual(TEXT("the Roquefort 0.5 s"), Roquefort().DrawTime, 0.5f);
 	TestTrue(TEXT("and is scoped"), Roquefort().bScoped);
-	TestFalse(TEXT("drawn just now, it can't fire"), IsDrawn(Munster(), 10.0f, 10.5f));
-	TestTrue(TEXT("once the draw time is past, it can"), IsDrawn(Munster(), 10.0f, 10.95f));
-	TestFalse(TEXT("not a little before"), IsDrawn(Munster(), 10.0f, 10.8f));
-	TestTrue(TEXT("though the server allows a shot a little early, for the network"), IsDrawn(Munster(), 10.0f, 10.8f, DrawAllowance));
-	TestFalse(TEXT("but not much"), IsDrawn(Munster(), 10.0f, 10.7f, DrawAllowance));
-	TestTrue(TEXT("put in hand at once, it can fire at once"), IsDrawn(Munster(), -1000.0f, 0.0f));
+	TestFalse(TEXT("drawn just now, it can't fire"), IsDrawn(BabyBomb(), 10.0f, 10.5f));
+	TestTrue(TEXT("once the draw time is past, it can"), IsDrawn(BabyBomb(), 10.0f, 10.75f));
+	TestFalse(TEXT("not a little before"), IsDrawn(BabyBomb(), 10.0f, 10.6f));
+	TestTrue(TEXT("though the server allows a shot a little early, for the network"), IsDrawn(BabyBomb(), 10.0f, 10.6f, DrawAllowance));
+	TestFalse(TEXT("but not much"), IsDrawn(BabyBomb(), 10.0f, 10.5f, DrawAllowance));
+	TestTrue(TEXT("put in hand at once, it can fire at once"), IsDrawn(BabyBomb(), -1000.0f, 0.0f));
 	// Carrying.
 	TestTrue(TEXT("a heavy weapon slows its carrier"), FMath::IsNearlyEqual(CheeseStrikeMovement::WithWeapon(450.0f, true), 450.0f * 0.85f));
+	TestTrue(TEXT("a long one less"), FMath::IsNearlyEqual(CheeseStrikeMovement::WithWeapon(450.0f, false, true), 450.0f * 0.9f));
 	TestEqual(TEXT("another doesn't"), CheeseStrikeMovement::WithWeapon(675.0f, false), 675.0f);
 	// Rounds.
 	TestTrue(TEXT("the Curd Pistol's rounds never run out"), Pistol().HasEndlessReserve());
@@ -376,7 +393,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheArsenalIsListedAndFound, "CheeseStrike.Weap
 bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 {
 	const TArray<const FWeaponStats*>& All = CheeseStrikeArsenal::All();
-	TestEqual(TEXT("ten weapons, the Gouda Gatling among them"), All.Num(), 10);
+	TestEqual(TEXT("twelve weapons, the Gouda Gatling among them"), All.Num(), 12);
 	TSet<FName> Ids;
 	for (const FWeaponStats* Weapon : All)
 	{
@@ -387,7 +404,9 @@ bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("found whatever the case"), CheeseStrikeArsenal::Find(FName(TEXT("ShotGun"))) == &CheeseStrikeWeapons::Shotgun());
 	TestNull(TEXT("and nothing that isn't one"), CheeseStrikeArsenal::Find(FName(TEXT("bazooka"))));
-	TestEqual(TEXT("seven primaries to pick, the streak's Gatling not among them"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Primary).Num(), 7);
+	TestEqual(TEXT("nine primaries to pick, the streak's Gatling not among them"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Primary).Num(), 9);
+	TestTrue(TEXT("the BabyBomb and the Cheese Stick among them"), CheeseStrikeArsenal::IsPickable(CheeseStrikeWeapons::BabyBomb().Id, EWeaponSlot::Primary) && CheeseStrikeArsenal::IsPickable(CheeseStrikeWeapons::Stick().Id, EWeaponSlot::Primary));
+	TestEqual(TEXT("the Grater keeps its id"), CheeseStrikeWeapons::Grater().Id, FName(TEXT("grater")));
 	TestEqual(TEXT("the Curd Pistol is the sidearm"), CheeseStrikeArsenal::InSlot(EWeaponSlot::Sidearm), TArray<FName>{CheeseStrikeArsenal::Sidearm()});
 	TestEqual(TEXT("everyone comes in with the Colby Carbine"), CheeseStrikeArsenal::DefaultPrimary(), CheeseStrikeWeapons::Carbine().Id);
 
@@ -399,6 +418,8 @@ bool FTheArsenalIsListedAndFound::RunTest(const FString& Parameters)
 	TestEqual(TEXT("and last the knife"), CheeseStrikeArsenal::GunGameWeapon(Ladder.Num() - 1), CheeseStrikeWeapons::Knife().Id);
 	TestEqual(TEXT("which it keeps"), CheeseStrikeArsenal::GunGameWeapon(100), CheeseStrikeWeapons::Knife().Id);
 	TestTrue(TEXT("the Dual Burratas are on it, after the Colby Carbine"), Ladder.IndexOfByKey(CheeseStrikeWeapons::Burratas().Id) == Ladder.IndexOfByKey(CheeseStrikeWeapons::Carbine().Id) + 1);
+	TestTrue(TEXT("the BabyBomb after the Roquefort, the Cheese Stick before the pistol"), Ladder.IndexOfByKey(CheeseStrikeWeapons::BabyBomb().Id) == Ladder.IndexOfByKey(CheeseStrikeWeapons::Roquefort().Id) + 1
+		&& Ladder.IndexOfByKey(CheeseStrikeWeapons::Stick().Id) == Ladder.IndexOfByKey(CheeseStrikeWeapons::Pistol().Id) - 1);
 	for (const FName& Id : Ladder)
 	{
 		TestNotNull(FString::Printf(TEXT("%s is a weapon"), *Id.ToString()), CheeseStrikeArsenal::Find(Id));
@@ -486,6 +507,113 @@ bool FTheDualBurratasFireInTurn::RunTest(const FString& Parameters)
 	TestTrue(TEXT("its along and up mirrored"), Left.GetUnitAxis(EAxis::Y).Equals(Reflect(Right.GetUnitAxis(EAxis::Y)), 0.001f) && Left.GetUnitAxis(EAxis::Z).Equals(Reflect(Right.GetUnitAxis(EAxis::Z)), 0.001f));
 	TestTrue(TEXT("and still a turn, not a mirror"), Left.GetUnitAxis(EAxis::X).Equals(-Reflect(Right.GetUnitAxis(EAxis::X)), 0.001f));
 	TestTrue(TEXT("across a plane off the middle too"), CheeseStrikeDual::Mirrored(Right, FVector(10.0f, 0.0f, 0.0f), FVector::XAxisVector).GetLocation().Equals(FVector(40.0f, 40.0f, 130.0f), 0.01f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheBabyBombBurstsAndHurtsItsShooter, "CheeseStrike.Weapons.TheBabyBombBurstsAndHurtsItsShooter", WeaponTests::Flags)
+
+bool FTheBabyBombBurstsAndHurtsItsShooter::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	const FWeaponStats& Bomb = BabyBomb();
+	TestTrue(TEXT("a projectile"), Bomb.IsProjectile() && !Blaster().IsProjectile());
+	TestEqual(TEXT("two in the tube"), Bomb.MagazineSize, 2);
+	TestEqual(TEXT("two more"), Bomb.Reserve, 2);
+	TestEqual(TEXT("a wheel a second"), Bomb.FireInterval, 1.0f);
+	TestEqual(TEXT("a 2.5 s reload"), Bomb.ReloadTime, 2.5f);
+	TestEqual(TEXT("at 25 m/s"), Bomb.ProjectileSpeed, 2500.0f);
+	TestTrue(TEXT("with a little drop"), Bomb.GravityShare > 0.0f && Bomb.GravityShare < 0.5f);
+	TestEqual(TEXT("a direct hit 150"), Bomb.Damage, 150.0f);
+	TestEqual(TEXT("its burst 110 at its heart"), SplashAt(Bomb, 0.0f), 110.0f);
+	TestEqual(TEXT("and to 3 m"), SplashAt(Bomb, 300.0f), 110.0f);
+	TestEqual(TEXT("70 at 4 m"), SplashAt(Bomb, 400.0f), 70.0f);
+	TestEqual(TEXT("30 at 5 m"), SplashAt(Bomb, 500.0f), 30.0f);
+	TestEqual(TEXT("nothing past it"), SplashAt(Bomb, 510.0f), 0.0f);
+	TestEqual(TEXT("and no burst for a gun without one"), SplashAt(Blaster(), 0.0f), 0.0f);
+	TestTrue(TEXT("a power weapon: slow to carry"), Bomb.CarrySpeed < 1.0f);
+	TestEqual(TEXT("bots fire it only from 6 m"), Bomb.BotLeast, 600.0f);
+	TestTrue(TEXT("it reaches as far as it flies"), FMath::IsNearlyEqual(Bomb.MaxRange, Bomb.ProjectileSpeed * Bomb.ProjectileLife));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheGratersShardsHomeAndBurstTogether, "CheeseStrike.Weapons.TheGratersShardsHomeAndBurstTogether", WeaponTests::Flags)
+
+bool FTheGratersShardsHomeAndBurstTogether::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	const FWeaponStats& Grater = CheeseStrikeWeapons::Grater();
+	TestEqual(TEXT("the Cheese Grater"), Grater.DisplayName.ToString(), FString(TEXT("Cheese Grater")));
+	TestTrue(TEXT("20 shards a magazine, ten a second, held"), Grater.MagazineSize == 20 && FMath::IsNearlyEqual(Grater.FireInterval, 0.1f) && Grater.bAutomatic);
+	TestTrue(TEXT("8 a shard, at 40 m/s"), Grater.Damage == 8.0f && Grater.ProjectileSpeed == 4000.0f && Grater.GravityShare == 0.0f);
+	TestTrue(TEXT("homing at up to 25 degrees a second, on someone within 10 degrees of the aim"), Grater.HomingTurn == 25.0f && Grater.HomingCone == 10.0f);
+	// Whom it homes on: the nearest within the cone.
+	const FVector Eye = FVector::ZeroVector;
+	const TArray<FVector> Targets = {FVector(2000.0f, 100.0f, 0.0f), FVector(1000.0f, 120.0f, 0.0f), FVector(500.0f, 400.0f, 0.0f), FVector(-800.0f, 0.0f, 0.0f)};
+	TestEqual(TEXT("the nearest within 10 degrees (not the nearer one 39 degrees off, nor the one behind)"), HomingPick(Eye, FVector::ForwardVector, Targets, Grater.HomingCone), 1);
+	TestEqual(TEXT("nobody in the cone, nobody"), HomingPick(Eye, FVector::UpVector, Targets, Grater.HomingCone), static_cast<int32>(INDEX_NONE));
+	// How it turns: by at most so much a frame, its speed kept, all the way once near enough.
+	const FVector Turned = TurnToward(FVector(4000.0f, 0.0f, 0.0f), FVector(0.0f, 1.0f, 0.0f), 25.0f * 0.1f);
+	const float Degrees = FMath::RadiansToDegrees(FMath::Acos(Turned.GetSafeNormal().X));
+	TestTrue(FString::Printf(TEXT("a tenth of a second turns it 2.5 degrees (%.2f)"), Degrees), FMath::IsNearlyEqual(Degrees, 2.5f, 0.01f) && Turned.Y > 0.0f);
+	TestTrue(TEXT("at the same speed"), FMath::IsNearlyEqual(Turned.Size(), 4000.0f, 0.1f));
+	TestTrue(TEXT("straight at it once within the turn"), TurnToward(FVector(4000.0f, 0.0f, 0.0f), FVector(1.0f, 0.01f, 0.0f), 2.5f).GetSafeNormal().Equals(FVector(1.0f, 0.01f, 0.0f).GetSafeNormal(), 0.0001f));
+	// The supercombine: 16 in one player within 2 s burst; slower, they don't.
+	TestTrue(TEXT("16 shards (80% of a magazine) in two seconds"), Grater.SuperShards == 16 && Grater.SuperWindow == 2.0f && Grater.SuperShards * 5 == Grater.MagazineSize * 4);
+	FShardTally Tally;
+	bool bBurst = false;
+	for (int32 Shard = 0; Shard < 15; ++Shard)
+	{
+		bBurst |= Tally.Add(Grater, Shard * 0.1f);
+	}
+	TestFalse(TEXT("fifteen don't burst"), bBurst);
+	TestEqual(TEXT("fifteen are stuck"), Tally.CountAt(Grater, 1.4f), 15);
+	TestTrue(TEXT("the sixteenth bursts them"), Tally.Add(Grater, 1.5f));
+	TestEqual(TEXT("and the tally starts again"), Tally.CountAt(Grater, 1.5f), 0);
+	FShardTally Slow;
+	bBurst = false;
+	for (int32 Shard = 0; Shard < 30; ++Shard)
+	{
+		bBurst |= Slow.Add(Grater, Shard * 0.15f);
+	}
+	TestFalse(TEXT("one every 0.15 s never has sixteen within two seconds"), bBurst);
+	TestEqual(TEXT("the oldest come out"), Slow.CountAt(Grater, 29 * 0.15f), 14);
+	TestTrue(TEXT("a burst kills (or downs)"), SuperDamage >= MaxHealth);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCheeseStickFellsAWideArc, "CheeseStrike.Weapons.TheCheeseStickFellsAWideArc", WeaponTests::Flags)
+
+bool FTheCheeseStickFellsAWideArc::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	const FWeaponStats& Stick = CheeseStrikeWeapons::Stick();
+	TestTrue(TEXT("a melee weapon in the primary's slot"), Stick.IsMelee() && Stick.Slot == EWeaponSlot::Primary && !Stick.UsesRounds());
+	TestTrue(TEXT("a swing every 1.1 s, 3 m, 120 degrees"), Stick.FireInterval == 1.1f && Stick.Reach == 300.0f && Stick.ArcDegrees == 120.0f);
+	TestTrue(TEXT("a blow that kills"), Stick.Damage >= MaxHealth);
+	TestTrue(TEXT("a slower, wider swing than the knife's"), SwipeSecondsOf(Stick) > SwipeSecondsOf(Knife()) && Stick.SwipeSize > 1.0f && SwipeSecondsOf(Stick) < Stick.FireInterval);
+	const FVector Aim = FVector::ForwardVector;
+	TestTrue(TEXT("someone ahead at 2.5 m"), InArc(Stick, Aim, FVector(250.0f, 0.0f, 0.0f)));
+	TestTrue(TEXT("someone 55 degrees to the side"), InArc(Stick, Aim, FVector(250.0f, 0.0f, 0.0f).RotateAngleAxis(55.0f, FVector::UpVector)));
+	TestTrue(TEXT("on the other side too"), InArc(Stick, Aim, FVector(250.0f, 0.0f, 0.0f).RotateAngleAxis(-55.0f, FVector::UpVector)));
+	TestFalse(TEXT("not 65 degrees off"), InArc(Stick, Aim, FVector(250.0f, 0.0f, 0.0f).RotateAngleAxis(65.0f, FVector::UpVector)));
+	TestFalse(TEXT("nor behind"), InArc(Stick, Aim, FVector(-150.0f, 0.0f, 0.0f)));
+	TestFalse(TEXT("nor past 3 m"), InArc(Stick, Aim, FVector(320.0f, 0.0f, 0.0f)));
+	TestTrue(TEXT("someone lying below the aim, whatever the pitch"), InArc(Stick, FVector(1.0f, 0.0f, -0.5f).GetSafeNormal(), FVector(150.0f, 20.0f, -120.0f)));
+	TestTrue(TEXT("a knife strikes one along its sweep, the stick everyone in its arc"), Knife().ArcDegrees == 0.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMunsterTwinsFireInTurn, "CheeseStrike.Weapons.TheMunsterTwinsFireInTurn", WeaponTests::Flags)
+
+bool FTheMunsterTwinsFireInTurn::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	const FWeaponStats& Twins = Munster();
+	TestEqual(TEXT("the Munster Twin SMGs"), Twins.DisplayName.ToString(), FString(TEXT("Munster Twin SMGs")));
+	TestTrue(TEXT("two guns, automatic"), Twins.bDual && Twins.bAutomatic);
+	TestEqual(TEXT("a belt of 60 each"), Twins.MagazineSize, 120);
+	TestTrue(TEXT("firing in turn"), DualHand(Twins, 0) == 0 && DualHand(Twins, 1) == 1 && DualHand(Twins, 2) == 0);
+	TestEqual(TEXT("not heavy any more"), Twins.CarrySpeed, 1.0f);
 	return true;
 }
 

@@ -93,7 +93,7 @@ namespace CheeseStrikePickups
 	/** Whether feet at `Feet` are within `Across` (cm) of a stand whose floor is at `Stand`, and within ReachUp above or below it. */
 	bool InReach(const FVector& Stand, const FVector& Feet, float Across);
 
-	/** What a primary is worth, 0 the spawn primary to 3 the Roquefort: the better ones lie at the riskier spots, and bots want them more. */
+	/** What a primary is worth, 0 the spawn primary to 3 the power weapons (the Roquefort, the BabyBomb, the Cheese Stick): the better ones lie at the riskier spots, and bots want them more. */
 	int32 Worth(FName Weapon);
 	/** The colour of a weapon's stand pad, prompt and label: the same green (not the cheese yellow) for every weapon, whatever it is worth. */
 	FLinearColor WorthColour(int32 Worth);
