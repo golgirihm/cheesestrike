@@ -211,20 +211,21 @@ namespace
 			Look.ShotPitch = 1.06f;
 			Looks.Add(Look);
 		}
-		// The Gouda Gatling: for now Max3d's DP-28 (the old Munster Machine Gun's) made all gouda (its pan in red wax), firing yellow tracers of molten
-		// cheese, faster and higher-pitched; group 9's rotary barrel of gouda wheels will take its place.
+		// The Gouda Gatling: six steel barrels through three gouda wheels before a housing that is a whole gouda in yellow
+		// wax, a carry handle over it and a waxed grip under the barrels for the other hand; yellow tracers of molten cheese.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("gatling");
-			Look.PlainModel = TEXT("/Game/Fab/Max3d/DP28/SM_DP28.SM_DP28");
-			Look.Model = Gripped(FVector(8.7f, -9.5f, 16.0f), 1.25f);
+			Look.PlainModel = Model(TEXT("Gatling"), TEXT("GoudaGatling"));
 			Look.Materials[0] = Material(TEXT("MI_Gatling"));
-			Look.Sight = FVector(8.7f, -14.0f, 23.6f);
-			Look.Muzzle = FVector(8.7f, 48.0f, 20.3f);
-			Look.LeftHand = FVector(8.7f, 13.0f, 18.5f);
+			Look.Materials[1] = Material(TEXT("MI_GoudaWax"));
+			Look.Materials[2] = Material(TEXT("MI_GunSteel"));
+			Look.Materials[3] = Material(TEXT("MI_GunBlack"));
+			Look.Sight = FVector(0.0f, -14.0f, 20.0f);
+			Look.Muzzle = FVector(0.0f, 72.0f, 6.0f);
+			Look.LeftHand = FVector(0.0f, 29.0f, 1.5f);
 			Look.FlashSize = 1.0f;
 			Look.Tracer = FLinearColor(1.0f, 0.72f, 0.08f, 1.0f);
-			Look.IconOf = TEXT("munster");
 			RifleSounds(Look, 0.8f, 1.25f);
 			Looks.Add(Look);
 		}
@@ -259,23 +260,20 @@ namespace
 			Look.ProjectileGlow = FLinearColor(1.0f, 0.35f, 0.12f, 1.0f);
 			Looks.Add(Look);
 		}
-		// The Cheese Stick: for now the engine's cylinder made a 1.2 m baton of white string cheese, held as the knife is, its
-		// end forward; group 9's peeled string cheese will take its place.
+		// The Cheese Stick: 1.2 m of string cheese in its red wrapper at the hand, peeled strands splaying at the striking end;
+		// made along -Y from its butt, gripped 15 cm from it, and turned as the knife is.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("stick");
 			Look.Hold = ECheeseStrikeHold::Knife;
-			Look.PlainModel = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
-			// Along -Y as the knife is (its axis turned from Z), gripped 15 cm from its end, then turned as the knife is.
-			Look.Model = FTransform(FQuat(FVector::XAxisVector, UE_HALF_PI), FVector(0.0f, -45.0f, 0.0f), FVector(0.045f, 0.045f, 1.2f))
-				* FTransform(FQuat(FRotator(0.0f, 180.0f, 0.0f)) * FQuat(FRotator(0.0f, 0.0f, 40.0f)) * FQuat(FRotator(60.0f, 0.0f, 0.0f)));
-			// Its end, the business end, is the cylinder's top (+Z as it was made).
-			Look.Along = FVector(0.0f, 0.0f, 1.0f);
-			Look.Materials[0] = Material(TEXT("MI_BurratasCream"));
+			Look.PlainModel = Model(TEXT("Stick"), TEXT("CheeseStick"));
+			Look.Model = FTransform(FQuat(FRotator(0.0f, 180.0f, 0.0f)) * FQuat(FRotator(0.0f, 0.0f, 40.0f)) * FQuat(FRotator(60.0f, 0.0f, 0.0f)));
+			Look.Along = FVector(0.0f, -1.0f, 0.0f);
+			Look.Materials[0] = Material(TEXT("MI_StringCheese"));
+			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
 			Look.FlashSize = 0.0f;
 			Look.ShotVolume = 0.9f;
 			Look.ShotPitch = 0.7f;
-			Look.IconOf = TEXT("knife");
 			Looks.Add(Look);
 		}
 		// The Cheese Knife: our own (tools/art/weapon_models.py), its handle in red wax. It came in pointing back.
