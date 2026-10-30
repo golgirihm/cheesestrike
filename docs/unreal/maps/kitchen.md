@@ -34,7 +34,7 @@ The bots and the mice walk a navigation mesh built when the level starts, in the
 
 Light: day, the sun low through the north window, across the lanes, falling on the sink and the wedge; the lamps over the table, under the wall cupboards, in the cupboards and in the hollow.
 
-The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), clear of the hills (the crumbs, the drawers, the table's top): the Roquefort Rifle in the sink, in the middle of the worktop; a Munster Machine Gun in each half of the hollow through the wedge; a Cheddar Blaster on the worktop at the top of each side's cookbooks; a Swiss Shotgun in each side's cupboard, inside its door; and the Dual Burratas on the floor under the table. Eight in all, mirrored like the room (the Burratas on its middle line).
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), clear of the hills (the crumbs, the drawers, the table's top): the Roquefort Rifle in the sink, in the middle of the worktop; the Munster Twin SMGs in each half of the hollow through the wedge; a Cheddar Blaster on the worktop at the top of each side's cookbooks; a Swiss Shotgun in each side's cupboard, inside its door; and the BabyBomb (a power weapon, wave 14) on the floor under the table. Eight in all, mirrored like the room (the BabyBomb on its middle line).
 
 ## The cheese, and what the mice change
 
