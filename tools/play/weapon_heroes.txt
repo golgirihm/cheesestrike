@@ -1,6 +1,87 @@
-# Looks at the weapons in each hero's hands (CheeseStrikeBody): for each, a rifle, the pistol and the knife from the
-# right side, and the rifle and the pistol in first person, aimed; for checking each hero's grip on each way of holding.
-wait 2
+# Looks at the weapons in each hero's hands (CheeseStrikeBody): for each hero, every weapon from the right side, and
+# the carbine and the pistol in first person, aimed; for checking each hero's grip on each weapon and way of holding.
+wait 3.5
+cmd CheeseStrikeBody 0 0
+wait 0.5
+cmd CheeseStrikeArm carbine
+wait 1
+hold Aim
+wait 0.7
+shot heroes_0_carbine_aimed
+release Aim
+tap Sidearm
+wait 0.8
+hold Aim
+wait 0.7
+shot heroes_0_pistol_aimed
+release Aim
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot heroes_0_pistol
+tap Knife
+wait 0.8
+shot heroes_0_knife
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm blaster
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_blaster
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm carbine
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_carbine
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm grater
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_grater
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_munster
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm shotgun
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_shotgun
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_burratas
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm roquefort
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_roquefort
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm babybomb
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_babybomb
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm gatling
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_0_gatling
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm stick
+wait 0.9
+cmd CheeseStrikeOutside 160 75 45
+wait 0.5
+shot heroes_0_stick
+cmd CheeseStrikeOutside
 cmd CheeseStrikeBody 1 0
 wait 0.5
 cmd CheeseStrikeArm carbine
@@ -9,10 +90,6 @@ hold Aim
 wait 0.7
 shot heroes_1_carbine_aimed
 release Aim
-cmd CheeseStrikeOutside 120 75 45
-wait 0.6
-shot heroes_1_carbine
-cmd CheeseStrikeOutside
 tap Sidearm
 wait 0.8
 hold Aim
@@ -20,15 +97,71 @@ wait 0.7
 shot heroes_1_pistol_aimed
 release Aim
 cmd CheeseStrikeOutside 120 75 45
-wait 0.6
+wait 0.5
 shot heroes_1_pistol
-cmd CheeseStrikeOutside
 tap Knife
 wait 0.8
-shot heroes_1_knife_view
-cmd CheeseStrikeOutside 120 75 45
-wait 0.6
 shot heroes_1_knife
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm blaster
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_blaster
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm carbine
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_carbine
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm grater
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_grater
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_munster
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm shotgun
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_shotgun
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_burratas
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm roquefort
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_roquefort
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm babybomb
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_babybomb
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm gatling
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_1_gatling
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm stick
+wait 0.9
+cmd CheeseStrikeOutside 160 75 45
+wait 0.5
+shot heroes_1_stick
 cmd CheeseStrikeOutside
 cmd CheeseStrikeBody 2 1
 wait 0.5
@@ -38,10 +171,6 @@ hold Aim
 wait 0.7
 shot heroes_2_carbine_aimed
 release Aim
-cmd CheeseStrikeOutside 120 75 45
-wait 0.6
-shot heroes_2_carbine
-cmd CheeseStrikeOutside
 tap Sidearm
 wait 0.8
 hold Aim
@@ -49,15 +178,71 @@ wait 0.7
 shot heroes_2_pistol_aimed
 release Aim
 cmd CheeseStrikeOutside 120 75 45
-wait 0.6
+wait 0.5
 shot heroes_2_pistol
-cmd CheeseStrikeOutside
 tap Knife
 wait 0.8
-shot heroes_2_knife_view
-cmd CheeseStrikeOutside 120 75 45
-wait 0.6
 shot heroes_2_knife
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm blaster
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_blaster
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm carbine
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_carbine
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm grater
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_grater
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_munster
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm shotgun
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_shotgun
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_burratas
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm roquefort
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_roquefort
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm babybomb
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_babybomb
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm gatling
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_2_gatling
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm stick
+wait 0.9
+cmd CheeseStrikeOutside 160 75 45
+wait 0.5
+shot heroes_2_stick
 cmd CheeseStrikeOutside
 cmd CheeseStrikeBody 3 0
 wait 0.5
@@ -67,10 +252,6 @@ hold Aim
 wait 0.7
 shot heroes_3_carbine_aimed
 release Aim
-cmd CheeseStrikeOutside 120 75 45
-wait 0.6
-shot heroes_3_carbine
-cmd CheeseStrikeOutside
 tap Sidearm
 wait 0.8
 hold Aim
@@ -78,13 +259,70 @@ wait 0.7
 shot heroes_3_pistol_aimed
 release Aim
 cmd CheeseStrikeOutside 120 75 45
-wait 0.6
+wait 0.5
 shot heroes_3_pistol
-cmd CheeseStrikeOutside
 tap Knife
 wait 0.8
-shot heroes_3_knife_view
-cmd CheeseStrikeOutside 120 75 45
-wait 0.6
 shot heroes_3_knife
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm blaster
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_blaster
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm carbine
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_carbine
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm grater
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_grater
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_munster
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm shotgun
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_shotgun
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_burratas
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm roquefort
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_roquefort
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm babybomb
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_babybomb
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm gatling
+wait 0.9
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot heroes_3_gatling
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm stick
+wait 0.9
+cmd CheeseStrikeOutside 160 75 45
+wait 0.5
+shot heroes_3_stick
+cmd CheeseStrikeOutside
 quit
