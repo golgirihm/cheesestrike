@@ -325,7 +325,7 @@ bool FTheControlsPageSaysWhatEveryKeyDoes::RunTest(const FString& Parameters)
 		for (const FKey& Key : Set->KeysFor(Action))
 		{
 			const FRow* Row = Rows.FindByPredicate([Action](const FRow& Each) { return Each.Actions.Contains(Action); });
-			const bool bShown = Row != nullptr && (Key.IsGamepadKey() ? Row->Xbox.Contains(PadLabel(Key, EPad::Xbox)) && Row->Nintendo.Contains(PadLabel(Key, EPad::Nintendo)) : Row->Keyboard.Contains(KeyboardLabel(Key)));
+			const bool bShown = Row != nullptr && (Key.IsGamepadKey() ? Row->Xbox.Contains(PadLabel(Key, EPad::Xbox)) && Row->PlayStation.Contains(PadLabel(Key, EPad::PlayStation)) && Row->Nintendo.Contains(PadLabel(Key, EPad::Nintendo)) : Row->Keyboard.Contains(KeyboardLabel(Key)));
 			TestTrue(FString::Printf(TEXT("%s's %s is shown"), *Action->GetName(), *Key.ToString()), bShown);
 		}
 	}
@@ -341,6 +341,8 @@ bool FTheControlsPageSaysWhatEveryKeyDoes::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the wheel is written as such"), Find(Set->NextWeapon).Keyboard.Contains(TEXT("WHEEL DOWN")));
 	TestEqual(TEXT("a Nintendo pad's face buttons are the Xbox's swapped round"), PadLabel(EKeys::Gamepad_FaceButton_Right, EPad::Nintendo) + PadLabel(EKeys::Gamepad_FaceButton_Left, EPad::Nintendo) + PadLabel(EKeys::Gamepad_FaceButton_Top, EPad::Nintendo), FString(TEXT("AYX")));
 	TestEqual(TEXT("its bumpers L and R"), PadLabel(EKeys::Gamepad_LeftShoulder, EPad::Nintendo) + PadLabel(EKeys::Gamepad_RightShoulder, EPad::Nintendo), FString(TEXT("LR")));
+	TestTrue(TEXT("a PlayStation pad's: Cross jumps, R2 fires, Options pauses, L3 sprints"), Find(Set->Jump).PlayStation == TEXT("CROSS") && Find(Set->Fire).PlayStation == TEXT("R2") && Find(Set->Menu).PlayStation == TEXT("OPTIONS") && Find(Set->Sprint).PlayStation == TEXT("L3"));
+	TestEqual(TEXT("its sticks by name"), Find(Set->Move).PlayStation, FString(TEXT("LEFT STICK")));
 
 	// The table is the settings' first tab, which open from the front end and from the pause menu.
 	using CheeseStrikeMenu::PageFor;
@@ -525,6 +527,12 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	Settings->SetFullscreenMode(EWindowMode::Windowed);
 	Settings->SetToDefaults();
 	TestTrue(TEXT("a fresh install plays borderless"), Settings->GetFullscreenMode() == EWindowMode::WindowedFullscreen && DefaultWindowMode == EWindowMode::WindowedFullscreen);
+	TestEqual(TEXT("and the heroes as they come"), Settings->GetHero(), INDEX_NONE);
+	Settings->SetHero(2);
+	TestEqual(TEXT("a hero picked is kept"), Settings->GetHero(), 2);
+	Settings->SetToDefaults();
+	TestEqual(TEXT("until the defaults"), Settings->GetHero(), INDEX_NONE);
+	TestEqual(TEXT("a pad's buttons go by the pad to begin with"), Settings->GetGamepadGlyphs(), static_cast<uint8>(CheeseStrikeInput::EGlyphs::Auto));
 	TestNotNull(TEXT("the engine keeps the game's settings (Config/DefaultEngine.ini)"), UCheeseStrikeSettings::Get());
 	return true;
 }

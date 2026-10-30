@@ -7,8 +7,8 @@ import unreal
 #
 # Builds the weapons' materials in /Game/CheeseStrike/Weapons/Materials/: M_CheeseWeapon, which draws a weapon from
 # its own maps (colour, normal, AORM) and turns parts of it into cheese, and an instance for each weapon's every slot;
-# and M_MuzzleFlash with its two instances. The weapons load them by path (CheeseStrikeWeaponLooks), never in a
-# constructor, so this can rebuild them.
+# M_MuzzleFlash with its two instances, and M_Tracer, a shot's streak of light. The weapons load them by path
+# (CheeseStrikeWeaponLooks), never in a constructor, so this can rebuild them.
 #
 # What turns to cheese: a channel of the weapon's mask (the red of a Fab gun's cheese mask, made by
 # weapon_textures.py from its wooden or green parts; the blue of a Lyra gun's own mask, its painted panels), or a box
@@ -18,7 +18,7 @@ import unreal
 # moves with the weapon, skinned or not.
 #
 # With instance names after the script ("py weapon_materials.py MI_Burratas MI_BurratasCream"), only those are made,
-# over the M_CheeseWeapon already there, and nothing else is touched.
+# over the M_CheeseWeapon already there, and nothing else is touched; "M_Tracer" among them makes the tracer's too.
 MATERIALS = "/Game/CheeseStrike/Weapons/Materials"
 OUT = unreal.Paths.project_saved_dir() + "weapon_materials.txt"
 ONLY = [a for a in sys.argv[1:] if a]
@@ -304,6 +304,23 @@ def build_flash_material():
     lib.save_asset(front.get_path_name(), False)
 
 
+def build_tracer_material():
+    # A tracer: a thin rod drawn unlit and additive in the colour the weapon gives it, bright enough to read in daylight.
+    m = material("M_Tracer")
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    m.set_editor_property("used_with_skeletal_mesh", False)
+    node, link = builder(m)
+    colour = node(unreal.MaterialExpressionVectorParameter, -600, 0, parameter_name="Colour", default_value=unreal.LinearColor(1.0, 0.72, 0.08, 1.0))
+    bright = node(unreal.MaterialExpressionScalarParameter, -600, 200, parameter_name="Brightness", default_value=12.0)
+    lit = node(unreal.MaterialExpressionMultiply, -300, 100)
+    link(colour, lit, "A")
+    link(bright, lit, "B")
+    mel.connect_material_property(lit, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(m)
+    lines.append("M_Tracer saved " + str(lib.save_asset(m.get_path_name(), False)))
+
+
 def texture(path):
     t = unreal.load_asset(path)
     if t is None:
@@ -353,6 +370,8 @@ try:
     else:
         parent = build_weapon_material()
         build_flash_material()
+    if not ONLY or "M_Tracer" in ONLY:
+        build_tracer_material()
     # The Cheddar Blaster: Lyra's rifle, its painted panels a deep cheddar orange.
     weapon_instance("MI_Blaster", parent, lyra("Rifle/Textures", "Rifle", "T_Rifle_Masks"),
                     {"MottleScale": 2.5, "Marble": 1.5, "CheeseRoughness": 0.5},
@@ -373,6 +392,10 @@ try:
     weapon_instance("MI_Munster", parent, fab("/Game/Fab/Max3d/DP28", "DP28"),
                     {"MottleScale": 1.5, "Marble": 1.5, "CheeseRoughness": 0.5, "RindRoughness": 0.45},
                     {"CheeseColor": (0.9, 0.74, 0.34, 1.0), "CheeseColorB": (0.84, 0.6, 0.2, 1.0), "RindColor": (0.8, 0.3, 0.05, 1.0)})
+    # The Gouda Gatling's gouda wheels (tools/art/cheese_weapons.py): young gouda, glossy and golden with a few small eyes.
+    weapon_instance("MI_Gatling", parent, None,
+                    {"UseTextures": 0.0, "CheeseAll": 1.0, "MottleScale": 1.2, "Marble": 1.4, "Holes": 0.18, "HoleSize": 0.7, "CheeseRoughness": 0.32},
+                    {"CheeseColor": (0.98, 0.7, 0.1, 1.0), "CheeseColorB": (0.92, 0.58, 0.06, 1.0)})
     # The Swiss Shotgun: Lyra's shotgun, its panels Emmental, holed right through forward of the grip.
     weapon_instance("MI_Shotgun", parent, lyra("Shotgun/Texture", "Shotgun", "T_Shotgun_Mask"),
                     {"MottleScale": 3.0, "Marble": 1.0, "Holes": 0.55, "HoleSize": 1.1, "CutHoles": 1.0, "CheeseRoughness": 0.45},
@@ -401,6 +424,44 @@ try:
     weapon_instance("MI_GrenadeCheese", parent, None, {"UseTextures": 0.0, "CheeseAll": 1.0, "MottleScale": 0.9, "Marble": 1.6, "Holes": 0.5, "HoleSize": 0.75, "CheeseRoughness": 0.5},
                     {"CheeseColor": (0.98, 0.78, 0.16, 1.0), "CheeseColorB": (0.93, 0.66, 0.1, 1.0)})
     weapon_instance("MI_GrenadeMetal", parent, None, {"UseTextures": 0.0, "PlainRoughness": 0.42, "PlainMetallic": 1.0}, {"PlainColor": (0.42, 0.42, 0.4, 1.0)})
+    # The cheese weapons modelled in Blender (tools/art/cheese_weapons.py), slot by slot: plain colours, no maps, each
+    # part all cheese, all rind or wax, or plain steel and black polymer.
+    plain = {"UseTextures": 0.0}
+
+    def cheese(name, colour, colour_b, **scalars):
+        weapon_instance(name, parent, None, dict(plain, CheeseAll=1.0, **scalars), {"CheeseColor": colour, "CheeseColorB": colour_b})
+
+    def rind(name, colour, roughness):
+        weapon_instance(name, parent, None, dict(plain, RindAll=1.0, RindRoughness=roughness, MottleScale=0.8), {"RindColor": colour})
+
+    weapon_instance("MI_GunSteel", parent, None, dict(plain, PlainRoughness=0.35, PlainMetallic=1.0), {"PlainColor": (0.3, 0.3, 0.32, 1.0)})
+    weapon_instance("MI_GunBlack", parent, None, dict(plain, PlainRoughness=0.6, PlainMetallic=0.0), {"PlainColor": (0.025, 0.025, 0.025, 1.0)})
+    weapon_instance("MI_BabyStrip", parent, None, dict(plain, PlainRoughness=0.3, PlainMetallic=0.0), {"PlainColor": (0.9, 0.9, 0.88, 1.0)})
+    # The Cheddar Blaster's blocks: a deep cheddar orange.
+    cheese("MI_Cheddar", (0.86, 0.27, 0.02, 1.0), (0.74, 0.2, 0.01, 1.0), MottleScale=2.5, Marble=1.5, CheeseRoughness=0.5)
+    # The Colby Carbine's longhorns: orange marbled with cream.
+    cheese("MI_Colby", (0.86, 0.3, 0.03, 1.0), (0.9, 0.66, 0.3, 1.0), MottleScale=1.2, Marble=3.0, CheeseRoughness=0.55)
+    # The Roquefort Rifle: creamy and veined blue-green; its scope dipped in dark red wax.
+    weapon_instance("MI_RoquefortCheese", parent, None, dict(plain, CheeseAll=1.0, MottleScale=3.0, Marble=1.0, Veins=1.0, VeinScale=2.2, VeinWidth=0.11, CheeseRoughness=0.5),
+                    {"CheeseColor": (0.84, 0.79, 0.6, 1.0), "CheeseColorB": (0.76, 0.71, 0.52, 1.0), "VeinColor": (0.08, 0.2, 0.22, 1.0)})
+    rind("MI_ScopeWax", (0.28, 0.02, 0.04, 1.0), 0.3)
+    # The Curd Pistol: fresh white curd.
+    cheese("MI_Curd", (0.95, 0.92, 0.8, 1.0), (0.85, 0.8, 0.62, 1.0), MottleScale=0.5, Marble=2.0, CheeseRoughness=0.6)
+    # The Swiss Shotgun: pale gold Emmental (its eyes are cut in the model, a few small ones besides) and its rind.
+    cheese("MI_Swiss", (0.95, 0.7, 0.2, 1.0), (0.88, 0.6, 0.14, 1.0), MottleScale=3.0, Marble=1.0, Holes=0.12, HoleSize=0.35, CheeseRoughness=0.45)
+    rind("MI_SwissRind", (0.55, 0.32, 0.08, 1.0), 0.55)
+    # The Munster Twin SMGs: the pale paste and the orange washed rind.
+    cheese("MI_MunsterCheese", (0.95, 0.8, 0.42, 1.0), (0.9, 0.72, 0.34, 1.0), MottleScale=1.5, Marble=1.5, CheeseRoughness=0.5)
+    rind("MI_MunsterRind", (0.72, 0.2, 0.02, 1.0), 0.45)
+    # The Cheese Grater's Parmesan, and its shards: grainy.
+    cheese("MI_Parmesan", (0.88, 0.7, 0.34, 1.0), (0.76, 0.58, 0.26, 1.0), MottleScale=0.35, Marble=2.0, CheeseRoughness=0.7)
+    # The Cheese Stick: string cheese, white and faintly streaked along it.
+    cheese("MI_StringCheese", (0.97, 0.95, 0.88, 1.0), (0.88, 0.86, 0.78, 1.0), MottleScale=4.0, Marble=0.8, CheeseRoughness=0.45)
+    # The BabyBomb: glossy red wax, and the cheese under it.
+    rind("MI_BabyWax", (0.6, 0.01, 0.01, 1.0), 0.22)
+    cheese("MI_BabyCheese", (0.96, 0.78, 0.38, 1.0), (0.92, 0.7, 0.3, 1.0), MottleScale=0.8, Marble=1.2, CheeseRoughness=0.45)
+    # The Gouda Gatling's housing: a whole gouda in yellow wax.
+    rind("MI_GoudaWax", (0.95, 0.68, 0.04, 1.0), 0.25)
 except Exception:
     lines.append(traceback.format_exc())
 finally:

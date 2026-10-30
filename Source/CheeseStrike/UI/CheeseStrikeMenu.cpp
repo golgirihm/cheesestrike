@@ -44,6 +44,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
 #include "CheeseStrikePlayerState.h"
+#include "Animation/CheeseStrikeBodies.h"
 
 namespace CheeseStrikeMenu
 {
@@ -798,6 +799,11 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 				SAssignNew(FriendsContent, SBox)
 			]
 		]
+		// The hero to play, under the figure on the front end's main page.
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0.0f, 0.0f, 0.0f, 22.0f))
+		[
+			SAssignNew(HeroBox, SBox)
+		]
 		// The question before closing the host's lobby or quitting: over everything, and it takes every press.
 		// Modal: a layer over the whole screen that blurs and darkens all that is behind it, other UI too, and is hit
 		// itself, so that nothing under it can be clicked.
@@ -938,7 +944,7 @@ void SCheeseStrikeMenu::Refresh()
 		}
 		// While the question is up nothing behind it can take a press, a click or the focus: the pad and the keys stay in the dialog.
 		const bool bBehind = Asking == EMenuAsk::None;
-		for (const TSharedPtr<SWidget>& Each : TArray<TSharedPtr<SWidget>>{ Panel, FriendsBox, Lobby })
+		for (const TSharedPtr<SWidget>& Each : TArray<TSharedPtr<SWidget>>{ Panel, FriendsBox, Lobby, HeroBox })
 		{
 			if (Each.IsValid() && Each->IsEnabled() != bBehind)
 			{
@@ -968,6 +974,10 @@ void SCheeseStrikeMenu::Refresh()
 	if (Masthead.IsValid())
 	{
 		Masthead->SetVisibility(bFrontEnd ? EVisibility::HitTestInvisible : EVisibility::Collapsed);
+	}
+	if (HeroBox.IsValid())
+	{
+		HeroBox->SetVisibility(Page == EMenuPage::Main ? EVisibility::Visible : EVisibility::Collapsed);
 	}
 	if (Panel.IsValid())
 	{
@@ -1008,6 +1018,11 @@ void SCheeseStrikeMenu::Refresh()
 			const bool bFade = BuiltPage != Page;
 			BuiltPage = Page;
 			Content->SetContent(bFade ? MenuFadeIn(MakePage()) : MakePage());
+			// Its items after the page's, so that the page's first item takes the focus first.
+			if (HeroBox.IsValid())
+			{
+				HeroBox->SetContent(Page == EMenuPage::Main ? MakeHeroPicker() : SNullWidget::NullWidget);
+			}
 		}
 	}
 	KeepFocus();
@@ -1623,10 +1638,49 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 		+ SVerticalBox::Slot().AutoHeight()
 		[
 			SNew(SVerticalBox).IsEnabled(!bHosting)
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("PRACTICE"), [Player]() { if (Player.IsValid()) Player->PracticeFromMenu(); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
 			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeQuitButton() ]
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeHeroPicker()
+{
+	const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+	if (Settings == nullptr)
+	{
+		return SNullWidget::NullWidget;
+	}
+	TArray<FString> Names = {TEXT("AUTO")};
+	for (int32 Body = 0; Body < CheeseStrikeBodies::All().Num(); ++Body)
+	{
+		Names.Add(FString(CheeseStrikeBodies::HeroKey(Body)).ToUpper());
+	}
+	static const FSlateRoundedBoxBrush HeroPanelBrush(FLinearColor::White, 14.0f);
+	return SNew(SBorder)
+		.BorderImage(&HeroPanelBrush)
+		.BorderBackgroundColor(PanelColour)
+		.Padding(FMargin(18.0f, 10.0f, 12.0f, 10.0f))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 14.0f, 0.0f))
+			[
+				SNew(STextBlock).Text(FText::FromString(TEXT("HERO"))).Font(Font(15, FName("Bold"))).ColorAndOpacity(Muted)
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				MakeChoiceButtons(Names, Settings->GetHero() + 1, true, [this](int32 Index)
+				{
+					if (UCheeseStrikeSettings* Kept = UCheeseStrikeSettings::Get())
+					{
+						Kept->SetHero(Index - 1);
+						Kept->SaveSettings();
+					}
+					Refresh();
+				})
+			]
 		];
 }
 
@@ -2542,6 +2596,12 @@ FString SCheeseStrikeMenu::PageKey() const
 			Key += TEXT("|") + Found;
 		}
 	}
+	if (Page == EMenuPage::Main || Page == EMenuPage::Options)
+	{
+		// The hero picked lights its button.
+		const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+		Key += FString::Printf(TEXT("|hero %d"), Settings != nullptr ? Settings->GetHero() : INDEX_NONE);
+	}
 	if (Page == EMenuPage::Options)
 	{
 		// What is pressed rather than slid: the sliders show their values by themselves, and drawing the page again would drop one being dragged.
@@ -2551,7 +2611,7 @@ FString SCheeseStrikeMenu::PageKey() const
 			const FIntPoint Resolution = Settings->GetScreenResolution();
 			const FIntPoint Drawn = Settings->GetResolutionShown();
 			Key += FString::Printf(TEXT("|%d %d %dx%d %dx%d %d %.0f %d"), Settings->GetOverallScalabilityLevel(), static_cast<int32>(Settings->GetFullscreenMode()), Resolution.X, Resolution.Y, Drawn.X, Drawn.Y,
-				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0) + (Settings->IsAimAssistOn() ? TEXT(" assist") : TEXT(""));
+				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0) + (Settings->IsAimAssistOn() ? TEXT(" assist") : TEXT("")) + FString::Printf(TEXT(" glyphs %d"), Settings->GetGamepadGlyphs());
 		}
 	}
 	return Key;
@@ -2822,7 +2882,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSlider(float Min, float Max, float St
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 {
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
-	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS")};
+	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS"), TEXT("HERO")};
 	const bool bInMatch = Page == EMenuPage::Options && Player.IsValid() && Player->IsPaused();
 	const bool bControls = OptionsTab == EOptionsTab::Controls;
 	// The controls are a table that scrolls under its heading; the other tabs' rows scroll as one.
@@ -2837,7 +2897,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 				Refresh();
 			})
 		]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 20.0f, 6.0f)) [ bControls ? ControlsRow(TEXT("ACTION"), TEXT("KEYBOARD AND MOUSE"), TEXT("XBOX"), TEXT("NINTENDO"), true) : SNullWidget::NullWidget ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 20.0f, 6.0f)) [ bControls ? ControlsRow(TEXT("ACTION"), TEXT("KEYBOARD AND MOUSE"), TEXT("XBOX"), TEXT("PLAYSTATION"), TEXT("NINTENDO"), true) : SNullWidget::NullWidget ]
 		// Clear of the scroll bar on the right.
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SAssignNew(Scroll, SScrollBox).ScrollWhenFocusChanges(EScrollWhenFocusChanges::AnimatedScroll) + SScrollBox::Slot().Padding(FMargin(0.0f, 0.0f, bControls ? 20.0f : 0.0f, 0.0f)) [ bControls ? MakeControls() : MakeOptionsTab() ] ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f))
@@ -2853,10 +2913,12 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 	return SettingsPage;
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const FString& Keys, const FString& Xbox, const FString& Nintendo, bool bHeading) const
+TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const FString& Keys, const FString& Xbox, const FString& PlayStation, const FString& Nintendo, bool bHeading) const
 {
-	// The action, then its keys, then each pad's buttons, the column of what the player uses now lit.
+	// The action, then its keys, then each pad's buttons, the column of what the player uses now lit: the keys, or the
+	// pad whose buttons the prompts name (CheeseStrikeInput::GlyphsOf).
 	const bool bPadLit = CheeseStrikeInput::IsUsingGamepad(Controller.Get());
+	const CheeseStrikeControls::EPad PadInUse = CheeseStrikeControls::PadFor(CheeseStrikeInput::GlyphsOf(Controller.Get()));
 	// Each column is a fixed width (880 across: the page less the clear of the scroll bar), its text wrapped inside it. Fill
 	// widths with the wrapping set from outside re-flowed the text a frame after the table was laid out, which was the
 	// flicker side to side that remained after the up and down one (waves 8 and 9).
@@ -2872,12 +2934,13 @@ TSharedRef<SWidget> SCheeseStrikeMenu::ControlsRow(const FString& Action, const 
 	const FSlateFontInfo KeyLook = bHeading ? Font(14, FName("Bold")) : Font(17, FName("Bold"));
 	const FLinearColor Name = bHeading ? Muted : Ink;
 	const FLinearColor KeysColour = bHeading ? Muted : (bPadLit ? Muted : Cheese);
-	const FLinearColor PadColour = bHeading ? Muted : (bPadLit ? Cheese : Muted);
+	const auto PadColour = [bHeading, bPadLit, PadInUse](CheeseStrikeControls::EPad Pad) { return bHeading || !bPadLit || Pad != PadInUse ? Muted : Cheese; };
 	return SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Action, Look, Name, 317.0f, 12.0f) ]
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Keys, KeyLook, KeysColour, 229.0f, 12.0f) ]
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Xbox, KeyLook, PadColour, 167.0f, 12.0f) ]
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour, 167.0f, 4.0f) ];
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Action, Look, Name, 250.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Keys, KeyLook, KeysColour, 200.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Xbox, KeyLook, PadColour(CheeseStrikeControls::EPad::Xbox), 143.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(PlayStation, KeyLook, PadColour(CheeseStrikeControls::EPad::PlayStation), 143.0f, 12.0f) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ Cell(Nintendo, KeyLook, PadColour(CheeseStrikeControls::EPad::Nintendo), 144.0f, 4.0f) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeControls()
@@ -2892,7 +2955,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeControls()
 	for (const CheeseStrikeControls::FRow& Each : CheeseStrikeControls::Rows(*Set))
 	{
 		const auto Or = [](const FString& Text) { return Text.IsEmpty() ? FString(TEXT("-")) : Text; };
-		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ ControlsRow(Each.Action, Or(Each.Keyboard), Or(Each.Xbox), Or(Each.Nintendo), false) ];
+		List->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ ControlsRow(Each.Action, Or(Each.Keyboard), Or(Each.Xbox), Or(Each.PlayStation), Or(Each.Nintendo), false) ];
 	}
 	return List;
 }
@@ -2941,6 +3004,23 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			Refresh();
 		})));
 		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("A gamepad's: the stick turns slower over an enemy, and a little toward them. Never the mouse."), true, true, WrapWidth() - OptionLabelWidth) ];
+		{
+			TArray<FString> Glyphs;
+			for (int32 Index = 0; Index < CheeseStrikeInput::NumGlyphs; ++Index)
+			{
+				Glyphs.Add(CheeseStrikeInput::GlyphsName(static_cast<CheeseStrikeInput::EGlyphs>(Index)));
+			}
+			Add(MakeOptionRow(TEXT("Gamepad buttons"), MakeChoiceButtons(Glyphs, Settings->GetGamepadGlyphs(), true, [this, Kept](int32 Index)
+			{
+				if (Kept.IsValid())
+				{
+					Kept->SetGamepadGlyphs(static_cast<uint8>(Index));
+					Kept->SaveSettings();
+				}
+				Refresh();
+			})));
+			Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("What the prompts and the controls call a pad's buttons. Auto goes by the pad when it can be told; through Steam Input every pad looks like an Xbox one, so pick yours."), true, true, WrapWidth() - OptionLabelWidth) ];
+		}
 		break;
 	case EOptionsTab::Sound:
 		Add(MakeOptionRow(TEXT("Master volume"), MakeSlider(0.0f, 1.0f, 0.01f,
@@ -3068,6 +3148,25 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			}
 			Refresh();
 		})));
+		break;
+	}
+	case EOptionsTab::Hero:
+	{
+		TArray<FString> Names = {TEXT("AUTO")};
+		for (int32 Body = 0; Body < CheeseStrikeBodies::All().Num(); ++Body)
+		{
+			Names.Add(FString(CheeseStrikeBodies::HeroKey(Body)).ToUpper());
+		}
+		Add(MakeOptionRow(TEXT("Hero"), MakeChoiceButtons(Names, Settings->GetHero() + 1, true, [this, Kept](int32 Index)
+		{
+			if (Kept.IsValid())
+			{
+				Kept->SetHero(Index - 1);
+				Kept->SaveSettings();
+			}
+			Refresh();
+		})));
+		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("Worn in your side's colours whichever side you are on; without sides, in the hero's own. Auto gives the heroes in turn."), true, true, WrapWidth() - OptionLabelWidth) ];
 		break;
 	}
 	}

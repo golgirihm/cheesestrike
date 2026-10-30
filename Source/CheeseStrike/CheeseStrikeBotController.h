@@ -52,6 +52,11 @@ public:
 	bool SeesTarget() const { return bSeesTarget; }
 	/** The skill it plays at (CheeseStrikeBots::Skills). */
 	int32 GetSkill() const { return SkillIndex; }
+	/** Whether it is one of the Practice Range's dummies (`?BotSkill=dummy`): it stands where it came in and never moves, aims or fires. */
+	bool IsDummy() const { return bDummy; }
+	/** A dummy's spot, of the map's (ACheeseStrikeGameMode::ChooseDummySpot), where it comes back each time; INDEX_NONE until it has one. */
+	int32 GetDummySpot() const { return DummySpot; }
+	void SetDummySpot(int32 Spot) { DummySpot = Spot; }
 	/** The seconds from first seeing an enemy to its first shot at them, the last time it shot at someone new; -1 before. */
 	float GetLastReaction() const { return LastReaction; }
 
@@ -144,6 +149,8 @@ protected:
 	void ForgetAll();
 
 	int32 SkillIndex = CheeseStrikeBots::DefaultSkill;
+	bool bDummy = false;
+	int32 DummySpot = INDEX_NONE;
 
 	TWeakObjectPtr<ACheeseStrikeCharacter> Target;
 	bool bSeesTarget = false;

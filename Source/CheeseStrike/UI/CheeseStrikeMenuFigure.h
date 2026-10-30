@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "CheeseStrikeMenuFigure.generated.h"
 
+class USkeletalMesh;
 class USkeletalMeshComponent;
 class UStaticMeshComponent;
 
@@ -31,7 +32,17 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
 
+	/** Wears hero `Hero` of CheeseStrikeBodies::All, in its own colours, at once, still turning; INDEX_NONE ("auto") is Lt. Belica. */
+	void ShowHero(int32 Hero);
+	/** The hero it wears. */
+	int32 GetHero() const { return Shown; }
+
 protected:
+	/** Every hero's mesh, in CheeseStrikeBodies::All's order. */
+	UPROPERTY()
+	TArray<TObjectPtr<USkeletalMesh>> Heroes;
+	int32 Shown = 0;
+
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<UStaticMeshComponent> Pedestal;
 	UPROPERTY(VisibleAnywhere, Category="Components")

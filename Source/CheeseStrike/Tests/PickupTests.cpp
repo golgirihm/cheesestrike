@@ -45,19 +45,28 @@ bool FEveryoneComesInWithTheWeakestPrimary::RunTest(const FString& Parameters)
 		const FWeaponStats& Other = *CheeseStrikeArsenal::Find(Id);
 		TestTrue(FString::Printf(TEXT("the %s lies on stands"), *Other.DisplayName.ToString()), CanLieOnAStand(Id));
 		TestTrue(FString::Printf(TEXT("and is worth more (%d)"), Worth(Id)), Worth(Id) > 0);
-		// Every other gun kills faster, close and at the body, but the scoped rifle, whose kill is a head shot.
-		if (!Other.bScoped)
+		// Every other gun kills faster, close and at the body, but the scoped rifle, whose kill is a head shot, and the
+		// Cheese Grater, whose shards home in and burst together.
+		if (!Other.bScoped && Other.HomingTurn <= 0.0f)
 		{
 			TestTrue(FString::Printf(TEXT("the %s kills faster (%.2f s against %.2f s)"), *Other.DisplayName.ToString(), CheeseStrikeWeapons::TimeToKill(Other), CheeseStrikeWeapons::TimeToKill(*Spawn)),
 				CheeseStrikeWeapons::TimeToKill(Other) < CheeseStrikeWeapons::TimeToKill(*Spawn));
 		}
 	}
 	TestEqual(TEXT("the Roquefort is worth the most"), Worth(CheeseStrikeWeapons::Roquefort().Id), 3);
+	TestTrue(TEXT("with the BabyBomb and the Cheese Stick: the power weapons, at the riskiest stands"), Worth(CheeseStrikeWeapons::BabyBomb().Id) == 3 && Worth(CheeseStrikeWeapons::Stick().Id) == 3);
+	TestTrue(TEXT("which bots go for"), BotWants(CheeseStrikeWeapons::Blaster().Id, CheeseStrikeWeapons::Stick().Id, 500.0f) > 0.0f && BotWants(CheeseStrikeWeapons::Blaster().Id, CheeseStrikeWeapons::BabyBomb().Id, 500.0f) > 0.0f);
 	TestTrue(TEXT("the Blaster and the Munster more than the Grater and the Shotgun"),
 		Worth(CheeseStrikeWeapons::Blaster().Id) == 2 && Worth(CheeseStrikeWeapons::Munster().Id) == 2 && Worth(CheeseStrikeWeapons::Grater().Id) == 1 && Worth(CheeseStrikeWeapons::Shotgun().Id) == 1 && Worth(CheeseStrikeWeapons::Burratas().Id) == 1);
 	TestFalse(TEXT("no sidearm on a stand"), CanLieOnAStand(CheeseStrikeArsenal::Sidearm()));
 	TestFalse(TEXT("nor the knife"), CanLieOnAStand(CheeseStrikeArsenal::Knife()));
 	TestFalse(TEXT("nor anything that isn't a weapon"), CanLieOnAStand(TEXT("bazooka")));
+	// The Gouda Overload's Gatling: never on a stand or the floor, and nothing is taken while it is carried.
+	const FName Gatling = CheeseStrikeWeapons::Gatling().Id;
+	TestFalse(TEXT("nor the Gouda Gatling"), CanLieOnAStand(Gatling) || CanBeDropped(Gatling));
+	TestTrue(TEXT("carrying it, nothing is taken from a stand"), HowToTake(Gatling, CheeseStrikeWeapons::Roquefort().Id, false) == ETake::None);
+	TestTrue(TEXT("or the floor"), HowToTake(Gatling, CheeseStrikeWeapons::Blaster().Id, false, true) == ETake::None);
+	TestEqual(TEXT("and a bot carrying it wants nothing better"), BotWants(Gatling, CheeseStrikeWeapons::Roquefort().Id, 300.0f), 0.0f);
 	return true;
 }
 

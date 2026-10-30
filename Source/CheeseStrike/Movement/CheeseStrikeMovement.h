@@ -58,10 +58,14 @@ namespace CheeseStrikeMovement
 	constexpr float SlideFrom = 1.2f;
 	constexpr float SlideRest = 0.4f;
 
-	/** What a heavy weapon in hand (the Munster Machine Gun) slows its carrier to. */
+	/** What a heavy weapon in hand (the BabyBomb) slows its carrier to, and a long one (the Cheese Stick). */
 	constexpr float HeavyFactor = 0.85f;
-	/** The top speed `Speed` becomes with a heavy weapon. */
-	float WithWeapon(float Speed, bool bHeavy);
+	constexpr float LongFactor = 0.9f;
+	/** The top speed `Speed` becomes with a heavy weapon, or a long one. */
+	float WithWeapon(float Speed, bool bHeavy, bool bLong = false);
+	/** Whether a weapon carried at `CarrySpeed` of the usual speed is heavy (HeavyFactor) or long (LongFactor), as the moves carry it. */
+	bool IsHeavy(float CarrySpeed);
+	bool IsLong(float CarrySpeed);
 
 	/** How fast a player moves across the ground. */
 	float Speed(bool bSprinting, bool bAiming, bool bCrouching);

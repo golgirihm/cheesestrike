@@ -33,6 +33,9 @@
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Weapons/CheeseStrikeWeapon.h"
+#include "Movement/CheeseStrikeMovement.h"
+#include "Movement/CheeseStrikeMovementComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "Effects/CheeseStrikeCheeseBlood.h"
 #include "Rules/CheeseStrikeBlood.h"
 
@@ -51,6 +54,8 @@ namespace ModePlayTests
 	const FVector AsideSpot(1150.0f, -1450.0f, 100.0f);
 	constexpr float AsideYaw = 117.0f;
 	const TCHAR* const Burst = TEXT("hold Fire\nwait 1.2\nrelease Fire");
+	/** The Gouda Overload's effects in StreaksAreCalledInAndScoreForTheirCallers, shortened (CheeseStrike.OverloadSeconds). */
+	constexpr float OverloadTest = 6.0f;
 
 	/** Player `Of`'s state as world `Seen` has it. */
 	ACheeseStrikePlayerState* StateOf(int32 Of, int32 Seen)
@@ -499,28 +504,95 @@ bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Paramete
 		TestTrue(TEXT("the host's own wheels don't hurt them"), Host->IsAlive() && Host->GetHealth() == CheeseStrikeWeapons::MaxHealth);
 	});
 
-	// The Gouda Overload, from the joiner's machine: it rains on the host, standing in the open, and kills them.
+	// The Gouda Overload, from the joiner's machine, its effects shortened to OverloadTest seconds: the joiner fast and firing
+	// the Gouda Gatling, the host splatted (slowed, no sprint), and both back to normal after.
 	WaitUntil(TEXT("the joiner back"), 4.0f + 4.0f, []() { const ACheeseStrikeCharacter* Joiner = Character(1); return Joiner != nullptr && Joiner->IsAlive(); });
-	Then([]() { StateOf(1, 0)->GiveStreak(EStreak::GoudaOverload); });
+	Then([]()
+	{
+		IConsoleManager::Get().FindConsoleVariable(TEXT("CheeseStrike.OverloadSeconds"))->Set(OverloadTest, ECVF_SetByCode);
+		StateOf(1, 0)->GiveStreak(EStreak::GoudaOverload);
+	});
+	PutAt(0, HostSpot, HostYaw);
+	PutAt(1, AsideSpot, AsideYaw);
 	WaitUntil(TEXT("the joiner hearing of the Overload"), 3.0f, []() { const ACheeseStrikePlayerState* Joiner = StateOf(1, 1); return Joiner != nullptr && Joiner->NextStreak() == EStreak::GoudaOverload; });
 	Play(1, TEXT("tap Streak\nwait 0.3"));
 	WaitUntil(TEXT("the Overload coming"), 3.0f, []() { const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0)); return Bombs != nullptr && Bombs->GetKind() == EStreak::GoudaOverload; });
+	WaitUntil(TEXT("the Gatling in the joiner's hands on their own machine"), 3.0f, []() { return HeldId(Character(1)) == CheeseStrikeWeapons::Gatling().Id; });
 	Then([this]()
 	{
 		const ACheeseStrikeGameState* Match = GameState(0);
 		TestTrue(TEXT("with a warning to everyone"), Match->GetAnnouncements().Last().Text.Contains(TEXT("called in the Gouda Overload")));
-		TestTrue(TEXT("and the host still standing, for now"), Character(0)->IsAlive());
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		TestEqual(TEXT("the caller has the Gouda Gatling in hand at once"), HeldId(Joiner), CheeseStrikeWeapons::Gatling().Id);
+		TestTrue(TEXT("its 200 rounds"), Joiner->GetWeapon() != nullptr && Joiner->GetWeapon()->GetMagazine() == CheeseStrikeWeapons::Gatling().MagazineSize);
+		TestEqual(TEXT("and runs half as fast again"), Joiner->HasteFactorNow(), CheeseStrikeStreaks::HasteFactor);
+		TestEqual(TEXT("as their own machine knows"), Character(1)->HasteFactorNow(), CheeseStrikeStreaks::HasteFactor);
+		TestEqual(TEXT("the host not splatted before the warning ends"), Character(0)->GooFactorNow(), 1.0f);
 	});
-	WaitUntil(TEXT("the Overload killing the host"), CheeseStrikeStreaks::OverloadWarning + CheeseStrikeStreaks::OverloadRain + 2.0f, []() { return Dead(0); });
+	// The caller, fast: walking (not sprinting) faster than anyone sprints.
+	Play(1, TEXT("hold Move 0 1\nwait 0.7"));
 	Then([this]()
 	{
-		const ACheeseStrikeGameState* Match = GameState(0);
-		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
-		TestEqual(TEXT("the host killed by the joiner"), Character(0)->GetKilledBy(), Joiner->DisplayName());
-		TestEqual(TEXT("by the Gouda Overload"), Match->GetKillFeed().Last().How, FString(TEXT("Gouda Overload")));
-		const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0));
-		TestTrue(TEXT("its wheels landing round the host"), Bombs != nullptr && Bombs->GetLanded() > 0 && Bombs->GetHits() > 0);
+		const float Speed = CharacterOf(1, 0)->GetVelocity().Size2D();
+		TestTrue(FString::Printf(TEXT("the caller walks at %.0f cm/s, 1.5 times a walk"), Speed), FMath::IsNearlyEqual(Speed, CheeseStrikeMovement::WalkSpeed * CheeseStrikeStreaks::HasteFactor, 25.0f));
+		// Turned away from the host to fire.
+		if (APlayerController* Own = Controller(1))
+		{
+			Own->SetControlRotation(FRotator(0.0f, AsideYaw + 180.0f, 0.0f));
+		}
+		ShotsBefore = Character(1)->GetWeapon()->ShotsFired;
 	});
+	// The Gatling spins up before it fires, then fires twenty a second.
+	Play(1, TEXT("release Move\nhold Fire\nwait 0.25"));
+	Then([this]() { TestEqual(TEXT("nothing fired while it spins up"), Character(1)->GetWeapon()->ShotsFired, ShotsBefore); });
+	Play(1, TEXT("wait 0.85\nrelease Fire\nwait 0.3"));
+	Then([this]()
+	{
+		const int32 Fired = Character(1)->GetWeapon()->ShotsFired - ShotsBefore;
+		TestTrue(FString::Printf(TEXT("then twenty a second (%d in 0.7 s)"), Fired), Fired >= 10 && Fired <= 17);
+		const ACheeseStrikeWeapon* Gatling = CharacterOf(1, 0)->GetWeapon();
+		TestTrue(TEXT("the server counting them off its belt"), Gatling != nullptr && Gatling->GetWeaponId() == CheeseStrikeWeapons::Gatling().Id
+			&& Gatling->GetMagazine() <= CheeseStrikeWeapons::Gatling().MagazineSize - 10);
+	});
+	// The host, splatted as the warning ends: slowed and unable to sprint.
+	WaitUntil(TEXT("the gouda on the host"), CheeseStrikeStreaks::OverloadWarning + 1.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->GetGooUntil() > 0.0f; });
+	Then([this]()
+	{
+		const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0));
+		TestTrue(TEXT("the enemy splatted"), Bombs != nullptr && Bombs->GetHits() == 1);
+		TestTrue(TEXT("to a quarter of their speed"), Character(0)->GooFactorNow() < 0.3f);
+		TestEqual(TEXT("not the caller"), CharacterOf(1, 0)->GetGooUntil(), 0.0f);
+	});
+	WaitUntil(TEXT("the joiner's machine seeing the host splatted"), 2.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 1); return Host != nullptr && Host->GooFactorNow() < 0.6f; });
+	Play(0, TEXT("hold Sprint\nhold Move 0 1\nwait 0.6"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		const float Speed = Host->GetVelocity().Size2D();
+		TestTrue(FString::Printf(TEXT("the host, sprinting, goes at %.0f cm/s: slower than a walk"), Speed), Speed > 40.0f && Speed < CheeseStrikeMovement::WalkSpeed * 0.55f);
+		TestFalse(TEXT("and doesn't sprint"), Host->GetCheeseStrikeMovement()->IsSprinting());
+	});
+	Play(0, TEXT("release Move\nrelease Sprint"));
+	// Back to normal: the Gatling gone and the primary back, the haste over, then the gouda.
+	WaitUntil(TEXT("the Gatling spent"), OverloadTest + 1.0f, []() { return HeldId(CharacterOf(1, 0)) == CheeseStrikeWeapons::Blaster().Id; });
+	WaitUntil(TEXT("the primary back on the joiner's machine"), 2.0f, []() { return HeldId(Character(1)) == CheeseStrikeWeapons::Blaster().Id; });
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		TestFalse(TEXT("nothing special carried"), Joiner->GetInventory()->HasSpecial());
+		TestEqual(TEXT("the caller's haste over"), Joiner->HasteFactorNow(), 1.0f);
+	});
+	WaitUntil(TEXT("the gouda gone"), OverloadTest, []() { return Character(0)->GooFactorNow() >= 1.0f; });
+	Play(0, TEXT("hold Sprint\nhold Move 0 1\nwait 0.8"));
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		const float Speed = Host->GetVelocity().Size2D();
+		TestTrue(FString::Printf(TEXT("the host sprints again (%.0f cm/s)"), Speed), Speed > CheeseStrikeMovement::WalkSpeed * 1.3f && Host->GetCheeseStrikeMovement()->IsSprinting());
+		TestTrue(TEXT("both alive"), Host->IsAlive() && CharacterOf(1, 0)->IsAlive());
+	});
+	Play(0, TEXT("release Move\nrelease Sprint"));
+	Then([]() { IConsoleManager::Get().FindConsoleVariable(TEXT("CheeseStrike.OverloadSeconds"))->Set(0.0f, ECVF_SetByCode); });
 	StopPlaying();
 	return true;
 }

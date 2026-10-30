@@ -23,6 +23,7 @@
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "AudioDevice.h"
 #include "Components/AudioComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -34,14 +35,19 @@
 #include "Animation/CheeseStrikeArmsPose.h"
 #include "CheeseStrikeArsenal.h"
 #include "CheeseStrikeCharacter.h"
+#include "CheeseStrikeGameMode.h"
+#include "CheeseStrikePlayerState.h"
 #include "CheeseStrikeBeat.h"
 #include "CheeseStrikeGunfire.h"
 #include "CheeseStrikeInventory.h"
 #include "CheeseStrikeWeaponLooks.h"
 #include "Map/CheeseStrikeMouse.h"
+#include "Map/CheeseStrikeTarget.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
+#include "Movement/CheeseStrikeMovement.h"
+#include "CheeseStrikeProjectile.h"
 
 /** With this on, every shot heard here is written to the log with how loud and how dull it is heard. */
 static TAutoConsoleVariable<int32> CVarTraceGunfire(TEXT("CheeseStrike.TraceGunfire"), 0, TEXT("Log every shot heard: how far off, at what volume and how dull."));
@@ -325,6 +331,7 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 			ShowShot();
 		}
 	}
+	UpdateTracers();
 	// The flash goes out.
 	if (FlashUntil > 0.0f && GetWorld()->GetTimeSeconds() >= FlashUntil)
 	{
@@ -352,7 +359,7 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 	if (bInHand && Movement != nullptr)
 	{
 		// The weapon in hand says how its carrier moves, through the moves they send.
-		Movement->SetCarryingHeavy(Stats->CarrySpeed < 1.0f);
+		Movement->SetCarrying(CheeseStrikeMovement::IsHeavy(Stats->CarrySpeed), CheeseStrikeMovement::IsLong(Stats->CarrySpeed));
 	}
 }
 
@@ -424,13 +431,13 @@ void ACheeseStrikeWeapon::PutFlashOn(bool bLeft)
 			// In the model's space, which may be scaled: the flash keeps its own size.
 			const FVector Scale = Model->GetComponentScale();
 			Star.Key->SetRelativeLocation(Muzzle);
-			Star.Key->SetRelativeScale3D(FVector(Size) / Scale.GetMax());
+			Star.Key->SetRelativeScale3D(FVector(Size) / Scale.ComponentMax(FVector(KINDA_SMALL_NUMBER)));
 		}
 	}
 	if (UPrimitiveComponent* Model = bLeft ? GetOffHandModel(false) : GetModel(false))
 	{
 		FlashLight->AttachToComponent(Model, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-		FlashLight->SetRelativeLocation(Muzzle + FVector(0.0f, 10.0f, 0.0f) / Model->GetComponentScale().GetMax());
+		FlashLight->SetRelativeLocation(Muzzle + FVector(0.0f, 10.0f, 0.0f) / Model->GetComponentScale().ComponentMax(FVector(KINDA_SMALL_NUMBER)));
 	}
 }
 
@@ -585,7 +592,7 @@ void ACheeseStrikeWeapon::PutAway()
 	{
 		if (UCheeseStrikeMovementComponent* Movement = Holder->GetCheeseStrikeMovement())
 		{
-			Movement->SetCarryingHeavy(false);
+			Movement->SetCarrying(false, false);
 		}
 	}
 	CancelReload();
@@ -913,7 +920,108 @@ void ACheeseStrikeWeapon::ShowShot()
 		}
 	}
 	Flash();
+	ShowTracer();
 	PlayShotSound(AnyOf(FireSounds));
+}
+
+void ACheeseStrikeWeapon::ShowTracer()
+{
+	UWorld* World = GetWorld();
+	if (Look == nullptr || Look->Tracer.A <= 0.0f || World == nullptr || GetNetMode() == NM_DedicatedServer || Holder == nullptr)
+	{
+		return;
+	}
+	if (TracerMesh == nullptr)
+	{
+		TracerMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	}
+	if (TracerLook == nullptr)
+	{
+		// Loaded here, by path, as tools/art/weapon_materials.py rebuilds it.
+		if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, CheeseStrikeWeaponLooks::TracerMaterial))
+		{
+			TracerLook = UMaterialInstanceDynamic::Create(Material, this);
+			TracerLook->SetVectorParameterValue(TEXT("Colour"), Look->Tracer);
+			// Bright enough to stand out in daylight, not so bright that it burns out to white.
+			TracerLook->SetScalarParameterValue(TEXT("Brightness"), 3.0f);
+		}
+	}
+	if (TracerMesh == nullptr || TracerLook == nullptr)
+	{
+		return;
+	}
+	// From the muzzle this machine shows (its own player's in view, else the body's), along the shooter's aim.
+	const bool bOwnView = Holder->IsLocallyControlled() && Holder->IsPlayerControlled();
+	const UStaticMeshComponent* Muzzle = bOwnView ? FirstPersonFlash.Get() : ThirdPersonFlash.Get();
+	FTracer Tracer;
+	Tracer.From = Muzzle->GetComponentLocation();
+	Tracer.Way = Holder->GetBaseAimRotation().Vector();
+	Tracer.At = World->GetTimeSeconds();
+	UStaticMeshComponent* Streak = nullptr;
+	// One of the spent ones again, rather than a new one each shot: twenty a second.
+	for (int32 Index = Tracers.Num() - 1; Index >= 0; --Index)
+	{
+		if (!Tracers[Index].Streak.IsValid())
+		{
+			Tracers.RemoveAt(Index);
+		}
+	}
+	for (UActorComponent* Part : GetComponents())
+	{
+		UStaticMeshComponent* Each = Cast<UStaticMeshComponent>(Part);
+		if (Each != nullptr && Each->ComponentHasTag(TEXT("Tracer")) && !Each->IsVisible())
+		{
+			Streak = Each;
+			break;
+		}
+	}
+	if (Streak == nullptr)
+	{
+		Streak = NewObject<UStaticMeshComponent>(this);
+		Streak->ComponentTags.Add(TEXT("Tracer"));
+		Streak->SetStaticMesh(TracerMesh);
+		Streak->SetMaterial(0, TracerLook);
+		Streak->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Streak->SetCastShadow(false);
+		Streak->SetUsingAbsoluteLocation(true);
+		Streak->SetUsingAbsoluteRotation(true);
+		Streak->SetUsingAbsoluteScale(true);
+		Streak->SetupAttachment(RootComponent);
+		Streak->RegisterComponent();
+	}
+	Streak->SetVisibility(true);
+	Tracer.Streak = Streak;
+	Tracers.Add(Tracer);
+	UpdateTracers();
+}
+
+void ACheeseStrikeWeapon::UpdateTracers()
+{
+	if (Tracers.Num() == 0 || GetWorld() == nullptr)
+	{
+		return;
+	}
+	const float Clock = GetWorld()->GetTimeSeconds();
+	for (int32 Index = Tracers.Num() - 1; Index >= 0; --Index)
+	{
+		const FTracer& Tracer = Tracers[Index];
+		UStaticMeshComponent* Streak = Tracer.Streak.Get();
+		const float Age = Clock - Tracer.At;
+		if (Streak == nullptr || Age > CheeseStrikeWeaponLooks::TracerLife)
+		{
+			if (Streak != nullptr)
+			{
+				Streak->SetVisibility(false);
+			}
+			Tracers.RemoveAt(Index);
+			continue;
+		}
+		// The engine's cylinder: 1 m tall along its Z, 1 m across, its middle at its origin; a thin rod along the way it flies.
+		const float Tail = CheeseStrikeWeaponLooks::TracerSpeed * Age;
+		const FVector Middle = Tracer.From + Tracer.Way * (Tail + CheeseStrikeWeaponLooks::TracerLength * 0.5f);
+		Streak->SetWorldLocationAndRotation(Middle, FRotationMatrix::MakeFromZ(Tracer.Way).ToQuat());
+		Streak->SetWorldScale3D(FVector(CheeseStrikeWeaponLooks::TracerThickness / 100.0f, CheeseStrikeWeaponLooks::TracerThickness / 100.0f, CheeseStrikeWeaponLooks::TracerLength / 100.0f));
+	}
 }
 
 void ACheeseStrikeWeapon::ShowReload()
@@ -1044,7 +1152,8 @@ bool ACheeseStrikeWeapon::IsDry() const
 float ACheeseStrikeWeapon::SwipePhase() const
 {
 	const float Since = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() - StrokeShownAt : 1000.0f;
-	return Stats->IsMelee() && Since < CheeseStrikeArms::SwipeSeconds ? Since / CheeseStrikeArms::SwipeSeconds : -1.0f;
+	const float Seconds = CheeseStrikeWeapons::SwipeSecondsOf(*Stats);
+	return Stats->IsMelee() && Since < Seconds ? Since / Seconds : -1.0f;
 }
 
 int32 ACheeseStrikeWeapon::NextShotIndex() const
@@ -1084,6 +1193,12 @@ void ACheeseStrikeWeapon::StartFiring()
 		return;
 	}
 	bTriggerHeld = true;
+	if (Stats->bAutomatic && Stats->SpinUp > 0.0f)
+	{
+		// A rotary barrel spins up first: the beat begins once it has, held all the while (Tick fires it).
+		AutoNextAt = GetWorld()->GetTimeSeconds() + Stats->SpinUp;
+		return;
+	}
 	FireOnce();
 	if (Stats->bAutomatic)
 	{
@@ -1321,6 +1436,16 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 	const int32 RunIndex = FMath::Max(0, Index);
 	FRandomStream Random(Seed);
 	const float Cone = CheeseStrikeWeapons::SpreadFor(FiringStats(), RunIndex, bWasAimed);
+	if (Stats->IsProjectile())
+	{
+		TArray<FVector> Ways;
+		for (int32 Pellet = 0; Pellet < FMath::Max(Stats->Pellets, 1); ++Pellet)
+		{
+			Ways.Add(CheeseStrikeWeapons::Spread(FVector(AimDirection).GetSafeNormal(), Cone, Random));
+		}
+		LaunchProjectiles(Origin, FVector(AimDirection).GetSafeNormal(), Ways);
+		return;
+	}
 	struct FHurt
 	{
 		float Damage = 0.0f;
@@ -1354,7 +1479,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 			// Something of the arena's, or the template's, which takes the engine's damage.
 			const float Damage = CheeseStrikeWeapons::DamageAt(FiringStats(), Hit.Distance, false);
 			UGameplayStatics::ApplyPointDamage(Hit.Wall.GetActor(), Damage, Direction, Hit.Wall, Holder->GetController(), this, nullptr);
-			if (Hit.Wall.GetActor()->IsA<APawn>() || Hit.Wall.GetActor()->IsA<ACheeseStrikeMouse>())
+			if (Hit.Wall.GetActor()->IsA<APawn>() || Hit.Wall.GetActor()->IsA<ACheeseStrikeMouse>() || Hit.Wall.GetActor()->IsA<ACheeseStrikeTarget>())
 			{
 				ClientHit(Damage, false, false);
 			}
@@ -1403,6 +1528,11 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 	ServerLastStrike = Now;
 	Holder->EndProtection();
 	MulticastShot();
+	if (Stats->ArcDegrees > 0.0f)
+	{
+		StrikeArc(Origin, FVector(AimDirection).GetSafeNormal(), When);
+		return;
+	}
 	// Straight ahead first, then fanned out to the sides: the first that reaches someone lands.
 	const TArray<FVector> Fan = CheeseStrikeWeapons::SweepDirections(*Stats, FVector(AimDirection).GetSafeNormal());
 	const FRayHit* Struck = nullptr;
@@ -1434,13 +1564,134 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 	for (int32 Ray = 0; Ray < Hits.Num(); ++Ray)
 	{
 		AActor* Thing = Hits[Ray].bWall ? Hits[Ray].Wall.GetActor() : nullptr;
-		if (Thing != nullptr && (Thing->IsA<APawn>() || Thing->IsA<ACheeseStrikeMouse>()))
+		if (Thing != nullptr && (Thing->IsA<APawn>() || Thing->IsA<ACheeseStrikeMouse>() || Thing->IsA<ACheeseStrikeTarget>()))
 		{
 			UGameplayStatics::ApplyPointDamage(Thing, Stats->Damage, Fan[Ray], Hits[Ray].Wall, Holder->GetController(), this, nullptr);
 			ClientHit(Stats->Damage, false, false);
 			return;
 		}
 	}
+}
+
+void ACheeseStrikeWeapon::LaunchProjectiles(const FVector& Origin, const FVector& Aim, const TArray<FVector>& Directions)
+{
+	UWorld* World = GetWorld();
+	// A homing round goes for the nearest enemy in sight within its cone of the aim (the server's choice, as it fires).
+	ACheeseStrikeCharacter* Homing = nullptr;
+	if (Stats->HomingTurn > 0.0f)
+	{
+		const ACheeseStrikeGameMode* Mode = World->GetAuthGameMode<ACheeseStrikeGameMode>();
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeHoming), false, Holder);
+		TArray<ACheeseStrikeCharacter*> Candidates;
+		TArray<FVector> Chests;
+		for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+		{
+			Params.AddIgnoredActor(*It);
+		}
+		for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+		{
+			ACheeseStrikeCharacter* Other = *It;
+			if (Other == Holder || !Other->IsAlive() || (Mode != nullptr && !Mode->CanHurt(Holder->GetPlayerState<ACheeseStrikePlayerState>(), Other->GetPlayerState<ACheeseStrikePlayerState>(), false)))
+			{
+				continue;
+			}
+			FHitResult Blocked;
+			if (World->LineTraceSingleByChannel(Blocked, Origin, Other->ChestAt(), ECC_Visibility, Params))
+			{
+				continue;
+			}
+			Candidates.Add(Other);
+			Chests.Add(Other->ChestAt());
+		}
+		const int32 Picked = CheeseStrikeWeapons::HomingPick(Origin, Aim, Chests, Stats->HomingCone);
+		Homing = Picked != INDEX_NONE ? Candidates[Picked] : nullptr;
+	}
+	for (const FVector& Way : Directions)
+	{
+		FActorSpawnParameters Spawn;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ACheeseStrikeProjectile* Round = World->SpawnActorDeferred<ACheeseStrikeProjectile>(ACheeseStrikeProjectile::StaticClass(), FTransform(Way.Rotation(), Origin), Holder, Holder, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (Round == nullptr)
+		{
+			continue;
+		}
+		Round->Launch(this, Holder, Way * Stats->ProjectileSpeed, Homing);
+		Round->FinishSpawning(FTransform(Way.Rotation(), Origin));
+	}
+	UE_LOG(LogCheeseStrike, Verbose, TEXT("Shot: %s fires the %s%s"), *Holder->GetName(), *Stats->DisplayName.ToString(), Homing != nullptr ? *FString::Printf(TEXT(" homing on %s"), *Homing->DisplayName()) : TEXT(""));
+}
+
+void ACheeseStrikeWeapon::StrikeArc(const FVector& Origin, const FVector& Aim, float When)
+{
+	UWorld* World = GetWorld();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeArc), false, Holder);
+	TArray<ACheeseStrikeCharacter*> Players;
+	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+	{
+		Players.Add(*It);
+		Params.AddIgnoredActor(*It);
+	}
+	int32 Struck = 0;
+	for (ACheeseStrikeCharacter* Player : Players)
+	{
+		if (Player == Holder || !Player->IsAlive())
+		{
+			continue;
+		}
+		// Where they were as the striker saw them: the nearest of their middle, head and feet to the swing.
+		const FHitHistory::FSample Then = Player->GetHitHistory().Num() > 0 ? Player->GetHitHistory().At(When) : Player->SampleNow(When);
+		const FVector Middle = (Then.Feet + Then.Eyes) * 0.5f;
+		const FVector Head = (Then.HeadLow + Then.HeadHigh) * 0.5f;
+		FVector Nearest = Middle;
+		for (const FVector& Part : {Head, Then.Feet + FVector(0.0f, 0.0f, 20.0f), Then.bLying ? Then.Hips : Middle})
+		{
+			Nearest = FVector::DistSquared(Origin, Part) < FVector::DistSquared(Origin, Nearest) ? Part : Nearest;
+		}
+		if (!CheeseStrikeWeapons::InArc(*Stats, Aim, Nearest - Origin))
+		{
+			continue;
+		}
+		// Not through a wall.
+		FHitResult Blocked;
+		if (World->LineTraceSingleByChannel(Blocked, Origin, Nearest, ECC_Visibility, Params))
+		{
+			continue;
+		}
+		const FVector Way = (Nearest - Origin).GetSafeNormal();
+		const bool bBack = CheeseStrikeWeapons::FromBehind(Way, Then.Yaw);
+		Player->NoteHit(WeaponId, FVector::Dist(Origin, Nearest), bBack);
+		if (Player->TakeShot(Stats->Damage, Holder, false))
+		{
+			++Struck;
+			ClientHit(Stats->Damage, false, !Player->IsAlive());
+			Player->MulticastBleed(Nearest - Then.Feet, Way, 255);
+			UE_LOG(LogCheeseStrike, Display, TEXT("Stroke: %s's %s fells %s at %.0f cm (health %.0f)"), *Holder->GetName(), *Stats->DisplayName.ToString(), *Player->GetName(), FVector::Dist(Origin, Nearest), Player->GetHealth());
+		}
+	}
+	if (Struck > 0)
+	{
+		return;
+	}
+	// Nobody: a mouse or anything else of the engine's in front takes its blow.
+	FHitResult Thing;
+	if (World->LineTraceSingleByChannel(Thing, Origin, Origin + Aim * Stats->Reach, ECC_Visibility, Params) && Thing.GetActor() != nullptr
+		&& (Thing.GetActor()->IsA<APawn>() || Thing.GetActor()->IsA<ACheeseStrikeMouse>() || Thing.GetActor()->IsA<ACheeseStrikeTarget>()))
+	{
+		UGameplayStatics::ApplyPointDamage(Thing.GetActor(), Stats->Damage, Aim, Thing, Holder->GetController(), this, nullptr);
+		ClientHit(Stats->Damage, false, false);
+	}
+}
+
+bool ACheeseStrikeWeapon::AddShard(const ACheeseStrikeCharacter* Victim, float Now)
+{
+	Shards.Remove(nullptr);
+	return Shards.FindOrAdd(Victim).Add(*Stats, Now);
+}
+
+int32 ACheeseStrikeWeapon::ShardsIn(const ACheeseStrikeCharacter* Victim, float Now) const
+{
+	const CheeseStrikeWeapons::FShardTally* Tally = Shards.Find(Victim);
+	return Tally != nullptr ? Tally->CountAt(*Stats, Now) : 0;
 }
 
 void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead, bool bKill)

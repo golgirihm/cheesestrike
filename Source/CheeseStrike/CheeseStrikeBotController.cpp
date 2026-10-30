@@ -144,6 +144,7 @@ void ACheeseStrikeBotController::OnPossess(APawn* InPawn)
 	if (const ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr)
 	{
 		SkillIndex = Mode->GetBotSkill();
+		bDummy = Mode->AreBotsDummies();
 	}
 	if (InPawn != nullptr)
 	{
@@ -233,7 +234,8 @@ bool ACheeseStrikeBotController::CanSeeInto(const ACheeseStrikeCharacter* Other)
 void ACheeseStrikeBotController::Tick(float DeltaSeconds)
 {
 	ACheeseStrikeCharacter* Me = Body();
-	if (Me == nullptr || !Me->CanAct())
+	// A dummy stands where it came in, facing the way it came in, and does nothing: it is there to be shot.
+	if (Me == nullptr || !Me->CanAct() || bDummy)
 	{
 		if (bTriggerHeld)
 		{
@@ -1082,7 +1084,7 @@ void ACheeseStrikeBotController::AimAndFire(float DeltaSeconds)
 		const bool bHasAmmo = Weapon != nullptr && !Weapon->IsDry();
 		const bool bInReach = Weapon != nullptr && Weapon->GetStats().IsMelee()
 			? CheeseStrikeBots::WouldStrikeAt(FVector::Dist(Eyes, Chest), Weapon->GetStats().Reach)
-			: CheeseStrikeBots::WouldFireAt(FVector::Dist(Eyes, Chest), Range, bShotByTarget);
+			: CheeseStrikeBots::WouldFireAt(FVector::Dist(Eyes, Chest), Range, bShotByTarget) && CheeseStrikeBots::FarEnoughFor(FVector::Dist(Eyes, Chest), Weapon->GetStats().BotLeast);
 		bWantsToFire = bHasAmmo && Tracking >= Skill.Reaction && Off <= Error + FireCone && bInReach;
 	}
 	else if (Target.IsValid())
@@ -1169,6 +1171,9 @@ void ACheeseStrikeBotController::ChooseWeapon()
 	{
 		Armed.PrimaryMagazine = Primary->GetMagazine();
 		Armed.bPrimaryReserve = Primary->GetReserve() != 0;
+		Armed.bPrimaryMelee = Primary->GetStats().IsMelee();
+		Armed.PrimaryReach = Primary->GetStats().Reach;
+		Armed.PrimaryLeast = Primary->GetStats().BotLeast;
 	}
 	const bool bFighting = bSeesTarget && Target.IsValid();
 	const float Distance = bFighting ? FVector::Dist(Me->GetActorLocation(), Target->GetActorLocation()) : 0.0f;

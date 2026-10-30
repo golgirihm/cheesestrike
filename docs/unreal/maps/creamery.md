@@ -34,7 +34,7 @@ The bots walk a navigation mesh built when the level starts, in the bounds of it
 
 Beyond the outer wall, for a skyline and nothing else: two cold stores, a chimney, a battery of tall silos, offices.
 
-The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`): the Roquefort Rifle in the middle of the mezzanine, over the whole hall; the Munster Machine Gun in the Squeeze, between its crate stacks; a Cheddar Blaster in each half of the yard, between the containers and clear of the yard's hill; a Swiss Shotgun in each Rind Tunnel; and a Parmesan Grater in each Curing House, on the way through from the dock. Eight in all, mirrored like the map, none on a hill's spot.
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`): the Roquefort Rifle in the middle of the mezzanine, over the whole hall; the Cheese Stick (a power weapon, wave 14) in the Squeeze, between its crate stacks, where a swing reaches across; a Cheddar Blaster in each half of the yard, between the containers and clear of the yard's hill; a Swiss Shotgun in each Rind Tunnel; and a Cheese Grater in each Curing House, on the way through from the dock. Eight in all, mirrored like the map, none on a hill's spot.
 
 ## The cheese, and what the mice change
 

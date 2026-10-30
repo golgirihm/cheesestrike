@@ -19,6 +19,7 @@ class UAudioComponent;
 class UQuartzClockHandle;
 class USoundBase;
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class UPointLightComponent;
 class UPrimitiveComponent;
 class UStaticMesh;
@@ -161,6 +162,12 @@ public:
 	void SetRounds(int32 InMagazine, int32 InReserve);
 	/** Server only: gives it rounds without end to reload with (Gun Game's weapons); it still reloads. */
 	void MakeReserveEndless();
+	/** Server only: tells its holder's machine that one of its shots (a projectile of its, landing later) hit, as a ray's hit does. */
+	void ConfirmHit(float Damage, bool bHead, bool bKill) { ClientHit(Damage, bHead, bKill); }
+	/** Server only: one of its shards struck `Victim` at `Now`; true when that bursts them (the supercombine, FWeaponStats::SuperShards). */
+	bool AddShard(const ACheeseStrikeCharacter* Victim, float Now);
+	/** Server only: how many of its shards are stuck in `Victim` now, within the supercombine's window. */
+	int32 ShardsIn(const ACheeseStrikeCharacter* Victim, float Now) const;
 
 	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
 	USkeletalMeshComponent* GetThirdPersonMesh() const { return ThirdPersonMesh; }
@@ -304,6 +311,23 @@ protected:
 	const FWeaponLook* Look = nullptr;
 	/** When the flash goes out (world time). */
 	float FlashUntil = 0.0f;
+	/** This machine's tracers in flight (a weapon whose look has them, CheeseStrikeWeaponLooks::TracerLength): a streak each, from where it was fired along the way it went, since `At` (world time). */
+	struct FTracer
+	{
+		TWeakObjectPtr<UStaticMeshComponent> Streak;
+		FVector From = FVector::ZeroVector;
+		FVector Way = FVector::ForwardVector;
+		float At = 0.0f;
+	};
+	TArray<FTracer> Tracers;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> TracerLook;
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMesh> TracerMesh;
+	/** A shot's tracer, on this machine, from the muzzle shown along the shooter's aim. */
+	void ShowTracer();
+	/** Every frame: the tracers fly on, and go. */
+	void UpdateTracers();
 
 	/** What its look names, loaded as it becomes that weapon: its model's own animations, and its sounds (Lyra's; Content/LICENSES.md). */
 	UPROPERTY()
@@ -381,4 +405,11 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<ACheeseStrikeCharacter> Holder;
+
+	/** The server's tally of its shards stuck in each player, for the supercombine. */
+	TMap<TWeakObjectPtr<const ACheeseStrikeCharacter>, CheeseStrikeWeapons::FShardTally> Shards;
+	/** Server only: fires a shot of projectiles (ACheeseStrikeProjectile), each pellet its own, from `Origin` along `Directions`. */
+	void LaunchProjectiles(const FVector& Origin, const FVector& Aim, const TArray<FVector>& Directions);
+	/** Server only: a melee arc's stroke (the Cheese Stick): everyone in it, at `When`. */
+	void StrikeArc(const FVector& Origin, const FVector& Aim, float When);
 };

@@ -27,9 +27,19 @@ namespace CheeseStrikeMovement
 		return GroundSpeed >= WalkSpeed * SlideFrom;
 	}
 
-	float WithWeapon(float Speed, bool bHeavy)
+	float WithWeapon(float Speed, bool bHeavy, bool bLong)
 	{
-		return bHeavy ? Speed * HeavyFactor : Speed;
+		return bHeavy ? Speed * HeavyFactor : (bLong ? Speed * LongFactor : Speed);
+	}
+
+	bool IsHeavy(float CarrySpeed)
+	{
+		return CarrySpeed < (HeavyFactor + LongFactor) * 0.5f;
+	}
+
+	bool IsLong(float CarrySpeed)
+	{
+		return CarrySpeed < 1.0f && !IsHeavy(CarrySpeed);
 	}
 
 	float SlideSpeed(float From, float Elapsed)

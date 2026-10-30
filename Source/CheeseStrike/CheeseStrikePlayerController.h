@@ -121,6 +121,8 @@ public:
 	void BackFromMenu();
 	/** Hosts a match with the lobby's usual rules (CheeseStrikeRules::HostOptions), through the online service, or the local network without Steam: straight into its lobby. */
 	void HostFromMenu();
+	/** Plays the Practice Range alone, at once, with no lobby (CheeseStrikeRange::PracticeUrl): its weapons, targets and dummies; the pause menu's Leave comes back. */
+	void PracticeFromMenu();
 	/** The host sets the match's rules and map from the lobby (INDEX_NONE keeps the map); everyone in it sees them. */
 	void SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map = INDEX_NONE);
 	/** The host sets how well the bots play, and how many there are (-1 for every empty seat), from the lobby. */
@@ -136,6 +138,17 @@ public:
 	void MoveBotFromMenu(int32 Bot);
 	UFUNCTION(Server, Reliable)
 	void ServerSwitchSide();
+	/**
+	 * The hero this player plays (CheeseStrikeBodies::All, INDEX_NONE for the usual): the settings' (UCheeseStrikeSettings::
+	 * GetHero), or CheeseStrikeHero's on this controller. Their machine puts it on their player state whenever it differs
+	 * (ServerPickHero), so it travels with them into every level and every machine dresses them in it.
+	 */
+	int32 WantedHero() const;
+	UFUNCTION(Server, Reliable)
+	void ServerPickHero(int32 Hero);
+	/** From the console or a test: this player plays `Hero` (Belica, Murdock, Wraith, Twinblast, or auto), whatever the settings say, until the level changes; with none, the settings' again. */
+	UFUNCTION(Exec)
+	void CheeseStrikeHero(const FString& Hero = TEXT(""));
 	/**
 	 * A joiner: the host is leaving the lobby (or, `bInMatch`, the match)
 	 * or quitting the game (UCheeseStrikeSessionSubsystem::SayGoodbye). The
@@ -325,4 +338,12 @@ protected:
 	int32 GoSounded = INDEX_NONE;
 	bool bScoreboardHeld = false;
 	bool bStartAtTaken = false;
+	/** CheeseStrikeHero's pick, if given (INDEX_NONE being "auto"). */
+	bool bHeroOverride = false;
+	int32 HeroOverride = INDEX_NONE;
+	/** The pick last sent to the server, and when (by real time), so that it is sent once and again only if it hasn't arrived. */
+	int32 HeroSent = INDEX_NONE - 1;
+	double HeroSentAt = 0.0;
+	/** Puts WantedHero on this player's state if it isn't there (their own machine). */
+	void SendHero();
 };

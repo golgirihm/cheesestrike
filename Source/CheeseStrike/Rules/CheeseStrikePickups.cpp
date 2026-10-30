@@ -32,13 +32,13 @@ namespace CheeseStrikePickups
 	bool CanLieOnAStand(FName Weapon)
 	{
 		const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
-		return Stats != nullptr && Stats->Slot == EWeaponSlot::Primary && Stats->Id != SpawnPrimary();
+		return Stats != nullptr && CheeseStrikeArsenal::IsPickable(Stats->Id, EWeaponSlot::Primary) && Stats->Id != SpawnPrimary();
 	}
 
 	bool CanBeDropped(FName Weapon)
 	{
 		const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
-		return Stats != nullptr && Stats->Slot == EWeaponSlot::Primary;
+		return Stats != nullptr && CheeseStrikeArsenal::IsPickable(Stats->Id, EWeaponSlot::Primary);
 	}
 
 	ETake HowToTake(FName Carried, FName Offered, bool bRoundsFull, bool bDropped)
@@ -48,6 +48,11 @@ namespace CheeseStrikePickups
 			return ETake::None;
 		}
 		const FWeaponStats* Mine = CheeseStrikeArsenal::Find(Carried);
+		// A streak's weapon in the primary's slot (the Gouda Gatling) is kept until it is spent: nothing is taken meanwhile.
+		if (Mine != nullptr && Mine->bSpecial)
+		{
+			return ETake::None;
+		}
 		if (Mine != nullptr && Mine->Slot == EWeaponSlot::Primary && Mine->Id == CheeseStrikeArsenal::Find(Offered)->Id)
 		{
 			return bRoundsFull ? ETake::None : ETake::TopUp;
@@ -93,16 +98,22 @@ namespace CheeseStrikePickups
 		{
 			return 0;
 		}
+		// A streak's weapon is worth more than any on a stand: a bot carrying one wants none of them.
+		if (Stats->bSpecial)
+		{
+			return 4;
+		}
 		// Made for one range: close, for the Grater, the Shotgun and the Dual Burratas.
 		if (Stats->Id == W::Grater().Id || Stats->Id == W::Shotgun().Id || Stats->Id == W::Burratas().Id)
 		{
 			return 1;
 		}
-		if (Stats->Id == W::Roquefort().Id)
+		// The power weapons, at the riskiest stands: the Roquefort, the BabyBomb and the Cheese Stick.
+		if (Stats->Id == W::Roquefort().Id || Stats->Id == W::BabyBomb().Id || Stats->Id == W::Stick().Id)
 		{
 			return 3;
 		}
-		// Good at every range: the Blaster and the Munster.
+		// Good at every range, or nearly: the Blaster and the Munster Twin SMGs.
 		return 2;
 	}
 
@@ -111,6 +122,11 @@ namespace CheeseStrikePickups
 		// Every weapon is the one colour, a green apart from the cheese's yellow (26 Oct 2026): what a gun is worth is not
 		// shown by a tint. The pad, its glow and beam, the prompt and the minimap all read it from here.
 		return FLinearColor(0.25f, 0.9f, 0.3f);
+	}
+
+	float BackAt(float Now, float Seconds, bool bInstant)
+	{
+		return bInstant ? 0.0f : Now + Seconds;
 	}
 
 	float SecondsLeft(float Now, float BackAt)

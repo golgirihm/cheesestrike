@@ -1,0 +1,49 @@
+# Looks at every weapon a stand can hold (not the Colby Carbine everyone comes in with: pickup_looks.txt drops one):
+# eight stands 4.5 m out in a fan from the player, 12 degrees apart, each looked at in turn from 1.1 m away
+# (CheeseStrikeViewFrom), the knife in hand. Run with tools/play.ps1 -StartAt 1150,-1450,100,117 (open ground on the
+# shooter level).
+wait 3.5
+tap Knife
+look -24 0
+cmd CheeseStrikeStand blaster 450
+look 12 0
+cmd CheeseStrikeStand grater 450
+look 12 0
+cmd CheeseStrikeStand munster 450
+look 12 0
+cmd CheeseStrikeStand shotgun 450
+look 12 0
+cmd CheeseStrikeStand burratas 450
+look 12 0
+cmd CheeseStrikeStand roquefort 450
+look 12 0
+cmd CheeseStrikeStand babybomb 450
+look 12 0
+cmd CheeseStrikeStand stick 450
+wait 1.5
+cmd CheeseStrikeViewFrom 1132 -1110 150 -26 93
+wait 0.4
+shot stand_blaster
+cmd CheeseStrikeViewFrom 1062 -1122 150 -26 105
+wait 0.4
+shot stand_grater
+cmd CheeseStrikeViewFrom 996 -1147 150 -26 117
+wait 0.4
+shot stand_munster
+cmd CheeseStrikeViewFrom 936 -1186 150 -26 129
+wait 0.4
+shot stand_shotgun
+cmd CheeseStrikeViewFrom 886 -1236 150 -26 141
+wait 0.4
+shot stand_burratas
+cmd CheeseStrikeViewFrom 847 -1296 150 -26 153
+wait 0.4
+shot stand_roquefort
+cmd CheeseStrikeViewFrom 822 -1362 150 -26 165
+wait 0.4
+shot stand_babybomb
+cmd CheeseStrikeViewFrom 810 -1432 150 -26 177
+wait 0.4
+shot stand_stick
+cmd CheeseStrikeOutside
+quit

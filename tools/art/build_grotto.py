@@ -456,7 +456,7 @@ def tunnel():
     side onto the landing where the south bridge comes down."""
     kit.tunnel("RindTunnel", "RindTunnel", (-TUNNEL_X, TUNNEL_Y), (TUNNEL_X, TUNNEL_Y), width=400, height=300, wall=60, bottom=L1,
                openings=[("L", TUNNEL_X - 150, TUNNEL_X + 150)], lamps=600)
-    kit.door("RindTunnel_Door", "Tunnels/RindTunnel", (0, TUNNEL_Y + 230, L1), 90, 260, 220)
+    kit.door("RindTunnel_Door", "Tunnels/RindTunnel", (0, TUNNEL_Y + 230, L1), 90, 260, 220, attach_to="RindTunnel")
 
 
 def spans():
@@ -618,9 +618,9 @@ def pickups():
     """The weapons' stands (kit.pickup), on rock and floor the mice never eat, and clear of the hills (on the Pulpit's
     middle, the landing and the pools): the Roquefort in the Spine's arch, between the bridges; a Munster at each end of
     the Pulpit; a Cheddar Blaster at the top of each gallery's stairs and a Swiss Shotgun in each Cheese Store; the Dual
-    Burratas in the Rind Tunnel's middle, behind the landing."""
+    Cheese Stick in the Rind Tunnel's middle, behind the landing, where it is fought close."""
     kit.pickup("roquefort", 0, 0, L1, "Arch")
-    kit.pickup("burratas", 0, -2400, L1, "RindTunnel")
+    kit.pickup("stick", 0, -2400, L1, "RindTunnel")
     for s, side in ((-1, "West"), (1, "East")):
         kit.pickup("munster", s * 850, 2050, L1, f"Pulpit{side}")
         kit.pickup("blaster", s * 2100, 2450, L2, f"Gallery{side}")

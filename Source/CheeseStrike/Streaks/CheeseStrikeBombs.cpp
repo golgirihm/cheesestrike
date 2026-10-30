@@ -6,6 +6,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -24,6 +25,10 @@
 
 namespace
 {
+	TAutoConsoleVariable<float> CVarOverloadSeconds(TEXT("CheeseStrike.OverloadSeconds"), 0.0f,
+		TEXT("Seconds every effect of the Gouda Overload lasts (the gouda, the haste, the Gatling) in place of its own; 0 for their own (the play tests shorten them)."),
+		ECVF_Cheat);
+
 	/** A gouda wheel's size, as the engine's 1 m cylinder is scaled: 1.3 m across, 45 cm thick. */
 	const FVector BombWheelScale(1.3f, 1.3f, 0.45f);
 	/** How long a burst's flash and shockwave last (s); the shockwave swells to where the harm stops. */
@@ -102,8 +107,7 @@ void ACheeseStrikeBombs::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(ACheeseStrikeBombs, Drops);
 	DOREPLIFETIME(ACheeseStrikeBombs, WarnAt);
 	DOREPLIFETIME(ACheeseStrikeBombs, WarnWhere);
-	DOREPLIFETIME(ACheeseStrikeBombs, RainFrom);
-	DOREPLIFETIME(ACheeseStrikeBombs, RainUntil);
+	DOREPLIFETIME(ACheeseStrikeBombs, SplatAt);
 }
 
 void ACheeseStrikeBombs::BeginPlay()
@@ -208,20 +212,6 @@ bool ACheeseStrikeBombs::StrikeLanding(UWorld* World, const FCheeseStrikeOverhea
 	return Landing(World, Over, OutImpact);
 }
 
-void ACheeseStrikeBombs::AddDrop(const FVector& Over, float LandsAt)
-{
-	FVector Impact;
-	if (!Landing(GetWorld(), Over, Impact))
-	{
-		return;
-	}
-	FCheeseStrikeDrop Drop;
-	Drop.Impact = Impact;
-	Drop.LandsAt = LandsAt;
-	Drops.Add(Drop);
-	DoneAt = FMath::Max(DoneAt, LandsAt + 2.0f);
-}
-
 void ACheeseStrikeBombs::StartStrike(ACheeseStrikePlayerState* InCaller, const FVector& Spot, float Yaw)
 {
 	Caller = InCaller;
@@ -264,12 +254,38 @@ void ACheeseStrikeBombs::StartOverload(ACheeseStrikePlayerState* InCaller)
 	Kind = static_cast<uint8>(CheeseStrikeStreaks::EStreak::GoudaOverload);
 	const float Start = Now();
 	WarnAt = Start;
-	// The first wheels land as the warning ends: they are let go a fall's time before.
-	RainFrom = Start + CheeseStrikeStreaks::OverloadWarning - CheeseStrikeStreaks::FallTime();
-	RainUntil = RainFrom + CheeseStrikeStreaks::OverloadRain;
-	NextRainAt = RainFrom;
-	DoneAt = RainUntil + CheeseStrikeStreaks::FallTime() + 2.0f;
-	UE_LOG(LogCheeseStrike, Display, TEXT("Gouda Overload from %s: rain from %.1f s to %.1f s"), InCaller != nullptr ? *InCaller->GetPlayerName() : TEXT("nobody"), RainFrom - Start, RainUntil - Start);
+	// The gouda splats as the warning ends.
+	SplatAt = Start + CheeseStrikeStreaks::OverloadWarning;
+	DoneAt = SplatAt + 2.0f;
+	UE_LOG(LogCheeseStrike, Display, TEXT("Gouda Overload from %s: the gouda in %.1f s"), InCaller != nullptr ? *InCaller->GetPlayerName() : TEXT("nobody"), SplatAt - Start);
+}
+
+float ACheeseStrikeBombs::OverloadTime(float Usual)
+{
+	const float Instead = CVarOverloadSeconds.GetValueOnGameThread();
+	return Instead > 0.0f ? Instead : Usual;
+}
+
+void ACheeseStrikeBombs::SplatEnemies()
+{
+	bSplatted = true;
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const ACheeseStrikePlayerState* By = Caller.Get();
+	if (Match == nullptr || By == nullptr)
+	{
+		return;
+	}
+	const float Until = Now() + OverloadTime(CheeseStrikeStreaks::GooSeconds);
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		// Every living enemy, standing or down, wherever they are: no cover saves them.
+		if (CheeseStrikeStreaks::IsSplatted(Match->AreEnemies(By, It->GetPlayerState()), It->IsAlive()))
+		{
+			It->Splat(Until);
+			++Hits;
+			UE_LOG(LogCheeseStrike, Display, TEXT("Gouda Overload: %s splatted %s"), *By->GetPlayerName(), *It->DisplayName());
+		}
+	}
 }
 
 void ACheeseStrikeBombs::Burst(const FCheeseStrikeDrop& Drop)
@@ -281,7 +297,7 @@ void ACheeseStrikeBombs::Burst(const FCheeseStrikeDrop& Drop)
 	{
 		return;
 	}
-	const CheeseStrikeStreaks::FBlast& Blast = GetKind() == CheeseStrikeStreaks::EStreak::GoudaOverload ? CheeseStrikeStreaks::OverloadBlast : CheeseStrikeStreaks::StrikeBlast;
+	const CheeseStrikeStreaks::FBlast& Blast = CheeseStrikeStreaks::StrikeBlast;
 	const FString How = CheeseStrikeStreaks::Info(GetKind()).Name;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeBurst), false);
 	TArray<ACheeseStrikeCharacter*> Near;
@@ -351,18 +367,11 @@ void ACheeseStrikeBombs::ShowBurst(const FVector& At, bool bIndoors)
 	{
 		return;
 	}
-	if (GetKind() == CheeseStrikeStreaks::EStreak::CheeseStrike)
+	// A heavy blast: a crack, a deep boom and a rumble that rolls away, under a recorded punch pitched down.
+	UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Explosion(3.2f, FMath::RandRange(0, 1000))), At, FRotator::ZeroRotator, 1.0f, FMath::FRandRange(0.92f, 1.05f), 0.0f, Attenuation);
+	if (Thumps.Num() > 0)
 	{
-		// A heavy blast: a crack, a deep boom and a rumble that rolls away, under a recorded punch pitched down.
-		UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Explosion(3.2f, FMath::RandRange(0, 1000))), At, FRotator::ZeroRotator, 1.0f, FMath::FRandRange(0.92f, 1.05f), 0.0f, Attenuation);
-		if (Thumps.Num() > 0)
-		{
-			UGameplayStatics::SpawnSoundAtLocation(this, Thumps[FMath::RandHelper(Thumps.Num())], At, FRotator::ZeroRotator, 0.8f, FMath::FRandRange(0.65f, 0.8f), 0.0f, Attenuation);
-		}
-	}
-	else if (Thumps.Num() > 0)
-	{
-		UGameplayStatics::SpawnSoundAtLocation(this, Thumps[FMath::RandHelper(Thumps.Num())], At, FRotator::ZeroRotator, 1.0f, FMath::FRandRange(0.85f, 1.0f), 0.0f, Attenuation);
+		UGameplayStatics::SpawnSoundAtLocation(this, Thumps[FMath::RandHelper(Thumps.Num())], At, FRotator::ZeroRotator, 0.8f, FMath::FRandRange(0.65f, 0.8f), 0.0f, Attenuation);
 	}
 	if (Rumble != nullptr)
 	{
@@ -370,7 +379,7 @@ void ACheeseStrikeBombs::ShowBurst(const FVector& At, bool bIndoors)
 	}
 	FFlash Flash;
 	Flash.At = Now();
-	Flash.Reach = (GetKind() == CheeseStrikeStreaks::EStreak::GoudaOverload ? CheeseStrikeStreaks::OverloadBlast : CheeseStrikeStreaks::StrikeBlast).Radius;
+	Flash.Reach = CheeseStrikeStreaks::StrikeBlast.Radius;
 	Flash.Brightness = bIndoors ? BombIndoorBrightness : BombFlashBrightness;
 	UPointLightComponent* Light = NewObject<UPointLightComponent>(this);
 	Light->SetMobility(EComponentMobility::Movable);
@@ -474,20 +483,10 @@ void ACheeseStrikeBombs::Tick(float DeltaSeconds)
 	const float Time = Now();
 	const bool bServer = HasAuthority();
 
-	// The Overload's rain: a wheel let go over every enemy, where they are now, give or take.
-	if (bServer && GetKind() == CheeseStrikeStreaks::EStreak::GoudaOverload && Time >= NextRainAt && NextRainAt < RainUntil)
+	// The Overload's gouda, on every enemy at once as the warning ends.
+	if (bServer && GetKind() == CheeseStrikeStreaks::EStreak::GoudaOverload && !bSplatted && SplatAt > 0.0f && Time >= SplatAt)
 	{
-		NextRainAt += CheeseStrikeStreaks::OverloadInterval;
-		const ACheeseStrikeGameState* Match = GetWorld()->GetGameState<ACheeseStrikeGameState>();
-		const ACheeseStrikePlayerState* By = Caller.Get();
-		for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
-		{
-			if (By != nullptr && Match != nullptr && It->IsAlive() && Match->AreEnemies(By, It->GetPlayerState()))
-			{
-				const FVector Scatter = FVector(FMath::FRandRange(-1.0f, 1.0f), FMath::FRandRange(-1.0f, 1.0f), 0.0f).GetClampedToMaxSize(1.0f) * CheeseStrikeStreaks::OverloadScatter;
-				AddDrop(It->GetActorLocation() + Scatter, Time + CheeseStrikeStreaks::FallTime());
-			}
-		}
+		SplatEnemies();
 	}
 
 	ShowWarning();
@@ -525,14 +524,9 @@ void ACheeseStrikeBombs::Tick(float DeltaSeconds)
 		{
 			continue;
 		}
-		// Falling: each Overload wheel whistles on its way down.
 		if (Shown[Index] < 1)
 		{
 			Shown[Index] = 1;
-			if (GetKind() == CheeseStrikeStreaks::EStreak::GoudaOverload)
-			{
-				UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Whistle(Left)), FVector(Drop.Impact) + FVector(0.0f, 0.0f, 800.0f), FRotator::ZeroRotator, 0.45f, FMath::FRandRange(0.9f, 1.1f), 0.0f, Attenuation);
-			}
 		}
 		if (Falling[Index] == nullptr && WheelMesh != nullptr)
 		{

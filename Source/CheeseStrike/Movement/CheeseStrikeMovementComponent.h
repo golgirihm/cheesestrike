@@ -13,10 +13,15 @@
  *
  * Sprinting is held, like crouching, and goes to the server in each move's
  * flags, so that the server simulates the same speed the client predicted.
- * So does carrying a heavy weapon (slower), held by the weapon in hand.
+ * So does carrying a heavy weapon or a long one (slower), held by the weapon in hand.
  * A slide begins when the player crouches at a sprint and runs by itself:
  * what it holds (how far into it, from what speed, which way) is saved with
  * each move, so that a replay after a correction comes out the same.
+ *
+ * The Gouda Overload slows the splatted and hastens its caller: the factors
+ * come from times the server replicates on the character (its SplatAt,
+ * GooUntil and HasteUntil) and the server's clock, which both sides read
+ * alike, so nothing more needs to go with the moves.
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeMovementComponent : public UCharacterMovementComponent
@@ -29,14 +34,20 @@ public:
 	/** The player holds, or has let go of, the sprint key. */
 	void SetWantsToSprint(bool bWants);
 	bool WantsToSprint() const { return bWantsToSprint; }
-	/** Whether the character is sprinting now: wants to, on the ground, not crouched, and moving. */
+	/** Whether the character is sprinting now: wants to, on the ground, not crouched, moving, and not held back by the Overload's gouda. */
 	bool IsSprinting() const;
+	/** The share of its speed the Overload's gouda leaves it (1 for none), and its caller's haste (1 for none). */
+	float GooFactor() const;
+	float HasteFactor() const;
+	/** Whether it may sprint and slide now: not too slowed by the gouda (CheeseStrikeStreaks::MaySprintInGoo). */
+	bool MaySprint() const;
 	bool IsSliding() const { return SlideElapsed >= 0.0f; }
 	/** Seconds into the slide, or -1 for none. */
 	float GetSlideElapsed() const { return SlideElapsed; }
-	/** The weapon in hand is heavy, slowing its carrier. */
-	void SetCarryingHeavy(bool bHeavy) { bCarryingHeavy = bHeavy; }
+	/** The weapon in hand is heavy, or long, slowing its carrier (CheeseStrikeMovement::IsHeavy, IsLong). */
+	void SetCarrying(bool bHeavy, bool bLong) { bCarryingHeavy = bHeavy; bCarryingLong = bLong; }
 	bool IsCarryingHeavy() const { return bCarryingHeavy; }
+	bool IsCarryingLong() const { return bCarryingLong; }
 
 	//~ UCharacterMovementComponent
 	virtual float GetMaxSpeed() const override;
@@ -71,6 +82,7 @@ protected:
 	/** What the player holds. */
 	bool bWantsToSprint = false;
 	bool bCarryingHeavy = false;
+	bool bCarryingLong = false;
 	/** Seconds into the slide, or -1 for none; the speed it began at; and which way it goes, flat. */
 	float SlideElapsed = -1.0f;
 	float SlideFrom = 0.0f;
@@ -97,6 +109,7 @@ public:
 
 	bool bSavedWantsToSprint = false;
 	bool bSavedCarryingHeavy = false;
+	bool bSavedCarryingLong = false;
 	float SavedSlideElapsed = -1.0f;
 	float SavedSlideFrom = 0.0f;
 	FVector SavedSlideDirection = FVector::ForwardVector;

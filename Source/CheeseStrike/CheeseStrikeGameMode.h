@@ -187,6 +187,8 @@ public:
 	int32 GetBotsWanted() const { return BotsWanted; }
 	/** How well the bots play (CheeseStrikeBots::Skills), as the host picks it in the lobby (`?BotSkill=`). */
 	int32 GetBotSkill() const { return BotSkill; }
+	/** Whether the bots are the Practice Range's dummies (`?BotSkill=dummy`): they stand at the map's dummy spots and never move, aim or fire. */
+	bool AreBotsDummies() const { return bDummyBots; }
 	/** The host sets how many bots fill in, -1 for every empty seat. */
 	void SetBotsWanted(int32 Wanted);
 	void SetBotSkill(int32 Skill);
@@ -198,6 +200,8 @@ protected:
 	void Respawn(TWeakObjectPtr<AController> Who);
 	/** Fills the empty slots with bots, by the roster the lobby showed. */
 	void SpawnBots();
+	/** A dummy's spot (CheeseStrikeRange): the map's `DummySpot` point it stood at, or the first nobody holds; null on a map with none. */
+	AActor* ChooseDummySpot(AController* Dummy) const;
 
 	/** The mice come over the edge of the map: one for every so many blocks of cheese, at its MouseEntry points (CheeseStrikeMice). */
 	void SpawnMice();
@@ -249,6 +253,7 @@ protected:
 	int32 MapIndex = INDEX_NONE;
 	int32 BotSeed = 0;
 	int32 BotSkill = CheeseStrikeBots::DefaultSkill;
+	bool bDummyBots = false;
 	/** Whether this match has mice (`?Mice=0` for none), and how long into it they come (`?MiceAt=`). */
 	bool bMice = true;
 	float MiceAfter = 60.0f;

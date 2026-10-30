@@ -36,7 +36,7 @@ Free-for-all has sixteen more starts (tagged "Free"), eight a half: in rings 2 a
 
 The mice come in at the drains, two in each side face, eight in all, and land 5 m in, in the gutter. The bots and mice walk a navigation mesh built when the level starts and rebuilt where the cheese goes; the doors don't block it.
 
-The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), turned half round for Mozza as the map is: the Roquefort Rifle on top of the Mother Wheel, under the oculus, reached by the gallery's bridges (once the mice have eaten the bridges' decks, only along their waxed beams); a Munster Machine Gun in the Brine Room and one in the Smoke Room, where the sides first meet; a Cheddar Blaster in West 2 and East 2; and a Swiss Shotgun in the West and East Gutters. Seven in all; the Roquefort stands over the vault's hill, above its reach.
+The weapons' stands (`kit.pickup`; the rules in `Rules/CheeseStrikePickups.h`), turned half round for Mozza as the map is: the Roquefort Rifle on top of the Mother Wheel, under the oculus, reached by the gallery's bridges (once the mice have eaten the bridges' decks, only along their waxed beams); the Munster Twin SMGs in the Brine Room and in the Smoke Room, where the sides first meet; a Cheddar Blaster in West 2 and East 2; and a Swiss Shotgun in the West and East Gutters. Seven in all; the Roquefort stands over the vault's hill, above its reach.
 
 ## The cheese, and what the mice change
 

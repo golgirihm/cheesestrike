@@ -89,7 +89,53 @@ struct FWeaponStats
 	/** Two guns, one in each hand, firing in turn (the Dual Burratas): shot 0 from the right, 1 from the left, and so on (CheeseStrikeWeapons::DualHand). */
 	bool bDual = false;
 
-	bool IsMelee() const { return Slot == EWeaponSlot::Knife; }
+	/**
+	 * A streak's weapon (the Gouda Overload's Gouda Gatling), never one a player picks: no loadout, stand, floor, bot's
+	 * choice or Gun Game step offers it (CheeseStrikeArsenal::InSlot leaves it out). It is put in the primary's slot for a
+	 * while, the primary kept and given back after (UCheeseStrikeInventory::GiveSpecial).
+	 */
+	bool bSpecial = false;
+	/** Seconds the trigger is held before the first shot, as a rotary barrel spins up (0 for none). */
+	float SpinUp = 0.0f;
+
+	/**
+	 * Projectiles (wave 14): with a speed (cm/s), each shot is an ACheeseStrikeProjectile the server flies and decides
+	 * rather than a ray (0: a ray, at once). It falls at GravityShare of the world's gravity and is gone after
+	 * ProjectileLife seconds; a hit on a player does Damage (the head's multiplier on a head).
+	 */
+	float ProjectileSpeed = 0.0f;
+	float GravityShare = 0.0f;
+	float ProjectileLife = 3.0f;
+	/**
+	 * Its burst where it lands: SplashDamage to whoever it can see within SplashInner, falling in a line to
+	 * SplashEdgeDamage at SplashRadius, nothing further (CheeseStrikeWeapons::SplashAt); its shooter too. The one it hit
+	 * outright takes Damage instead (0: no burst).
+	 */
+	float SplashRadius = 0.0f;
+	float SplashInner = 0.0f;
+	float SplashDamage = 0.0f;
+	float SplashEdgeDamage = 0.0f;
+	/** Homing: degrees a second a projectile turns toward the nearest enemy within HomingCone degrees of the aim it was fired along (0: none). */
+	float HomingTurn = 0.0f;
+	float HomingCone = 0.0f;
+	/** The supercombine (the Cheese Grater's): SuperShards of its projectiles in one player within SuperWindow seconds burst for a kill (0: none). */
+	int32 SuperShards = 0;
+	float SuperWindow = 0.0f;
+	/**
+	 * A melee weapon's arc (the Cheese Stick): everyone within Reach and within ArcDegrees in front, about the aim, is
+	 * struck at once by Damage (0: the knife's swipe, which strikes the first it meets along its sweep).
+	 */
+	float ArcDegrees = 0.0f;
+	/** How long a melee weapon's swing is shown (0: the knife's, CheeseStrikeArms::SwipeSeconds), and how wide (1: the knife's). */
+	float SwipeSeconds = 0.0f;
+	float SwipeSize = 1.0f;
+	/** The nearest a bot fires it at someone (cm): a weapon whose burst would hurt the bot too. */
+	float BotLeast = 0.0f;
+
+	/** Whether it strikes rather than fires: the knife, or a melee primary (the Cheese Stick). */
+	bool IsMelee() const { return Slot == EWeaponSlot::Knife || ArcDegrees > 0.0f; }
+	/** Whether its shots are projectiles in flight rather than rays. */
+	bool IsProjectile() const { return ProjectileSpeed > 0.0f; }
 	/** Whether it never runs out of rounds to reload with. */
 	bool HasEndlessReserve() const { return Reserve < 0; }
 	/** Whether it fires rounds at all: the knife doesn't. */
@@ -164,6 +210,30 @@ namespace CheeseStrikeWeapons
 	bool FromBehind(const FVector& Direction, float Yaw);
 	/** The damage of a knife stroke along `Direction` on someone facing `Yaw`. */
 	float StrokeDamage(const FWeaponStats& Knife, const FVector& Direction, float Yaw);
+	/** Whether a melee arc's stroke along `Aim` (normalized) reaches someone `ToThem` from the eyes: within its Reach, and within half its ArcDegrees of the aim, seen from above. */
+	bool InArc(const FWeaponStats& Weapon, const FVector& Aim, const FVector& ToThem);
+	/** How long a melee weapon's swing is shown (s). */
+	float SwipeSecondsOf(const FWeaponStats& Weapon);
+
+	/** A projectile's burst on someone `Distance` from it: SplashDamage within SplashInner, falling in a line to SplashEdgeDamage at SplashRadius, none past it. */
+	float SplashAt(const FWeaponStats& Weapon, float Distance);
+	/** Whether `ToThem` is within `Degrees` of `Aim` (normalized). */
+	bool WithinCone(const FVector& Aim, const FVector& ToThem, float Degrees);
+	/** Which of `Targets` (places, from `From`) a homing projectile fired along `Aim` goes for: the nearest within `Cone` degrees of it, or INDEX_NONE. */
+	int32 HomingPick(const FVector& From, const FVector& Aim, const TArray<FVector>& Targets, float Cone);
+	/** A projectile's `Velocity` turned toward `ToTarget` by at most `MostDegrees`, its speed kept. */
+	FVector TurnToward(const FVector& Velocity, const FVector& ToTarget, float MostDegrees);
+	/** What a supercombine does: a kill, or a down in Execution. */
+	constexpr float SuperDamage = 500.0f;
+	/** The shards stuck in one player, for the supercombine: when each struck. */
+	struct FShardTally
+	{
+		TArray<float> Times;
+		/** One more struck at `Now`: true if that makes `Weapon.SuperShards` within its window, which bursts them (the tally starts again). */
+		bool Add(const FWeaponStats& Weapon, float Now);
+		/** How many are stuck within the window at `Now`. */
+		int32 CountAt(const FWeaponStats& Weapon, float Now) const;
+	};
 
 	/**
 	 * How far shot number `Index` of a run of fire (0 for the first, which goes

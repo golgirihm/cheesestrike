@@ -59,6 +59,8 @@ namespace CheeseStrikeBodies
 		/** The Gouda Guys are Murdock and Twinblast, the Mozza Radicals Lt. Belica and Wraith. */
 		const TCHAR* const TeamBodies[CheeseStrikeRules::Teams][HeroesPerTeam] = {{TEXT("Murdock"), TEXT("Twinblast")}, {TEXT("Lt. Belica"), TEXT("Wraith")}};
 		const TCHAR* const TeamWords[CheeseStrikeRules::Teams] = {TEXT("Gouda"), TEXT("Mozza")};
+		/** Each hero's word in the settings, in Bodies' order. */
+		const TCHAR* const HeroKeys[] = {TEXT("Belica"), TEXT("Murdock"), TEXT("Wraith"), TEXT("Twinblast")};
 	}
 
 	TConstArrayView<FBody> All()
@@ -102,6 +104,29 @@ namespace CheeseStrikeBodies
 			return ForTeam(Team, Rank);
 		}
 		return FMath::Max(Rank, 0) % UE_ARRAY_COUNT(Bodies);
+	}
+
+	int32 BodyFor(int32 Pick, bool bTeams, int32 Team, int32 Rank)
+	{
+		return All().IsValidIndex(Pick) ? Pick : For(bTeams, Team, Rank);
+	}
+
+	const TCHAR* HeroKey(int32 Body)
+	{
+		static_assert(UE_ARRAY_COUNT(HeroKeys) == UE_ARRAY_COUNT(Bodies), "a key for every hero");
+		return All().IsValidIndex(Body) ? HeroKeys[Body] : TEXT("auto");
+	}
+
+	int32 HeroFromKey(const FString& Key)
+	{
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Bodies); ++Index)
+		{
+			if (Key.Equals(HeroKeys[Index], ESearchCase::IgnoreCase) || Key.Equals(Bodies[Index].Name, ESearchCase::IgnoreCase))
+			{
+				return Index;
+			}
+		}
+		return INDEX_NONE;
 	}
 
 	int32 TeamOf(int32 Body)

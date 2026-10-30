@@ -50,6 +50,7 @@
 #include "UI/CheeseStrikePodium.h"
 #include "UI/CheeseStrikePodiumHUD.h"
 #include "Rules/CheeseStrikePodiums.h"
+#include "Rules/CheeseStrikeRange.h"
 #include "Rules/CheeseStrikeSounds.h"
 #include "Rules/CheeseStrikeVoice.h"
 #include "Records/CheeseStrikeRecords.h"
@@ -168,6 +169,60 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	{
 		HideMenuCamera();
 	}
+	// The figure wears the hero picked, at once; and the pick goes with the player into the match.
+	if (MenuFigure != nullptr)
+	{
+		MenuFigure->ShowHero(WantedHero());
+	}
+	SendHero();
+}
+
+int32 ACheeseStrikePlayerController::WantedHero() const
+{
+	if (bHeroOverride)
+	{
+		return HeroOverride;
+	}
+	// The tests play the heroes as they come, whatever this PC's player picked (every player in the editor shares the settings).
+	if (GIsAutomationTesting)
+	{
+		return INDEX_NONE;
+	}
+	const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+	return Settings != nullptr ? Settings->GetHero() : INDEX_NONE;
+}
+
+void ACheeseStrikePlayerController::SendHero()
+{
+	const ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>();
+	const int32 Wanted = WantedHero();
+	if (Mine == nullptr || Mine->GetHero() == Wanted)
+	{
+		return;
+	}
+	// Once, and again after a second if it still hasn't come back on the player state (it was sent before the server had it ready).
+	const double Now = FPlatformTime::Seconds();
+	if (Wanted != HeroSent || Now - HeroSentAt > 1.0)
+	{
+		HeroSent = Wanted;
+		HeroSentAt = Now;
+		ServerPickHero(Wanted);
+	}
+}
+
+void ACheeseStrikePlayerController::ServerPickHero_Implementation(int32 Hero)
+{
+	if (ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>())
+	{
+		Mine->SetHero(CheeseStrikeBodies::All().IsValidIndex(Hero) ? Hero : INDEX_NONE);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeHero(const FString& Hero)
+{
+	bHeroOverride = !Hero.IsEmpty();
+	HeroOverride = CheeseStrikeBodies::HeroFromKey(Hero);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Hero: %s"), bHeroOverride ? CheeseStrikeBodies::HeroKey(HeroOverride) : TEXT("the settings'"));
 }
 
 void ACheeseStrikePlayerController::PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel)
@@ -717,6 +772,13 @@ void ACheeseStrikePlayerController::HostFromMenu()
 	}
 }
 
+void ACheeseStrikePlayerController::PracticeFromMenu()
+{
+	// Alone and offline: no match is offered, so Leave the Match travels straight back to the front end.
+	UE_LOG(LogCheeseStrike, Display, TEXT("Practice: %s"), *CheeseStrikeRange::PracticeUrl());
+	ClientTravel(CheeseStrikeRange::PracticeUrl(), TRAVEL_Absolute);
+}
+
 void ACheeseStrikePlayerController::SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map)
 {
 	ACheeseStrikeGameMode* Mode = GetWorld() != nullptr ? GetWorld()->GetAuthGameMode<ACheeseStrikeGameMode>() : nullptr;
@@ -926,7 +988,7 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 		ShowMenu(EMenuPage::Pause);
 		Menu->ConfirmBackToLobby(Tab.Equals(TEXT("Ask"), ESearchCase::IgnoreCase) && CanGoBackToLobby());
 	}
-	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("Aiming"), TEXT("Sound"), TEXT("Graphics")};
+	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("Aiming"), TEXT("Sound"), TEXT("Graphics"), TEXT("Hero")};
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Tabs) && Menu.IsValid(); ++Index)
 	{
 		if (Tab.Equals(Tabs[Index], ESearchCase::IgnoreCase))

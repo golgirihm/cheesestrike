@@ -122,6 +122,23 @@ def place(cls, label, folder, centre, rotation=(0, 0, 0)):
     return actor
 
 
+HUNG_TAG = "HungOn:"
+
+
+def hang(actor, structure):
+    """Hangs `actor` (a door, a lamp, a sign, a prop) in the cheese of `structure` (the name its blocks were given): once
+    the mice have eaten every block of it, the actor shrinks and falls away on every machine and is gone
+    (UCheeseStrikeHungSubsystem, by the tag HungOn:<structure>; CheeseStrike.Play.AfterTheMice checks it). Use it for
+    what sits in or on cheese and would otherwise hang in the air once it is eaten; never for what stands on the
+    ground or on what is never eaten. Nothing with no `structure`. Returns it."""
+    if structure:
+        tags = list(actor.get_editor_property("tags"))
+        tags.append(unreal.Name(HUNG_TAG + structure))
+        actor.set_editor_property("tags", tags)
+        count("hung on cheese")
+    return actor
+
+
 def solid(label, folder, centre, size, material, mesh=None, rotation=(0, 0, 0)):
     """A static block of `size` (cm, along its own axes) centred on `centre`: the engine's cube, or `mesh` a metre across."""
     actor = place(unreal.StaticMeshActor, label, folder, centre, rotation)
@@ -255,14 +272,15 @@ def fill(label, folder, model, low, high, yaw=0, materials=None):
     return actor
 
 
-def prop(label, folder, name, x, y, z=0, yaw=0, scale=1.0):
-    """A Megascans model at its own size (times `scale`), standing at (x, y, z)."""
+def prop(label, folder, name, x, y, z=0, yaw=0, scale=1.0, attach_to=None):
+    """A Megascans model at its own size (times `scale`), standing at (x, y, z); on cheese, `attach_to` its structure
+    (hang())."""
     model = mesh(name)
     b = model.get_bounding_box()
     half = ((b.max.x - b.min.x) * scale / 2.0, (b.max.y - b.min.y) * scale / 2.0)
     if yaw % 180:
         half = (half[1], half[0])
-    return fill(label, folder, model, (x - half[0], y - half[1], z), (x + half[0], y + half[1], z + (b.max.z - b.min.z) * scale), yaw)
+    return hang(fill(label, folder, model, (x - half[0], y - half[1], z), (x + half[0], y + half[1], z + (b.max.z - b.min.z) * scale), yaw), attach_to)
 
 
 def stack(label, folder, name, low, high, nx, ny, nz):
@@ -532,12 +550,12 @@ def rail(label, folder, start, end, z, height=100, colour="Yellow", material=Non
         box(f"{label}_Post_{i}", folder, (x - 4, y - 4, z), (x + 4, y + 4, z + height), m)
 
 
-def door(label, folder, at, yaw, width=200, height=220, double=True, leaves=None, jambs=True, jamb_material=None):
+def door(label, folder, at, yaw, width=200, height=220, double=True, leaves=None, jambs=True, jamb_material=None, attach_to=None):
     """A door (ACheeseStrikeDoor) in a doorway whose bottom middle is `at`, its X through the doorway (`yaw` 0 for a
     wall along y, 90 for one along x): it slides open as anyone comes up to it (player, bot or mouse) and shuts behind
     them; the navigation mesh runs through it. Steel jambs either side (or of `jamb_material`) stay when the wall
-    round it is eaten."""
-    actor = place(unreal.CheeseStrikeDoor, label, folder, at, (0, yaw, 0))
+    round it is eaten. In a wall of cheese, `attach_to` its structure: the door goes once the cheese has (hang())."""
+    actor = hang(place(unreal.CheeseStrikeDoor, label, folder, at, (0, yaw, 0)), attach_to)
     actor.set_editor_property("width", float(width))
     actor.set_editor_property("height", float(height))
     actor.set_editor_property("double", bool(double))
@@ -552,9 +570,10 @@ def door(label, folder, at, yaw, width=200, height=220, double=True, leaves=None
     return actor
 
 
-def interior_lamp(label, folder, x, y, z, intensity=12.0, radius=900.0, temperature=3600.0, size=(120, 40)):
-    """A ceiling lamp, shining down: light for a room, a tunnel or under a floor, so that whoever is there can be seen."""
-    light = place(unreal.RectLight, label, folder, (x, y, z), (-90, 0, 0))
+def interior_lamp(label, folder, x, y, z, intensity=12.0, radius=900.0, temperature=3600.0, size=(120, 40), attach_to=None):
+    """A ceiling lamp, shining down: light for a room, a tunnel or under a floor, so that whoever is there can be seen.
+    Under a roof of cheese, `attach_to` its structure: the lamp and its fitting go once the cheese has (hang())."""
+    light = hang(place(unreal.RectLight, label, folder, (x, y, z), (-90, 0, 0)), attach_to)
     component = light.get_component_by_class(unreal.RectLightComponent)
     component.set_editor_property("intensity", intensity)
     component.set_editor_property("attenuation_radius", radius)
@@ -562,16 +581,16 @@ def interior_lamp(label, folder, x, y, z, intensity=12.0, radius=900.0, temperat
     component.set_editor_property("source_height", float(size[1]))
     component.set_editor_property("use_temperature", True)
     component.set_editor_property("temperature", temperature)
-    box(label + "_Fitting", folder, (x - size[0] / 2.0, y - size[1] / 2.0, z), (x + size[0] / 2.0, y + size[1] / 2.0, z + 6), painted("Cream"))
+    hang(box(label + "_Fitting", folder, (x - size[0] / 2.0, y - size[1] / 2.0, z), (x + size[0] / 2.0, y + size[1] / 2.0, z + 6), painted("Cream")), attach_to)
     count("lamps")
     return light
 
 
-def point_light(label, folder, at, intensity=8.0, radius=1200.0, temperature=2700.0, shadows=True, source=8.0):
+def point_light(label, folder, at, intensity=8.0, radius=1200.0, temperature=2700.0, shadows=True, source=8.0, attach_to=None):
     """A light shining all round from `at` (a street lamp's lantern, a wall lantern, a brazier), warm unless said: for
     the lamps that light a dusk or night map. Lumen lights everything; keep shadowed lights to about twenty a map, and
-    give small lamps outdoors `shadows=False`."""
-    light = place(unreal.PointLight, label, folder, at)
+    give small lamps outdoors `shadows=False`. On cheese, `attach_to` its structure (hang())."""
+    light = hang(place(unreal.PointLight, label, folder, at), attach_to)
     component = light.get_component_by_class(unreal.PointLightComponent)
     component.set_editor_property("intensity", float(intensity))
     component.set_editor_property("attenuation_radius", float(radius))
@@ -631,7 +650,7 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
         mid = at - (s[0] if side in "NS" else s[1])
         openings[side].append((mid - w / 2.0, mid + w / 2.0, 0, h))
         at_point = (at, walls[side][0][1], bottom) if side in "NS" else (walls[side][0][0], at, bottom)
-        door(f"{name}_Door_{side}_{int(at)}", f, at_point, 90 if side in "NS" else 0, w, h, leaves=door_material, jamb_material=frame_material)
+        door(f"{name}_Door_{side}_{int(at)}", f, at_point, 90 if side in "NS" else 0, w, h, leaves=door_material, jamb_material=frame_material, attach_to=structure)
     for wnd in windows:
         side, at, level = wnd[0], wnd[1], wnd[2]
         w = wnd[3] if len(wnd) > 3 else 200
@@ -711,8 +730,11 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
             else:
                 cheese_box(f"Cheese_{name}_Roof_{i}", structure, (a, span[0], bottom + height), (b, span[1], bottom + height + 30), edible)
     if lamps:
+        # Each under a deck, which stays, but the top storey's under the roof of cheese, which goes with it.
         for level in range(storeys):
-            interior_lamp(f"{name}_Lamp_{level}", f, (ix0 + ix1) / 2.0, (iy0 + iy1) / 2.0, bottom + (level + 1) * storey - 32)
+            under_cheese = cheese_roof and level == storeys - 1
+            interior_lamp(f"{name}_Lamp_{level}", f, (ix0 + ix1) / 2.0, (iy0 + iy1) / 2.0, bottom + (level + 1) * storey - 32,
+                          attach_to=structure if under_cheese else None)
     # Steel at its corners outside, up to the roof: it reads as a building, and stands with the decks once the walls go.
     for cx, cy in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)):
         box(f"{name}_Corner_{int(cx)}_{int(cy)}", f, (cx - 15, cy - 15, bottom), (cx + 15, cy + 15, bottom + height + 30), frame_material or painted(frame))
@@ -775,7 +797,7 @@ def tunnel(name, structure, start, end, width=400, height=300, wall=50, bottom=0
         while d < length:
             x = start[0] + sign * d if along_x else start[0]
             y = start[1] if along_x else start[1] + sign * d
-            interior_lamp(f"{name}_Lamp_{k}", f, x, y, bottom + height - 10, intensity=6.0, radius=700.0)
+            interior_lamp(f"{name}_Lamp_{k}", f, x, y, bottom + height - 10, intensity=6.0, radius=700.0, attach_to=structure if cheese_roof else None)
             d += lamps
             k += 1
     count("tunnels")
@@ -981,11 +1003,11 @@ def ceiling(label, folder, low, high, material, holes=()):
         overhead(box(f"{label}_{i}", folder, (a[0], a[1], low[2]), (b[0], b[1], high[2]), material))
 
 
-def point_lamp(label, folder, x, y, z, intensity=8.0, radius=800.0, temperature=3000.0, shadows=True, fitting="Dark", colour=None):
+def point_lamp(label, folder, x, y, z, intensity=8.0, radius=800.0, temperature=3000.0, shadows=True, fitting="Dark", colour=None, attach_to=None):
     """A hanging lamp: a point light at (x, y, z) under a small shade (painted `fitting`, or none), lighting all round
     it, `radius` far. Without `shadows` it is cheap but shines through walls: use it for fill, a few metres across.
-    `colour` (r, g, b) tints it instead of its `temperature`."""
-    light = place(unreal.PointLight, label, folder, (x, y, z))
+    `colour` (r, g, b) tints it instead of its `temperature`. Hung from cheese, `attach_to` its structure (hang())."""
+    light = hang(place(unreal.PointLight, label, folder, (x, y, z)), attach_to)
     component = light.get_component_by_class(unreal.PointLightComponent)
     component.set_editor_property("intensity", intensity)
     component.set_editor_property("attenuation_radius", radius)
@@ -997,7 +1019,7 @@ def point_lamp(label, folder, x, y, z, intensity=8.0, radius=800.0, temperature=
         component.set_editor_property("use_temperature", True)
         component.set_editor_property("temperature", temperature)
     if fitting:
-        overhead(cylinder(label + "_Shade", folder, x, y, z + 6, 44, 18, painted(fitting)), "Lamp")
+        hang(overhead(cylinder(label + "_Shade", folder, x, y, z + 6, 44, 18, painted(fitting)), "Lamp"), attach_to)
     count("lamps" if shadows else "fill lamps")
     return light
 
@@ -1089,19 +1111,60 @@ def mouse_entries(x0, y0, x1, y1, top, xs=(), ys=()):
         mouse_entry(x1 + 50, y, top, 180)
 
 
-def pickup(weapon, x, y, z=0, name=""):
+def pickup(weapon, x, y, z=0, name="", instant=False):
     """A weapon's stand (ACheeseStrikePickup): a low plinth at (x, y) on the floor at `z`, its weapon (a primary's id:
-    blaster, grater, munster, shotgun, burratas, roquefort; never the carbine everyone comes in with) floating over it, labelled
-    Pickup_<weapon>_<name>. Four to eight a map, the better weapons at the riskier spots (the roquefort the riskiest),
+    blaster, grater, munster, shotgun, burratas, roquefort, babybomb, stick; never the carbine everyone comes in with) floating
+    over it, labelled Pickup_<weapon>_<name>. Four to eight a map, the better weapons at the riskier spots (the power weapons,
+    roquefort, babybomb and stick, the riskiest),
     each side reaching them alike: on a mirrored map in pairs (x and -x) or on the middle line. It blocks nothing, so
     put it on open floor with room round it (a metre and a half across, two metres up), off the lanes' choke points
-    unless that is the risk; the cheese under it is kept (keep()), so that the mice never eat its floor away."""
+    unless that is the risk; the cheese under it is kept (keep()), so that the mice never eat its floor away.
+    `instant`: taken, its weapon is back at once, so that the stand is never empty (the Practice Range's)."""
     label = f"Pickup_{weapon.capitalize()}_{name or counts.get('pickups', 0)}"
     actor = place(unreal.CheeseStrikePickup, label, "Pickups", (x, y, z))
     actor.set_editor_property("weapon", weapon)
+    if instant:
+        actor.set_editor_property("instant", True)
     keep((x - 60, y - 60, z - 400), (x + 60, y + 60, z + 5))
     count("pickups")
     lines.append(f"pickup: {weapon} at ({x:.0f}, {y:.0f}, {z:.0f})")
+    return actor
+
+
+def dummy_spot(name, x, y, z=0, yaw=180):
+    """Where one of the Practice Range's dummies stands (a bot with `?BotSkill=dummy`: it never moves, aims or fires),
+    on the floor at (x, y, z), facing `yaw`: it comes in there and comes back there each time it is killed
+    (ACheeseStrikeGameMode::ChooseDummySpot, by the tag DummySpot). Not a start: no player ever comes in at one."""
+    spot = place(unreal.TargetPoint, f"DummySpot_{name}", "Dummies", (x, y, z + 100), (0, yaw, 0))
+    spot.set_editor_property("tags", ["DummySpot"])
+    count("dummy spots")
+    return spot
+
+
+def target(label, folder, x, y, z, yaw=180, diameter=60, thickness=16):
+    """A cheese target (ACheeseStrikeTarget): a wheel of cheese on its edge, its middle at (x, y, z), its face toward
+    `yaw` (the firing line), `diameter` across and `thickness` thick. Shots break it, and it grows back a few seconds
+    later. Not cheese the mice eat: it counts for none of the map's."""
+    actor = place(unreal.CheeseStrikeTarget, label, folder, (x, y, z), (0, yaw, 0))
+    actor.set_editor_property("diameter", float(diameter))
+    actor.set_editor_property("thickness", float(thickness))
+    count("targets")
+    return actor
+
+
+def text_sign(label, folder, text, at, yaw, size=60, colour=(255, 255, 255)):
+    """Words standing in the world (a range's distances, a sign), `size` cm high, facing `yaw`, centred on `at`."""
+    actor = place(unreal.TextRenderActor, label, folder, at, (0, yaw, 0))
+    component = actor.get_component_by_class(unreal.TextRenderComponent)
+    component.set_editor_property("text", text)
+    component.set_editor_property("world_size", float(size))
+    try:
+        component.set_editor_property("horizontal_alignment", unreal.HorizTextAligment.EHTA_CENTER)
+        component.set_editor_property("vertical_alignment", unreal.VerticalTextAligment.EVRTA_TEXT_CENTER)
+    except Exception as error:
+        lines.append(f"WARNING: {label}: not centred ({error})")
+    component.set_editor_property("text_render_color", unreal.Color(r=colour[0], g=colour[1], b=colour[2], a=255))
+    count("signs")
     return actor
 
 

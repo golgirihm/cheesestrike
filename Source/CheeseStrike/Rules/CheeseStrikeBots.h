@@ -37,6 +37,14 @@ namespace CheeseStrikeBots
 	const FSkill& Skill(int32 Index);
 	/** The skill a map URL's `?BotSkill=` picks, or `Otherwise`. */
 	int32 SkillFrom(const FString& Options, int32 Otherwise = DefaultSkill);
+	/**
+	 * `?BotSkill=dummy`: the bots are the Practice Range's dummies
+	 * (CheeseStrikeRange), apart from the skills a lobby offers: each stands
+	 * at its spot and never moves, aims or fires, and comes back there.
+	 */
+	extern const TCHAR* const DummyKey;
+	/** Whether a map URL's `?BotSkill=` makes the bots dummies. */
+	bool DummiesFrom(const FString& Options);
 
 	/** Seconds of tracking over which a bot's aim steadies. */
 	constexpr float SteadyTime = 1.5f;
@@ -105,17 +113,30 @@ namespace CheeseStrikeBots
 		/** Rounds left in the primary's magazine, and whether there are any more to reload it with. */
 		int32 PrimaryMagazine = 0;
 		bool bPrimaryReserve = false;
+		/** A melee primary (the Cheese Stick) and its reach (cm), which needs no rounds. */
+		bool bPrimaryMelee = false;
+		float PrimaryReach = 0.0f;
+		/** The nearest the primary is fired at someone (the BabyBomb's, whose burst would hurt the bot; 0 for none). */
+		float PrimaryLeast = 0.0f;
 	};
+	/** A melee primary is drawn on anyone closer than this share of its reach and more (StickFrom), and kept out until they are further than StickLetGo of it. */
+	constexpr float StickFrom = 1.6f;
+	constexpr float StickLetGo = 2.2f;
 	/**
-	 * Which weapon a bot wants in hand: the knife for someone close; the
-	 * sidearm when the primary is spent, or its magazine empty with an enemy
-	 * near (quicker than reloading), until the fight is over; otherwise the
+	 * Which weapon a bot wants in hand: a melee primary (the Cheese Stick) for
+	 * someone close, and the sidearm while they are further (the stick then
+	 * goes on in hand to close in, with no sidearm); the knife for someone
+	 * close; the sidearm when the primary is spent, or its magazine empty with
+	 * an enemy near (quicker than reloading), until the fight is over, or with
+	 * someone too close for the primary (the BabyBomb's burst); otherwise the
 	 * primary. `Distance` is to the enemy it fights (`bFighting`), `Current`
 	 * the slot in hand. Only what it may draw is chosen.
 	 */
 	EWeaponSlot ChooseWeapon(const FArmed& Armed, bool bFighting, float Distance, EWeaponSlot Current);
 	/** Whether a bot strikes with a knife reaching `Reach` at someone `Distance` from its eyes. */
 	bool WouldStrikeAt(float Distance, float Reach);
+	/** Whether a bot fires a weapon fired no nearer than `Least` (cm; its burst would hurt the bot) at someone `Distance` off. */
+	bool FarEnoughFor(float Distance, float Least);
 
 	/** Seconds without progress toward where it is going before a bot finds another way. */
 	constexpr float StuckTime = 1.2f;

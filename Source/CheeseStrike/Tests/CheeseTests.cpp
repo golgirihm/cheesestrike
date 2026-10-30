@@ -17,6 +17,7 @@
 #include "NavigationSystem.h"
 #include "Map/CheeseStrikeCheese.h"
 #include "Map/CheeseStrikeDoor.h"
+#include "Map/CheeseStrikeHung.h"
 #include "Map/CheeseStrikeMouse.h"
 #include "Misc/App.h"
 #include "CheeseStrikeCharacter.h"
@@ -293,6 +294,18 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 		AddInfo(FString::Printf(TEXT("%d blocks to eat, %d kept"), Edible, Kept.Num()));
 		// Its weapons' stands, as the map has them.
 		PickupChecks::CheckStands(*this, World(0), false);
+		// What hangs in its cheese (doors, lamps) hangs on a structure there is cheese of, and is there for now.
+		if (const UCheeseStrikeHungSubsystem* Hung = World(0)->GetSubsystem<UCheeseStrikeHungSubsystem>())
+		{
+			for (const TPair<TWeakObjectPtr<AActor>, FName>& Each : Hung->GetHung())
+			{
+				const int32 Blocks = AllCheese().FilterByPredicate([&Each](const ACheeseStrikeCheese* Block) { return Block->GetStructure() == Each.Value; }).Num();
+				const FString Name = Each.Key.IsValid() ? Each.Key->GetActorLabel() : FString(TEXT("something"));
+				TestTrue(FString::Printf(TEXT("%s hangs on %s, which has cheese (%d blocks)"), *Name, *Each.Value.ToString(), Blocks), Blocks > 0);
+				TestTrue(FString::Printf(TEXT("%s is there before the mice"), *Name), Each.Key.IsValid() && !Each.Key->IsHidden() && !Hung->IsGone(Each.Key.Get()));
+			}
+			AddInfo(FString::Printf(TEXT("%d things hung on cheese"), Hung->GetHung().Num()));
+		}
 	});
 	// The mice come, and eat all they may in about a minute and a quarter, steadily and spread out: played at a fixed
 	// step, as fast as the editor goes.
@@ -447,6 +460,17 @@ bool FAfterTheMice::RunTest(const FString& Parameters)
 	{
 		UWorld* Here = World(0);
 		PickupChecks::CheckStands(*this, Here, true);
+		// What hung in the cheese has gone with it: hidden, and blocking nothing.
+		if (const UCheeseStrikeHungSubsystem* Hung = Here->GetSubsystem<UCheeseStrikeHungSubsystem>())
+		{
+			for (const TPair<TWeakObjectPtr<AActor>, FName>& Each : Hung->GetHung())
+			{
+				const AActor* Thing = Each.Key.Get();
+				const bool bAnyLeft = AllCheese().ContainsByPredicate([&Each](const ACheeseStrikeCheese* Block) { return Block->GetStructure() == Each.Value; });
+				TestTrue(FString::Printf(TEXT("%s is gone with the cheese of %s"), Thing != nullptr ? *Thing->GetActorLabel() : TEXT("something"), *Each.Value.ToString()),
+					bAnyLeft || (Thing != nullptr && Hung->IsGone(Thing) && Thing->IsHidden() && !Thing->GetActorEnableCollision()));
+			}
+		}
 		// What the map keeps stands where it stood.
 		for (const TPair<TWeakObjectPtr<ACheeseStrikeCheese>, FBox>& Each : Kept)
 		{

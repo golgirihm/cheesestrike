@@ -47,8 +47,12 @@ bool FEveryWeaponHasItsOwnLook::RunTest(const FString& Parameters)
 		// One model, skinned or plain, of its own, which loads.
 		TestTrue(FString::Printf(TEXT("%s has one model"), *Name), (Look.SkinnedModel != nullptr) != (Look.PlainModel != nullptr));
 		const FString ModelPath = Look.SkinnedModel != nullptr ? Look.SkinnedModel : Look.PlainModel;
-		TestFalse(FString::Printf(TEXT("%s's model is its own"), *Name), Models.Contains(ModelPath));
-		Models.Add(ModelPath);
+		// A streak's weapon may borrow another's model until it has one (the Gouda Gatling the Munster's).
+		if (!Weapon->bSpecial)
+		{
+			TestFalse(FString::Printf(TEXT("%s's model is its own"), *Name), Models.Contains(ModelPath));
+			Models.Add(ModelPath);
+		}
 		FBox Bounds(ForceInit);
 		if (Look.SkinnedModel != nullptr)
 		{
@@ -107,7 +111,8 @@ bool FEveryWeaponHasItsOwnLook::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("%s's shots are about as loud as the rest"), *Name), Look.ShotVolume > 0.5f && Look.ShotVolume <= 1.3f);
 
 		// Its picture in the HUD's slot list.
-		const FString Icon = FString::Printf(TEXT("/Game/CheeseStrike/Weapons/Icons/T_Icon_%s.T_Icon_%s"), *Name, *Name);
+		const FString Pictured = Look.IconOf != nullptr ? FString(Look.IconOf) : Name;
+		const FString Icon = FString::Printf(TEXT("/Game/CheeseStrike/Weapons/Icons/T_Icon_%s.T_Icon_%s"), *Pictured, *Pictured);
 		TestNotNull(FString::Printf(TEXT("%s has a picture"), *Name), Load<UTexture2D>(*Icon));
 	}
 

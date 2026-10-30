@@ -350,6 +350,28 @@ namespace MiceTests
 	}
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWhatHangsInCheeseGoesWithIt, "CheeseStrike.Mice.WhatHangsInCheeseGoesWithIt", MiceTests::Flags)
+
+bool FWhatHangsInCheeseGoesWithIt::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeMice;
+	// The map's scripts tag what hangs in cheese with its structure's name.
+	TestEqual(TEXT("a tag names the structure"), StructureOfTag(FName(TEXT("HungOn:RindTunnel"))), FName(TEXT("RindTunnel")));
+	TestTrue(TEXT("another tag names none"), StructureOfTag(FName(TEXT("Ceiling"))).IsNone());
+	TestTrue(TEXT("nor does the tag alone"), StructureOfTag(FName(HungOnTag)).IsNone());
+	// It goes once no block of its structure is left, and not before.
+	TestFalse(TEXT("a door stays while a block of its wall is left"), IsHungOnEatenCheese(FName(TEXT("CuringHouseGouda")), 1));
+	TestTrue(TEXT("and goes when the last is eaten"), IsHungOnEatenCheese(FName(TEXT("CuringHouseGouda")), 0));
+	TestFalse(TEXT("nothing hung on no structure goes"), IsHungOnEatenCheese(NAME_None, 0));
+	// Quickly: it shrinks from whole to nothing, falling, in half a second.
+	TestEqual(TEXT("whole as it begins"), VanishScale(0.0f), 1.0f);
+	TestTrue(TEXT("smaller as it goes"), VanishScale(0.25f) < 1.0f && VanishScale(0.25f) > VanishScale(0.4f));
+	TestEqual(TEXT("nothing at the end"), VanishScale(VanishSeconds), 0.0f);
+	TestTrue(TEXT("quick"), VanishSeconds <= 0.6f);
+	TestTrue(TEXT("falling, faster as it goes"), VanishDrop(0.0f) == 0.0f && VanishDrop(0.4f) - VanishDrop(0.3f) > VanishDrop(0.2f) - VanishDrop(0.1f));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMiceEatTheCreamery, "CheeseStrike.Play.TheMiceEatTheCreamery", MiceTests::Flags)
 
 bool FTheMiceEatTheCreamery::RunTest(const FString& Parameters)

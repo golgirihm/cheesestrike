@@ -8,6 +8,7 @@
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
+#include "Animation/CheeseStrikeBodies.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
@@ -29,12 +30,16 @@ ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
 	Pedestal->SetRelativeScale3D(FVector(PedestalWidth / 100.0f, PedestalWidth / 100.0f, PedestalHeight / 100.0f));
 	Pedestal->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// The character as players see one another, animated as in the game, holding the rifle.
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> Belica(TEXT("/Game/ParagonLtBelica/Characters/Heroes/Belica/Meshes/Belica.Belica"));
+	// The character as players see one another, animated as in the game, holding the rifle: the hero picked (ShowHero).
+	for (const CheeseStrikeBodies::FBody& Each : CheeseStrikeBodies::All())
+	{
+		ConstructorHelpers::FObjectFinder<USkeletalMesh> Hero(Each.Mesh);
+		Heroes.Add(Hero.Object);
+	}
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> RifleMesh(TEXT("/Game/Weapons/Rifle/Mesh/SK_Rifle.SK_Rifle"));
 	Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
 	Body->SetupAttachment(Pedestal);
-	Body->SetSkeletalMeshAsset(Belica.Object);
+	Body->SetSkeletalMeshAsset(Heroes.IsValidIndex(0) ? Heroes[0].Get() : nullptr);
 	Body->SetAnimInstanceClass(UCheeseStrikeHeroAnimInstance::StaticClass());
 	// Undo the pedestal's scale, and stand on its top, facing the way the pedestal faces.
 	Body->SetRelativeScale3D(FVector(100.0f / PedestalWidth, 100.0f / PedestalWidth, 100.0f / PedestalHeight));
@@ -55,6 +60,46 @@ void ACheeseStrikeMenuFigure::BeginPlay()
 	// In the hand as the game holds it, with only our rifle showing.
 	ACheeseStrikeWeapon::PutInHand(Rifle, Body);
 	ACheeseStrikeWeapon::HideBuiltInWeapons(Body);
+}
+
+void ACheeseStrikeMenuFigure::ShowHero(int32 Hero)
+{
+	const int32 Wanted = Heroes.IsValidIndex(Hero) ? Hero : 0;
+	USkeletalMesh* const Model = Heroes.IsValidIndex(Wanted) ? Heroes[Wanted].Get() : nullptr;
+	if (Model == nullptr || (Wanted == Shown && Body->GetSkeletalMeshAsset() == Model))
+	{
+		return;
+	}
+	Shown = Wanted;
+	Body->SetSkeletalMeshAsset(Model);
+	// A fresh animation, which plays the new skeleton's set; nothing the last hero hid stays hidden.
+	Body->SetAnimInstanceClass(nullptr);
+	Body->SetAnimInstanceClass(UCheeseStrikeHeroAnimInstance::StaticClass());
+	Body->EmptyOverrideMaterials();
+	for (int32 Level = 0; Level < Model->GetLODNum(); ++Level)
+	{
+		Body->ShowAllMaterialSections(Level);
+	}
+	for (int32 Bone = 0; Bone < Model->GetRefSkeleton().GetNum(); ++Bone)
+	{
+		if (Body->IsBoneHiddenByName(Model->GetRefSkeleton().GetBoneName(Bone)))
+		{
+			Body->UnHideBoneByName(Model->GetRefSkeleton().GetBoneName(Bone));
+		}
+	}
+	// Only our rifle shows, at this hero's grip.
+	const CheeseStrikeBodies::FBody& Look = CheeseStrikeBodies::All()[Wanted];
+	for (int32 Slot = 0; Slot < Look.NumWeaponSlots; ++Slot)
+	{
+		const FName Name(Look.WeaponSlots[Slot]);
+		const int32 Material = Model->GetMaterials().IndexOfByPredicate([&Name](const FSkeletalMaterial& Each) { return Each.MaterialSlotName == Name; });
+		for (int32 Level = 0; Material != INDEX_NONE && Level < Model->GetLODNum(); ++Level)
+		{
+			Body->ShowMaterialSection(Material, INDEX_NONE, false, Level);
+		}
+	}
+	ACheeseStrikeWeapon::HideBuiltInWeapons(Body);
+	ACheeseStrikeWeapon::PutInHand(Rifle, Body);
 }
 
 void ACheeseStrikeMenuFigure::Tick(float DeltaSeconds)
