@@ -110,6 +110,8 @@ struct FCheeseStrikeViewHold : public FAnimNode_Base
 	/** Held as a knife (on guard, swiped), and the swipe's phase (none below 0). */
 	bool bKnife = false;
 	float SwipePhase = -1.0f;
+	/** How wide the swipe is (1 the knife's; the Cheese Stick's wider). */
+	float SwipeSize = 1.0f;
 	/** How much a montage moves the arms (1 - the slot's source weight). */
 	float Montage = 0.0f;
 
@@ -160,8 +162,9 @@ struct FCheeseStrikeKnifeHold : public FAnimNode_Base
 	FTransform ModelInHand = FTransform::Identity;
 	FVector ModelAlong = FVector(0.0, -1.0, 0.0);
 	FVector ModelSpine = FVector(0.0, 0.0, 1.0);
-	/** The swipe's phase (none below 0). */
+	/** The swipe's phase (none below 0), and how wide it is (1 the knife's). */
 	float SwipePhase = -1.0f;
+	float SwipeSize = 1.0f;
 
 	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
 	virtual void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;

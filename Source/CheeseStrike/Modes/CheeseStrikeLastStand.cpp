@@ -154,6 +154,11 @@ namespace
 	}
 }
 
+void UCheeseStrikeLastStand::ShowCheeseBurst(UWorld* World, const FVector& At)
+{
+	BurstIntoCheese(World, At);
+}
+
 UCheeseStrikeLastStand::UCheeseStrikeLastStand()
 {
 	PrimaryComponentTick.bCanEverTick = true;
