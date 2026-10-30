@@ -1,11 +1,13 @@
 import os, traceback
 import unreal
 
-# Run with the editor closed, after tools/art/weapon_textures.py and tools/art/weapon_models.py have written into
-# FAB/x/weapons:
-#   UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/import_weapons.py" -unattended -nullrhi
+# Run with the editor closed, after tools/art/weapon_textures.py, tools/art/weapon_models.py and
+# tools/art/cheese_weapons.py (Blender) have written into FAB/x/weapons and tools/art/weapon_icons.py has drawn the
+# icons:
+#   UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/import_weapons.py [Name ...]" -unattended -nullrhi
 # (both paths absolute). Then run tools/art/weapon_materials.py, which gives them the game's cheese materials.
-# It writes what it did to Saved/import_weapons.txt.
+# It writes what it did to Saved/import_weapons.txt. With names (of OURS, "Icons" for the icons), only those are
+# imported, afresh.
 #
 # Imports the weapons' models: the Fab models of the primaries that aren't Lyra's (Content/LICENSES.md lists
 # each listing) into /Game/Fab/<publisher>/<model>/, each a static mesh (no Nanite, which the first-person view
@@ -33,6 +35,13 @@ MODELS = [
 OURS = [("CheeseKnife", "/Game/CheeseStrike/Weapons/Knife", os.path.join(WORK, "cheese_knife.obj")),
         ("MuzzleFlash", "/Game/CheeseStrike/Weapons/Flash", os.path.join(WORK, "muzzle_flash.obj")),
         ("FragGrenade", "/Game/CheeseStrike/Weapons/Grenade", os.path.join(WORK, "frag_grenade.obj"))]
+# The cheese weapons, modelled in Blender by tools/art/cheese_weapons.py.
+OURS += [(asset, "/Game/CheeseStrike/Weapons/" + folder, os.path.join(WORK, f"cheese_{source}.obj")) for asset, folder, source in [
+    ("CheddarBlaster", "Blaster", "blaster"), ("ColbyCarbine", "Carbine", "carbine"), ("RoquefortRifle", "Roquefort", "roquefort"),
+    ("CurdPistol", "Pistol", "pistol"), ("SwissShotgun", "Shotgun", "shotgun"), ("MunsterSMG", "Munster", "munster"),
+    ("CheeseGrater", "Grater", "grater"), ("GraterShard", "Grater", "grater_shard"), ("BabyBomb", "BabyBomb", "babybomb"),
+    ("BabyBombRound", "BabyBomb", "babybomb_round"), ("CheeseStick", "Stick", "stick"), ("GoudaGatling", "Gatling", "gatling")]]
+ONLY = [a for a in __import__("sys").argv[1:] if a]
 SHOTGUN_TEXTURES = ["/Game/Weapons/Shotgun/Texture/T_Shotgun_AORM", "/Game/Weapons/Shotgun/Texture/T_Shotgun_D", "/Game/Weapons/Shotgun/Texture/T_Shotgun_N", "/Game/Weapons/Shotgun/Texture/T_Shotgun_Mask"]
 
 lines = []
@@ -80,7 +89,7 @@ def texture(path, destination, name, kind):
 
 def model(asset, path, destination, yaw=0.0):
     """A static mesh, its parts combined, with its material slots; no Nanite, no collision."""
-    if not REIMPORT and lib.does_asset_exist(f"{destination}/SM_{asset}"):
+    if not REIMPORT and asset not in ONLY and lib.does_asset_exist(f"{destination}/SM_{asset}"):
         return unreal.load_asset(f"{destination}/SM_{asset}")
     options = unreal.FbxImportUI()
     options.set_editor_property("import_mesh", True)
@@ -96,6 +105,8 @@ def model(asset, path, destination, yaw=0.0):
     data.set_editor_property("auto_generate_collision", False)
     data.set_editor_property("build_nanite", False)
     data.set_editor_property("generate_lightmap_u_vs", False)
+    # The models' own normals: smooth cheese, sharp where they are cut.
+    data.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
     if yaw:
         data.set_editor_property("import_rotation", unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw))
     imported = import_file(path, destination, "SM_" + asset, options)
@@ -133,7 +144,7 @@ def describe(asset, mesh):
 def icon(path, name):
     """A HUD icon: white on clear, drawn as it is, no mips."""
     destination = "/Game/CheeseStrike/Weapons/Icons"
-    if not REIMPORT and lib.does_asset_exist(f"{destination}/{name}"):
+    if not REIMPORT and "Icons" not in ONLY and lib.does_asset_exist(f"{destination}/{name}"):
         return
     imported = [a for a in import_file(path, destination, name) if isinstance(a, unreal.Texture2D)]
     if not imported:
@@ -150,7 +161,7 @@ def icon(path, name):
 try:
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.OBJ False")
-    for asset, destination, path, sets, *turn in MODELS:
+    for asset, destination, path, sets, *turn in (MODELS if not ONLY else []):
         lines.append(asset)
         for name, has_cheese in sets:
             for kind in ["Albedo", "Normal", "AORM"] + (["Cheese"] if has_cheese else []):
@@ -159,20 +170,22 @@ try:
         if mesh is not None:
             describe(asset, mesh)
     for asset, destination, path in OURS:
+        if ONLY and asset not in ONLY:
+            continue
         lines.append(asset)
         mesh = model(asset, path, destination)
         if mesh is not None:
             describe(asset, mesh)
     icons = os.path.join(WORK, "icons")
-    if os.path.isdir(icons):
+    if os.path.isdir(icons) and (not ONLY or "Icons" in ONLY):
         for file in sorted(os.listdir(icons)):
             if file.endswith(".png"):
                 icon(os.path.join(icons, file), file[:-4])
-    for path in ["/Game/Weapons/Rifle/Mesh/SK_Rifle", "/Game/Weapons/Pistol/Mesh/SK_Pistol", "/Game/Weapons/Shotgun/Mesh/SKM_Shotgun"]:
+    for path in ([] if ONLY else ["/Game/Weapons/Rifle/Mesh/SK_Rifle", "/Game/Weapons/Pistol/Mesh/SK_Pistol", "/Game/Weapons/Shotgun/Mesh/SKM_Shotgun"]):
         skeletal = unreal.load_asset(path)
         box = skeletal.get_bounds()
         lines.append(f"{path}: middle {box.origin}, half {box.box_extent}")
-    for path in SHOTGUN_TEXTURES:
+    for path in ([] if ONLY else SHOTGUN_TEXTURES):
         t = unreal.load_asset(path)
         width = t.blueprint_get_size_x()
         if width > MAX:
@@ -180,7 +193,7 @@ try:
             lib.save_asset(path, False)
         lines.append(f"{path}: {width} -> {t.blueprint_get_size_x()}")
     # Lyra's weapon textures, written out to look at.
-    for path in ["/Game/Weapons/Rifle/Textures/T_Rifle_Masks", "/Game/Weapons/Rifle/Textures/T_Rifle_D", "/Game/Weapons/Pistol/Textures/T_Pistol_Masks", "/Game/Weapons/Pistol/Textures/T_Pistol_D", "/Game/Weapons/Shotgun/Texture/T_Shotgun_Mask", "/Game/Weapons/Shotgun/Texture/T_Shotgun_D"]:
+    for path in [] if ONLY else ["/Game/Weapons/Rifle/Textures/T_Rifle_Masks", "/Game/Weapons/Rifle/Textures/T_Rifle_D", "/Game/Weapons/Pistol/Textures/T_Pistol_Masks", "/Game/Weapons/Pistol/Textures/T_Pistol_D", "/Game/Weapons/Shotgun/Texture/T_Shotgun_Mask", "/Game/Weapons/Shotgun/Texture/T_Shotgun_D"]:
         task = unreal.AssetExportTask()
         task.set_editor_property("object", unreal.load_asset(path))
         task.set_editor_property("filename", SHAPES + path.split("/")[-1] + ".png")

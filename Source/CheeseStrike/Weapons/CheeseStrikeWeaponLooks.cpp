@@ -91,7 +91,7 @@ namespace
 			RifleSounds(Look, 0.7f, 1.5f);
 			Look.IconOf = TEXT("knife");
 			Look.ProjectileModel = TEXT("/Engine/BasicShapes/Cube.Cube");
-			Look.ProjectileMaterial = Material(TEXT("MI_GrenadeCheese"));
+			Look.ProjectileMaterials[0] = Material(TEXT("MI_GrenadeCheese"));
 			Look.ProjectileShape = FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(0.09f, 0.015f, 0.02f));
 			Look.ProjectileGlow = FLinearColor(1.0f, 0.78f, 0.2f, 1.0f);
 			Looks.Add(Look);
@@ -236,7 +236,7 @@ namespace
 			Look.ShotPitch = 0.6f;
 			Look.IconOf = TEXT("munster");
 			Look.ProjectileModel = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
-			Look.ProjectileMaterial = Material(TEXT("MI_KnifeWax"));
+			Look.ProjectileMaterials[0] = Material(TEXT("MI_KnifeWax"));
 			// The wheel's face forward, spinning as it flies.
 			Look.ProjectileShape = FTransform(FRotator(90.0f, 0.0f, 0.0f), FVector::ZeroVector, FVector(0.12f, 0.12f, 0.07f));
 			Look.ProjectileSpin = 720.0f;

@@ -55,11 +55,11 @@ struct FWeaponLook
 	/** The weapon whose HUD picture it borrows (tools/art/weapon_icons.py's), if not its own. */
 	const TCHAR* IconOf = nullptr;
 	/**
-	 * A projectile weapon's round in flight (ACheeseStrikeProjectile): its model, its material, and its size and turn,
-	 * its front along X; and how fast it spins about its flight (degrees a second).
+	 * A projectile weapon's round in flight (ACheeseStrikeProjectile): its model, its materials slot by slot, and its size
+	 * and turn, its front along X; and how fast it spins about its flight (degrees a second).
 	 */
 	const TCHAR* ProjectileModel = nullptr;
-	const TCHAR* ProjectileMaterial = nullptr;
+	const TCHAR* ProjectileMaterials[2] = {nullptr, nullptr};
 	FTransform ProjectileShape = FTransform::Identity;
 	float ProjectileSpin = 0.0f;
 	/** The colour of the light it glows with as it flies (none where its alpha is 0). */
