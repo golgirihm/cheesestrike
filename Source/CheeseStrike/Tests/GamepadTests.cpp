@@ -271,7 +271,7 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	}
 	const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(nullptr);
 	Menu->Show(EMenuPage::Main);
-	TestEqual(TEXT("the front end's items, then the hero row under the figure"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("QUIT"),
+	TestEqual(TEXT("the front end's items, then the hero row under the figure"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("PRACTICE"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("QUIT"),
 		TEXT("AUTO"), TEXT("BELICA"), TEXT("MURDOCK"), TEXT("WRAITH"), TEXT("TWINBLAST")}));
 	TestEqual(TEXT("the first has the focus"), Menu->GetFocusName(), FString(TEXT("HOST A MATCH")));
 	Menu->FocusItem(TEXT("SETTINGS"));

@@ -1638,6 +1638,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 		+ SVerticalBox::Slot().AutoHeight()
 		[
 			SNew(SVerticalBox).IsEnabled(!bHosting)
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("PRACTICE"), [Player]() { if (Player.IsValid()) Player->PracticeFromMenu(); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]

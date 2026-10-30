@@ -124,6 +124,11 @@ namespace CheeseStrikePickups
 		return FLinearColor(0.25f, 0.9f, 0.3f);
 	}
 
+	float BackAt(float Now, float Seconds, bool bInstant)
+	{
+		return bInstant ? 0.0f : Now + Seconds;
+	}
+
 	float SecondsLeft(float Now, float BackAt)
 	{
 		return BackAt > 0.0f ? FMath::Max(0.0f, BackAt - Now) : 0.0f;

@@ -42,6 +42,7 @@
 #include "CheeseStrikeInventory.h"
 #include "CheeseStrikeWeaponLooks.h"
 #include "Map/CheeseStrikeMouse.h"
+#include "Map/CheeseStrikeTarget.h"
 #include "UI/CheeseStrikeHUD.h"
 #include "Rules/CheeseStrikeModes.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
@@ -1478,7 +1479,7 @@ void ACheeseStrikeWeapon::ServerFire_Implementation(FVector_NetQuantize Origin, 
 			// Something of the arena's, or the template's, which takes the engine's damage.
 			const float Damage = CheeseStrikeWeapons::DamageAt(FiringStats(), Hit.Distance, false);
 			UGameplayStatics::ApplyPointDamage(Hit.Wall.GetActor(), Damage, Direction, Hit.Wall, Holder->GetController(), this, nullptr);
-			if (Hit.Wall.GetActor()->IsA<APawn>() || Hit.Wall.GetActor()->IsA<ACheeseStrikeMouse>())
+			if (Hit.Wall.GetActor()->IsA<APawn>() || Hit.Wall.GetActor()->IsA<ACheeseStrikeMouse>() || Hit.Wall.GetActor()->IsA<ACheeseStrikeTarget>())
 			{
 				ClientHit(Damage, false, false);
 			}
@@ -1563,7 +1564,7 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 	for (int32 Ray = 0; Ray < Hits.Num(); ++Ray)
 	{
 		AActor* Thing = Hits[Ray].bWall ? Hits[Ray].Wall.GetActor() : nullptr;
-		if (Thing != nullptr && (Thing->IsA<APawn>() || Thing->IsA<ACheeseStrikeMouse>()))
+		if (Thing != nullptr && (Thing->IsA<APawn>() || Thing->IsA<ACheeseStrikeMouse>() || Thing->IsA<ACheeseStrikeTarget>()))
 		{
 			UGameplayStatics::ApplyPointDamage(Thing, Stats->Damage, Fan[Ray], Hits[Ray].Wall, Holder->GetController(), this, nullptr);
 			ClientHit(Stats->Damage, false, false);
@@ -1674,7 +1675,7 @@ void ACheeseStrikeWeapon::StrikeArc(const FVector& Origin, const FVector& Aim, f
 	// Nobody: a mouse or anything else of the engine's in front takes its blow.
 	FHitResult Thing;
 	if (World->LineTraceSingleByChannel(Thing, Origin, Origin + Aim * Stats->Reach, ECC_Visibility, Params) && Thing.GetActor() != nullptr
-		&& (Thing.GetActor()->IsA<APawn>() || Thing.GetActor()->IsA<ACheeseStrikeMouse>()))
+		&& (Thing.GetActor()->IsA<APawn>() || Thing.GetActor()->IsA<ACheeseStrikeMouse>() || Thing.GetActor()->IsA<ACheeseStrikeTarget>()))
 	{
 		UGameplayStatics::ApplyPointDamage(Thing.GetActor(), Stats->Damage, Aim, Thing, Holder->GetController(), this, nullptr);
 		ClientHit(Stats->Damage, false, false);

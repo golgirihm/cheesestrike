@@ -23,6 +23,7 @@
 #include "CheeseStrikePlayerState.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikePodiums.h"
+#include "Rules/CheeseStrikeRange.h"
 #include "UI/CheeseStrikePodium.h"
 #include "Rules/CheeseStrikeStart.h"
 #include "Sessions/CheeseStrikeSeatMemory.h"
@@ -66,6 +67,7 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	MapIndex = CheeseStrikeRules::MapFrom(Options, CurrentMapIndex());
 	BotSeed = CheeseStrikeRules::BotSeedFrom(Options, FMath::Rand());
 	BotSkill = CheeseStrikeBots::SkillFrom(Options);
+	bDummyBots = CheeseStrikeBots::DummiesFrom(Options);
 	bMice = CheeseStrikeMice::HasMice(Options);
 	MiceAfter = CheeseStrikeMice::ArrivalFrom(Options);
 	StartCountdown = CheeseStrikeStart::CountdownFrom(Options);
@@ -135,7 +137,7 @@ void ACheeseStrikeGameMode::SetRules(int32 InKillLimit, float InRespawnDelay, in
 
 FString ACheeseStrikeGameMode::RulesOptions() const
 {
-	FString Options = FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?BotSeed=%d?BotSkill=%d"), KillLimit, RespawnDelay, BotSeed, BotSkill);
+	FString Options = FString::Printf(TEXT("?KillLimit=%d?RespawnDelay=%.1f?BotSeed=%d?BotSkill=%s"), KillLimit, RespawnDelay, BotSeed, bDummyBots ? CheeseStrikeBots::DummyKey : *FString::FromInt(BotSkill));
 	Options += FString::Printf(TEXT("?Mode=%s?Rounds=%d?RoundTime=%.0f"), CheeseStrikeModes::Info(Mode).Key, RoundLimit, RoundTime);
 	if (MapIndex >= 0)
 	{
@@ -1492,9 +1494,58 @@ void ACheeseStrikeGameMode::Respawn(TWeakObjectPtr<AController> Who)
 	}
 }
 
+AActor* ACheeseStrikeGameMode::ChooseDummySpot(AController* Dummy) const
+{
+	UWorld* World = GetWorld();
+	ACheeseStrikeBotController* Bot = Cast<ACheeseStrikeBotController>(Dummy);
+	if (World == nullptr || Bot == nullptr)
+	{
+		return nullptr;
+	}
+	TArray<AActor*> Spots;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->ActorHasTag(FName(CheeseStrikeRange::DummySpotTag)))
+		{
+			Spots.Add(*It);
+		}
+	}
+	if (Spots.Num() == 0)
+	{
+		return nullptr;
+	}
+	// In a fixed order (nearest the firing line first), so that each dummy keeps its own.
+	Spots.Sort([](const AActor& A, const AActor& B)
+	{
+		const FVector At = A.GetActorLocation(), Bt = B.GetActorLocation();
+		return At.X != Bt.X ? At.X < Bt.X : At.Y < Bt.Y;
+	});
+	if (!Spots.IsValidIndex(Bot->GetDummySpot()))
+	{
+		TArray<int32> Taken;
+		for (TActorIterator<ACheeseStrikeBotController> It(World); It; ++It)
+		{
+			if (*It != Bot && Spots.IsValidIndex(It->GetDummySpot()))
+			{
+				Taken.Add(It->GetDummySpot());
+			}
+		}
+		Bot->SetDummySpot(CheeseStrikeRange::DummySpotFor(Taken, Spots.Num()));
+	}
+	return Spots[Bot->GetDummySpot()];
+}
+
 AActor* ACheeseStrikeGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	UWorld* World = GetWorld();
+	// The range's dummies come in, and back, where they stood.
+	if (bDummyBots && Player != nullptr && Player->IsA<ACheeseStrikeBotController>())
+	{
+		if (AActor* Spot = ChooseDummySpot(Player))
+		{
+			return Spot;
+		}
+	}
 	TArray<APlayerStart*> Starts;
 	TArray<FVector> Spots;
 	for (TActorIterator<APlayerStart> It(World); It; ++It)

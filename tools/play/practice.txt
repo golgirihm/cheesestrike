@@ -1,0 +1,22 @@
+# The front end's PRACTICE: pressed (with the keyboard), the Practice Range alone with its dummies; Escape's menu
+# and its Leave take the player back to the front end. Run with tools/play.ps1 -Lobby (the front end, not a match).
+wait 4
+device keyboard
+shot practice_1_front_end
+key Down
+wait 0.3
+key Enter
+wait 20
+shot practice_2_on_the_range
+state
+key Escape
+wait 1
+shot practice_3_paused
+key Down
+wait 0.2
+key Down
+wait 0.2
+key Enter
+wait 15
+shot practice_4_back
+quit

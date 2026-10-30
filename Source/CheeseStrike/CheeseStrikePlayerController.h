@@ -121,6 +121,8 @@ public:
 	void BackFromMenu();
 	/** Hosts a match with the lobby's usual rules (CheeseStrikeRules::HostOptions), through the online service, or the local network without Steam: straight into its lobby. */
 	void HostFromMenu();
+	/** Plays the Practice Range alone, at once, with no lobby (CheeseStrikeRange::PracticeUrl): its weapons, targets and dummies; the pause menu's Leave comes back. */
+	void PracticeFromMenu();
 	/** The host sets the match's rules and map from the lobby (INDEX_NONE keeps the map); everyone in it sees them. */
 	void SetRulesFromMenu(int32 KillLimit, float RespawnDelay, int32 Map = INDEX_NONE);
 	/** The host sets how well the bots play, and how many there are (-1 for every empty seat), from the lobby. */
