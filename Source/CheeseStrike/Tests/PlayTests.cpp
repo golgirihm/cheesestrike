@@ -434,10 +434,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAKillIsScoredAndTheKilledComeBack, "CheeseStri
 bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
-	StartPlaying({2, TEXT("?RespawnDelay=2")});
+	// A count-in long enough for the picks to arrive during it (a hero may be picked then, never mid-match).
+	StartPlaying({2, TEXT("?RespawnDelay=2?Countdown=6")});
 	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
 	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
-	// Every player's hero is a pick (Lt. Belica until they pick): the host picks Murdock, the joiner Wraith.
+	// Every player's hero is a pick (Lt. Belica until they pick): the host picks Murdock, the joiner Wraith, as the count runs.
 	Then([]()
 	{
 		PlayTests::FirstBody = Character(0);
@@ -445,8 +446,8 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 		Controller(0)->CheeseStrikeHero(TEXT("Murdock"));
 		Controller(1)->CheeseStrikeHero(TEXT("Wraith"));
 	});
-	// Both have just arrived, and can't be hurt yet.
-	Wait(CheeseStrikeRules::SpawnProtection);
+	// Both have just arrived, and can't be hurt until the count and the protection after it are over.
+	Wait(CheeseStrikeRules::SpawnProtection + 6.0f);
 	Then([this]()
 	{
 		// Everyone for themself: on both machines, the two are the heroes they picked, each in its own colours.
@@ -551,7 +552,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSidesLookDifferent, "CheeseStrike.Play.TheS
 bool FTheSidesLookDifferent::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
-	StartPlaying({2, TEXT("?Mode=Deathmatch")});
+	// A count-in, during which a hero may still be picked (never mid-match).
+	StartPlaying({2, TEXT("?Mode=Deathmatch?Countdown=4")});
 	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
 	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
 	// Every player's hero is a pick: each picks the first hero of their own side (bots are dealt a side's heroes by rank).
@@ -631,17 +633,20 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAPickedHeroIsSeenByEveryone, "CheeseStrike.Pla
 bool FAPickedHeroIsSeenByEveryone::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
-	StartPlaying({2, TEXT("?Mode=Deathmatch")});
+	// A pick is taken during a count-in (never mid-match), and the body swaps at once while everyone is held: the count
+	// is made long enough on the server for both picks and the change back.
+	StartPlaying({2, TEXT("?Mode=Deathmatch?Countdown=10")});
 	// Both pick one hero of the joiner's foes' side: each wears it in their own side's colours, so both show the same hero.
 	TSharedRef<int32> Pick = MakeShared<int32>(INDEX_NONE);
 	Then([this, Pick]()
 	{
-		const ACheeseStrikeGameState* Match = GameState(0);
+		ACheeseStrikeGameState* Match = GameState(0);
 		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
 		if (!TestNotNull(TEXT("a match"), Match) || !TestNotNull(TEXT("with the joiner"), Joiner))
 		{
 			return;
 		}
+		Match->SetGoAt(static_cast<float>(Match->GetServerWorldTimeSeconds()) + 30.0f);
 		*Pick = CheeseStrikeBodies::ForTeam(1 - Match->TeamOf(Joiner->GetPlayerState()), 0);
 		Controller(1)->CheeseStrikeHero(CheeseStrikeBodies::HeroKey(*Pick));
 		Controller(0)->CheeseStrikeHero(CheeseStrikeBodies::HeroKey(*Pick));
@@ -676,6 +681,7 @@ bool FAPickedHeroIsSeenByEveryone::RunTest(const FString& Parameters)
 				}
 				const int32 Side = Match->TeamOf(Body->GetPlayerState());
 				TestEqual(FString::Printf(TEXT("machine %d shows player %d as the hero picked"), Machine, Player), Body->GetBody(), *Pick);
+				TestTrue(TEXT("swapped while the count holds them"), Match->IsFrozen());
 				TestEqual(TEXT("in their own side's colours"), Body->GetBodyTeam(), Side);
 				const UMaterialInterface* Dress = Body->GetMesh()->GetMaterial(0);
 				TestTrue(FString::Printf(TEXT("worn in them (%s)"), Dress != nullptr ? *Dress->GetName() : TEXT("none")), Dress != nullptr && Side >= 0 && Dress->GetName().Contains(CheeseStrikeBodies::TeamWord(Side)));

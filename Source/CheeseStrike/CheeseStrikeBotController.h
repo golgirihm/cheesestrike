@@ -64,6 +64,8 @@ public:
 	FString Describe() const;
 	/** Turns its view to `Rotation` at once, as on coming in. */
 	void FaceTo(const FRotator& Rotation);
+	/** Whether nothing of the world stands between its eyes and `Other`'s head or chest (the Visibility channel: a wall, the cheese, a smoke cloud). */
+	bool CanSeeInto(const ACheeseStrikeCharacter* Other) const;
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void UpdateControlRotation(float DeltaTime, bool bUpdatePawn = true) override;
@@ -79,8 +81,6 @@ protected:
 	float Now() const;
 	/** Where it sees from: its view's place. */
 	FVector EyesAt() const;
-	/** Whether nothing of the world stands between its eyes and `Other`'s head or chest. */
-	bool CanSeeInto(const ACheeseStrikeCharacter* Other) const;
 	/** The ten-a-second decisions: what it sees, whom it fights, where it goes. */
 	void Think();
 	void Perceive();

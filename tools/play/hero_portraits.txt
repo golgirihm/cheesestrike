@@ -1,0 +1,23 @@
+# Each hero in its own colours, seen from in front and a little to the side,
+# the view on its head and shoulders, for the loadout page's portraits:
+# tools/art/hero_portraits.py runs this with tools/play.ps1 -Res 1280x720
+# and crops the screenshots into Content/UI/Heroes.
+wait 2
+cmd ShowHUD
+cmd CheeseStrikeBody 0 -1
+wait 0.5
+cmd CheeseStrikeOutside 150 25 55 12
+wait 1
+shot portrait_0
+cmd CheeseStrikeBody 1 -1
+wait 1
+shot portrait_1
+cmd CheeseStrikeBody 2 -1
+wait 1
+shot portrait_2
+cmd CheeseStrikeBody 3 -1
+wait 1
+shot portrait_3
+cmd CheeseStrikeOutside
+wait 0.3
+quit

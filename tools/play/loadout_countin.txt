@@ -1,0 +1,19 @@
+# The loadout page a count-in puts up: the match starts at once with the
+# loadout's eight-second count (tools/play.ps1 -Countdown), the page comes up
+# of itself over the match saying the seconds, a pick is taken up at once
+# while held, OK puts it away, and the HUD's glyphs come for the last three
+# seconds. Run with tools/play.ps1 -Countdown -Res 1280x720.
+wait 1.5
+shot countin_1_page
+cmd CheeseStrikeLoadout munster smoke murdock
+wait 1.5
+shot countin_2_picked
+key Enter
+wait 0.5
+shot countin_3_dismissed
+wait 3.5
+shot countin_4_glyphs
+wait 2
+state
+shot countin_5_playing
+quit

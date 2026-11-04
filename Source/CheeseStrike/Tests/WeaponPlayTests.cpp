@@ -170,8 +170,8 @@ bool FItChangesWeapons::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("which fires as before (%d)"), Character->GetWeapon()->ShotsFired), Character->GetWeapon()->ShotsFired >= 3);
 		}
 	});
-	// A primary chosen now is carried from the next life: this one has fired, and is no longer fresh.
-	Play(0, TEXT("cmd CheeseStrikeLoadout shotgun\nwait 0.3"));
+	// A primary chosen now (one of the loadout's, taken at once alone on a level) is carried from the next life: this one has fired, and is no longer fresh.
+	Play(0, TEXT("cmd CheeseStrikeLoadout munster\nwait 0.3"));
 	Then([this]() { TestEqual(TEXT("choosing doesn't change what is carried in a fight"), HeldId(Pawn(0)), CheeseStrikeWeapons::Blaster().Id); });
 	Play(0, TEXT("cmd CheeseStrikeDie\nwait 2.5"));
 	WaitUntil(TEXT("coming back"), 5.0f, []() { return Character(0) != nullptr && Character(0)->IsAlive() && Character(0)->GetWeapon() != nullptr; });
@@ -179,18 +179,21 @@ bool FItChangesWeapons::RunTest(const FString& Parameters)
 	{
 		if (ACheeseStrikeCharacter* Character = Pawn(0))
 		{
-			TestEqual(TEXT("the next life carries the Swiss Shotgun"), HeldId(Character), CheeseStrikeWeapons::Shotgun().Id);
+			TestEqual(TEXT("the next life carries the Munster Twin SMGs"), HeldId(Character), CheeseStrikeWeapons::Munster().Id);
 			TestTrue(TEXT("with the pistol and the knife still"), Character->GetInventory()->CanDraw(EWeaponSlot::Sidearm) && Character->GetInventory()->CanDraw(EWeaponSlot::Knife));
 		}
 	});
 	PutAt(0, JoinerSpot, JoinerYaw);
 	// Just come in, a choice is carried at once.
-	Play(0, TEXT("cmd CheeseStrikeLoadout babybomb\nwait 0.8"));
+	Play(0, TEXT("cmd CheeseStrikeLoadout blaster\nwait 0.8"));
+	Then([this]() { TestEqual(TEXT("just come in, the Blaster at once"), HeldId(Pawn(0)), CheeseStrikeWeapons::Blaster().Id); });
+	// The BabyBomb, a stand's weapon, is heavy to carry (CheeseStrikeArm puts it in hand at once).
+	Play(0, TEXT("cmd CheeseStrikeArm babybomb\nwait 0.8"));
 	Then([this]()
 	{
 		if (ACheeseStrikeCharacter* Character = Pawn(0))
 		{
-			TestEqual(TEXT("just come in, the BabyBomb at once"), HeldId(Character), CheeseStrikeWeapons::BabyBomb().Id);
+			TestEqual(TEXT("the BabyBomb in hand"), HeldId(Character), CheeseStrikeWeapons::BabyBomb().Id);
 			TestTrue(TEXT("which is heavy to carry"), Character->GetCheeseStrikeMovement()->IsCarryingHeavy());
 		}
 	});

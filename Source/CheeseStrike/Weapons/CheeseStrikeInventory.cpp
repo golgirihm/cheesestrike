@@ -700,6 +700,15 @@ void UCheeseStrikeInventory::TakeChoice(FName Primary)
 void UCheeseStrikeInventory::ServerArm_Implementation(FName Weapon)
 {
 #if !UE_BUILD_SHIPPING
+	// A grenade's kind (cheese, smoke): carried at once, a fresh count of them.
+	if (const TOptional<CheeseStrikeGrenades::EGrenadeKind> Kind = CheeseStrikeGrenades::KindFromKey(Weapon.ToString()))
+	{
+		if (UCheeseStrikeGrenades* Grenades = Holder() != nullptr ? Holder()->GetGrenades() : nullptr)
+		{
+			Grenades->SetKind(*Kind);
+		}
+		return;
+	}
 	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
 	if (Stats == nullptr)
 	{
@@ -869,7 +878,7 @@ namespace
 
 	FAutoConsoleCommandWithWorldAndArgs ArmCommand(
 		TEXT("CheeseStrikeArm"),
-		TEXT("CheeseStrikeArm <weapon>: that weapon in hand at once (development)."),
+		TEXT("CheeseStrikeArm <weapon>: that weapon in hand at once, or a grenade's kind (cheese, smoke) carried at once (development)."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ArmWith));
 #endif
 

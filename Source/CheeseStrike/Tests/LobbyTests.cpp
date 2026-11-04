@@ -21,7 +21,9 @@
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
 #include "PlayTesting.h"
+#include "Rules/CheeseStrikeLoadout.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "UI/CheeseStrikeCurtain.h"
 #include "UI/CheeseStrikeMenu.h"
@@ -236,6 +238,8 @@ bool FTheMenuHasItsMusic::RunTest(const FString& Parameters)
 	TestFalse(TEXT("its pause menu"), IsWanted(EMenuPage::Pause, true, false, false, false));
 	TestFalse(TEXT("and the options opened from it"), IsWanted(EMenuPage::Options, true, false, false, false));
 	TestFalse(TEXT("and while the results are held up on the way back"), IsWanted(EMenuPage::Lobby, false, false, false, true));
+	TestTrue(TEXT("the loadout page is the front end's, with music"), IsWanted(EMenuPage::Loadout, false, false, false, false));
+	TestFalse(TEXT("but over a match's count-in it is the match's, without"), IsWanted(EMenuPage::Loadout, false, false, false, false, true));
 	// The songs: the six of Fab's "FREE Cyber Metal Music Pack", each a whole song of minutes.
 	TestEqual(TEXT("six songs"), CheeseStrikeMusic::NumSongs(), 6);
 	for (int32 Index = 0; Index < CheeseStrikeMusic::NumSongs(); ++Index)
@@ -540,6 +544,18 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	Settings->SetHero(2);
 	Settings->SetToDefaults();
 	TestEqual(TEXT("until the defaults"), Settings->GetHero(), CheeseStrikeBodies::DefaultHero);
+	// The rest of the loadout: the primary among the three offered, and the grenade's kind.
+	TestEqual(TEXT("the Colby Carbine to begin with"), Settings->GetPrimary(), CheeseStrikeLoadout::DefaultPrimary());
+	Settings->SetPrimary(CheeseStrikeWeapons::Munster().Id);
+	TestEqual(TEXT("a primary picked is kept"), Settings->GetPrimary(), CheeseStrikeWeapons::Munster().Id);
+	Settings->SetPrimary(CheeseStrikeWeapons::Shotgun().Id);
+	TestEqual(TEXT("one not offered is the default"), Settings->GetPrimary(), CheeseStrikeLoadout::DefaultPrimary());
+	TestTrue(TEXT("the cheese grenade to begin with"), Settings->GetGrenade() == CheeseStrikeGrenades::EGrenadeKind::Cheese);
+	Settings->SetGrenade(CheeseStrikeGrenades::EGrenadeKind::Smoke);
+	TestTrue(TEXT("the smoke is kept"), Settings->GetGrenade() == CheeseStrikeGrenades::EGrenadeKind::Smoke);
+	Settings->SetPrimary(CheeseStrikeWeapons::Blaster().Id);
+	Settings->SetToDefaults();
+	TestTrue(TEXT("until the defaults"), Settings->GetPrimary() == CheeseStrikeLoadout::DefaultPrimary() && Settings->GetGrenade() == CheeseStrikeLoadout::DefaultGrenade);
 	TestEqual(TEXT("a pad's buttons go by the pad to begin with"), Settings->GetGamepadGlyphs(), static_cast<uint8>(CheeseStrikeInput::EGlyphs::Auto));
 	TestNotNull(TEXT("the engine keeps the game's settings (Config/DefaultEngine.ini)"), UCheeseStrikeSettings::Get());
 	return true;
@@ -782,6 +798,13 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 			TestTrue(TEXT("the masthead is drawn"), Masthead.X > 600.0 && Masthead.Y > 100.0);
 			TestTrue(TEXT("and clear of the panel at the smallest window"), (Room.X - Masthead.X) / 2.0 >= PanelRight + 16.0);
 			TestTrue(TEXT("and over the figure's head (the top quarter of the view)"), CheeseStrikeMenu::MastheadTop + Masthead.Y <= Room.Y * 0.26);
+			// The loadout page, in the pages' panel, fits the smallest window too.
+			Menu->Show(EMenuPage::Loadout);
+			Menu->SlatePrepass(1.0f);
+			const FVector2D Loadout = Menu->PanelWants();
+			AddInfo(FString::Printf(TEXT("the loadout page's panel wants %.0f x %.0f"), Loadout.X, Loadout.Y));
+			TestTrue(TEXT("the loadout page is drawn"), Loadout.X > 500.0 && Loadout.Y > 400.0);
+			TestTrue(TEXT("and fits the smallest window"), Loadout.X <= Room.X * 0.6 && Loadout.Y <= Room.Y + 1.0);
 		}
 		World(0)->GetAuthGameMode<ACheeseStrikeGameMode>()->AskToStart(false);
 		// Counting down, the host's Close Lobby can't be pressed.

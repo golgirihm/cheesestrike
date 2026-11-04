@@ -1,0 +1,25 @@
+# The Smoked Gouda: armed with smoke (CheeseStrikeArm smoke, at once), the
+# round in hand, thrown a few metres ahead, its cloud about a second after
+# it smokes and eight seconds on, seen from behind and above the thrower
+# (CheeseStrikeViewFrom). Run with tools/play.ps1 -StartAt 1150,-1450,100,117.
+wait 2
+cmd CheeseStrikeArm smoke
+wait 0.5
+look 0 -25
+hold Grenade
+wait 0.8
+shot smoke_1_in_hand
+release Grenade
+wait 0.3
+cmd CheeseStrikeViewFrom 1286 -1717 380 -28 117
+wait 2.5
+shot smoke_2_cloud_1s
+wait 2
+shot smoke_3_cloud_3s
+wait 5
+shot smoke_4_cloud_8s
+wait 4
+shot smoke_5_thinning
+wait 2
+state
+quit

@@ -1,0 +1,18 @@
+# The loadout page on the front end: opened with LOADOUT, each row's choice
+# changed (the figure wears the hero and holds the primary at once), then
+# Back. Run with tools/play.ps1 -Lobby -Res 1280x720.
+wait 3
+cmd CheeseStrikePage Loadout
+wait 1
+shot loadout_1_page
+cmd CheeseStrikeLoadout munster smoke twinblast
+wait 1.5
+shot loadout_2_picked
+cmd CheeseStrikeLoadout blaster cheese wraith
+wait 1.5
+shot loadout_3_picked_again
+cmd CheeseStrikeLoadout
+cmd CheeseStrikePage Main
+wait 1
+shot loadout_4_front_end
+quit

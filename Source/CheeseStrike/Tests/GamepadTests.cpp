@@ -271,9 +271,16 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	}
 	const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(nullptr);
 	Menu->Show(EMenuPage::Main);
-	TestEqual(TEXT("the front end's items, then the hero row under the figure (every hero a pick, none automatic)"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("PRACTICE"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("QUIT"),
-		TEXT("BELICA"), TEXT("MURDOCK"), TEXT("WRAITH"), TEXT("TWINBLAST")}));
+	TestEqual(TEXT("the front end's items, LOADOUT among them (the hero is picked there, every hero a pick, none automatic)"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("PRACTICE"), TEXT("LOADOUT"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("QUIT")}));
 	TestEqual(TEXT("the first has the focus"), Menu->GetFocusName(), FString(TEXT("HOST A MATCH")));
+	// The loadout page: the heroes' portraits, the primaries, the grenades, then Back; the first hero has the focus.
+	Menu->FocusItem(TEXT("LOADOUT"));
+	Menu->Show(EMenuPage::Loadout);
+	TestEqual(TEXT("the loadout page's items, in rows"), Menu->GetFocusableNames(), TArray<FString>({TEXT("BELICA"), TEXT("MURDOCK"), TEXT("WRAITH"), TEXT("TWINBLAST"),
+		TEXT("COLBY CARBINE"), TEXT("CHEDDAR BLASTER"), TEXT("MUNSTER TWIN SMGS"), TEXT("CHEESE GRENADE"), TEXT("SMOKED GOUDA"), TEXT("BACK")}));
+	TestEqual(TEXT("the first hero has the focus"), Menu->GetFocusName(), FString(TEXT("BELICA")));
+	Menu->Show(EMenuPage::Main);
+	TestEqual(TEXT("back on the front end, on Loadout"), Menu->GetFocusName(), FString(TEXT("LOADOUT")));
 	Menu->FocusItem(TEXT("SETTINGS"));
 	Menu->Show(EMenuPage::Options);
 	TestEqual(TEXT("the settings' first item is their first tab"), Menu->GetFocusName(), FString(TEXT("CONTROLS")));
