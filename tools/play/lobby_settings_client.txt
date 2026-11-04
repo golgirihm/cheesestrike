@@ -1,0 +1,12 @@
+# Joins the host of lobby_settings.txt: the joiner's lobby, then the settings
+# over it (Escape), and back.
+wait 3
+shot lobby_settings_client_1_lobby
+key Escape
+wait 1
+shot lobby_settings_client_2_settings
+key Escape
+wait 1
+shot lobby_settings_client_3_back
+wait 8
+quit

@@ -69,10 +69,16 @@ namespace CheeseStrikeMenu
 		}
 		if (bInAMatch)
 		{
-			// The settings open over the lobby with Escape (LobbyMenuKey); any other page chosen is the front end's.
-			return Chosen == EMenuPage::Options ? EMenuPage::Options : EMenuPage::Lobby;
+			// The lobby, whatever page the player chose: the settings chosen there (Escape, LobbyMenuKey) are an overlay on
+			// it (SettingsOverLobby), not a page in its place.
+			return EMenuPage::Lobby;
 		}
 		return FrontEnd;
+	}
+
+	bool SettingsOverLobby(EMenuPage Shown, EMenuPage Chosen)
+	{
+		return Shown == EMenuPage::Lobby && Chosen == EMenuPage::Options;
 	}
 
 	ECountdownTone CountdownTone(int32& Sounded, bool bCounting, float Left, bool bOver)
@@ -763,6 +769,28 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 					SAssignNew(LobbyContent, SBox).HAlign(HAlign_Fill).VAlign(VAlign_Fill)
 				]
 			]
+			// The settings over the lobby (Escape): the lobby stays under them, blurred and darkened as the game is under the
+			// pause menu, and takes no press; the settings in the pages' panel on the left, as on the front end.
+			+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Fill)
+			[
+				SAssignNew(LobbySettings, SBackgroundBlur)
+				.BlurStrength(CheeseStrikeMenu::PauseBlur)
+				.Padding(0.0f)
+				.Visibility(EVisibility::Collapsed)
+				[
+					SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.0f, 0.0f, 0.0f, CheeseStrikeMenu::PauseDarkening)).Padding(0.0f)
+					.HAlign(HAlign_Left).VAlign(VAlign_Fill)
+					[
+						SNew(SBorder)
+						.BorderImage(&PagesPanelBrush)
+						.BorderBackgroundColor(PanelColour)
+						.Padding(FMargin(48.0f, 64.0f))
+						[
+							SAssignNew(LobbySettingsContent, SBox).WidthOverride(900.0f).VAlign(VAlign_Fill)
+						]
+					]
+				]
+			]
 		]
 		// The game's name over the front end, at the top in the middle.
 		// Big enough to read from across a room: the subtitle twice what it was, the name still clearly the larger.
@@ -847,16 +875,42 @@ void SCheeseStrikeMenu::Show(EMenuPage InPage)
 	ShownLobbyKey.Reset();
 	ShownLobbyStatus = INDEX_NONE;
 	ShownPageKey.Reset();
+	ShownLobbySettingsKey.Reset();
 	Refresh();
 }
 
 void SCheeseStrikeMenu::Refresh()
 {
 	MenuFocusRingsShown = CheeseStrikeInput::DeviceOf(Controller.Get()) != CheeseStrikeInput::EDevice::Mouse;
+	// The settings over the lobby: shown while the player has them chosen there, the lobby's own items out of reach under them.
+	const bool bSettingsOver = Controller.IsValid() && CheeseStrikeMenu::SettingsOverLobby(Page, Controller->GetChosenPage());
+	if (bSettingsOver != bLobbySettingsShown)
+	{
+		bLobbySettingsShown = bSettingsOver;
+		if (bSettingsOver)
+		{
+			// Their first item takes the focus; the lobby's has it back as they go.
+			FocusBeforeLobbySettings = FocusName;
+			FocusName.Reset();
+		}
+		else
+		{
+			FocusName = FocusBeforeLobbySettings;
+			ShownLobbySettingsKey.Reset();
+			LobbySettingsFocusables.Reset();
+			if (LobbySettingsContent.IsValid())
+			{
+				LobbySettingsContent->SetContent(SNullWidget::NullWidget);
+			}
+		}
+		FocusIndex = 0;
+		bFocusPending = true;
+	}
 	if (FriendsBox.IsValid())
 	{
 		UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Controller.Get());
-		const bool bPanel = Page == EMenuPage::Lobby || Page == EMenuPage::Find || Page == EMenuPage::Main;
+		// (Not under the settings over the lobby, as not on the settings page.)
+		const bool bPanel = (Page == EMenuPage::Lobby && !bSettingsOver) || Page == EMenuPage::Find || Page == EMenuPage::Main;
 		// Open on the find page, and on the front end's main page and in the lobby while hovered.
 		const bool bOpen = bPanel && (Page == EMenuPage::Find || FriendsBox->IsHovered() || CVarFriendsOpen.GetValueOnGameThread() != 0);
 		FriendsBox->SetVisibility(bPanel ? EVisibility::Visible : EVisibility::Collapsed);
@@ -1003,6 +1057,30 @@ void SCheeseStrikeMenu::Refresh()
 			BuiltPage = Page;
 			LobbyContent->SetContent(bFade ? MenuFadeIn(MakeLobby()) : MakeLobby());
 		}
+		// The settings over it: drawn as they come (fading in, as a page does) and again as their tab or what they show
+		// changes; never the lobby for them. Under them the lobby takes no press, its items no focus.
+		if (LobbySettings.IsValid())
+		{
+			LobbySettings->SetVisibility(bSettingsOver ? EVisibility::Visible : EVisibility::Collapsed);
+		}
+		if (LobbyContent->IsEnabled() == bSettingsOver)
+		{
+			LobbyContent->SetEnabled(!bSettingsOver);
+		}
+		if (bSettingsOver && LobbySettingsContent.IsValid())
+		{
+			const FString SettingsKey = OptionsKey();
+			if (SettingsKey != ShownLobbySettingsKey)
+			{
+				const bool bFade = ShownLobbySettingsKey.IsEmpty();
+				ShownLobbySettingsKey = SettingsKey;
+				LobbySettingsFocusables.Reset();
+				bFocusPending = true;
+				bBuildingLobbySettings = true;
+				LobbySettingsContent->SetContent(bFade ? MenuFadeIn(MakeOptions()) : MakeOptions());
+				bBuildingLobbySettings = false;
+			}
+		}
 	}
 	else if (Content.IsValid())
 	{
@@ -1038,7 +1116,7 @@ int32 SCheeseStrikeMenu::UserIndex() const
 TSharedRef<SWidget> SCheeseStrikeMenu::Focusable(const FString& Name, TSharedRef<SWidget> Widget)
 {
 	FString Unique = Name;
-	TArray<FFocusable>& Items = bBuildingDialog ? DialogFocusables : Focusables;
+	TArray<FFocusable>& Items = bBuildingDialog ? DialogFocusables : (bBuildingLobbySettings ? LobbySettingsFocusables : Focusables);
 	for (int32 Number = 2; Items.ContainsByPredicate([&Unique](const FFocusable& Each) { return Each.Name == Unique; }); ++Number)
 	{
 		Unique = FString::Printf(TEXT("%s #%d"), *Name, Number);
@@ -1171,8 +1249,9 @@ bool SCheeseStrikeMenu::CloseDropdowns()
 FNavigationReply SCheeseStrikeMenu::OnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent)
 {
 	const EUINavigation Way = InNavigationEvent.GetNavigationType();
-	// The credits and the settings' controls have nothing to focus but Back (and the tabs): up and down scroll them.
-	if ((Page == EMenuPage::Credits || (Page == EMenuPage::Options && OptionsTab == EOptionsTab::Controls)) && (Way == EUINavigation::Up || Way == EUINavigation::Down))
+	// The credits and the settings' controls (on their page, or over the lobby) have nothing to focus but Back (and the tabs): up and down scroll them.
+	const bool bOptions = Page == EMenuPage::Options || bLobbySettingsShown;
+	if ((Page == EMenuPage::Credits || (bOptions && OptionsTab == EOptionsTab::Controls)) && (Way == EUINavigation::Up || Way == EUINavigation::Down))
 	{
 		if (const TSharedPtr<SScrollBox> Scroll = CreditsScroll.Pin())
 		{
@@ -1347,8 +1426,8 @@ FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 			ConfirmBackToLobby(false);
 			return FReply::Handled();
 		}
-		// In the lobby, B has nothing to go back to: Escape and Menu open the settings over it.
-		if (Page == EMenuPage::Lobby && Key == EKeys::Gamepad_FaceButton_Right)
+		// In the lobby, B has nothing to go back to: Escape and Menu open the settings over it (from which B goes back).
+		if (Page == EMenuPage::Lobby && !bLobbySettingsShown && Key == EKeys::Gamepad_FaceButton_Right)
 		{
 			return FReply::Handled();
 		}
@@ -1397,8 +1476,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeTitle(const FString& Text)
 
 float SCheeseStrikeMenu::WrapWidth() const
 {
-	// The same widths as the content box is given in Refresh.
-	return (Page == EMenuPage::Options ? 900.0f : (Page == EMenuPage::Credits ? 640.0f : 400.0f)) - 24.0f;
+	// The same widths as the content box is given in Refresh (the settings over the lobby have the settings page's).
+	return (Page == EMenuPage::Options || bBuildingLobbySettings ? 900.0f : (Page == EMenuPage::Credits ? 640.0f : 400.0f)) - 24.0f;
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim, bool bWrap, float WrapAt)
@@ -2607,15 +2686,21 @@ FString SCheeseStrikeMenu::PageKey() const
 	}
 	if (Page == EMenuPage::Options)
 	{
-		// What is pressed rather than slid: the sliders show their values by themselves, and drawing the page again would drop one being dragged.
-		Key += FString::Printf(TEXT("|tab %d"), static_cast<int32>(OptionsTab));
-		if (const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get())
-		{
-			const FIntPoint Resolution = Settings->GetScreenResolution();
-			const FIntPoint Drawn = Settings->GetResolutionShown();
-			Key += FString::Printf(TEXT("|%d %d %dx%d %dx%d %d %.0f %d"), Settings->GetOverallScalabilityLevel(), static_cast<int32>(Settings->GetFullscreenMode()), Resolution.X, Resolution.Y, Drawn.X, Drawn.Y,
-				Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0) + (Settings->IsAimAssistOn() ? TEXT(" assist") : TEXT("")) + FString::Printf(TEXT(" glyphs %d"), Settings->GetGamepadGlyphs());
-		}
+		Key += TEXT("|") + OptionsKey();
+	}
+	return Key;
+}
+
+FString SCheeseStrikeMenu::OptionsKey() const
+{
+	// What is pressed rather than slid: the sliders show their values by themselves, and drawing the page again would drop one being dragged.
+	FString Key = FString::Printf(TEXT("tab %d"), static_cast<int32>(OptionsTab));
+	if (const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get())
+	{
+		const FIntPoint Resolution = Settings->GetScreenResolution();
+		const FIntPoint Drawn = Settings->GetResolutionShown();
+		Key += FString::Printf(TEXT("|%d %d %dx%d %dx%d %d %.0f %d"), Settings->GetOverallScalabilityLevel(), static_cast<int32>(Settings->GetFullscreenMode()), Resolution.X, Resolution.Y, Drawn.X, Drawn.Y,
+			Settings->IsVSyncEnabled() ? 1 : 0, Settings->GetFrameRateLimit(), Settings->IsLookInverted() ? 1 : 0) + (Settings->IsAimAssistOn() ? TEXT(" assist") : TEXT("")) + FString::Printf(TEXT(" glyphs %d"), Settings->GetGamepadGlyphs());
 	}
 	return Key;
 }

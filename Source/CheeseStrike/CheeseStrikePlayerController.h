@@ -73,6 +73,8 @@ public:
 	 * they are all ready (ServerReady), and then the view is the character's.
 	 */
 	bool IsViewReady() const;
+	/** The page the player chose (ChooseMenu): the front end's, or the settings over the pause menu or the lobby (CheeseStrikeMenu::SettingsOverLobby). */
+	EMenuPage GetChosenPage() const { return ChosenPage; }
 	/**
 	 * Server: this player's level is loaded and their view can be shown, so
 	 * a match the lobby sent everyone to may begin (ACheeseStrikeGameMode::
