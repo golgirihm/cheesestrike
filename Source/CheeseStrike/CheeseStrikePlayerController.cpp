@@ -910,6 +910,14 @@ void ACheeseStrikePlayerController::CheeseStrikeSampleFriends(int32 Show)
 	}
 }
 
+void ACheeseStrikePlayerController::CheeseStrikeCover(float Seconds)
+{
+	if (UCheeseStrikeCurtainSubsystem* Curtain = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeCurtainSubsystem>() : nullptr)
+	{
+		Curtain->ShowForLooking(Seconds);
+	}
+}
+
 void ACheeseStrikePlayerController::CheeseStrikeBots()
 {
 	for (TActorIterator<ACheeseStrikeBotController> It(GetWorld()); It; ++It)

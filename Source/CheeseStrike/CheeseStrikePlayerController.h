@@ -230,6 +230,9 @@ public:
 	/** From the console or a play script: the friends panel lists made-up friends in every state (1), or the service's again (0), for looking at it. */
 	UFUNCTION(Exec)
 	void CheeseStrikeSampleFriends(int32 Show = 1);
+	/** From the console or a play script: puts the loading cover up for `Seconds` (the loading screen's own widget, its spinner turning), for looking at it. */
+	UFUNCTION(Exec)
+	void CheeseStrikeCover(float Seconds = 3.0f);
 
 	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
 	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */
