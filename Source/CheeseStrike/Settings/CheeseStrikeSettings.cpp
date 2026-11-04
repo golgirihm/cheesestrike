@@ -251,18 +251,58 @@ void UCheeseStrikeSettings::SetToDefaults()
 	EffectsVolume = CheeseStrikeSettings::DefaultVolume;
 	MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
 	FullscreenResolution = FIntPoint::ZeroValue;
-	Hero = TEXT("auto");
+	Hero = CheeseStrikeBodies::HeroKey(CheeseStrikeBodies::DefaultHero);
 	GamepadGlyphs = 0;
 }
 
 int32 UCheeseStrikeSettings::GetHero() const
 {
-	return CheeseStrikeBodies::HeroFromKey(Hero);
+	// A word that names no hero (an old file's "auto") is the default's.
+	return CheeseStrikeBodies::BodyFor(CheeseStrikeBodies::HeroFromKey(Hero));
 }
 
 void UCheeseStrikeSettings::SetHero(int32 Body)
 {
 	Hero = CheeseStrikeBodies::HeroKey(Body);
+}
+
+const TCHAR* UCheeseStrikeSettings::WindowModeWord(EWindowMode::Type Mode)
+{
+	switch (Mode)
+	{
+	case EWindowMode::Fullscreen: return TEXT("fullscreen");
+	case EWindowMode::WindowedFullscreen: return TEXT("borderless");
+	default: return TEXT("windowed");
+	}
+}
+
+int32 UCheeseStrikeSettings::VersionTheEngineReads()
+{
+	// The engine keeps it to itself (UE_GAMEUSERSETTINGS_VERSION): a fresh object brought up to date says it.
+	UCheeseStrikeSettings* Fresh = NewObject<UCheeseStrikeSettings>(GetTransientPackage());
+	Fresh->UpdateVersion();
+	return static_cast<int32>(Fresh->Version);
+}
+
+void UCheeseStrikeSettings::LoadSettings(bool bForceReload)
+{
+	Super::LoadSettings(bForceReload);
+	// Once, in the game, before its window exists (the engine loads the settings at its init, then makes the window from
+	// GSystemResolution): the mode and the resolution loaded go on it. A fresh install's are Config/DefaultGameUserSettings.ini's,
+	// borderless at the screen's own size (a resolution of 0 is the screen's, UGameEngine::DetermineGameWindowResolution); a
+	// saved file's are the player's choice. The command line's -windowed, -ResX and the like still win (the play scripts').
+	static bool bWindowSet = false;
+	if (GIsEditor || bWindowSet || GEngine == nullptr || GEngine->GameViewport != nullptr || IsRunningDedicatedServer())
+	{
+		return;
+	}
+	bWindowSet = true;
+	const EWindowMode::Type Mode = GetFullscreenMode();
+	const FIntPoint Size = GetScreenResolution();
+	RequestResolutionChange(Size.X, Size.Y, Mode, true);
+	IConsoleManager::Get().CallAllConsoleVariableSinks();
+	UE_LOG(LogCheeseStrike, Display, TEXT("Window: the settings say %s at %s (%d x %d); the window will be %s at %d x %d"), WindowModeWord(Mode),
+		Size.X > 0 && Size.Y > 0 ? TEXT("their resolution") : TEXT("the screen's own size"), Size.X, Size.Y, WindowModeWord(GSystemResolution.WindowMode), GSystemResolution.ResX, GSystemResolution.ResY);
 }
 
 FIntPoint UCheeseStrikeSettings::GetResolutionShown() const

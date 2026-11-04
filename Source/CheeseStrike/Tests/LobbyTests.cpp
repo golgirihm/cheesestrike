@@ -7,6 +7,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "Rules/CheeseStrikeModes.h"
+#include "Animation/CheeseStrikeBodies.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
@@ -527,11 +528,14 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	Settings->SetFullscreenMode(EWindowMode::Windowed);
 	Settings->SetToDefaults();
 	TestTrue(TEXT("a fresh install plays borderless"), Settings->GetFullscreenMode() == EWindowMode::WindowedFullscreen && DefaultWindowMode == EWindowMode::WindowedFullscreen);
-	TestEqual(TEXT("and the heroes as they come"), Settings->GetHero(), INDEX_NONE);
+	TestEqual(TEXT("and Lt. Belica as the hero to begin with: every player's hero is a pick, none automatic"), Settings->GetHero(), CheeseStrikeBodies::DefaultHero);
 	Settings->SetHero(2);
 	TestEqual(TEXT("a hero picked is kept"), Settings->GetHero(), 2);
+	Settings->SetHero(INDEX_NONE);
+	TestEqual(TEXT("a pick that is no hero is the default"), Settings->GetHero(), CheeseStrikeBodies::DefaultHero);
+	Settings->SetHero(2);
 	Settings->SetToDefaults();
-	TestEqual(TEXT("until the defaults"), Settings->GetHero(), INDEX_NONE);
+	TestEqual(TEXT("until the defaults"), Settings->GetHero(), CheeseStrikeBodies::DefaultHero);
 	TestEqual(TEXT("a pad's buttons go by the pad to begin with"), Settings->GetGamepadGlyphs(), static_cast<uint8>(CheeseStrikeInput::EGlyphs::Auto));
 	TestNotNull(TEXT("the engine keeps the game's settings (Config/DefaultEngine.ini)"), UCheeseStrikeSettings::Get());
 	return true;

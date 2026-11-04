@@ -106,15 +106,16 @@ namespace CheeseStrikeBodies
 		return FMath::Max(Rank, 0) % UE_ARRAY_COUNT(Bodies);
 	}
 
-	int32 BodyFor(int32 Pick, bool bTeams, int32 Team, int32 Rank)
+	int32 BodyFor(int32 Pick)
 	{
-		return All().IsValidIndex(Pick) ? Pick : For(bTeams, Team, Rank);
+		return All().IsValidIndex(Pick) ? Pick : DefaultHero;
 	}
 
 	const TCHAR* HeroKey(int32 Body)
 	{
 		static_assert(UE_ARRAY_COUNT(HeroKeys) == UE_ARRAY_COUNT(Bodies), "a key for every hero");
-		return All().IsValidIndex(Body) ? HeroKeys[Body] : TEXT("auto");
+		static_assert(DefaultHero >= 0 && DefaultHero < UE_ARRAY_COUNT(Bodies), "the default is a hero");
+		return HeroKeys[BodyFor(Body)];
 	}
 
 	int32 HeroFromKey(const FString& Key)

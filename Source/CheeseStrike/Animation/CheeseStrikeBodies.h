@@ -68,15 +68,18 @@ namespace CheeseStrikeBodies
 	 * one of its heroes in turn; without sides, one of every hero in turn.
 	 */
 	int32 For(bool bTeams, int32 Team, int32 Rank);
+	/** The hero a player wears until they pick another (a fresh install's, and the front end's figure to begin with): Lt. Belica. */
+	constexpr int32 DefaultHero = 0;
 	/**
-	 * The body a player has who picked hero `Pick` (an index of All; INDEX_NONE, the usual, for none: For's by `Rank`). A
-	 * hero picked is worn whatever side the player is on, dressed in that side's colours (so both sides may show the same
-	 * hero, told apart by colour), or in its own without sides. Bots pick none.
+	 * The body a player has: the hero they picked, `Pick` (an index of All), worn whatever side they are on, dressed in
+	 * that side's colours (so both sides may show the same hero, told apart by colour), or in its own without sides.
+	 * Every player's hero is a pick; one that is no hero (INDEX_NONE: none has come yet) is DefaultHero. Bots pick none:
+	 * they wear For's, by rank.
 	 */
-	int32 BodyFor(int32 Pick, bool bTeams, int32 Team, int32 Rank);
-	/** The word a hero is kept by in the settings and passed by (UCheeseStrikeSettings' Hero): "Belica", "Murdock", "Wraith", "Twinblast"; "auto" for INDEX_NONE. */
+	int32 BodyFor(int32 Pick);
+	/** The word a hero is kept by in the settings and passed by (UCheeseStrikeSettings' Hero): "Belica", "Murdock", "Wraith", "Twinblast"; a body that is none is the default's. */
 	const TCHAR* HeroKey(int32 Body);
-	/** Which of All `Key` names (HeroKey's word, or the hero's name, either case); INDEX_NONE for "auto" or anything else. */
+	/** Which of All `Key` names (HeroKey's word, or the hero's name, either case); INDEX_NONE for anything else (an old settings file's "auto"). */
 	int32 HeroFromKey(const FString& Key);
 	/** Which side's heroes a body is (INDEX_NONE for none). */
 	int32 TeamOf(int32 Body);

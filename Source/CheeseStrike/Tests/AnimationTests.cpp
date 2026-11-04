@@ -235,21 +235,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAPickedHeroIsWornOnEitherSide, "CheeseStrike.A
 bool FAPickedHeroIsWornOnEitherSide::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeBodies;
-	// None picked: the usual, by rank.
-	for (int32 Rank = 0; Rank < 6; ++Rank)
-	{
-		TestEqual(TEXT("none picked is the usual with sides"), BodyFor(INDEX_NONE, true, 1, Rank), For(true, 1, Rank));
-		TestEqual(TEXT("and without"), BodyFor(INDEX_NONE, false, 0, Rank), For(false, 0, Rank));
-		TestEqual(TEXT("a pick that is no hero is none"), BodyFor(All().Num(), true, 0, Rank), For(true, 0, Rank));
-	}
+	// Every player's hero is a pick: none yet, or one that is no hero, is the default, Lt. Belica; the rota by rank is the bots'.
+	TestEqual(TEXT("the default hero is Lt. Belica"), FString(All()[DefaultHero].Name), FString(TEXT("Lt. Belica")));
+	TestEqual(TEXT("none picked is the default"), BodyFor(INDEX_NONE), DefaultHero);
+	TestEqual(TEXT("a pick that is no hero is the default"), BodyFor(All().Num()), DefaultHero);
 	// A hero picked is worn whatever the side and rank, so both sides may wear the same one.
 	for (int32 Pick = 0; Pick < All().Num(); ++Pick)
 	{
-		for (int32 Team = 0; Team < CheeseStrikeRules::Teams; ++Team)
-		{
-			TestEqual(FString::Printf(TEXT("%s on side %d"), All()[Pick].Name, Team), BodyFor(Pick, true, Team, 3), Pick);
-		}
-		TestEqual(TEXT("and without sides"), BodyFor(Pick, false, 0, 2), Pick);
+		TestEqual(FString::Printf(TEXT("%s picked is worn"), All()[Pick].Name), BodyFor(Pick), Pick);
 		// Its word in the settings names it again, and every side has its colours for it.
 		TestEqual(FString::Printf(TEXT("%s's word"), HeroKey(Pick)), HeroFromKey(HeroKey(Pick)), Pick);
 		TestEqual(TEXT("its name too, in any case"), HeroFromKey(FString(All()[Pick].Name).ToUpper()), Pick);
@@ -258,8 +251,8 @@ bool FAPickedHeroIsWornOnEitherSide::RunTest(const FString& Parameters)
 			TestTrue(TEXT("dressed in either side's colours"), TeamLook(Pick, Team, TEXT("M")).Contains(TeamWord(Team)));
 		}
 	}
-	TestEqual(TEXT("auto is none"), HeroFromKey(TEXT("auto")), INDEX_NONE);
-	TestEqual(TEXT("and none's word is auto"), FString(HeroKey(INDEX_NONE)), FString(TEXT("auto")));
+	TestEqual(TEXT("an old file's auto names no hero"), HeroFromKey(TEXT("auto")), INDEX_NONE);
+	TestEqual(TEXT("and none's word is the default's"), FString(HeroKey(INDEX_NONE)), FString(HeroKey(DefaultHero)));
 	TestEqual(TEXT("anything else is none"), HeroFromKey(TEXT("Shrek")), INDEX_NONE);
 	return true;
 }

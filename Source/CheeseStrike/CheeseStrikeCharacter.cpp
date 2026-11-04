@@ -446,8 +446,8 @@ int32 ACheeseStrikeCharacter::BodyOf(const ACheeseStrikeGameState* Match, const 
 		}
 	}
 	OutTeam = bTeams ? Side : INDEX_NONE;
-	// A hero the player picked, in the side's colours (bots pick none).
-	return CheeseStrikeBodies::BodyFor(State->IsABot() ? INDEX_NONE : State->GetHero(), bTeams, Side, Rank);
+	// The hero the player picked (Lt. Belica until one has come), in the side's colours; a bot one of the side's in turn.
+	return State->IsABot() ? CheeseStrikeBodies::For(bTeams, Side, Rank) : CheeseStrikeBodies::BodyFor(State->GetHero());
 }
 
 void ACheeseStrikeCharacter::ApplyBody(int32 Index, int32 Team)

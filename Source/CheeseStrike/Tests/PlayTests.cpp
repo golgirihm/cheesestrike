@@ -437,20 +437,29 @@ bool FAKillIsScoredAndTheKilledComeBack::RunTest(const FString& Parameters)
 	StartPlaying({2, TEXT("?RespawnDelay=2")});
 	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
 	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
-	Then([]() { PlayTests::FirstBody = Character(0); PlayTests::bBackProtected.Reset(); });
+	// Every player's hero is a pick (Lt. Belica until they pick): the host picks Murdock, the joiner Wraith.
+	Then([]()
+	{
+		PlayTests::FirstBody = Character(0);
+		PlayTests::bBackProtected.Reset();
+		Controller(0)->CheeseStrikeHero(TEXT("Murdock"));
+		Controller(1)->CheeseStrikeHero(TEXT("Wraith"));
+	});
 	// Both have just arrived, and can't be hurt yet.
 	Wait(CheeseStrikeRules::SpawnProtection);
 	Then([this]()
 	{
-		// Everyone for themself: on both machines, the two are different heroes, each in its own colours.
+		// Everyone for themself: on both machines, the two are the heroes they picked, each in its own colours.
+		const int32 HostPick = CheeseStrikeBodies::HeroFromKey(TEXT("Murdock"));
+		const int32 JoinerPick = CheeseStrikeBodies::HeroFromKey(TEXT("Wraith"));
 		for (int32 Machine = 0; Machine < 2; ++Machine)
 		{
 			const ACheeseStrikeCharacter* Host = CharacterOf(0, Machine);
 			const ACheeseStrikeCharacter* Joiner = CharacterOf(1, Machine);
 			if (TestNotNull(TEXT("both players are there"), Host) && TestNotNull(TEXT("both"), Joiner))
 			{
-				TestTrue(FString::Printf(TEXT("machine %d shows two heroes"), Machine), CheeseStrikeBodies::All().IsValidIndex(Host->GetBody()) && CheeseStrikeBodies::All().IsValidIndex(Joiner->GetBody()));
-				TestNotEqual(TEXT("different ones"), Host->GetBody(), Joiner->GetBody());
+				TestEqual(FString::Printf(TEXT("machine %d shows the host as the hero they picked"), Machine), Host->GetBody(), HostPick);
+				TestEqual(TEXT("and the joiner as theirs"), Joiner->GetBody(), JoinerPick);
 				TestEqual(TEXT("in the host's own colours"), Host->GetBodyTeam(), static_cast<int32>(INDEX_NONE));
 				TestEqual(TEXT("and the joiner's"), Joiner->GetBodyTeam(), static_cast<int32>(INDEX_NONE));
 			}
@@ -545,7 +554,33 @@ bool FTheSidesLookDifferent::RunTest(const FString& Parameters)
 	StartPlaying({2, TEXT("?Mode=Deathmatch")});
 	PutAt(0, PlayTests::HostSpot, PlayTests::HostYaw);
 	PutAt(1, PlayTests::JoinerSpot, PlayTests::JoinerYaw);
-	Wait(1.0f);
+	// Every player's hero is a pick: each picks the first hero of their own side (bots are dealt a side's heroes by rank).
+	Then([this]()
+	{
+		const ACheeseStrikeGameState* Match = GameState(0);
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		if (TestNotNull(TEXT("a match"), Match) && TestNotNull(TEXT("with the joiner"), Joiner) && Character(0) != nullptr)
+		{
+			Controller(0)->CheeseStrikeHero(CheeseStrikeBodies::HeroKey(CheeseStrikeBodies::ForTeam(Match->TeamOf(Character(0)->GetPlayerState()), 0)));
+			Controller(1)->CheeseStrikeHero(CheeseStrikeBodies::HeroKey(CheeseStrikeBodies::ForTeam(Match->TeamOf(Joiner->GetPlayerState()), 0)));
+		}
+	});
+	WaitUntil(TEXT("both picks on both machines"), 5.0f, []()
+	{
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			const ACheeseStrikeGameState* Match = GameState(Machine);
+			for (int32 Player = 0; Player < 2; ++Player)
+			{
+				const ACheeseStrikeCharacter* Body = CharacterOf(Player, Machine);
+				if (Body == nullptr || Match == nullptr || CheeseStrikeBodies::TeamOf(Body->GetBody()) != Match->TeamOf(Body->GetPlayerState()))
+				{
+					return false;
+				}
+			}
+		}
+		return true;
+	});
 	Then([this]()
 	{
 		// The two are on different sides, and look it on both machines: each a hero of their side's, in its colours.
@@ -646,15 +681,15 @@ bool FAPickedHeroIsSeenByEveryone::RunTest(const FString& Parameters)
 				TestTrue(FString::Printf(TEXT("worn in them (%s)"), Dress != nullptr ? *Dress->GetName() : TEXT("none")), Dress != nullptr && Side >= 0 && Dress->GetName().Contains(CheeseStrikeBodies::TeamWord(Side)));
 			}
 		}
-		// Back to the usual: the heroes by player id again.
-		Controller(0)->CheeseStrikeHero(TEXT("auto"));
-		Controller(1)->CheeseStrikeHero(TEXT("auto"));
+		// Back to the settings' (none under the tests): the default hero, Lt. Belica, for both.
+		Controller(0)->CheeseStrikeHero(TEXT(""));
+		Controller(1)->CheeseStrikeHero(TEXT(""));
 	});
-	WaitUntil(TEXT("the usual heroes again"), 5.0f, []()
+	WaitUntil(TEXT("the default hero again"), 5.0f, []()
 	{
 		const ACheeseStrikeCharacter* Host = CharacterOf(0, 1);
 		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
-		return Host != nullptr && Joiner != nullptr && Host->GetBody() != Joiner->GetBody();
+		return Host != nullptr && Joiner != nullptr && Host->GetBody() == CheeseStrikeBodies::DefaultHero && Joiner->GetBody() == CheeseStrikeBodies::DefaultHero;
 	});
 	StopPlaying();
 	return true;
