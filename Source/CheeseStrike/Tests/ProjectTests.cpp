@@ -13,9 +13,12 @@
 #include "CheeseStrikeCharacter.h"
 #include "ShooterCharacter.h"
 #include "CheeseStrikeGameMode.h"
+#include "Misc/App.h"
+#include "Misc/ConfigCacheIni.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "UI/CheeseStrikeCredits.h"
+#include "UI/CheeseStrikeLoader.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "Sound/SoundClass.h"
 
@@ -147,6 +150,87 @@ bool FTheCreditsNameEveryone::RunTest(const FString& Parameters)
 }
 
 #endif
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAFreshInstallPlaysBorderless, "CheeseStrike.Project.AFreshInstallPlaysBorderless", ProjectTests::Flags)
+
+bool FAFreshInstallPlaysBorderless::RunTest(const FString& Parameters)
+{
+	// Config/DefaultGameUserSettings.ini: what a machine with no saved settings plays in. The engine reads the window mode
+	// and the resolution from it before it makes the window, but only under a Version of its own (UGameUserSettings::
+	// PreloadResolutionSettings), so the version there must be the engine's.
+	FConfigFile File;
+	File.Read(FPaths::ProjectConfigDir() / TEXT("DefaultGameUserSettings.ini"));
+	const FString Section = UCheeseStrikeSettings::StaticClass()->GetPathName();
+	int32 Version = -1;
+	TestTrue(TEXT("the game's settings have defaults in Config/DefaultGameUserSettings.ini"), File.GetInt(*Section, TEXT("Version"), Version));
+	TestEqual(TEXT("under the version the engine reads them by"), Version, UCheeseStrikeSettings::VersionTheEngineReads());
+	int32 Mode = -1;
+	TestTrue(TEXT("the window mode is there"), File.GetInt(*Section, TEXT("FullscreenMode"), Mode));
+	TestEqual(TEXT("borderless (the engine's windowed fullscreen)"), Mode, static_cast<int32>(EWindowMode::WindowedFullscreen));
+	TestEqual(TEXT("as the settings' own default"), static_cast<int32>(CheeseStrikeSettings::DefaultWindowMode), Mode);
+	int32 Confirmed = -1;
+	int32 Preferred = -1;
+	TestTrue(TEXT("confirmed as such"), File.GetInt(*Section, TEXT("LastConfirmedFullscreenMode"), Confirmed) && Confirmed == Mode);
+	TestTrue(TEXT("and preferred when full screen is asked for"), File.GetInt(*Section, TEXT("PreferredFullscreenMode"), Preferred) && Preferred == 1);
+	int32 Width = -1;
+	int32 Height = -1;
+	bool bDesktop = false;
+	TestTrue(TEXT("at the screen's own size (a resolution of 0 is the desktop's)"), File.GetInt(*Section, TEXT("ResolutionSizeX"), Width) && File.GetInt(*Section, TEXT("ResolutionSizeY"), Height) && Width == 0 && Height == 0);
+	TestTrue(TEXT("the desktop's, says the file"), File.GetBool(*Section, TEXT("bUseDesktopResolution"), bDesktop) && bDesktop);
+	// Nothing in the file turns the saved settings of a player's machine over: it has no other keys of the player's own.
+	for (const TCHAR* Key : {TEXT("MouseSensitivity"), TEXT("FieldOfView"), TEXT("Hero"), TEXT("MasterVolume")})
+	{
+		FString Value;
+		TestFalse(FString::Printf(TEXT("%s is the player's own, not the file's"), Key), File.GetString(*Section, Key, Value));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSoundPlaysOnWithoutFocus, "CheeseStrike.Project.TheSoundPlaysOnWithoutFocus", ProjectTests::Flags)
+
+bool FTheSoundPlaysOnWithoutFocus::RunTest(const FString& Parameters)
+{
+	// The engine mutes an unfocused game (its [Audio] UnfocusedVolumeMultiplier is 0): the game's own ini says 1, so the music
+	// and the sounds go on when the player clicks off the window, and the engine reads that value.
+	FConfigFile File;
+	File.Read(FPaths::ProjectConfigDir() / TEXT("DefaultEngine.ini"));
+	float Multiplier = -1.0f;
+	TestTrue(TEXT("Config/DefaultEngine.ini sets the unfocused volume"), File.GetFloat(TEXT("Audio"), TEXT("UnfocusedVolumeMultiplier"), Multiplier));
+	TestEqual(TEXT("to full"), Multiplier, 1.0f);
+	TestEqual(TEXT("and the engine has it so"), FApp::GetUnfocusedVolumeMultiplier(), 1.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSpinnerIsACheeseWedge, "CheeseStrike.Project.TheSpinnerIsACheeseWedge", ProjectTests::Flags)
+
+bool FTheSpinnerIsACheeseWedge::RunTest(const FString& Parameters)
+{
+	// The spinner's frames (tools/art/spinner_frames.py): a loop of 48 PNGs of 64 x 64 in Content/UI/Spinner, read as files so
+	// that the loading screen can draw them before any asset is loaded, shown at 24 a second.
+	using namespace CheeseStrikeLoader;
+	TestEqual(TEXT("a loop of 48 frames"), Frames, 48);
+	TestEqual(TEXT("at 24 a second"), FramesPerSecond, 24);
+	TestEqual(TEXT("the first frame at the start"), FrameAt(0.0), 0);
+	TestEqual(TEXT("the next a 24th of a second on"), FrameAt(1.0 / 24.0 + 0.001), 1);
+	TestEqual(TEXT("round in two seconds"), FrameAt(2.0 + 0.001), 0);
+	TestEqual(TEXT("never past the loop"), FrameAt(1.999), 47);
+	TestTrue(TEXT("never back"), FrameAt(-0.5) >= 0 && FrameAt(-0.5) < Frames);
+	for (int32 Frame = 0; Frame < Frames; ++Frame)
+	{
+		TArray<uint8> Bytes;
+		const FString Path = FramePath(Frame);
+		if (!TestTrue(FString::Printf(TEXT("%s is there"), *Path), FFileHelper::LoadFileToArray(Bytes, *Path)) || Bytes.Num() < 24)
+		{
+			continue;
+		}
+		// A PNG's size is in its header: the width and height as big-endian 32-bit numbers at 16 and 20.
+		const auto At = [&Bytes](int32 Offset) { return (Bytes[Offset] << 24) | (Bytes[Offset + 1] << 16) | (Bytes[Offset + 2] << 8) | Bytes[Offset + 3]; };
+		TestTrue(TEXT("a PNG"), Bytes[1] == 'P' && Bytes[2] == 'N' && Bytes[3] == 'G');
+		TestEqual(TEXT("64 across"), At(16), FrameSize);
+		TestEqual(TEXT("and 64 high"), At(20), FrameSize);
+	}
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheVolumesKeepTheSoundClassesTheySet, "CheeseStrike.Project.TheVolumesKeepTheSoundClassesTheySet", ProjectTests::Flags)
 

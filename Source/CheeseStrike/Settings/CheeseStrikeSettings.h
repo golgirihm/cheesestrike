@@ -125,6 +125,17 @@ public:
 
 	virtual void SetToDefaults() override;
 	virtual void ApplyNonResolutionSettings() override;
+	/**
+	 * Loads them, and in the game (never the editor), the first time, before the game's window is made (UGameEngine::Init),
+	 * puts the window mode and resolution they say on the window to come: a fresh install's borderless at the screen's own
+	 * size (Config/DefaultGameUserSettings.ini), or the player's saved choice. The engine reads the same file before any
+	 * of this (PreloadResolutionSettings); this makes sure of it, and says in the log what the window will be.
+	 */
+	virtual void LoadSettings(bool bForceReload = false) override;
+	/** The word for a window mode, for the log and the settings page: "borderless", "fullscreen", "windowed". */
+	static const TCHAR* WindowModeWord(EWindowMode::Type Mode);
+	/** The version the engine reads a settings file under (a file under another is wiped to the defaults, and never read for the window): what Config/DefaultGameUserSettings.ini must say. */
+	static int32 VersionTheEngineReads();
 
 protected:
 	UPROPERTY(config)
