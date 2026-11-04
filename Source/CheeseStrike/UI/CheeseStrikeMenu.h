@@ -53,8 +53,6 @@ enum class EOptionsTab : uint8
 	Aiming,
 	Sound,
 	Graphics,
-	/** The hero this player plays (UCheeseStrikeSettings::GetHero), as on the front end beside the figure. */
-	Hero,
 };
 
 namespace CheeseStrikeMenu
@@ -285,7 +283,7 @@ private:
 
 	TSharedRef<SWidget> MakePage();
 	TSharedRef<SWidget> MakeMain();
-	/** The heroes to pick from (AUTO, then CheeseStrikeBodies::All), the one picked lit: the figure wears it at once. */
+	/** The heroes to pick from (CheeseStrikeBodies::All), the one picked lit: the figure wears it at once. */
 	TSharedRef<SWidget> MakeHeroPicker();
 	TSharedRef<SWidget> MakeFind();
 	TSharedRef<SWidget> MakeLobby();

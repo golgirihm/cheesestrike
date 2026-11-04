@@ -183,13 +183,14 @@ int32 ACheeseStrikePlayerController::WantedHero() const
 	{
 		return HeroOverride;
 	}
-	// The tests play the heroes as they come, whatever this PC's player picked (every player in the editor shares the settings).
+	// The tests play the default hero unless they pick (CheeseStrikeHero), whatever this PC's player picked: every player in
+	// the editor shares the settings.
 	if (GIsAutomationTesting)
 	{
 		return INDEX_NONE;
 	}
 	const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
-	return Settings != nullptr ? Settings->GetHero() : INDEX_NONE;
+	return Settings != nullptr ? Settings->GetHero() : CheeseStrikeBodies::DefaultHero;
 }
 
 void ACheeseStrikePlayerController::SendHero()
@@ -222,7 +223,9 @@ void ACheeseStrikePlayerController::CheeseStrikeHero(const FString& Hero)
 {
 	bHeroOverride = !Hero.IsEmpty();
 	HeroOverride = CheeseStrikeBodies::HeroFromKey(Hero);
-	UE_LOG(LogCheeseStrike, Display, TEXT("Hero: %s"), bHeroOverride ? CheeseStrikeBodies::HeroKey(HeroOverride) : TEXT("the settings'"));
+	// A word that names no hero is the default's.
+	UE_LOG(LogCheeseStrike, Display, TEXT("Hero: %s%s"), bHeroOverride ? CheeseStrikeBodies::HeroKey(HeroOverride) : TEXT("the settings'"),
+		bHeroOverride && HeroOverride == INDEX_NONE ? *FString::Printf(TEXT(" (\"%s\" names no hero)"), *Hero) : TEXT(""));
 }
 
 void ACheeseStrikePlayerController::PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel)
@@ -988,7 +991,7 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 		ShowMenu(EMenuPage::Pause);
 		Menu->ConfirmBackToLobby(Tab.Equals(TEXT("Ask"), ESearchCase::IgnoreCase) && CanGoBackToLobby());
 	}
-	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("Aiming"), TEXT("Sound"), TEXT("Graphics"), TEXT("Hero")};
+	static const TCHAR* const Tabs[] = {TEXT("Controls"), TEXT("Aiming"), TEXT("Sound"), TEXT("Graphics")};
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Tabs) && Menu.IsValid(); ++Index)
 	{
 		if (Tab.Equals(Tabs[Index], ESearchCase::IgnoreCase))

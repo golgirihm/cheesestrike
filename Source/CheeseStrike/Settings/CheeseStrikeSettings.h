@@ -107,7 +107,7 @@ public:
 	/** The menu's music (CheeseStrikeMusic). */
 	float GetMusicVolume() const { return MusicVolume; }
 	void SetMusicVolume(float Value);
-	/** The hero this player plays (an index of CheeseStrikeBodies::All), or INDEX_NONE for "auto", the usual by player id; kept by its word (CheeseStrikeBodies::HeroKey). */
+	/** The hero this player plays (an index of CheeseStrikeBodies::All): Lt. Belica until they pick another; kept by its word (CheeseStrikeBodies::HeroKey; an old file's "auto" reads as the default). */
 	int32 GetHero() const;
 	void SetHero(int32 Body);
 	/** The buttons a gamepad's prompts and the controls' table name (CheeseStrikeInput::EGlyphs): Auto (the pad's, as far as it can be told), Xbox, PlayStation or Nintendo. */
@@ -145,9 +145,9 @@ protected:
 	float MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
 	UPROPERTY(config)
 	FIntPoint FullscreenResolution = FIntPoint::ZeroValue;
-	/** The hero picked, by its word ("auto" for none). */
+	/** The hero picked, by its word: Lt. Belica's to begin with (CheeseStrikeBodies::DefaultHero). */
 	UPROPERTY(config)
-	FString Hero = TEXT("auto");
+	FString Hero = TEXT("Belica");
 	/** CheeseStrikeInput::EGlyphs, Auto by default. */
 	UPROPERTY(config)
 	uint8 GamepadGlyphs = 0;

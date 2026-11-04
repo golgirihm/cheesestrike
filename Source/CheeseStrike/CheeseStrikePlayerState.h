@@ -58,7 +58,7 @@ public:
 	/** Server only. */
 	void SetJoinOrder(int32 Order) { JoinOrder = Order; }
 
-	/** The hero this player picked (an index of CheeseStrikeBodies::All), or INDEX_NONE for the usual by player id: set by their own machine from its settings (ACheeseStrikePlayerController::ServerPickHero); bots pick none. */
+	/** The hero this player picked (an index of CheeseStrikeBodies::All), or INDEX_NONE while none has come (they wear CheeseStrikeBodies::DefaultHero then): set by their own machine from its settings (ACheeseStrikePlayerController::ServerPickHero); bots pick none. */
 	int32 GetHero() const { return Hero; }
 	/** Server only. */
 	void SetHero(int32 InHero) { Hero = InHero; }

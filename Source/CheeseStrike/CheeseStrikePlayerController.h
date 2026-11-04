@@ -139,14 +139,14 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerSwitchSide();
 	/**
-	 * The hero this player plays (CheeseStrikeBodies::All, INDEX_NONE for the usual): the settings' (UCheeseStrikeSettings::
-	 * GetHero), or CheeseStrikeHero's on this controller. Their machine puts it on their player state whenever it differs
-	 * (ServerPickHero), so it travels with them into every level and every machine dresses them in it.
+	 * The hero this player plays (CheeseStrikeBodies::All; INDEX_NONE is the default, Lt. Belica): the settings'
+	 * (UCheeseStrikeSettings::GetHero), or CheeseStrikeHero's on this controller. Their machine puts it on their player
+	 * state whenever it differs (ServerPickHero), so it travels with them into every level and every machine dresses them in it.
 	 */
 	int32 WantedHero() const;
 	UFUNCTION(Server, Reliable)
 	void ServerPickHero(int32 Hero);
-	/** From the console or a test: this player plays `Hero` (Belica, Murdock, Wraith, Twinblast, or auto), whatever the settings say, until the level changes; with none, the settings' again. */
+	/** From the console or a test: this player plays `Hero` (Belica, Murdock, Wraith or Twinblast; any other word the default), whatever the settings say, until the level changes; with none, the settings' again. */
 	UFUNCTION(Exec)
 	void CheeseStrikeHero(const FString& Hero = TEXT(""));
 	/**
@@ -215,7 +215,7 @@ public:
 	/** From the console or a play script: the host calls off the countdown. */
 	UFUNCTION(Exec)
 	void CheeseStrikeCancel();
-	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits or Settings, which also opens from the pause menu), and of the settings the tab named (Controls, Aiming, View, Sound or Graphics); or, in a match, the pause menu (Pause), with Ask the host's question whether to go back to the lobby. */
+	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits or Settings, which also opens from the pause menu), and of the settings the tab named (Controls, Aiming, Sound or Graphics); or, in a match, the pause menu (Pause), with Ask the host's question whether to go back to the lobby. */
 	UFUNCTION(Exec)
 	void CheeseStrikePage(const FString& Page, const FString& Tab = TEXT(""));
 	/** From the console or a play script: opens the lobby's nth dropdown (0 the map, then the mode and on down), for looking at it; -1 shuts it. */
@@ -338,7 +338,7 @@ protected:
 	int32 GoSounded = INDEX_NONE;
 	bool bScoreboardHeld = false;
 	bool bStartAtTaken = false;
-	/** CheeseStrikeHero's pick, if given (INDEX_NONE being "auto"). */
+	/** CheeseStrikeHero's pick, if given (INDEX_NONE being the default hero). */
 	bool bHeroOverride = false;
 	int32 HeroOverride = INDEX_NONE;
 	/** The pick last sent to the server, and when (by real time), so that it is sent once and again only if it hasn't arrived. */

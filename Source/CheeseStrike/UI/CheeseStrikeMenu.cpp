@@ -1653,7 +1653,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeHeroPicker()
 	{
 		return SNullWidget::NullWidget;
 	}
-	TArray<FString> Names = {TEXT("AUTO")};
+	TArray<FString> Names;
 	for (int32 Body = 0; Body < CheeseStrikeBodies::All().Num(); ++Body)
 	{
 		Names.Add(FString(CheeseStrikeBodies::HeroKey(Body)).ToUpper());
@@ -1671,11 +1671,11 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeHeroPicker()
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				MakeChoiceButtons(Names, Settings->GetHero() + 1, true, [this](int32 Index)
+				MakeChoiceButtons(Names, Settings->GetHero(), true, [this](int32 Index)
 				{
 					if (UCheeseStrikeSettings* Kept = UCheeseStrikeSettings::Get())
 					{
-						Kept->SetHero(Index - 1);
+						Kept->SetHero(Index);
 						Kept->SaveSettings();
 					}
 					Refresh();
@@ -2596,7 +2596,7 @@ FString SCheeseStrikeMenu::PageKey() const
 			Key += TEXT("|") + Found;
 		}
 	}
-	if (Page == EMenuPage::Main || Page == EMenuPage::Options)
+	if (Page == EMenuPage::Main)
 	{
 		// The hero picked lights its button.
 		const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
@@ -2882,7 +2882,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSlider(float Min, float Max, float St
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptions()
 {
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
-	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS"), TEXT("HERO")};
+	TArray<FString> Tabs = {TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS")};
 	const bool bInMatch = Page == EMenuPage::Options && Player.IsValid() && Player->IsPaused();
 	const bool bControls = OptionsTab == EOptionsTab::Controls;
 	// The controls are a table that scrolls under its heading; the other tabs' rows scroll as one.
@@ -3148,25 +3148,6 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionsTab()
 			}
 			Refresh();
 		})));
-		break;
-	}
-	case EOptionsTab::Hero:
-	{
-		TArray<FString> Names = {TEXT("AUTO")};
-		for (int32 Body = 0; Body < CheeseStrikeBodies::All().Num(); ++Body)
-		{
-			Names.Add(FString(CheeseStrikeBodies::HeroKey(Body)).ToUpper());
-		}
-		Add(MakeOptionRow(TEXT("Hero"), MakeChoiceButtons(Names, Settings->GetHero() + 1, true, [this, Kept](int32 Index)
-		{
-			if (Kept.IsValid())
-			{
-				Kept->SetHero(Index - 1);
-				Kept->SaveSettings();
-			}
-			Refresh();
-		})));
-		Rows->AddSlot().AutoHeight().Padding(FMargin(OptionLabelWidth, 0.0f, 0.0f, 4.0f)) [ MakeLine(TEXT("Worn in your side's colours whichever side you are on; without sides, in the hero's own. Auto gives the heroes in turn."), true, true, WrapWidth() - OptionLabelWidth) ];
 		break;
 	}
 	}

@@ -271,13 +271,13 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	}
 	const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(nullptr);
 	Menu->Show(EMenuPage::Main);
-	TestEqual(TEXT("the front end's items, then the hero row under the figure"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("PRACTICE"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("QUIT"),
-		TEXT("AUTO"), TEXT("BELICA"), TEXT("MURDOCK"), TEXT("WRAITH"), TEXT("TWINBLAST")}));
+	TestEqual(TEXT("the front end's items, then the hero row under the figure (every hero a pick, none automatic)"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("PRACTICE"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("QUIT"),
+		TEXT("BELICA"), TEXT("MURDOCK"), TEXT("WRAITH"), TEXT("TWINBLAST")}));
 	TestEqual(TEXT("the first has the focus"), Menu->GetFocusName(), FString(TEXT("HOST A MATCH")));
 	Menu->FocusItem(TEXT("SETTINGS"));
 	Menu->Show(EMenuPage::Options);
 	TestEqual(TEXT("the settings' first item is their first tab"), Menu->GetFocusName(), FString(TEXT("CONTROLS")));
-	TestEqual(TEXT("the controls' tab has nothing to focus but the tabs and Back"), Menu->GetFocusableNames(), TArray<FString>({TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS"), TEXT("HERO"), TEXT("BACK")}));
+	TestEqual(TEXT("the controls' tab has nothing to focus but the tabs and Back (no hero tab: the hero is picked under the figure)"), Menu->GetFocusableNames(), TArray<FString>({TEXT("CONTROLS"), TEXT("AIMING"), TEXT("SOUND"), TEXT("GRAPHICS"), TEXT("BACK")}));
 	Menu->SetOptionsTab(EOptionsTab::Aiming);
 	Menu->Refresh();
 	const TArray<FString> Options = Menu->GetFocusableNames();
