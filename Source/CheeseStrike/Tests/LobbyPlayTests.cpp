@@ -232,7 +232,8 @@ bool FTheHostTakesEveryoneBackToTheLobby::RunTest(const FString& Parameters)
 	{
 		BuildsBefore[0] = Builds(0);
 		BuildsBefore[1] = Builds(1);
-		MapPicked = CheeseStrikeRules::NumMaps() - 2;
+		// The last map the lobby offers (not the Practice Range, which it doesn't).
+		MapPicked = CheeseStrikeRules::MapsOffered().Last();
 		Controller(0)->SetRulesFromMenu(30, 3.0f, MapPicked);
 		Controller(0)->SetBotSkillFromMenu(2);
 		Controller(0)->SetRulesFromMenu(10, 1.0f);

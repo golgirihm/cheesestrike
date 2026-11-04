@@ -7,6 +7,7 @@
 #include "CheeseStrikeGameMode.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerState.h"
+#include "Rules/CheeseStrikeRange.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "UI/CheeseStrikeMenu.h"
 
@@ -166,6 +167,21 @@ bool FAHostPicksAMap::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the URL picks a map"), MapFrom(TEXT("?Map=1"), 0), 1);
 	TestEqual(TEXT("but not one there isn't"), MapFrom(TEXT("?Map=9"), 0), 0);
 	TestEqual(TEXT("and without it, the one given"), MapFrom(TEXT("?KillLimit=5"), 1), 1);
+	// The Practice Range is a map (for the cook, the URL and PRACTICE), but not one the lobby offers or a match is hosted on.
+	const int32 Range = MapIndexFor(CheeseStrikeRange::Level);
+	TestTrue(TEXT("the Practice Range is a map"), Range != INDEX_NONE);
+	TestFalse(TEXT("but not one the lobby offers"), IsOffered(Range));
+	TestTrue(TEXT("every other map is"), IsOffered(0) && IsOffered(DefaultMap()) && IsOffered(Shooter));
+	TestFalse(TEXT("nor is a map there isn't"), IsOffered(NumMaps()) || IsOffered(INDEX_NONE));
+	const TArray<int32> Offered = MapsOffered();
+	TestEqual(TEXT("the lobby offers every map but the range"), Offered.Num(), NumMaps() - 1);
+	TestFalse(TEXT("not the range"), Offered.Contains(Range));
+	TestTrue(TEXT("in the maps' order"), Offered.Num() > 1 && Offered[0] == 0 && Offered.Last() > Offered[0]);
+	TestTrue(TEXT("a match with ?listen is hosted for others"), IsHosted(TEXT("?listen?Bots=0")) && IsHosted(CheeseStrikeRules::HostOptions() + TEXT("?listen")));
+	TestFalse(TEXT("PRACTICE plays alone"), IsHosted(CheeseStrikeRange::PracticeOptions()));
+	TestEqual(TEXT("a match hosted on the range plays the default map instead"), MapForMatch(Range, true), DefaultMap());
+	TestEqual(TEXT("alone, the range is played"), MapForMatch(Range, false), Range);
+	TestEqual(TEXT("a map offered is played as picked"), MapForMatch(0, true), 0);
 	TestEqual(TEXT("a travelled match waits for so many players"), PlayersFrom(TEXT("?Players=3")), 3);
 	TestEqual(TEXT("and a hosted one for none"), PlayersFrom(TEXT("")), 0);
 	TestEqual(TEXT("the bots' names travel by their seed"), BotSeedFrom(TEXT("?BotSeed=1234"), 7), 1234);

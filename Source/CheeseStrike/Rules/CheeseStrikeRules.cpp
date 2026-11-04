@@ -4,6 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "CheeseStrikeBots.h"
 #include "CheeseStrikeModes.h"
+#include "CheeseStrikeRange.h"
 
 namespace CheeseStrikeRules
 {
@@ -95,6 +96,34 @@ namespace CheeseStrikeRules
 	int32 DefaultMap()
 	{
 		return FMath::Max(0, MapIndexFor(TEXT("/Game/CheeseStrike/Maps/Lvl_Grotto")));
+	}
+
+	bool IsOffered(int32 MapIndex)
+	{
+		return MapIndex >= 0 && MapIndex < NumMaps() && !FString(Maps[MapIndex].Level).Equals(CheeseStrikeRange::Level, ESearchCase::IgnoreCase);
+	}
+
+	TArray<int32> MapsOffered()
+	{
+		TArray<int32> Offered;
+		for (int32 Index = 0; Index < NumMaps(); ++Index)
+		{
+			if (IsOffered(Index))
+			{
+				Offered.Add(Index);
+			}
+		}
+		return Offered;
+	}
+
+	bool IsHosted(const FString& Options)
+	{
+		return UGameplayStatics::HasOption(Options, TEXT("listen"));
+	}
+
+	int32 MapForMatch(int32 Picked, bool bHosted)
+	{
+		return bHosted && !IsOffered(Picked) ? DefaultMap() : Picked;
 	}
 
 	FString HostOptions()

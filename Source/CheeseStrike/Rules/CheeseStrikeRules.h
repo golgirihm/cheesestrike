@@ -44,11 +44,23 @@ namespace CheeseStrikeRules
 		const TCHAR* Level;
 		const TCHAR* Picture;
 	};
-	/** The maps, in the order the lobby offers them. */
+	/** The maps, in the order the lobby offers them (MapsOffered: all but the Practice Range). */
 	extern const FMapChoice Maps[];
 	int32 NumMaps();
 	/** The map a lobby hosted from the front end begins with (HostOptions): Gruyère Grotto. */
 	int32 DefaultMap();
+	/**
+	 * Whether the lobby offers map `MapIndex` and a match may be hosted on it: every map but the Practice Range
+	 * (CheeseStrikeRange::Level), which is for one player alone, from the front end's PRACTICE; it stays in Maps for
+	 * MapFrom, the cook and PracticeFromMenu.
+	 */
+	bool IsOffered(int32 MapIndex);
+	/** The maps the lobby offers, as indices of Maps, in its order. */
+	TArray<int32> MapsOffered();
+	/** Whether a match with these URL `Options` is hosted for others (`?listen`: the lobby's host), rather than played alone. */
+	bool IsHosted(const FString& Options);
+	/** The map a match plays on: `Picked`, unless it is hosted (`bHosted`, IsHosted) on a map that isn't offered (the Practice Range), which falls back to the default map. */
+	int32 MapForMatch(int32 Picked, bool bHosted);
 	/**
 	 * The URL options a match hosted from the front end begins its lobby
 	 * with, before the host changes anything: Gruyère Grotto, Deathmatch to

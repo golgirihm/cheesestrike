@@ -39,7 +39,8 @@ bool FThePracticeRange::RunTest(const FString& Parameters)
 	TestEqual(TEXT("no count before it"), CheeseStrikeStart::CountdownFrom(Options), 0.0f);
 	const int32 Limit = CheeseStrikeModes::KillLimitFor(CheeseStrikeModes::EMode::FreeForAll, Options);
 	TestTrue(FString::Printf(TEXT("a kill limit nobody reaches (%d)"), Limit), Limit >= 1000);
-	TestTrue(TEXT("the range is a map a host can pick"), CheeseStrikeRules::MapIndexFor(Level) != INDEX_NONE);
+	TestTrue(TEXT("the range is a map (for the cook and the URL)"), CheeseStrikeRules::MapIndexFor(Level) != INDEX_NONE);
+	TestFalse(TEXT("but not one the lobby offers: it is for one player, from the front end"), CheeseStrikeRules::IsOffered(CheeseStrikeRules::MapIndexFor(Level)));
 
 	// The dummies take the spots in turn, each keeping its own.
 	TestEqual(TEXT("the first dummy, the first spot"), DummySpotFor({}, 4), 0);
