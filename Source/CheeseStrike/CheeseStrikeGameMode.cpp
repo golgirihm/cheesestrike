@@ -65,6 +65,12 @@ void ACheeseStrikeGameMode::InitGame(const FString& MapName, const FString& Opti
 	BotsWanted = CheeseStrikeRules::BotsFrom(Options);
 	BotSides = CheeseStrikeRules::BotSidesFrom(Options);
 	MapIndex = CheeseStrikeRules::MapFrom(Options, CurrentMapIndex());
+	// The Practice Range is for one player alone (the front end's PRACTICE): a match hosted on it plays the default map instead.
+	if (CheeseStrikeRules::MapForMatch(MapIndex, CheeseStrikeRules::IsHosted(Options)) != MapIndex)
+	{
+		UE_LOG(LogCheeseStrike, Warning, TEXT("A match can't be hosted on %s, which is for one player from the front end: it plays %s instead"), CheeseStrikeRules::Maps[MapIndex].Name, CheeseStrikeRules::Maps[CheeseStrikeRules::DefaultMap()].Name);
+		MapIndex = CheeseStrikeRules::MapForMatch(MapIndex, true);
+	}
 	BotSeed = CheeseStrikeRules::BotSeedFrom(Options, FMath::Rand());
 	BotSkill = CheeseStrikeBots::SkillFrom(Options);
 	bDummyBots = CheeseStrikeBots::DummiesFrom(Options);
@@ -123,9 +129,13 @@ void ACheeseStrikeGameMode::SetRules(int32 InKillLimit, float InRespawnDelay, in
 {
 	KillLimit = InKillLimit;
 	RespawnDelay = InRespawnDelay;
-	if (InMapIndex >= 0 && InMapIndex < CheeseStrikeRules::NumMaps())
+	if (CheeseStrikeRules::IsOffered(InMapIndex))
 	{
 		MapIndex = InMapIndex;
+	}
+	else if (InMapIndex >= 0 && InMapIndex < CheeseStrikeRules::NumMaps())
+	{
+		UE_LOG(LogCheeseStrike, Warning, TEXT("Rules: %s isn't offered (it is for one player from the front end); the map stays %s"), CheeseStrikeRules::Maps[InMapIndex].Name, MapIndex >= 0 ? CheeseStrikeRules::Maps[MapIndex].Name : TEXT("this level"));
 	}
 	if (ACheeseStrikeGameState* State = GetGameState<ACheeseStrikeGameState>())
 	{

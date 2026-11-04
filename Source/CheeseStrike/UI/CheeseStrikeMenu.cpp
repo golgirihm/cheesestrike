@@ -2460,14 +2460,17 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 		}
 		return Chosen;
 	};
+	// The maps the lobby offers (not the Practice Range, which is for one player from the front end), by their place in that list.
+	const TArray<int32> Offered = CheeseStrikeRules::MapsOffered();
 	TArray<FString> MapNames;
 	TArray<const FSlateBrush*> MapPictures;
-	for (int32 Index = 0; Index < CheeseStrikeRules::NumMaps(); ++Index)
+	for (const int32 Index : Offered)
 	{
 		MapNames.Add(Upper(CheeseStrikeRules::Maps[Index].Name));
 		MapPictures.Add(Looks().MapPicture(CheeseStrikeRules::Maps[Index].Picture));
 	}
-	const auto MapChosen = [Now]() { const ACheeseStrikeGameState* State = Now(); return State != nullptr ? State->GetMapIndex() : INDEX_NONE; };
+	const auto MapNow = [Now]() { const ACheeseStrikeGameState* State = Now(); return State != nullptr ? State->GetMapIndex() : INDEX_NONE; };
+	const auto MapChosen = [MapNow, Offered]() { return Offered.IndexOfByKey(MapNow()); };
 	TArray<FString> Skills;
 	for (const CheeseStrikeBots::FSkill& Skill : CheeseStrikeBots::Skills)
 	{
@@ -2489,7 +2492,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	// A row a rule, each showing its choice and opening onto the rest, so that the whole lobby fits on the screen.
 	TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
 	const auto Row = [this, &Rows](const FString& Label, TSharedRef<SWidget> Setter) { Rows->AddSlot().AutoHeight() [ MakeRuleRow(Label, Setter) ]; };
-	Row(TEXT("Map"), MakeDropdown(MapNames, MapChosen, bCanPick, [Player, KillLimitNow, RespawnDelayNow](int32 Index) { if (Player.IsValid()) Player->SetRulesFromMenu(KillLimitNow(), RespawnDelayNow(), Index); }, MapPictures));
+	Row(TEXT("Map"), MakeDropdown(MapNames, MapChosen, bCanPick, [Player, KillLimitNow, RespawnDelayNow, Offered](int32 Index) { if (Player.IsValid() && Offered.IsValidIndex(Index)) Player->SetRulesFromMenu(KillLimitNow(), RespawnDelayNow(), Offered[Index]); }, MapPictures));
 	Row(TEXT("Mode"), MakeDropdown(ModeNames, [ModeChosen]() { return ModeChosen; }, bCanPick, [Player, ModesListed](int32 Index)
 	{
 		if (Player.IsValid() && ModesListed.IsValidIndex(Index))
@@ -2551,7 +2554,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyRules()
 	}
 	return SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOBBY")) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 10.0f)) [ MakeMapPicture(MapChosen) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 10.0f)) [ MakeMapPicture(MapNow) ]
 		+ SVerticalBox::Slot().AutoHeight() [ Rows ];
 }
 
