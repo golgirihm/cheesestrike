@@ -6,6 +6,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
+#include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
@@ -21,6 +22,9 @@ namespace
 	{
 		return CheeseStrikeWeaponLooks::For(CheeseStrikeWeapons::Blaster().Id);
 	}
+
+	TAutoConsoleVariable<float> CVarFigureTurn(TEXT("CheeseStrike.FigureTurn"), 1.0f,
+		TEXT("How fast the front end's figure turns, as a share of its usual rate: 0 holds it still, its animation paused too, for comparing screenshots of it (tools/play/hero_switch.txt)."));
 }
 
 ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
@@ -76,6 +80,31 @@ void ACheeseStrikeMenuFigure::BeginPlay()
 	ACheeseStrikeWeapon::DressModel(Weapon, FigureWeapon());
 	ArmHero();
 	KeepTexturesResident(true);
+	WarmUpHeroes();
+}
+
+void ACheeseStrikeMenuFigure::WarmUpHeroes()
+{
+	// Each hero a couple of centimetres tall in the middle of the pedestal (inside its cylinder, so never seen), with no
+	// animation or shadow: enough to be drawn, which is what readies its materials. The pedestal is scaled; the body's
+	// relative scale undoes that.
+	const float Tiny = 0.012f;
+	const FVector Scale(Tiny * 100.0f / PedestalWidth, Tiny * 100.0f / PedestalWidth, Tiny * 100.0f / PedestalHeight);
+	for (int32 Hero = 0; Hero < Heroes.Num(); ++Hero)
+	{
+		if (Heroes[Hero] == nullptr)
+		{
+			continue;
+		}
+		USkeletalMeshComponent* Warm = NewObject<USkeletalMeshComponent>(this, *FString::Printf(TEXT("Warm%d"), Hero));
+		Warm->SetSkeletalMeshAsset(Heroes[Hero]);
+		Warm->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Warm->SetCastShadow(false);
+		Warm->SetRelativeScale3D(Scale);
+		Warm->SetupAttachment(Pedestal);
+		Warm->RegisterComponent();
+		WarmBodies.Add(Warm);
+	}
 }
 
 void ACheeseStrikeMenuFigure::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -152,7 +181,10 @@ bool ACheeseStrikeMenuFigure::IsShown() const
 void ACheeseStrikeMenuFigure::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	AddActorWorldRotation(FRotator(0.0f, TurnRate * DeltaSeconds, 0.0f));
+	// Held still (CheeseStrike.FigureTurn 0): neither turning nor breathing, so that two screenshots of it differ in nothing but their drawing.
+	const float Turn = CVarFigureTurn.GetValueOnGameThread();
+	AddActorWorldRotation(FRotator(0.0f, TurnRate * Turn * DeltaSeconds, 0.0f));
+	Body->bPauseAnims = Turn <= 0.0f;
 	// The tick after a change of hero: the body has its first pose (ShowHero evaluated one, and its own animation tick
 	// follows this), so it can be seen again, weapon and all.
 	if (HiddenTicks != INDEX_NONE && ++HiddenTicks >= 1)
@@ -187,12 +219,22 @@ TArray<UTexture*> ACheeseStrikeMenuFigure::TexturesOf(int32 Hero) const
 
 void ACheeseStrikeMenuFigure::KeepTexturesResident(bool bKeep)
 {
-	// Every mip of every hero's textures loaded and kept (bForceMiplevelsToBeResident), fetched at once when asked for, so
-	// that a hero switched to is as sharp on its first frame as on its thirtieth; let go as the figure goes.
+	// Every mip of every hero's textures, and every level of detail of its mesh, loaded and kept (bForceMiplevelsToBeResident),
+	// fetched at once when asked for, so that a hero switched to is as whole and sharp on its first frame as on its thirtieth;
+	// let go as the figure goes.
 	for (int32 Hero = 0; Hero < Heroes.Num(); ++Hero)
 	{
-		const USkeletalMesh* Model = Heroes[Hero].Get();
-		for (const FSkeletalMaterial& Each : Model != nullptr ? Model->GetMaterials() : TArray<FSkeletalMaterial>())
+		USkeletalMesh* Model = Heroes[Hero].Get();
+		if (Model == nullptr)
+		{
+			continue;
+		}
+		Model->bForceMiplevelsToBeResident = bKeep;
+		if (bKeep)
+		{
+			Model->SetForceMipLevelsToBeResident(TexturesWaitSeconds);
+		}
+		for (const FSkeletalMaterial& Each : Model->GetMaterials())
 		{
 			if (Each.MaterialInterface != nullptr)
 			{
@@ -204,6 +246,11 @@ void ACheeseStrikeMenuFigure::KeepTexturesResident(bool bKeep)
 
 bool ACheeseStrikeMenuFigure::AreTexturesResident() const
 {
+	USkeletalMesh* Model = Heroes.IsValidIndex(Shown) ? Heroes[Shown].Get() : nullptr;
+	if (Model != nullptr && !Model->IsFullyStreamedIn())
+	{
+		return false;
+	}
 	for (UTexture* Texture : TexturesOf(Shown))
 	{
 		if (UTexture2D* Streamed = Cast<UTexture2D>(Texture); Streamed != nullptr && !Streamed->IsFullyStreamedIn())

@@ -4,8 +4,17 @@
 # nothing of the old or new body or the weapon out of place on any frame
 # (CheeseStrike.Play.TheFigureChangesHeroWithNothingOutOfPlace checks that
 # every frame). Run with tools/play.ps1 -Lobby -FixedFps 30 (so that a wait
-# of 0.034 is one frame).
+# of 0.034 is one frame). The figure is held still, its animation paused
+# (CheeseStrike.FigureTurn 0), and the anti-aliasing and Lumen's temporal
+# filters turned off (their history settles on a newly shown mesh over its
+# first frames), so that the two screenshots of a pair differ only in whether
+# the hero's textures and levels of detail are there.
 wait 4
+cmd CheeseStrike.FigureTurn 0
+cmd r.AntiAliasingMethod 0
+cmd r.Lumen.ScreenProbeGather.Temporal 0
+cmd r.Lumen.Reflections.Temporal 0
+wait 0.5
 shot switch_0_belica
 cmd CheeseStrikeHero Murdock
 wait 0.034
