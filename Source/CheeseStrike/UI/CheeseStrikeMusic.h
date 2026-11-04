@@ -31,9 +31,10 @@ namespace CheeseStrikeMusic
 	 * (`bCountingDown`: it fades out over the countdown, into the match) or
 	 * the match is leaving for its level (`bLeaving`), nor over a match, its
 	 * pause menu and options included, nor while the results are held up
-	 * on the way back to the lobby (`bHeld`).
+	 * on the way back to the lobby (`bHeld`). The loadout page is the front
+	 * end's, unless the match is on (`bMatchOn`: its count-in's page).
 	 */
-	bool IsWanted(EMenuPage Page, bool bPausedInAMatch, bool bCountingDown, bool bLeaving, bool bHeld);
+	bool IsWanted(EMenuPage Page, bool bPausedInAMatch, bool bCountingDown, bool bLeaving, bool bHeld, bool bMatchOn = false);
 
 	/**
 	 * In a session everyone hears the host's song at the host's point in it:

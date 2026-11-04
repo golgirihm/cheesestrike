@@ -24,6 +24,8 @@ void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	DOREPLIFETIME(ACheeseStrikePlayerState, Team);
 	DOREPLIFETIME(ACheeseStrikePlayerState, JoinOrder);
 	DOREPLIFETIME(ACheeseStrikePlayerState, Hero);
+	DOREPLIFETIME(ACheeseStrikePlayerState, Primary);
+	DOREPLIFETIME(ACheeseStrikePlayerState, Grenade);
 	DOREPLIFETIME(ACheeseStrikePlayerState, GunLevel);
 	DOREPLIFETIME(ACheeseStrikePlayerState, StreakKills);
 	DOREPLIFETIME(ACheeseStrikePlayerState, ReadyStreaks);
@@ -35,6 +37,13 @@ void ACheeseStrikePlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 	DOREPLIFETIME(ACheeseStrikePlayerState, HillPoints);
 	DOREPLIFETIME(ACheeseStrikePlayerState, HillSeconds);
 	DOREPLIFETIME(ACheeseStrikePlayerState, BadgeCounts);
+}
+
+void ACheeseStrikePlayerState::SetLoadout(FName InPrimary, CheeseStrikeGrenades::EGrenadeKind InGrenade, int32 InHero)
+{
+	Primary = InPrimary;
+	Grenade = static_cast<uint8>(InGrenade);
+	Hero = InHero;
 }
 
 void ACheeseStrikePlayerState::AddHillTime(float Seconds)

@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeStart.h"
+#include "CheeseStrikeLoadout.h"
+#include "CheeseStrikeModes.h"
 #include "CheeseStrikeRules.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -8,17 +10,18 @@ namespace CheeseStrikeStart
 {
 	float CountdownFrom(const FString& Options)
 	{
+		const float Usual = CheeseStrikeLoadout::HasLoadout(CheeseStrikeModes::ModeFrom(Options)) ? LoadoutCountdown : Countdown;
 		if (!UGameplayStatics::HasOption(Options, TEXT("Countdown")))
 		{
-			return Countdown;
+			return Usual;
 		}
 		const FString Value = UGameplayStatics::ParseOption(Options, TEXT("Countdown"));
-		return Value.IsNumeric() ? FMath::Clamp(FCString::Atof(*Value), 0.0f, MostCountdown) : Countdown;
+		return Value.IsNumeric() ? FMath::Clamp(FCString::Atof(*Value), 0.0f, MostCountdown) : Usual;
 	}
 
-	float RoundCountdownFor(float MatchCountdown)
+	float RoundCountdownFor(float MatchCountdown, bool bLoadout)
 	{
-		return FMath::Clamp(MatchCountdown, 0.0f, RoundCountdown);
+		return FMath::Clamp(MatchCountdown, 0.0f, bLoadout ? LoadoutRoundCountdown : RoundCountdown);
 	}
 
 	bool IsFrozen(float Now, float GoAt)
@@ -73,7 +76,8 @@ namespace CheeseStrikeStart
 			return Out;
 		}
 		const float Left = GoAt - Now;
-		if (Left > MostCountdown)
+		// A longer count's first seconds are the loadout page's to say; the glyphs come for its last three.
+		if (Left > GlyphSeconds)
 		{
 			return Out;
 		}

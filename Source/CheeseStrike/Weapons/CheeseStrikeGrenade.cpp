@@ -21,6 +21,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikePlayerState.h"
 #include "CheeseStrikeGrenadeRules.h"
+#include "CheeseStrikeSmokeCloud.h"
 
 namespace
 {
@@ -32,6 +33,8 @@ namespace
 	const TCHAR* GrenadeFragPath = TEXT("/Game/CheeseStrike/Weapons/Grenade/SM_FragGrenade.SM_FragGrenade");
 	const TCHAR* const GrenadeMaterialPaths[] = {TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeCheese.MI_GrenadeCheese"),
 		TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeMetal.MI_GrenadeMetal")};
+	/** The Smoked Gouda's rind in place of the cheese: dark, smoked. */
+	const TCHAR* GrenadeSmokedPath = TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeSmoked.MI_GrenadeSmoked");
 	const TCHAR* GrenadeGlowPath = TEXT("/Game/CheeseStrike/Materials/M_Glow.M_Glow");
 	const TCHAR* GrenadeScorchPath = TEXT("/Game/CheeseStrike/Materials/MI_Decal_OilStain.MI_Decal_OilStain");
 	/** Lyra's grenade knocking on the ground (Content/LICENSES.md). */
@@ -131,6 +134,33 @@ void ACheeseStrikeGrenade::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ACheeseStrikeGrenade, BurstsAt);
+	DOREPLIFETIME(ACheeseStrikeGrenade, Kind);
+}
+
+bool ACheeseStrikeGrenade::DressRound(UStaticMeshComponent* Round, CheeseStrikeGrenades::EGrenadeKind Kind)
+{
+	UStaticMesh* Frag = Round != nullptr ? LoadObject<UStaticMesh>(nullptr, GrenadeFragPath) : nullptr;
+	if (Frag == nullptr)
+	{
+		return false;
+	}
+	Round->SetStaticMesh(Frag);
+	Round->SetRelativeScale3D(FVector::OneVector);
+	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(GrenadeMaterialPaths); ++Slot)
+	{
+		const TCHAR* Path = Slot == 0 && Kind == CheeseStrikeGrenades::EGrenadeKind::Smoke ? GrenadeSmokedPath : GrenadeMaterialPaths[Slot];
+		UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, Path);
+		// Without the smoked rind made yet, the cheese.
+		if (Material == nullptr && Slot == 0)
+		{
+			Material = LoadObject<UMaterialInterface>(nullptr, GrenadeMaterialPaths[Slot]);
+		}
+		if (Material != nullptr)
+		{
+			Round->SetMaterial(Slot, Material);
+		}
+	}
+	return true;
 }
 
 void ACheeseStrikeGrenade::PostNetReceiveVelocity(const FVector& NewVelocity)
@@ -147,14 +177,15 @@ float ACheeseStrikeGrenade::Now() const
 	return State != nullptr ? State->GetServerWorldTimeSeconds() : (GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f);
 }
 
-void ACheeseStrikeGrenade::Launch(ACheeseStrikeCharacter* InThrower, const FVector& Velocity)
+void ACheeseStrikeGrenade::Launch(ACheeseStrikeCharacter* InThrower, const FVector& Velocity, CheeseStrikeGrenades::EGrenadeKind InKind)
 {
 	Thrower = InThrower != nullptr ? InThrower->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
-	BurstsAt = Now() + CheeseStrikeGrenades::Fuse;
+	Kind = static_cast<uint8>(InKind);
+	BurstsAt = Now() + CheeseStrikeGrenades::FuseOf(InKind);
 	Movement->Velocity = Velocity;
 	Movement->UpdateComponentVelocity();
-	UE_LOG(LogCheeseStrike, Display, TEXT("Grenade: %s throws one from (%.0f, %.0f, %.0f) at %.0f cm/s"), InThrower != nullptr ? *InThrower->DisplayName() : TEXT("nobody"),
-		GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, Velocity.Size());
+	UE_LOG(LogCheeseStrike, Display, TEXT("Grenade: %s throws a %s from (%.0f, %.0f, %.0f) at %.0f cm/s"), InThrower != nullptr ? *InThrower->DisplayName() : TEXT("nobody"),
+		CheeseStrikeGrenades::NameOf(InKind), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, Velocity.Size());
 }
 
 void ACheeseStrikeGrenade::BeginPlay()
@@ -163,18 +194,8 @@ void ACheeseStrikeGrenade::BeginPlay()
 	Movement->OnProjectileBounce.AddDynamic(this, &ACheeseStrikeGrenade::OnBounce);
 	// Each spins its own way as it flies, mostly end over end.
 	Spin = FRotator(FMath::FRandRange(-720.0f, -420.0f), FMath::FRandRange(-90.0f, 90.0f), FMath::FRandRange(-160.0f, 160.0f));
-	if (UStaticMesh* Frag = LoadObject<UStaticMesh>(nullptr, GrenadeFragPath))
-	{
-		Round->SetStaticMesh(Frag);
-		Round->SetRelativeScale3D(FVector::OneVector);
-		for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(GrenadeMaterialPaths); ++Slot)
-		{
-			if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, GrenadeMaterialPaths[Slot]))
-			{
-				Round->SetMaterial(Slot, Material);
-			}
-		}
-	}
+	DressRound(Round, GetKind());
+	DressedKind = Kind;
 	if (UMaterialInterface* Glow = LoadObject<UMaterialInterface>(nullptr, GrenadeGlowPath))
 	{
 		SparkMaterial = UMaterialInstanceDynamic::Create(Glow, this);
@@ -238,6 +259,8 @@ bool ACheeseStrikeGrenade::BurstSees(UWorld* World, const FVector& At, const ACh
 	{
 		Params.AddIgnoredActor(*It);
 	}
+	// Smoke saves nobody from a burst.
+	ACheeseStrikeSmokeCloud::IgnoreClouds(Params, World);
 	for (const FVector& To : {Chest, Head, Feet})
 	{
 		FHitResult Hit;
@@ -256,8 +279,25 @@ void ACheeseStrikeGrenade::Burst()
 	ACheeseStrikePlayerState* By = Thrower.Get();
 	// A little above where it lies, so that the floor it is on hides nobody.
 	const FVector At = GetActorLocation() + FVector(0.0f, 0.0f, 15.0f);
-	UE_LOG(LogCheeseStrike, Display, TEXT("Grenade: %s's bursts at (%.0f, %.0f, %.0f) after %d bounces"), By != nullptr ? *By->GetPlayerName() : TEXT("nobody"), At.X, At.Y, At.Z, Bounces);
-	if (World == nullptr || By == nullptr)
+	UE_LOG(LogCheeseStrike, Display, TEXT("Grenade: %s's %s %s at (%.0f, %.0f, %.0f) after %d bounces"), By != nullptr ? *By->GetPlayerName() : TEXT("nobody"), CheeseStrikeGrenades::NameOf(GetKind()),
+		CheeseStrikeGrenades::Harms(GetKind()) ? TEXT("bursts") : TEXT("smokes"), At.X, At.Y, At.Z, Bounces);
+	if (World == nullptr)
+	{
+		return;
+	}
+	// The Smoked Gouda harms nobody: its cloud, from where it lies, is the server's to spawn and every machine's to show.
+	if (!CheeseStrikeGrenades::Harms(GetKind()))
+	{
+		FActorSpawnParameters Spawn;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Spawn.Owner = GetOwner();
+		if (ACheeseStrikeSmokeCloud* Cloud = World->SpawnActor<ACheeseStrikeSmokeCloud>(ACheeseStrikeSmokeCloud::StaticClass(), GetActorLocation(), FRotator::ZeroRotator, Spawn))
+		{
+			Cloud->Begin(Now());
+		}
+		return;
+	}
+	if (By == nullptr)
 	{
 		return;
 	}
@@ -295,6 +335,15 @@ void ACheeseStrikeGrenade::ShowBurst(const FVector& At)
 		return;
 	}
 	BurstShownAt = GetWorld()->GetTimeSeconds();
+	// The Smoked Gouda goes off with a puff and no more: its cloud is the show.
+	if (!CheeseStrikeGrenades::Harms(GetKind()))
+	{
+		if (Knocks.Num() > 0)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, Knocks[FMath::RandHelper(Knocks.Num())], At, FRotator::ZeroRotator, 0.7f, 0.6f, 0.0f, Attenuation);
+		}
+		return;
+	}
 	if (Bangs.Num() > 0)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, Bangs[FMath::RandHelper(Bangs.Num())], At, FRotator::ZeroRotator, 1.0f, FMath::FRandRange(0.95f, 1.08f), 0.0f, Attenuation);
@@ -350,6 +399,12 @@ void ACheeseStrikeGrenade::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (!bBurst)
 	{
+		// A round that came before its kind did (the first replication) is dressed again as it arrives.
+		if (DressedKind != Kind)
+		{
+			DressRound(Round, GetKind());
+			DressedKind = Kind;
+		}
 		// Spinning as it flies; the spark flickering as the fuse burns down.
 		const float Speed = Movement->Velocity.Size();
 		Pivot->AddLocalRotation(Spin * DeltaSeconds * FMath::Clamp(Speed / 400.0f, 0.0f, 1.0f));

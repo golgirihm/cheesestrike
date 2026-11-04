@@ -14,6 +14,10 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikePickup.h"
 #include "CheeseStrikeWeapon.h"
+#include "CheeseStrikeGrenades.h"
+#include "CheeseStrikePlayerState.h"
+#include "Animation/CheeseStrikeBodies.h"
+#include "Rules/CheeseStrikeLoadout.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "TimerManager.h"
 
@@ -63,7 +67,7 @@ FName FCheeseStrikeLoadout::For(EWeaponSlot Slot) const
 UCheeseStrikeInventory::UCheeseStrikeInventory()
 {
 	SetIsReplicatedByDefault(true);
-	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bCanEverTick = false;
 	Weapons.SetNum(NumWeaponSlots);
 }
 
@@ -533,6 +537,12 @@ void UCheeseStrikeInventory::GiveSpawnLoadout(AController* Controller)
 {
 	const UCheeseStrikeLoadouts* Loadouts = GetWorld() != nullptr ? GetWorld()->GetSubsystem<UCheeseStrikeLoadouts>() : nullptr;
 	GiveInternal(FCheeseStrikeLoadout::Usual(Loadouts != nullptr ? Loadouts->PrimaryFor(Controller) : NAME_None), true);
+	// And the kind of grenade chosen, a fresh count of them.
+	UCheeseStrikeGrenades* Grenades = Holder() != nullptr ? Holder()->GetGrenades() : nullptr;
+	if (Grenades != nullptr && Loadouts != nullptr)
+	{
+		Grenades->SetKind(Loadouts->GrenadeFor(Controller));
+	}
 }
 
 bool UCheeseStrikeInventory::TakePickup(ACheeseStrikePickup* Pickup)
@@ -670,23 +680,21 @@ void UCheeseStrikeInventory::HoldNow(EWeaponSlot Slot)
 	SetHeld(static_cast<uint8>(Slot), true);
 }
 
-void UCheeseStrikeInventory::ServerChoosePrimary_Implementation(FName Primary)
+void UCheeseStrikeInventory::TakeChoice(FName Primary)
 {
 	ACheeseStrikeCharacter* Character = Holder();
 	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Primary);
-	UCheeseStrikeLoadouts* Loadouts = GetWorld() != nullptr ? GetWorld()->GetSubsystem<UCheeseStrikeLoadouts>() : nullptr;
-	if (Character == nullptr || Stats == nullptr || !CheeseStrikeArsenal::IsPickable(Stats->Id, EWeaponSlot::Primary) || Loadouts == nullptr)
+	if (Character == nullptr || !Character->HasAuthority() || Stats == nullptr || !CheeseStrikeArsenal::IsPickable(Stats->Id, EWeaponSlot::Primary))
 	{
 		return;
 	}
-	Loadouts->Choose(Character->GetController(), Stats->Id);
-	// Just come in, untouched by the mode and not yet fighting: the choice is carried at once.
+	// Just come in, untouched by the mode and not yet fighting (held by a count, or in its first seconds): carried at once.
 	const ACheeseStrikeWeapon* Carried = At(static_cast<uint8>(EWeaponSlot::Primary));
-	if (bSpawnLoadout && Character->IsProtected() && (Carried == nullptr || Carried->GetStats().Id != Stats->Id))
+	if (bSpawnLoadout && Character->IsAlive() && Character->IsProtected() && (Carried == nullptr || Carried->GetStats().Id != Stats->Id))
 	{
 		GiveInternal(FCheeseStrikeLoadout::Usual(Stats->Id), true);
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s takes up the %s at once"), *Character->DisplayName(), *Stats->DisplayName.ToString());
 	}
-	UE_LOG(LogCheeseStrike, Display, TEXT("%s chose the %s"), *Character->DisplayName(), *Stats->DisplayName.ToString());
 }
 
 void UCheeseStrikeInventory::ServerArm_Implementation(FName Weapon)
@@ -714,35 +722,6 @@ void UCheeseStrikeInventory::ServerArm_Implementation(FName Weapon)
 #endif
 }
 
-void UCheeseStrikeInventory::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	// The player's choice of primary goes to the server once, as soon as this is their character.
-	const ACheeseStrikeCharacter* Character = Holder();
-	if (Character == nullptr)
-	{
-		return;
-	}
-	// Someone else's, here: nothing to tell from this machine.
-	const bool bOwnPlayers = Character->IsLocallyControlled() && Character->IsPlayerControlled();
-	if (Character->GetLocalRole() == ROLE_SimulatedProxy || (Character->HasAuthority() && Character->GetController() != nullptr && !bOwnPlayers))
-	{
-		SetComponentTickEnabled(false);
-		return;
-	}
-	if (!bToldChoice && bOwnPlayers)
-	{
-		bToldChoice = true;
-		SetComponentTickEnabled(false);
-		const UGameInstance* Game = GetWorld() != nullptr ? GetWorld()->GetGameInstance() : nullptr;
-		const UCheeseStrikeLoadoutChoice* Choice = Game != nullptr ? Game->GetSubsystem<UCheeseStrikeLoadoutChoice>() : nullptr;
-		if (Choice != nullptr && !Choice->GetPrimary().IsNone())
-		{
-			ServerChoosePrimary(Choice->GetPrimary());
-		}
-	}
-}
-
 void UCheeseStrikeInventory::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	// The weapons go with their character.
@@ -763,6 +742,12 @@ void UCheeseStrikeLoadouts::Choose(const AController* Controller, FName Primary)
 
 FName UCheeseStrikeLoadouts::PrimaryFor(const AController* Controller) const
 {
+	// The player's own pick first (their player state's loadout, from their machine's settings).
+	const ACheeseStrikePlayerState* Player = Controller != nullptr ? Controller->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+	if (Player != nullptr && !Player->IsABot() && CheeseStrikeLoadout::IsPrimaryOffered(Player->GetPrimary()))
+	{
+		return Player->GetPrimary();
+	}
 	const FName* Found = Controller != nullptr ? Chosen.Find(Controller) : nullptr;
 	if (Found != nullptr)
 	{
@@ -772,34 +757,79 @@ FName UCheeseStrikeLoadouts::PrimaryFor(const AController* Controller) const
 	return Instead != nullptr && CheeseStrikeArsenal::IsPickable(Instead->Id, EWeaponSlot::Primary) ? Instead->Id : CheeseStrikeArsenal::DefaultPrimary();
 }
 
+CheeseStrikeGrenades::EGrenadeKind UCheeseStrikeLoadouts::GrenadeFor(const AController* Controller) const
+{
+	const ACheeseStrikePlayerState* Player = Controller != nullptr ? Controller->GetPlayerState<ACheeseStrikePlayerState>() : nullptr;
+	return Player != nullptr && !Player->IsABot() ? Player->GetGrenade() : CheeseStrikeLoadout::DefaultGrenade;
+}
+
 bool UCheeseStrikeLoadouts::HasChosen(const AController* Controller) const
 {
 	return Controller != nullptr && Chosen.Contains(Controller);
 }
 
-bool UCheeseStrikeLoadoutChoice::Choose(FName Weapon, UWorld* World)
+bool UCheeseStrikeLoadoutChoice::Take(const FString& Word)
 {
-	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Weapon);
-	if (Stats == nullptr || !CheeseStrikeArsenal::IsPickable(Stats->Id, EWeaponSlot::Primary))
+	const FName Id(*Word.ToLower());
+	if (CheeseStrikeLoadout::IsPrimaryOffered(Id))
 	{
-		return false;
+		Primary = Id;
+		return true;
 	}
-	Primary = Stats->Id;
-	// Told now, if there is a character to tell it through; otherwise the next one tells it as it comes.
-	APlayerController* Player = World != nullptr ? World->GetFirstPlayerController() : nullptr;
-	if (ACheeseStrikeCharacter* Character = Player != nullptr ? Cast<ACheeseStrikeCharacter>(Player->GetPawn()) : nullptr)
+	if (const TOptional<CheeseStrikeGrenades::EGrenadeKind> Kind = CheeseStrikeGrenades::KindFromKey(Word))
 	{
-		if (UCheeseStrikeInventory* Inventory = Character->GetInventory())
-		{
-			Inventory->ServerChoosePrimary(Primary);
-		}
+		Grenade = Kind;
+		return true;
 	}
-	return true;
+	const int32 Body = CheeseStrikeBodies::HeroFromKey(Word);
+	if (Body != INDEX_NONE)
+	{
+		Hero = Body;
+		return true;
+	}
+	return false;
+}
+
+void UCheeseStrikeLoadoutChoice::SetHero(const FString& Key)
+{
+	if (Key.IsEmpty())
+	{
+		Hero.Reset();
+	}
+	else
+	{
+		Hero = CheeseStrikeBodies::HeroFromKey(Key);
+	}
+}
+
+void UCheeseStrikeLoadoutChoice::Clear()
+{
+	Primary.Reset();
+	Grenade.Reset();
+	Hero.Reset();
+}
+
+FString UCheeseStrikeLoadoutChoice::Describe() const
+{
+	TArray<FString> Parts;
+	if (Primary.IsSet())
+	{
+		Parts.Add(TEXT("the ") + Primary->ToString());
+	}
+	if (Grenade.IsSet())
+	{
+		Parts.Add(CheeseStrikeGrenades::KeyOf(*Grenade));
+	}
+	if (Hero.IsSet())
+	{
+		Parts.Add(CheeseStrikeBodies::HeroKey(*Hero));
+	}
+	return Parts.Num() > 0 ? FString::Join(Parts, TEXT(", ")) : FString(TEXT("the settings'"));
 }
 
 namespace
 {
-	/** `CheeseStrikeLoadout <weapon>`: chooses the primary for the next character (or this one, just come in). */
+	/** `CheeseStrikeLoadout <words>`: the primary, the grenade's kind and the hero this machine's player plays with, in place of the settings' (sent to the server by its rules: in the lobby or a count-in, at once; never mid-match). */
 	void ChooseLoadout(const TArray<FString>& Args, UWorld* World)
 	{
 		UGameInstance* Game = World != nullptr ? World->GetGameInstance() : nullptr;
@@ -808,17 +838,21 @@ namespace
 		{
 			return;
 		}
+		const FString Offered = FString::JoinBy(CheeseStrikeLoadout::Primaries(), TEXT(", "), [](const FName& Id) { return Id.ToString(); });
 		if (Args.Num() == 0)
 		{
-			UE_LOG(LogCheeseStrike, Display, TEXT("CheeseStrikeLoadout: carrying the %s; choose one of %s"), *Choice->GetPrimary().ToString(), *CheeseStrikeArsenal::ListIds(EWeaponSlot::Primary));
+			Choice->Clear();
+			UE_LOG(LogCheeseStrike, Display, TEXT("CheeseStrikeLoadout: the settings' again; choose among %s, cheese or smoke, and a hero"), *Offered);
 			return;
 		}
-		if (!Choice->Choose(FName(*Args[0]), World))
+		for (const FString& Word : Args)
 		{
-			UE_LOG(LogCheeseStrike, Warning, TEXT("CheeseStrikeLoadout: no primary called %s; choose one of %s"), *Args[0], *CheeseStrikeArsenal::ListIds(EWeaponSlot::Primary));
-			return;
+			if (!Choice->Take(Word))
+			{
+				UE_LOG(LogCheeseStrike, Warning, TEXT("CheeseStrikeLoadout: \"%s\" names no primary offered (%s), grenade (cheese, smoke) or hero"), *Word, *Offered);
+			}
 		}
-		UE_LOG(LogCheeseStrike, Display, TEXT("CheeseStrikeLoadout: the %s, from the next time you come in"), *Choice->GetPrimary().ToString());
+		UE_LOG(LogCheeseStrike, Display, TEXT("CheeseStrikeLoadout: %s"), *Choice->Describe());
 	}
 
 #if !UE_BUILD_SHIPPING
@@ -841,6 +875,6 @@ namespace
 
 	FAutoConsoleCommandWithWorldAndArgs LoadoutCommand(
 		TEXT("CheeseStrikeLoadout"),
-		TEXT("CheeseStrikeLoadout <weapon>: the primary to carry from the next time you come in (blaster, carbine, grater, munster, shotgun, roquefort)."),
+		TEXT("CheeseStrikeLoadout <words>: the loadout in place of the settings' (a primary: carbine, blaster, munster; a grenade: cheese, smoke; a hero), taken in the lobby or a count-in; none for the settings' again."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ChooseLoadout));
 }

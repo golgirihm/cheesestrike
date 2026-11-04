@@ -28,6 +28,49 @@ namespace CheeseStrikeGrenades
 	/** How the feed and the death screen say someone died by their own: "blew themself up". */
 	extern const TCHAR* const OwnWords;
 
+	/**
+	 * The kinds of grenade a player may carry (chosen in the loadout, Rules/CheeseStrikeLoadout.h): the cheese grenade,
+	 * which bursts and harms, and the Smoked Gouda, which smokes: thrown, flown and bounced alike, its fuse shorter, and
+	 * at its end no harm but a cloud of smoke (ACheeseStrikeSmokeCloud) that hides whoever is behind it from bots' eyes
+	 * and the HUD's name tags for a while, though not from the Unmanned Aerial Cheese, and stops no shot.
+	 */
+	enum class EGrenadeKind : uint8
+	{
+		Cheese,
+		Smoke,
+	};
+	constexpr int32 NumKinds = 2;
+	/** What each is called ("Cheese Grenade", "Smoked Gouda"), and the word it is kept and picked by ("cheese", "smoke"). */
+	const TCHAR* NameOf(EGrenadeKind Kind);
+	const TCHAR* KeyOf(EGrenadeKind Kind);
+	/** The kind `Key` names (its word or its name, either case), or none. */
+	TOptional<EGrenadeKind> KindFromKey(const FString& Key);
+	/** A kind as replicated (a byte): any other number is the cheese grenade. */
+	EGrenadeKind KindAt(int32 Index);
+	/** Seconds from leaving the hand to going off, for `Kind`. */
+	float FuseOf(EGrenadeKind Kind);
+	/** Whether `Kind`'s burst harms anyone: only the cheese grenade's does. */
+	bool Harms(EGrenadeKind Kind);
+
+	/** The Smoked Gouda's fuse: shorter than the cheese grenade's, so that the smoke comes where it was thrown. */
+	constexpr float SmokeFuse = 1.5f;
+	/** Its cloud: how long it grows for, how wide it gets (cm across), how long it lasts, and how long it thins for at its end. */
+	constexpr float CloudGrowSeconds = 1.0f;
+	constexpr float CloudAcross = 500.0f;
+	constexpr float CloudLife = 12.0f;
+	constexpr float CloudThinSeconds = 3.0f;
+	/** How many mist cards swirl in it (between 80 and 150), and how far up its middle sits over where it burst (cm). */
+	constexpr int32 CloudCards = 120;
+	constexpr float CloudMiddleUp = 110.0f;
+	/** The sphere inside it that blocks sight (bots' eyes, name tags): a little inside the cards, which thin at the edge. */
+	constexpr float CloudSightRadius = 190.0f;
+	/** How wide the cloud is `Age` seconds after it burst (its radius, cm): growing to its full size over CloudGrowSeconds, easing, and nothing past its life. */
+	float CloudRadiusAt(float Age);
+	/** How thick it is then (0 to 1): whole until its last CloudThinSeconds, then thinning to nothing. */
+	float CloudOpacityAt(float Age);
+	/** Whether it still blocks sight at `Age`: while it is at least half as thick as it was. */
+	bool CloudBlocksSightAt(float Age);
+
 	/** Grenades a player comes in with, and the most carried (the design's two). */
 	constexpr int32 SpawnCount = 2;
 	constexpr int32 MostCarried = 2;

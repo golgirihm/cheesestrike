@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "CheeseStrikeGrenadeRules.h"
 #include "CheeseStrikeGrenade.generated.h"
 
 class ACheeseStrikeCharacter;
@@ -29,6 +30,12 @@ class UStaticMeshComponent;
  * (a wall between them saves them), falling off with distance
  * (CheeseStrikeGrenades::DamageAt), as the thrower's kill, by the match's
  * rules for who may hurt whom; its thrower too, as their own doing.
+ *
+ * The Smoked Gouda (CheeseStrikeGrenades::EGrenadeKind::Smoke) is the same
+ * round in a dark smoked rind, thrown, flown and bounced alike, with a
+ * shorter fuse; at its end it harms nobody and leaves a cloud of smoke
+ * where it lies (ACheeseStrikeSmokeCloud, spawned by the server), with a
+ * puff rather than a flash.
  */
 UCLASS(NotPlaceable)
 class CHEESESTRIKE_API ACheeseStrikeGrenade : public AActor
@@ -38,8 +45,16 @@ class CHEESESTRIKE_API ACheeseStrikeGrenade : public AActor
 public:
 	ACheeseStrikeGrenade();
 
-	/** Server only, as it is spawned: thrown by `Thrower` (whose player has the kill) at `Velocity`. */
-	void Launch(ACheeseStrikeCharacter* Thrower, const FVector& Velocity);
+	/** Server only, as it is spawned: thrown by `Thrower` (whose player has the kill) at `Velocity`, a round of `Kind`. */
+	void Launch(ACheeseStrikeCharacter* Thrower, const FVector& Velocity, CheeseStrikeGrenades::EGrenadeKind Kind = CheeseStrikeGrenades::EGrenadeKind::Cheese);
+	/** The kind of round this is. */
+	CheeseStrikeGrenades::EGrenadeKind GetKind() const { return CheeseStrikeGrenades::KindAt(Kind); }
+	/**
+	 * Dresses `Round` as a grenade of `Kind`: the frag's model (tools/art/weapon_models.py) in its cheese, or its dark
+	 * smoked rind, and steel (tools/art/weapon_materials.py), loaded by path now so that the scripts can rebuild them;
+	 * false, and nothing changed, without the model. The rounds in hand (UCheeseStrikeGrenades) wear the same.
+	 */
+	static bool DressRound(UStaticMeshComponent* Round, CheeseStrikeGrenades::EGrenadeKind Kind);
 
 	/** The server's time it bursts. */
 	float GetBurstsAt() const { return BurstsAt; }
@@ -92,6 +107,11 @@ protected:
 	/** The server's time it bursts. */
 	UPROPERTY(Replicated)
 	float BurstsAt = 0.0f;
+	/** CheeseStrikeGrenades::EGrenadeKind, as thrown. */
+	UPROPERTY(Replicated)
+	uint8 Kind = 0;
+	/** The kind the round was last dressed as, so that one that arrives before its kind is dressed again. */
+	uint8 DressedKind = 0;
 	bool bBurst = false;
 	float BurstShownAt = -1.0f;
 	TWeakObjectPtr<ACheeseStrikePlayerState> Thrower;

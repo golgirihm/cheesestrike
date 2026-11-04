@@ -11,18 +11,13 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/CheeseStrikeAnimInstance.h"
 #include "Animation/CheeseStrikeBodies.h"
+#include "Rules/CheeseStrikeLoadout.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeWeaponLooks.h"
 
 namespace
 {
-	/** The weapon the figure holds: the Cheddar Blaster, as its look has it. */
-	const FWeaponLook& FigureWeapon()
-	{
-		return CheeseStrikeWeaponLooks::For(CheeseStrikeWeapons::Blaster().Id);
-	}
-
 	TAutoConsoleVariable<float> CVarFigureTurn(TEXT("CheeseStrike.FigureTurn"), 1.0f,
 		TEXT("How fast the front end's figure turns, as a share of its usual rate: 0 holds it still, its animation paused too, for comparing screenshots of it (tools/play/hero_switch.txt)."));
 }
@@ -66,8 +61,9 @@ ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
 	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 
-	// The Cheddar Blaster, as a character holds it: its model and materials are loaded by path as the figure begins
-	// (ACheeseStrikeWeapon::DressModel), as a weapon's are, never in a constructor.
+	// The loadout's primary (the Colby Carbine to begin with), as a character holds it: its model and materials are
+	// loaded by path as the figure begins (ACheeseStrikeWeapon::DressModel), as a weapon's are, never in a constructor.
+	Primary = CheeseStrikeLoadout::DefaultPrimary();
 	Weapon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Weapon"));
 	Weapon->SetupAttachment(Body);
 	Weapon->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -77,7 +73,7 @@ void ACheeseStrikeMenuFigure::BeginPlay()
 {
 	Super::BeginPlay();
 	BegunAt = FPlatformTime::Seconds();
-	ACheeseStrikeWeapon::DressModel(Weapon, FigureWeapon());
+	ACheeseStrikeWeapon::DressModel(Weapon, CheeseStrikeWeaponLooks::For(Primary));
 	ArmHero();
 	KeepTexturesResident(true);
 	WarmUpHeroes();
@@ -134,7 +130,22 @@ void ACheeseStrikeMenuFigure::ArmHero()
 	}
 	ACheeseStrikeWeapon::HideBuiltInWeapons(Body);
 	// In the hand as the game holds it, at this hero's grip.
-	ACheeseStrikeWeapon::PutInHand(Weapon, Body, FigureWeapon());
+	ACheeseStrikeWeapon::PutInHand(Weapon, Body, CheeseStrikeWeaponLooks::For(Primary));
+}
+
+void ACheeseStrikeMenuFigure::ShowPrimary(FName Id)
+{
+	if (Id == Primary || Id.IsNone())
+	{
+		return;
+	}
+	Primary = Id;
+	if (HasActorBegunPlay())
+	{
+		const FWeaponLook& Look = CheeseStrikeWeaponLooks::For(Primary);
+		ACheeseStrikeWeapon::DressModel(Weapon, Look);
+		ACheeseStrikeWeapon::PutInHand(Weapon, Body, Look);
+	}
 }
 
 void ACheeseStrikeMenuFigure::ShowHero(int32 Hero)

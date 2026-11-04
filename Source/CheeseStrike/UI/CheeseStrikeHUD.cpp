@@ -376,8 +376,10 @@ void ACheeseStrikeHUD::DrawHUD()
 {
 	Super::DrawHUD();
 	const ACheeseStrikePlayerController* Controller = Cast<ACheeseStrikePlayerController>(GetOwningPlayerController());
-	// Nothing under the front end, the lobby and their pages: only in a match, paused or not.
-	if (Canvas == nullptr || Controller == nullptr || (Controller->GetMenuPage() != EMenuPage::None && Controller->GetMenuPage() != EMenuPage::Pause))
+	// Nothing under the front end, the lobby and their pages: only in a match, paused or not, or under the loadout page a
+	// count-in puts up (its count shows through).
+	const EMenuPage Page = Controller != nullptr ? Controller->GetMenuPage() : EMenuPage::None;
+	if (Canvas == nullptr || Controller == nullptr || (Page != EMenuPage::None && Page != EMenuPage::Pause && !(Page == EMenuPage::Loadout && Controller->IsLoadoutOffered())))
 	{
 		return;
 	}
@@ -886,9 +888,10 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 	{
 		DrawWeaponIcon(Shapes, Stats.Slot, IconAt, IconSize, IconColour);
 	}
-	// The grenades carried, left of the weapon: a yellow cheese frag each, and the key that throws one over them.
+	// The grenades carried, left of the weapon: a yellow cheese frag each (or a dark smoked wheel, the Smoked Gouda's), and the key that throws one over them.
 	const UCheeseStrikeGrenades* Grenades = Character->GetGrenades();
 	const int32 GrenadeCount = Grenades != nullptr ? Grenades->GetCount() : 0;
+	const CheeseStrikeGrenades::EGrenadeKind GrenadeKind = Grenades != nullptr ? Grenades->GetKind() : CheeseStrikeGrenades::EGrenadeKind::Cheese;
 	const float GrenadeRadius = 8.0f * U;
 	const float GrenadeStep = GrenadeRadius * 2.0f + 5.0f * U;
 	const float GrenadesRight = IconAt.X - 14.0f * U;
@@ -896,7 +899,7 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 	for (int32 Index = 0; Index < GrenadeCount; ++Index)
 	{
 		const FVector2D Middle(GrenadesRight - GrenadeRadius - Index * GrenadeStep, GrenadeY);
-		CheeseStrikeGrenadeHUD::DrawIcon(Shapes, Middle, GrenadeRadius);
+		CheeseStrikeGrenadeHUD::DrawIcon(Shapes, Middle, GrenadeRadius, GrenadeKind);
 	}
 	Shapes.Draw(Canvas);
 	if (bPicture)

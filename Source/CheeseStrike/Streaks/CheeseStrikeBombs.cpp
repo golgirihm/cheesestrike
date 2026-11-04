@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeBombs.h"
+#include "Weapons/CheeseStrikeSmokeCloud.h"
 #include "Components/DecalComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -309,6 +310,8 @@ void ACheeseStrikeBombs::Burst(const FCheeseStrikeDrop& Drop)
 			Near.Add(*It);
 		}
 	}
+	// Smoke saves nobody from a wheel's burst.
+	ACheeseStrikeSmokeCloud::IgnoreClouds(Params, World);
 	// The burst is a little above where it landed, so that the ground itself hides nobody.
 	const FVector From = FVector(Drop.Impact) + FVector(0.0f, 0.0f, 40.0f);
 	for (ACheeseStrikeCharacter* Victim : Near)

@@ -48,6 +48,7 @@
 #include "Movement/CheeseStrikeMovementComponent.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "CheeseStrikeProjectile.h"
+#include "CheeseStrikeSmokeCloud.h"
 
 /** With this on, every shot heard here is written to the log with how loud and how dull it is heard. */
 static TAutoConsoleVariable<int32> CVarTraceGunfire(TEXT("CheeseStrike.TraceGunfire"), 0, TEXT("Log every shot heard: how far off, at what volume and how dull."));
@@ -1407,6 +1408,8 @@ ACheeseStrikeWeapon::FRayHit ACheeseStrikeWeapon::TraceRay(const FVector& Origin
 		Players.Add(*It);
 		Params.AddIgnoredActor(*It);
 	}
+	// Smoke stops no shot.
+	ACheeseStrikeSmokeCloud::IgnoreClouds(Params, World);
 	const FVector End = Origin + Direction * Range;
 	Hit.bWall = World->LineTraceSingleByChannel(Hit.Wall, Origin, End, ECC_Visibility, Params);
 	Hit.Distance = Hit.bWall ? Hit.Wall.Distance : Range;
@@ -1614,6 +1617,7 @@ void ACheeseStrikeWeapon::LaunchProjectiles(const FVector& Origin, const FVector
 		{
 			Params.AddIgnoredActor(*It);
 		}
+		ACheeseStrikeSmokeCloud::IgnoreClouds(Params, World);
 		for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
 		{
 			ACheeseStrikeCharacter* Other = *It;
@@ -1657,6 +1661,7 @@ void ACheeseStrikeWeapon::StrikeArc(const FVector& Origin, const FVector& Aim, f
 		Players.Add(*It);
 		Params.AddIgnoredActor(*It);
 	}
+	ACheeseStrikeSmokeCloud::IgnoreClouds(Params, World);
 	int32 Struck = 0;
 	for (ACheeseStrikeCharacter* Player : Players)
 	{

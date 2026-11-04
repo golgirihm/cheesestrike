@@ -30,10 +30,6 @@ namespace
 	/** A grenade held, with no arms to hold it in: low on the right of its player's view (cm from the eye: ahead, right, up). */
 	const FVector GrenadeInViewAt(40.0f, 14.0f, -10.0f);
 	const FRotator GrenadeInViewTurn(-15.0f, 160.0f, -10.0f);
-	/** The grenade (tools/art/weapon_models.py) and its materials (tools/art/weapon_materials.py), as ACheeseStrikeGrenade has them. */
-	const TCHAR* ThrowRoundPath = TEXT("/Game/CheeseStrike/Weapons/Grenade/SM_FragGrenade.SM_FragGrenade");
-	const TCHAR* const ThrowMaterialPaths[] = {TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeCheese.MI_GrenadeCheese"),
-		TEXT("/Game/CheeseStrike/Weapons/Materials/MI_GrenadeMetal.MI_GrenadeMetal")};
 	/** The arc shown while a throw is held: its glow, its colour (the cheese's), how big its dots are and the mark where it comes down (cm across). */
 	const TCHAR* PreviewGlowPath = TEXT("/Game/CheeseStrike/Materials/M_Glow.M_Glow");
 	const FLinearColor PreviewColour(1.0f, 0.78f, 0.2f);
@@ -52,6 +48,7 @@ void UCheeseStrikeGrenades::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(UCheeseStrikeGrenades, Count, COND_OwnerOnly);
+	DOREPLIFETIME(UCheeseStrikeGrenades, Kind);
 	DOREPLIFETIME_CONDITION(UCheeseStrikeGrenades, bHoldShown, COND_SkipOwner);
 }
 
@@ -72,6 +69,17 @@ void UCheeseStrikeGrenades::SetCount(int32 InCount)
 	{
 		Count = FMath::Clamp(InCount, 0, CheeseStrikeGrenades::MostCarried);
 	}
+}
+
+void UCheeseStrikeGrenades::SetKind(CheeseStrikeGrenades::EGrenadeKind InKind)
+{
+	if (GetOwner() == nullptr || !GetOwner()->HasAuthority() || static_cast<uint8>(InKind) == Kind)
+	{
+		return;
+	}
+	Kind = static_cast<uint8>(InKind);
+	// A fresh count of the new kind: the others are no longer carried.
+	Count = CheeseStrikeGrenades::SpawnCount;
 }
 
 bool UCheeseStrikeGrenades::IsThrowing() const
@@ -285,21 +293,18 @@ bool UCheeseStrikeGrenades::InPalm(const USkeletalMeshComponent* Body, FTransfor
 UStaticMeshComponent* UCheeseStrikeGrenades::MakeInHand(USkeletalMeshComponent* Body, bool bFirstPerson)
 {
 	ACheeseStrikeCharacter* Character = Holder();
-	UStaticMesh* Round = LoadObject<UStaticMesh>(nullptr, ThrowRoundPath);
-	if (Character == nullptr || Round == nullptr)
+	if (Character == nullptr)
 	{
 		return nullptr;
 	}
-	// The frag, in its cheese and steel.
+	// The frag, in its cheese (or its smoked rind) and steel, as ACheeseStrikeGrenade wears it.
 	UStaticMeshComponent* Mesh = NewObject<UStaticMeshComponent>(GetOwner());
-	Mesh->SetStaticMesh(Round);
-	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(ThrowMaterialPaths); ++Slot)
+	if (!ACheeseStrikeGrenade::DressRound(Mesh, GetKind()))
 	{
-		if (UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, ThrowMaterialPaths[Slot]))
-		{
-			Mesh->SetMaterial(Slot, Material);
-		}
+		Mesh->MarkAsGarbage();
+		return nullptr;
 	}
+	ShownKind = Kind;
 	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Mesh->SetCastShadow(!bFirstPerson);
 	Mesh->SetFirstPersonPrimitiveType(bFirstPerson ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
@@ -336,6 +341,18 @@ void UCheeseStrikeGrenades::UpdateInHand()
 	}
 	// Up in the right hand once the weapon is down, and through a throw until it goes.
 	const bool bShow = Character->IsAlive() && ((IsHoldShown() && Switch >= 1.0f) || GetWorld()->GetTimeSeconds() < InHandUntil);
+	// Another kind come (the loadout changed): the rounds in hand are dressed afresh.
+	if (ShownKind != Kind)
+	{
+		for (UStaticMeshComponent* Mesh : {HeldInView.Get(), InHandThird.Get()})
+		{
+			if (Mesh != nullptr)
+			{
+				ACheeseStrikeGrenade::DressRound(Mesh, GetKind());
+			}
+		}
+		ShownKind = Kind;
+	}
 	const auto Show = [this, bShow](TObjectPtr<UStaticMeshComponent>& Mesh, USkeletalMeshComponent* Body, bool bFirstPerson)
 	{
 		if (bShow && Mesh == nullptr)
@@ -364,7 +381,7 @@ bool UCheeseStrikeGrenades::PredictPath(const FVector& Aim, FPredictProjectilePa
 	}
 	// As ACheeseStrikeGrenade flies: from the hand, at its speed, under its gravity, its size, off the world and the cheese, through players.
 	const FVector Along = Aim.GetSafeNormal();
-	FPredictProjectilePathParams Path(CheeseStrikeGrenades::CollisionRadius, ReleasePoint(Along), CheeseStrikeGrenades::LaunchVelocity(Along, Character->GetVelocity()), CheeseStrikeGrenades::Fuse);
+	FPredictProjectilePathParams Path(CheeseStrikeGrenades::CollisionRadius, ReleasePoint(Along), CheeseStrikeGrenades::LaunchVelocity(Along, Character->GetVelocity()), CheeseStrikeGrenades::FuseOf(GetKind()));
 	Path.bTraceWithCollision = true;
 	Path.bTraceWithChannel = false;
 	Path.ObjectTypes = {UEngineTypes::ConvertToObjectType(ECC_WorldStatic), UEngineTypes::ConvertToObjectType(ECC_WorldDynamic)};
@@ -519,7 +536,7 @@ void UCheeseStrikeGrenades::Release(FVector Aim)
 	{
 		return;
 	}
-	Grenade->Launch(Character, CheeseStrikeGrenades::LaunchVelocity(Aim, Character->GetVelocity()));
+	Grenade->Launch(Character, CheeseStrikeGrenades::LaunchVelocity(Aim, Character->GetVelocity()), GetKind());
 	UGameplayStatics::FinishSpawningActor(Grenade, At);
 	Thrown.RemoveAll([](const TWeakObjectPtr<ACheeseStrikeGrenade>& Each) { return !Each.IsValid(); });
 	Thrown.Add(Grenade);

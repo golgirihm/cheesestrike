@@ -45,12 +45,16 @@
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
 #include "CheeseStrikePlayerState.h"
 #include "Animation/CheeseStrikeBodies.h"
+#include "Engine/Texture2D.h"
+#include "Rules/CheeseStrikeLoadout.h"
+#include "Weapons/CheeseStrikeArsenal.h"
+#include "Weapons/CheeseStrikeGrenadeRules.h"
 
 namespace CheeseStrikeMenu
 {
-	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling, bool bResultsHeld)
+	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling, bool bResultsHeld, bool bLoadoutOffered)
 	{
-		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options;
+		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout;
 		const EMenuPage FrontEnd = bFrontEndPage ? Chosen : EMenuPage::Main;
 		// Going to the map the host picked: the lobby, saying so. Back to the lobby after the results: the results, held up
 		// until the lobby is there.
@@ -64,21 +68,31 @@ namespace CheeseStrikeMenu
 		}
 		if (bMatchStarted)
 		{
-			// The settings open from the pause menu, the match going on and the player still paused.
-			return bPaused ? (Chosen == EMenuPage::Options ? Chosen : EMenuPage::Pause) : EMenuPage::None;
+			// The settings open from the pause menu, the match going on and the player still paused; the loadout page
+			// while a count-in offers it.
+			if (bPaused)
+			{
+				return Chosen == EMenuPage::Options ? Chosen : EMenuPage::Pause;
+			}
+			return bLoadoutOffered ? EMenuPage::Loadout : EMenuPage::None;
 		}
 		if (bInAMatch)
 		{
-			// The lobby, whatever page the player chose: the settings chosen there (Escape, LobbyMenuKey) are an overlay on
-			// it (SettingsOverLobby), not a page in its place.
+			// The lobby, whatever page the player chose: the settings chosen there (Escape, LobbyMenuKey) and the loadout
+			// (its LOADOUT button) are overlays on it (LobbyOverlay), not pages in its place.
 			return EMenuPage::Lobby;
 		}
 		return FrontEnd;
 	}
 
+	EMenuPage LobbyOverlay(EMenuPage Shown, EMenuPage Chosen)
+	{
+		return Shown == EMenuPage::Lobby && (Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout) ? Chosen : EMenuPage::None;
+	}
+
 	bool SettingsOverLobby(EMenuPage Shown, EMenuPage Chosen)
 	{
-		return Shown == EMenuPage::Lobby && Chosen == EMenuPage::Options;
+		return LobbyOverlay(Shown, Chosen) == EMenuPage::Options;
 	}
 
 	ECountdownTone CountdownTone(int32& Sounded, bool bCounting, float Left, bool bOver)
@@ -127,7 +141,7 @@ namespace CheeseStrikeMenu
 
 	EMenuPage LobbyMenuKey(EMenuPage Chosen)
 	{
-		return Chosen == EMenuPage::Options ? EMenuPage::Main : EMenuPage::Options;
+		return Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout ? EMenuPage::Main : EMenuPage::Options;
 	}
 
 	int32 FocusAfterRedraw(const TArray<FString>& Names, const FString& Name, int32 Index)
@@ -282,6 +296,59 @@ namespace
 		TUniquePtr<FSlateDynamicImageBrush> LobbyTile;
 		TMap<FString, TUniquePtr<FSlateDynamicImageBrush>> MapPictures;
 		TMap<FString, TUniquePtr<FSlateRoundedBoxBrush>> Chips;
+		/** The loadout page's pictures: a hero's portrait and a grenade's icon from files in Content/UI, a weapon's from its HUD icon (the texture rooted, as the brush holds it by itself). */
+		TMap<FString, TUniquePtr<FSlateDynamicImageBrush>> Portraits;
+		TMap<FString, TUniquePtr<FSlateDynamicImageBrush>> GrenadeIcons;
+		TMap<FName, TUniquePtr<FSlateBrush>> WeaponIcons;
+
+		/** A file in Content/UI/`Folder`, `Size` across in Slate units, loaded the first time it is asked for; null without the file. */
+		static const FSlateBrush* FileBrush(TMap<FString, TUniquePtr<FSlateDynamicImageBrush>>& Kept, const TCHAR* Folder, const FString& File, const FVector2D& Size)
+		{
+			if (!Kept.Contains(File))
+			{
+				const FString Path = FPaths::ProjectContentDir() / TEXT("UI") / Folder / File;
+				TUniquePtr<FSlateDynamicImageBrush> Picture;
+				if (FPaths::FileExists(Path))
+				{
+					Picture = MakeUnique<FSlateDynamicImageBrush>(FName(*Path), Size);
+					Picture->DrawAs = ESlateBrushDrawType::RoundedBox;
+					Picture->OutlineSettings = FSlateBrushOutlineSettings(8.0f);
+				}
+				Kept.Add(File, MoveTemp(Picture));
+			}
+			return Kept[File].Get();
+		}
+
+		const FSlateBrush* Portrait(const FString& HeroKey)
+		{
+			return FileBrush(Portraits, TEXT("Heroes"), HeroKey.ToLower() + TEXT(".png"), FVector2D(CheeseStrikeMenu::PortraitSize, CheeseStrikeMenu::PortraitSize));
+		}
+
+		const FSlateBrush* GrenadeIcon(const FString& KindKey)
+		{
+			return FileBrush(GrenadeIcons, TEXT("Loadout"), FString::Printf(TEXT("grenade_%s.png"), *KindKey), FVector2D(CheeseStrikeMenu::GrenadeIconSize, CheeseStrikeMenu::GrenadeIconSize));
+		}
+
+		/** A weapon's HUD icon (tools/art/weapon_icons.py, /Game/CheeseStrike/Weapons/Icons), WeaponIconWidth across; null without it. */
+		const FSlateBrush* WeaponIcon(FName Id)
+		{
+			if (!WeaponIcons.Contains(Id))
+			{
+				const FString Name = FString::Printf(TEXT("T_Icon_%s"), *Id.ToString());
+				UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("/Game/CheeseStrike/Weapons/Icons/%s.%s"), *Name, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
+				TUniquePtr<FSlateBrush> Brush;
+				if (Texture != nullptr && Texture->GetSizeX() > 0)
+				{
+					Texture->AddToRoot();
+					Brush = MakeUnique<FSlateBrush>();
+					Brush->SetResourceObject(Texture);
+					Brush->ImageSize = FVector2D(CheeseStrikeMenu::WeaponIconWidth, CheeseStrikeMenu::WeaponIconWidth * Texture->GetSizeY() / Texture->GetSizeX());
+					Brush->DrawAs = ESlateBrushDrawType::Image;
+				}
+				WeaponIcons.Add(Id, MoveTemp(Brush));
+			}
+			return WeaponIcons[Id].Get();
+		}
 
 		/** A map's picture, from Content/UI/Maps, loaded the first time it is asked for. */
 		const FSlateBrush* MapPicture(const FString& File)
@@ -773,7 +840,7 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 			// pause menu, and takes no press; the settings in the pages' panel on the left, as on the front end.
 			+ SOverlay::Slot().HAlign(HAlign_Fill).VAlign(VAlign_Fill)
 			[
-				SAssignNew(LobbySettings, SBackgroundBlur)
+				SAssignNew(LobbyOverlay, SBackgroundBlur)
 				.BlurStrength(CheeseStrikeMenu::PauseBlur)
 				.Padding(0.0f)
 				.Visibility(EVisibility::Collapsed)
@@ -786,7 +853,7 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 						.BorderBackgroundColor(PanelColour)
 						.Padding(FMargin(48.0f, 64.0f))
 						[
-							SAssignNew(LobbySettingsContent, SBox).WidthOverride(900.0f).VAlign(VAlign_Fill)
+							SAssignNew(LobbyOverlayContent, SBox).WidthOverride(900.0f).VAlign(VAlign_Fill)
 						]
 					]
 				]
@@ -826,11 +893,6 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 			[
 				SAssignNew(FriendsContent, SBox)
 			]
-		]
-		// The hero to play, under the figure on the front end's main page.
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0.0f, 0.0f, 0.0f, 22.0f))
-		[
-			SAssignNew(HeroBox, SBox)
 		]
 		// The question before closing the host's lobby or quitting: over everything, and it takes every press.
 		// Modal: a layer over the whole screen that blurs and darkens all that is behind it, other UI too, and is hit
@@ -875,32 +937,34 @@ void SCheeseStrikeMenu::Show(EMenuPage InPage)
 	ShownLobbyKey.Reset();
 	ShownLobbyStatus = INDEX_NONE;
 	ShownPageKey.Reset();
-	ShownLobbySettingsKey.Reset();
+	ShownLobbyOverlayKey.Reset();
 	Refresh();
 }
 
 void SCheeseStrikeMenu::Refresh()
 {
 	MenuFocusRingsShown = CheeseStrikeInput::DeviceOf(Controller.Get()) != CheeseStrikeInput::EDevice::Mouse;
-	// The settings over the lobby: shown while the player has them chosen there, the lobby's own items out of reach under them.
-	const bool bSettingsOver = Controller.IsValid() && CheeseStrikeMenu::SettingsOverLobby(Page, Controller->GetChosenPage());
-	if (bSettingsOver != bLobbySettingsShown)
+	// The settings or the loadout over the lobby: shown while the player has one chosen there, the lobby's own items out of reach under it.
+	const EMenuPage OverlayPage = Controller.IsValid() ? CheeseStrikeMenu::LobbyOverlay(Page, Controller->GetChosenPage()) : EMenuPage::None;
+	const bool bOverlay = OverlayPage != EMenuPage::None;
+	LobbyOverlayPage = OverlayPage;
+	if (bOverlay != bLobbyOverlayShown)
 	{
-		bLobbySettingsShown = bSettingsOver;
-		if (bSettingsOver)
+		bLobbyOverlayShown = bOverlay;
+		if (bOverlay)
 		{
 			// Their first item takes the focus; the lobby's has it back as they go.
-			FocusBeforeLobbySettings = FocusName;
+			FocusBeforeLobbyOverlay = FocusName;
 			FocusName.Reset();
 		}
 		else
 		{
-			FocusName = FocusBeforeLobbySettings;
-			ShownLobbySettingsKey.Reset();
-			LobbySettingsFocusables.Reset();
-			if (LobbySettingsContent.IsValid())
+			FocusName = FocusBeforeLobbyOverlay;
+			ShownLobbyOverlayKey.Reset();
+			LobbyOverlayFocusables.Reset();
+			if (LobbyOverlayContent.IsValid())
 			{
-				LobbySettingsContent->SetContent(SNullWidget::NullWidget);
+				LobbyOverlayContent->SetContent(SNullWidget::NullWidget);
 			}
 		}
 		FocusIndex = 0;
@@ -910,7 +974,7 @@ void SCheeseStrikeMenu::Refresh()
 	{
 		UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Controller.Get());
 		// (Not under the settings over the lobby, as not on the settings page.)
-		const bool bPanel = (Page == EMenuPage::Lobby && !bSettingsOver) || Page == EMenuPage::Find || Page == EMenuPage::Main;
+		const bool bPanel = (Page == EMenuPage::Lobby && !bOverlay) || Page == EMenuPage::Find || Page == EMenuPage::Main;
 		// Open on the find page, and on the front end's main page and in the lobby while hovered.
 		const bool bOpen = bPanel && (Page == EMenuPage::Find || FriendsBox->IsHovered() || CVarFriendsOpen.GetValueOnGameThread() != 0);
 		FriendsBox->SetVisibility(bPanel ? EVisibility::Visible : EVisibility::Collapsed);
@@ -998,7 +1062,7 @@ void SCheeseStrikeMenu::Refresh()
 		}
 		// While the question is up nothing behind it can take a press, a click or the focus: the pad and the keys stay in the dialog.
 		const bool bBehind = Asking == EMenuAsk::None;
-		for (const TSharedPtr<SWidget>& Each : TArray<TSharedPtr<SWidget>>{ Panel, FriendsBox, Lobby, HeroBox })
+		for (const TSharedPtr<SWidget>& Each : TArray<TSharedPtr<SWidget>>{ Panel, FriendsBox, Lobby })
 		{
 			if (Each.IsValid() && Each->IsEnabled() != bBehind)
 			{
@@ -1008,12 +1072,12 @@ void SCheeseStrikeMenu::Refresh()
 	}
 	const bool bLobby = Page == EMenuPage::Lobby;
 	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
-	// The credits and the options are wide: a wider panel, and the game's name out of their way.
-	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options;
+	// The credits, the options and the loadout are wide: a wider panel, and the game's name out of their way.
+	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options || Page == EMenuPage::Loadout;
 	if (Content.IsValid())
 	{
 		Content->SetWidthOverride(Page == EMenuPage::Options ? 900.0f : (bWide ? 640.0f : 400.0f));
-		Content->SetVAlign(bWide ? VAlign_Fill : VAlign_Center);
+		Content->SetVAlign(bWide && Page != EMenuPage::Loadout ? VAlign_Fill : VAlign_Center);
 	}
 	if (Lobby.IsValid())
 	{
@@ -1028,10 +1092,6 @@ void SCheeseStrikeMenu::Refresh()
 	if (Masthead.IsValid())
 	{
 		Masthead->SetVisibility(bFrontEnd ? EVisibility::HitTestInvisible : EVisibility::Collapsed);
-	}
-	if (HeroBox.IsValid())
-	{
-		HeroBox->SetVisibility(Page == EMenuPage::Main ? EVisibility::Visible : EVisibility::Collapsed);
 	}
 	if (Panel.IsValid())
 	{
@@ -1059,26 +1119,27 @@ void SCheeseStrikeMenu::Refresh()
 		}
 		// The settings over it: drawn as they come (fading in, as a page does) and again as their tab or what they show
 		// changes; never the lobby for them. Under them the lobby takes no press, its items no focus.
-		if (LobbySettings.IsValid())
+		if (LobbyOverlay.IsValid())
 		{
-			LobbySettings->SetVisibility(bSettingsOver ? EVisibility::Visible : EVisibility::Collapsed);
+			LobbyOverlay->SetVisibility(bOverlay ? EVisibility::Visible : EVisibility::Collapsed);
 		}
-		if (LobbyContent->IsEnabled() == bSettingsOver)
+		if (LobbyContent->IsEnabled() == bOverlay)
 		{
-			LobbyContent->SetEnabled(!bSettingsOver);
+			LobbyContent->SetEnabled(!bOverlay);
 		}
-		if (bSettingsOver && LobbySettingsContent.IsValid())
+		if (bOverlay && LobbyOverlayContent.IsValid())
 		{
-			const FString SettingsKey = OptionsKey();
-			if (SettingsKey != ShownLobbySettingsKey)
+			const FString OverlayKey = FString::FromInt(static_cast<int32>(OverlayPage)) + TEXT("|") + (OverlayPage == EMenuPage::Options ? OptionsKey() : LoadoutKey());
+			if (OverlayKey != ShownLobbyOverlayKey)
 			{
-				const bool bFade = ShownLobbySettingsKey.IsEmpty();
-				ShownLobbySettingsKey = SettingsKey;
-				LobbySettingsFocusables.Reset();
+				const bool bFade = ShownLobbyOverlayKey.IsEmpty() || ShownLobbyOverlayKey[0] != OverlayKey[0];
+				ShownLobbyOverlayKey = OverlayKey;
+				LobbyOverlayFocusables.Reset();
 				bFocusPending = true;
-				bBuildingLobbySettings = true;
-				LobbySettingsContent->SetContent(bFade ? MenuFadeIn(MakeOptions()) : MakeOptions());
-				bBuildingLobbySettings = false;
+				bBuildingLobbyOverlay = true;
+				const TSharedRef<SWidget> Made = OverlayPage == EMenuPage::Options ? MakeOptions() : MakeLoadout();
+				LobbyOverlayContent->SetContent(bFade ? MenuFadeIn(Made) : Made);
+				bBuildingLobbyOverlay = false;
 			}
 		}
 	}
@@ -1096,11 +1157,6 @@ void SCheeseStrikeMenu::Refresh()
 			const bool bFade = BuiltPage != Page;
 			BuiltPage = Page;
 			Content->SetContent(bFade ? MenuFadeIn(MakePage()) : MakePage());
-			// Its items after the page's, so that the page's first item takes the focus first.
-			if (HeroBox.IsValid())
-			{
-				HeroBox->SetContent(Page == EMenuPage::Main ? MakeHeroPicker() : SNullWidget::NullWidget);
-			}
 		}
 	}
 	KeepFocus();
@@ -1116,7 +1172,7 @@ int32 SCheeseStrikeMenu::UserIndex() const
 TSharedRef<SWidget> SCheeseStrikeMenu::Focusable(const FString& Name, TSharedRef<SWidget> Widget)
 {
 	FString Unique = Name;
-	TArray<FFocusable>& Items = bBuildingDialog ? DialogFocusables : (bBuildingLobbySettings ? LobbySettingsFocusables : Focusables);
+	TArray<FFocusable>& Items = bBuildingDialog ? DialogFocusables : (bBuildingLobbyOverlay ? LobbyOverlayFocusables : Focusables);
 	for (int32 Number = 2; Items.ContainsByPredicate([&Unique](const FFocusable& Each) { return Each.Name == Unique; }); ++Number)
 	{
 		Unique = FString::Printf(TEXT("%s #%d"), *Name, Number);
@@ -1250,7 +1306,7 @@ FNavigationReply SCheeseStrikeMenu::OnNavigation(const FGeometry& MyGeometry, co
 {
 	const EUINavigation Way = InNavigationEvent.GetNavigationType();
 	// The credits and the settings' controls (on their page, or over the lobby) have nothing to focus but Back (and the tabs): up and down scroll them.
-	const bool bOptions = Page == EMenuPage::Options || bLobbySettingsShown;
+	const bool bOptions = Page == EMenuPage::Options || bLobbyOverlayShown;
 	if ((Page == EMenuPage::Credits || (bOptions && OptionsTab == EOptionsTab::Controls)) && (Way == EUINavigation::Up || Way == EUINavigation::Down))
 	{
 		if (const TSharedPtr<SScrollBox> Scroll = CreditsScroll.Pin())
@@ -1319,6 +1375,12 @@ FReply SCheeseStrikeMenu::OnPreviewKeyDown(const FGeometry& MyGeometry, const FK
 	// would press a button. Only Enter, a click or a gamepad's A press one here (the match's own Space is the game's).
 	if (InKeyEvent.GetKey() == EKeys::SpaceBar)
 	{
+		return FReply::Handled();
+	}
+	// Enter on the loadout page a count-in put up is OK: it goes, whatever item has the focus.
+	if (InKeyEvent.GetKey() == EKeys::Enter && Page == EMenuPage::Loadout && Controller.IsValid() && Controller->IsLoadoutOffered())
+	{
+		Controller->DismissLoadout();
 		return FReply::Handled();
 	}
 	return SCompoundWidget::OnPreviewKeyDown(MyGeometry, InKeyEvent);
@@ -1415,6 +1477,12 @@ FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 		{
 			return FReply::Handled();
 		}
+		// The loadout page a count-in put up goes (the count goes on under it).
+		if (Page == EMenuPage::Loadout && Controller.IsValid() && Controller->IsLoadoutOffered())
+		{
+			Controller->DismissLoadout();
+			return FReply::Handled();
+		}
 		if (Asking != EMenuAsk::None && Key != EKeys::Gamepad_Special_Right)
 		{
 			Asking = EMenuAsk::None;
@@ -1427,7 +1495,7 @@ FReply SCheeseStrikeMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 			return FReply::Handled();
 		}
 		// In the lobby, B has nothing to go back to: Escape and Menu open the settings over it (from which B goes back).
-		if (Page == EMenuPage::Lobby && !bLobbySettingsShown && Key == EKeys::Gamepad_FaceButton_Right)
+		if (Page == EMenuPage::Lobby && !bLobbyOverlayShown && Key == EKeys::Gamepad_FaceButton_Right)
 		{
 			return FReply::Handled();
 		}
@@ -1460,6 +1528,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePage()
 	case EMenuPage::Pause: return MakePause();
 	case EMenuPage::Credits: return MakeCredits();
 	case EMenuPage::Options: return MakeOptions();
+	case EMenuPage::Loadout: return MakeLoadout();
 	default: return SNullWidget::NullWidget;
 	}
 }
@@ -1477,7 +1546,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeTitle(const FString& Text)
 float SCheeseStrikeMenu::WrapWidth() const
 {
 	// The same widths as the content box is given in Refresh (the settings over the lobby have the settings page's).
-	return (Page == EMenuPage::Options || bBuildingLobbySettings ? 900.0f : (Page == EMenuPage::Credits ? 640.0f : 400.0f)) - 24.0f;
+	return (Page == EMenuPage::Options || bBuildingLobbyOverlay ? 900.0f : (Page == EMenuPage::Credits || Page == EMenuPage::Loadout ? 640.0f : 400.0f)) - 24.0f;
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim, bool bWrap, float WrapAt)
@@ -1718,6 +1787,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 		[
 			SNew(SVerticalBox).IsEnabled(!bHosting)
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("PRACTICE"), [Player]() { if (Player.IsValid()) Player->PracticeFromMenu(); }) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("LOADOUT"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Loadout); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
@@ -1725,42 +1795,159 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 		];
 }
 
-TSharedRef<SWidget> SCheeseStrikeMenu::MakeHeroPicker()
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeLoadoutChoice(const FString& Name, const FSlateBrush* Picture, const FVector2D& PictureSize, bool bChosen, TFunction<void()> Pick)
 {
-	const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+	// A card: the picture over its name, ringed in cheese (and warmed) when it is the one picked.
+	static const FSlateRoundedBoxBrush ChosenCard(FLinearColor(0.96f, 0.72f, 0.2f, 0.18f), 10.0f, Cheese, 3.0f);
+	static const FSlateRoundedBoxBrush PlainCard(FLinearColor(0.1f, 0.1f, 0.11f, 0.9f), 10.0f, FLinearColor(0.2f, 0.2f, 0.21f, 1.0f), 1.0f);
+	return SNew(SBox).Padding(FMargin(0.0f, 0.0f, 10.0f, 0.0f))
+	[
+		Focusable(Name, SNew(SCheeseStrikeButton)
+		.ButtonStyle(&ButtonStyle(EButtonKind::Quiet))
+		.ContentPadding(FMargin(0.0f))
+		.OnClicked_Lambda([Pick]() { Pick(); return FReply::Handled(); })
+		[
+			SNew(SBorder).BorderImage(bChosen ? &ChosenCard : &PlainCard).Padding(FMargin(8.0f, 8.0f, 8.0f, 6.0f))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				[
+					SNew(SBox).WidthOverride(PictureSize.X).HeightOverride(PictureSize.Y)
+					[
+						Picture != nullptr ? StaticCastSharedRef<SWidget>(SNew(SImage).Image(Picture)) : StaticCastSharedRef<SWidget>(SNew(SBorder).BorderImage(&Looks().ReadOnlyValue))
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, 6.0f, 0.0f, 0.0f))
+				[
+					SNew(STextBlock).Text(FText::FromString(Name)).Font(Font(13, FName("Bold"))).ColorAndOpacity(bChosen ? Cheese : Ink)
+				]
+			]
+		])
+	];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeLoadoutRow(const FString& Label, TSharedRef<SWidget> Choices)
+{
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 10.0f, 0.0f, 6.0f))
+		[
+			SNew(STextBlock).Text(FText::FromString(Label)).Font(Font(15, FName("Bold"))).ColorAndOpacity(Muted)
+		]
+		+ SVerticalBox::Slot().AutoHeight() [ Choices ];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeLoadout()
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
 	if (Settings == nullptr)
 	{
-		return SNullWidget::NullWidget;
+		return MakeLine(TEXT("The settings aren't there to keep a loadout in."), true);
 	}
-	TArray<FString> Names;
+	TWeakObjectPtr<UCheeseStrikeSettings> Kept = Settings;
+	// What is picked: the settings', or what the console said (the controller's wanted loadout, which the figure and the server get).
+	const int32 Hero = Player.IsValid() ? Player->WantedHero() : Settings->GetHero();
+	const FName Primary = CheeseStrikeLoadout::PrimaryOrDefault(Player.IsValid() ? Player->WantedLoadout().Primary : Settings->GetPrimary());
+	const CheeseStrikeGrenades::EGrenadeKind Grenade = Player.IsValid() ? Player->WantedLoadout().Grenade : Settings->GetGrenade();
+	// Each pick is kept at once; the page is drawn again by its key, the figure follows, and the controller sends it on.
+	const auto Keep = [this, Kept]()
+	{
+		if (Kept.IsValid())
+		{
+			Kept->SaveSettings();
+		}
+		Refresh();
+	};
+	TSharedRef<SHorizontalBox> Heroes = SNew(SHorizontalBox);
 	for (int32 Body = 0; Body < CheeseStrikeBodies::All().Num(); ++Body)
 	{
-		Names.Add(FString(CheeseStrikeBodies::HeroKey(Body)).ToUpper());
-	}
-	static const FSlateRoundedBoxBrush HeroPanelBrush(FLinearColor::White, 14.0f);
-	return SNew(SBorder)
-		.BorderImage(&HeroPanelBrush)
-		.BorderBackgroundColor(PanelColour)
-		.Padding(FMargin(18.0f, 10.0f, 12.0f, 10.0f))
+		const FString Key = CheeseStrikeBodies::HeroKey(Body);
+		Heroes->AddSlot().AutoWidth()
 		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 14.0f, 0.0f))
-			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("HERO"))).Font(Font(15, FName("Bold"))).ColorAndOpacity(Muted)
-			]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-			[
-				MakeChoiceButtons(Names, Settings->GetHero(), true, [this](int32 Index)
+			MakeLoadoutChoice(Key.ToUpper(), Looks().Portrait(Key), FVector2D(CheeseStrikeMenu::PortraitSize, CheeseStrikeMenu::PortraitSize), Body == Hero, [Kept, Keep, Body]()
+			{
+				if (Kept.IsValid())
 				{
-					if (UCheeseStrikeSettings* Kept = UCheeseStrikeSettings::Get())
-					{
-						Kept->SetHero(Index);
-						Kept->SaveSettings();
-					}
-					Refresh();
-				})
+					Kept->SetHero(Body);
+				}
+				Keep();
+			})
+		];
+	}
+	TSharedRef<SHorizontalBox> Primaries = SNew(SHorizontalBox);
+	for (const FName& Id : CheeseStrikeLoadout::Primaries())
+	{
+		const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Id);
+		const FSlateBrush* Icon = Looks().WeaponIcon(Id);
+		const float Aspect = Icon != nullptr && Icon->ImageSize.X > 0.0f ? static_cast<float>(Icon->ImageSize.Y / Icon->ImageSize.X) : 0.4f;
+		Primaries->AddSlot().AutoWidth()
+		[
+			MakeLoadoutChoice(Stats != nullptr ? Stats->DisplayName.ToString().ToUpper() : Id.ToString().ToUpper(), Icon, FVector2D(CheeseStrikeMenu::WeaponIconWidth, CheeseStrikeMenu::WeaponIconWidth * Aspect), Id == Primary, [Kept, Keep, Id]()
+			{
+				if (Kept.IsValid())
+				{
+					Kept->SetPrimary(Id);
+				}
+				Keep();
+			})
+		];
+	}
+	TSharedRef<SHorizontalBox> Grenades = SNew(SHorizontalBox);
+	for (int32 Index = 0; Index < CheeseStrikeGrenades::NumKinds; ++Index)
+	{
+		const CheeseStrikeGrenades::EGrenadeKind Kind = CheeseStrikeGrenades::KindAt(Index);
+		Grenades->AddSlot().AutoWidth()
+		[
+			MakeLoadoutChoice(FString(CheeseStrikeGrenades::NameOf(Kind)).ToUpper(), Looks().GrenadeIcon(CheeseStrikeGrenades::KeyOf(Kind)), FVector2D(CheeseStrikeMenu::GrenadeIconSize, CheeseStrikeMenu::GrenadeIconSize), Kind == Grenade, [Kept, Keep, Kind]()
+			{
+				if (Kept.IsValid())
+				{
+					Kept->SetGrenade(Kind);
+				}
+				Keep();
+			})
+		];
+	}
+	// During a count-in the page says the seconds left (the HUD's own glyphs come for the last three), and OK puts it away.
+	const bool bOffered = Player.IsValid() && Player->IsLoadoutOffered();
+	TWeakObjectPtr<const ACheeseStrikeGameState> Match = Player.IsValid() && Player->GetWorld() != nullptr ? Player->GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const auto Count = [Match]()
+	{
+		return FText::FromString(Match.IsValid() ? CheeseStrikeLoadout::CountText(Match->GetRound() > 1, Match->SecondsToGo()) : FString());
+	};
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOADOUT")) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, bOffered ? 8.0f : 0.0f))
+		[
+			bOffered ? StaticCastSharedRef<SWidget>(SNew(STextBlock).Text_Lambda(Count).Font(Font(22, FName("Bold"))).ColorAndOpacity(Cheese)) : SNullWidget::NullWidget
+		]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLoadoutRow(TEXT("HERO"), Heroes) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLoadoutRow(TEXT("PRIMARY"), Primaries) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLoadoutRow(TEXT("GRENADE"), Grenades) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 14.0f, 0.0f, 0.0f))
+		[
+			MakeLine(bOffered ? TEXT("Taken up as you stand: the match begins when the count ends.") : TEXT("Kept for every match; the figure wears it."), true)
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f)).HAlign(HAlign_Left)
+		[
+			SNew(SBox).WidthOverride(304.0f)
+			[
+				bOffered ? MakeButton(TEXT("OK"), [Player]() { if (Player.IsValid()) Player->DismissLoadout(); }, EButtonKind::Primary)
+					: MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); })
 			]
 		];
+}
+
+FString SCheeseStrikeMenu::LoadoutKey() const
+{
+	const ACheeseStrikePlayerController* Player = Controller.Get();
+	const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
+	if (Player != nullptr)
+	{
+		const ACheeseStrikePlayerController::FWantedLoadout Wanted = Player->WantedLoadout();
+		return FString::Printf(TEXT("%s %d %d|offered %d"), *Wanted.Primary.ToString(), static_cast<int32>(Wanted.Grenade), Wanted.Hero, Player->IsLoadoutOffered() ? 1 : 0);
+	}
+	return Settings != nullptr ? FString::Printf(TEXT("%s %d %d"), *Settings->GetPrimary().ToString(), static_cast<int32>(Settings->GetGrenade()), Settings->GetHero()) : FString();
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFarewell()
@@ -2678,11 +2865,9 @@ FString SCheeseStrikeMenu::PageKey() const
 			Key += TEXT("|") + Found;
 		}
 	}
-	if (Page == EMenuPage::Main)
+	if (Page == EMenuPage::Loadout)
 	{
-		// The hero picked lights its button.
-		const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
-		Key += FString::Printf(TEXT("|hero %d"), Settings != nullptr ? Settings->GetHero() : INDEX_NONE);
+		Key += TEXT("|") + LoadoutKey();
 	}
 	if (Page == EMenuPage::Options)
 	{
@@ -2876,7 +3061,16 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 					Rules
 				]
 			]
-			+ SHorizontalBox::Slot().FillWidth(1.0f) [ MakeSeatColumns(bTeams) ]
+			+ SHorizontalBox::Slot().FillWidth(1.0f)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().FillHeight(1.0f) [ MakeSeatColumns(bTeams) ]
+				// The loadout, for the host and every joiner alike (over the lobby, as the settings are), until the match is on.
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(FMargin(0.0f, 10.0f, 0.0f, 0.0f))
+				[
+					MakeButton(TEXT("LOADOUT"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Loadout); })
+				]
+			]
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ Bottom ];
 }

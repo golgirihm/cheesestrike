@@ -39,7 +39,7 @@ namespace CheeseStrikeMusic
 		return bSkip && Pick >= Last ? Pick + 1 : Pick;
 	}
 
-	bool IsWanted(EMenuPage Page, bool bPausedInAMatch, bool bCountingDown, bool bLeaving, bool bHeld)
+	bool IsWanted(EMenuPage Page, bool bPausedInAMatch, bool bCountingDown, bool bLeaving, bool bHeld, bool bMatchOn)
 	{
 		if (bHeld || bLeaving || bPausedInAMatch)
 		{
@@ -51,10 +51,12 @@ namespace CheeseStrikeMusic
 		case EMenuPage::Find:
 		case EMenuPage::Credits:
 			return true;
-		// The settings, from the front end or over the lobby (whose countdown fades it out as the lobby's does).
+		// The settings and the loadout, from the front end or over the lobby (whose countdown fades it out as the lobby's
+		// does); the loadout page over a match's count-in is the match's, with no music.
 		case EMenuPage::Options:
+		case EMenuPage::Loadout:
 		case EMenuPage::Lobby:
-			return !bCountingDown;
+			return !bCountingDown && !bMatchOn;
 		default:
 			return false;
 		}

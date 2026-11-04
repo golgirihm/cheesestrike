@@ -25,6 +25,7 @@
 #include "Rules/CheeseStrikePodiums.h"
 #include "Rules/CheeseStrikeRange.h"
 #include "UI/CheeseStrikePodium.h"
+#include "Rules/CheeseStrikeLoadout.h"
 #include "Rules/CheeseStrikeStart.h"
 #include "Sessions/CheeseStrikeSeatMemory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
@@ -1092,7 +1093,7 @@ void ACheeseStrikeGameMode::StartRound(bool bFirst)
 	const float Now = State->GetServerWorldTimeSeconds();
 	if (!bFirst)
 	{
-		const float Count = CheeseStrikeStart::RoundCountdownFor(StartCountdown);
+		const float Count = CheeseStrikeStart::RoundCountdownFor(StartCountdown, CheeseStrikeLoadout::HasLoadout(Mode));
 		State->SetGoAt(Count > 0.0f ? Now + Count : 0.0f);
 	}
 	const float CountLeft = FMath::Max(0.0f, State->GetGoAt() - Now);

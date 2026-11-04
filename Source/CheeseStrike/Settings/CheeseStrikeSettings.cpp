@@ -14,6 +14,7 @@
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UObjectIterator.h"
 #include "Animation/CheeseStrikeBodies.h"
+#include "Rules/CheeseStrikeLoadout.h"
 
 namespace CheeseStrikeSettings
 {
@@ -255,6 +256,8 @@ void UCheeseStrikeSettings::SetToDefaults()
 	MusicVolume = CheeseStrikeSettings::DefaultMusicVolume;
 	FullscreenResolution = FIntPoint::ZeroValue;
 	Hero = CheeseStrikeBodies::HeroKey(CheeseStrikeBodies::DefaultHero);
+	Primary = CheeseStrikeLoadout::DefaultPrimary().ToString();
+	Grenade = CheeseStrikeGrenades::KeyOf(CheeseStrikeLoadout::DefaultGrenade);
 	GamepadGlyphs = 0;
 }
 
@@ -267,6 +270,27 @@ int32 UCheeseStrikeSettings::GetHero() const
 void UCheeseStrikeSettings::SetHero(int32 Body)
 {
 	Hero = CheeseStrikeBodies::HeroKey(Body);
+}
+
+FName UCheeseStrikeSettings::GetPrimary() const
+{
+	// A word that names none offered (a weapon taken off the list) is the default.
+	return CheeseStrikeLoadout::PrimaryOrDefault(FName(*Primary.ToLower()));
+}
+
+void UCheeseStrikeSettings::SetPrimary(FName Id)
+{
+	Primary = CheeseStrikeLoadout::PrimaryOrDefault(Id).ToString();
+}
+
+CheeseStrikeGrenades::EGrenadeKind UCheeseStrikeSettings::GetGrenade() const
+{
+	return CheeseStrikeGrenades::KindFromKey(Grenade).Get(CheeseStrikeLoadout::DefaultGrenade);
+}
+
+void UCheeseStrikeSettings::SetGrenade(CheeseStrikeGrenades::EGrenadeKind Kind)
+{
+	Grenade = CheeseStrikeGrenades::KeyOf(Kind);
 }
 
 const TCHAR* UCheeseStrikeSettings::WindowModeWord(EWindowMode::Type Mode)

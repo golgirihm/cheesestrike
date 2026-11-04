@@ -12,9 +12,10 @@ class UStaticMeshComponent;
 class UTexture;
 
 /**
- * The figure on the front end: the player's hero standing with the Cheddar
- * Blaster in hand (placed as a character holds it, CheeseStrikeWeaponLooks)
- * on a low round pedestal in the middle of the view, turning slowly. Made on
+ * The figure on the front end: the player's hero standing with the primary
+ * of their loadout in hand (the Colby Carbine to begin with; placed as a
+ * character holds it, CheeseStrikeWeaponLooks) on a low round pedestal in
+ * the middle of the view, turning slowly. Made on
  * each machine for its own menu, never replicated. Every hero's meshes,
  * materials and textures are held and kept resident while it exists, so that
  * a hero switched to is whole and sharp from its first frame; the switch
@@ -48,6 +49,10 @@ public:
 	void ShowHero(int32 Hero);
 	/** The hero it wears. */
 	int32 GetHero() const { return Shown; }
+	/** Holds the primary `Id` (a weapon of CheeseStrikeWeaponLooks; the Cheddar Blaster's look for one there isn't), at once, as a character holds it. */
+	void ShowPrimary(FName Id);
+	/** The primary it holds. */
+	FName GetPrimary() const { return Primary; }
 	/** Whether the body shows (not hidden through a change of hero). */
 	bool IsShown() const;
 	/** The body, and the weapon in its right hand. */
@@ -63,6 +68,8 @@ protected:
 	UPROPERTY()
 	TArray<TObjectPtr<USkeletalMesh>> Heroes;
 	int32 Shown = 0;
+	/** The primary held (CheeseStrikeWeaponLooks' id). */
+	FName Primary;
 	/** Hidden through a change of hero: how many ticks since; INDEX_NONE while shown. */
 	int32 HiddenTicks = INDEX_NONE;
 	/** When it began, by the PC's clock (IsReady's wait). */

@@ -30,6 +30,8 @@ namespace CheeseStrikeSynth
 	TArray<int16> JetPass(float Seconds);
 	/** A heavy explosion lasting `Seconds`: the crack, a falling boom, a rumble dying away and falling debris. `Seed` varies it. */
 	TArray<int16> Explosion(float Seconds, int32 Seed);
+	/** A soft hiss for `Seconds` (the Smoked Gouda's cloud): band-limited noise, in over a third of a second, wavering gently, and out over the last fifth. Peaks at a quarter of full scale. */
+	TArray<int16> Hiss(float Seconds);
 	/** A sound, owned by `Outer`, that plays `Samples` once. */
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples);
 }
