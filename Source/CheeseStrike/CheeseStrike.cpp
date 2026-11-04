@@ -9,6 +9,7 @@
 #include "Misc/CoreDelegates.h"
 #include "Misc/Paths.h"
 #include "Widgets/SWindow.h"
+#include "Settings/CheeseStrikeSettings.h"
 
 #if PLATFORM_WINDOWS
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -47,6 +48,12 @@ private:
 		}
 		const UGameEngine* Game = Cast<UGameEngine>(GEngine);
 		const TSharedPtr<SWindow> Window = Game != nullptr ? Game->GameViewportWindow.Pin() : nullptr;
+		if (Window.IsValid())
+		{
+			// What the window came up as, for checking a fresh install opens borderless (docs/manual-tests.md).
+			const FVector2D Size = Window->GetSizeInScreen();
+			UE_LOG(LogCheeseStrike, Display, TEXT("Window: %s, %.0f x %.0f"), UCheeseStrikeSettings::WindowModeWord(Window->GetWindowMode()), Size.X, Size.Y);
+		}
 		const TSharedPtr<FGenericWindow> Native = Window.IsValid() ? Window->GetNativeWindow() : nullptr;
 		const FString IconPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Build/Windows/Application.ico"));
 		if (!Native.IsValid() || !FPaths::FileExists(IconPath))
