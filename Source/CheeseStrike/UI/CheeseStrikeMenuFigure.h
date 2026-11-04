@@ -74,9 +74,18 @@ protected:
 	TObjectPtr<USkeletalMeshComponent> Body;
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<UStaticMeshComponent> Weapon;
+	/**
+	 * Every hero's body besides, tiny inside the pedestal where nothing sees it, drawn by the renderer all the same: so
+	 * that the shaders and pipeline states of every hero's materials are made before one is switched to (a mesh first
+	 * drawn after a switch showed grey, in the default material, until they were), and its textures asked for.
+	 */
+	UPROPERTY()
+	TArray<TObjectPtr<USkeletalMeshComponent>> WarmBodies;
 
 	/** Hides the hero shown's own guns (its weapon slots and bones) and puts the weapon in its hand at its grip. */
 	void ArmHero();
+	/** Makes WarmBodies. */
+	void WarmUpHeroes();
 	/** The textures of hero `Hero`'s materials. */
 	TArray<UTexture*> TexturesOf(int32 Hero) const;
 	/** Every hero's textures kept resident, every mip loaded (`bKeep`), or let go. */

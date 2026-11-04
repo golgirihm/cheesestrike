@@ -51,14 +51,15 @@ FVector2D SCheeseStrikeLoader::ComputeDesiredSize(float) const
 
 int32 SCheeseStrikeLoader::OnPaint(const FPaintArgs&, const FGeometry& AllottedGeometry, const FSlateRect&, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool) const
 {
-	// The frame the clock says, drawn as big as the spinner is, in the middle of what it was given.
+	// The frame the clock says, drawn a little bigger than the spinner's own box (the wedge fills most of its frame, not
+	// all), in the middle of what it was given.
 	const TArray<TUniquePtr<FSlateDynamicImageBrush>>& Frames = CheeseStrikeLoader::Brushes();
 	const int32 Frame = CheeseStrikeLoader::FrameAt(FPlatformTime::Seconds());
 	if (!Frames.IsValidIndex(Frame) || !Frames[Frame].IsValid())
 	{
 		return LayerId;
 	}
-	const FVector2f Size(Radius * 2.0f, Radius * 2.0f);
+	const FVector2f Size(Radius * 2.0f * CheeseStrikeLoader::DrawnOver, Radius * 2.0f * CheeseStrikeLoader::DrawnOver);
 	const FVector2f Corner = (FVector2f(AllottedGeometry.GetLocalSize()) - Size) * 0.5f;
 	FSlateDrawElement::MakeBox(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform(Corner)), Frames[Frame].Get(), ESlateDrawEffect::None, InWidgetStyle.GetColorAndOpacityTint());
 	return LayerId;

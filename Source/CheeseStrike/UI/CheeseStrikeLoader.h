@@ -21,6 +21,8 @@ namespace CheeseStrikeLoader
 	constexpr int32 Frames = 48;
 	constexpr int32 FramesPerSecond = 24;
 	constexpr int32 FrameSize = 64;
+	/** How much bigger than its box a frame is drawn: the wedge fills about 85% of its frame, so drawn so it is the box's size. */
+	constexpr float DrawnOver = 1.18f;
 	/** Which frame shows `Seconds` into the loop (any time: it goes round, and round again). */
 	int32 FrameAt(double Seconds);
 	/** The file frame `Frame` is in (Content/UI/Spinner/spinner_NN.png). */

@@ -1,7 +1,8 @@
-# The spinner, a cheese wedge turning: on the front end's HOST A MATCH while
-# the match is being offered, on the loading cover (the loading screen's own
-# widget, put up by CheeseStrikeCover for looking at it) and in the lobby.
-# Run with tools/play.ps1 -Lobby -Res 1280x720 (the front end alone).
+# The spinner, a cheese wedge turning: on the loading cover (the loading
+# screen's own widget, put up by CheeseStrikeCover for looking at it), and on
+# the cover that hosting from the front end puts up on its way to the lobby.
+# Run with tools/play.ps1 -Lobby -Res 1280x720 (the front end alone); the
+# lobby's countdown spinner is in tools/play/lobby_settings.txt's pictures.
 wait 4
 cmd CheeseStrikeCover 2
 wait 0.5
@@ -9,8 +10,7 @@ shot spinner_1_cover
 wait 2
 device keyboard
 key Enter
-wait 0.3
+wait 0.08
 shot spinner_2_hosting
-wait 12
-shot spinner_3_lobby
+wait 10
 quit
