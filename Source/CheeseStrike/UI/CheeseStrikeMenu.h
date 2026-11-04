@@ -132,9 +132,17 @@ namespace CheeseStrikeMenu
 	 * The page chosen after the menu key (Escape, a pad's Menu or B) in the
 	 * lobby, from the one chosen now: the settings over the lobby, and from
 	 * them back to it (the lobby's own page, which PageFor shows for anything
-	 * but the settings).
+	 * chosen; the settings are an overlay on it, SettingsOverLobby).
 	 */
 	EMenuPage LobbyMenuKey(EMenuPage Chosen);
+	/**
+	 * Whether the settings show over the lobby: the page `Shown` is the lobby
+	 * and the player `Chosen` the settings (Escape, LobbyMenuKey). They are an
+	 * overlay within the lobby's page, the lobby under them blurred and
+	 * darkened and taking no press, so that nothing of the lobby is drawn
+	 * afresh for them; Escape, B or Back puts them away.
+	 */
+	bool SettingsOverLobby(EMenuPage Shown, EMenuPage Chosen);
 	/** Corners, in Slate units. */
 	constexpr float Rounding = 6.0f;
 	/** The front end's masthead: the game's name and under it the subtitle, their font sizes, and how far down from the top. */
@@ -223,13 +231,15 @@ public:
 	/** Draws the page again if what it shows has changed; cheap otherwise, so run every frame. */
 	void Refresh();
 	EMenuPage GetPage() const { return Page; }
-	/** Shows `Tab` of the options when they show. */
-	void SetOptionsTab(EOptionsTab Tab) { OptionsTab = Tab; ShownPageKey.Reset(); }
+	/** Shows `Tab` of the options when they show (on their page, or over the lobby). */
+	void SetOptionsTab(EOptionsTab Tab) { OptionsTab = Tab; ShownPageKey.Reset(); ShownLobbySettingsKey.Reset(); }
 	EOptionsTab GetOptionsTab() const { return OptionsTab; }
 	/** Opens the lobby's dropdown `Index` (in the order they show), shutting any other; out of range, shuts them all. */
 	void OpenDropdown(int32 Index);
 	/** Whether the game behind the menu is blurred: under the pause menu, and the options opened from it. */
 	bool IsBlurringTheGame() const;
+	/** Whether the settings show over the lobby (CheeseStrikeMenu::SettingsOverLobby), the lobby under them blurred and taking no press. */
+	bool AreSettingsOverLobby() const { return bLobbySettingsShown; }
 
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
@@ -380,6 +390,8 @@ private:
 	FString LobbyKey() const;
 	/** The same for the other pages: the page, and on the Find page what was found. */
 	FString PageKey() const;
+	/** What the settings page is made of (its tab, and what is pressed rather than slid): drawn again when it changes, on the front end, the pause menu and over the lobby alike. */
+	FString OptionsKey() const;
 	/** Whether the local player has the host's match yet: its state, with the host and themself in it. */
 	bool HaveMatch() const;
 	/** What the lobby's bottom says now (CheeseStrikeMenu::LobbyStatus). */
@@ -420,8 +432,11 @@ private:
 	/** The items of the dialog, which has the focus to itself while it is up (Asking): the page's are out of reach meanwhile. */
 	TArray<FFocusable> DialogFocusables;
 	bool bBuildingDialog = false;
-	const TArray<FFocusable>& Active() const { return Asking != EMenuAsk::None ? DialogFocusables : Focusables; }
-	TArray<FFocusable>& Active() { return Asking != EMenuAsk::None ? DialogFocusables : Focusables; }
+	/** The items of the settings over the lobby, likewise theirs alone while they show (bLobbySettingsShown); the lobby's are out of reach under them. */
+	TArray<FFocusable> LobbySettingsFocusables;
+	bool bBuildingLobbySettings = false;
+	const TArray<FFocusable>& Active() const { return Asking != EMenuAsk::None ? DialogFocusables : (bLobbySettingsShown ? LobbySettingsFocusables : Focusables); }
+	TArray<FFocusable>& Active() { return Asking != EMenuAsk::None ? DialogFocusables : (bLobbySettingsShown ? LobbySettingsFocusables : Focusables); }
 	/** What had the focus before the dialog came up, to have it back as it goes. */
 	FString FocusBeforeAsk;
 	FString FocusName;
@@ -443,6 +458,17 @@ private:
 	EOptionsTab OptionsTab = EOptionsTab::Controls;
 	FString ShownLobbyKey;
 	int32 ShownLobbyStatus = INDEX_NONE;
+	/**
+	 * The settings over the lobby (CheeseStrikeMenu::SettingsOverLobby): a blur over the lobby's page with the settings
+	 * drawn in a panel on it, shown while the player has them chosen, and drawn again as their tab or what they show
+	 * changes (OptionsKey); the lobby under it is drawn by its own rules meanwhile, never afresh for them.
+	 */
+	TSharedPtr<SWidget> LobbySettings;
+	TSharedPtr<SBox> LobbySettingsContent;
+	FString ShownLobbySettingsKey;
+	bool bLobbySettingsShown = false;
+	/** The lobby's item that had the focus as the settings came over it, to have it back as they go. */
+	FString FocusBeforeLobbySettings;
 	/** The lobby's dropdowns as last drawn. */
 	TArray<TWeakPtr<class SMenuAnchor>> Dropdowns;
 	/** The blur over the game behind the pause menu. */

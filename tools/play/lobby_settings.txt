@@ -1,0 +1,18 @@
+# The settings over the lobby, from the host's side: the lobby with the joiner
+# in it, then Escape, which draws the settings over it with the lobby blurred
+# and darkened under them; a tab changed; Escape back to the lobby, which is
+# as it was. Run with tools/play.ps1 -Lobby -Res 1600x900 and
+# tools/play/lobby_settings_client.txt as the client's script.
+wait 32
+shot lobby_settings_1_host
+key Escape
+wait 1
+shot lobby_settings_2_host_settings
+cmd CheeseStrikePage Settings Graphics
+wait 1
+shot lobby_settings_3_host_graphics
+key Escape
+wait 1
+shot lobby_settings_4_host_back
+wait 6
+quit
