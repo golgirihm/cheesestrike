@@ -1,0 +1,30 @@
+# Switching heroes on the front end: a screenshot on the first frame after
+# each switch and one thirty frames later, which tools/art/figure_sharpness.py
+# compares (both equally sharp: the heroes' textures are kept resident), and
+# nothing of the old or new body or the weapon out of place on any frame
+# (CheeseStrike.Play.TheFigureChangesHeroWithNothingOutOfPlace checks that
+# every frame). Run with tools/play.ps1 -Lobby -FixedFps 30 (so that a wait
+# of 0.034 is one frame).
+wait 4
+shot switch_0_belica
+cmd CheeseStrikeHero Murdock
+wait 0.034
+shot switch_1_murdock_first
+wait 1
+shot switch_1_murdock_30
+cmd CheeseStrikeHero Wraith
+wait 0.034
+shot switch_2_wraith_first
+wait 1
+shot switch_2_wraith_30
+cmd CheeseStrikeHero Twinblast
+wait 0.034
+shot switch_3_twinblast_first
+wait 1
+shot switch_3_twinblast_30
+cmd CheeseStrikeHero Belica
+wait 0.034
+shot switch_4_belica_first
+wait 1
+shot switch_4_belica_30
+quit

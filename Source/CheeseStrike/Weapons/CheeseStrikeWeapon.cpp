@@ -390,9 +390,7 @@ void ACheeseStrikeWeapon::FitToHands()
 		{FirstPersonModel, Holder->GetFirstPersonMesh()}, {ThirdPersonModel, Holder->GetMesh()}};
 	for (const TPair<UPrimitiveComponent*, USkeletalMeshComponent*>& Part : Parts)
 	{
-		PutInHand(Part.Key, Part.Value);
-		// The model's own size, turn and place in the grip, then the grip's in the hand.
-		Part.Key->SetRelativeTransform(Look->Model * Part.Key->GetRelativeTransform());
+		PutInHand(Part.Key, Part.Value, *Look);
 	}
 	// The second gun of two, in the left hand as the first is in the right, mirrored across the body.
 	if (Stats->bDual)
@@ -650,6 +648,34 @@ void ACheeseStrikeWeapon::PutInHand(USceneComponent* Rifle, USkeletalMeshCompone
 	}
 	Rifle->AttachToComponent(Body, Snap, FName(TEXT("hand_r")));
 	Rifle->SetRelativeTransform(Hero != INDEX_NONE ? CheeseStrikeBodies::All()[Hero].HandGrip : HandGrip);
+}
+
+void ACheeseStrikeWeapon::PutInHand(USceneComponent* Model, USkeletalMeshComponent* Body, const FWeaponLook& Look)
+{
+	if (Model == nullptr || Body == nullptr)
+	{
+		return;
+	}
+	PutInHand(Model, Body);
+	// The model's own size, turn and place in the grip, then the grip's in the hand.
+	Model->SetRelativeTransform(Look.Model * Model->GetRelativeTransform());
+}
+
+void ACheeseStrikeWeapon::DressModel(UStaticMeshComponent* Model, const FWeaponLook& Look)
+{
+	if (Model == nullptr)
+	{
+		return;
+	}
+	Model->SetStaticMesh(LoadLook<UStaticMesh>(Look.PlainModel));
+	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(Look.Materials); ++Slot)
+	{
+		UMaterialInterface* Material = LoadLook<UMaterialInterface>(Look.Materials[Slot]);
+		if (Material != nullptr && Slot < Model->GetNumMaterials())
+		{
+			Model->SetMaterial(Slot, Material);
+		}
+	}
 }
 
 FTransform ACheeseStrikeWeapon::MirroredGrip(const USkeletalMeshComponent* Body, FName FromBone, const FTransform& InFromBone, FName ToBone)

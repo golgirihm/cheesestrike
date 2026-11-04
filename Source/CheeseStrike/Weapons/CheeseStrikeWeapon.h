@@ -142,6 +142,14 @@ public:
 	 */
 	static void PutInHand(USceneComponent* Rifle, USkeletalMeshComponent* Body);
 	/**
+	 * Puts a weapon's model in `Body`'s right hand as `Look` has it: at the hand's grip (PutInHand), then the model's own
+	 * size, turn and place in the grip (FWeaponLook::Model). A weapon's own models and the front end's figure are placed by
+	 * this alike (ACheeseStrikeMenuFigure).
+	 */
+	static void PutInHand(USceneComponent* Model, USkeletalMeshComponent* Body, const FWeaponLook& Look);
+	/** Dresses `Model` as `Look`'s plain model in its materials, slot by slot, loaded by path now (as a weapon's are, so that the scripts in tools/art can rebuild them). */
+	static void DressModel(UStaticMeshComponent* Model, const FWeaponLook& Look);
+	/**
 	 * Where a thing held `InFromBone` in `Body`'s bone `FromBone` sits in its bone `ToBone` when held the mirror way
 	 * across the body (left for right), by the reference pose: the second gun's grip in the left hand.
 	 */
