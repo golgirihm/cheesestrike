@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "UI/CheeseStrikeMenu.h"
+#include "Rules/CheeseStrikeLoadout.h"
 #include "CheeseStrikePlayerController.generated.h"
 
 class ACameraActor;
@@ -141,16 +142,41 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerSwitchSide();
 	/**
-	 * The hero this player plays (CheeseStrikeBodies::All; INDEX_NONE is the default, Lt. Belica): the settings'
-	 * (UCheeseStrikeSettings::GetHero), or CheeseStrikeHero's on this controller. Their machine puts it on their player
-	 * state whenever it differs (ServerPickHero), so it travels with them into every level and every machine dresses them in it.
+	 * The loadout this player plays with (Rules/CheeseStrikeLoadout.h): the primary (none for the usual one), the kind
+	 * of grenade and the hero (CheeseStrikeBodies::All; INDEX_NONE the default, Lt. Belica): the settings'
+	 * (UCheeseStrikeSettings), or the console's (UCheeseStrikeLoadoutChoice: CheeseStrikeLoadout, CheeseStrikeHero);
+	 * the tests play the defaults unless they pick. Their machine puts it on their player state whenever it differs
+	 * (ServerSetLoadout), while the rules let it change (CheeseStrikeLoadout::MayChange: the front end, the lobby, a
+	 * count-in), so it travels with them into every level and every machine dresses and arms them by it.
 	 */
-	int32 WantedHero() const;
+	struct FWantedLoadout
+	{
+		FName Primary;
+		CheeseStrikeGrenades::EGrenadeKind Grenade = CheeseStrikeGrenades::EGrenadeKind::Cheese;
+		int32 Hero = INDEX_NONE;
+		bool operator==(const FWantedLoadout& Other) const { return Primary == Other.Primary && Grenade == Other.Grenade && Hero == Other.Hero; }
+	};
+	FWantedLoadout WantedLoadout() const;
+	int32 WantedHero() const { return WantedLoadout().Hero; }
+	/** Where this player is for changing the loadout (CheeseStrikeLoadout::WhenFor), as this machine sees it. */
+	CheeseStrikeLoadout::EWhen LoadoutWhen() const;
+	/**
+	 * Server: the player's machine says what they play with. Taken, onto their player state, while the rules allow
+	 * (MayChange: never mid-match), and then at once on a character just come in and still held or protected (the body
+	 * follows the state by itself; the primary and the grenades through UCheeseStrikeInventory::TakeChoice and
+	 * UCheeseStrikeGrenades::SetKind); refused with a line in the log otherwise.
+	 */
 	UFUNCTION(Server, Reliable)
-	void ServerPickHero(int32 Hero);
-	/** From the console or a test: this player plays `Hero` (Belica, Murdock, Wraith or Twinblast; any other word the default), whatever the settings say, until the level changes; with none, the settings' again. */
+	void ServerSetLoadout(FName Primary, uint8 Grenade, int32 Hero);
+	/** From the console or a test: this player plays `Hero` (Belica, Murdock, Wraith or Twinblast; any other word the default), whatever the settings say, for as long as the game runs; with none, the settings' again. The same as `CheeseStrikeLoadout <hero>`. */
 	UFUNCTION(Exec)
 	void CheeseStrikeHero(const FString& Hero = TEXT(""));
+	/**
+	 * The loadout page during a count-in (CheeseStrikeLoadout::OffersPage): it comes up of itself as a count begins in
+	 * a mode with a loadout, and goes on OK, Enter, B or Escape (DismissLoadout), or as the count ends.
+	 */
+	bool IsLoadoutOffered() const;
+	void DismissLoadout();
 	/**
 	 * A joiner: the host is leaving the lobby (or, `bInMatch`, the match)
 	 * or quitting the game (UCheeseStrikeSessionSubsystem::SayGoodbye). The
@@ -343,12 +369,12 @@ protected:
 	int32 GoSounded = INDEX_NONE;
 	bool bScoreboardHeld = false;
 	bool bStartAtTaken = false;
-	/** CheeseStrikeHero's pick, if given (INDEX_NONE being the default hero). */
-	bool bHeroOverride = false;
-	int32 HeroOverride = INDEX_NONE;
-	/** The pick last sent to the server, and when (by real time), so that it is sent once and again only if it hasn't arrived. */
-	int32 HeroSent = INDEX_NONE - 1;
-	double HeroSentAt = 0.0;
-	/** Puts WantedHero on this player's state if it isn't there (their own machine). */
-	void SendHero();
+	/** The loadout last sent to the server, and when (by real time), so that it is sent once and again only if it hasn't come back. */
+	FWantedLoadout LoadoutSent;
+	bool bLoadoutSent = false;
+	double LoadoutSentAt = 0.0;
+	/** The count (its end, ACheeseStrikeGameState::GetGoAt) the loadout page was put away for; 0 for none. */
+	float LoadoutDismissedFor = 0.0f;
+	/** Puts WantedLoadout on this player's state if it isn't there (their own machine), while the rules let it change. */
+	void SendLoadout();
 };

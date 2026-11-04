@@ -7,6 +7,69 @@ namespace CheeseStrikeGrenades
 	const TCHAR* const Name = TEXT("Cheese Grenade");
 	const TCHAR* const OwnWords = TEXT("blew themself up");
 
+	const TCHAR* NameOf(EGrenadeKind Kind)
+	{
+		return Kind == EGrenadeKind::Smoke ? TEXT("Smoked Gouda") : Name;
+	}
+
+	const TCHAR* KeyOf(EGrenadeKind Kind)
+	{
+		return Kind == EGrenadeKind::Smoke ? TEXT("smoke") : TEXT("cheese");
+	}
+
+	TOptional<EGrenadeKind> KindFromKey(const FString& Key)
+	{
+		for (int32 Index = 0; Index < NumKinds; ++Index)
+		{
+			const EGrenadeKind Kind = static_cast<EGrenadeKind>(Index);
+			if (Key.Equals(KeyOf(Kind), ESearchCase::IgnoreCase) || Key.Equals(NameOf(Kind), ESearchCase::IgnoreCase))
+			{
+				return Kind;
+			}
+		}
+		return TOptional<EGrenadeKind>();
+	}
+
+	EGrenadeKind KindAt(int32 Index)
+	{
+		return Index == static_cast<int32>(EGrenadeKind::Smoke) ? EGrenadeKind::Smoke : EGrenadeKind::Cheese;
+	}
+
+	float FuseOf(EGrenadeKind Kind)
+	{
+		return Kind == EGrenadeKind::Smoke ? SmokeFuse : Fuse;
+	}
+
+	bool Harms(EGrenadeKind Kind)
+	{
+		return Kind == EGrenadeKind::Cheese;
+	}
+
+	float CloudRadiusAt(float Age)
+	{
+		if (Age < 0.0f || Age >= CloudLife)
+		{
+			return 0.0f;
+		}
+		// Quick at first, settling to its size: eased out.
+		const float Grown = FMath::Clamp(Age / CloudGrowSeconds, 0.0f, 1.0f);
+		return CloudAcross * 0.5f * (1.0f - FMath::Square(1.0f - Grown));
+	}
+
+	float CloudOpacityAt(float Age)
+	{
+		if (Age < 0.0f || Age >= CloudLife)
+		{
+			return 0.0f;
+		}
+		return FMath::Clamp((CloudLife - Age) / CloudThinSeconds, 0.0f, 1.0f);
+	}
+
+	bool CloudBlocksSightAt(float Age)
+	{
+		return Age >= 0.0f && CloudOpacityAt(Age) >= 0.5f;
+	}
+
 	float DamageAt(float Distance)
 	{
 		if (Distance < 0.0f || Distance > Radius)

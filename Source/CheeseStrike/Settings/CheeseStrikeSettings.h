@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameUserSettings.h"
+#include "Weapons/CheeseStrikeGrenadeRules.h"
 #include "CheeseStrikeSettings.generated.h"
 
 class USoundClass;
@@ -110,6 +111,11 @@ public:
 	/** The hero this player plays (an index of CheeseStrikeBodies::All): Lt. Belica until they pick another; kept by its word (CheeseStrikeBodies::HeroKey; an old file's "auto" reads as the default). */
 	int32 GetHero() const;
 	void SetHero(int32 Body);
+	/** The rest of the loadout (Rules/CheeseStrikeLoadout.h): the primary carried (one of CheeseStrikeLoadout::Primaries, the Colby Carbine to begin with; any other word reads as it) and the kind of grenade (the cheese grenade to begin with), each kept by its word. */
+	FName GetPrimary() const;
+	void SetPrimary(FName Id);
+	CheeseStrikeGrenades::EGrenadeKind GetGrenade() const;
+	void SetGrenade(CheeseStrikeGrenades::EGrenadeKind Kind);
 	/** The buttons a gamepad's prompts and the controls' table name (CheeseStrikeInput::EGlyphs): Auto (the pad's, as far as it can be told), Xbox, PlayStation or Nintendo. */
 	uint8 GetGamepadGlyphs() const { return GamepadGlyphs; }
 	void SetGamepadGlyphs(uint8 Value) { GamepadGlyphs = Value; }
@@ -159,6 +165,11 @@ protected:
 	/** The hero picked, by its word: Lt. Belica's to begin with (CheeseStrikeBodies::DefaultHero). */
 	UPROPERTY(config)
 	FString Hero = TEXT("Belica");
+	/** The primary picked, by its id ("carbine" to begin with), and the grenade's kind by its word ("cheese"). */
+	UPROPERTY(config)
+	FString Primary = TEXT("carbine");
+	UPROPERTY(config)
+	FString Grenade = TEXT("cheese");
 	/** CheeseStrikeInput::EGlyphs, Auto by default. */
 	UPROPERTY(config)
 	uint8 GamepadGlyphs = 0;

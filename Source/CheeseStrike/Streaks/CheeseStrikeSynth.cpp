@@ -258,6 +258,34 @@ namespace CheeseStrikeSynth
 		return Normalised(Values, 0.95f);
 	}
 
+	TArray<int16> Hiss(float Seconds)
+	{
+		// Smoke escaping: white noise through a band (two low-pass poles at 2.6 kHz over a high-pass at 500 Hz), so that it
+		// is neither a rumble nor a whistle, swelling in and wavering a little as it goes, gone over the last fifth.
+		const int32 Count = FMath::Max(1, FMath::RoundToInt(Seconds * SampleRate));
+		TArray<float> Values;
+		Values.SetNumUninitialized(Count);
+		uint32 Seed = 4242u;
+		const float Low = PoleFor(2600.0f);
+		const float High = PoleFor(500.0f);
+		float A = 0.0f;
+		float B = 0.0f;
+		float C = 0.0f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const float Time = static_cast<float>(Index) / SampleRate;
+			const float White = Noise(Seed);
+			A += (White - A) * Low;
+			B += (A - B) * Low;
+			C += (B - C) * High;
+			const float Band = B - C;
+			const float Waver = 1.0f + 0.12f * FMath::Sin(2.0f * PI * 0.7f * Time) + 0.06f * FMath::Sin(2.0f * PI * 1.9f * Time + 1.0f);
+			const float Envelope = FMath::Min(1.0f, Time / 0.35f) * FMath::Min(1.0f, (Seconds - Time) / (Seconds * 0.2f));
+			Values[Index] = Band * Waver * Envelope;
+		}
+		return Normalised(Values, 0.25f);
+	}
+
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples)
 	{
 		USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(Outer);

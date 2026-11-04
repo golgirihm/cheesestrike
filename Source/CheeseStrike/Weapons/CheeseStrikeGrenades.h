@@ -22,6 +22,11 @@ struct FPredictProjectilePathResult;
  * CheeseStrikeGrenades::SpawnCount; a mode may give it others (Gun Game
  * gives none).
  *
+ * The kind carried is the loadout's (CheeseStrikeGrenades::EGrenadeKind: the
+ * cheese grenade, or the Smoked Gouda, which smokes rather than bursts),
+ * set by the server as the character comes in (UCheeseStrikeInventory::
+ * GiveSpawnLoadout) or at once during a count-in; bots carry the cheese.
+ *
  * A player holds G (or the right bumper) to throw: the weapon in hand goes
  * down out of view and the grenade comes up in the right hand, the left let
  * go (the switch, CheeseStrikeGrenades::SwitchStep, posed in code by
@@ -57,6 +62,10 @@ public:
 	int32 GetCount() const { return Count; }
 	/** Server only: carries `InCount` from now on (no more than CheeseStrikeGrenades::MostCarried). */
 	void SetCount(int32 InCount);
+	/** The kind carried (CheeseStrikeGrenades::EGrenadeKind: the cheese grenade, or the Smoked Gouda), as the server has it, seen on every machine (the round in hand wears it). */
+	CheeseStrikeGrenades::EGrenadeKind GetKind() const { return CheeseStrikeGrenades::KindAt(Kind); }
+	/** Server only: carries `InKind` from now on, with a fresh count of them if the kind changes. */
+	void SetKind(CheeseStrikeGrenades::EGrenadeKind InKind);
 
 	/** Whether a throw is under way on this machine: the weapon in hand waits for it. */
 	bool IsThrowing() const;
@@ -140,6 +149,10 @@ protected:
 	/** Everyone comes in with the usual; a mode may change it in its SetPlayerDefaults. */
 	UPROPERTY(Replicated)
 	int32 Count = CheeseStrikeGrenades::SpawnCount;
+	/** The kind carried (CheeseStrikeGrenades::EGrenadeKind), and the kind the rounds in hand were last dressed as. */
+	UPROPERTY(Replicated)
+	uint8 Kind = 0;
+	uint8 ShownKind = 0;
 	/** A grenade held up by its player, for every other machine (its own knows by bHolding). */
 	UPROPERTY(Replicated)
 	bool bHoldShown = false;

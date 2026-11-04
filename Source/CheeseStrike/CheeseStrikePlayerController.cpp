@@ -37,6 +37,8 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "UI/CheeseStrikeTones.h"
+#include "Weapons/CheeseStrikeGrenades.h"
+#include "Weapons/CheeseStrikeInventory.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Sessions/CheeseStrikeSessionSubsystem.h"
 #include "Sessions/CheeseStrikeSessions.h"
@@ -143,12 +145,12 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	const UCheeseStrikePostGameSubsystem* PostGame = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>() : nullptr;
 	const bool bResultsHeld = PostGame != nullptr && PostGame->IsHeld();
 	PublishPresence(bStarted);
-	// Settings left open over the lobby as the match began are gone: back in the lobby later, it shows, not them.
-	if (bStarted && !bPaused && ChosenPage == EMenuPage::Options)
+	// Settings (or the loadout) left open over the lobby as the match began are gone: back in the lobby later, it shows, not them.
+	if (bStarted && !bPaused && (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Loadout))
 	{
 		ChosenPage = EMenuPage::Main;
 	}
-	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch() || bLeaving, bPaused, ChosenPage, bTravelling, bResultsHeld);
+	const EMenuPage Wanted = CheeseStrikeMenu::PageFor(bStarted, bEnded, IsInAMatch() || bLeaving, bPaused, ChosenPage, bTravelling, bResultsHeld, IsLoadoutOffered());
 	if (Wanted != ShownPage)
 	{
 		ShowMenu(Wanted);
@@ -169,63 +171,129 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	{
 		HideMenuCamera();
 	}
-	// The figure wears the hero picked, at once; and the pick goes with the player into the match.
+	// The figure wears the hero picked and holds the primary, at once; and the loadout goes with the player into the match.
 	if (MenuFigure != nullptr)
 	{
-		MenuFigure->ShowHero(WantedHero());
+		const FWantedLoadout Loadout = WantedLoadout();
+		MenuFigure->ShowHero(Loadout.Hero);
+		MenuFigure->ShowPrimary(CheeseStrikeLoadout::PrimaryOrDefault(Loadout.Primary));
 	}
-	SendHero();
+	SendLoadout();
 }
 
-int32 ACheeseStrikePlayerController::WantedHero() const
+ACheeseStrikePlayerController::FWantedLoadout ACheeseStrikePlayerController::WantedLoadout() const
 {
-	if (bHeroOverride)
+	FWantedLoadout Wanted;
+	// The tests play the defaults unless they pick (CheeseStrikeHero, CheeseStrikeLoadout), whatever this PC's player
+	// picked: every player in the editor shares the settings.
+	const UCheeseStrikeSettings* Settings = GIsAutomationTesting ? nullptr : UCheeseStrikeSettings::Get();
+	if (Settings != nullptr)
 	{
-		return HeroOverride;
+		Wanted.Primary = Settings->GetPrimary();
+		Wanted.Grenade = Settings->GetGrenade();
+		Wanted.Hero = Settings->GetHero();
 	}
-	// The tests play the default hero unless they pick (CheeseStrikeHero), whatever this PC's player picked: every player in
-	// the editor shares the settings.
-	if (GIsAutomationTesting)
+	const UCheeseStrikeLoadoutChoice* Console = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeLoadoutChoice>() : nullptr;
+	if (Console != nullptr)
 	{
-		return INDEX_NONE;
+		Wanted.Primary = Console->GetPrimary().Get(Wanted.Primary);
+		Wanted.Grenade = Console->GetGrenade().Get(Wanted.Grenade);
+		Wanted.Hero = Console->GetHero().Get(Wanted.Hero);
 	}
-	const UCheeseStrikeSettings* Settings = UCheeseStrikeSettings::Get();
-	return Settings != nullptr ? Settings->GetHero() : CheeseStrikeBodies::DefaultHero;
+	return Wanted;
 }
 
-void ACheeseStrikePlayerController::SendHero()
+CheeseStrikeLoadout::EWhen ACheeseStrikePlayerController::LoadoutWhen() const
+{
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	return CheeseStrikeLoadout::WhenFor(IsInAMatch() || bLeaving, Match != nullptr && Match->HasMatchStarted(), Match != nullptr && Match->HasMatchEnded(), Match != nullptr && Match->IsFrozen());
+}
+
+void ACheeseStrikePlayerController::SendLoadout()
 {
 	const ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>();
-	const int32 Wanted = WantedHero();
-	if (Mine == nullptr || Mine->GetHero() == Wanted)
+	const FWantedLoadout Wanted = WantedLoadout();
+	// Only while the rules would have it taken: a pick made mid-match waits for the next lobby or count-in.
+	if (Mine == nullptr || (Mine->GetHero() == Wanted.Hero && Mine->GetPrimary() == Wanted.Primary && Mine->GetGrenade() == Wanted.Grenade) || !CheeseStrikeLoadout::MayChange(LoadoutWhen()))
 	{
 		return;
 	}
 	// Once, and again after a second if it still hasn't come back on the player state (it was sent before the server had it ready).
 	const double Now = FPlatformTime::Seconds();
-	if (Wanted != HeroSent || Now - HeroSentAt > 1.0)
+	if (!bLoadoutSent || !(Wanted == LoadoutSent) || Now - LoadoutSentAt > 1.0)
 	{
-		HeroSent = Wanted;
-		HeroSentAt = Now;
-		ServerPickHero(Wanted);
+		bLoadoutSent = true;
+		LoadoutSent = Wanted;
+		LoadoutSentAt = Now;
+		ServerSetLoadout(Wanted.Primary, static_cast<uint8>(Wanted.Grenade), Wanted.Hero);
 	}
 }
 
-void ACheeseStrikePlayerController::ServerPickHero_Implementation(int32 Hero)
+void ACheeseStrikePlayerController::ServerSetLoadout_Implementation(FName Primary, uint8 Grenade, int32 Hero)
 {
-	if (ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>())
+	ACheeseStrikePlayerState* Mine = GetPlayerState<ACheeseStrikePlayerState>();
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	if (Mine == nullptr)
 	{
-		Mine->SetHero(CheeseStrikeBodies::All().IsValidIndex(Hero) ? Hero : INDEX_NONE);
+		return;
+	}
+	// The server's own view of where this player is: a level with others is a match; alone (the front end, the practice
+	// range) anything goes.
+	const bool bInAMatch = GetWorld()->GetNetMode() != NM_Standalone;
+	const CheeseStrikeLoadout::EWhen When = CheeseStrikeLoadout::WhenFor(bInAMatch, Match != nullptr && Match->HasMatchStarted(), Match != nullptr && Match->HasMatchEnded(), Match != nullptr && Match->IsFrozen());
+	const FName Chosen = Primary.IsNone() ? NAME_None : CheeseStrikeLoadout::PrimaryOrDefault(Primary);
+	const CheeseStrikeGrenades::EGrenadeKind Kind = CheeseStrikeGrenades::KindAt(Grenade);
+	const int32 Picked = CheeseStrikeBodies::All().IsValidIndex(Hero) ? Hero : INDEX_NONE;
+	if (!CheeseStrikeLoadout::MayChange(When))
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Loadout: %s's change (%s, %s, %s) is refused: the match is on"), *Mine->GetPlayerName(), Chosen.IsNone() ? TEXT("the usual primary") : *Chosen.ToString(), CheeseStrikeGrenades::KeyOf(Kind), CheeseStrikeBodies::HeroKey(Picked));
+		return;
+	}
+	Mine->SetLoadout(Chosen, Kind, Picked);
+	UE_LOG(LogCheeseStrike, Display, TEXT("Loadout: %s plays with %s, %s grenades, as %s"), *Mine->GetPlayerName(), Chosen.IsNone() ? TEXT("the usual primary") : *Chosen.ToString(), CheeseStrikeGrenades::KeyOf(Kind), CheeseStrikeBodies::HeroKey(Picked));
+	// A character just come in and still held or protected (a count-in) takes it up at once; the body follows the state
+	// by itself (ACheeseStrikeCharacter::UpdateBody).
+	if (ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(GetPawn()))
+	{
+		if (Body->GetInventory() != nullptr && !Chosen.IsNone())
+		{
+			Body->GetInventory()->TakeChoice(Chosen);
+		}
+		if (Body->GetGrenades() != nullptr && Body->IsAlive() && Body->IsProtected())
+		{
+			Body->GetGrenades()->SetKind(Kind);
+		}
 	}
 }
 
 void ACheeseStrikePlayerController::CheeseStrikeHero(const FString& Hero)
 {
-	bHeroOverride = !Hero.IsEmpty();
-	HeroOverride = CheeseStrikeBodies::HeroFromKey(Hero);
+	UCheeseStrikeLoadoutChoice* Console = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeLoadoutChoice>() : nullptr;
+	if (Console == nullptr)
+	{
+		return;
+	}
+	Console->SetHero(Hero);
 	// A word that names no hero is the default's.
-	UE_LOG(LogCheeseStrike, Display, TEXT("Hero: %s%s"), bHeroOverride ? CheeseStrikeBodies::HeroKey(HeroOverride) : TEXT("the settings'"),
-		bHeroOverride && HeroOverride == INDEX_NONE ? *FString::Printf(TEXT(" (\"%s\" names no hero)"), *Hero) : TEXT(""));
+	const TOptional<int32>& Picked = Console->GetHero();
+	UE_LOG(LogCheeseStrike, Display, TEXT("Hero: %s%s"), Picked.IsSet() ? CheeseStrikeBodies::HeroKey(*Picked) : TEXT("the settings'"),
+		Picked.IsSet() && *Picked == INDEX_NONE ? *FString::Printf(TEXT(" (\"%s\" names no hero)"), *Hero) : TEXT(""));
+}
+
+bool ACheeseStrikePlayerController::IsLoadoutOffered() const
+{
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	if (Match == nullptr || !Match->HasMatchStarted() || Match->HasMatchEnded() || !IsInAMatch())
+	{
+		return false;
+	}
+	return CheeseStrikeLoadout::OffersPage(CheeseStrikeLoadout::HasLoadout(Match->GetMode()), Match->IsFrozen(), Match->GetGoAt(), LoadoutDismissedFor);
+}
+
+void ACheeseStrikePlayerController::DismissLoadout()
+{
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	LoadoutDismissedFor = Match != nullptr ? Match->GetGoAt() : 0.0f;
 }
 
 void ACheeseStrikePlayerController::PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel)
@@ -303,7 +371,7 @@ bool ACheeseStrikePlayerController::IsLobbyReady() const
 
 bool ACheeseStrikePlayerController::IsDoneWithTheResults() const
 {
-	const bool bFrontEnd = ShownPage == EMenuPage::Main || ShownPage == EMenuPage::Find || ShownPage == EMenuPage::Credits || ShownPage == EMenuPage::Options;
+	const bool bFrontEnd = ShownPage == EMenuPage::Main || ShownPage == EMenuPage::Find || ShownPage == EMenuPage::Credits || ShownPage == EMenuPage::Options || ShownPage == EMenuPage::Loadout;
 	// A level that skips the lobby (?StartNow, as the play scripts' do) goes straight into a match: the player's in it.
 	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
 	const bool bPlaying = State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded() && GetPawn() != nullptr && GetViewTarget() == GetPawn();
@@ -505,7 +573,7 @@ void ACheeseStrikePlayerController::PlayMusic()
 	const bool bCounting = Match != nullptr && Match->IsCountingDown();
 	const bool bLeavingNow = bLeaving || (Match != nullptr && Match->GetMatchState() == MatchState::LeavingMap);
 	const UCheeseStrikePostGameSubsystem* PostGame = GetGameInstance()->GetSubsystem<UCheeseStrikePostGameSubsystem>();
-	const bool bWanted = CheeseStrikeMusic::IsWanted(ShownPage, bPaused, bCounting, bLeavingNow, PostGame != nullptr && PostGame->IsHeld());
+	const bool bWanted = CheeseStrikeMusic::IsWanted(ShownPage, bPaused, bCounting, bLeavingNow, PostGame != nullptr && PostGame->IsHeld(), Match != nullptr && Match->HasMatchStarted());
 	// Out over the countdown, into the match; otherwise quicker.
 	Music->Want(GetWorld(), bWanted, bCounting && Match != nullptr ? FMath::Max(Match->SecondsToStart(), 0.5f) : CheeseStrikeMusic::FadeOutSeconds);
 	// In a session, everyone hears the host's song at the host's point in it.
@@ -659,7 +727,7 @@ bool ACheeseStrikePlayerController::IsInAMatch() const
 
 void ACheeseStrikePlayerController::ShowMenu(EMenuPage Page)
 {
-	static const TCHAR* const PageNames[] = {TEXT("none"), TEXT("main"), TEXT("find"), TEXT("lobby"), TEXT("pause"), TEXT("credits"), TEXT("settings")};
+	static const TCHAR* const PageNames[] = {TEXT("none"), TEXT("main"), TEXT("find"), TEXT("lobby"), TEXT("pause"), TEXT("credits"), TEXT("settings"), TEXT("loadout")};
 	const int32 PageIndex = static_cast<int32>(Page);
 	UE_LOG(LogCheeseStrike, Display, TEXT("Menu: %s"), PageIndex < UE_ARRAY_COUNT(PageNames) ? PageNames[PageIndex] : TEXT("?"));
 	ShownPage = Page;
@@ -988,6 +1056,10 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 	{
 		Chosen = EMenuPage::Options;
 	}
+	else if (Page.Equals(TEXT("Loadout"), ESearchCase::IgnoreCase))
+	{
+		Chosen = EMenuPage::Loadout;
+	}
 	else if (Page.Equals(TEXT("Pause"), ESearchCase::IgnoreCase))
 	{
 		// The pause menu: during a match, paused (or still paused) on it; with `Tab` "Ask", the host's Back to Lobby asks.
@@ -1237,7 +1309,7 @@ void ACheeseStrikePlayerController::MenuPressed()
 	if (State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded())
 	{
 		// From the settings back a page, still paused; otherwise pause or resume.
-		if (bPaused && ChosenPage == EMenuPage::Options)
+		if (bPaused && (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Loadout))
 		{
 			BackFromMenu();
 		}

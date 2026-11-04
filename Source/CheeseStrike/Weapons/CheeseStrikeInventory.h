@@ -7,6 +7,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "CheeseStrikeShot.h"
+#include "CheeseStrikeGrenadeRules.h"
 #include "CheeseStrikeInventory.generated.h"
 
 class ACheeseStrikeCharacter;
@@ -50,7 +51,8 @@ struct CHEESESTRIKE_API FCheeseStrikeLoadout
  * loadout, GiveOnly one weapon (Gun Game), RestrictTo one slot (Execution:
  * the sidearm), HoldNow to put a weapon in hand without its draw time.
  * Every character is given the usual loadout as it is possessed, with the
- * primary its player chose (UCheeseStrikeLoadouts), before the game mode's
+ * primary and the kind of grenade its player chose (UCheeseStrikeLoadouts,
+ * from the player state's loadout), before the game mode's
  * SetPlayerDefaults, where a mode can give another.
  */
 UCLASS()
@@ -142,13 +144,15 @@ public:
 	UFUNCTION(Server, Reliable)
 	void ServerArm(FName Weapon);
 
-	/** Server: the player's choice of primary, from their machine, kept for their next character (or this one, still fresh). */
-	UFUNCTION(Server, Reliable)
-	void ServerChoosePrimary(FName Primary);
+	/**
+	 * Server: the player's choice of primary has come (ACheeseStrikePlayerController::ServerSetLoadout): carried at once
+	 * if this character has just come in, untouched by a mode and still protected (a count-in, or its first seconds);
+	 * otherwise it waits for the next character, which GiveSpawnLoadout gives it.
+	 */
+	void TakeChoice(FName Primary);
 
 	//~ UActorComponent
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 protected:
@@ -197,15 +201,17 @@ protected:
 	uint8 ShownSlot = NoSlot;
 	/** The weapons this machine last saw carried, to know when they are replaced. */
 	TArray<TWeakObjectPtr<ACheeseStrikeWeapon>> Seen;
-	/** Whether its player's choice of primary has been sent to the server. */
-	bool bToldChoice = false;
 	/** Server: whether what it carries is the loadout it was given on coming in, untouched by a mode, so that a choice made now can take its place. */
 	bool bSpawnLoadout = false;
 };
 
 /**
- * The primaries the server has been told players chose, kept for their next
- * character; bots choose their own. For the world's life (a match).
+ * What each controller's character comes in with, on the server: the
+ * primary and the kind of grenade its player chose (their player state's
+ * loadout, ACheeseStrikePlayerState::GetPrimary), or for a bot what it was
+ * given here (CheeseStrike.BotPrimary), or else the usual
+ * (CheeseStrikeArsenal::DefaultPrimary, or CheeseStrike.SpawnPrimary's for
+ * the play tests; the cheese grenade). For the world's life (a match).
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeLoadouts : public UWorldSubsystem
@@ -213,10 +219,12 @@ class CHEESESTRIKE_API UCheeseStrikeLoadouts : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
-	/** Server: `Controller`'s player chose `Primary`. */
+	/** Server: `Controller` (a bot) comes in with `Primary`. */
 	void Choose(const AController* Controller, FName Primary);
-	/** The primary `Controller` chose, or the default (CheeseStrikeArsenal::DefaultPrimary, or CheeseStrike.SpawnPrimary's for the play tests). */
+	/** The primary `Controller`'s character comes in with. */
 	FName PrimaryFor(const AController* Controller) const;
+	/** The kind of grenade it comes in with. */
+	CheeseStrikeGrenades::EGrenadeKind GrenadeFor(const AController* Controller) const;
 	bool HasChosen(const AController* Controller) const;
 
 private:
@@ -224,10 +232,12 @@ private:
 };
 
 /**
- * The primary this game's player has chosen, for as long as the game runs:
- * set by the console command `CheeseStrikeLoadout <weapon>` (and by the
- * menu's loadout page once there is one), and sent to the server for the
- * next character. Not saved between runs yet.
+ * The console's say over this machine's loadout, for as long as the game
+ * runs: `CheeseStrikeLoadout <words>` (a primary's id, a grenade's kind,
+ * a hero's name, in any order; none clears them) and `CheeseStrikeHero
+ * <name>` set what the player's controller sends the server in place of
+ * the settings' (ACheeseStrikePlayerController::WantedLoadout), by the
+ * same rules as the loadout page's picks; nothing is saved.
  */
 UCLASS()
 class CHEESESTRIKE_API UCheeseStrikeLoadoutChoice : public UGameInstanceSubsystem
@@ -235,10 +245,21 @@ class CHEESESTRIKE_API UCheeseStrikeLoadoutChoice : public UGameInstanceSubsyste
 	GENERATED_BODY()
 
 public:
-	FName GetPrimary() const { return Primary; }
-	/** Chooses `Weapon` as the primary, if it is one, and tells the server through the local player's character if there is one; false if it isn't a primary. */
-	bool Choose(FName Weapon, UWorld* World);
+	const TOptional<FName>& GetPrimary() const { return Primary; }
+	const TOptional<CheeseStrikeGrenades::EGrenadeKind>& GetGrenade() const { return Grenade; }
+	/** The hero, if given: INDEX_NONE for a word that named none (the default hero). */
+	const TOptional<int32>& GetHero() const { return Hero; }
+	/** Takes `Word` as whichever it names (a primary offered, a grenade's kind, a hero); false, and nothing set, for a word that names none. */
+	bool Take(const FString& Word);
+	/** The hero by `Key` (CheeseStrikeBodies::HeroFromKey; any other word the default), or with none the settings' again. */
+	void SetHero(const FString& Key);
+	/** Forgets them all: the settings' again. */
+	void Clear();
+	/** What is set, for the log: "the munster, smoke, Wraith", or "the settings'". */
+	FString Describe() const;
 
 private:
-	FName Primary;
+	TOptional<FName> Primary;
+	TOptional<CheeseStrikeGrenades::EGrenadeKind> Grenade;
+	TOptional<int32> Hero;
 };

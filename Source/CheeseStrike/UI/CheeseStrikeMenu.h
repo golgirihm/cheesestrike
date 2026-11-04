@@ -34,6 +34,12 @@ enum class EMenuPage : uint8
 	Credits,
 	/** The player's settings (UCheeseStrikeSettings), each kind on a tab (EOptionsTab): from the front end, or from the pause menu during a match. */
 	Options,
+	/**
+	 * The loadout (Rules/CheeseStrikeLoadout.h): the hero, the primary and the grenade, picked from the front end, over
+	 * the lobby (an overlay on it, as the settings are), and of itself as a count-in begins in a mode with a loadout
+	 * (ACheeseStrikePlayerController::IsLoadoutOffered: the HUD's count shows through, the page says the seconds).
+	 */
+	Loadout,
 };
 
 /** The settings page's tabs. */
@@ -65,9 +71,11 @@ namespace CheeseStrikeMenu
 	 * held up on the way back to the lobby, `bResultsHeld`:
 	 * UCheeseStrikePostGameSubsystem) or the settings opened over it with
 	 * Escape (LobbyMenuKey), and otherwise the page the player chose among
-	 * the front end's.
+	 * the front end's. Once a match is on, the loadout page while a count-in
+	 * offers it (`bLoadoutOffered`, CheeseStrikeLoadout::OffersPage), unless
+	 * paused.
 	 */
-	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling = false, bool bResultsHeld = false);
+	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling = false, bool bResultsHeld = false, bool bLoadoutOffered = false);
 
 	/** The tones of the lobby's countdown (CheeseStrikeTones). */
 	enum class ECountdownTone : uint8
@@ -131,18 +139,26 @@ namespace CheeseStrikeMenu
 	/**
 	 * The page chosen after the menu key (Escape, a pad's Menu or B) in the
 	 * lobby, from the one chosen now: the settings over the lobby, and from
-	 * them back to it (the lobby's own page, which PageFor shows for anything
-	 * chosen; the settings are an overlay on it, SettingsOverLobby).
+	 * them (or from the loadout over it) back to it (the lobby's own page,
+	 * which PageFor shows for anything chosen; the settings and the loadout
+	 * are overlays on it, LobbyOverlay).
 	 */
 	EMenuPage LobbyMenuKey(EMenuPage Chosen);
 	/**
-	 * Whether the settings show over the lobby: the page `Shown` is the lobby
-	 * and the player `Chosen` the settings (Escape, LobbyMenuKey). They are an
+	 * What shows over the lobby: the settings or the loadout, when the page
+	 * `Shown` is the lobby and the player `Chosen` one of them (Escape,
+	 * LobbyMenuKey; the lobby's LOADOUT button); None otherwise. They are an
 	 * overlay within the lobby's page, the lobby under them blurred and
 	 * darkened and taking no press, so that nothing of the lobby is drawn
 	 * afresh for them; Escape, B or Back puts them away.
 	 */
+	EMenuPage LobbyOverlay(EMenuPage Shown, EMenuPage Chosen);
+	/** Whether the settings show over the lobby (LobbyOverlay is the settings). */
 	bool SettingsOverLobby(EMenuPage Shown, EMenuPage Chosen);
+	/** The loadout page's pictures: a hero's portrait (Content/UI/Heroes, tools/art/hero_portraits.py), a weapon's icon and a grenade's (Content/UI/Loadout), in Slate units. */
+	constexpr float PortraitSize = 108.0f;
+	constexpr float WeaponIconWidth = 150.0f;
+	constexpr float GrenadeIconSize = 72.0f;
 	/** Corners, in Slate units. */
 	constexpr float Rounding = 6.0f;
 	/** The front end's masthead: the game's name and under it the subtitle, their font sizes, and how far down from the top. */
@@ -232,14 +248,15 @@ public:
 	void Refresh();
 	EMenuPage GetPage() const { return Page; }
 	/** Shows `Tab` of the options when they show (on their page, or over the lobby). */
-	void SetOptionsTab(EOptionsTab Tab) { OptionsTab = Tab; ShownPageKey.Reset(); ShownLobbySettingsKey.Reset(); }
+	void SetOptionsTab(EOptionsTab Tab) { OptionsTab = Tab; ShownPageKey.Reset(); ShownLobbyOverlayKey.Reset(); }
 	EOptionsTab GetOptionsTab() const { return OptionsTab; }
 	/** Opens the lobby's dropdown `Index` (in the order they show), shutting any other; out of range, shuts them all. */
 	void OpenDropdown(int32 Index);
 	/** Whether the game behind the menu is blurred: under the pause menu, and the options opened from it. */
 	bool IsBlurringTheGame() const;
-	/** Whether the settings show over the lobby (CheeseStrikeMenu::SettingsOverLobby), the lobby under them blurred and taking no press. */
-	bool AreSettingsOverLobby() const { return bLobbySettingsShown; }
+	/** What shows over the lobby (CheeseStrikeMenu::LobbyOverlay: the settings, the loadout, or None), the lobby under it blurred and taking no press. */
+	EMenuPage GetLobbyOverlay() const { return bLobbyOverlayShown ? LobbyOverlayPage : EMenuPage::None; }
+	bool AreSettingsOverLobby() const { return GetLobbyOverlay() == EMenuPage::Options; }
 
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
@@ -293,8 +310,19 @@ private:
 
 	TSharedRef<SWidget> MakePage();
 	TSharedRef<SWidget> MakeMain();
-	/** The heroes to pick from (CheeseStrikeBodies::All), the one picked lit: the figure wears it at once. */
-	TSharedRef<SWidget> MakeHeroPicker();
+	/**
+	 * The loadout page (EMenuPage::Loadout, Rules/CheeseStrikeLoadout.h): HERO as the four heroes' portraits, PRIMARY as
+	 * the three weapons' icons with their names, GRENADE as the two kinds', the one picked of each ringed in cheese, each
+	 * kept in the settings as it is picked (and sent to the server by the controller); on the front end the figure wears and
+	 * holds the picks at once. During a count-in it says the seconds left and OK puts it away; otherwise Back.
+	 */
+	TSharedRef<SWidget> MakeLoadout();
+	/** One choice of the loadout page: `Picture` (sized `PictureSize`) over `Name`, ringed in cheese when `bChosen`; `Pick` on a press. */
+	TSharedRef<SWidget> MakeLoadoutChoice(const FString& Name, const FSlateBrush* Picture, const FVector2D& PictureSize, bool bChosen, TFunction<void()> Pick);
+	/** A row of the loadout page: `Label` over `Choices`. */
+	TSharedRef<SWidget> MakeLoadoutRow(const FString& Label, TSharedRef<SWidget> Choices);
+	/** What the loadout page is made of (the picks, and whether a count-in offers it): drawn again when it changes. */
+	FString LoadoutKey() const;
 	TSharedRef<SWidget> MakeFind();
 	TSharedRef<SWidget> MakeLobby();
 	TSharedRef<SWidget> MakeLobbyRules();
@@ -403,8 +431,6 @@ private:
 	TSharedPtr<SWidget> Masthead;
 	TSharedPtr<SWidget> Panel;
 	TSharedPtr<SBox> Content;
-	/** The front end's choice of hero, under the figure (MakeHeroPicker): filled as the main page is drawn, empty on every other page. */
-	TSharedPtr<SBox> HeroBox;
 	TSharedPtr<SWidget> Lobby;
 	TSharedPtr<SBox> LobbyContent;
 	/**
@@ -432,11 +458,11 @@ private:
 	/** The items of the dialog, which has the focus to itself while it is up (Asking): the page's are out of reach meanwhile. */
 	TArray<FFocusable> DialogFocusables;
 	bool bBuildingDialog = false;
-	/** The items of the settings over the lobby, likewise theirs alone while they show (bLobbySettingsShown); the lobby's are out of reach under them. */
-	TArray<FFocusable> LobbySettingsFocusables;
-	bool bBuildingLobbySettings = false;
-	const TArray<FFocusable>& Active() const { return Asking != EMenuAsk::None ? DialogFocusables : (bLobbySettingsShown ? LobbySettingsFocusables : Focusables); }
-	TArray<FFocusable>& Active() { return Asking != EMenuAsk::None ? DialogFocusables : (bLobbySettingsShown ? LobbySettingsFocusables : Focusables); }
+	/** The items of the overlay over the lobby (the settings or the loadout), likewise theirs alone while it shows (bLobbyOverlayShown); the lobby's are out of reach under it. */
+	TArray<FFocusable> LobbyOverlayFocusables;
+	bool bBuildingLobbyOverlay = false;
+	const TArray<FFocusable>& Active() const { return Asking != EMenuAsk::None ? DialogFocusables : (bLobbyOverlayShown ? LobbyOverlayFocusables : Focusables); }
+	TArray<FFocusable>& Active() { return Asking != EMenuAsk::None ? DialogFocusables : (bLobbyOverlayShown ? LobbyOverlayFocusables : Focusables); }
 	/** What had the focus before the dialog came up, to have it back as it goes. */
 	FString FocusBeforeAsk;
 	FString FocusName;
@@ -459,16 +485,18 @@ private:
 	FString ShownLobbyKey;
 	int32 ShownLobbyStatus = INDEX_NONE;
 	/**
-	 * The settings over the lobby (CheeseStrikeMenu::SettingsOverLobby): a blur over the lobby's page with the settings
-	 * drawn in a panel on it, shown while the player has them chosen, and drawn again as their tab or what they show
-	 * changes (OptionsKey); the lobby under it is drawn by its own rules meanwhile, never afresh for them.
+	 * The overlay over the lobby (CheeseStrikeMenu::LobbyOverlay: the settings, or the loadout): a blur over the lobby's
+	 * page with the page drawn in a panel on it, shown while the player has it chosen, and drawn again as its tab or
+	 * what it shows changes (OptionsKey, LoadoutKey); the lobby under it is drawn by its own rules meanwhile, never
+	 * afresh for it.
 	 */
-	TSharedPtr<SWidget> LobbySettings;
-	TSharedPtr<SBox> LobbySettingsContent;
-	FString ShownLobbySettingsKey;
-	bool bLobbySettingsShown = false;
-	/** The lobby's item that had the focus as the settings came over it, to have it back as they go. */
-	FString FocusBeforeLobbySettings;
+	TSharedPtr<SWidget> LobbyOverlay;
+	TSharedPtr<SBox> LobbyOverlayContent;
+	FString ShownLobbyOverlayKey;
+	bool bLobbyOverlayShown = false;
+	EMenuPage LobbyOverlayPage = EMenuPage::None;
+	/** The lobby's item that had the focus as the overlay came over it, to have it back as it goes. */
+	FString FocusBeforeLobbyOverlay;
 	/** The lobby's dropdowns as last drawn. */
 	TArray<TWeakPtr<class SMenuAnchor>> Dropdowns;
 	/** The blur over the game behind the pause menu. */

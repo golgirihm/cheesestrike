@@ -21,6 +21,7 @@
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikeGrenade.h"
 #include "CheeseStrikeGrenadeRules.h"
+#include "CheeseStrikeSmokeCloud.h"
 #include "CheeseStrikePlayerState.h"
 #include "CheeseStrikeShot.h"
 #include "CheeseStrikeWeapon.h"
@@ -283,6 +284,8 @@ void ACheeseStrikeProjectile::Fly(float DeltaSeconds)
 		Players.Add(*It);
 		Params.AddIgnoredActor(*It);
 	}
+	// Smoke stops no round.
+	ACheeseStrikeSmokeCloud::IgnoreClouds(Params, World);
 	FHitResult Wall;
 	const bool bWall = World->LineTraceSingleByChannel(Wall, From, To, ECC_Visibility, Params);
 	float Nearest = bWall ? Wall.Distance : Length;

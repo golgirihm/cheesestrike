@@ -7,6 +7,7 @@
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Rules/CheeseStrikeBadges.h"
+#include "Weapons/CheeseStrikeGrenadeRules.h"
 #include "CheeseStrikePlayerState.generated.h"
 
 class ACheeseStrikeWatchCamera;
@@ -58,10 +59,18 @@ public:
 	/** Server only. */
 	void SetJoinOrder(int32 Order) { JoinOrder = Order; }
 
-	/** The hero this player picked (an index of CheeseStrikeBodies::All), or INDEX_NONE while none has come (they wear CheeseStrikeBodies::DefaultHero then): set by their own machine from its settings (ACheeseStrikePlayerController::ServerPickHero); bots pick none. */
+	/**
+	 * This player's loadout (Rules/CheeseStrikeLoadout.h), as their own machine sent it from its settings
+	 * (ACheeseStrikePlayerController::ServerSetLoadout, which the server takes only when it may be changed): the hero
+	 * they picked (an index of CheeseStrikeBodies::All), or INDEX_NONE while none has come (they wear
+	 * CheeseStrikeBodies::DefaultHero then); the primary they carry (none while none has come: the usual one), and the
+	 * kind of grenade (CheeseStrikeGrenades::EGrenadeKind, the cheese grenade until one comes). Bots pick none.
+	 */
 	int32 GetHero() const { return Hero; }
+	FName GetPrimary() const { return Primary; }
+	CheeseStrikeGrenades::EGrenadeKind GetGrenade() const { return CheeseStrikeGrenades::KindAt(Grenade); }
 	/** Server only. */
-	void SetHero(int32 InHero) { Hero = InHero; }
+	void SetLoadout(FName InPrimary, CheeseStrikeGrenades::EGrenadeKind InGrenade, int32 InHero);
 
 	/** In Gun Game, the step of the ladder this player is on (CheeseStrikeArsenal::GunGameLadder), 0 the first. */
 	int32 GetGunLevel() const { return GunLevel; }
@@ -157,6 +166,10 @@ protected:
 	int32 JoinOrder = 0;
 	UPROPERTY(Replicated)
 	int32 Hero = INDEX_NONE;
+	UPROPERTY(Replicated)
+	FName Primary;
+	UPROPERTY(Replicated)
+	uint8 Grenade = 0;
 	UPROPERTY(Replicated)
 	int32 GunLevel = 0;
 	UPROPERTY(Replicated)
