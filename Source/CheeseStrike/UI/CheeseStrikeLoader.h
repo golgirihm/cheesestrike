@@ -8,10 +8,30 @@
 #include "Widgets/SLeafWidget.h"
 
 /**
- * The game's loader: a wheel of cheese with a bite taken out of it that turns
- * round, the bite opening and closing as it goes. Drawn in Slate alone from
- * the clock, so that it turns anywhere Slate draws, the loading screen's own
- * thread included.
+ * The game's spinner, as plain rules: a loop of pictures of a 3D cheese
+ * wedge with rounded corners turning about its vertical axis, rendered in
+ * Blender by tools/art/spinner_frames.py into Content/UI/Spinner as PNG
+ * files (read as files, not assets, so that the loading screen can draw
+ * them on its own thread before any asset is loaded), shown in turn from
+ * the clock.
+ */
+namespace CheeseStrikeLoader
+{
+	/** How many frames the loop has, how many are shown a second (one turn in two seconds), and each frame's size in pixels (square). */
+	constexpr int32 Frames = 48;
+	constexpr int32 FramesPerSecond = 24;
+	constexpr int32 FrameSize = 64;
+	/** Which frame shows `Seconds` into the loop (any time: it goes round, and round again). */
+	int32 FrameAt(double Seconds);
+	/** The file frame `Frame` is in (Content/UI/Spinner/spinner_NN.png). */
+	FString FramePath(int32 Frame);
+}
+
+/**
+ * The game's spinner: the cheese wedge turning (CheeseStrikeLoader), drawn
+ * from the clock, so that it turns anywhere Slate draws, the loading
+ * screen's own thread included; its frames are loaded as files once, the
+ * first time one is made (on the game's thread). `Radius` is half its size.
  */
 class SCheeseStrikeLoader : public SLeafWidget
 {

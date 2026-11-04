@@ -38,6 +38,8 @@ public:
 
 	/** A travel to `PendingURL` has been told to this machine: puts the cover up at once, for the loading screen to take over from. */
 	void RaiseForTravel(const FString& PendingURL);
+	/** Puts the cover up for `Seconds`, saying "Loading", for looking at it (the loading screen draws the same widget): CheeseStrikeCover on the console. */
+	void ShowForLooking(float Seconds);
 	bool IsUp() const { return Curtain.IsValid(); }
 	/** What the cover says now, or nothing when it is down. */
 	FString GetSaying() const;

@@ -207,6 +207,32 @@ void UCheeseStrikeCurtainSubsystem::RaiseForTravel(const FString& PendingURL)
 	UE_LOG(LogCheeseStrike, Display, TEXT("The cover goes up for the travel: %s"), *Where);
 }
 
+void UCheeseStrikeCurtainSubsystem::ShowForLooking(float Seconds)
+{
+	UGameViewportClient* Viewport = GetGameInstance() != nullptr ? GetGameInstance()->GetGameViewportClient() : nullptr;
+	if (Viewport == nullptr)
+	{
+		return;
+	}
+	Lift();
+	Curtain = MakeCover(FText::FromString(TEXT("Loading")), CoverTarget(Viewport));
+	Viewport->AddViewportWidgetContent(Curtain.ToSharedRef(), CurtainOrder);
+	GoingTo = TEXT("Loading");
+	UpSince = FPlatformTime::Seconds();
+	const float For = FMath::Max(Seconds, 0.1f);
+	Ticker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this, For](float)
+	{
+		if (FPlatformTime::Seconds() - UpSince < For)
+		{
+			return true;
+		}
+		Ticker.Reset();
+		Lift();
+		return false;
+	}));
+	UE_LOG(LogCheeseStrike, Display, TEXT("The cover is up for %.1f s, for looking at it"), For);
+}
+
 void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 {
 	UGameViewportClient* Viewport = GetGameInstance() != nullptr ? GetGameInstance()->GetGameViewportClient() : nullptr;
