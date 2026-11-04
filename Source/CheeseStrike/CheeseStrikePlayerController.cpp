@@ -292,7 +292,8 @@ bool ACheeseStrikePlayerController::IsViewReady() const
 	{
 		return Match->HasMatchEnded() || (Match->HasMatchStarted() && bThroughCharacter);
 	}
-	return ShownPage != EMenuPage::None || bThroughCharacter;
+	// A page of the menu over the level, with the figure before it whole and sharp (its textures streamed in, or waited for long enough).
+	return (ShownPage != EMenuPage::None && (MenuFigure == nullptr || MenuFigure->IsReady())) || bThroughCharacter;
 }
 
 bool ACheeseStrikePlayerController::IsLobbyReady() const
