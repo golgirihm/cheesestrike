@@ -14,6 +14,7 @@
 #include "Animation/CheeseStrikeBodies.h"
 #include "PlayTesting.h"
 #include "UI/CheeseStrikeMenuFigure.h"
+#include "Weapons/CheeseStrikeShot.h"
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
@@ -93,10 +94,13 @@ bool FTheFigureChangesHeroWithNothingOutOfPlace::RunTest(const FString& Paramete
 		}
 		const ACheeseStrikeMenuFigure* Made = Figure->Get();
 		TestEqual(TEXT("it wears the default hero to begin with"), Made->GetHero(), CheeseStrikeBodies::DefaultHero);
-		// It holds the Cheddar Blaster, the cheese weapon's model, on the right hand.
+		// It holds the loadout's primary, the Colby Carbine to begin with, the cheese weapon's model, on the right hand; and the one picked, at once.
 		const UStaticMesh* Held = Made->GetWeapon() != nullptr ? Made->GetWeapon()->GetStaticMesh() : nullptr;
-		TestTrue(FString::Printf(TEXT("it holds the Cheddar Blaster (%s)"), Held != nullptr ? *Held->GetName() : TEXT("nothing")), Held != nullptr && Held->GetName().Contains(TEXT("Blaster")));
+		TestTrue(FString::Printf(TEXT("it holds the Colby Carbine to begin with (%s)"), Held != nullptr ? *Held->GetName() : TEXT("nothing")), Held != nullptr && Held->GetName().Contains(TEXT("Carbine")));
 		TestEqual(TEXT("in its right hand"), Made->GetWeapon() != nullptr ? Made->GetWeapon()->GetAttachSocketName() : NAME_None, FName(TEXT("hand_r")));
+		Figure->Get()->ShowPrimary(CheeseStrikeWeapons::Blaster().Id);
+		const UStaticMesh* Picked = Made->GetWeapon() != nullptr ? Made->GetWeapon()->GetStaticMesh() : nullptr;
+		TestTrue(FString::Printf(TEXT("and the Cheddar Blaster once picked (%s)"), Picked != nullptr ? *Picked->GetName() : TEXT("nothing")), Picked != nullptr && Picked->GetName().Contains(TEXT("Blaster")));
 	});
 	Wait(0.5f);
 	Then([this, Figure]()

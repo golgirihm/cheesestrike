@@ -16,6 +16,8 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
+#include "CheeseStrikeBotController.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
@@ -23,6 +25,8 @@
 #include "Weapons/CheeseStrikeGrenade.h"
 #include "Weapons/CheeseStrikeGrenadeRules.h"
 #include "Weapons/CheeseStrikeGrenades.h"
+#include "Weapons/CheeseStrikeShot.h"
+#include "Weapons/CheeseStrikeSmokeCloud.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
@@ -323,6 +327,122 @@ bool FAHeldGrenadeIsSeenInTheRightHand::RunTest(const FString& Parameters)
 		TestTrue(TEXT("after the throw the weapon is back"), Weapon != nullptr && Weapon->GetModel(true) != nullptr && Weapon->GetModel(true)->IsVisible());
 		TestFalse(TEXT("its hands free"), Me == nullptr || Me->GetGrenades()->IsBusy());
 		TestFalse(TEXT("the grenade gone from the hand"), Me == nullptr || Me->GetGrenades()->GetHeldInView()->IsVisible());
+	});
+	StopPlaying();
+	return true;
+}
+
+#endif
+
+#if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FASmokeGrenadeHidesWhatIsBehindIt, "CheeseStrike.Play.ASmokeGrenadeHidesWhatIsBehindIt", GrenadePlayTests::Flags)
+
+bool FASmokeGrenadeHidesWhatIsBehindIt::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace GrenadePlayTests;
+	// The host and a dummy bot (it stands still, aims at nobody) four metres apart, facing each other; the smoke shortened for the test.
+	StartPlaying({1, TEXT("?Bots=1?BotSkill=dummy")});
+	TSharedRef<TWeakObjectPtr<ACheeseStrikeBotController>> Bot = MakeShared<TWeakObjectPtr<ACheeseStrikeBotController>>();
+	PutAt(0, HostSpot, HostYaw);
+	WaitUntil(TEXT("the bot in with its character"), 10.0f, [Bot]()
+	{
+		for (TActorIterator<ACheeseStrikeBotController> It(World(0)); It; ++It)
+		{
+			if (Cast<ACheeseStrikeCharacter>(It->GetPawn()) != nullptr)
+			{
+				*Bot = *It;
+				return true;
+			}
+		}
+		return false;
+	});
+	Then([this, Bot]()
+	{
+		if (IConsoleVariable* Seconds = IConsoleManager::Get().FindConsoleVariable(TEXT("CheeseStrike.SmokeSeconds")))
+		{
+			Seconds->Set(4.0f);
+		}
+		ACheeseStrikeCharacter* Dummy = Bot->IsValid() ? Cast<ACheeseStrikeCharacter>((*Bot)->GetPawn()) : nullptr;
+		if (!TestNotNull(TEXT("the dummy's character"), Dummy))
+		{
+			return;
+		}
+		Dummy->SetActorLocationAndRotation(JoinerSpot, FRotator(0.0f, JoinerYaw, 0.0f), false, nullptr, ETeleportType::TeleportPhysics);
+		(*Bot)->FaceTo(FRotator(0.0f, JoinerYaw, 0.0f));
+		Dummy->EndProtection();
+		CharacterOf(0, 0)->EndProtection();
+		// The host carries the Smoked Gouda.
+		CharacterOf(0, 0)->GetGrenades()->SetKind(CheeseStrikeGrenades::EGrenadeKind::Smoke);
+		TestTrue(TEXT("the host carries smoke"), CharacterOf(0, 0)->GetGrenades()->GetKind() == CheeseStrikeGrenades::EGrenadeKind::Smoke);
+	});
+	Wait(0.3f);
+	Then([this, Bot]()
+	{
+		TestTrue(TEXT("in the open, the bot sees the host"), Bot->IsValid() && (*Bot)->CanSeeInto(CharacterOf(0, 0)));
+	});
+	// Thrown nearly straight down at the floor ahead: it comes down between them, close by, and smokes there.
+	Play(0, TEXT("look 0 -80\ntap Grenade\nwait 0.5"));
+	Then([this]()
+	{
+		const TArray<ACheeseStrikeGrenade*> Flying = Grenades(0);
+		TestEqual(TEXT("a smoke grenade flies"), Flying.Num(), 1);
+		TestTrue(TEXT("of the smoke kind"), Flying.Num() == 1 && Flying[0]->GetKind() == CheeseStrikeGrenades::EGrenadeKind::Smoke);
+		TestEqual(TEXT("one fewer carried"), CountOf(CharacterOf(0, 0)), CheeseStrikeGrenades::SpawnCount - 1);
+	});
+	TSharedRef<TWeakObjectPtr<ACheeseStrikeSmokeCloud>> Cloud = MakeShared<TWeakObjectPtr<ACheeseStrikeSmokeCloud>>();
+	WaitUntil(TEXT("the cloud after the fuse"), 4.0f, [Cloud]()
+	{
+		for (TActorIterator<ACheeseStrikeSmokeCloud> It(World(0)); It; ++It)
+		{
+			*Cloud = *It;
+			return true;
+		}
+		return false;
+	});
+	Wait(0.6f);
+	Then([this, Bot, Cloud]()
+	{
+		const ACheeseStrikeSmokeCloud* Smoke = Cloud->Get();
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		if (!TestNotNull(TEXT("the cloud"), Smoke) || !TestNotNull(TEXT("the host"), Host))
+		{
+			return;
+		}
+		TestTrue(FString::Printf(TEXT("it lies between them (%.0f cm from the host)"), FVector::Dist2D(Smoke->GetActorLocation(), Host->GetActorLocation())), FVector::Dist2D(Smoke->GetActorLocation(), Host->GetActorLocation()) < 320.0f);
+		TestTrue(TEXT("it blocks sight while it lasts"), Smoke->BlocksSight());
+		TestTrue(FString::Printf(TEXT("and shows its cards (%d)"), Smoke->GetCardCount()), Smoke->GetCardCount() >= 80);
+		TestFalse(TEXT("the bot can't see the host through it"), Bot->IsValid() && (*Bot)->CanSeeInto(Host));
+		TestTrue(TEXT("nobody was hurt by it"), Host->GetHealth() == CheeseStrikeWeapons::MaxHealth);
+		// A shot goes through the smoke: the host fires at the dummy's chest.
+		ACheeseStrikeCharacter* Dummy = Bot->IsValid() ? Cast<ACheeseStrikeCharacter>((*Bot)->GetPawn()) : nullptr;
+		if (Dummy != nullptr && Controller(0) != nullptr && Controller(0)->PlayerCameraManager != nullptr)
+		{
+			Controller(0)->SetControlRotation((Dummy->ChestAt() - Controller(0)->PlayerCameraManager->GetCameraLocation()).Rotation());
+		}
+	});
+	Play(0, TEXT("hold Fire\nwait 0.6\nrelease Fire\nwait 0.2"));
+	Then([this, Bot]()
+	{
+		const ACheeseStrikeCharacter* Dummy = Bot->IsValid() ? Cast<ACheeseStrikeCharacter>((*Bot)->GetPawn()) : nullptr;
+		TestTrue(FString::Printf(TEXT("shots pass through the smoke (the dummy's health %.0f)"), Dummy != nullptr ? Dummy->GetHealth() : -1.0f), Dummy != nullptr && Dummy->GetHealth() < CheeseStrikeWeapons::MaxHealth);
+	});
+	WaitUntil(TEXT("the cloud gone"), 8.0f, []()
+	{
+		for (TActorIterator<ACheeseStrikeSmokeCloud> It(World(0)); It; ++It)
+		{
+			return false;
+		}
+		return true;
+	});
+	Then([this, Bot]()
+	{
+		TestTrue(TEXT("gone, the bot sees the host again"), Bot->IsValid() && (*Bot)->CanSeeInto(CharacterOf(0, 0)));
+		if (IConsoleVariable* Seconds = IConsoleManager::Get().FindConsoleVariable(TEXT("CheeseStrike.SmokeSeconds")))
+		{
+			Seconds->Set(0.0f);
+		}
 	});
 	StopPlaying();
 	return true;

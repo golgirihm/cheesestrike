@@ -1,0 +1,15 @@
+# Joins the host of lobby_loadout.txt: the joiner's lobby, then the loadout
+# over it (its LOADOUT button, through CheeseStrikePage), a pick, and Escape back.
+wait 3
+shot lobby_loadout_client_1_lobby
+cmd CheeseStrikePage Loadout
+wait 1
+shot lobby_loadout_client_2_page
+cmd CheeseStrikeLoadout blaster smoke twinblast
+wait 1
+shot lobby_loadout_client_3_picked
+key Escape
+wait 1
+shot lobby_loadout_client_4_back
+wait 12
+quit

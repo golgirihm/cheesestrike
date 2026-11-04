@@ -283,7 +283,8 @@ void ACheeseStrikePlayerController::CheeseStrikeHero(const FString& Hero)
 bool ACheeseStrikePlayerController::IsLoadoutOffered() const
 {
 	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
-	if (Match == nullptr || !Match->HasMatchStarted() || Match->HasMatchEnded() || !IsInAMatch())
+	// Alone on a level too (tools/play.ps1 -Countdown), for looking at it; the practice range counts nothing.
+	if (Match == nullptr || !Match->HasMatchStarted() || Match->HasMatchEnded())
 	{
 		return false;
 	}

@@ -188,3 +188,38 @@ bool FABotThrowsAGrenadeSensibly::RunTest(const FString& Parameters)
 }
 
 #endif
+
+#if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSmokedGoudaSmokesAndHarmsNobody, "CheeseStrike.Weapons.TheSmokedGoudaSmokesAndHarmsNobody", GrenadeTests::Flags)
+
+bool FTheSmokedGoudaSmokesAndHarmsNobody::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeGrenades;
+	// Two kinds, each with its name and its word, found by either.
+	TestEqual(TEXT("two kinds"), NumKinds, 2);
+	TestEqual(TEXT("the cheese grenade"), FString(NameOf(EGrenadeKind::Cheese)), FString(Name));
+	TestEqual(TEXT("and the Smoked Gouda"), FString(NameOf(EGrenadeKind::Smoke)), FString(TEXT("Smoked Gouda")));
+	TestEqual(TEXT("kept by their words"), FString(KeyOf(EGrenadeKind::Cheese)) + TEXT(" ") + KeyOf(EGrenadeKind::Smoke), FString(TEXT("cheese smoke")));
+	TestTrue(TEXT("found by the word"), KindFromKey(TEXT("smoke")).IsSet() && *KindFromKey(TEXT("smoke")) == EGrenadeKind::Smoke);
+	TestTrue(TEXT("or the name, in any case"), KindFromKey(TEXT("SMOKED GOUDA")).IsSet() && KindFromKey(TEXT("cheese grenade")).Get(EGrenadeKind::Smoke) == EGrenadeKind::Cheese);
+	TestFalse(TEXT("anything else names none"), KindFromKey(TEXT("gouda")).IsSet() || KindFromKey(TEXT("")).IsSet());
+	TestTrue(TEXT("as replicated, any other number is the cheese grenade"), KindAt(1) == EGrenadeKind::Smoke && KindAt(0) == EGrenadeKind::Cheese && KindAt(7) == EGrenadeKind::Cheese);
+	// The smoke's fuse is shorter, and its burst harms nobody; the cloud grows, lasts and thins as the design says.
+	TestEqual(TEXT("the cheese grenade's fuse is its own"), FuseOf(EGrenadeKind::Cheese), Fuse);
+	TestEqual(TEXT("the smoke's a second and a half"), FuseOf(EGrenadeKind::Smoke), 1.5f);
+	TestTrue(TEXT("only the cheese grenade harms"), Harms(EGrenadeKind::Cheese) && !Harms(EGrenadeKind::Smoke));
+	TestTrue(TEXT("between 80 and 150 cards"), CloudCards >= 80 && CloudCards <= 150);
+	TestEqual(TEXT("about five metres across"), CloudAcross, 500.0f);
+	TestEqual(TEXT("for twelve seconds"), CloudLife, 12.0f);
+	TestTrue(TEXT("it grows to its size in a second"), CloudRadiusAt(0.0f) < 1.0f && CloudRadiusAt(0.5f) > CloudAcross * 0.3f && FMath::IsNearlyEqual(CloudRadiusAt(CloudGrowSeconds), CloudAcross * 0.5f, 0.01f));
+	TestTrue(TEXT("and stays"), FMath::IsNearlyEqual(CloudRadiusAt(6.0f), CloudAcross * 0.5f, 0.01f));
+	TestTrue(TEXT("whole until its last three seconds"), CloudOpacityAt(1.0f) == 1.0f && CloudOpacityAt(CloudLife - CloudThinSeconds) == 1.0f);
+	TestTrue(TEXT("thinning over them"), CloudOpacityAt(CloudLife - 1.5f) > 0.4f && CloudOpacityAt(CloudLife - 1.5f) < 0.6f);
+	TestTrue(TEXT("gone at the end"), CloudOpacityAt(CloudLife) == 0.0f && CloudRadiusAt(CloudLife) == 0.0f);
+	TestTrue(TEXT("it blocks sight while at least half as thick"), CloudBlocksSightAt(0.2f) && CloudBlocksSightAt(CloudLife - CloudThinSeconds * 0.5f) && !CloudBlocksSightAt(CloudLife - 1.0f) && !CloudBlocksSightAt(CloudLife));
+	TestTrue(TEXT("its sphere sits inside its cards"), CloudSightRadius < CloudAcross * 0.5f && CloudSightRadius > CloudAcross * 0.3f);
+	return true;
+}
+
+#endif

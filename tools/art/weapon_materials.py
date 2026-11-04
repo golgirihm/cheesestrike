@@ -424,6 +424,9 @@ try:
     weapon_instance("MI_GrenadeCheese", parent, None, {"UseTextures": 0.0, "CheeseAll": 1.0, "MottleScale": 0.9, "Marble": 1.6, "Holes": 0.5, "HoleSize": 0.75, "CheeseRoughness": 0.5},
                     {"CheeseColor": (0.98, 0.78, 0.16, 1.0), "CheeseColorB": (0.93, 0.66, 0.1, 1.0)})
     weapon_instance("MI_GrenadeMetal", parent, None, {"UseTextures": 0.0, "PlainRoughness": 0.42, "PlainMetallic": 1.0}, {"PlainColor": (0.42, 0.42, 0.4, 1.0)})
+    # The Smoked Gouda (wave 15): the same frag in a dark smoked rind, its holes few and small, matte.
+    weapon_instance("MI_GrenadeSmoked", parent, None, {"UseTextures": 0.0, "CheeseAll": 1.0, "MottleScale": 1.4, "Marble": 0.8, "Holes": 0.15, "HoleSize": 0.5, "CheeseRoughness": 0.78},
+                    {"CheeseColor": (0.26, 0.14, 0.06, 1.0), "CheeseColorB": (0.17, 0.09, 0.04, 1.0)})
     # The cheese weapons modelled in Blender (tools/art/cheese_weapons.py), slot by slot: plain colours, no maps, each
     # part all cheese, all rind or wax, or plain steel and black polymer.
     plain = {"UseTextures": 0.0}

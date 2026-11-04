@@ -15,6 +15,7 @@
 #include "CheeseStrikePlayerController.h"
 #include "CheeseStrikePlayerState.h"
 #include "PlayTesting.h"
+#include "Rules/CheeseStrikeLoadout.h"
 #include "Rules/CheeseStrikeRules.h"
 #include "Rules/CheeseStrikeStart.h"
 #include "UI/CheeseStrikeTones.h"
@@ -28,12 +29,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheMatchCountsInAndProtectionEndsOnAttackOrTim
 bool FTheMatchCountsInAndProtectionEndsOnAttackOrTime::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeStart;
-	// The count: three seconds unless the URL says, never more than ten; a later round's is two, none if the match has none.
-	TestEqual(TEXT("a match counts three seconds"), CountdownFrom(TEXT("?Mode=Elimination")), 3.0f);
+	// The count: three seconds in Gun Game (eight in a mode with a loadout, CheeseStrike.Rules.TheLoadoutIsPickedBeforePlayAndLengthensTheCount)
+	// unless the URL says, never more than ten; a later round's is two, none if the match has none.
+	TestEqual(TEXT("a match counts three seconds"), CountdownFrom(TEXT("?Mode=GunGame")), 3.0f);
 	TestEqual(TEXT("or as the URL says"), CountdownFrom(TEXT("?StartNow?Countdown=5")), 5.0f);
 	TestEqual(TEXT("none, for the tests"), CountdownFrom(TEXT("?Countdown=0")), 0.0f);
 	TestEqual(TEXT("never more than ten"), CountdownFrom(TEXT("?Countdown=60")), MostCountdown);
-	TestEqual(TEXT("nothing that isn't a number"), CountdownFrom(TEXT("?Countdown=soon")), Countdown);
+	TestEqual(TEXT("nothing that isn't a number"), CountdownFrom(TEXT("?Mode=GunGame?Countdown=soon")), Countdown);
 	TestEqual(TEXT("a later round counts two"), RoundCountdownFor(Countdown), 2.0f);
 	TestEqual(TEXT("or the match's, if shorter"), RoundCountdownFor(1.0f), 1.0f);
 	TestEqual(TEXT("none if it has none"), RoundCountdownFor(0.0f), 0.0f);
@@ -193,11 +195,14 @@ bool FTheCountHoldsEveryoneAndReachesTheJoiner::RunTest(const FString& Parameter
 		TestFalse(TEXT("the host can't act"), Character(0)->CanAct());
 		TestFalse(TEXT("nor the joiner, on their machine"), Character(1)->CanAct());
 		TestFalse(TEXT("nor on the server's"), CharacterOf(1, 0) != nullptr && CharacterOf(1, 0)->CanAct());
-		// Both see it counting in the middle of the screen.
+		// Both have the loadout page up, saying the seconds (the HUD's own glyphs come for the last three); put away, so that the keys below are the game's.
 		for (int32 Each = 0; Each < 2; ++Each)
 		{
 			const CheeseStrikeStart::FShown Shown = CheeseStrikeStart::Shown(Now(Each), GameState(Each)->GetGoAt());
-			TestTrue(FString::Printf(TEXT("player %d sees a second counting (%s)"), Each, *Shown.Text), !Shown.Text.IsEmpty() && !Shown.bGo);
+			TestTrue(FString::Printf(TEXT("player %d sees no glyph yet (%s)"), Each, *Shown.Text), Shown.Text.IsEmpty());
+			TestTrue(FString::Printf(TEXT("the loadout page is offered to player %d"), Each), Controller(Each)->IsLoadoutOffered());
+			TestTrue(TEXT("saying the seconds"), CheeseStrikeLoadout::CountText(false, GameState(Each)->SecondsToGo()).StartsWith(TEXT("THE MATCH BEGINS IN ")));
+			Controller(Each)->DismissLoadout();
 		}
 		// Protected from the count's end, not from coming in.
 		TestTrue(TEXT("both are protected"), Character(0)->IsProtected() && Character(1)->IsProtected());
@@ -338,7 +343,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEachRoundCountsIn, "CheeseStrike.Play.EachRoun
 bool FEachRoundCountsIn::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
-	// Elimination with a count of three before the match, so two before each later round.
+	// Elimination with a count of three before the match (its loadout's would be eight), so no more than that before each later round (five with a loadout).
 	StartPlaying({2, TEXT("?Mode=Elimination?Countdown=3?RoundTime=60")});
 	WaitUntil(TEXT("the first round's count ending"), 8.0f, []() { return !GameState(0)->IsFrozen() && !GameState(1)->IsFrozen(); });
 	Then([this]()
@@ -354,7 +359,7 @@ bool FEachRoundCountsIn::RunTest(const FString& Parameters)
 	{
 		const ACheeseStrikeGameState* Host = GameState(0);
 		AddInfo(FString::Printf(TEXT("Round two counts %.1f s more"), Host->SecondsToGo()));
-		TestTrue(TEXT("round two counts in"), Host->IsFrozen() && Host->SecondsToGo() <= CheeseStrikeStart::RoundCountdown + 0.1f);
+		TestTrue(TEXT("round two counts in"), Host->IsFrozen() && Host->SecondsToGo() <= CheeseStrikeStart::RoundCountdownFor(3.0f, true) + 0.1f);
 		TestTrue(TEXT("on the joiner's machine too"), GameState(1)->IsFrozen() && FMath::IsNearlyEqual(GameState(1)->GetGoAt(), Host->GetGoAt()));
 		TestEqual(TEXT("with the round's clock standing at its time"), Host->SecondsLeftInRound(), 60.0f);
 		TestFalse(TEXT("holding everyone"), Character(0)->CanAct());
