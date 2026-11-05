@@ -54,6 +54,13 @@ struct FCheeseStrikeGripIK : public FAnimNode_TwoBoneIK
 	/** Where the hand closes round the weapon, in the anchor's space (cm), if the weapon says. */
 	bool bHasHold = false;
 	FVector Hold = FVector::ZeroVector;
+	/**
+	 * Holding a handle in the fist (the Cheese Stick, held as a sledgehammer): the hand turned so that its fist
+	 * (CheeseStrikeArms::FFist) closes round the handle at Hold, which runs `HandleAlong` (in the anchor's space) on
+	 * toward the head out of its thumb's side, the fingers pointing on from the forearm; rather than as the idle has it.
+	 */
+	bool bFist = false;
+	FVector HandleAlong = FVector::ForwardVector;
 
 	/** The hand's place and turn relative to the anchor in the idle, and where the middle of its closed fingers is in the hand's own space, once measured. */
 	FTransform Grip = FTransform::Identity;
@@ -73,4 +80,9 @@ struct FCheeseStrikeGripIK : public FAnimNode_TwoBoneIK
 
 private:
 	FBoneReference PalmReferences[UE_ARRAY_COUNT(CheeseStrikeGrip::PalmBones)];
+	/** The hand's fist, from the skeleton's reference pose. */
+	FVector FistCentre = FVector::ZeroVector;
+	FVector FistHandle = FVector::RightVector;
+	FVector FistFingers = FVector::ForwardVector;
+	bool bFistKnown = false;
 };

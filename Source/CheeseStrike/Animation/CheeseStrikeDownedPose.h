@@ -70,7 +70,9 @@ namespace CheeseStrikeDowned
  * turned to look along the aim, two-bone IK for the arms (the left elbow on
  * the floor, the right hand out along the aim, the pistol turned with it) and
  * for the legs (out along the floor as far as there is room, scooting: each
- * pushing in turn, the hips shuffling). The whole is blended in by Alpha,
+ * pushing in turn, the hips shuffling), each lying on the floor under it as
+ * the character measured it (a slope, a step: Floor), and the whole raised if
+ * any bone would still be under it. The whole is blended in by Alpha,
  * bone by bone in local space, so that going down and getting up are a
  * movement, not a snap.
  */
@@ -98,6 +100,8 @@ struct FCheeseStrikeDownedPose : public FAnimNode_Base
 	float ScootPhase = 0.0f;
 	/** Whether this is the body its own player sees from inside. */
 	bool bFirstPerson = false;
+	/** The floor round the body (CheeseStrikeDowned::FFloor), which each part of it lies on. */
+	CheeseStrikeDowned::FFloor Floor;
 
 	/** Whether it has every bone it needs (logged once if not). */
 	bool HasBones() const { return bBones; }
@@ -130,6 +134,8 @@ private:
 	/** The left hand's fingers' joints (index, middle, ring, little, thumb; three each), laid open on the floor; if the body has them all. */
 	FBoneReference LeftFingers[5][3];
 	bool bLeftFingers = false;
+	/** The body's bones lying on the floor: the pelvis and what hangs from it, but the heroes' own guns (CheeseStrikeDowned::OwnGunBones). */
+	TArray<FCompactPoseBoneIndex> BodyBones;
 	bool bBones = false;
 	bool bToldMissing = false;
 };

@@ -539,7 +539,7 @@ bool FTheDualBurratasFireInTurn::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("%s: aimed, shot 3 within %.1f degrees"), *Name, Two->SpreadDegrees), SpreadFor(*Two, 3, true) < SpreadFor(*Two, 3, false) && SpreadFor(*Two, Two->BloomShots, true) == Two->SpreadDegrees);
 	}
 	TestTrue(TEXT("a weapon of one gun aims down its middle"), FMath::IsNearlyZero(CheeseStrikeWeaponLooks::For(Blaster().Id).Sight->X, 0.5f));
-	TestTrue(TEXT("the two a hand's width apart, turned in a few degrees; at the hip about a shoulder's width apart"), CheeseStrikeDual::AimHalfApart >= 5.0f && CheeseStrikeDual::AimHalfApart <= 9.0f && CheeseStrikeDual::Converge >= 1.0f && CheeseStrikeDual::Converge <= 6.0f
+	TestTrue(TEXT("aimed, the two either side of the crosshair, the hands clear of it, turned in a few degrees; at the hip about a shoulder's width apart"), CheeseStrikeDual::AimHalfApart >= 9.0f && CheeseStrikeDual::AimHalfApart <= 14.0f && CheeseStrikeDual::Converge >= 1.0f && CheeseStrikeDual::Converge <= 6.0f
 		&& CheeseStrikeDual::AimSpread < CheeseStrikeDual::HipHalfApart && CheeseStrikeDual::HipHalfApart >= 15.0f && CheeseStrikeDual::HipHalfApart <= 25.0f);
 	// Aligned: the body faces +Y (its right is -X); a hand whose gun lies along the hand's Y (as a weapon rides the hand:
 	// the mirror above keeps a frame's Y and Z and turns its X back) points 15 degrees right of that and 10 up; it is
@@ -707,19 +707,28 @@ bool FTheCheeseStickFellsAWideArc::RunTest(const FString& Parameters)
 	TestTrue(TEXT("a swing every 1.4 s, 3 m, 120 degrees"), Stick.FireInterval == 1.4f && Stick.Reach == 300.0f && Stick.ArcDegrees == 120.0f);
 	TestTrue(TEXT("a blow that kills"), Stick.Damage >= MaxHealth);
 	TestTrue(TEXT("a slower, wider swing than the knife's"), SwipeSecondsOf(Stick) > SwipeSecondsOf(Knife()) && Stick.SwipeSize > 1.0f && SwipeSecondsOf(Stick) < Stick.FireInterval);
-	// Wave 15: the swing shown 1.6 times slower than wave 14's 0.8 s, the length of its heavy whoosh; held upright in both
-	// hands (its look: the guard tipped up to about 60 degrees, the left hand on it above the right).
+	// Wave 15: the swing shown 1.6 times slower than wave 14's 0.8 s, the length of its heavy whoosh. Wave 16: held as a
+	// sledgehammer in both fists, the left up the handle from the right, its head over the right shoulder at rest, and
+	// swung from there: back over the shoulder, down onto straight ahead, on round to the lower left, and back.
 	TestTrue(FString::Printf(TEXT("the swing takes 1.28 s (%.2f)"), SwipeSecondsOf(Stick)), FMath::IsNearlyEqual(SwipeSecondsOf(Stick), 0.8f * 1.6f, 0.001f));
 	const FWeaponLook& StickLook = CheeseStrikeWeaponLooks::For(Stick.Id);
-	TestTrue(FString::Printf(TEXT("held about 60 degrees up at rest (%.0f over the knife's guard)"), StickLook.GuardPitchUp), StickLook.GuardPitchUp > 40.0f && StickLook.GuardPitchUp < 55.0f);
-	TestTrue(TEXT("in both hands: the left on the stick above the right"), StickLook.LeftHand.IsSet() && StickLook.LeftHand->Y < -10.0f && StickLook.Hold == ECheeseStrikeHold::Knife);
-	TestTrue(TEXT("the knife in one hand, the other free"), !CheeseStrikeWeaponLooks::For(Knife().Id).LeftHand.IsSet() && CheeseStrikeWeaponLooks::For(Knife().Id).GuardPitchUp == 0.0f);
-	const CheeseStrikeArms::FKnifeAt Upright = CheeseStrikeArms::KnifeGuard(StickLook.GuardPitchUp);
-	const CheeseStrikeArms::FKnifeAt Guard = CheeseStrikeArms::KnifeGuard();
-	const float UprightPitch = FMath::RadiansToDegrees(FMath::Asin(Upright.Blade.Z));
-	TestTrue(FString::Printf(TEXT("its tip stands up about 60 degrees (%.0f)"), UprightPitch), UprightPitch > 55.0f && UprightPitch < 65.0f && UprightPitch > FMath::RadiansToDegrees(FMath::Asin(Guard.Blade.Z)) + 25.0f);
-	TestTrue(TEXT("its spine still up over it"), FMath::IsNearlyZero(FVector::DotProduct(Upright.Blade, Upright.Spine), 0.001f) && Upright.Spine.Z > 0.0f);
-	TestTrue(TEXT("and the swipe starts and ends on that guard"), CheeseStrikeArms::KnifeSwipe(0.0f, 1.0f, StickLook.GuardPitchUp).Blade.Equals(Upright.Blade, 0.01f) && CheeseStrikeArms::KnifeSwipe(1.0f, 1.0f, StickLook.GuardPitchUp).Blade.Equals(Upright.Blade, 0.01f));
+	TestTrue(TEXT("a sledgehammer, held in the fist"), StickLook.bSledge && StickLook.bInFist && StickLook.Hold == ECheeseStrikeHold::Knife);
+	TestTrue(TEXT("in both hands: the left at its end, the right up the handle from it"), StickLook.LeftHand.IsSet() && FVector::DotProduct(*StickLook.LeftHand, StickLook.Along) < -5.0f && StickLook.FistAlong > 15.0f);
+	const FWeaponLook& KnifeLook = CheeseStrikeWeaponLooks::For(Knife().Id);
+	TestTrue(TEXT("the knife in one fist, the other free"), !KnifeLook.LeftHand.IsSet() && !KnifeLook.bSledge && KnifeLook.bInFist);
+	using namespace CheeseStrikeArms;
+	const FSledgeAt Rest = SledgeRest();
+	TestTrue(FString::Printf(TEXT("at rest its head up over the right shoulder (%.2f, %.2f, %.2f)"), Rest.Along.X, Rest.Along.Y, Rest.Along.Z), Rest.Along.Z > 0.6f && Rest.Along.Y > 0.4f && Rest.Along.X < 0.0f);
+	TestTrue(TEXT("the swing starts and ends there"), SledgeSwing(0.0f).Along.Equals(Rest.Along, 0.01f) && SledgeSwing(1.0f).Along.Equals(Rest.Along, 0.01f) && SledgeSwing(1.0f).Hand.IsNearlyZero(0.01f));
+	TestTrue(TEXT("wound back over the shoulder"), SledgeSwing(0.2f).Along.X < Rest.Along.X - 0.2f && SledgeSwing(0.2f).Along.Z > 0.3f);
+	const FSledgeAt Contact = SledgeSwing(SwipeContactPhase);
+	TestTrue(FString::Printf(TEXT("its head straight ahead as the blow lands (%.2f, %.2f, %.2f)"), Contact.Along.X, Contact.Along.Y, Contact.Along.Z), Contact.Along.X > 0.99f);
+	TestTrue(TEXT("coming down onto it from over the right"), SledgeSwing(SwipeContactPhase - 0.06f).Along.Z > 0.1f && SledgeSwing(SwipeContactPhase - 0.06f).Along.Y > 0.0f);
+	TestTrue(TEXT("and going on round to the lower left"), SledgeSwing(0.5f).Along.Y < -0.3f && SledgeSwing(0.58f).Along.Z < -0.3f);
+	// A knife on guard stands up out of the fist.
+	const FKnifeAt Guard = KnifeGuard();
+	TestTrue(FString::Printf(TEXT("the knife on guard stands up out of the fist (%.0f degrees)"), FMath::RadiansToDegrees(FMath::Asin(Guard.Blade.Z))), Guard.Blade.Z > FMath::Sin(FMath::DegreesToRadians(40.0f)) && Guard.Blade.X > 0.3f);
+	TestTrue(TEXT("and the swipe starts and ends on that guard"), KnifeSwipe(0.0f).Blade.Equals(Guard.Blade, 0.01f) && KnifeSwipe(1.0f).Blade.Equals(Guard.Blade, 0.01f));
 	const FVector Aim = FVector::ForwardVector;
 	TestTrue(TEXT("someone ahead at 2.5 m"), InArc(Stick, Aim, FVector(250.0f, 0.0f, 0.0f)));
 	TestTrue(TEXT("someone 55 degrees to the side"), InArc(Stick, Aim, FVector(250.0f, 0.0f, 0.0f).RotateAngleAxis(55.0f, FVector::UpVector)));

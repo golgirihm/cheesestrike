@@ -129,8 +129,9 @@ namespace
 			Look.Materials[1] = Material(TEXT("MI_MunsterRind"));
 			Look.Materials[2] = Material(TEXT("MI_GunSteel"));
 			Look.Materials[3] = Material(TEXT("MI_GunBlack"));
-			// Aimed, the eye between the two guns (FCheeseStrikeDualHold brings them up side by side either side of it).
-			Look.Sight = FVector(CheeseStrikeDual::AimHalfApart, -14.0f, 11.0f);
+			// Aimed, the eye between the two guns (FCheeseStrikeDualHold brings them up side by side either side of it), over
+			// their tops and far enough behind them that the hands sit clear of the middle of the view.
+			Look.Sight = FVector(CheeseStrikeDual::AimHalfApart, -32.0f, 16.0f);
 			Look.Muzzle = FVector(0.0f, 25.3f, 6.0f);
 			Look.FlashSize = 0.7f;
 			// Each hand holds its own.
@@ -197,9 +198,7 @@ namespace
 			Look.Sight = FVector(0.0f, -32.0f, 10.6f);
 			Look.Muzzle = FVector(0.0f, 20.8f, 7.6f);
 			Look.FlashSize = 0.6f;
-			// The left hand cupped round the right on the grip (a two-handed hold): its fingers close over the right hand's,
-			// a little below the grip's top and ahead of it.
-			Look.LeftHand = FVector(-4.5f, 2.5f, -2.5f);
+			// Held in the right hand alone (wave 16), the left let go and by the side (FCheeseStrikeFreeArm).
 			Look.Shots[0] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_01.Weapons_Pistol_Punch-Close_01");
 			Look.Shots[1] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_02.Weapons_Pistol_Punch-Close_02");
 			Look.Shots[2] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_03.Weapons_Pistol_Punch-Close_03");
@@ -223,8 +222,9 @@ namespace
 			Look.Materials[1] = Material(TEXT("MI_BurratasCream"));
 			Look.Materials[2] = Material(TEXT("MI_SwissRind"));
 			Look.Materials[3] = Material(TEXT("MI_GunSteel"));
-			// Aimed, the eye between the two guns (FCheeseStrikeDualHold brings them up side by side either side of it).
-			Look.Sight = FVector(CheeseStrikeDual::AimHalfApart, -31.6f, 10.7f);
+			// Aimed, the eye between the two guns (FCheeseStrikeDualHold brings them up side by side either side of it), over
+			// their knots and far enough behind them that the hands sit clear of the middle of the view.
+			Look.Sight = FVector(CheeseStrikeDual::AimHalfApart, -41.0f, 15.5f);
 			Look.Muzzle = FVector(0.0f, 19.0f, 7.5f);
 			// Each hand holds its own: the left hand isn't on the first gun (FCheeseStrikeDualHold places it).
 			Look.LeftHand.Reset();
@@ -292,8 +292,8 @@ namespace
 			Looks.Add(Look);
 		}
 		// The Cheese Stick: 1.2 m of string cheese, 9 cm across, in its red wrapper at the hand, peeled strands splaying at the
-		// striking end; made along -Y from its butt, gripped 15 cm from it, and turned as the knife is, but held upright in
-		// both hands (its tip pitched up about 60 degrees at rest, the left hand on it above the right).
+		// striking end; made along -Y from its butt, gripped 15 cm from it in the right fist, and held as a sledgehammer in
+		// both hands (wave 16), the left fist higher up the handle, its head over the right shoulder at rest.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("stick");
@@ -301,9 +301,11 @@ namespace
 			Look.PlainModel = Model(TEXT("Stick"), TEXT("CheeseStick"));
 			Look.Model = FTransform(FQuat(FRotator(0.0f, 180.0f, 0.0f)) * FQuat(FRotator(0.0f, 0.0f, 40.0f)) * FQuat(FRotator(60.0f, 0.0f, 0.0f)));
 			Look.Along = FVector(0.0f, -1.0f, 0.0f);
-			// Up to about 60 degrees from the knife guard's 13.
-			Look.GuardPitchUp = 47.0f;
-			Look.LeftHand = FVector(0.0f, -24.0f, 0.0f);
+			// The right fist up the handle from the wrapper, the left at its end, as a sledgehammer's are.
+			Look.bInFist = true;
+			Look.FistAlong = 16.0f;
+			Look.bSledge = true;
+			Look.LeftHand = FVector(0.0f, 11.0f, 0.0f);
 			Look.Materials[0] = Material(TEXT("MI_StringCheese"));
 			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
 			Look.FlashSize = 0.0f;
@@ -324,7 +326,9 @@ namespace
 			Look.Id = TEXT("knife");
 			Look.Hold = ECheeseStrikeHold::Knife;
 			Look.PlainModel = TEXT("/Game/CheeseStrike/Weapons/Knife/SM_CheeseKnife.SM_CheeseKnife");
-			// Turned about its length so that its flat shows, tipped up out of the fist, and turned to point forward.
+			// In the hand, in the fist, its blade out of the top of it (wave 16: it sat behind the hand); on a stand, turned
+			// about its length so that its flat shows, tipped up, and turned to point forward.
+			Look.bInFist = true;
 			Look.Model = FTransform(FQuat(FRotator(0.0f, 180.0f, 0.0f)) * FQuat(FRotator(0.0f, 0.0f, 40.0f)) * FQuat(FRotator(60.0f, 0.0f, 0.0f)));
 			// It came in pointing back: its tip is along -Y.
 			Look.Along = FVector(0.0f, -1.0f, 0.0f);
@@ -354,7 +358,7 @@ namespace CheeseStrikeWeaponLooks
 
 	FVector KnifeHand()
 	{
-		return FVector(30.0f, 16.0f, -17.0f);
+		return FVector(32.0f, 16.0f, -12.0f);
 	}
 
 	const TCHAR* const KnifeSwings[4] = {

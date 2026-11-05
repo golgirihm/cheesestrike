@@ -4,6 +4,7 @@
 #include "Animation/AnimInstanceProxy.h"
 #include "AnimationRuntime.h"
 #include "TwoBoneIK.h"
+#include "CheeseStrikeArmsPose.h"
 
 namespace CheeseStrikeDual
 {
@@ -85,7 +86,8 @@ void FCheeseStrikeDualHold::CacheBones_AnyThread(const FAnimationCacheBonesConte
 	ComponentPose.CacheBones(Context);
 	const FBoneContainer& Bones = Context.AnimInstanceProxy->GetRequiredBones();
 	bBones = DualBone(UpperR, TEXT("upperarm_r"), Bones) && DualBone(LowerR, TEXT("lowerarm_r"), Bones) && DualBone(HandR, TEXT("hand_r"), Bones)
-		&& DualBone(UpperL, TEXT("upperarm_l"), Bones) && DualBone(LowerL, TEXT("lowerarm_l"), Bones) && DualBone(HandL, TEXT("hand_l"), Bones);
+		&& DualBone(UpperL, TEXT("upperarm_l"), Bones) && DualBone(LowerL, TEXT("lowerarm_l"), Bones) && DualBone(HandL, TEXT("hand_l"), Bones)
+		&& DualBone(Head, TEXT("head"), Bones);
 	Correction = FTransform::Identity;
 	if (!bBones)
 	{
@@ -103,6 +105,25 @@ void FCheeseStrikeDualHold::CacheBones_AnyThread(const FAnimationCacheBonesConte
 		const FTransform MirroredRight = CheeseStrikeDual::Mirrored(RightInBody, FVector::ZeroVector, FVector::XAxisVector);
 		Correction = LeftInBody.GetRelativeTransform(MirroredRight);
 		Correction.SetScale3D(FVector::OneVector);
+	}
+	// And each finger's joint likewise, for closing the left hand's fingers as the right's are.
+	const TCHAR* const FingerNames[] = {TEXT("thumb"), TEXT("index"), TEXT("middle"), TEXT("ring"), TEXT("pinky")};
+	bFingers = true;
+	for (int32 Finger = 0; Finger < 5; ++Finger)
+	{
+		for (int32 Joint = 0; Joint < 3; ++Joint)
+		{
+			const FString Name = FString::Printf(TEXT("%s_0%d"), FingerNames[Finger], Joint + 1);
+			bFingers &= DualBone(Fingers[0][Finger][Joint], *(Name + TEXT("_r")), Bones) && DualBone(Fingers[1][Finger][Joint], *(Name + TEXT("_l")), Bones);
+			FingerCorrection[Finger][Joint] = FQuat::Identity;
+			const int32 RightJoint = Skeleton.FindBoneIndex(Fingers[0][Finger][Joint].BoneName);
+			const int32 LeftJoint = Skeleton.FindBoneIndex(Fingers[1][Finger][Joint].BoneName);
+			if (RightJoint != INDEX_NONE && LeftJoint != INDEX_NONE)
+			{
+				const FTransform MirroredJoint = CheeseStrikeDual::Mirrored(FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, RightJoint), FVector::ZeroVector, FVector::XAxisVector);
+				FingerCorrection[Finger][Joint] = FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, LeftJoint).GetRelativeTransform(MirroredJoint).GetRotation();
+			}
+		}
 	}
 }
 
@@ -122,8 +143,16 @@ void FCheeseStrikeDualHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FBoneContainer& Bones = Pose.GetPose().GetBoneContainer();
 	const FCompactPoseBoneIndex RightHand = HandR.GetCompactPoseIndex(Bones);
 	const FCompactPoseBoneIndex LeftHand = HandL.GetCompactPoseIndex(Bones);
-	// Across the body, toward its right: the body faces Forward, up is up.
-	const FVector Across = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+	// Across the body, toward its right: the body faces Forward, up is up; the mirror is the body's middle, or in its own
+	// player's view the view's own (through the eye, along the view), so that the pair sits evenly about the crosshair.
+	FVector Across = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+	FVector Middle = Origin;
+	if (bAboutEye)
+	{
+		const FVector ViewRight = View.RotateVector(FVector::RightVector);
+		Across = FVector(ViewRight.X, ViewRight.Y, 0.0).GetSafeNormal();
+		Middle = Pose.GetComponentSpaceTransform(Head.GetCompactPoseIndex(Bones)).TransformPosition(CameraAtHead);
+	}
 	const FTransform RightNow = Pose.GetComponentSpaceTransform(RightHand);
 	const FTransform LeftNow = Pose.GetComponentSpaceTransform(LeftHand);
 	// The right gun laid along the body's forward (the stance's own yaw may be a little out), turned in a little toward
@@ -135,10 +164,10 @@ void FCheeseStrikeDualHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FTransform Laid = CheeseStrikeDual::Aligned(RightNow, AlongInHand, Forward, FVector::UpVector, CheeseStrikeDual::Converge * Aimed);
 	FTransform RightTarget = RightNow;
 	RightTarget.SetRotation(FQuat::Slerp(RightNow.GetRotation(), Laid.GetRotation(), Alpha).GetNormalized());
-	const float HipOut = bFromMiddle ? FMath::Max(0.0f, Spread - static_cast<float>(FVector::DotProduct(RightNow.GetLocation() - Origin, Across))) : Spread;
+	const float HipOut = bFromMiddle ? FMath::Max(0.0f, Spread - static_cast<float>(FVector::DotProduct(RightNow.GetLocation() - Middle, Across))) : Spread;
 	RightTarget.AddToTranslation(Across * FMath::Lerp(HipOut, AimSpread, Aimed) * Alpha);
 	// The left hand where the right would be held the mirror way round.
-	const FTransform Mirror = Correction * CheeseStrikeDual::Mirrored(RightTarget, Origin, Across);
+	const FTransform Mirror = Correction * CheeseStrikeDual::Mirrored(RightTarget, Middle, Across);
 	FTransform LeftTarget = LeftNow;
 	LeftTarget.SetLocation(FMath::Lerp(LeftNow.GetLocation(), Mirror.GetLocation(), static_cast<double>(Alpha)));
 	LeftTarget.SetRotation(FQuat::Slerp(LeftNow.GetRotation(), Mirror.GetRotation(), Alpha).GetNormalized());
@@ -155,6 +184,40 @@ void FCheeseStrikeDualHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FVector RightElbow = DualReach(Pose, UpperR.GetCompactPoseIndex(Bones), LowerRight, RightHand, RightTarget, RightPole);
 	const FVector LeftElbowNow = Pose.GetComponentSpaceTransform(LowerL.GetCompactPoseIndex(Bones)).GetLocation();
 	const FVector LeftStancePole = LeftElbowNow + (LeftElbowNow - (Pose.GetComponentSpaceTransform(UpperL.GetCompactPoseIndex(Bones)).GetLocation() + LeftNow.GetLocation()) * 0.5).GetSafeNormal() * 50.0;
-	const FVector LeftPole = FMath::Lerp(LeftStancePole, DualMirrored(RightElbow, Origin, Across), static_cast<double>(Alpha));
+	const FVector LeftPole = FMath::Lerp(LeftStancePole, DualMirrored(RightElbow, Middle, Across), static_cast<double>(Alpha));
 	DualReach(Pose, UpperL.GetCompactPoseIndex(Bones), LowerL.GetCompactPoseIndex(Bones), LeftHand, LeftTarget, LeftPole);
+	// The right hand's fingers closed round its gun's grip, the index on the trigger (the stance's hold a two-handed
+	// pistol's, its fingers loose); and the left's closed round its own as the right's are: each joint the mirror of the
+	// right's, parent first, keeping its own length.
+	if (bFingers)
+	{
+		FBoneReference Closing[4][3];
+		FBoneReference Thumb[3];
+		for (int32 Joint = 0; Joint < 3; ++Joint)
+		{
+			Thumb[Joint] = Fingers[0][0][Joint];
+			for (int32 Finger = 0; Finger < 4; ++Finger)
+			{
+				Closing[Finger][Joint] = Fingers[0][Finger + 1][Joint];
+			}
+		}
+		if (Alpha >= 0.999f)
+		{
+			CheeseStrikeCloseFist(Pose, HandR, Closing, Thumb, true, true);
+		}
+		for (int32 Finger = 0; Finger < 5; ++Finger)
+		{
+			for (int32 Joint = 0; Joint < 3; ++Joint)
+			{
+				const FCompactPoseBoneIndex Right = Fingers[0][Finger][Joint].GetCompactPoseIndex(Bones);
+				const FCompactPoseBoneIndex Left = Fingers[1][Finger][Joint].GetCompactPoseIndex(Bones);
+				const FTransform Parent = Pose.GetComponentSpaceTransform(Bones.GetParentBoneIndex(Left));
+				FTransform Closed = Bones.GetRefPoseTransform(Left) * Parent;
+				const FQuat Wanted = FingerCorrection[Finger][Joint] * CheeseStrikeDual::Mirrored(Pose.GetComponentSpaceTransform(Right), Middle, Across).GetRotation();
+				Closed.SetRotation(FQuat::Slerp(Pose.GetComponentSpaceTransform(Left).GetRotation(), Wanted, Alpha).GetNormalized());
+				const FBoneTransform Set(Left, Closed);
+				Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
+			}
+		}
+	}
 }

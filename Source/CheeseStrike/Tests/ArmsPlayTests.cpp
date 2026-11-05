@@ -1,19 +1,24 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 // Tests that play the arms in the editor (see PlayTesting.h): every hero's
-// left hand on every weapon, in both bodies, before and after the knife;
+// left hand on every weapon, in both bodies, before and after the knife; the
+// Curd Pistol in the right hand alone; two guns either side of the
+// crosshair, neither hand over it;
 // the weapon in its own player's view at the hip and down the sights, held
 // steadier than the animations hold it, and following a look without a jump
 // at any frame rate; nothing of the body before the eyes at a sprint; a
 // slide's sprawl and lean; the knife's swipe reaching someone off to the
 // side, without a lunge; a body down lying on the floor, as every hero, on
-// flat ground and against a wall; and the view of a player down kept out of
-// the floor.
+// flat ground and against a wall, up and down a slope and by a step; and the
+// view of a player down kept out of the floor.
 
 #include "Misc/AutomationTest.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Animation/CheeseStrikeArmsPose.h"
@@ -76,6 +81,12 @@ namespace ArmsPlayTests
 			return 0.0f;
 		}
 		const FVector Wanted = Body->GetSocketTransform(TEXT("hand_r")).TransformPosition(Hold);
+		// A handle held in the fist (the Cheese Stick): the fist's middle, round the handle; else the middle of the closed fingers.
+		CheeseStrikeArms::FFist Fist;
+		if (Weapon->IsSledge() && Body->GetSkeletalMeshAsset() != nullptr && CheeseStrikeArms::FistOfSkeleton(Body->GetSkeletalMeshAsset()->GetRefSkeleton(), false, Fist))
+		{
+			return FVector::Dist(Body->GetSocketTransform(TEXT("hand_l")).TransformPosition(Fist.Centre), Wanted);
+		}
 		FVector Palm = FVector::ZeroVector;
 		for (const TCHAR* Bone : CheeseStrikeGrip::PalmBones)
 		{
@@ -130,14 +141,23 @@ bool FTheArmsHoldEveryWeapon::RunTest(const FString& Parameters)
 				TestTrue(FString::Printf(TEXT("%s: held low on the right at the hip (%.0f, %.0f, %.0f)"), *What, At.X, At.Y, At.Z), At.X > 0.0f && At.X < 60.0f && At.Y > 2.0f && At.Y < 35.0f && At.Z < -2.0f && At.Z > -45.0f);
 			});
 		}
-		// The pistol, held in both hands; the knife in one, the other up on guard.
-		Play(0, TEXT("tap Sidearm\nwait 0.7"));
+		// The pistol, held in the right hand alone, the left lowered by the side, out of view; the knife in one, the other
+		// up on guard.
+		Play(0, TEXT("tap Sidearm\nwait 0.9"));
 		Then([this, Who]()
 		{
 			if (const ACheeseStrikeCharacter* Character = Pawn(0))
 			{
 				TestEqual(Who + TEXT(": the pistol in hand"), Character->GetWeapon()->GetWeaponId(), CheeseStrikeWeapons::Pistol().Id);
-				CheckLeftHand(Character, Who + TEXT(" with the pistol"));
+				FVector Hold;
+				TestFalse(Who + TEXT(": the pistol is held in the right hand alone"), Character->GetWeapon()->LeftHandHoldFor(Character->GetMesh(), Hold));
+				for (const USkeletalMeshComponent* Body : {Character->GetFirstPersonMesh(), Character->GetMesh()})
+				{
+					const float Below = Body->GetBoneLocation(TEXT("hand_r")).Z - Body->GetBoneLocation(TEXT("hand_l")).Z;
+					TestTrue(FString::Printf(TEXT("%s with the pistol: the left hand let go, low by the side in %s (%.0f cm under the right)"), *Who, Body == Character->GetMesh() ? TEXT("the body others see") : TEXT("its own view"), Below), Below > 30.0f);
+				}
+				const FVector Left = ViewOf(Character).InverseTransformPosition(Character->GetFirstPersonMesh()->GetBoneLocation(TEXT("hand_l")));
+				TestTrue(FString::Printf(TEXT("%s with the pistol: the left hand out of view (%.0f, %.0f, %.0f)"), *Who, Left.X, Left.Y, Left.Z), Left.X < 5.0f || Left.Z < -Left.X * 0.6f);
 			}
 		});
 		Play(0, TEXT("tap Knife\nwait 0.7"));
@@ -177,6 +197,46 @@ bool FTheArmsHoldEveryWeapon::RunTest(const FString& Parameters)
 		}
 	});
 	Play(0, TEXT("release Aim\nwait 0.3"));
+	// Two guns aimed, as every hero: the pair either side of the crosshair, evenly, and neither hand nor its fingers over
+	// the middle of the view.
+	for (int32 Hero = 0; Hero < CheeseStrikeBodies::All().Num(); ++Hero)
+	{
+		for (const TCHAR* Two : {TEXT("burratas"), TEXT("munster")})
+		{
+			Play(0, FString::Printf(TEXT("cmd CheeseStrikeBody %d %d\ncmd CheeseStrikeArm %s\nwait 0.6\nhold Aim\nwait 0.9"), Hero, Hero % 2, Two));
+			Then([this, Hero, Two]()
+			{
+				const ACheeseStrikeCharacter* Character = Pawn(0);
+				if (Character == nullptr)
+				{
+					return;
+				}
+				const FString What = FString::Printf(TEXT("%s with the %s aimed"), CheeseStrikeBodies::All()[Hero].Name, Two);
+				const FTransform View = ViewOf(Character);
+				const USkeletalMeshComponent* Body = Character->GetFirstPersonMesh();
+				const FVector Right = View.InverseTransformPosition(Body->GetBoneLocation(TEXT("hand_r")));
+				const FVector Left = View.InverseTransformPosition(Body->GetBoneLocation(TEXT("hand_l")));
+				TestTrue(FString::Printf(TEXT("%s: the hands either side of the crosshair, evenly (%.1f and %.1f cm)"), *What, Right.Y, Left.Y), Right.Y > 3.0f && Left.Y < -3.0f && FMath::Abs(Right.Y + Left.Y) < 2.5f);
+				float Nearest = 180.0f;
+				FString NearestBone;
+				for (const TCHAR* Side : {TEXT("_r"), TEXT("_l")})
+				{
+					for (const TCHAR* Bone : {TEXT("hand"), TEXT("thumb_02"), TEXT("thumb_03"), TEXT("index_02"), TEXT("index_03"), TEXT("middle_03")})
+					{
+						const FVector At = View.InverseTransformPosition(Body->GetBoneLocation(FName(FString(Bone) + Side)));
+						const float Off = At.X > 0.0f ? FMath::RadiansToDegrees(FMath::Atan2(FVector2D(At.Y, At.Z).Size(), At.X)) : 180.0f;
+						if (Off < Nearest)
+						{
+							Nearest = Off;
+							NearestBone = FString(Bone) + Side;
+						}
+					}
+				}
+				TestTrue(FString::Printf(TEXT("%s: nothing of the hands near the crosshair (%s %.1f degrees off it)"), *What, *NearestBone, Nearest), Nearest > 10.0f);
+			});
+			Play(0, TEXT("release Aim\nwait 0.3"));
+		}
+	}
 	StopPlaying();
 	return true;
 }
@@ -404,15 +464,12 @@ namespace ArmsPlayTests
 {
 	/** How far under the floor a bone of a body lying on it may be (cm). */
 	constexpr float FloorSlack = 2.0f;
-	/** The heroes' own guns' bones (hidden with their sections, or skinned into a body section: Murdock's sniper can; as tools/art/ragdolls.py knows them), whose children are no part of the body. */
-	const TCHAR* const OwnGunBones[] = {TEXT("gun"), TEXT("shotgun_base"), TEXT("sniper_can_arm_01"), TEXT("trap_handle"), TEXT("weapon"), TEXT("weapon_l"), TEXT("pistol"), TEXT("ult_weapon_l"), TEXT("ult_weapon_r"), TEXT("grenade")};
-
-	/** Whether `Bone` of `Body` is one of the heroes' own guns' bones, or hangs from one. */
+	/** Whether `Bone` of `Body` is one of the heroes' own guns' bones (hidden with their sections, or skinned into a body section: Murdock's sniper can), or hangs from one. */
 	bool IsOwnGunBone(const USkeletalMeshComponent* Body, FName Bone)
 	{
 		for (FName Each = Bone; Each != NAME_None; Each = Body->GetParentBone(Each))
 		{
-			for (const TCHAR* Gun : OwnGunBones)
+			for (const TCHAR* Gun : CheeseStrikeDowned::OwnGunBones)
 			{
 				if (Each == FName(Gun))
 				{
@@ -545,6 +602,125 @@ bool FADownedBodyLiesOnTheFloor::RunTest(const FString& Parameters)
 			});
 		}
 		Play(0, TEXT("cmd CheeseStrikeBody\ncmd CheeseStrikeRevive\nwait 1.5"));
+	}
+	StopPlaying();
+	return true;
+}
+
+namespace ArmsPlayTests
+{
+	/** The floor under the host standing at Spot, and the blocks put down for a test, gone after it. */
+	float SpotFloor = 0.0f;
+	TArray<TWeakObjectPtr<AActor>> Blocks;
+
+	/** A block of `Size` (cm) with its middle at `At`, turned `Turn`, that stops players as the floor does. */
+	void PutBlock(const FVector& At, const FRotator& Turn, const FVector& Size)
+	{
+		const ACheeseStrikeCharacter* Host = PlayTesting::Character(0);
+		UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+		if (Host == nullptr || Cube == nullptr)
+		{
+			PlayTesting::Test()->AddError(TEXT("no world or no cube for a block"));
+			return;
+		}
+		FActorSpawnParameters Parameters;
+		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AStaticMeshActor* Block = Host->GetWorld()->SpawnActor<AStaticMeshActor>(At, Turn, Parameters);
+		Block->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+		Block->GetStaticMeshComponent()->SetStaticMesh(Cube);
+		Block->GetStaticMeshComponent()->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+		Block->SetActorScale3D(Size / 100.0f);
+		Blocks.Add(Block);
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FADownedBodyLiesOnASlopeOrAStep, "CheeseStrike.Play.ADownedBodyLiesOnASlopeOrAStep", ArmsPlayTests::Flags)
+
+bool FADownedBodyLiesOnASlopeOrAStep::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace ArmsPlayTests;
+	StartPlaying({1, TEXT("?Mode=Execution")});
+	PutAt(0, Spot, SpotYaw);
+	Wait(0.5f);
+	Then([]()
+	{
+		if (const ACheeseStrikeCharacter* Host = Pawn(0))
+		{
+			SpotFloor = Host->GetActorLocation().Z - Host->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		}
+	});
+	// Down on a slope of 20 degrees, the legs up it and down it; with a step of 30 cm just behind; and on a step's edge, the
+	// legs out over the drop; as every hero: nothing of the body others see, nor of its own player's, under the floor.
+	struct FCase
+	{
+		const TCHAR* Where;
+		float Yaw;
+		/** The block: its middle from Spot on the floor (cm: along the facing, up), its pitch, and its size along the facing, across and up. */
+		FVector Middle;
+		float Pitch;
+		FVector Size;
+		/** Where the host stands, from Spot: up from the floor. */
+		float StandUp;
+	};
+	const FCase Cases[] = {
+		{TEXT("with the legs up a slope"), SpotYaw, FVector(0.0f, 0.0f, 60.0f), 20.0f, FVector(500.0f, 300.0f, 20.0f), 70.0f},
+		{TEXT("with the legs down a slope"), SpotYaw + 180.0f, FVector(0.0f, 0.0f, 60.0f), 20.0f, FVector(500.0f, 300.0f, 20.0f), 70.0f},
+		{TEXT("with a step just behind"), SpotYaw, FVector(-187.0f, 0.0f, 15.0f), 0.0f, FVector(300.0f, 300.0f, 30.0f), 2.0f},
+		{TEXT("on a step's edge, the legs over the drop"), SpotYaw, FVector(-140.0f, 0.0f, 15.0f), 0.0f, FVector(300.0f, 300.0f, 30.0f), 32.0f},
+	};
+	for (const FCase& Case : Cases)
+	{
+		Then([Case]()
+		{
+			// The slope rises along the way the spot faces (+Y), whichever way the host lies on it.
+			const FVector Along = FRotator(0.0f, SpotYaw, 0.0f).Vector();
+			const FVector Floor(Spot.X, Spot.Y, SpotFloor);
+			const float Offset = Case.Yaw == SpotYaw ? 1.0f : -1.0f;
+			PutBlock(Floor + Along * Case.Middle.X * Offset + FVector(0.0f, 0.0f, Case.Middle.Z) - FVector(0.0f, 0.0f, Case.Size.Z * 0.5f * FMath::Cos(FMath::DegreesToRadians(Case.Pitch))),
+				FRotator(Case.Pitch, SpotYaw, 0.0f), Case.Size);
+		});
+		Then([Case]()
+		{
+			if (ACheeseStrikeCharacter* Host = Pawn(0))
+			{
+				Host->TeleportTo(FVector(Spot.X, Spot.Y, SpotFloor + Case.StandUp + Host->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 5.0f), FRotator(0.0f, Case.Yaw, 0.0f));
+				if (AController* Controller = Host->GetController())
+				{
+					Controller->SetControlRotation(FRotator(0.0f, Case.Yaw, 0.0f));
+				}
+			}
+		});
+		Play(0, TEXT("wait 0.8\ncmd CheeseStrikeDie\nwait 1.6"));
+		for (int32 Hero = 0; Hero < CheeseStrikeBodies::All().Num(); ++Hero)
+		{
+			Play(0, FString::Printf(TEXT("cmd CheeseStrikeBody %d %d\nwait 1.2"), Hero, Hero % 2));
+			Then([this, Hero, Case]()
+			{
+				const ACheeseStrikeCharacter* Host = Pawn(0);
+				if (Host == nullptr || !TestTrue(TEXT("down"), Host->IsDowned()))
+				{
+					return;
+				}
+				const FString Who = CheeseStrikeBodies::All()[Hero].Name;
+				UE_LOG(LogCheeseStrike, Display, TEXT("ADownedBodyLiesOnASlopeOrAStep: %s %s at (%.0f, %.0f, %.0f) facing %.0f"), *Who, Case.Where, Host->GetActorLocation().X, Host->GetActorLocation().Y, Host->GetActorLocation().Z, Host->GetActorRotation().Yaw);
+				TestFalse(FString::Printf(TEXT("%s %s: the floor round the body measured not flat"), *Who, Case.Where), Host->GetDownFloor().IsFlat());
+				CheckOnTheFloor(Host, Host->GetMesh(), FString::Printf(TEXT("%s %s, the body others see"), *Who, Case.Where));
+				CheckOnTheFloor(Host, Host->GetFirstPersonMesh(), FString::Printf(TEXT("%s %s, in its own view"), *Who, Case.Where));
+			});
+		}
+		Play(0, TEXT("cmd CheeseStrikeBody\ncmd CheeseStrikeRevive\nwait 1.5"));
+		Then([]()
+		{
+			for (const TWeakObjectPtr<AActor>& Block : Blocks)
+			{
+				if (Block.IsValid())
+				{
+					Block->Destroy();
+				}
+			}
+			Blocks.Reset();
+		});
 	}
 	StopPlaying();
 	return true;

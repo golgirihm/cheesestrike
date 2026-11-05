@@ -188,11 +188,61 @@ float ACheeseStrikeCharacter::MeasureLegRoom() const
 		Params.AddIgnoredActor(*It);
 	}
 	FHitResult Hit;
-	if (World->SweepSingleByChannel(Hit, From, From + Forward * (HipsAhead + Plenty - Ball), FQuat::Identity, GetCapsuleComponent()->GetCollisionObjectType(), FCollisionShape::MakeSphere(Ball), Params, Responses))
+	const float Length = HipsAhead + Plenty - Ball;
+	if (!World->SweepSingleByChannel(Hit, From, From + Forward * Length, FQuat::Identity, GetCapsuleComponent()->GetCollisionObjectType(), FCollisionShape::MakeSphere(Ball), Params, Responses))
 	{
-		return FMath::Max(0.0f, Hit.Distance + Ball - HipsAhead);
+		return Plenty;
 	}
-	return Plenty;
+	// Floor rising ahead (a slope one could walk up) is no wall: the legs lie up it, so the ball is swept again rising with it.
+	if (Hit.ImpactNormal.Z > 0.7f && !Hit.bStartPenetrating)
+	{
+		const float Rise = -FVector::DotProduct(Hit.ImpactNormal, Forward) / Hit.ImpactNormal.Z;
+		FHitResult Up;
+		if (!World->SweepSingleByChannel(Up, From, From + Forward * Length + FVector(0.0f, 0.0f, Rise * Length + 2.0f), FQuat::Identity, GetCapsuleComponent()->GetCollisionObjectType(), FCollisionShape::MakeSphere(Ball), Params, Responses))
+		{
+			return Plenty;
+		}
+		Hit = Up;
+	}
+	return FMath::Max(0.0f, Hit.Distance + Ball - HipsAhead);
+}
+
+void ACheeseStrikeCharacter::MeasureDownFloor()
+{
+	using namespace CheeseStrikeDowned;
+	const UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return;
+	}
+	// Down through the grid's points from a reach over the capsule's floor to a reach under it, through whatever stops the
+	// character but players: the floor under each, or the capsule's own where there is none in reach (the legs over a
+	// drop lie out level) or the point is inside something (a wall: no floor of the body's).
+	const FVector Floor = GetActorLocation() - FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	const FVector Ahead = GetActorForwardVector().GetSafeNormal2D();
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Ahead);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeDownFloor), false, this);
+	FCollisionResponseParams Responses;
+	GetCapsuleComponent()->InitSweepCollisionParams(Params, Responses);
+	for (TActorIterator<ACheeseStrikeCharacter> It(World); It; ++It)
+	{
+		Params.AddIgnoredActor(*It);
+	}
+	for (int32 Column = 0; Column < FloorColumns; ++Column)
+	{
+		for (int32 Row = 0; Row < FloorRows; ++Row)
+		{
+			const FVector2D Point = FFloor::Point(Column, Row);
+			const FVector Over = Floor + Ahead * Point.X + Right * Point.Y;
+			FHitResult Hit;
+			float Height = 0.0f;
+			if (World->LineTraceSingleByChannel(Hit, Over + FVector(0.0f, 0.0f, FloorReach), Over - FVector(0.0f, 0.0f, FloorReach), GetCapsuleComponent()->GetCollisionObjectType(), Params, Responses) && !Hit.bStartPenetrating)
+			{
+				Height = Hit.ImpactPoint.Z - Floor.Z;
+			}
+			DownFloor.Heights[Column][Row] = Height;
+		}
+	}
 }
 
 float ACheeseStrikeCharacter::GetDownAimYaw() const
@@ -280,6 +330,7 @@ void ACheeseStrikeCharacter::UpdateDown(float DeltaSeconds)
 	if (bDown || DownBlend > 0.0f)
 	{
 		DownLegRoom = MeasureLegRoom();
+		MeasureDownFloor();
 	}
 	if (bDown && HasAuthority())
 	{

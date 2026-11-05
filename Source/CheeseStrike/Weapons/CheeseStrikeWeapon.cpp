@@ -498,9 +498,9 @@ FVector ACheeseStrikeWeapon::GetModelAlong() const
 	return Look != nullptr ? Look->Along : FVector(0.0, 1.0, 0.0);
 }
 
-float ACheeseStrikeWeapon::GetGuardPitchUp() const
+bool ACheeseStrikeWeapon::IsSledge() const
 {
-	return Look != nullptr ? Look->GuardPitchUp : 0.0f;
+	return Look != nullptr && Look->bSledge;
 }
 
 void ACheeseStrikeWeapon::UpdateSpinner(float DeltaSeconds)
@@ -773,6 +773,15 @@ void ACheeseStrikeWeapon::PutInHand(USceneComponent* Model, USkeletalMeshCompone
 {
 	if (Model == nullptr || Body == nullptr)
 	{
+		return;
+	}
+	// A knife or a stick in the fist: its grip in the hand's own, from the hand's bones, so that the fingers close round it.
+	CheeseStrikeArms::FFist Fist;
+	const USkeletalMesh* Mesh = Body->GetSkeletalMeshAsset();
+	if (Look.bInFist && Mesh != nullptr && CheeseStrikeArms::FistOfSkeleton(Mesh->GetRefSkeleton(), true, Fist))
+	{
+		Model->AttachToComponent(Body, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, false), FName(TEXT("hand_r")));
+		Model->SetRelativeTransform(CheeseStrikeArms::HeldInFist(Fist, Look.Along, FVector::UpVector, Look.Model.GetScale3D(), Look.FistAlong));
 		return;
 	}
 	PutInHand(Model, Body);

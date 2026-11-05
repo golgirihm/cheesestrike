@@ -217,6 +217,8 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	float ScootSpeed = 0.0f;
 	float TurnSpeed = 0.0f;
 	bool bFirstPersonBody = false;
+	/** Down: the floor round the body. */
+	CheeseStrikeDowned::FFloor DownFloor;
 	/** The blends under way, eased towards what the character is doing. */
 	float CrouchBlend = 0.0f;
 	float AirBlend = 0.0f;
@@ -232,12 +234,14 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	float GuardBlend = 0.0f;
 	float KnifeBlend = 0.0f;
 	float TwoHandBlend = 1.0f;
+	/** How far the weapon in hand is held in the right hand alone, the left lowered (the Curd Pistol). */
+	float OneHandBlend = 0.0f;
 	/** The weapon's model in the hand, which way it points, the knife's swipe and the arms in view (UCheeseStrikeAnimInstance's of the same names); the sprint's and the slide's blends. */
 	FTransform ModelInHand = FTransform::Identity;
 	FVector ModelAlong = FVector(0.0, 1.0, 0.0);
 	float SwipePhase = -1.0f;
 	float SwipeSize = 1.0f;
-	float GuardPitchUp = 0.0f;
+	bool bSledge = false;
 	FCheeseStrikeAnimInstanceView View;
 	float SprintBlend = 0.0f;
 	float SlideBlend = 0.0f;
@@ -323,6 +327,8 @@ protected:
 	/** Two guns: the hands apart, the left the mirror of the right. */
 	FCheeseStrikeDualHold DualHold;
 	FCheeseStrikeGripIK LeftHand;
+	/** A weapon in the right hand alone: the left arm let go and lowered. */
+	FCheeseStrikeFreeArm FreeArm;
 	/** A grenade in the right hand, held and thrown, the left let go: over the weapon's hold, which is put away meanwhile. */
 	FCheeseStrikeGrenadeHold GrenadeHold;
 	/** Down in Execution's last stand: on their back, propped on the elbow, the pistol out. */
@@ -385,6 +391,8 @@ public:
 	float LegRoom = CheeseStrikeDowned::LegLength;
 	float ScootSpeed = 0.0f;
 	float TurnSpeed = 0.0f;
+	/** Down: the floor round the body lying on it (ACheeseStrikeCharacter::GetDownFloor). */
+	CheeseStrikeDowned::FFloor DownFloor;
 	/** Whether this is the first-person body, its own player's. */
 	bool bFirstPersonBody = false;
 	/**
@@ -415,10 +423,10 @@ public:
 	/** The weapon's model in this body's hand bone's space, and which way its business end points in its own space. */
 	FTransform ModelInHand = FTransform::Identity;
 	FVector ModelAlong = FVector(0.0, 1.0, 0.0);
-	/** The knife's swipe (none below 0), and how wide (1 the knife's; the Cheese Stick's wider); and how far up beyond the knife's its guard holds it at rest (degrees, the Cheese Stick's). */
+	/** The knife's swipe (none below 0), and how wide (1 the knife's; the Cheese Stick's wider); and whether it is held and swung as a sledgehammer (the Cheese Stick). */
 	float SwipePhase = -1.0f;
 	float SwipeSize = 1.0f;
-	float GuardPitchUp = 0.0f;
+	bool bSledge = false;
 	/** The arms in view, for its own player's body. */
 	FCheeseStrikeAnimInstanceView View;
 	/** A grenade in hand. */

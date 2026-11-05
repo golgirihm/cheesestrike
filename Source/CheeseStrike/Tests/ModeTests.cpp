@@ -548,6 +548,22 @@ bool FADownedPlayerAimsAheadAndScootsRound::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the head raised, over the shoulders, the shoulders over the hips"), Body.Head.Z > Body.Shoulders.Z && Body.Shoulders.Z > Body.Hips.Z + 10.0f);
 	TestTrue(TEXT("the head about 40 cm up, within the capsule's radius of its axis"), Body.Head.Z - 100.0f > 35.0f && Body.Head.Z - 100.0f < 55.0f && FVector::Dist2D(Body.Head, FVector::ZeroVector) < 34.0f);
 	TestTrue(TEXT("its middle between the shoulders and the hips"), Middle(Body).Y > Body.Shoulders.Y && Middle(Body).Y < Body.Hips.Y);
+	// The floor round it (wave 16): flat until measured; measured on a slope rising 0.36 a centimetre toward the feet, the
+	// height anywhere under the body between the grid's points, and the edge's beyond the grid.
+	FFloor Floor;
+	TestTrue(TEXT("a floor not measured is flat"), Floor.IsFlat() && Floor.At(40.0f, 10.0f) == 0.0f);
+	TestTrue(TEXT("the grid runs from behind the head to past the feet, and across the body"), FFloor::Point(0, 0).X < -50.0f && FFloor::Point(FloorColumns - 1, 0).X > HipsAhead + LegLength && FFloor::Point(0, 0).Y < -40.0f && FFloor::Point(0, FloorRows - 1).Y > 40.0f);
+	for (int32 Column = 0; Column < FloorColumns; ++Column)
+	{
+		for (int32 Row = 0; Row < FloorRows; ++Row)
+		{
+			Floor.Heights[Column][Row] = FFloor::Point(Column, Row).X * 0.36f;
+		}
+	}
+	TestFalse(TEXT("a slope is no flat floor"), Floor.IsFlat());
+	TestTrue(FString::Printf(TEXT("under the feet (%.1f)"), Floor.At(110.0f, 7.0f)), FMath::IsNearlyEqual(Floor.At(110.0f, 7.0f), 110.0f * 0.36f, 0.01f));
+	TestTrue(FString::Printf(TEXT("behind the head (%.1f)"), Floor.At(-30.0f, -12.0f)), FMath::IsNearlyEqual(Floor.At(-30.0f, -12.0f), -30.0f * 0.36f, 0.01f));
+	TestTrue(TEXT("beyond the grid, its edge's"), FMath::IsNearlyEqual(Floor.At(500.0f, 0.0f), FFloor::Point(FloorColumns - 1, 0).X * 0.36f, 0.01f));
 	return true;
 }
 

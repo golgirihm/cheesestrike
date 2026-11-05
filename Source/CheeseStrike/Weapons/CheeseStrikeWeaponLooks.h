@@ -39,8 +39,16 @@ struct FWeaponLook
 	 * right gun's left, so that aimed, the two come up side by side either side of the eye.
 	 */
 	TOptional<FVector> Sight;
-	/** A melee weapon's: how many degrees more than the knife's guard its tip is tipped up at rest (the Cheese Stick held upright). */
-	float GuardPitchUp = 0.0f;
+	/**
+	 * Held in the fist (the knife, the Cheese Stick): its grip in the hand's own grip, as the hand's bones have it
+	 * (CheeseStrikeArms::FistOfSkeleton, HeldInFist: its `Along` out of the top of the fist, its top, +Z, back from the
+	 * fingers), rather than in the rifle's grip frame by `Model` (which a stand still shows it by).
+	 */
+	bool bInFist = false;
+	/** Held in the fist, how far along it from its grip's origin the fist closes (cm, toward its business end). */
+	float FistAlong = 0.0f;
+	/** A melee weapon held and swung as a sledgehammer, in both hands (the Cheese Stick: CheeseStrikeArms::SledgeRest, SledgeSwing). */
+	bool bSledge = false;
 	/**
 	 * A part of the model that turns while it fires (the Gouda Gatling's barrels): a second plain model in the same frame,
 	 * its materials slot by slot, and the axis it turns about (a direction and a point on it, in the model's space).
@@ -53,9 +61,10 @@ struct FWeaponLook
 	FVector Muzzle = FVector(0.0f, 70.0f, 4.0f);
 	float FlashSize = 1.0f;
 	/**
-	 * Where the other hand closes round it (the middle of its closed fingers: FCheeseStrikeGripIK), in the model's
-	 * space: on a long gun's fore-end, under the barrel's line; on a pistol, round the hand on its grip. None for a
-	 * weapon held in one hand, the other free (the knife).
+	 * Where the other hand closes round it (the middle of its closed fingers: FCheeseStrikeGripIK; for a weapon held in
+	 * the fist, the middle of the fist, round the handle), in the model's space: on a long gun's fore-end, under the
+	 * barrel's line; up the Cheese Stick's handle. None for a weapon held in one hand, the other free (the knife, the
+	 * Curd Pistol) or holding its own (two guns).
 	 */
 	TOptional<FVector> LeftHand;
 	/**

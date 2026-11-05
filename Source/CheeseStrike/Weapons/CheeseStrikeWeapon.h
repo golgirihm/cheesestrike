@@ -123,8 +123,8 @@ public:
 	ECheeseStrikeHold GetHold() const;
 	/** Which way its business end (muzzle, blade) points in its model's own space. */
 	FVector GetModelAlong() const;
-	/** A melee weapon's: how far up beyond the knife's guard it rests (degrees, FWeaponLook::GuardPitchUp). */
-	float GetGuardPitchUp() const;
+	/** Whether it is held and swung as a sledgehammer, in both hands (FWeaponLook::bSledge: the Cheese Stick). */
+	bool IsSledge() const;
 	/** The barrels' turn (degrees a second) now, on this machine: the Gouda Gatling's spinner. */
 	float GetBarrelSpeed() const { return BarrelSpeed; }
 	/** Where `Body`'s left hand closes round this weapon, in the space of the bone the weapon rides (cm); false if it is held in one hand. */

@@ -216,6 +216,9 @@ public:
 	/** Down: how much room there is ahead of its hips for its legs (cm; CheeseStrikeDowned::LegLength or more for all they need), as last measured, and measured now. */
 	float GetDownLegRoom() const { return DownLegRoom; }
 	float MeasureLegRoom() const;
+	/** Down: the floor round the body lying on it (CheeseStrikeDowned::FFloor), measured every frame while it is down, for its pose. */
+	const CheeseStrikeDowned::FFloor& GetDownFloor() const { return DownFloor; }
+	void MeasureDownFloor();
 	/** Down: where it aims, in degrees to the right of the way its body faces (within CheeseStrikeDowned::ConeYaw), on every machine. */
 	float GetDownAimYaw() const;
 	/** Down: where its body lies (CheeseStrikeDowned::Shape). */
@@ -531,6 +534,7 @@ protected:
 	/** GetDownBlend's, and the room for the legs. */
 	float DownBlend = 0.0f;
 	float DownLegRoom = CheeseStrikeDowned::LegLength;
+	CheeseStrikeDowned::FFloor DownFloor;
 	/** Down: where it aims from its body's facing (degrees), as the server has it, for the other machines. */
 	UPROPERTY(Replicated)
 	int8 DownAimYawSent = 0;

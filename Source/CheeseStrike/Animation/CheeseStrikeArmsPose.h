@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Animation/AnimNodeBase.h"
 #include "BoneContainer.h"
+#include "ReferenceSkeleton.h"
 
 /**
  * The numbers the arms and the body are posed by in code, over the
@@ -45,10 +46,52 @@ namespace CheeseStrikeArms
 	/** The share of the way a first-order follow at `Rate` per second goes in `DeltaSeconds`, whatever the frame rate. */
 	float Follow(float Rate, float DeltaSeconds);
 
+	/**
+	 * A hand's fist, in its hand bone's space (the wrist at the origin): where the middle of a handle it closes round lies
+	 * (across the palm, under the fingers' roots, the fingers curled round it), which way the handle runs on out of the
+	 * fist on the thumb's side (from the little finger's side to the index's, leaning toward the fingers' tips, as a handle
+	 * lies across the palm in a hammer grip), and which way the fingers point from the wrist. Found from the hand's own
+	 * bones (FistOfSkeleton), so that a knife or a stick sits in any hero's fist as it closes (FWeaponLook::bInFist).
+	 */
+	struct FFist
+	{
+		FVector Centre = FVector::ZeroVector;
+		FVector Handle = FVector::RightVector;
+		FVector Fingers = FVector::ForwardVector;
+	};
+	/** How far the handle leans from straight across the palm toward the fingers' tips (degrees). */
+	constexpr float FistSlant = 20.0f;
+	/** Where the handle's middle lies from the middle of the fingers' roots: toward the palm, and back toward the wrist (shares of the hand's length from the wrist to them). */
+	constexpr float FistInset = 0.3f;
+	constexpr float FistBack = 0.12f;
+	/** How far each joint of a finger (from its root) bends to close the fist round a handle (degrees). */
+	constexpr float FistBends[3] = {60.0f, 80.0f, 45.0f};
+	/** The fist of a hand whose fingers' roots (index, middle, ring, little: the _01 bones) are at `Knuckles` in its own space; `bRight` for a right hand. */
+	FFist FistOf(const FVector (&Knuckles)[4], bool bRight);
+	/** The fist of `Skeleton`'s right hand (or left) in its reference pose; false if it hasn't the bones. */
+	bool FistOfSkeleton(const FReferenceSkeleton& Skeleton, bool bRight, FFist& Out);
+	/**
+	 * Where a thing held in the fist sits in the hand bone's space: its own `Along` (a blade's tip, a stick's head) along the
+	 * handle out of the thumb's side, its own `Up` (a knife's spine) facing back from the fingers (the edge the way they
+	 * point), its own origin (the middle of its grip) in the fist, scaled `Scale`; or held `GripAlong` further along it
+	 * (cm in its own space, toward its business end).
+	 */
+	FTransform HeldInFist(const FFist& Fist, const FVector& Along, const FVector& Up, const FVector& Scale, float GripAlong = 0.0f);
+	/**
+	 * The turn of a hand whose fist holds a handle running `Handle` out of its thumb's side, its fingers pointing `Away` as
+	 * far as the handle lets them (the forearm's way on, so that the wrist is straight), in whatever frame those are in.
+	 */
+	FQuat FistTurn(const FFist& Fist, const FVector& Handle, const FVector& Away);
+	/** Holding a knife or a stick, the forearm runs to the hand from a point this far under the shoulder (cm): the elbow hangs. */
+	constexpr float FistElbowDrop = 25.0f;
+
 	/** The knife's swipe: seconds it takes from the stroke to the knife back on guard. */
 	constexpr float SwipeSeconds = 0.45f;
-	/** In its own player's view the knife's blade is tipped up this many degrees more than on the body, so that it shows from behind the fist. */
-	constexpr float ViewKnifeTip = 18.0f;
+	/** On guard the knife's blade stands up out of the fist this many degrees from level, turned this many in toward the middle. */
+	constexpr float GuardPitch = 55.0f;
+	constexpr float GuardYaw = -10.0f;
+	/** In its own player's view the knife's blade is tipped up this many degrees more than on the body. */
+	constexpr float ViewKnifeTip = 5.0f;
 	/** Where the knife hand is at `Phase` (0 to 1) of a swipe, from where it is on guard (cm: forward, right, up), and which way the blade points and its spine faces (unit vectors in the same axes), for a frame scaled by `Size` (1 for the body, smaller for the view). */
 	struct FKnifeAt
 	{
@@ -56,16 +99,33 @@ namespace CheeseStrikeArms
 		FVector Blade = FVector::ForwardVector;
 		FVector Spine = FVector::UpVector;
 	};
-	/** On guard: the blade forward out of the fist, a little up and in (a hammer grip, the blade along the forearm), its spine up; tipped up `PitchUp` degrees more (the Cheese Stick held upright). */
+	/** On guard: the blade standing up out of the top of the fist, leaning forward and a little in (GuardPitch, GuardYaw: a hammer grip), its spine back; tipped up `PitchUp` degrees more. */
 	FKnifeAt KnifeGuard(float PitchUp = 0.0f);
 	/** At `Phase` of a swipe from the right shoulder down and across to the left, the edge leading: raised, swept, back on guard (tipped up `PitchUp` more, as KnifeGuard). */
 	FKnifeAt KnifeSwipe(float Phase, float Size = 1.0f, float PitchUp = 0.0f);
 	/**
 	 * The phase of a swipe at which the blade (the Cheese Stick's head) comes round to straight ahead, sweeping across from
-	 * the right: where a blow lands on someone before the swinger (CheeseStrikeWeapons::ContactDelay). The swipe's keys
-	 * have it pointing straight ahead there.
+	 * the right: where a blow lands on someone before the swinger (CheeseStrikeWeapons::ContactDelay). The swipe's keys,
+	 * and the sledgehammer swing's (SledgeSwing), have it pointing straight ahead there.
 	 */
 	constexpr float SwipeContactPhase = 0.38f;
+
+	/**
+	 * The Cheese Stick, held as a sledgehammer (FWeaponLook::bSledge): both hands on its handle, the right near its end and
+	 * the left higher up, its head over the right shoulder at rest; swung from there, wound back over the shoulder, down
+	 * and across to straight ahead (at SwipeContactPhase), on round to the lower left and back. Where the right hand is
+	 * from where it rests (cm: ahead, right, up) and which way the stick runs from it to its head.
+	 */
+	struct FSledgeAt
+	{
+		FVector Hand = FVector::ZeroVector;
+		FVector Along = FVector::UpVector;
+	};
+	FSledgeAt SledgeRest();
+	FSledgeAt SledgeSwing(float Phase, float Size = 1.0f);
+	/** Where the right hand rests holding it, in its own player's view (cm from the eye: ahead, right, up), so that the stick takes the lower right of the view; and on the body others see, from the chest. */
+	inline const FVector SledgeViewHand(30.0f, 9.0f, -17.0f);
+	inline const FVector SledgeBodyHand(22.0f, 6.0f, -12.0f);
 	/** A heavy shot's kick in view: the weapon in hand tipped up this many degrees for a whole kick (FWeaponStats::KickPitch moves the view; this the weapon in it). */
 	constexpr float ViewKickTip = 9.0f;
 
@@ -120,9 +180,9 @@ struct FCheeseStrikeViewHold : public FAnimNode_Base
 	/** Held as a knife (on guard, swiped), and the swipe's phase (none below 0). */
 	bool bKnife = false;
 	float SwipePhase = -1.0f;
-	/** How wide the swipe is (1 the knife's; the Cheese Stick's wider), and how far up beyond the knife's guard it rests (degrees). */
+	/** How wide the swipe is (1 the knife's; the Cheese Stick's wider), and whether it is held and swung as a sledgehammer (the Cheese Stick). */
 	float SwipeSize = 1.0f;
-	float GuardPitchUp = 0.0f;
+	bool bSledge = false;
 	/** How much a montage moves the arms (1 - the slot's source weight). */
 	float Montage = 0.0f;
 	/** A heavy shot's kick (0 to 1): the weapon thrown back KickBack cm toward the eye and tipped up (CheeseStrikeArms::ViewKickTip for a whole one). */
@@ -144,6 +204,8 @@ private:
 	FBoneReference OtherLowerArm;
 	FBoneReference OtherHand;
 	bool bBones = false;
+	/** The right hand's fist (CheeseStrikeArms::FistOfSkeleton), for a knife or a stick held in it. */
+	CheeseStrikeArms::FFist Fist;
 	float DeltaSeconds = 0.0f;
 	/** The animation's hand in view, followed steadily and settling (FCheeseStrikeViewHold's rates). */
 	FVector SteadyAt = FVector::ZeroVector;
@@ -154,14 +216,18 @@ private:
 };
 
 /**
- * The knife in hand, on either body: the fist closed round its handle (the
- * index finger curled as the middle one is, where the pistol's stance has
- * it along the frame); for the body others see, the knife hand on guard low
- * on the right ahead of the hip, a hammer grip with the blade forward and the
- * wrist straight (the elbow bent toward a point a forearm behind the fist
- * along the blade), and its swipe (CheeseStrikeArms::KnifeSwipe), in the
- * frame of the way the body faces and aims. (The first-person body's hand is
- * placed in view by FCheeseStrikeViewHold, after it.)
+ * The knife (or the Cheese Stick) in hand, on either body: the fist closed
+ * round its handle (every finger curled, CheeseStrikeArms::FistBends, the
+ * thumb over them), which sits in the fist's grip as the hand's own bones
+ * have it (CheeseStrikeArms::FFist, FWeaponLook::bInFist); with the stick,
+ * the left fist too. For the body others see, the knife hand on guard low on
+ * the right ahead of the hip, the blade standing up out of the top of the
+ * fist, the wrist straight (the fingers pointing on from the forearm,
+ * CheeseStrikeArms::FistTurn), and its swipe (CheeseStrikeArms::KnifeSwipe);
+ * or the stick held as a sledgehammer, its head over the right shoulder, and
+ * swung (SledgeRest, SledgeSwing); in the frame of the way the body faces and
+ * aims. (The first-person body's hand is placed in view by
+ * FCheeseStrikeViewHold, after it.)
  */
 struct FCheeseStrikeKnifeHold : public FAnimNode_Base
 {
@@ -174,14 +240,10 @@ struct FCheeseStrikeKnifeHold : public FAnimNode_Base
 	/** The way the body faces in component space, and its aim's pitch (degrees). */
 	FVector Forward = FVector(0.0, 1.0, 0.0);
 	float AimPitch = 0.0f;
-	/** The knife's model in the hand bone's space, which way its blade points and its spine faces in its own space. */
-	FTransform ModelInHand = FTransform::Identity;
-	FVector ModelAlong = FVector(0.0, -1.0, 0.0);
-	FVector ModelSpine = FVector(0.0, 0.0, 1.0);
-	/** The swipe's phase (none below 0), how wide it is (1 the knife's), and how far up beyond the knife's guard it rests (degrees). */
+	/** The swipe's phase (none below 0), how wide it is (1 the knife's), and whether it is the Cheese Stick held as a sledgehammer in both hands. */
 	float SwipePhase = -1.0f;
 	float SwipeSize = 1.0f;
-	float GuardPitchUp = 0.0f;
+	bool bSledge = false;
 
 	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
 	virtual void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;
@@ -193,11 +255,50 @@ private:
 	FBoneReference UpperArm;
 	FBoneReference LowerArm;
 	FBoneReference Hand;
-	FBoneReference Index[3];
-	FBoneReference Middle[3];
+	FBoneReference OtherHand;
+	/** Each hand's (right, left) fingers' three joints, index to little, and its thumb's. */
+	FBoneReference Fingers[2][4][3];
+	FBoneReference Thumb[2][3];
 	bool bBones = false;
-	bool bFingers = false;
+	bool bFingers[2] = {false, false};
+	CheeseStrikeArms::FFist Fist;
 };
+
+/**
+ * Closes `Hand`'s fingers (index to little, three joints each) into a fist round a handle, the thumb over them
+ * (CheeseStrikeArms::FistBends), whatever the pose had them doing; `bRight` for a right hand. On a gun's grip
+ * (bTrigger), the index finger only part closed, on the trigger, and the thumb left as it was.
+ */
+void CheeseStrikeCloseFist(FCSPose<FCompactPose>& Pose, const FBoneReference& Hand, const FBoneReference (&Fingers)[4][3], const FBoneReference (&Thumb)[3], bool bRight, bool bTrigger = false);
+
+/**
+ * A weapon held in the right hand alone (the Curd Pistol), on either body:
+ * the left arm let go of it and lowered by the side, the hand turned on the
+ * forearm as the skeleton's own pose has it (as a grenade's throw lowers it),
+ * blended in by Alpha, bone by bone.
+ */
+struct FCheeseStrikeFreeArm : public FAnimNode_Base
+{
+	FComponentSpacePoseLink ComponentPose;
+
+	float Alpha = 0.0f;
+	/** The way the body faces in component space. */
+	FVector Forward = FVector(0.0, 1.0, 0.0);
+
+	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
+	virtual void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;
+	virtual void Update_AnyThread(const FAnimationUpdateContext& Context) override;
+	virtual void EvaluateComponentSpace_AnyThread(FComponentSpacePoseContext& Output) override;
+
+private:
+	FBoneReference UpperArm;
+	FBoneReference LowerArm;
+	FBoneReference Hand;
+	bool bBones = false;
+};
+
+/** Lowers the arm (`Upper`, `Lower`, `End`) by the side of a body facing `Ahead` (flat), its hand a little ahead and out toward `Out` (the arm's own side), the elbow back, turned on the forearm as the skeleton's own pose has it. */
+void CheeseStrikeLowerArm(FCSPose<FCompactPose>& Pose, FCompactPoseBoneIndex Upper, FCompactPoseBoneIndex Lower, FCompactPoseBoneIndex End, const FVector& Ahead, const FVector& Out);
 
 /**
  * A grenade in hand, on either body (CheeseStrikeGrenades::HeldHand,
