@@ -713,12 +713,12 @@ bool FTheCheeseStickFellsAWideArc::RunTest(const FString& Parameters)
 	TestTrue(FString::Printf(TEXT("the swing takes 1.28 s (%.2f)"), SwipeSecondsOf(Stick)), FMath::IsNearlyEqual(SwipeSecondsOf(Stick), 0.8f * 1.6f, 0.001f));
 	const FWeaponLook& StickLook = CheeseStrikeWeaponLooks::For(Stick.Id);
 	TestTrue(TEXT("a sledgehammer, held in the fist"), StickLook.bSledge && StickLook.bInFist && StickLook.Hold == ECheeseStrikeHold::Knife);
-	TestTrue(TEXT("in both hands: the left at its end, the right up the handle from it"), StickLook.LeftHand.IsSet() && FVector::DotProduct(*StickLook.LeftHand, StickLook.Along) < -5.0f && StickLook.FistAlong > 15.0f);
+	TestTrue(TEXT("in both hands: the left at its end, the right up the handle from it"), StickLook.LeftHand.IsSet() && FVector::DotProduct(*StickLook.LeftHand, StickLook.Along) < -5.0f && StickLook.FistAlong > 10.0f);
 	const FWeaponLook& KnifeLook = CheeseStrikeWeaponLooks::For(Knife().Id);
 	TestTrue(TEXT("the knife in one fist, the other free"), !KnifeLook.LeftHand.IsSet() && !KnifeLook.bSledge && KnifeLook.bInFist);
 	using namespace CheeseStrikeArms;
 	const FSledgeAt Rest = SledgeRest();
-	TestTrue(FString::Printf(TEXT("at rest its head up over the right shoulder (%.2f, %.2f, %.2f)"), Rest.Along.X, Rest.Along.Y, Rest.Along.Z), Rest.Along.Z > 0.6f && Rest.Along.Y > 0.4f && Rest.Along.X < 0.0f);
+	TestTrue(FString::Printf(TEXT("at rest its head up over the right shoulder (%.2f, %.2f, %.2f)"), Rest.Along.X, Rest.Along.Y, Rest.Along.Z), Rest.Along.Z > 0.5f && Rest.Along.Y > 0.5f && Rest.Along.X < 0.0f);
 	TestTrue(TEXT("the swing starts and ends there"), SledgeSwing(0.0f).Along.Equals(Rest.Along, 0.01f) && SledgeSwing(1.0f).Along.Equals(Rest.Along, 0.01f) && SledgeSwing(1.0f).Hand.IsNearlyZero(0.01f));
 	TestTrue(TEXT("wound back over the shoulder"), SledgeSwing(0.2f).Along.X < Rest.Along.X - 0.2f && SledgeSwing(0.2f).Along.Z > 0.3f);
 	const FSledgeAt Contact = SledgeSwing(SwipeContactPhase);

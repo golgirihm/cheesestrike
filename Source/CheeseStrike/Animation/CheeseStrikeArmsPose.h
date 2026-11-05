@@ -124,7 +124,7 @@ namespace CheeseStrikeArms
 	FSledgeAt SledgeRest();
 	FSledgeAt SledgeSwing(float Phase, float Size = 1.0f);
 	/** Where the right hand rests holding it, in its own player's view (cm from the eye: ahead, right, up), so that the stick takes the lower right of the view; and on the body others see, from the chest. */
-	inline const FVector SledgeViewHand(30.0f, 9.0f, -17.0f);
+	inline const FVector SledgeViewHand(30.0f, 15.0f, -21.0f);
 	inline const FVector SledgeBodyHand(22.0f, 6.0f, -12.0f);
 	/** A heavy shot's kick in view: the weapon in hand tipped up this many degrees for a whole kick (FWeaponStats::KickPitch moves the view; this the weapon in it). */
 	constexpr float ViewKickTip = 9.0f;

@@ -303,7 +303,7 @@ namespace
 			Look.Along = FVector(0.0f, -1.0f, 0.0f);
 			// The right fist up the handle from the wrapper, the left at its end, as a sledgehammer's are.
 			Look.bInFist = true;
-			Look.FistAlong = 16.0f;
+			Look.FistAlong = 14.0f;
 			Look.bSledge = true;
 			Look.LeftHand = FVector(0.0f, 11.0f, 0.0f);
 			Look.Materials[0] = Material(TEXT("MI_StringCheese"));
