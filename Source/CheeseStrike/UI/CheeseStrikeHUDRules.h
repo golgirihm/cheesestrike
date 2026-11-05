@@ -358,6 +358,18 @@ namespace CheeseStrikeHUD
 	 */
 	constexpr float ScoreMostShare = 0.45f;
 	constexpr float ScoreLeastScale = 0.7f;
+	/**
+	 * A block's width and its words' and score's sizes (design pixels, ACheeseStrikeHUD's Unit; wave 16: 200 wide, the name
+	 * 14 and the score 32, cut a name of ten letters): wide enough that a name of sixteen letters stays whole beside a
+	 * four-figure score (CheeseStrike.HUD.TheScoreSummaryKeepsNamesOffTheScores
+	 * measures it in the HUD's font at 1280 x 720 and 1920 x 1080); a longer one is cut with dots.
+	 */
+	constexpr float ScoreBlockWidth = 280.0f;
+	constexpr float ScoreBlockPad = 12.0f;
+	constexpr float ScoreBlockGap = 8.0f;
+	constexpr float ScoreCaptionSize = 12.0f;
+	constexpr float ScoreNameSize = 12.0f;
+	constexpr float ScoreDigitsSize = 30.0f;
 	struct FScoreBlockText
 	{
 		FString Caption;
@@ -366,6 +378,25 @@ namespace CheeseStrikeHUD
 	};
 	FScoreBlockText FitScoreBlock(const FScoreLine& Line, float Width, float Pad, float Gap,
 		TFunctionRef<float(const FString&)> CaptionWidth, TFunctionRef<float(const FString&)> NameWidth, TFunctionRef<float(const FString&)> ScoreWidth);
+
+	// ---------------------------------------------------------------- the middle of the screen, under the crosshair
+
+	/**
+	 * Where the weapon pickup's card (UI/CheeseStrikePickupHUD) has its first line, as a share of the screen's height; the
+	 * card starts PickupCardOver design pixels over it.
+	 */
+	constexpr float PickupCardAt = 0.64f;
+	constexpr float PickupCardOver = 6.0f;
+	/** The least room (design pixels) between the "<STREAK> READY" line and the card under it, and between the line and the crosshair. */
+	constexpr float StreakWordGap = 12.0f;
+	constexpr float StreakWordClearOfCrosshair = 24.0f;
+	/**
+	 * The top of the "<STREAK> READY · PRESS Q" line (its words and its icon, `Height` pixels tall in all) on a screen
+	 * `ScreenHeight` pixels high at `Unit` pixels a design pixel: stacked over the pickup card's place, StreakWordGap clear of
+	 * it, so that the two never overlap when both show; and never onto the crosshair (StreakWordClearOfCrosshair under the
+	 * middle), where the card is lower down then.
+	 */
+	float StreakWordTop(float ScreenHeight, float Unit, float Height);
 
 	// ---------------------------------------------------------------- the scoreboard's sides
 

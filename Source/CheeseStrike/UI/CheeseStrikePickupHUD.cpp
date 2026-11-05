@@ -85,13 +85,13 @@ namespace CheeseStrikePickupHUD
 		const FString Line = PromptLine(UCheeseStrikeInputSet::Prompt(Player, &UCheeseStrikeInputSet::Interact), Offered->GetWeaponName().ToString(), bRounds);
 		const FString Under = bRounds ? FString() : PromptUnder(Carried != nullptr ? Carried->GetStats().DisplayName.ToString() : FString());
 		const float Middle = Canvas->SizeX / 2.0f;
-		const float Y = Canvas->SizeY * 0.64f;
+		const float Y = Canvas->SizeY * CheeseStrikeHUD::PickupCardAt;
 		const FSlateFontInfo Big = HudDraw::Font(24.0f * U);
 		const FSlateFontInfo Small = HudDraw::Font(16.0f * U);
 		const FVector2D LineSize = HudDraw::Measure(Line, Big);
 		HudDraw::FShapes Shapes;
 		// A rounded card, its colour strip along the top from side to side, clipped to the card's corners.
-		const FVector2D CardMin(Middle - LineSize.X / 2.0f - 14.0f * U, Y - 6.0f * U);
+		const FVector2D CardMin(Middle - LineSize.X / 2.0f - 14.0f * U, Y - CheeseStrikeHUD::PickupCardOver * U);
 		const FVector2D CardMax = CardMin + FVector2D(LineSize.X + 28.0f * U, LineSize.Y + (Under.IsEmpty() ? 30.0f : 44.0f) * U);  // room under the second line, as much as over the first
 		Shapes.RoundedRect(CardMin.X, CardMin.Y, CardMax.X - CardMin.X, CardMax.Y - CardMin.Y, 8.0f * U, HudDraw::Panel);
 		const FLinearColor Worth = CheeseStrikePickups::WorthColour(CheeseStrikePickups::Worth(Offered->GetWeapon()));

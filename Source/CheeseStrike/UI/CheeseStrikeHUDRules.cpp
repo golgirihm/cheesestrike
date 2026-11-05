@@ -731,6 +731,13 @@ namespace CheeseStrikeHUD
 		return Text;
 	}
 
+	float StreakWordTop(float ScreenHeight, float Unit, float Height)
+	{
+		const float CardTop = ScreenHeight * PickupCardAt - PickupCardOver * Unit;
+		const float Over = CardTop - StreakWordGap * Unit - Height;
+		return FMath::Max(Over, ScreenHeight * 0.5f + StreakWordClearOfCrosshair * Unit);
+	}
+
 	FString TeamScoreLabel(CheeseStrikeModes::EWinBy WinBy, int32 Score)
 	{
 		switch (WinBy)

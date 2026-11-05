@@ -12,6 +12,8 @@
 #include "Streaks/CheeseStrikeSynth.h"
 #include "Rules/CheeseStrikeStreaks.h"
 #include "UI/CheeseStrikeHUDRules.h"
+#include "UI/CheeseStrikeHUDDraw.h"
+#include "Framework/Application/SlateApplication.h"
 #include "UI/CheeseStrikeLoader.h"
 #include "Engine/Texture2D.h"
 
@@ -118,6 +120,31 @@ bool FTheScoreSummaryKeepsNamesOffTheScores::RunTest(const FString& Parameters)
 	Text = FitScoreBlock(Side, Width * 0.667f, Pad * 0.667f, Gap * 0.667f, SmallWords, SmallWords, SmallDigits);
 	TestTrue(TEXT("at 1280 by 720 too"), 0.667f * Pad + SmallWords(Text.Caption) + 0.667f * Gap + SmallDigits(TEXT("150")) * Text.ScoreScale <= 0.667f * (Width - Pad) + 0.01f);
 
+	// In the HUD's own font, at the blocks' own sizes (ACheeseStrikeHUD::DrawScoreSummary): a name of sixteen letters stays
+	// whole beside a four-figure score, at 1280 x 720 and 1920 x 1080 (wave 16: at 200 wide it was cut).
+	if (FSlateApplication::IsInitialized() && CheeseStrikeHUDDraw::Measure(TEXT("M"), CheeseStrikeHUDDraw::Font(14.0f)).X > 0.0)
+	{
+		for (const float U : {720.0f / 1080.0f, 1.0f})
+		{
+			const FSlateFontInfo CaptionFont = CheeseStrikeHUDDraw::Font(ScoreCaptionSize * U);
+			const FSlateFontInfo NameFont = CheeseStrikeHUDDraw::Font(ScoreNameSize * U);
+			const FSlateFontInfo ScoreFont = CheeseStrikeHUDDraw::Font(ScoreDigitsSize * U);
+			const auto Measured = [](const FSlateFontInfo& Font) { return [&Font](const FString& Text) { return static_cast<float>(CheeseStrikeHUDDraw::Measure(Text, Font).X); }; };
+			for (const TCHAR* Sixteen : {TEXT("CheddarChampion7"), TEXT("MozzarellaMonger"), TEXT("GoudaGuyBrieDave")})
+			{
+				const FScoreLine Long{TEXT("Leader"), Sixteen, 1000, INDEX_NONE, false};
+				const FScoreBlockText Fitted = FitScoreBlock(Long, ScoreBlockWidth * U, ScoreBlockPad * U, ScoreBlockGap * U, Measured(CaptionFont), Measured(NameFont), Measured(ScoreFont));
+				AddInfo(FString::Printf(TEXT("%s at %.0f high: the name %.1f wide, 1000 %.1f, in a block %.1f"), Sixteen, 1080.0f * U, Measured(NameFont)(FString(Sixteen).ToUpper()), Measured(ScoreFont)(TEXT("1000")), ScoreBlockWidth * U));
+				TestEqual(FString::Printf(TEXT("%s, sixteen letters, whole beside 1000 at %.0f high"), Sixteen, 1080.0f * U), Fitted.Name, FString(Sixteen).ToUpper());
+				TestEqual(TEXT("the score at its own size"), Fitted.ScoreScale, 1.0f);
+			}
+		}
+	}
+	else
+	{
+		AddWarning(TEXT("No Slate font measure here: the names' widths in the HUD's font aren't checked."));
+	}
+
 	// The scoreboard says what a side's score counts.
 	TestEqual(TEXT("rounds won in a mode of rounds"), TeamScoreLabel(CheeseStrikeModes::EWinBy::Rounds, 2), FString(TEXT("ROUNDS WON")));
 	TestEqual(TEXT("round one in a mode of rounds"), TeamScoreLabel(CheeseStrikeModes::EWinBy::Rounds, 1), FString(TEXT("ROUND WON")));
@@ -125,6 +152,27 @@ bool FTheScoreSummaryKeepsNamesOffTheScores::RunTest(const FString& Parameters)
 	TestEqual(TEXT("kills in Deathmatch"), TeamScoreLabel(CheeseStrikeModes::EWinBy::TeamKills, 2), FString(TEXT("KILLS")));
 	TestTrue(TEXT("Elimination and Execution are modes of rounds"), CheeseStrikeModes::Info(CheeseStrikeModes::EMode::Elimination).WinBy == CheeseStrikeModes::EWinBy::Rounds
 		&& CheeseStrikeModes::Info(CheeseStrikeModes::EMode::Execution).WinBy == CheeseStrikeModes::EWinBy::Rounds);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheStreakWordNeverOverlapsThePickupCard, "CheeseStrike.HUD.TheStreakWordNeverOverlapsThePickupCard", HUDLayoutTests::Flags)
+
+bool FTheStreakWordNeverOverlapsThePickupCard::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	// "<STREAK> READY · PRESS Q" (30 design pixels of words beside a 64-pixel icon) and the weapon pickup's card under the
+	// crosshair can show together: the line is stacked over the card, clear of it, and clear of the crosshair, at every size.
+	for (const float Screen : {720.0f, 900.0f, 1080.0f, 1440.0f, 2160.0f})
+	{
+		const float U = FMath::Max(0.5f, Screen / 1080.0f);
+		for (const float Height : {40.0f * U, 64.0f * U})
+		{
+			const float Top = StreakWordTop(Screen, U, Height);
+			const float CardTop = Screen * PickupCardAt - PickupCardOver * U;
+			TestTrue(FString::Printf(TEXT("at %.0f high a line %.0f tall ends over the card (%.1f <= %.1f)"), Screen, Height, Top + Height, CardTop), Top + Height + StreakWordGap * U <= CardTop + 0.01f);
+			TestTrue(FString::Printf(TEXT("and starts under the crosshair at %.0f high (%.1f)"), Screen, Top), Top >= Screen * 0.5f + StreakWordClearOfCrosshair * U - 0.01f);
+		}
+	}
 	return true;
 }
 
