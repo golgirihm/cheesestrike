@@ -1,0 +1,30 @@
+# A tour of the Proving Ground from fixed views: over the arena from a corner,
+# down a lane from a start's end, the middle and its low walls, a platform and
+# its steps, a stand at the wall, and the rounded cheese up close. Run with
+# -Map /Game/CheeseStrike/Maps/Lvl_ProvingGround -StartAt -2700,-1400,100,0.
+wait 20
+cmd showhud
+cmd CheeseStrikeViewFrom -3700 -2900 1900 -30 38
+wait 3
+shot proving_1_over
+cmd CheeseStrikeViewFrom -2600 0 170 -2 0
+wait 3
+shot proving_2_lane
+cmd CheeseStrikeViewFrom -900 -300 220 -8 20
+wait 3
+shot proving_3_middle
+cmd CheeseStrikeViewFrom -700 1100 180 -6 0
+wait 3
+shot proving_4_platform
+cmd CheeseStrikeViewFrom -300 1400 170 -4 50
+wait 3
+shot proving_5_stand
+cmd CheeseStrikeViewFrom -1450 -1100 160 -6 60
+wait 3
+shot proving_6_wall_close
+cmd CheeseStrikeEatCheese 1
+wait 2
+cmd CheeseStrikeViewFrom -3700 -2900 1900 -30 38
+wait 3
+shot proving_7_eaten
+quit

@@ -85,7 +85,7 @@ namespace CheeseStrikeRules
 		{TEXT("The Fondue Floor"), TEXT("/Game/CheeseStrike/Maps/Lvl_FondueFloor"), TEXT("fondue.png")},
 		{TEXT("Crumb Kitchen"), TEXT("/Game/CheeseStrike/Maps/Lvl_Kitchen"), TEXT("kitchen.png")},
 		{TEXT("Practice Range"), TEXT("/Game/CheeseStrike/Maps/Lvl_Range"), TEXT("range.png")},
-		{TEXT("Proving Ground"), TEXT("/Game/Variant_Shooter/Lvl_Shooter"), TEXT("proving_ground.png")},
+		{TEXT("Proving Ground"), TEXT("/Game/CheeseStrike/Maps/Lvl_ProvingGround"), TEXT("proving_ground.png")},
 	};
 
 	int32 NumMaps()
