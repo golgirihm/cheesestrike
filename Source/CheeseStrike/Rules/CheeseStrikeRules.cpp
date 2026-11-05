@@ -123,7 +123,8 @@ namespace CheeseStrikeRules
 
 	int32 MapForMatch(int32 Picked, bool bHosted)
 	{
-		return bHosted && !IsOffered(Picked) ? DefaultMap() : Picked;
+		// A level not in the list (the template's shooter level, which the play tests use) is left alone: only the range is refused.
+		return bHosted && Picked >= 0 && !IsOffered(Picked) ? DefaultMap() : Picked;
 	}
 
 	FString HostOptions()

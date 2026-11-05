@@ -28,6 +28,7 @@ PROJECT = ROOT / "CheeseStrike.uproject"
 TARGET = "CheeseStrikeEditor"
 LOG = ROOT / "Saved" / "Logs" / "run_tests.log"
 COMPLETED = re.compile(r"Test Completed\. Result=\{(\w+)\} Name=\{([^}]*)\} Path=\{([^}]*)\}")
+FOUND = re.compile(r"Found (\d+) automation tests based on")
 
 
 def engine():
@@ -60,12 +61,19 @@ def run_tests(root, name):
     print("+", " ".join(command), flush=True)
     process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     results = []
+    expected = None
+    crashed = False
     for line in process.stdout:
         if "LogAutomationController" in line and ("Error" in line or "Test Completed" in line):
             print(line.rstrip(), flush=True)
         found = COMPLETED.search(line)
         if found:
             results.append((found.group(1), found.group(3)))
+        counted = FOUND.search(line)
+        if counted:
+            expected = int(counted.group(1))
+        if "=== Critical error: ===" in line:
+            crashed = True
     process.wait()
     failed = [path for result, path in results if result != "Success"]
     print(f"\n{len(results)} tests, {len(results) - len(failed)} passed, {len(failed)} failed. Full log: {LOG}")
@@ -73,7 +81,12 @@ def run_tests(root, name):
         print(f"  failed: {path}")
     if not results:
         print("error: no test ran. Check the filter, and look for the test module failing to load in the log.")
-    return bool(results) and not failed
+    # The editor crashing part way (a fatal error, or fewer tests completed than it found) is a failure too, not a pass of what ran.
+    if crashed:
+        print("error: the editor crashed during the run (see the Critical error in the log).")
+    if expected is not None and len(results) < expected:
+        print(f"error: only {len(results)} of the {expected} tests found completed.")
+    return bool(results) and not failed and not crashed and (expected is None or len(results) >= expected)
 
 
 def main():
