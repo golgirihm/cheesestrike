@@ -6,13 +6,20 @@
 #include "Animation/AnimNodeBase.h"
 #include "BoneContainer.h"
 
-/** The numbers two guns are held by, one in each hand (the Dual Burratas). */
+/** The numbers two guns are held by, one in each hand (the Dual Burratas, the Munster Twin SMGs). */
 namespace CheeseStrikeDual
 {
-	/** How far out (cm) each hand is moved from where the stance has the weapon hand, across the body: the guns apart. */
+	/** How far out (cm) each hand is moved from where the stance has the weapon hand, across the body, from the hip: the guns apart. */
 	constexpr float Spread = 9.0f;
-	/** The same in its own player's view, where the guns are seen up close. */
-	constexpr float ViewSpread = 7.0f;
+	/**
+	 * Aimed: on the body others see, how far out each hand goes from where the aimed stance has the weapon hand (the two
+	 * side by side at eye level); and in its own player's view, half of how far apart the two guns sit either side of the
+	 * eye, which the look's Sight gives (FWeaponLook::Sight, its X), so that the view's hold needs no push at all.
+	 */
+	constexpr float AimSpread = 6.0f;
+	constexpr float AimHalfApart = 7.0f;
+	/** Aimed, each gun is turned in toward the middle by this many degrees (the right to the left, the left to the right). */
+	constexpr float Converge = 3.0f;
 
 	/**
 	 * `Held` (in the body's space) mirrored across the plane through `Origin`
@@ -22,6 +29,13 @@ namespace CheeseStrikeDual
 	 * into the left hand's own (their bones' axes need not be mirrors).
 	 */
 	FTransform Mirrored(const FTransform& Held, const FVector& Origin, const FVector& Across);
+	/**
+	 * `Hand` (in the body's space) turned about its own place so that the gun it holds, whose business end points
+	 * `AlongInHand` in the hand's space, points the way `Forward` does turned `InDegrees` in toward the body's
+	 * left (the right gun converged on the middle), its pitch kept as it was: the aimed stance's own yaw, which the
+	 * animation may have a little out, is put right by it.
+	 */
+	FTransform Aligned(const FTransform& Hand, const FVector& AlongInHand, const FVector& Forward, const FVector& Up, float InDegrees);
 }
 
 /**
@@ -30,9 +44,14 @@ namespace CheeseStrikeDual
  * has it, and the other hand put where it would be held the mirror way
  * round, across the body's middle, so that the second gun (which it holds
  * as the right holds the first, ACheeseStrikeWeapon::MirroredGrip) points
- * the same way, the two side by side. After the first-person hold, so that
- * it moves the hand placed in view; the left hand's grip (FCheeseStrikeGripIK)
- * has nothing to do then, the weapon being held in one hand each.
+ * the same way, the two side by side. Aimed (Aim), the spread is the aimed
+ * one (in its own player's view none: the look's Sight has put the right
+ * gun beside the eye already) and the right gun is laid along the body's
+ * forward turned in a little (CheeseStrikeDual::Converge, Aligned) before
+ * the mirror, so that the two converge whatever yaw the stance gave. After the first-person
+ * hold, so that it moves the hand placed in view; the left hand's grip
+ * (FCheeseStrikeGripIK) has nothing to do then, the weapon being held in one
+ * hand each.
  */
 struct FCheeseStrikeDualHold : public FAnimNode_Base
 {
@@ -40,8 +59,13 @@ struct FCheeseStrikeDualHold : public FAnimNode_Base
 
 	/** How much it is held so (0 to 1). */
 	float Alpha = 0.0f;
-	/** How far out each hand goes (cm). */
+	/** How far out each hand goes (cm) from the hip, and aimed; and how far aimed it is (0 to 1). */
 	float Spread = CheeseStrikeDual::Spread;
+	float AimSpread = CheeseStrikeDual::AimSpread;
+	float Aim = 0.0f;
+	/** The weapon's model in the hand bone's space, and which way its muzzle points in its own space, for laying it along the aim. */
+	FTransform ModelInHand = FTransform::Identity;
+	FVector ModelAlong = FVector(0.0, 1.0, 0.0);
 	/** The way the body faces in component space, and where the capsule's axis meets the floor. */
 	FVector Forward = FVector(0.0, 1.0, 0.0);
 	FVector Origin = FVector::ZeroVector;

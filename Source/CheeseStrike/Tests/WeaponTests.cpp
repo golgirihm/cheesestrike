@@ -7,7 +7,9 @@
 
 #include "Misc/AutomationTest.h"
 #include "Weapons/CheeseStrikeBeat.h"
+#include "Animation/CheeseStrikeArmsPose.h"
 #include "Animation/CheeseStrikeDualHold.h"
+#include "Weapons/CheeseStrikeWeaponLooks.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeGunfire.h"
@@ -259,9 +261,12 @@ bool FTheShotgunFiresTwelvePellets::RunTest(const FString& Parameters)
 	TestEqual(TEXT("14 each, close"), DamageAt(Shotgun, 100.0f, false), 14.0f);
 	TestEqual(TEXT("and still at 4 m"), DamageAt(Shotgun, 400.0f, false), 14.0f);
 	TestTrue(TEXT("all twelve kill at 4 m"), DamageAt(Shotgun, 400.0f, false) * Shotgun.Pellets >= MaxHealth);
-	// At 4 m its cone is no wider than a body, aimed or from the hip, so they all land: a kill a shot.
+	// Wave 15: a wider cone (9 degrees aimed, 14 from the hip) and a slower shot (1.19 s, 1.4 times what it was). At 4 m
+	// its cone is still about a body wide from the hip, so nearly all land: a kill a shot.
+	TestTrue(TEXT("9 degrees aimed, 14 from the hip"), Shotgun.SpreadDegrees == 9.0f && Shotgun.HipSpreadDegrees == 14.0f);
+	TestTrue(FString::Printf(TEXT("a shot every 1.19 s (%.2f)"), Shotgun.FireInterval), FMath::IsNearlyEqual(Shotgun.FireInterval, 0.85f * 1.4f, 0.001f));
 	const float Across4 = FMath::Tan(FMath::DegreesToRadians(Shotgun.HipSpreadDegrees * 0.5f)) * 400.0f;
-	TestTrue(FString::Printf(TEXT("from the hip its pellets are within %.0f cm of the aim at 4 m: a body's width"), Across4), Across4 <= CheeseStrikeMovement::CapsuleRadius * 1.1f);
+	TestTrue(FString::Printf(TEXT("from the hip its pellets are within %.0f cm of the aim at 4 m: about a body's width"), Across4), Across4 <= CheeseStrikeMovement::CapsuleRadius * 1.5f);
 	TestTrue(FString::Printf(TEXT("not a kill past 8 m even if all twelve land (%.0f)"), DamageAt(Shotgun, 800.0f, false) * Shotgun.Pellets), DamageAt(Shotgun, 800.0f, false) * Shotgun.Pellets < MaxHealth);
 	const float Across8 = FMath::Tan(FMath::DegreesToRadians(Shotgun.HipSpreadDegrees * 0.5f)) * 800.0f;
 	TestTrue(FString::Printf(TEXT("and many miss there (%.0f cm across a body %.0f wide)"), Across8, CheeseStrikeMovement::CapsuleRadius), Across8 > CheeseStrikeMovement::CapsuleRadius * 1.5f);
@@ -488,6 +493,37 @@ bool FTheDualBurratasFireInTurn::RunTest(const FString& Parameters)
 	TestTrue(TEXT("the right gun's kick goes right"), RecoilFor(Dual, 4, false).X > 0.0f);
 	TestTrue(TEXT("the left gun's left"), RecoilFor(Dual, 5, false).X < 0.0f);
 	TestTrue(TEXT("and both climb"), RecoilFor(Dual, 5, false).Y > RecoilFor(Dual, 4, false).Y);
+	// Aimed (wave 15: both guns up side by side before the eyes, a little converged), a tighter cone, as other weapons get;
+	// no scope, and the eye between the two (the look's Sight half the apart to the right gun's left).
+	for (const FWeaponStats* Two : {&Dual, &Munster()})
+	{
+		const FString Name = Two->DisplayName.ToString();
+		TestTrue(FString::Printf(TEXT("%s: aimed, a tighter cone than from the hip"), *Name), Two->SpreadDegrees > 0.0f && Two->SpreadDegrees < Two->HipSpreadDegrees / 3.0f);
+		TestTrue(FString::Printf(TEXT("%s: no scope, a mild zoom"), *Name), !Two->bScoped && Two->AimZoom < 1.0f && Two->AimZoom >= 0.75f);
+		const FWeaponLook& Look = CheeseStrikeWeaponLooks::For(Two->Id);
+		TestTrue(FString::Printf(TEXT("%s: the eye between the two guns"), *Name), Look.Sight.IsSet() && FMath::IsNearlyEqual(Look.Sight->X, CheeseStrikeDual::AimHalfApart) && !Look.LeftHand.IsSet());
+		TestTrue(FString::Printf(TEXT("%s: aimed, shot 3 within %.1f degrees"), *Name, Two->SpreadDegrees), SpreadFor(*Two, 3, true) < SpreadFor(*Two, 3, false) && SpreadFor(*Two, Two->BloomShots, true) == Two->SpreadDegrees);
+	}
+	TestTrue(TEXT("a weapon of one gun aims down its middle"), FMath::IsNearlyZero(CheeseStrikeWeaponLooks::For(Blaster().Id).Sight->X, 0.5f));
+	TestTrue(TEXT("the two a hand's width apart, turned in a few degrees"), CheeseStrikeDual::AimHalfApart >= 5.0f && CheeseStrikeDual::AimHalfApart <= 9.0f && CheeseStrikeDual::Converge >= 1.0f && CheeseStrikeDual::Converge <= 6.0f
+		&& CheeseStrikeDual::AimSpread < CheeseStrikeDual::Spread);
+	// Aligned: the body faces +Y (its right is -X); a hand whose gun lies along the hand's Y (as a weapon rides the hand:
+	// the mirror above keeps a frame's Y and Z and turns its X back) points 15 degrees right of that and 10 up; it is
+	// turned, in place, so that the gun points the forward's way turned in to the left by the angle, still 10 up; mirrored
+	// across the body's middle, the left hand's gun points as much to the right.
+	const FVector SkewAlong = FRotator(10.0f, 105.0f, 0.0f).Vector();
+	const FTransform Askew(FRotationMatrix::MakeFromY(SkewAlong).ToQuat(), FVector(-10.0f, 40.0f, 130.0f));
+	TestTrue(TEXT("the test's hand holds its gun 15 right of forward"), Askew.GetUnitAxis(EAxis::Y).Equals(SkewAlong, 0.001f));
+	const FTransform In = CheeseStrikeDual::Aligned(Askew, FVector::YAxisVector, FVector::YAxisVector, FVector::UpVector, CheeseStrikeDual::Converge);
+	const FVector InAlong = In.GetUnitAxis(EAxis::Y);
+	const float InYaw = FMath::RadiansToDegrees(FMath::Atan2(InAlong.Y, InAlong.X));
+	const float InPitch = FMath::RadiansToDegrees(FMath::Asin(InAlong.Z));
+	TestTrue(TEXT("aligned in place"), In.GetLocation().Equals(Askew.GetLocation()));
+	TestTrue(FString::Printf(TEXT("the right gun laid %.0f degrees left of forward (yaw %.1f), still 10 up (%.1f)"), CheeseStrikeDual::Converge, InYaw, InPitch),
+		InAlong.X > 0.0f && FMath::IsNearlyEqual(InYaw, 90.0f - CheeseStrikeDual::Converge, 0.05f) && FMath::IsNearlyEqual(InPitch, 10.0f, 0.05f));
+	const FVector LeftAlong = CheeseStrikeDual::Mirrored(In, FVector::ZeroVector, FVector::XAxisVector).GetUnitAxis(EAxis::Y);
+	TestTrue(TEXT("and the left gun, mirrored, as much to the right"), LeftAlong.X < 0.0f && FMath::IsNearlyEqual(LeftAlong.X, -InAlong.X, 0.001f) && FMath::IsNearlyEqual(LeftAlong.Y, InAlong.Y, 0.001f) && FMath::IsNearlyEqual(LeftAlong.Z, InAlong.Z, 0.001f));
+	TestTrue(TEXT("a hand already aligned is left as it is"), CheeseStrikeDual::Aligned(In, FVector::YAxisVector, FVector::YAxisVector, FVector::UpVector, CheeseStrikeDual::Converge).GetRotation().Equals(In.GetRotation(), 0.0001f));
 	// A shot a pull (as Counter-Strike's are), no more than ten a second however fast the pulls; a long magazine, a long
 	// reload, middling damage.
 	TestFalse(TEXT("not automatic: a shot a pull"), Dual.bAutomatic);
@@ -521,8 +557,18 @@ bool FTheBabyBombBurstsAndHurtsItsShooter::RunTest(const FString& Parameters)
 	TestEqual(TEXT("two more"), Bomb.Reserve, 2);
 	TestEqual(TEXT("a wheel a second"), Bomb.FireInterval, 1.0f);
 	TestEqual(TEXT("a 2.5 s reload"), Bomb.ReloadTime, 2.5f);
-	TestEqual(TEXT("at 25 m/s"), Bomb.ProjectileSpeed, 2500.0f);
+	TestEqual(TEXT("at 12.5 m/s (wave 15: half what it was)"), Bomb.ProjectileSpeed, 1250.0f);
 	TestTrue(TEXT("with a little drop"), Bomb.GravityShare > 0.0f && Bomb.GravityShare < 0.5f);
+	// Fired level from the eyes it comes down to the floor about 25 m out, as the faster wheel with more drop did (the
+	// gravity share was lowered with the speed, by the ballistics: reach = v sqrt(2h / g')).
+	const float Reach = LevelReach(Bomb, ReachEyeHeight);
+	TestTrue(FString::Printf(TEXT("a level wheel comes down about 25 m out (%.1f m)"), Reach / 100.0f), FMath::IsNearlyEqual(Reach, 2500.0f, 150.0f));
+	FWeaponStats Old = Bomb;
+	Old.ProjectileSpeed = 2500.0f;
+	Old.GravityShare = 0.15f;
+	TestTrue(FString::Printf(TEXT("about as far as the old wheel went before falling 75 cm (%.1f m)"), LevelReach(Old, 75.0f) / 100.0f), FMath::IsNearlyEqual(LevelReach(Old, 75.0f), Reach, 200.0f));
+	TestTrue(TEXT("within its life"), Reach / Bomb.ProjectileSpeed < Bomb.ProjectileLife);
+	TestTrue(TEXT("a round without gravity reaches as far as it flies"), FMath::IsNearlyEqual(LevelReach(Grater(), ReachEyeHeight), Grater().ProjectileSpeed * Grater().ProjectileLife));
 	TestEqual(TEXT("a direct hit 150"), Bomb.Damage, 150.0f);
 	TestEqual(TEXT("its burst 110 at its heart"), SplashAt(Bomb, 0.0f), 110.0f);
 	TestEqual(TEXT("and to 3 m"), SplashAt(Bomb, 300.0f), 110.0f);
@@ -590,9 +636,22 @@ bool FTheCheeseStickFellsAWideArc::RunTest(const FString& Parameters)
 	using namespace CheeseStrikeWeapons;
 	const FWeaponStats& Stick = CheeseStrikeWeapons::Stick();
 	TestTrue(TEXT("a melee weapon in the primary's slot"), Stick.IsMelee() && Stick.Slot == EWeaponSlot::Primary && !Stick.UsesRounds());
-	TestTrue(TEXT("a swing every 1.1 s, 3 m, 120 degrees"), Stick.FireInterval == 1.1f && Stick.Reach == 300.0f && Stick.ArcDegrees == 120.0f);
+	TestTrue(TEXT("a swing every 1.4 s, 3 m, 120 degrees"), Stick.FireInterval == 1.4f && Stick.Reach == 300.0f && Stick.ArcDegrees == 120.0f);
 	TestTrue(TEXT("a blow that kills"), Stick.Damage >= MaxHealth);
 	TestTrue(TEXT("a slower, wider swing than the knife's"), SwipeSecondsOf(Stick) > SwipeSecondsOf(Knife()) && Stick.SwipeSize > 1.0f && SwipeSecondsOf(Stick) < Stick.FireInterval);
+	// Wave 15: the swing shown 1.6 times slower than wave 14's 0.8 s, the length of its heavy whoosh; held upright in both
+	// hands (its look: the guard tipped up to about 60 degrees, the left hand on it above the right).
+	TestTrue(FString::Printf(TEXT("the swing takes 1.28 s (%.2f)"), SwipeSecondsOf(Stick)), FMath::IsNearlyEqual(SwipeSecondsOf(Stick), 0.8f * 1.6f, 0.001f));
+	const FWeaponLook& StickLook = CheeseStrikeWeaponLooks::For(Stick.Id);
+	TestTrue(FString::Printf(TEXT("held about 60 degrees up at rest (%.0f over the knife's guard)"), StickLook.GuardPitchUp), StickLook.GuardPitchUp > 25.0f && StickLook.GuardPitchUp < 40.0f);
+	TestTrue(TEXT("in both hands: the left on the stick above the right"), StickLook.LeftHand.IsSet() && StickLook.LeftHand->Y < -10.0f && StickLook.Hold == ECheeseStrikeHold::Knife);
+	TestTrue(TEXT("the knife in one hand, the other free"), !CheeseStrikeWeaponLooks::For(Knife().Id).LeftHand.IsSet() && CheeseStrikeWeaponLooks::For(Knife().Id).GuardPitchUp == 0.0f);
+	const CheeseStrikeArms::FKnifeAt Upright = CheeseStrikeArms::KnifeGuard(StickLook.GuardPitchUp);
+	const CheeseStrikeArms::FKnifeAt Guard = CheeseStrikeArms::KnifeGuard();
+	const float UprightPitch = FMath::RadiansToDegrees(FMath::Asin(Upright.Blade.Z));
+	TestTrue(FString::Printf(TEXT("its tip stands up about 60 degrees (%.0f)"), UprightPitch), UprightPitch > 55.0f && UprightPitch < 65.0f && UprightPitch > FMath::RadiansToDegrees(FMath::Asin(Guard.Blade.Z)) + 25.0f);
+	TestTrue(TEXT("its spine still up over it"), FMath::IsNearlyZero(FVector::DotProduct(Upright.Blade, Upright.Spine), 0.001f) && Upright.Spine.Z > 0.0f);
+	TestTrue(TEXT("and the swipe starts and ends on that guard"), CheeseStrikeArms::KnifeSwipe(0.0f, 1.0f, StickLook.GuardPitchUp).Blade.Equals(Upright.Blade, 0.01f) && CheeseStrikeArms::KnifeSwipe(1.0f, 1.0f, StickLook.GuardPitchUp).Blade.Equals(Upright.Blade, 0.01f));
 	const FVector Aim = FVector::ForwardVector;
 	TestTrue(TEXT("someone ahead at 2.5 m"), InArc(Stick, Aim, FVector(250.0f, 0.0f, 0.0f)));
 	TestTrue(TEXT("someone 55 degrees to the side"), InArc(Stick, Aim, FVector(250.0f, 0.0f, 0.0f).RotateAngleAxis(55.0f, FVector::UpVector)));
@@ -616,6 +675,49 @@ bool FTheMunsterTwinsFireInTurn::RunTest(const FString& Parameters)
 	TestEqual(TEXT("a belt of 60 each"), Twins.MagazineSize, 120);
 	TestTrue(TEXT("firing in turn"), DualHand(Twins, 0) == 0 && DualHand(Twins, 1) == 1 && DualHand(Twins, 2) == 0);
 	TestEqual(TEXT("not heavy any more"), Twins.CarrySpeed, 1.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheGatlingsBarrelsSpinUpAndWindDown, "CheeseStrike.Weapons.TheGatlingsBarrelsSpinUpAndWindDown", WeaponTests::Flags)
+
+bool FTheGatlingsBarrelsSpinUpAndWindDown::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	const FWeaponStats& Gatling = CheeseStrikeWeapons::Gatling();
+	// Six barrels, a shot from each in turn: at twenty a second, a third of a turn a second... a sixth of a turn a shot.
+	TestEqual(TEXT("six barrels"), Gatling.Barrels, 6);
+	const float Full = FullBarrelSpeed(Gatling);
+	TestTrue(FString::Printf(TEXT("at full speed a sixth of a turn a shot: %.0f degrees a second"), Full), FMath::IsNearlyEqual(Full, 360.0f / 6.0f / Gatling.FireInterval, 0.01f) && Full > 1000.0f);
+	TestEqual(TEXT("a gun without barrels turns nothing"), FullBarrelSpeed(Blaster()), 0.0f);
+	// Held: up to full speed in the spin-up's 0.4 s, steadily; let go: down to nothing over the wind-down, steadily.
+	float Speed = 0.0f;
+	float Time = 0.0f;
+	int32 Frames = 0;
+	while (Speed < Full && Frames < 1000)
+	{
+		Speed = BarrelSpeed(Speed, Full, 1.0f / 120.0f, Gatling.SpinUp, Full);
+		Time += 1.0f / 120.0f;
+		++Frames;
+	}
+	TestTrue(FString::Printf(TEXT("full speed as the spin-up ends (%.2f s)"), Time), FMath::IsNearlyEqual(Time, Gatling.SpinUp, 0.02f));
+	TestTrue(TEXT("half way at half the spin-up"), FMath::IsNearlyEqual(BarrelSpeed(0.0f, Full, Gatling.SpinUp * 0.5f, Gatling.SpinUp, Full), Full * 0.5f, 1.0f));
+	TestEqual(TEXT("and no faster, held on"), BarrelSpeed(Full, Full, 0.1f, Gatling.SpinUp, Full), Full);
+	Time = 0.0f;
+	Frames = 0;
+	while (Speed > 0.0f && Frames < 1000)
+	{
+		Speed = BarrelSpeed(Speed, 0.0f, 1.0f / 60.0f, Gatling.SpinUp, Full);
+		Time += 1.0f / 60.0f;
+		++Frames;
+	}
+	TestTrue(FString::Printf(TEXT("wound down to nothing in %.1f s"), Time), FMath::IsNearlyEqual(Time, BarrelSpinDown, 0.03f) && BarrelSpinDown > Gatling.SpinUp);
+	TestTrue(TEXT("let go half way up, it winds down from there at the same rate"), FMath::IsNearlyEqual(BarrelSpeed(Full * 0.5f, 0.0f, 0.1f, Gatling.SpinUp, Full), Full * 0.5f - Full / BarrelSpinDown * 0.1f, 0.5f));
+	TestEqual(TEXT("and never below nothing"), BarrelSpeed(1.0f, 0.0f, 1.0f, Gatling.SpinUp, Full), 0.0f);
+	// Its barrels are a part of their own, turning about the axle.
+	const FWeaponLook& Look = CheeseStrikeWeaponLooks::For(Gatling.Id);
+	TestNotNull(TEXT("the Gatling's barrels are a part of their own"), Look.SpinningPart);
+	TestTrue(TEXT("turning about the barrels' axis, along the gun"), Look.SpinAxis.GetSafeNormal().Equals(FVector(0.0f, 1.0f, 0.0f)) && FMath::IsNearlyEqual(Look.SpinCentre.Z, Look.Muzzle.Z));
+	TestNull(TEXT("another gun has none"), CheeseStrikeWeaponLooks::For(Blaster().Id).SpinningPart);
 	return true;
 }
 

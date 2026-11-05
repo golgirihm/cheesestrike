@@ -54,10 +54,10 @@ namespace CheeseStrikeArms
 		FVector Blade = FVector::ForwardVector;
 		FVector Spine = FVector::UpVector;
 	};
-	/** On guard: the blade forward, up and a little in, its spine up. */
-	FKnifeAt KnifeGuard();
-	/** At `Phase` of a swipe from the right shoulder down and across to the left, the edge leading: raised, swept, back on guard. */
-	FKnifeAt KnifeSwipe(float Phase, float Size = 1.0f);
+	/** On guard: the blade forward, up and a little in, its spine up; tipped up `PitchUp` degrees more (the Cheese Stick held upright). */
+	FKnifeAt KnifeGuard(float PitchUp = 0.0f);
+	/** At `Phase` of a swipe from the right shoulder down and across to the left, the edge leading: raised, swept, back on guard (tipped up `PitchUp` more, as KnifeGuard). */
+	FKnifeAt KnifeSwipe(float Phase, float Size = 1.0f, float PitchUp = 0.0f);
 
 	/** Whether someone crouched and going at `Speed` (cm/s) is sliding, as any machine can tell: faster than a crouched walk can go. */
 	bool LooksSliding(bool bCrouched, float Speed);
@@ -110,8 +110,9 @@ struct FCheeseStrikeViewHold : public FAnimNode_Base
 	/** Held as a knife (on guard, swiped), and the swipe's phase (none below 0). */
 	bool bKnife = false;
 	float SwipePhase = -1.0f;
-	/** How wide the swipe is (1 the knife's; the Cheese Stick's wider). */
+	/** How wide the swipe is (1 the knife's; the Cheese Stick's wider), and how far up beyond the knife's guard it rests (degrees). */
 	float SwipeSize = 1.0f;
+	float GuardPitchUp = 0.0f;
 	/** How much a montage moves the arms (1 - the slot's source weight). */
 	float Montage = 0.0f;
 
@@ -162,9 +163,10 @@ struct FCheeseStrikeKnifeHold : public FAnimNode_Base
 	FTransform ModelInHand = FTransform::Identity;
 	FVector ModelAlong = FVector(0.0, -1.0, 0.0);
 	FVector ModelSpine = FVector(0.0, 0.0, 1.0);
-	/** The swipe's phase (none below 0), and how wide it is (1 the knife's). */
+	/** The swipe's phase (none below 0), how wide it is (1 the knife's), and how far up beyond the knife's guard it rests (degrees). */
 	float SwipePhase = -1.0f;
 	float SwipeSize = 1.0f;
+	float GuardPitchUp = 0.0f;
 
 	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
 	virtual void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;

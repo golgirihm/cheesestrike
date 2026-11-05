@@ -245,6 +245,41 @@ namespace CheeseStrikeWeapons
 		return Weapon.bDual && Index % 2 != 0 ? 1 : 0;
 	}
 
+	float FullBarrelSpeed(const FWeaponStats& Weapon)
+	{
+		if (Weapon.Barrels <= 0 || Weapon.FireInterval <= 0.0f)
+		{
+			return 0.0f;
+		}
+		return 360.0f / Weapon.Barrels / Weapon.FireInterval;
+	}
+
+	float BarrelSpeed(float Speed, float Wanted, float DeltaSeconds, float SpinUp, float Full)
+	{
+		if (Wanted > Speed)
+		{
+			// Up at the spin-up's rate: the full speed in SpinUp seconds (at once for a weapon without one).
+			const float Rate = SpinUp > 0.0f ? Wanted / SpinUp : TNumericLimits<float>::Max();
+			return FMath::Min(Speed + Rate * DeltaSeconds, Wanted);
+		}
+		// Winding down: at the steady rate that takes it from full to nothing over BarrelSpinDown (`Full` is the speed it winds
+		// down from: the full speed, which the caller gives as the wanted speed's stand-in when it is 0).
+		return FMath::Max(Speed - Full / BarrelSpinDown * DeltaSeconds, Wanted);
+	}
+
+	float LevelReach(const FWeaponStats& Weapon, float Height, float Gravity)
+	{
+		const float Fall = FMath::Abs(Gravity) * Weapon.GravityShare;
+		const float Furthest = Weapon.ProjectileSpeed * Weapon.ProjectileLife;
+		if (Fall <= KINDA_SMALL_NUMBER || Height <= 0.0f)
+		{
+			return Furthest;
+		}
+		// Level, it falls Height in sqrt(2 Height / g') seconds, going on at its speed meanwhile.
+		const float Seconds = FMath::Sqrt(2.0f * Height / Fall);
+		return FMath::Min(Weapon.ProjectileSpeed * Seconds, Furthest);
+	}
+
 	int32 NextInRun(const FWeaponStats& Weapon, int32 Last, float SinceLast)
 	{
 		if (Last < 0 || SinceLast > Weapon.RecoilReset)

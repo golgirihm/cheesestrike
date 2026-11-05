@@ -19,7 +19,8 @@ from PIL import Image, ImageDraw
 WIDTH, HEIGHT = 256, 96
 MARGIN = 6
 SUPER = 4
-# Weapon id: its OBJ, which way its muzzle points along Y (the knife and the stick point back), and whose OBJ it is.
+# Weapon id: its OBJ (or several, drawn together: the Gatling's body and its barrels), which way its muzzle points along Y
+# (the knife and the stick point back), and whose OBJ it is.
 ICONS = {
     "blaster": ("cheese_blaster", 1.0, "ours"),
     "carbine": ("cheese_carbine", 1.0, "ours"),
@@ -30,23 +31,26 @@ ICONS = {
     "pistol": ("cheese_pistol", 1.0, "ours"),
     "babybomb": ("cheese_babybomb", 1.0, "ours"),
     "stick": ("cheese_stick", -1.0, "ours"),
-    "gatling": ("cheese_gatling", 1.0, "ours"),
-    # Two M1911s back to back, the one in each hand.
-    "burratas": ("SM_M1911", 1.0, "unreal"),
+    "gatling": (["cheese_gatling", "cheese_gatling_barrels"], 1.0, "ours"),
+    # Two burrata pistols back to back, the one in each hand.
+    "burratas": ("cheese_burrata", 1.0, "ours"),
     "knife": ("SM_CheeseKnife", -1.0, "unreal"),
 }
 
 
-def load(path):
+def load(paths):
+    """The vertices and faces of one OBJ, or of several as one."""
     vertices, faces = [], []
-    for line in open(path):
-        parts = line.split()
-        if not parts:
-            continue
-        if parts[0] == "v":
-            vertices.append(tuple(map(float, parts[1:4])))
-        elif parts[0] == "f":
-            faces.append([int(p.split("/")[0]) - 1 for p in parts[1:]])
+    for path in paths:
+        offset = len(vertices)
+        for line in open(path):
+            parts = line.split()
+            if not parts:
+                continue
+            if parts[0] == "v":
+                vertices.append(tuple(map(float, parts[1:4])))
+            elif parts[0] == "f":
+                faces.append([int(p.split("/")[0]) - 1 + offset for p in parts[1:]])
     return vertices, faces
 
 
@@ -54,8 +58,8 @@ def load(path):
 DUAL = {"burratas", "munster"}
 
 
-def icon(path, forward, whose, width=WIDTH):
-    vertices, faces = load(path)
+def icon(paths, forward, whose, width=WIDTH):
+    vertices, faces = load(paths)
     # Side on: forward (Y) across, muzzle to the left; up (Z) up.
     if whose == "ours":
         points = [(forward * v[1], v[2]) for v in vertices]
@@ -81,20 +85,21 @@ def icon(path, forward, whose, width=WIDTH):
 def main():
     source, target = sys.argv[1], sys.argv[2]
     os.makedirs(target, exist_ok=True)
-    for weapon, (name, forward, whose) in ICONS.items():
-        path = os.path.join(source, name + ".obj")
-        if not os.path.exists(path):
-            print(weapon, "has no model at", path)
+    for weapon, (names, forward, whose) in ICONS.items():
+        paths = [os.path.join(source, name + ".obj") for name in (names if isinstance(names, list) else [names])]
+        missing = [path for path in paths if not os.path.exists(path)]
+        if missing:
+            print(weapon, "has no model at", missing[0])
             continue
         if weapon in DUAL:
             # The left hand's facing left, the right hand's its mirror, side by side.
-            half = icon(path, forward, whose, WIDTH // 2)
+            half = icon(paths, forward, whose, WIDTH // 2)
             both = Image.new("RGBA", (WIDTH, HEIGHT), (255, 255, 255, 0))
             both.paste(half, (0, 0))
             both.paste(half.transpose(Image.FLIP_LEFT_RIGHT), (WIDTH // 2, 0))
             both.save(os.path.join(target, f"T_Icon_{weapon}.png"))
         else:
-            icon(path, forward, whose).save(os.path.join(target, f"T_Icon_{weapon}.png"))
+            icon(paths, forward, whose).save(os.path.join(target, f"T_Icon_{weapon}.png"))
         print(weapon, "drawn")
 
 

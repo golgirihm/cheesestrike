@@ -24,6 +24,25 @@ namespace CheeseStrikeDual
 		const FMatrix Turn = Reflect * FRotationMatrix::Make(Held.GetRotation()) * Reflect;
 		return FTransform(Turn.ToQuat().GetNormalized(), MirroredAt, Held.GetScale3D());
 	}
+
+	FTransform Aligned(const FTransform& Hand, const FVector& AlongInHand, const FVector& Forward, const FVector& Up, float InDegrees)
+	{
+		const FVector UpNow = Up.GetSafeNormal();
+		const FVector AlongNow = Hand.GetRotation().RotateVector(AlongInHand).GetSafeNormal();
+		const FVector Flat = (Forward - UpNow * FVector::DotProduct(Forward, UpNow)).GetSafeNormal();
+		if (AlongNow.IsNearlyZero() || Flat.IsNearlyZero())
+		{
+			return Hand;
+		}
+		// A turn about up by a positive angle takes forward toward the right: in toward the left is the other way. The
+		// pitch stays the gun's own (the aim offsets' up and down).
+		const FVector InYaw = Flat.RotateAngleAxis(-InDegrees, UpNow).GetSafeNormal();
+		const float Rise = FMath::Clamp(static_cast<float>(FVector::DotProduct(AlongNow, UpNow)), -1.0f, 1.0f);
+		const FVector Wanted = (InYaw * FMath::Sqrt(FMath::Max(1.0f - Rise * Rise, 0.0f)) + UpNow * Rise).GetSafeNormal();
+		FTransform Turned = Hand;
+		Turned.SetRotation((FQuat::FindBetweenNormals(AlongNow, Wanted) * Hand.GetRotation()).GetNormalized());
+		return Turned;
+	}
 }
 
 namespace
@@ -102,9 +121,14 @@ void FCheeseStrikeDualHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FVector Across = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
 	const FTransform RightNow = Pose.GetComponentSpaceTransform(RightHand);
 	const FTransform LeftNow = Pose.GetComponentSpaceTransform(LeftHand);
-	// The right hand out to the right; the left where it would be held the mirror way.
+	// The right hand out to the right (less so aimed, when the stance has brought it up before the eyes) and, aimed, its
+	// gun laid along the aim turned in a little toward the middle; the left where it would be held the mirror way.
+	const float Aimed = FMath::Clamp(Aim, 0.0f, 1.0f);
+	const FVector AlongInHand = ModelInHand.GetRotation().RotateVector(ModelAlong);
+	const FTransform Laid = CheeseStrikeDual::Aligned(RightNow, AlongInHand, Forward, FVector::UpVector, CheeseStrikeDual::Converge);
 	FTransform RightTarget = RightNow;
-	RightTarget.AddToTranslation(Across * Spread * Alpha);
+	RightTarget.SetRotation(FQuat::Slerp(RightNow.GetRotation(), Laid.GetRotation(), Aimed * Alpha).GetNormalized());
+	RightTarget.AddToTranslation(Across * FMath::Lerp(Spread, AimSpread, Aimed) * Alpha);
 	const FTransform Mirror = Correction * CheeseStrikeDual::Mirrored(RightTarget, Origin, Across);
 	FTransform LeftTarget = LeftNow;
 	LeftTarget.SetLocation(FMath::Lerp(LeftNow.GetLocation(), Mirror.GetLocation(), static_cast<double>(Alpha)));

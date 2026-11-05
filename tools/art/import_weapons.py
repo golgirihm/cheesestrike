@@ -1,20 +1,21 @@
 import os, traceback
 import unreal
 
-# Run with the editor closed, after tools/art/weapon_textures.py, tools/art/weapon_models.py and
-# tools/art/cheese_weapons.py (Blender) have written into FAB/x/weapons and tools/art/weapon_icons.py has drawn the
-# icons:
+# Run with the editor closed, after tools/art/weapon_models.py and tools/art/cheese_weapons.py (Blender) have written
+# into FAB/x/weapons and tools/art/weapon_icons.py has drawn the icons:
 #   UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/import_weapons.py [Name ...]" -unattended -nullrhi
 # (both paths absolute). Then run tools/art/weapon_materials.py, which gives them the game's cheese materials.
 # It writes what it did to Saved/import_weapons.txt. With names (of OURS, "Icons" for the icons), only those are
 # imported, afresh.
 #
-# Imports the weapons' models: the Fab models of the primaries that aren't Lyra's (Content/LICENSES.md lists
-# each listing) into /Game/Fab/<publisher>/<model>/, each a static mesh (no Nanite, which the first-person view
-# doesn't draw; no collision, as a weapon in hand needs none) with its textures; and the Cheese Knife, the muzzle
-# flash and the cheese grenade, made by weapon_models.py, into /Game/CheeseStrike/Weapons/. Lyra's shotgun, copied in with its 4096-pixel maps,
-# has them cut to MAX. Also writes each mesh's vertices to Saved/weapon_shapes/ for looking at their shapes, and imports
-# the HUD's weapon icons that tools/art/weapon_icons.py drew into FAB/x/weapons/icons, into /Game/CheeseStrike/Weapons/Icons/.
+# Imports the weapons' models, every one the game's own: the Cheese Knife, the muzzle flash and the cheese grenade,
+# made by weapon_models.py, and the cheese weapons and their rounds, modelled by cheese_weapons.py, into
+# /Game/CheeseStrike/Weapons/<weapon>/, each a static mesh (no Nanite, which the first-person view doesn't draw; no
+# collision, as a weapon in hand needs none). Lyra's shotgun, copied in with its 4096-pixel maps, has them cut to MAX.
+# Also writes each mesh's vertices to Saved/weapon_shapes/ for looking at their shapes, and imports the HUD's weapon
+# icons that tools/art/weapon_icons.py drew into FAB/x/weapons/icons, into /Game/CheeseStrike/Weapons/Icons/. (The Fab
+# guns the older looks borrowed, Max3d's PPSh-41 and DP-28, SpatialNeglect's SV-98 and M4 and Xeradev's M1911, were
+# deleted in wave 15 by tools/art/delete_unused_weapons.py.)
 FAB = os.environ.get("CHEESESTRIKE_FAB", r"C:\Hamid\code\FabDownloads")
 WORK = os.path.join(FAB, "x", "weapons")
 OUT = unreal.Paths.project_saved_dir() + "import_weapons.txt"
@@ -22,16 +23,6 @@ SHAPES = unreal.Paths.project_saved_dir() + "weapon_shapes/"
 MAX = 2048
 REIMPORT = os.environ.get("CHEESESTRIKE_FAB_REIMPORT") == "1"
 
-# (asset, destination, model file under FAB, its texture sets (name in WORK, the maps it has))
-MODELS = [
-    ("PPSh41", "/Game/Fab/Max3d/PPSh41", "Max3d_PPSh41/source/PPSH 41/PPSH 41.fbx", [("PPSh41", True)]),
-    ("DP28", "/Game/Fab/Max3d/DP28", "Max3d_DP28/source/Dp28/dp28.FBX", [("DP28", True)]),
-    ("SV98", "/Game/Fab/SpatialNeglect/SV98", "SpatialNeglect_SV98/source/sv 98.fbx", [("SV98", True), ("SV98Scope", False)]),
-    ("ClassicM4", "/Game/Fab/SpatialNeglect/ClassicM4", "SpatialNeglect_ClassicM4/source/Classic M4.fbx", [("ClassicM4", False), ("ClassicM4Scope", False)]),
-    # The Dual Burratas' pistols: no maps of its own; weapon_materials.py makes it burrata and steel. Made along X,
-    # muzzle toward -X: turned as it comes in to lie along Y, muzzle forward, as the game's weapons do.
-    ("M1911", "/Game/Fab/Xeradev/M1911", "Xeradev_M1911/fbx/FBX/NonRigged/NonRigged_M1911.fbx", [], -90.0),
-]
 OURS = [("CheeseKnife", "/Game/CheeseStrike/Weapons/Knife", os.path.join(WORK, "cheese_knife.obj")),
         ("MuzzleFlash", "/Game/CheeseStrike/Weapons/Flash", os.path.join(WORK, "muzzle_flash.obj")),
         ("FragGrenade", "/Game/CheeseStrike/Weapons/Grenade", os.path.join(WORK, "frag_grenade.obj"))]
@@ -40,7 +31,8 @@ OURS += [(asset, "/Game/CheeseStrike/Weapons/" + folder, os.path.join(WORK, f"ch
     ("CheddarBlaster", "Blaster", "blaster"), ("ColbyCarbine", "Carbine", "carbine"), ("RoquefortRifle", "Roquefort", "roquefort"),
     ("CurdPistol", "Pistol", "pistol"), ("SwissShotgun", "Shotgun", "shotgun"), ("MunsterSMG", "Munster", "munster"),
     ("CheeseGrater", "Grater", "grater"), ("GraterShard", "Grater", "grater_shard"), ("BabyBomb", "BabyBomb", "babybomb"),
-    ("BabyBombRound", "BabyBomb", "babybomb_round"), ("CheeseStick", "Stick", "stick"), ("GoudaGatling", "Gatling", "gatling")]]
+    ("BabyBombRound", "BabyBomb", "babybomb_round"), ("CheeseStick", "Stick", "stick"), ("Burrata", "Burratas", "burrata"),
+    ("GoudaGatling", "Gatling", "gatling"), ("GoudaGatlingBarrels", "Gatling", "gatling_barrels")]]
 ONLY = [a for a in __import__("sys").argv[1:] if a]
 SHOTGUN_TEXTURES = ["/Game/Weapons/Shotgun/Texture/T_Shotgun_AORM", "/Game/Weapons/Shotgun/Texture/T_Shotgun_D", "/Game/Weapons/Shotgun/Texture/T_Shotgun_N", "/Game/Weapons/Shotgun/Texture/T_Shotgun_Mask"]
 
@@ -64,38 +56,19 @@ def import_file(path, destination, name, options=None):
     return [unreal.load_asset(p) for p in task.get_editor_property("imported_object_paths")]
 
 
-def texture(path, destination, name, kind):
-    if not REIMPORT and lib.does_asset_exist(f"{destination}/{name}"):
-        return unreal.load_asset(f"{destination}/{name}")
-    imported = [a for a in import_file(path, destination, name) if isinstance(a, unreal.Texture2D)]
-    if not imported:
-        lines.append(f"  {name}: nothing imported from {path}")
-        return None
-    t = imported[0]
-    if kind == "Albedo":
-        t.set_editor_property("srgb", True)
-    elif kind == "Normal":
-        # Substance's and Max3d's normals are OpenGL's way up; Unreal's are DirectX's.
-        t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
-        t.set_editor_property("srgb", False)
-        t.set_editor_property("flip_green_channel", True)
-    else:
-        t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
-        t.set_editor_property("srgb", False)
-    lib.save_asset(t.get_path_name(), False)
-    lines.append(f"  {name}: {t.blueprint_get_size_x()} pixels")
-    return t
-
-
 def model(asset, path, destination, yaw=0.0):
     """A static mesh, its parts combined, with its material slots; no Nanite, no collision."""
-    if not REIMPORT and asset not in ONLY and lib.does_asset_exist(f"{destination}/SM_{asset}"):
-        return unreal.load_asset(f"{destination}/SM_{asset}")
+    if lib.does_asset_exist(f"{destination}/SM_{asset}"):
+        if not REIMPORT and asset not in ONLY:
+            return unreal.load_asset(f"{destination}/SM_{asset}")
+        # Afresh: a reimport over the old mesh keeps its old material slots (a slot its faces no longer use stays, and
+        # the new slots come after it), so the old mesh goes first; the game loads it by path.
+        lib.delete_asset(f"{destination}/SM_{asset}")
     options = unreal.FbxImportUI()
     options.set_editor_property("import_mesh", True)
     options.set_editor_property("import_as_skeletal", False)
     options.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_STATIC_MESH)
-    # A model with bones (the DP28 has some) is still taken as a plain mesh.
+    # A model with bones is still taken as a plain mesh.
     options.set_editor_property("automated_import_should_detect_type", False)
     options.set_editor_property("import_materials", False)
     options.set_editor_property("import_textures", False)
@@ -161,14 +134,6 @@ def icon(path, name):
 try:
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.OBJ False")
-    for asset, destination, path, sets, *turn in (MODELS if not ONLY else []):
-        lines.append(asset)
-        for name, has_cheese in sets:
-            for kind in ["Albedo", "Normal", "AORM"] + (["Cheese"] if has_cheese else []):
-                texture(os.path.join(WORK, f"T_{name}_{kind}.png"), destination, f"T_{name}_{kind}", kind)
-        mesh = model(asset, os.path.join(FAB, path), destination, turn[0] if turn else 0.0)
-        if mesh is not None:
-            describe(asset, mesh)
     for asset, destination, path in OURS:
         if ONLY and asset not in ONLY:
             continue

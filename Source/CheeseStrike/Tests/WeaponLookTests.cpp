@@ -138,6 +138,23 @@ bool FEveryWeaponHasItsOwnLook::RunTest(const FString& Parameters)
 	{
 		TestNotNull(TEXT("a weapon is drawn"), Load<USoundBase>(Sound));
 	}
+	// A part that turns while it fires (the Gatling's barrels) loads, with its materials.
+	for (const FWeaponStats* Weapon : CheeseStrikeArsenal::All())
+	{
+		const FWeaponLook& Look = CheeseStrikeWeaponLooks::For(Weapon->Id);
+		if (Look.SpinningPart != nullptr)
+		{
+			TestNotNull(FString::Printf(TEXT("%s's spinning part loads"), Look.Id), Load<UStaticMesh>(Look.SpinningPart));
+			TestNotNull(FString::Printf(TEXT("%s's spinning part has a material"), Look.Id), Look.SpinningMaterials[0]);
+			for (const TCHAR* Material : Look.SpinningMaterials)
+			{
+				if (Material != nullptr)
+				{
+					TestNotNull(FString::Printf(TEXT("%s's spinning part's material %s loads"), Look.Id, Material), Load<UMaterialInterface>(Material));
+				}
+			}
+		}
+	}
 	TestNotNull(TEXT("the flash"), Load<UStaticMesh>(CheeseStrikeWeaponLooks::FlashModel));
 	TestNotNull(TEXT("its side"), Load<UMaterialInterface>(CheeseStrikeWeaponLooks::FlashMaterial));
 	TestNotNull(TEXT("its front"), Load<UMaterialInterface>(CheeseStrikeWeaponLooks::FlashFrontMaterial));

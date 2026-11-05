@@ -159,6 +159,20 @@ ACheeseStrikeWeapon::ACheeseStrikeWeapon()
 	ThirdPersonOffHand->bOwnerNoSee = true;
 	ThirdPersonOffHand->SetHiddenInGame(true);
 
+	// A part that turns while it fires (the Gouda Gatling's barrels), in the model's frame.
+	FirstPersonSpinner = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("First Person Spinner"));
+	FirstPersonSpinner->SetupAttachment(RootComponent);
+	FirstPersonSpinner->SetCollisionProfileName(FName("NoCollision"));
+	FirstPersonSpinner->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
+	FirstPersonSpinner->bOnlyOwnerSee = true;
+	FirstPersonSpinner->SetHiddenInGame(true);
+	ThirdPersonSpinner = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Third Person Spinner"));
+	ThirdPersonSpinner->SetupAttachment(RootComponent);
+	ThirdPersonSpinner->SetCollisionProfileName(FName("NoCollision"));
+	ThirdPersonSpinner->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::WorldSpaceRepresentation);
+	ThirdPersonSpinner->bOwnerNoSee = true;
+	ThirdPersonSpinner->SetHiddenInGame(true);
+
 	// The muzzle's flash: a star of light in its player's view and on the body, and a moment's light round it.
 	FirstPersonFlash = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("First Person Flash"));
 	FirstPersonFlash->SetupAttachment(RootComponent);
@@ -194,6 +208,7 @@ void ACheeseStrikeWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME_CONDITION(ACheeseStrikeWeapon, Magazine, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(ACheeseStrikeWeapon, Reserve, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(ACheeseStrikeWeapon, ReloadEndsAt, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(ACheeseStrikeWeapon, bTriggerShown, COND_SkipOwner);
 }
 
 void ACheeseStrikeWeapon::SetWeapon(FName Id)
@@ -239,6 +254,24 @@ void ACheeseStrikeWeapon::ApplyWeapon()
 			}
 		}
 	}
+	// The part that turns while it fires, in its own materials.
+	UStaticMesh* Spinning = LoadLook<UStaticMesh>(Look->SpinningPart);
+	for (UStaticMeshComponent* Spinner : {FirstPersonSpinner.Get(), ThirdPersonSpinner.Get()})
+	{
+		Spinner->SetStaticMesh(Spinning);
+		for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(Look->SpinningMaterials); ++Slot)
+		{
+			if (UMaterialInterface* Material = LoadLook<UMaterialInterface>(Look->SpinningMaterials[Slot]))
+			{
+				if (Slot < Spinner->GetNumMaterials())
+				{
+					Spinner->SetMaterial(Slot, Material);
+				}
+			}
+		}
+	}
+	BarrelSpeed = 0.0f;
+	BarrelAngle = 0.0f;
 	// The flash, if it has one.
 	UStaticMesh* FlashModel = Look->FlashSize > 0.0f ? LoadLook<UStaticMesh>(CheeseStrikeWeaponLooks::FlashModel) : nullptr;
 	UMaterialInterface* FlashSide = FlashModel != nullptr ? LoadLook<UMaterialInterface>(CheeseStrikeWeaponLooks::FlashMaterial) : nullptr;
@@ -344,6 +377,7 @@ void ACheeseStrikeWeapon::Tick(float DeltaSeconds)
 		}
 	}
 	UpdateTracers();
+	UpdateSpinner(DeltaSeconds);
 	// The flash goes out.
 	if (FlashUntil > 0.0f && GetWorld()->GetTimeSeconds() >= FlashUntil)
 	{
@@ -404,6 +438,15 @@ void ACheeseStrikeWeapon::FitToHands()
 	{
 		PutInHand(Part.Key, Part.Value, *Look);
 	}
+	// The part that turns rides the model, in its frame.
+	for (const TPair<UStaticMeshComponent*, bool>& Spinner : {TPair<UStaticMeshComponent*, bool>(FirstPersonSpinner, true), TPair<UStaticMeshComponent*, bool>(ThirdPersonSpinner, false)})
+	{
+		if (UPrimitiveComponent* Model = GetModel(Spinner.Value))
+		{
+			Spinner.Key->AttachToComponent(Model, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+			Spinner.Key->SetRelativeTransform(FTransform::Identity);
+		}
+	}
 	// The second gun of two, in the left hand as the first is in the right, mirrored across the body.
 	if (Stats->bDual)
 	{
@@ -461,6 +504,36 @@ FVector ACheeseStrikeWeapon::GetModelAlong() const
 	return Look != nullptr ? Look->Along : FVector(0.0, 1.0, 0.0);
 }
 
+float ACheeseStrikeWeapon::GetGuardPitchUp() const
+{
+	return Look != nullptr ? Look->GuardPitchUp : 0.0f;
+}
+
+void ACheeseStrikeWeapon::UpdateSpinner(float DeltaSeconds)
+{
+	if (Look == nullptr || Look->SpinningPart == nullptr || Stats == nullptr || GetWorld() == nullptr)
+	{
+		return;
+	}
+	// The trigger as this machine knows it: the owner's own, or the server's word of it.
+	const bool bOwn = Holder != nullptr && Holder->IsLocallyControlled();
+	const bool bHeld = bInHand && (bOwn ? bTriggerHeld : bTriggerShown) && (Holder == nullptr || Holder->IsAlive());
+	const float Full = CheeseStrikeWeapons::FullBarrelSpeed(*Stats);
+	BarrelSpeed = CheeseStrikeWeapons::BarrelSpeed(BarrelSpeed, bHeld ? Full : 0.0f, DeltaSeconds, Stats->SpinUp, Full);
+	BarrelAngle = FMath::Fmod(BarrelAngle + BarrelSpeed * DeltaSeconds, 360.0f);
+	const FQuat Turn(Look->SpinAxis.GetSafeNormal(), FMath::DegreesToRadians(BarrelAngle));
+	const FTransform Spun(Turn, Look->SpinCentre - Turn.RotateVector(Look->SpinCentre));
+	for (UStaticMeshComponent* Spinner : {FirstPersonSpinner.Get(), ThirdPersonSpinner.Get()})
+	{
+		Spinner->SetRelativeTransform(Spun);
+	}
+}
+
+void ACheeseStrikeWeapon::ServerSetTrigger_Implementation(bool bHeld)
+{
+	bTriggerShown = bHeld;
+}
+
 UPrimitiveComponent* ACheeseStrikeWeapon::GetModel(bool bFirstPerson) const
 {
 	const bool bPlain = Look != nullptr && Look->PlainModel != nullptr;
@@ -496,7 +569,8 @@ bool ACheeseStrikeWeapon::LeftHandHoldFor(const USkeletalMeshComponent* Body, FV
 void ACheeseStrikeWeapon::SetAway(bool bAway)
 {
 	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(FirstPersonMesh), static_cast<UPrimitiveComponent*>(FirstPersonModel), static_cast<UPrimitiveComponent*>(FirstPersonOffHand),
-		static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel), static_cast<UPrimitiveComponent*>(ThirdPersonOffHand)})
+		static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel), static_cast<UPrimitiveComponent*>(ThirdPersonOffHand),
+		static_cast<UPrimitiveComponent*>(FirstPersonSpinner), static_cast<UPrimitiveComponent*>(ThirdPersonSpinner)})
 	{
 		if (Part != nullptr)
 		{
@@ -517,6 +591,9 @@ void ACheeseStrikeWeapon::SetInHand(bool bIsInHand)
 	const bool bTwo = Stats != nullptr && Stats->bDual && FirstPersonOffHand->GetStaticMesh() != nullptr;
 	FirstPersonOffHand->SetHiddenInGame(!bInHand || !bTwo);
 	ThirdPersonOffHand->SetHiddenInGame(!bInHand || !bTwo);
+	const bool bSpins = FirstPersonSpinner->GetStaticMesh() != nullptr;
+	FirstPersonSpinner->SetHiddenInGame(!bInHand || !bSpins);
+	ThirdPersonSpinner->SetHiddenInGame(!bInHand || !bSpins);
 	if (!bInHand)
 	{
 		FirstPersonFlash->SetHiddenInGame(true);
@@ -538,7 +615,7 @@ FString ACheeseStrikeWeapon::DescribeModel(const FVector& Eye) const
 
 void ACheeseStrikeWeapon::SetSeenFromOutside(bool bOutside)
 {
-	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel), static_cast<UPrimitiveComponent*>(ThirdPersonFlash), static_cast<UPrimitiveComponent*>(ThirdPersonOffHand)})
+	for (UPrimitiveComponent* Part : {static_cast<UPrimitiveComponent*>(ThirdPersonMesh), static_cast<UPrimitiveComponent*>(ThirdPersonModel), static_cast<UPrimitiveComponent*>(ThirdPersonFlash), static_cast<UPrimitiveComponent*>(ThirdPersonOffHand), static_cast<UPrimitiveComponent*>(ThirdPersonSpinner)})
 	{
 		Part->SetOwnerNoSee(!bOutside);
 		Part->SetFirstPersonPrimitiveType(bOutside ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation);
@@ -1235,8 +1312,10 @@ void ACheeseStrikeWeapon::StartFiring()
 	bTriggerHeld = true;
 	if (Stats->bAutomatic && Stats->SpinUp > 0.0f)
 	{
-		// A rotary barrel spins up first: the beat begins once it has, held all the while (Tick fires it).
+		// A rotary barrel spins up first: the beat begins once it has, held all the while (Tick fires it); the server is told,
+		// so that every machine sees the barrels turn.
 		AutoNextAt = GetWorld()->GetTimeSeconds() + Stats->SpinUp;
+		ServerSetTrigger(true);
 		return;
 	}
 	FireOnce();
@@ -1255,13 +1334,17 @@ void ACheeseStrikeWeapon::StartFiring()
 
 void ACheeseStrikeWeapon::StopFiring()
 {
+	if (bTriggerHeld && Stats->bAutomatic && Stats->SpinUp > 0.0f)
+	{
+		ServerSetTrigger(false);
+	}
 	bTriggerHeld = false;
 }
 
 void ACheeseStrikeWeapon::StartAiming()
 {
-	// A knife has no sights, and two guns aren't aimed down one's (as Counter-Strike's Dual Berettas aren't).
-	bAimed = !Stats->IsMelee() && !Stats->bDual;
+	// A knife has no sights; two guns come up side by side before the eyes (FCheeseStrikeDualHold).
+	bAimed = !Stats->IsMelee();
 }
 
 void ACheeseStrikeWeapon::StopAiming()
@@ -1821,7 +1904,7 @@ void ACheeseStrikeWeapon::SetOverlay(UMaterialInterface* Overlay, UMaterialInter
 {
 	const TPair<UMeshComponent*, UMaterialInterface*> Parts[] = {
 		{FirstPersonMesh.Get(), ViewOverlay}, {FirstPersonModel.Get(), ViewOverlay}, {ThirdPersonMesh.Get(), Overlay}, {ThirdPersonModel.Get(), Overlay},
-		{FirstPersonOffHand.Get(), ViewOverlay}, {ThirdPersonOffHand.Get(), Overlay}};
+		{FirstPersonOffHand.Get(), ViewOverlay}, {ThirdPersonOffHand.Get(), Overlay}, {FirstPersonSpinner.Get(), ViewOverlay}, {ThirdPersonSpinner.Get(), Overlay}};
 	for (const TPair<UMeshComponent*, UMaterialInterface*>& Part : Parts)
 	{
 		if (Part.Key != nullptr && Part.Key->GetOverlayMaterial() != Part.Value)
