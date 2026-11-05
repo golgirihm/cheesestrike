@@ -528,6 +528,14 @@ void ACheeseStrikeCharacter::BeginPlay()
 	ACheeseStrikeWeapon::HideBuiltInWeapons(GetMesh());
 	FitFirstPersonBody();
 	FirstPersonBase = FirstPersonMesh->GetRelativeTransform();
+	// The first-person body is animated after the movement component, and so after the controller that has taken this
+	// frame's look (the engine orders only the body others see that way): its arms are placed in view
+	// (FCheeseStrikeViewHold) by the control rotation the camera is about to use, not last frame's, which would put the
+	// weapon a frame behind the view, dipping as a look up began and popping back as it ended.
+	if (GetCharacterMovement() != nullptr)
+	{
+		FirstPersonMesh->AddTickPrerequisiteComponent(GetCharacterMovement());
+	}
 	// The server finds heads by the body's bones (SampleNow), so its copy of every body is posed whether or not it is drawn.
 	if (HasAuthority())
 	{
@@ -1340,8 +1348,16 @@ FVector ACheeseStrikeCharacter::LeftHandOnRifle() const
 	return Rifle->GetComponentTransform().InverseTransformPosition(FirstPersonMesh->GetBoneLocation(TEXT("hand_l")));
 }
 
-void ACheeseStrikeCharacter::NoteWeaponInView(const FTransform& InView)
+void ACheeseStrikeCharacter::NoteWeaponInView(const FTransform& InView, float ViewPitch)
 {
+	if (ViewTrack.Num() < MostViewTrack)
+	{
+		FViewFrame Frame;
+		Frame.Pitch = ViewPitch;
+		Frame.WeaponAt = InView.GetLocation();
+		Frame.WeaponPitch = InView.Rotator().Pitch;
+		ViewTrack.Add(Frame);
+	}
 	if (WeaponInViewKnown >= 2)
 	{
 		// How it moved and turned this frame against the last: a shake turns one way, then the other.
@@ -1356,6 +1372,13 @@ void ACheeseStrikeCharacter::NoteWeaponInView(const FTransform& InView)
 	WeaponInView[1] = WeaponInView[0];
 	WeaponInView[0] = InView;
 	WeaponInViewKnown = FMath::Min(WeaponInViewKnown + 1, 2);
+}
+
+TArray<ACheeseStrikeCharacter::FViewFrame> ACheeseStrikeCharacter::TakeViewTrack()
+{
+	TArray<FViewFrame> Taken = MoveTemp(ViewTrack);
+	ViewTrack.Reset();
+	return Taken;
 }
 
 FVector2D ACheeseStrikeCharacter::TakeViewTremble()

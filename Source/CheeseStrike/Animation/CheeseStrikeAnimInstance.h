@@ -421,9 +421,12 @@ public:
 	/** A grenade in hand. */
 	FCheeseStrikeAnimInstanceGrenade Grenade;
 
-	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+	/** Reads the character (ReadCharacter) before the proxy copies these fields: the engine calls NativeUpdateAnimation only after that copy, a frame late for the pose. */
+	virtual void PreUpdateAnimation(float DeltaSeconds) override;
 
 protected:
+	/** Reads what the character is doing into the fields above, on the game thread, each frame. */
+	void ReadCharacter(float DeltaSeconds);
 	virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;
 	virtual void DestroyAnimInstanceProxy(FAnimInstanceProxy* InProxy) override;
 

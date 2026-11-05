@@ -1,0 +1,40 @@
+# Traces the weapon in view through a steady look (CheeseStrike.TraceView 2 logs
+# where it is each frame): with the pistol and then the carbine, looking up
+# slowly and steadily for a second, holding, then down for a second. For the
+# aim jitter: tools/art/look_trace.py reads the log and reports any reversal
+# of the weapon's in-view height against the look. Run with -FixedFps 60 (and
+# 144): tools/play.ps1 -Script tools/play/look_trace.txt -Tag look -FixedFps 60.
+wait 2
+tap Sidearm
+wait 1.5
+cmd CheeseStrike.TraceView 2
+log look up pistol
+hold MouseLook 0 0.12
+wait 1
+release MouseLook
+log look held pistol
+wait 0.5
+log look down pistol
+hold MouseLook 0 -0.12
+wait 1
+release MouseLook
+log look held pistol
+wait 0.5
+cmd CheeseStrike.TraceView 0
+tap Primary
+wait 1.5
+cmd CheeseStrike.TraceView 2
+log look up carbine
+hold MouseLook 0 0.12
+wait 1
+release MouseLook
+log look held carbine
+wait 0.5
+log look down carbine
+hold MouseLook 0 -0.12
+wait 1
+release MouseLook
+log look held carbine
+wait 0.5
+cmd CheeseStrike.TraceView 0
+quit

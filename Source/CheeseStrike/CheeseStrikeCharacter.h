@@ -335,8 +335,18 @@ public:
 
 	/** Where the first-person left hand is in the first-person rifle's own space, for the trace and the tests: it should stay put whatever the aim. */
 	FVector LeftHandOnRifle() const;
-	/** Its own player's view: where the weapon in hand is in it this frame, as the camera has it (ACheeseStrikeCameraManager), for how steadily it is held. */
-	void NoteWeaponInView(const FTransform& InView);
+	/** Its own player's view: where the weapon in hand is in it this frame, as the camera has it (ACheeseStrikeCameraManager), and the view's pitch, for how steadily it is held and how it follows a look. */
+	void NoteWeaponInView(const FTransform& InView, float ViewPitch);
+	/** One frame of the view: its pitch, and where the weapon in hand is in it (cm: forward, right, up) and its pitch in it. */
+	struct FViewFrame
+	{
+		float Pitch = 0.0f;
+		FVector WeaponAt = FVector::ZeroVector;
+		float WeaponPitch = 0.0f;
+	};
+	/** Every frame of the view since last asked (up to MostViewTrack), oldest first: for the tests of how the weapon follows a look (CheeseStrike.Play.TheWeaponFollowsTheLookWithoutReversing). */
+	TArray<FViewFrame> TakeViewTrack();
+	static constexpr int32 MostViewTrack = 2048;
 	/**
 	 * How much the weapon has trembled in view since this was last asked: the
 	 * mean change, frame to frame, of how it moves (cm) and turns (degrees)
@@ -505,6 +515,8 @@ protected:
 	int32 WeaponInViewKnown = 0;
 	FVector2D TrembleSum = FVector2D::ZeroVector;
 	int32 TrembleFrames = 0;
+	/** The view frame by frame since last taken (TakeViewTrack). */
+	TArray<FViewFrame> ViewTrack;
 	/** How far the first-person view is down (eased): the arms are then where the pose puts them, and the first-person body is drawn at the world's field of view, its legs lying on the floor in view. */
 	float DownInView = 0.0f;
 	/** Down, the view sits this far ahead of where the head has it (cm). */

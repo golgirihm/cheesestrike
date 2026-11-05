@@ -54,13 +54,13 @@ void ACheeseStrikeCameraManager::UpdateViewTarget(FTViewTarget& OutVT, float Del
 	}
 	const FTransform View(OutVT.POV.Rotation, OutVT.POV.Location);
 	const FTransform InView = Model->GetComponentTransform().GetRelativeTransform(View);
-	Character->NoteWeaponInView(InView);
+	Character->NoteWeaponInView(InView, OutVT.POV.Rotation.Pitch);
 	if (CVarTraceView.GetValueOnGameThread() != 0)
 	{
 		const FVector Body = View.InverseTransformPosition(Character->GetFirstPersonMesh()->GetComponentLocation());
-		UE_LOG(LogCheeseStrike, Display, TEXT("View: weapon at (%.3f, %.3f, %.3f) turned (%.3f, %.3f, %.3f), body at (%.3f, %.3f, %.3f), eye (%.2f, %.2f, %.2f) dt %.4f"),
+		UE_LOG(LogCheeseStrike, Display, TEXT("View: weapon at (%.3f, %.3f, %.3f) turned (%.3f, %.3f, %.3f), body at (%.3f, %.3f, %.3f), eye (%.2f, %.2f, %.2f) pitch %.3f yaw %.3f dt %.4f"),
 			InView.GetLocation().X, InView.GetLocation().Y, InView.GetLocation().Z, InView.Rotator().Pitch, InView.Rotator().Yaw, InView.Rotator().Roll,
-			Body.X, Body.Y, Body.Z, OutVT.POV.Location.X, OutVT.POV.Location.Y, OutVT.POV.Location.Z, DeltaTime);
+			Body.X, Body.Y, Body.Z, OutVT.POV.Location.X, OutVT.POV.Location.Y, OutVT.POV.Location.Z, OutVT.POV.Rotation.Pitch, OutVT.POV.Rotation.Yaw, DeltaTime);
 		if (CVarTraceView.GetValueOnGameThread() > 1)
 		{
 			FString Bones;
