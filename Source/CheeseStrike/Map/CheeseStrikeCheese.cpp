@@ -263,17 +263,23 @@ namespace
 {
 	/**
 	 * For looking at a map as the mice leave it (development): eats a share (0 to 1) of the cheese the mice may eat,
-	 * at random, at once, as the mice would (what stood on it falls), on the server; with a structure's name, only
-	 * that structure's.
+	 * at random, at once, as the mice would (what stood on it falls), on the server; with a structure's name (or *
+	 * for any), only that structure's; with a point and a radius after it, only the blocks within that of the point
+	 * (the cheese round a door, to see it go while its building stands).
 	 */
-	FAutoConsoleCommandWithWorldAndArgs EatCheeseCommand(TEXT("CheeseStrikeEatCheese"), TEXT("Eats a share (0 to 1) of the cheese at random, as the mice would: CheeseStrikeEatCheese 0.5 [structure]."),
+	FAutoConsoleCommandWithWorldAndArgs EatCheeseCommand(TEXT("CheeseStrikeEatCheese"), TEXT("Eats a share (0 to 1) of the cheese at random, as the mice would: CheeseStrikeEatCheese 0.5 [structure or *] [x y z radius]."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 	{
 		const float Share = Args.Num() > 0 ? FMath::Clamp(FCString::Atof(*Args[0]), 0.0f, 1.0f) : 1.0f;
+		const bool bAnyStructure = Args.Num() < 2 || Args[1] == TEXT("*");
+		const bool bNear = Args.Num() >= 6;
+		const FVector Point = bNear ? FVector(FCString::Atof(*Args[2]), FCString::Atof(*Args[3]), FCString::Atof(*Args[4])) : FVector::ZeroVector;
+		const float Radius = bNear ? FCString::Atof(*Args[5]) : 0.0f;
 		TArray<ACheeseStrikeCheese*> Edible;
 		for (TActorIterator<ACheeseStrikeCheese> It(World); It; ++It)
 		{
-			if (It->HasAuthority() && It->IsEdible() && !It->IsActorBeingDestroyed() && (Args.Num() < 2 || It->GetStructure().ToString() == Args[1]))
+			if (It->HasAuthority() && It->IsEdible() && !It->IsActorBeingDestroyed() && (bAnyStructure || It->GetStructure().ToString() == Args[1])
+				&& (!bNear || It->GetComponentsBoundingBox().ComputeSquaredDistanceToPoint(Point) <= Radius * Radius))
 			{
 				Edible.Add(*It);
 			}

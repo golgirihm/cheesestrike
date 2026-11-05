@@ -190,9 +190,18 @@ namespace CheeseStrikeMice
 		return Text.StartsWith(HungOnTag, ESearchCase::CaseSensitive) && Text.Len() > FCString::Strlen(HungOnTag) ? FName(*Text.RightChop(FCString::Strlen(HungOnTag))) : NAME_None;
 	}
 
-	bool IsHungOnEatenCheese(FName Structure, int32 BlocksLeft)
+	bool IsRoundHung(const FBox& Hung, const FBox& Block)
 	{
-		return !Structure.IsNone() && BlocksLeft <= 0;
+		return Hung.IsValid && Block.IsValid && Hung.ExpandBy(HungReach).Intersect(Block);
+	}
+
+	bool IsHungOnEatenCheese(FName Structure, int32 BlocksLeft, int32 Round, int32 RoundLeft)
+	{
+		if (Structure.IsNone())
+		{
+			return false;
+		}
+		return Round > 0 ? RoundLeft <= 0 : BlocksLeft <= 0;
 	}
 
 	float VanishScale(float Seconds)
