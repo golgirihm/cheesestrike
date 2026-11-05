@@ -1,0 +1,23 @@
+# The HUD's middle and bottom (wave 16): a weapon stand in reach (its card
+# under the crosshair) while a streak is just earned (its "READY · PRESS Q"
+# line, stacked over the card, never on it), and the score summary at the
+# bottom with a sixteen-letter name beside a four-figure score, whole. Run with
+# tools/play.ps1 -Bots -Name CheddarChampion7 -StartAt 1150,-1450,100,117
+# (open ground on the shooter level); it draws 1920 x 1080, then 1280 x 720.
+wait 2
+cmd r.SetRes 1920x1080w
+wait 1
+tap Knife
+cmd CheeseStrike.HUD.Score 1000
+cmd CheeseStrikeStand roquefort 140
+wait 1.2
+cmd CheeseStrikeGiveStreak 1
+wait 0.6
+shot hud_w16_1_card_and_streak
+cmd r.SetRes 1280x720w
+wait 1.5
+cmd CheeseStrikeGiveStreak 2
+wait 0.6
+shot hud_w16_2_card_and_streak_720
+wait 1
+quit

@@ -1136,7 +1136,7 @@ void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 		return;
 	}
 	const float U = Unit();
-	const float BlockWidth = 200.0f * U;
+	const float BlockWidth = CheeseStrikeHUD::ScoreBlockWidth * U;
 	// Each block and the goal between them a rounded tile of its own, a little apart.
 	const float Apart = 4.0f * U;
 	const float Round = 9.0f * U;
@@ -1149,9 +1149,9 @@ void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 	const float Total = Summary.Lines.Num() * (BlockWidth + Apart) + GoalWidth;
 	float X = (Canvas->SizeX - Total) / 2.0f;
 	const float Top = Canvas->SizeY - Margin * U - BlockHeight;
-	const FSlateFontInfo Caption = HudDraw::Font(12.0f * U);
-	const FSlateFontInfo Name = HudDraw::Font(14.0f * U);
-	const FSlateFontInfo Score = HudDraw::Font(32.0f * U);
+	const FSlateFontInfo Caption = HudDraw::Font(CheeseStrikeHUD::ScoreCaptionSize * U);
+	const FSlateFontInfo Name = HudDraw::Font(CheeseStrikeHUD::ScoreNameSize * U);
+	const FSlateFontInfo Score = HudDraw::Font(CheeseStrikeHUD::ScoreDigitsSize * U);
 	const FVector2D ScoreSize = HudDraw::Measure(TEXT("0"), Score);
 	HudDraw::FShapes Shapes;
 	// A band across the tile from `From` to `To` down it, `Share` of the way across, cut to its rounded corners.
@@ -1201,8 +1201,8 @@ void ACheeseStrikeHUD::DrawScoreSummary(const ACheeseStrikeGameState* Match)
 	for (const FPlaced& Block : Placed)
 	{
 		// The words cut to what the score leaves, and a score too wide for its block shrunk (CheeseStrikeHUD::FitScoreBlock).
-		const float Pad = 12.0f * U;
-		const CheeseStrikeHUD::FScoreBlockText Fitted = CheeseStrikeHUD::FitScoreBlock(*Block.Line, BlockWidth, Pad, 8.0f * U, Width(Caption), Width(Name), Width(Score));
+		const float Pad = CheeseStrikeHUD::ScoreBlockPad * U;
+		const CheeseStrikeHUD::FScoreBlockText Fitted = CheeseStrikeHUD::FitScoreBlock(*Block.Line, BlockWidth, Pad, CheeseStrikeHUD::ScoreBlockGap * U, Width(Caption), Width(Name), Width(Score));
 		HudDraw::Text(Canvas, Fitted.Caption, FVector2D(Block.X + Pad, Top + 9.0f * U), Caption, Block.Line->bMine ? HudDraw::Accent : HudDraw::Soft);
 		if (!Fitted.Name.IsEmpty())
 		{

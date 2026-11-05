@@ -134,9 +134,12 @@ namespace
 			const FString Words = FString::Printf(TEXT("%s READY  ·  PRESS %s"), CheeseStrikeStreaks::Info(Mine->GetLastEarned()).Name, *StreakKey).ToUpper();
 			const FSlateFontInfo Big = HudDraw::Font(30.0f * U);
 			const FVector2D WordsSize = HudDraw::Measure(Words, Big);
-			const float Top = Canvas->SizeY * 0.62f;
 			UTexture2D* Icon = CheeseHud != nullptr ? CheeseHud->StreakIcon(Mine->GetLastEarned()) : nullptr;
 			const float IconSide = Icon != nullptr ? 64.0f * U : 0.0f;
+			// Over the weapon pickup's card, clear of it (CheeseStrikeHUD::StreakWordTop): the words in the middle of the
+			// line's height, which is the icon's where that is taller.
+			const float LineHigh = FMath::Max(static_cast<float>(WordsSize.Y), IconSide);
+			const float Top = CheeseStrikeHUD::StreakWordTop(Canvas->SizeY, U, LineHigh) + (LineHigh - static_cast<float>(WordsSize.Y)) / 2.0f;
 			const float IconGap = Icon != nullptr ? 10.0f * U : 0.0f;
 			const float Left = Middle - (IconSide + IconGap + WordsSize.X) / 2.0f;
 			if (Icon != nullptr)
