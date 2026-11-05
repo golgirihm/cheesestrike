@@ -178,14 +178,24 @@ namespace CheeseStrikeMice
 	/**
 	 * Things hung in cheese (a door in a wall of it, a lamp under its roof, a sign on it): a map's script tags them with
 	 * the structure they belong to (tools/art/map_kit.py, `attach_to`: the tag HungOnTag followed by the structure's
-	 * name), and once every block of that structure is eaten they shrink and fall away on every machine
-	 * (UCheeseStrikeHungSubsystem), by the cheese that every machine already has.
+	 * name), and once the cheese round them is eaten they shrink and fall away on every machine
+	 * (UCheeseStrikeHungSubsystem), by the cheese that every machine already has. The cheese round a thing is the
+	 * blocks of its structure touching its bounds or within HungReach (cm) of them as the level starts (IsRoundHung: a
+	 * door's wall either side of it and the lintel over it, not the far end of the wall); once all of those are eaten
+	 * or have fallen away it goes, though the rest of the structure stands. A thing with no block round it (a lamp
+	 * hung in the air under a roof of cheese) goes once the whole structure has.
 	 */
 	inline const TCHAR* const HungOnTag = TEXT("HungOn:");
+	constexpr float HungReach = 150.0f;
 	/** The structure a tag hangs its actor on, or none if it is another tag. */
 	FName StructureOfTag(FName Tag);
-	/** Whether a thing hung on `Structure` is gone: it names one, and no block of it (`BlocksLeft`) is left. */
-	bool IsHungOnEatenCheese(FName Structure, int32 BlocksLeft);
+	/** Whether a block with bounds `Block` is part of the cheese round a thing with bounds `Hung`: touching them or within HungReach. */
+	bool IsRoundHung(const FBox& Hung, const FBox& Block);
+	/**
+	 * Whether a thing hung on `Structure` is gone: it names one, and of the `Round` blocks round it none is left
+	 * (`RoundLeft`: there and still within reach); or, with none round it, no block of the structure (`BlocksLeft`).
+	 */
+	bool IsHungOnEatenCheese(FName Structure, int32 BlocksLeft, int32 Round, int32 RoundLeft);
 	/** How long it takes to go (s), and its size meanwhile, `Seconds` after it began: a quick shrink to nothing, eased in. */
 	constexpr float VanishSeconds = 0.5f;
 	float VanishScale(float Seconds);

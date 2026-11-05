@@ -14,6 +14,27 @@ namespace
 {
 	/** How often the structures' cheese is counted (s). */
 	constexpr float HungCountEvery = 0.25f;
+
+	/** For looking at a map (development): lists what hangs in cheese, the blocks round each and how many are left. */
+	FAutoConsoleCommandWithWorld HungCommand(TEXT("CheeseStrikeHung"), TEXT("Lists what hangs in cheese, with the blocks round each and how many of them are left."),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		const UCheeseStrikeHungSubsystem* Hung = World != nullptr ? World->GetSubsystem<UCheeseStrikeHungSubsystem>() : nullptr;
+		if (Hung == nullptr)
+		{
+			return;
+		}
+		for (const TPair<TWeakObjectPtr<AActor>, FName>& Each : Hung->GetHung())
+		{
+			const AActor* Actor = Each.Key.Get();
+			if (Actor == nullptr)
+			{
+				continue;
+			}
+			UE_LOG(LogCheeseStrike, Display, TEXT("Hung: %s on %s at %s: %d of %d blocks round it left%s"), *Actor->GetName(), *Each.Value.ToString(), *Actor->GetActorLocation().ToCompactString(),
+				Hung->GetRoundLeft(Actor), Hung->GetRound(Actor), Hung->IsGone(Actor) ? TEXT(", gone") : TEXT(""));
+		}
+	}));
 }
 
 bool UCheeseStrikeHungSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
@@ -56,10 +77,50 @@ void UCheeseStrikeHungSubsystem::Gather()
 			}
 		}
 	}
+	// The cheese round each: the blocks of its structure touching its bounds or within reach of them.
+	for (FHung& Each : Hung)
+	{
+		Each.Bounds = Each.Actor->GetComponentsBoundingBox(true);
+		if (!Each.Bounds.IsValid)
+		{
+			// A light alone has no bounds: where it is.
+			Each.Bounds = FBox(Each.Actor->GetActorLocation(), Each.Actor->GetActorLocation());
+		}
+	}
+	int32 WithCheeseRound = 0;
+	for (TActorIterator<ACheeseStrikeCheese> It(World); It; ++It)
+	{
+		const FBox Block = It->GetComponentsBoundingBox();
+		for (FHung& Each : Hung)
+		{
+			if (Each.Structure == It->GetStructure() && CheeseStrikeMice::IsRoundHung(Each.Bounds, Block))
+			{
+				Each.Round.Add(*It);
+			}
+		}
+	}
+	for (const FHung& Each : Hung)
+	{
+		WithCheeseRound += Each.Round.Num() > 0 ? 1 : 0;
+	}
 	if (Hung.Num() > 0)
 	{
-		UE_LOG(LogCheeseStrike, Display, TEXT("Hung on cheese: %d things"), Hung.Num());
+		UE_LOG(LogCheeseStrike, Display, TEXT("Hung on cheese: %d things, %d with cheese round them"), Hung.Num(), WithCheeseRound);
 	}
+}
+
+int32 UCheeseStrikeHungSubsystem::RoundLeft(const FHung& Each)
+{
+	int32 Left = 0;
+	for (const TWeakObjectPtr<ACheeseStrikeCheese>& Block : Each.Round)
+	{
+		// Eaten, it is gone; fallen away, it is out of reach.
+		if (const ACheeseStrikeCheese* Cheese = Block.Get(); Cheese != nullptr && !Cheese->IsActorBeingDestroyed() && CheeseStrikeMice::IsRoundHung(Each.Bounds, Cheese->GetComponentsBoundingBox()))
+		{
+			++Left;
+		}
+	}
+	return Left;
 }
 
 void UCheeseStrikeHungSubsystem::Tick(float DeltaTime)
@@ -96,7 +157,7 @@ void UCheeseStrikeHungSubsystem::Tick(float DeltaTime)
 		}
 		for (FHung& Each : Hung)
 		{
-			if (Each.GoneAt < 0.0f && Each.Actor.IsValid() && CheeseStrikeMice::IsHungOnEatenCheese(Each.Structure, Left.FindRef(Each.Structure)))
+			if (Each.GoneAt < 0.0f && Each.Actor.IsValid() && CheeseStrikeMice::IsHungOnEatenCheese(Each.Structure, Left.FindRef(Each.Structure), Each.Round.Num(), RoundLeft(Each)))
 			{
 				Each.GoneAt = Now;
 				StartGoing(Each);
@@ -137,7 +198,7 @@ void UCheeseStrikeHungSubsystem::StartGoing(FHung& Each)
 	{
 		Each.Lights.Add({Light, Light->Intensity});
 	}
-	UE_LOG(LogCheeseStrike, Display, TEXT("%s goes with the cheese of %s"), *Actor->GetName(), *Each.Structure.ToString());
+	UE_LOG(LogCheeseStrike, Display, TEXT("%s goes with the cheese of %s (%d blocks round it)"), *Actor->GetName(), *Each.Structure.ToString(), Each.Round.Num());
 }
 
 void UCheeseStrikeHungSubsystem::ShowGoing(FHung& Each)
@@ -190,4 +251,16 @@ TArray<TPair<TWeakObjectPtr<AActor>, FName>> UCheeseStrikeHungSubsystem::GetHung
 		Out.Add({Each.Actor, Each.Structure});
 	}
 	return Out;
+}
+
+int32 UCheeseStrikeHungSubsystem::GetRound(const AActor* Actor) const
+{
+	const FHung* Found = Hung.FindByPredicate([Actor](const FHung& Each) { return Each.Actor.Get() == Actor; });
+	return Found != nullptr ? Found->Round.Num() : 0;
+}
+
+int32 UCheeseStrikeHungSubsystem::GetRoundLeft(const AActor* Actor) const
+{
+	const FHung* Found = Hung.FindByPredicate([Actor](const FHung& Each) { return Each.Actor.Get() == Actor; });
+	return Found != nullptr ? RoundLeft(*Found) : 0;
 }

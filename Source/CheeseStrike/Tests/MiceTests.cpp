@@ -359,10 +359,26 @@ bool FWhatHangsInCheeseGoesWithIt::RunTest(const FString& Parameters)
 	TestEqual(TEXT("a tag names the structure"), StructureOfTag(FName(TEXT("HungOn:RindTunnel"))), FName(TEXT("RindTunnel")));
 	TestTrue(TEXT("another tag names none"), StructureOfTag(FName(TEXT("Ceiling"))).IsNone());
 	TestTrue(TEXT("nor does the tag alone"), StructureOfTag(FName(HungOnTag)).IsNone());
-	// It goes once no block of its structure is left, and not before.
-	TestFalse(TEXT("a door stays while a block of its wall is left"), IsHungOnEatenCheese(FName(TEXT("CuringHouseGouda")), 1));
-	TestTrue(TEXT("and goes when the last is eaten"), IsHungOnEatenCheese(FName(TEXT("CuringHouseGouda")), 0));
-	TestFalse(TEXT("nothing hung on no structure goes"), IsHungOnEatenCheese(NAME_None, 0));
+	// The cheese round a thing: the blocks of its structure touching its bounds or within HungReach of them, found as the
+	// level starts: for a door 2 m wide and 2.2 m high in a wall of blocks a metre across, the wall either side, the
+	// lintel over it and the next blocks along, not the far end of the wall.
+	const FBox Door(FVector(-100.0f, -10.0f, 0.0f), FVector(100.0f, 10.0f, 220.0f));
+	TestTrue(TEXT("the block beside a door is round it"), IsRoundHung(Door, FBox(FVector(100.0f, -50.0f, 0.0f), FVector(200.0f, 50.0f, 100.0f))));
+	TestTrue(TEXT("and the next along, a metre off"), IsRoundHung(Door, FBox(FVector(200.0f, -50.0f, 0.0f), FVector(300.0f, 50.0f, 100.0f))));
+	TestTrue(TEXT("and the lintel over it"), IsRoundHung(Door, FBox(FVector(-100.0f, -50.0f, 220.0f), FVector(100.0f, 50.0f, 320.0f))));
+	TestFalse(TEXT("not the far end of the wall"), IsRoundHung(Door, FBox(FVector(400.0f, -50.0f, 0.0f), FVector(500.0f, 50.0f, 100.0f))));
+	TestFalse(TEXT("nor the storey over it"), IsRoundHung(Door, FBox(FVector(-100.0f, -50.0f, 400.0f), FVector(100.0f, 50.0f, 500.0f))));
+	TestTrue(TEXT("a lamp with no bounds of its own has the blocks round its place"), IsRoundHung(FBox(FVector(0.0f, 0.0f, 340.0f), FVector(0.0f, 0.0f, 340.0f)), FBox(FVector(-50.0f, -50.0f, 350.0f), FVector(50.0f, 50.0f, 450.0f))));
+	TestFalse(TEXT("nothing is round a thing with no bounds"), IsRoundHung(FBox(ForceInit), FBox(FVector(-50.0f, -50.0f, 0.0f), FVector(50.0f, 50.0f, 100.0f))));
+	// A door goes once the cheese round it is eaten, though the rest of its wall stands, and stays while any of that is
+	// left, though the far end of the wall is eaten; with no cheese round it, it goes with the whole structure.
+	const FName Wall(TEXT("CuringHouseGouda"));
+	TestTrue(TEXT("half the wall eaten, the door's blocks among them: the door goes"), IsHungOnEatenCheese(Wall, 12, 6, 0));
+	TestFalse(TEXT("the far end eaten only: it stays"), IsHungOnEatenCheese(Wall, 6, 6, 6));
+	TestFalse(TEXT("one block round it left: it stays"), IsHungOnEatenCheese(Wall, 1, 6, 1));
+	TestFalse(TEXT("a lamp with none round it stays while a block of its roof is left"), IsHungOnEatenCheese(Wall, 1, 0, 0));
+	TestTrue(TEXT("and goes when the last is eaten"), IsHungOnEatenCheese(Wall, 0, 0, 0));
+	TestFalse(TEXT("nothing hung on no structure goes"), IsHungOnEatenCheese(NAME_None, 0, 0, 0));
 	// Quickly: it shrinks from whole to nothing, falling, in half a second.
 	TestEqual(TEXT("whole as it begins"), VanishScale(0.0f), 1.0f);
 	TestTrue(TEXT("smaller as it goes"), VanishScale(0.25f) < 1.0f && VanishScale(0.25f) > VanishScale(0.4f));
