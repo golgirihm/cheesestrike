@@ -21,6 +21,10 @@
 #include "UI/CheeseStrikeLoader.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "Sound/SoundClass.h"
+#include "Rules/CheeseStrikeRules.h"
+#include "UObject/Linker.h"
+#include "UObject/LinkerLoad.h"
+#include "UObject/ObjectResource.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -242,5 +246,37 @@ bool FTheVolumesKeepTheSoundClassesTheySet::RunTest(const FString& Parameters)
 	UCheeseStrikeSettings::ApplySound();
 	CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
 	TestTrue(TEXT("a sound class the volumes were put on is still there after the level's things are let go"), Passing.IsValid());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNoMapKeepsAnUnbuiltNavigationMesh, "CheeseStrike.Project.NoMapKeepsAnUnbuiltNavigationMesh", ProjectTests::Flags)
+
+bool FNoMapKeepsAnUnbuiltNavigationMesh::RunTest(const FString& Parameters)
+{
+	// The game builds each map's navigation mesh as the level starts (RuntimeGeneration=Dynamic) and rebuilds it where the
+	// cheese goes; a mesh saved in the map is kept as built, so a map saved by a script with the editor's unbuilt one in it
+	// (a tile grid and no tiles: the editor fills it over the frames a script never gives it) leaves the bots and mice
+	// nowhere to walk, as every map was on 5 Nov 2026. The scripts save through map_kit.save_level, which leaves it out;
+	// this reads each map's export table (nothing is loaded) for a RecastNavMesh.
+	for (int32 Index = 0; Index < CheeseStrikeRules::NumMaps(); ++Index)
+	{
+		const FString Level = CheeseStrikeRules::Maps[Index].Level;
+		FPackagePath Path;
+		if (!TestTrue(FString::Printf(TEXT("%s is a package"), *Level), FPackagePath::TryFromPackageName(Level, Path)))
+		{
+			continue;
+		}
+		const FLinkerLoad* Linker = GetPackageLinker(nullptr, Path, LOAD_NoVerify | LOAD_Quiet, nullptr);
+		if (!TestNotNull(FString::Printf(TEXT("%s can be read"), *Level), Linker))
+		{
+			continue;
+		}
+		int32 Saved = 0;
+		for (int32 Export = 0; Export < Linker->ExportMap.Num(); ++Export)
+		{
+			Saved += Linker->GetExportClassName(Export) == FName(TEXT("RecastNavMesh")) ? 1 : 0;
+		}
+		TestEqual(FString::Printf(TEXT("%s keeps no navigation mesh for the game to take as built"), *Level), Saved, 0);
+	}
 	return true;
 }

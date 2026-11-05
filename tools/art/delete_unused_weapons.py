@@ -5,14 +5,21 @@ assets of the day they were built (a pickup's components are set again at play, 
 what the map keeps is stale): each map is opened first and any mesh component of any actor that still holds one of
 these assets or materials has it cleared, and the map saved. Then each asset is deleted only if nothing else references
 it (unreal.EditorAssetLibrary.find_package_referencers_for_asset, after the others on the list); what was cleared,
-deleted and kept, and why, is written to Saved/delete_unused_weapons.txt. Run headless, the editor closed:
+deleted and kept, and why, is written to Saved/delete_unused_weapons.txt. A map is saved through map_kit.save_level,
+which leaves the editor's unbuilt navigation mesh out of it (saved once, in wave 15, it left every map's bots and mice
+with nowhere to walk: the game keeps a saved mesh as built and rebuilds only where something changes). Run headless,
+the editor closed:
 
     UnrealEditor-Cmd.exe CheeseStrike.uproject -ExecCmds="py tools/art/delete_unused_weapons.py" -unattended -nullrhi
 """
 
 import os
+import sys
 import traceback
 import unreal
+
+sys.path.insert(0, os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), "tools", "art"))
+import map_kit as kit
 
 FOLDERS = ["/Game/Fab/Max3d", "/Game/Fab/SpatialNeglect", "/Game/Fab/Xeradev"]
 INSTANCES = ["MI_Blaster", "MI_Carbine", "MI_CarbineSling", "MI_CarbineScope", "MI_Grater", "MI_Munster", "MI_Shotgun", "MI_Roquefort",
@@ -54,7 +61,7 @@ def clear_references(level, doomed):
                 component.set_skeletal_mesh_asset(None)
                 cleared += 1
     if cleared:
-        lines.append(f"{level}: cleared {cleared} stale meshes and materials off its actors; saved {levels.save_current_level()}")
+        lines.append(f"{level}: cleared {cleared} stale meshes and materials off its actors; saved {kit.save_level()}")
     else:
         lines.append(f"{level}: nothing stale")
 
