@@ -29,6 +29,7 @@
 #include "Widgets/SLeafWidget.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
+#include "CheeseStrike.h"
 #include "CheeseStrikeGameState.h"
 #include "GameFramework/GameMode.h"
 #include "CheeseStrikePlayerController.h"
@@ -289,10 +290,21 @@ namespace
 		FSlateRoundedBoxBrush MapNameBar;
 		/** A confirmation dialog's card. */
 		FSlateRoundedBoxBrush DialogCard;
+		/**
+		 * The pages' panel against the left edge of the screen, its two right corners rounded; and the friends panel
+		 * against the right edge, the same mirrored (its two left corners rounded): the one shape, colour (PanelColour)
+		 * and opacity for both.
+		 */
+		FSlateRoundedBoxBrush PagesPanel;
+		FSlateRoundedBoxBrush FriendsPanel;
+		/** A tooltip's card: rounded, no border, tinted the panel's colour. */
+		FSlateRoundedBoxBrush TooltipCard;
 		FSliderStyle Slider;
 		TUniquePtr<FSlateDynamicImageBrush> PlayerIcon;
 		TUniquePtr<FSlateDynamicImageBrush> BotIcon;
 		TUniquePtr<FSlateDynamicImageBrush> CrownIcon;
+		/** The menu's one chevron (tools/art/chevron_icon.py): a white V pointing down, 16 across, turned to point the other ways. */
+		TUniquePtr<FSlateDynamicImageBrush> ChevronIcon;
 		TUniquePtr<FSlateDynamicImageBrush> LobbyTile;
 		TMap<FString, TUniquePtr<FSlateDynamicImageBrush>> MapPictures;
 		TMap<FString, TUniquePtr<FSlateRoundedBoxBrush>> Chips;
@@ -411,6 +423,9 @@ namespace
 			, MapBack(FLinearColor(0.1f, 0.1f, 0.11f, 1.0f), CheeseStrikeMenu::MapPictureRounding)
 			, MapNameBar(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f), FVector4(0.0, 0.0, CheeseStrikeMenu::MapPictureRounding, CheeseStrikeMenu::MapPictureRounding))
 			, DialogCard(FLinearColor(PanelColour.R, PanelColour.G, PanelColour.B, 1.0f), 16.0f)
+			, PagesPanel(FLinearColor::White, FVector4(0.0, CheeseStrikeMenu::PanelRounding, CheeseStrikeMenu::PanelRounding, 0.0))
+			, FriendsPanel(FLinearColor::White, FVector4(CheeseStrikeMenu::PanelRounding, 0.0, 0.0, CheeseStrikeMenu::PanelRounding))
+			, TooltipCard(FLinearColor::White, 10.0f)
 		{
 			const auto Make = [](FButtonStyle& Style, const FLinearColor& Rest, const FLinearColor& Hover, const FLinearColor& Press)
 			{
@@ -442,6 +457,7 @@ namespace
 			PlayerIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("player.png"))), FVector2D(22.0, 22.0));
 			BotIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("bot.png"))), FVector2D(22.0, 22.0));
 			CrownIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("crown.png"))), FVector2D(22.0, 22.0));
+			ChevronIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("chevron.png"))), FVector2D(16.0, 16.0));
 			LobbyTile = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("lobby_tile.png"))), FVector2D(512.0, 512.0), FLinearColor::White, ESlateBrushTileType::Both);
 		}
 	};
@@ -452,96 +468,57 @@ namespace
 		return Made;
 	}
 
-	/** A dropdown's chevron, drawn in the button's own colour: down, or up while its list is open. */
-	class SCheeseStrikeDropArrow : public SLeafWidget
-	{
-	public:
-		SLATE_BEGIN_ARGS(SCheeseStrikeDropArrow) {}
-			SLATE_ATTRIBUTE(bool, Open)
-		SLATE_END_ARGS()
-
-		void Construct(const FArguments& InArgs)
-		{
-			Open = InArgs._Open;
-		}
-
-		virtual FVector2D ComputeDesiredSize(float) const override
-		{
-			return FVector2D(16.0, 10.0);
-		}
-
-		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
-		{
-			const bool bUp = Open.Get(false);
-			TArray<FVector2f> Points = bUp ? TArray<FVector2f>({{2.0f, 8.0f}, {8.0f, 2.0f}, {14.0f, 8.0f}}) : TArray<FVector2f>({{2.0f, 2.0f}, {8.0f, 8.0f}, {14.0f, 2.0f}});
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), MoveTemp(Points), ESlateDrawEffect::None, InWidgetStyle.GetForegroundColor(), true, 3.0f);
-			return LayerId;
-		}
-
-	private:
-		TAttribute<bool> Open;
-	};
-
 	/**
-	 * The friends panel's chevron, drawn as a polyline (not a character), 12 across in a 16 box: pointing down while what it
-	 * folds is open, turned a quarter turn to the right (or to the left, `FoldsLeft`: the panel's tab, which opens that way) while
-	 * folded. `Turning`: it has just changed, so it turns from the other way over a few frames.
+	 * The menu's one chevron: Content/UI/chevron.png (tools/art/chevron_icon.py), a white V pointing down, 16 across,
+	 * anti-aliased, turned by a render transform to point `Angle` degrees clockwise from down: 0 down (a section open, a
+	 * dropdown shut), -90 right (a section folded; the open friends panel, which folds that way), 90 left (the friends tab,
+	 * which opens that way), 180 up (a dropdown open). Shown in `Colour` (a button's own foreground, if that is given). When
+	 * the angle it is given changes, or it is made afresh in place of one pointing elsewhere (`From`), it turns there at
+	 * 900 degrees a second: a tenth of a second for a quarter turn.
 	 */
-	class SCheeseStrikeChevron : public SLeafWidget
+	class SCheeseStrikeChevron : public SImage
 	{
 	public:
-		SLATE_BEGIN_ARGS(SCheeseStrikeChevron) : _Open(true), _FoldsLeft(false), _Turning(false), _Colour(FLinearColor::White) {}
-			SLATE_ARGUMENT(bool, Open)
-			SLATE_ARGUMENT(bool, FoldsLeft)
-			SLATE_ARGUMENT(bool, Turning)
-			SLATE_ARGUMENT(FLinearColor, Colour)
+		SLATE_BEGIN_ARGS(SCheeseStrikeChevron) : _Angle(0.0f), _From(), _Colour(FLinearColor::White) {}
+			SLATE_ATTRIBUTE(float, Angle)
+			SLATE_ARGUMENT(TOptional<float>, From)
+			SLATE_ARGUMENT(FSlateColor, Colour)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
 		{
-			Colour = InArgs._Colour;
-			const float Folded = InArgs._FoldsLeft ? 90.0f : -90.0f;
-			Target = InArgs._Open ? 0.0f : Folded;
-			Angle = InArgs._Turning ? (InArgs._Open ? Folded : 0.0f) : Target;
+			Angle = InArgs._Angle;
+			Shown = InArgs._From.IsSet() ? InArgs._From.GetValue() : Angle.Get(0.0f);
 			LastTime = FPlatformTime::Seconds();
-		}
-
-		virtual FVector2D ComputeDesiredSize(float) const override
-		{
-			return FVector2D(16.0, 16.0);
-		}
-
-		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
-		{
-			// Eased to where it points, 900 degrees a second: a tenth of a second for the quarter turn.
-			const double Now = FPlatformTime::Seconds();
-			Angle = FMath::FixedTurn(Angle, Target, static_cast<float>(FMath::Min(0.1, Now - LastTime)) * 900.0f);
-			LastTime = Now;
-			const FVector2f Centre = FVector2f(AllottedGeometry.GetLocalSize()) * 0.5f;
-			const float Radians = FMath::DegreesToRadians(Angle);
-			const float Cos = FMath::Cos(Radians);
-			const float Sin = FMath::Sin(Radians);
-			// Pointing down: 12 across and 6 high, its middle on the box's.
-			const FVector2f Down[] = { {-6.0f, -3.0f}, {0.0f, 3.0f}, {6.0f, -3.0f} };
-			TArray<FVector2f> Points;
-			for (const FVector2f& Each : Down)
-			{
-				Points.Add(Centre + FVector2f(Each.X * Cos - Each.Y * Sin, Each.X * Sin + Each.Y * Cos));
-			}
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), MoveTemp(Points), ESlateDrawEffect::None, Colour * InWidgetStyle.GetColorAndOpacityTint(), true, 2.4f);
-			return LayerId;
+			SImage::Construct(SImage::FArguments().Image(Looks().ChevronIcon.Get()).ColorAndOpacity(InArgs._Colour));
+			SetRenderTransformPivot(FVector2D(0.5, 0.5));
+			SetRenderTransform(TAttribute<TOptional<FSlateRenderTransform>>::CreateSP(this, &SCheeseStrikeChevron::Turned));
 		}
 
 	private:
-		FLinearColor Colour = FLinearColor::White;
-		float Target = 0.0f;
-		mutable float Angle = 0.0f;
+		/** The turn to where it points now, eased from where it was (read as it is drawn, every frame). */
+		TOptional<FSlateRenderTransform> Turned() const
+		{
+			const double Now = FPlatformTime::Seconds();
+			Shown = FMath::FixedTurn(Shown, Angle.Get(0.0f), static_cast<float>(FMath::Min(0.1, Now - LastTime)) * 900.0f);
+			LastTime = Now;
+			return FSlateRenderTransform(FQuat2D(FMath::DegreesToRadians(Shown)));
+		}
+
+		TAttribute<float> Angle;
+		mutable float Shown = 0.0f;
 		mutable double LastTime = 0.0;
 	};
-	/** The one chevron of the friends panel: its sections' headers and its tab (`bFoldsLeft`). */
-	TSharedRef<SWidget> MakeChevron(bool bOpen, const FLinearColor& Colour, bool bTurning = false, bool bFoldsLeft = false)
+
+	/** The chevron pointing `Angle` degrees clockwise from down, turning there from `From` if that is given. */
+	TSharedRef<SWidget> MakeChevron(float Angle, const FSlateColor& Colour, TOptional<float> From = TOptional<float>())
 	{
-		return SNew(SCheeseStrikeChevron).Open(bOpen).Colour(Colour).Turning(bTurning).FoldsLeft(bFoldsLeft);
+		return SNew(SCheeseStrikeChevron).Angle(Angle).Colour(Colour).From(From);
+	}
+	/** A section's chevron: down while it is open, right while folded, turning from the other if it has just changed. */
+	TSharedRef<SWidget> MakeFoldChevron(bool bOpen, const FSlateColor& Colour, bool bTurning)
+	{
+		return MakeChevron(bOpen ? 0.0f : -90.0f, Colour, bTurning ? TOptional<float>(bOpen ? -90.0f : 0.0f) : TOptional<float>());
 	}
 
 	/** A round dot 8 across in its colour: where a friend is (CheeseStrikeFriends::StatusDotColour). */
@@ -800,8 +777,9 @@ namespace
 void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 {
 	Controller = InArgs._Controller;
-	// The pages' panel stands against the left edge of the screen, so its two right corners are the ones rounded.
-	static const FSlateRoundedBoxBrush PagesPanelBrush(FLinearColor::White, FVector4(0.0, 18.0, 18.0, 0.0));
+	// The friends panel's curve from shut to open, eased in and out; shut to begin with.
+	FriendsCurve.AddCurve(0.0f, CheeseStrikeFriends::PanelSeconds, ECurveEaseFunction::QuadInOut);
+	FriendsCurve.JumpToStart();
 	ChildSlot
 	[
 		SNew(SOverlay)
@@ -849,9 +827,9 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 					.HAlign(HAlign_Left).VAlign(VAlign_Fill)
 					[
 						SNew(SBorder)
-						.BorderImage(&PagesPanelBrush)
+						.BorderImage(&Looks().PagesPanel)
 						.BorderBackgroundColor(PanelColour)
-						.Padding(FMargin(48.0f, 64.0f))
+						.Padding(FMargin(CheeseStrikeMenu::PanelPadding, 64.0f))
 						[
 							SAssignNew(LobbyOverlayContent, SBox).WidthOverride(900.0f).VAlign(VAlign_Fill)
 						]
@@ -875,24 +853,32 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 				.ShadowOffset(FVector2D(2.0f, 2.0f)).ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.8f))
 			]
 		]
-		// The pages' panel on the left.
+		// The pages' panel on the left, against the screen's edge: its two right corners rounded.
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Fill)
 		[
 			SAssignNew(Panel, SBorder)
-			.BorderImage(&PagesPanelBrush)
+			.BorderImage(&Looks().PagesPanel)
 			.BorderBackgroundColor(PanelColour)
-			.Padding(FMargin(48.0f, 64.0f))
+			.Padding(FMargin(CheeseStrikeMenu::PanelPadding, 64.0f))
 			[
-				SAssignNew(Content, SBox).WidthOverride(400.0f).VAlign(VAlign_Center)
+				SAssignNew(Content, SBox).WidthOverride(CheeseStrikeMenu::PanelContentWidth).VAlign(VAlign_Center)
 			]
 		]
-		// The friends, on the right: a tab, opened by hovering it on the main page and in the lobby, and open on the find page.
+		// The friends, on the right: a tab, opened by hovering it on the main page and in the lobby or pinned by its chevron,
+		// and open on the find page. As wide as its curve says each frame (the tab's width to the pages' panel's), what is
+		// in it cut at that width while it slides.
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Fill)
 		[
-			SAssignNew(FriendsBox, SBox).WidthOverride(CheeseStrikeMenu::FriendsTabWidth).Visibility(EVisibility::Collapsed)
+			SAssignNew(FriendsBox, SBox).WidthOverride(this, &SCheeseStrikeMenu::FriendsWidthNow).Visibility(EVisibility::Collapsed).Clipping(EWidgetClipping::ClipToBounds)
 			[
 				SAssignNew(FriendsContent, SBox)
 			]
+		]
+		// The tooltip of whatever is hovered, beside the mouse (UpdateTooltip): over the pages, the lobby and the friends,
+		// under a dialog, and never in the way of the mouse.
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top)
+		[
+			SAssignNew(TooltipBox, SBox).Visibility(EVisibility::HitTestInvisible)
 		]
 		// The question before closing the host's lobby or quitting: over everything, and it takes every press.
 		// Modal: a layer over the whole screen that blurs and darkens all that is behind it, other UI too, and is hit
@@ -972,17 +958,51 @@ void SCheeseStrikeMenu::Refresh()
 	}
 	if (FriendsBox.IsValid())
 	{
+		using namespace CheeseStrikeFriends;
 		UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Controller.Get());
 		// (Not under the settings over the lobby, as not on the settings page.)
 		const bool bPanel = (Page == EMenuPage::Lobby && !bOverlay) || Page == EMenuPage::Find || Page == EMenuPage::Main;
-		// Open on the find page, and on the front end's main page and in the lobby while hovered.
-		const bool bOpen = bPanel && (Page == EMenuPage::Find || FriendsBox->IsHovered() || CVarFriendsOpen.GetValueOnGameThread() != 0);
 		FriendsBox->SetVisibility(bPanel ? EVisibility::Visible : EVisibility::Collapsed);
-		// Eased open and shut, rather than snapping: a fifth of a second to the width it wants.
+		// Open on the find page; on the front end's main page and in the lobby as pinned by its chevron, else while hovered
+		// and for half a second after the mouse leaves (CheeseStrikeFriends::PanelOpen); and held open for looking at it.
 		const double Now = FPlatformTime::Seconds();
-		FriendsWidth = FMath::FInterpConstantTo(FriendsWidth, bOpen ? 410.0f : CheeseStrikeMenu::FriendsTabWidth, static_cast<float>(FMath::Min(0.1, Now - FriendsWidthAt)), 1500.0f);
-		FriendsWidthAt = Now;
-		FriendsBox->SetWidthOverride(FriendsWidth);
+		const bool bHovered = bPanel && FriendsBox->IsHovered();
+		if (bFriendsHovered && !bHovered)
+		{
+			FriendsLeftAt = Now;
+		}
+		bFriendsHovered = bHovered;
+		const bool bOpen = bPanel && (CVarFriendsOpen.GetValueOnGameThread() != 0 || PanelOpen(Page == EMenuPage::Find, FriendsPinned, bHovered, static_cast<float>(Now - FriendsLeftAt)));
+		// Slid open and shut along its curve (PanelSeconds, eased in and out), the width read off it every frame
+		// (FriendsWidthNow): shutting is opening played backwards, from wherever it has got to.
+		if (bOpen != bFriendsWantOpen)
+		{
+			bFriendsWantOpen = bOpen;
+			if (FriendsCurve.IsPlaying())
+			{
+				FriendsCurve.Reverse();
+			}
+			else if (bOpen)
+			{
+				FriendsCurve.Play(AsShared());
+			}
+			else
+			{
+				FriendsCurve.PlayReverse(AsShared());
+			}
+		}
+		const float Along = FriendsCurve.GetLerp();
+		if (FriendsCurve.IsPlaying())
+		{
+			UE_LOG(LogCheeseStrike, Log, TEXT("Friends panel: %.1f wide"), PanelWidthAt(Along, CheeseStrikeMenu::FriendsTabWidth, CheeseStrikeMenu::PanelWidth));
+		}
+		// The tall content while open or on the way (collapsing, it stays while the width shrinks), the tab only once shut;
+		// the content fading in over the second half of an expand and out over the first half of a collapse.
+		const bool bContent = ShowsContent(bFriendsWantOpen, Along);
+		if (FriendsInside.IsValid())
+		{
+			FriendsInside->SetRenderOpacity(ContentOpacityAt(Along));
+		}
 		// Asked for when it opens, and again every 20 s while it is open, so that a friend who joins a game shows.
 		if (bOpen && Sessions != nullptr && Now - FriendsReadAt > 20.0)
 		{
@@ -991,7 +1011,7 @@ void SCheeseStrikeMenu::Refresh()
 		}
 		// Drawn again only when a friend or a player changes (rebuilding it would restart a spinner). The session's status is not in
 		// it: the dropdown and its line say how friends may join, and a failure says why where it happened (the lobby, the matches found).
-		FString Key = FString::Printf(TEXT("%d|"), bOpen ? 1 : 0);
+		FString Key = FString::Printf(TEXT("%d|%d|"), bContent ? 1 : 0, Page == EMenuPage::Find ? 1 : 0);
 		if (Sessions != nullptr)
 		{
 			for (const FCheeseStrikeFriend& Each : Sessions->GetFriends())
@@ -1033,7 +1053,11 @@ void SCheeseStrikeMenu::Refresh()
 		if (Key != ShownFriendsKey && FriendsContent.IsValid() && !IsDropdownOpen())
 		{
 			ShownFriendsKey = Key;
-			FriendsContent->SetContent(MakeFriendsPanel(bOpen));
+			FriendsContent->SetContent(MakeFriendsPanel(bContent));
+			if (FriendsInside.IsValid())
+			{
+				FriendsInside->SetRenderOpacity(ContentOpacityAt(Along));
+			}
 		}
 	}
 	// The question whether to close the lobby goes once the countdown begins: it can't be closed then.
@@ -1076,7 +1100,7 @@ void SCheeseStrikeMenu::Refresh()
 	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options || Page == EMenuPage::Loadout;
 	if (Content.IsValid())
 	{
-		Content->SetWidthOverride(Page == EMenuPage::Options ? 900.0f : (bWide ? 640.0f : 400.0f));
+		Content->SetWidthOverride(Page == EMenuPage::Options ? 900.0f : (bWide ? 640.0f : CheeseStrikeMenu::PanelContentWidth));
 		Content->SetVAlign(bWide && Page != EMenuPage::Loadout ? VAlign_Fill : VAlign_Center);
 	}
 	if (Lobby.IsValid())
@@ -1160,6 +1184,156 @@ void SCheeseStrikeMenu::Refresh()
 		}
 	}
 	KeepFocus();
+	UpdateTooltip();
+}
+
+void SCheeseStrikeMenu::PinFriends(bool bOpen)
+{
+	FriendsPinned = bOpen;
+}
+
+FOptionalSize SCheeseStrikeMenu::FriendsWidthNow() const
+{
+	return CheeseStrikeFriends::PanelWidthAt(FriendsCurve.GetLerp(), CheeseStrikeMenu::FriendsTabWidth, CheeseStrikeMenu::PanelWidth);
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsChevron(bool bOpen)
+{
+	return SNew(SButton)
+		.ButtonStyle(&ButtonStyle(EButtonKind::Quiet))
+		.ContentPadding(FMargin(6.0f))
+		.IsFocusable(false)
+		.OnClicked_Lambda([this]()
+		{
+			PinFriends(!bFriendsWantOpen);
+			return FReply::Handled();
+		})
+		[
+			MakeChevron(bOpen ? -90.0f : 90.0f, Ink, bOpen ? 90.0f : -90.0f)
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeTooltip(const FString& Text, const FString& Title)
+{
+	TSharedRef<SVerticalBox> Lines = SNew(SVerticalBox);
+	if (!Title.IsEmpty())
+	{
+		Lines->AddSlot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 4.0f))
+		[
+			SNew(STextBlock).Text(FText::FromString(Title)).Font(Font(13, FName("Bold"))).ColorAndOpacity(Cheese).WrapTextAt(CheeseStrikeMenu::TooltipWrap)
+		];
+	}
+	Lines->AddSlot().AutoHeight()
+	[
+		SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(14)).ColorAndOpacity(Ink).WrapTextAt(CheeseStrikeMenu::TooltipWrap)
+	];
+	return SNew(SBorder)
+		.BorderImage(&Looks().TooltipCard)
+		.BorderBackgroundColor(FLinearColor(PanelColour.R, PanelColour.G, PanelColour.B, 0.97f))
+		.Padding(FMargin(14.0f, 9.0f))
+		.Visibility(EVisibility::HitTestInvisible)
+		[
+			Lines
+		];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::WithTooltip(TSharedRef<SWidget> Widget, const FString& Text, const FString& Title)
+{
+	if (!Text.IsEmpty())
+	{
+		TooltipOwners.Add({Widget, Text, Title});
+	}
+	return Widget;
+}
+
+static TAutoConsoleVariable<int32> CVarMenuTooltip(TEXT("CheeseStrike.MenuTooltip"), 0,
+	TEXT("n: the menu shows the tooltip of its n-th widget that has one (in the order they were made), as if hovered, for looking at it; 0: none."));
+
+void SCheeseStrikeMenu::UpdateTooltip()
+{
+	if (!TooltipBox.IsValid() || !FSlateApplication::IsInitialized())
+	{
+		return;
+	}
+	// The widgets gone with a page drawn again are dropped; of those still here and hovered, the innermost (the smallest)
+	// has its tooltip: a row's button over the row's.
+	TooltipOwners.RemoveAll([](const FTooltipOwner& Each) { return !Each.Widget.IsValid(); });
+	const int32 Forced = CVarMenuTooltip.GetValueOnGameThread();
+	const FTooltipOwner* Hovered = nullptr;
+	float Smallest = TNumericLimits<float>::Max();
+	for (int32 Index = 0; Index < TooltipOwners.Num(); ++Index)
+	{
+		const TSharedPtr<SWidget> Widget = TooltipOwners[Index].Widget.Pin();
+		const bool bForced = Forced > 0 && Index == Forced - 1;
+		if (Widget.IsValid() && (bForced || (Forced <= 0 && Widget->IsHovered())) && Asking == EMenuAsk::None)
+		{
+			const FVector2D Size = Widget->GetCachedGeometry().GetLocalSize();
+			const float Area = static_cast<float>(Size.X * Size.Y);
+			if (Area < Smallest)
+			{
+				Smallest = Area;
+				Hovered = &TooltipOwners[Index];
+			}
+		}
+	}
+	const double Now = FPlatformTime::Seconds();
+	const TSharedPtr<SWidget> HoveredWidget = Hovered != nullptr ? Hovered->Widget.Pin() : nullptr;
+	if (HoveredWidget != TooltipHoveredWidget.Pin())
+	{
+		TooltipHoveredWidget = HoveredWidget;
+		TooltipHoveredAt = Now;
+	}
+	// Shown after a moment's rest on the widget, or at once from one tooltip to the next; put beside the mouse, kept
+	// within the view (left of the mouse if there is no room right of it, above it if none below); for one held up for
+	// looking at, under its widget's left end.
+	const bool bShow = HoveredWidget.IsValid() && (Forced > 0 || Now - TooltipHoveredAt >= CheeseStrikeMenu::TooltipDelay || Now - TooltipHiddenAt < CheeseStrikeMenu::TooltipDelay);
+	if (!bShow)
+	{
+		if (bTooltipShown)
+		{
+			TooltipBox->SetContent(SNullWidget::NullWidget);
+			TooltipCard.Reset();
+			TooltipHiddenAt = Now;
+			TooltipShownFor.Reset();
+			bTooltipShown = false;
+		}
+		return;
+	}
+	const FGeometry& Mine = GetCachedGeometry();
+	if (!bTooltipShown || TooltipShownFor.Pin() != HoveredWidget)
+	{
+		TooltipShownFor = HoveredWidget;
+		bTooltipShown = true;
+		TooltipCard = MakeTooltip(Hovered->Text, Hovered->Title);
+		TooltipBox->SetContent(MenuFadeIn(TooltipCard.ToSharedRef()));
+		// Measured now, so that it is put right from its first frame.
+		TooltipCard->SlatePrepass(Mine.Scale);
+	}
+	// (The card's own size: the box's includes the padding that places it.)
+	const FVector2D Room = Mine.GetLocalSize();
+	const FVector2D Wants = TooltipCard->GetDesiredSize();
+	FVector2D At;
+	if (Forced > 0)
+	{
+		const FGeometry& Owner = HoveredWidget->GetCachedGeometry();
+		At = Mine.AbsoluteToLocal(Owner.GetAbsolutePosition()) + FVector2D(0.0, Owner.GetLocalSize().Y + 4.0);
+	}
+	else
+	{
+		const FVector2D Mouse = Mine.AbsoluteToLocal(FSlateApplication::Get().GetCursorPos());
+		At = Mouse + FVector2D(CheeseStrikeMenu::TooltipOffset, CheeseStrikeMenu::TooltipOffset);
+		if (At.X + Wants.X > Room.X)
+		{
+			At.X = Mouse.X - CheeseStrikeMenu::TooltipOffset - Wants.X;
+		}
+		if (At.Y + Wants.Y > Room.Y)
+		{
+			At.Y = Mouse.Y - CheeseStrikeMenu::TooltipOffset - Wants.Y;
+		}
+	}
+	At.X = FMath::Clamp(At.X, 0.0, FMath::Max(0.0, Room.X - Wants.X));
+	At.Y = FMath::Clamp(At.Y, 0.0, FMath::Max(0.0, Room.Y - Wants.Y));
+	TooltipBox->SetPadding(FMargin(static_cast<float>(At.X), static_cast<float>(At.Y), 0.0f, 0.0f));
 }
 
 int32 SCheeseStrikeMenu::UserIndex() const
@@ -1735,7 +1909,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(12.0f, 0.0f, 0.0f, 0.0f))
 			[
-				SNew(SCheeseStrikeDropArrow).Open_Lambda([Weak]() { const TSharedPtr<SMenuAnchor> Open = Weak.Pin(); return Open.IsValid() && Open->IsOpen(); })
+				// Down, and up while the list is open, in the button's own colour.
+				SNew(SCheeseStrikeChevron).Colour(FSlateColor::UseForeground()).Angle_Lambda([Weak]() { const TSharedPtr<SMenuAnchor> Open = Weak.Pin(); return Open.IsValid() && Open->IsOpen() ? 180.0f : 0.0f; })
 			]
 		];
 	*Opener = Button;
@@ -2034,10 +2209,9 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFind()
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 {
-	// Rounded, like every card: white, tinted by the border's colour.
-	static const FSlateRoundedBoxBrush FriendsCardBrush(FLinearColor::White, 12.0f);
 	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Player.Get());
+	FriendsInside.Reset();
 	if (!bOpen)
 	{
 		return MakeFriendsTab(Sessions);
@@ -2126,14 +2300,18 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 	{
 		Friends->AddSlot().AutoHeight() [ MakeLine(TEXT("No online service"), true, false) ];
 	}
-	// Nearly opaque: open over the lobby's seats, they would show through its rows.
-	return SNew(SBorder).BorderImage(&FriendsCardBrush).BorderBackgroundColor(FLinearColor(PanelColour.R, PanelColour.G, PanelColour.B, 0.96f)).Padding(FMargin(20.0f, 24.0f))
-	[
-		SNew(SVerticalBox)
-		// The title, and Refresh beside it.
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(6.0f, 0.0f, 0.0f, 14.0f))
+	// The pages' panel's looks, mirrored: as wide (the box it is in), the same brush, colour and opacity, its left corners
+	// rounded. Its chevron, pointing right to the edge it folds to, is hidden on the find page, where it can't fold. The
+	// content inside is what fades as the panel slides (FriendsInside).
+	const TSharedRef<SWidget> Inside = SNew(SVerticalBox)
+		// The chevron and the title, and Refresh beside them.
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 14.0f))
 		[
 			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 8.0f, 0.0f))
+			[
+				SNew(SBox).Visibility(Page == EMenuPage::Find ? EVisibility::Collapsed : EVisibility::Visible) [ MakeFriendsChevron(true) ]
+			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 			[
 				SNew(STextBlock).Text(FText::FromString(TEXT("FRIENDS"))).Font(Font(30, FName("Bold"))).ColorAndOpacity(Cheese)
@@ -2144,13 +2322,16 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 			]
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(6.0f, 0.0f, 6.0f, 12.0f)) [ bInGame ? MakePartyPermission(bHost, Sessions) : SNullWidget::NullWidget ]
-		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ Friends ] ]
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ Friends ] ];
+	FriendsInside = Inside;
+	return SNew(SBorder).BorderImage(&Looks().FriendsPanel).BorderBackgroundColor(PanelColour).Padding(FMargin(20.0f, 24.0f))
+	[
+		Inside
 	];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsTab(UCheeseStrikeSessionSubsystem* Sessions)
 {
-	static const FSlateRoundedBoxBrush FriendsTabBrush(FLinearColor::White, 12.0f);
 	int32 Online = 0;
 	if (Sessions != nullptr)
 	{
@@ -2159,13 +2340,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsTab(UCheeseStrikeSessionSubsys
 			Online += Each.Online != CheeseStrikeFriends::EOnline::Offline ? 1 : 0;
 		}
 	}
-	// A card at the top of the edge, as high as the lobby's page starts: it opens to the left as it is hovered.
+	// A card at the top of the edge, as high as the lobby's page starts, in the panels' looks (its left corners rounded):
+	// it opens to the left as it is hovered, or as its chevron is clicked.
 	return SNew(SBox).VAlign(VAlign_Top).Padding(FMargin(0.0f, 40.0f, 0.0f, 0.0f))
 	[
-		SNew(SBorder).BorderImage(&FriendsTabBrush).BorderBackgroundColor(PanelColour).Padding(FMargin(10.0f, 16.0f, 10.0f, 18.0f)).HAlign(HAlign_Center)
+		SNew(SBorder).BorderImage(&Looks().FriendsPanel).BorderBackgroundColor(PanelColour).Padding(FMargin(10.0f, 12.0f, 10.0f, 18.0f)).HAlign(HAlign_Center)
 		[
 			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center) [ MakeChevron(false, Ink, false, true) ]
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center) [ MakeFriendsChevron(false) ]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, 10.0f, 0.0f, 6.0f))
 			[
 				SNew(SBox).WidthOverride(30.0f).HeightOverride(30.0f) [ SNew(SImage).Image(Looks().PlayerIcon.Get()).ColorAndOpacity(Cheese) ]
@@ -2244,7 +2426,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSectionHeader(CheeseStrikeFriends::ES
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(2.0f, 0.0f, 8.0f, 0.0f))
 			[
-				MakeChevron(!bClosed, Muted, TurningFriendSection == Id)
+				MakeFoldChevron(!bClosed, Muted, TurningFriendSection == Id)
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 			[
@@ -2315,7 +2497,6 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendCard(TSharedRef<SWidget> Pictur
 	SAssignNew(Card, SBorder)
 		.BorderImage(&FriendRowBrush)
 		.Padding(FMargin(10.0f, 8.0f))
-		.ToolTipText(Hover.IsEmpty() ? FText() : FText::FromString(Hover))
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 10.0f, 0.0f)) [ Picture ]
@@ -2338,14 +2519,15 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendCard(TSharedRef<SWidget> Pictur
 		const TSharedPtr<SBorder> Me = Weak.Pin();
 		return FSlateColor(FLinearColor(1.0f, 1.0f, 1.0f, Me.IsValid() && Me->IsHovered() ? 0.11f : 0.045f));
 	}));
-	return Card.ToSharedRef();
+	// Hovered, it says what the panel knows of them, under their name.
+	return WithTooltip(Card.ToSharedRef(), Hover, Name);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeRowButton(const FString& Text, const FString& ItemName, TFunction<void()> Do, EButtonKind Kind, const FString& WhyNot, const FString& Hover)
 {
 	const FString Says = WhyNot.IsEmpty() ? Hover : WhyNot;
 	// The tooltip on a box round the button, which shows it faded too; the button itself enabled or not (no click, no focus).
-	return SNew(SBox).ToolTipText(Says.IsEmpty() ? FText() : FText::FromString(Says))
+	return WithTooltip(SNew(SBox)
 	[
 		SNew(SBox).IsEnabled(WhyNot.IsEmpty())
 		[
@@ -2359,7 +2541,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeRowButton(const FString& Text, const 
 					SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(13, FName("Bold")))
 				])
 		]
-	];
+	], Says);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index, CheeseStrikeFriends::ESection Section)
@@ -2456,10 +2638,10 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeNameChip(const CheeseStrikeRules::FRo
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 			[
-				SNew(STextBlock).Text(FText::FromString(Name)).Font(Font(CheeseStrikeMenu::SeatNameSize(Name), Seat.bBot ? FName("Regular") : FName("Bold")))
+				// A long name, which may be cut short, is whole in its tooltip.
+				WithTooltip(SNew(STextBlock).Text(FText::FromString(Name)).Font(Font(CheeseStrikeMenu::SeatNameSize(Name), Seat.bBot ? FName("Regular") : FName("Bold")))
 				.ColorAndOpacity(Seat.bBot ? FLinearColor(0.78f, 0.77f, 0.74f) : FLinearColor::White)
-				.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-				.ToolTipText(Name.Len() > 16 ? FText::FromString(Name) : FText())
+				.OverflowPolicy(ETextOverflowPolicy::Ellipsis), Name.Len() > 16 ? Name : FString())
 			];
 		if (bHost)
 		{

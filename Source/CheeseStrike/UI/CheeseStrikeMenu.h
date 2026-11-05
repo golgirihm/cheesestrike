@@ -3,8 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Animation/CurveSequence.h"
 #include "Layout/SlateRect.h"
 #include "Types/SlateEnums.h"
+#include "Types/SlateStructs.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Rules/CheeseStrikeFriends.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -177,6 +179,20 @@ namespace CheeseStrikeMenu
 	constexpr float LobbyGap = 44.0f;
 	/** The friends panel's width when it is collapsed to its tab: the lobby leaves this much room at its right, so nothing is under it. */
 	constexpr float FriendsTabWidth = 120.0f;
+	/**
+	 * The pages' panel on the left: how far its content is in from its sides, how wide its content is on the front end, so
+	 * how wide the panel is; the friends panel open on the right is as wide (the one width for both), drawn with the same
+	 * brush, colour and opacity, its corners the pages' panel's mirrored: the two touching the screen's edge square, the
+	 * two inner ones rounded by PanelRounding.
+	 */
+	constexpr float PanelPadding = 48.0f;
+	constexpr float PanelContentWidth = 400.0f;
+	constexpr float PanelWidth = PanelContentWidth + 2.0f * PanelPadding;
+	constexpr float PanelRounding = 18.0f;
+	/** The menu's tooltips: how long the mouse rests on an item before its tooltip shows, how far from the mouse it is put, and how wide its words wrap at. */
+	constexpr float TooltipDelay = 0.3f;
+	constexpr float TooltipOffset = 18.0f;
+	constexpr float TooltipWrap = 340.0f;
 	/** The width of the names of the lobby's rules, left of their dropdowns. */
 	constexpr float RuleLabelWidth = 220.0f;
 	/** The smallest the game's window may be made (in a window), so that nothing in the menus is crowded out. */
@@ -281,10 +297,19 @@ public:
 	/** The dialog over the whole menu, for what `Asking` is: its question, and what to press. */
 	TSharedRef<SWidget> MakeDialog();
 	/**
-	 * The friends panel, open or as its tab; a friend's row in it, in `Section` (JOIN and INVITE in Joinable, INVITE in Others,
-	 * nothing in the party); and a player of our game's row in the party (ourself, or another with the host's KICK).
+	 * The friends panel, open (its tall content, shown too while it slides open or shut) or folded to its tab; a friend's row
+	 * in it, in `Section` (JOIN and INVITE in Joinable, INVITE in Others, nothing in the party); and a player of our game's
+	 * row in the party (ourself, or another with the host's KICK).
 	 */
 	TSharedRef<SWidget> MakeFriendsPanel(bool bOpen);
+	/** Pins the friends panel open or shut (a click on its chevron): it then stays so whatever the mouse does, for as long as the menu lasts. */
+	void PinFriends(bool bOpen);
+	/** Whether the friends panel is pinned, and which way. */
+	const TOptional<bool>& GetFriendsPin() const { return FriendsPinned; }
+	/** Whether the friends panel is open, or on its way open (CheeseStrikeFriends::PanelOpen). */
+	bool IsFriendsPanelOpen() const { return bFriendsWantOpen; }
+	/** The friends panel's width now, from its curve (CheeseStrikeFriends::PanelWidthAt): the tab's shut, PanelWidth open, between on the way. */
+	FOptionalSize FriendsWidthNow() const;
 	TSharedRef<SWidget> MakeFriendRow(int32 Index, CheeseStrikeFriends::ESection Section);
 	TSharedRef<SWidget> MakePartyRow(const APlayerState* Who, bool bSelf, bool bHost);
 	/** The host's choice of who can join the party (read-only for everyone else). */
@@ -356,6 +381,23 @@ private:
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain, TSharedPtr<SWidget> Inside = nullptr);
 	/** The friends panel folded to its tab: a chevron, the friends' figure, the word and how many are online. */
 	TSharedRef<SWidget> MakeFriendsTab(UCheeseStrikeSessionSubsystem* Sessions);
+	/**
+	 * The friends panel's chevron, a button: pointing right (to the edge it folds to) while the panel is open, left (the
+	 * way it opens) on its tab, turning from the other's way as it is made afresh; a click pins the panel the other way
+	 * (PinFriends). It takes no focus: a pad's stays on the page's items.
+	 */
+	TSharedRef<SWidget> MakeFriendsChevron(bool bOpen);
+	/**
+	 * A tooltip in the menu's own looks: `Text` (lines, wrapped at TooltipWrap) on a rounded box in the panel's colour, the
+	 * menu's font, no border, with `Title` in cheese over it when there is one. Drawn by the menu itself, beside the mouse,
+	 * while the widget it belongs to is hovered (WithTooltip): not in a window of the OS's, as Slate's tooltips are, whose
+	 * corners can't be rounded, and which a screenshot never shows.
+	 */
+	TSharedRef<SWidget> MakeTooltip(const FString& Text, const FString& Title = FString());
+	/** Gives `Widget` the tooltip MakeTooltip makes of `Text` and `Title` (none for an empty `Text`); returns `Widget`. */
+	TSharedRef<SWidget> WithTooltip(TSharedRef<SWidget> Widget, const FString& Text, const FString& Title = FString());
+	/** Shows the tooltip of whichever widget with one is hovered (the innermost), after TooltipDelay, beside the mouse; run every frame. */
+	void UpdateTooltip();
 	/**
 	 * A row of the friends panel: a rounded card, lit under the mouse, with `Picture` on the left, `Name` over `Under`
 	 * (cut with an ellipsis, never wrapped) and `Action` on the right; `Hover` as its tooltip.
@@ -510,19 +552,49 @@ private:
 	EMenuAsk ShownAsk = EMenuAsk::None;
 	TSharedPtr<SWidget> Dialog;
 	TSharedPtr<SBox> DialogContent;
-	/** The friends panel on the right: a tab, opened by hovering it in the lobby, and open on the find page. */
+	/**
+	 * The friends panel on the right: a tab, opened by hovering it on the front end and in the lobby (shut again half a
+	 * second after the mouse leaves) or pinned open or shut by a click on its chevron, and open on the find page
+	 * (CheeseStrikeFriends::PanelOpen). Its width is bound to a curve (FriendsCurve, CheeseStrikeFriends::PanelSeconds,
+	 * eased in and out) played forward to open and backward to shut, read off it every frame; its content (FriendsInside)
+	 * fades in over the second half of an expand and out over the first half of a collapse, and the tall content stays
+	 * until the panel is shut, when it folds to its tab.
+	 */
 	TSharedPtr<SBox> FriendsBox;
 	TSharedPtr<SBox> FriendsContent;
+	TSharedPtr<SWidget> FriendsInside;
+	FCurveSequence FriendsCurve;
+	TOptional<bool> FriendsPinned;
+	bool bFriendsWantOpen = false;
+	bool bFriendsHovered = false;
+	double FriendsLeftAt = -1000.0;
 	/** What the panel was last drawn for. */
 	FString ShownFriendsKey;
-	/** When the friends were last asked for, the panel's width now and when it was last set (to ease it open and shut). */
+	/** When the friends were last asked for. */
 	double FriendsReadAt = -1000.0;
-	float FriendsWidth = 120.0f;
 	/** The friends sections folded shut (remembered while the menu lasts), and the one just folded or opened, whose chevron turns. */
 	TSet<uint8> ClosedFriendSections;
 	int32 TurningFriendSection = INDEX_NONE;
-	double FriendsWidthAt = 0.0;
 	/** The pictures of the friends in the rows drawn (kept while they are). */
 	TArray<TSharedPtr<FSlateBrush>> FriendBrushes;
 	int32 LobbyBuilds = 0;
+	/** The widgets given a tooltip (WithTooltip), with its words; the dead are dropped as they are looked through. */
+	struct FTooltipOwner
+	{
+		TWeakPtr<SWidget> Widget;
+		FString Text;
+		FString Title;
+	};
+	TArray<FTooltipOwner> TooltipOwners;
+	/**
+	 * The box the tooltip is drawn in, over everything, put beside the mouse by its padding; whose tooltip it shows, which
+	 * widget with one is hovered and since when, and when the last tooltip went (one hovered soon after shows at once).
+	 */
+	TSharedPtr<SBox> TooltipBox;
+	TSharedPtr<SWidget> TooltipCard;
+	bool bTooltipShown = false;
+	TWeakPtr<SWidget> TooltipShownFor;
+	TWeakPtr<SWidget> TooltipHoveredWidget;
+	double TooltipHoveredAt = 0.0;
+	double TooltipHiddenAt = -1000.0;
 };
