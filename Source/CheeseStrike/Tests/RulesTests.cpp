@@ -185,6 +185,7 @@ bool FAHostPicksAMap::RunTest(const FString& Parameters)
 	TestEqual(TEXT("a match hosted on the range plays the default map instead"), MapForMatch(Range, true), DefaultMap());
 	TestEqual(TEXT("alone, the range is played"), MapForMatch(Range, false), Range);
 	TestEqual(TEXT("a map offered is played as picked"), MapForMatch(0, true), 0);
+	TestEqual(TEXT("a level not in the list is left alone when hosted"), MapForMatch(INDEX_NONE, true), INDEX_NONE);
 	TestEqual(TEXT("a travelled match waits for so many players"), PlayersFrom(TEXT("?Players=3")), 3);
 	TestEqual(TEXT("and a hosted one for none"), PlayersFrom(TEXT("")), 0);
 	TestEqual(TEXT("the bots' names travel by their seed"), BotSeedFrom(TEXT("?BotSeed=1234"), 7), 1234);
