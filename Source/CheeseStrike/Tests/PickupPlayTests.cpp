@@ -156,14 +156,28 @@ void PickupChecks::CheckStands(FAutomationTestBase& Test, UWorld* World, bool bA
 		Test.TestTrue(FString::Printf(TEXT("%s stands on its floor%s (%.0f cm under it)"), *Stand->GetActorLabel(), bAfterTheMice ? TEXT(" after the mice") : TEXT(""), bFloor ? Hit.Distance - 50.0f : -1.0f),
 			bFloor && FMath::Abs(Hit.Distance - 50.0f) < 15.0f);
 	}
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 	if (bAfterTheMice)
 	{
-		return;
-	}
-	// The Proving Ground, the template's shooter level, has none: the play tests walk all over it.
-	if (World->GetMapName().Contains(TEXT("Lvl_Shooter")))
-	{
-		Test.TestEqual(TEXT("no weapons' stands on the Proving Ground"), Stands.Num(), 0);
+		// A way to each from a start still, but for a stand the map strands (tagged Stranded: the Grotto's Roquefort in the
+		// Spine's arch, its bridges eaten), which must have none: that is the design, and a way left would be a mistake.
+		FNavLocation From;
+		APlayerStart* First = nullptr;
+		for (TActorIterator<APlayerStart> It(World); It && First == nullptr; ++It)
+		{
+			First = *It;
+		}
+		const bool bFrom = Navigation != nullptr && First != nullptr && Navigation->ProjectPointToNavigation(First->GetActorLocation(), From, FVector(100.0f, 100.0f, 250.0f));
+		for (const ACheeseStrikePickup* Stand : Stands)
+		{
+			FNavLocation To;
+			const bool bOnMesh = Navigation != nullptr && Navigation->ProjectPointToNavigation(Stand->FloorAt(), To, FVector(60.0f, 60.0f, 150.0f));
+			const UNavigationPath* Path = bFrom && bOnMesh ? Navigation->FindPathToLocationSynchronously(World, From.Location, To.Location) : nullptr;
+			const bool bWay = Path != nullptr && Path->IsValid() && !Path->IsPartial();
+			const bool bStranded = Stand->ActorHasTag(FName(TEXT("Stranded")));
+			Test.TestEqual(FString::Printf(TEXT("%s %s after the mice (%s)"), *Stand->GetActorLabel(), bStranded ? TEXT("is stranded") : TEXT("can still be reached"),
+				!bOnMesh ? TEXT("off the navigation mesh") : Path == nullptr || !Path->IsValid() ? TEXT("no way") : Path->IsPartial() ? TEXT("part of a way") : TEXT("a whole way")), bWay, !bStranded);
+		}
 		return;
 	}
 	Test.TestTrue(FString::Printf(TEXT("%d to %d weapons' stands (%d)"), FewestSpots, MostSpots, Stands.Num()), Stands.Num() >= FewestSpots && Stands.Num() <= MostSpots);
@@ -180,7 +194,6 @@ void PickupChecks::CheckStands(FAutomationTestBase& Test, UWorld* World, bool bA
 			Mozza.Add(It->GetActorLocation());
 		}
 	}
-	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 	FNavLocation From;
 	const bool bFrom = Navigation != nullptr && Gouda.Num() > 0 && Navigation->ProjectPointToNavigation(Gouda[0], From, FVector(100.0f, 100.0f, 250.0f));
 	for (const ACheeseStrikePickup* Stand : Stands)

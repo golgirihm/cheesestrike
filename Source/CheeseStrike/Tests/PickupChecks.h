@@ -17,7 +17,9 @@ namespace PickupChecks
 	 * better at the riskier spots (CheeseStrikePickups::AreFair,
 	 * BetterLieRiskier), each on its floor with room for a player over
 	 * it, clear of every hill's spot, and a way to it from a side's start. After them (`bAfterTheMice`):
-	 * each still has its floor. The Proving Ground (the template's shooter level, where the play tests walk) has none.
+	 * each still has its floor and a way to it from a start, but for a stand the map strands on purpose
+	 * (tagged `Stranded` by `kit.pickup(stranded=True)`: Gruyère Grotto's Roquefort Rifle in the Spine's arch, reached
+	 * over bridges of cheese alone), which must have no way to it then.
 	 */
 	void CheckStands(FAutomationTestBase& Test, UWorld* World, bool bAfterTheMice);
 }

@@ -154,14 +154,17 @@ bool FAHostPicksAMap::RunTest(const FString& Parameters)
 	TestTrue(TEXT("there is more than one map"), NumMaps() >= 2);
 	TestEqual(TEXT("the first is the Creamery"), FString(Maps[0].Name), FString(TEXT("The Creamery")));
 	TestEqual(TEXT("a level is known by its package"), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery")), 0);
-	// The shooter level is one of them, wherever the list has it.
-	int32 Shooter = INDEX_NONE;
+	// The Proving Ground is one of them, wherever the list has it: the game's own, built by a script, not the template's
+	// shooter level, which is the front end's and the play tests' playground and no map of the game's.
+	int32 Proving = INDEX_NONE;
 	for (int32 Index = 0; Index < NumMaps(); ++Index)
 	{
-		Shooter = FString(Maps[Index].Level) == TEXT("/Game/Variant_Shooter/Lvl_Shooter") ? Index : Shooter;
+		Proving = FString(Maps[Index].Level) == TEXT("/Game/CheeseStrike/Maps/Lvl_ProvingGround") ? Index : Proving;
+		TestTrue(FString::Printf(TEXT("%s is a map of the game's own"), Maps[Index].Name), FString(Maps[Index].Level).StartsWith(TEXT("/Game/CheeseStrike/Maps/")));
 	}
-	TestTrue(TEXT("the shooter level is one"), Shooter > 0);
-	TestEqual(TEXT("or by its object path"), MapIndexFor(TEXT("/Game/Variant_Shooter/Lvl_Shooter.Lvl_Shooter")), Shooter);
+	TestTrue(TEXT("the Proving Ground is one"), Proving > 0);
+	TestEqual(TEXT("or by its object path"), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/Lvl_ProvingGround.Lvl_ProvingGround")), Proving);
+	TestEqual(TEXT("the template's shooter level is none"), MapIndexFor(TEXT("/Game/Variant_Shooter/Lvl_Shooter")), static_cast<int32>(INDEX_NONE));
 	TestEqual(TEXT("or as it is played in the editor"), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/UEDPIE_1_Lvl_Creamery")), 0);
 	TestEqual(TEXT("and a level that isn't one of them is none"), MapIndexFor(TEXT("/Game/Elsewhere/Lvl_Other")), static_cast<int32>(INDEX_NONE));
 	TestEqual(TEXT("the URL picks a map"), MapFrom(TEXT("?Map=1"), 0), 1);
@@ -171,7 +174,7 @@ bool FAHostPicksAMap::RunTest(const FString& Parameters)
 	const int32 Range = MapIndexFor(CheeseStrikeRange::Level);
 	TestTrue(TEXT("the Practice Range is a map"), Range != INDEX_NONE);
 	TestFalse(TEXT("but not one the lobby offers"), IsOffered(Range));
-	TestTrue(TEXT("every other map is"), IsOffered(0) && IsOffered(DefaultMap()) && IsOffered(Shooter));
+	TestTrue(TEXT("every other map is"), IsOffered(0) && IsOffered(DefaultMap()) && IsOffered(Proving));
 	TestFalse(TEXT("nor is a map there isn't"), IsOffered(NumMaps()) || IsOffered(INDEX_NONE));
 	const TArray<int32> Offered = MapsOffered();
 	TestEqual(TEXT("the lobby offers every map but the range"), Offered.Num(), NumMaps() - 1);

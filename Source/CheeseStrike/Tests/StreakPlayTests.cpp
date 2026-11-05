@@ -87,7 +87,7 @@ IMPLEMENT_COMPLEX_AUTOMATION_TEST(FTheStreaksWorkOnEveryMap, "CheeseStrike.Play.
 
 void FTheStreaksWorkOnEveryMap::GetTests(TArray<FString>& OutBeautifiedNames, TArray<FString>& OutTestCommands) const
 {
-	// Every map of the game's own (not the template's shooter level, which has no roof).
+	// Every map of the game's own: all of them, since the Proving Ground is one built by a script (wave 15).
 	for (int32 Index = 0; Index < CheeseStrikeRules::NumMaps(); ++Index)
 	{
 		if (FString(CheeseStrikeRules::Maps[Index].Level).StartsWith(TEXT("/Game/CheeseStrike/")))

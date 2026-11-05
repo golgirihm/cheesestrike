@@ -323,7 +323,7 @@ IMPLEMENT_COMPLEX_AUTOMATION_TEST(FEveryMapHasFairHills, "CheeseStrike.Play.Ever
 
 void FEveryMapHasFairHills::GetTests(TArray<FString>& OutBeautifiedNames, TArray<FString>& OutTestCommands) const
 {
-	// Every map a host can pick that a script builds (not the template's level, whose hill stands by its middle start).
+	// Every map a host can pick: all of them are the game's own, built by a script (the Proving Ground since wave 15).
 	for (int32 Index = 0; Index < CheeseStrikeRules::NumMaps(); ++Index)
 	{
 		if (FString(CheeseStrikeRules::Maps[Index].Level).StartsWith(TEXT("/Game/CheeseStrike/Maps/")))
