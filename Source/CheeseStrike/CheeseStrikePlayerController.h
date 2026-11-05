@@ -12,6 +12,8 @@
 class ACameraActor;
 class ACheeseStrikeMenuFigure;
 class ACheeseStrikeMenuMouse;
+class ACheeseStrikeHeroView;
+class UTextureRenderTarget2D;
 class ACheeseStrikePodium;
 class UAudioComponent;
 struct FPodiumPlace;
@@ -60,6 +62,9 @@ public:
 	EMenuPage GetMenuPage() const { return ShownPage; }
 	/** The menu as this player sees it, for the tests. */
 	TSharedPtr<SCheeseStrikeMenu> GetMenu() const { return Menu; }
+	/** The loadout page's picture of the hero, its loadout in hand (ACheeseStrikeHeroView), while the page is up; null otherwise. */
+	UTextureRenderTarget2D* GetHeroPicture() const;
+	const ACheeseStrikeHeroView* GetHeroView() const { return HeroView; }
 	/** Whether this player has been told to follow the server to another level (and is waiting to): the lobby says where to. */
 	bool IsLeaving() const { return bLeaving; }
 	/** The map (CheeseStrikeRules::Maps) this player was told to follow the server to, or INDEX_NONE. */
@@ -243,7 +248,7 @@ public:
 	/** From the console or a play script: the host calls off the countdown. */
 	UFUNCTION(Exec)
 	void CheeseStrikeCancel();
-	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits or Settings, which also opens from the pause menu), and of the settings the tab named (Controls, Aiming, Sound or Graphics); or, in a match, the pause menu (Pause), with Ask the host's question whether to go back to the lobby. */
+	/** From the console or a play script: shows a page of the front end, as its buttons do (Main, Find, Credits, Loadout or Settings, which also opens from the pause menu), and of the settings the tab named (Controls, Aiming, Sound or Graphics); in the lobby its menu (LobbyMenu), or the settings or the loadout over it; or, in a match, the pause menu (Pause), with Ask the host's question whether to go back to the lobby. */
 	UFUNCTION(Exec)
 	void CheeseStrikePage(const FString& Page, const FString& Tab = TEXT(""));
 	/** From the console or a play script: opens the lobby's nth dropdown (0 the map, then the mode and on down), for looking at it; -1 shuts it. */
@@ -264,6 +269,17 @@ public:
 	/** From the console or a play script: puts the loading cover up for `Seconds` (the loading screen's own widget, its spinner turning), for looking at it. */
 	UFUNCTION(Exec)
 	void CheeseStrikeCover(float Seconds = 3.0f);
+	/**
+	 * From the console or a play script (development): plays the menu's hover sound (`Which` Hover) or its click (Click)
+	 * `Count` times at once, as its buttons do (CheeseStrikeMenu::UISound); with `Queued` given, as a procedural wave fed
+	 * through its queue, the way every sound made in code played until wave 16, whose playings never ended. For reading
+	 * CheeseStrikeSoundsPlaying after.
+	 */
+	UFUNCTION(Exec)
+	void CheeseStrikeUISound(const FString& Which = TEXT("Hover"), int32 Count = 1, const FString& Queued = TEXT(""));
+	/** From the console or a play script: logs how many voices play now, of how many there are, how many sounds, and whether the menu's music plays. */
+	UFUNCTION(Exec)
+	void CheeseStrikeSoundsPlaying();
 
 	/** Matches through the online service (UCheeseStrikeSessionSubsystem), from the console: host with URL options such as ?KillLimit=10, find, join the nth found, leave. */
 	/** Logs every bot's state: what it is doing, its health, ammunition and speed (the host's world only). */
@@ -344,6 +360,11 @@ protected:
 	/** The mouse that now and then crosses the front end behind the figure (on the front end's level only). */
 	UPROPERTY()
 	TObjectPtr<ACheeseStrikeMenuMouse> MenuMouse;
+	/** The loadout page's picture of the hero (ACheeseStrikeHeroView), made the first time the page shows and kept for the level, capturing only while it shows. */
+	UPROPERTY()
+	TObjectPtr<ACheeseStrikeHeroView> HeroView;
+	/** Shows the hero view while the loadout page is up (on its own, over the lobby or over a count-in), dressed as the loadout is. */
+	void UpdateHeroView();
 	UPROPERTY()
 	TObjectPtr<ACheeseStrikePodium> Podium;
 	/** The host's button over it. */

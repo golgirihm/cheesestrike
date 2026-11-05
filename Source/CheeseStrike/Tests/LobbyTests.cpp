@@ -486,10 +486,22 @@ bool FTheOptionsOpenAndKeepToTheirRanges::RunTest(const FString& Parameters)
 	TestFalse(TEXT("the front end's settings are a page of their own"), SettingsOverLobby(EMenuPage::Options, EMenuPage::Options) || SettingsOverLobby(EMenuPage::Main, EMenuPage::Options));
 	TestTrue(TEXT("but not while going to another level"), PageFor(false, false, true, false, EMenuPage::Options, true) == EMenuPage::Lobby);
 	TestTrue(TEXT("a joiner following the host to another level sees the lobby, not the front end"), PageFor(false, false, true, false, EMenuPage::Find, true) == EMenuPage::Lobby);
-	// Escape (or the pad's Menu) in the lobby opens the settings over it, and from them goes back to the lobby.
+	// Escape (or the pad's Menu) in the lobby puts the lobby's menu over it (SETTINGS, LOADOUT), as the pause menu is over
+	// a match; Escape in the settings or the loadout goes back to that menu, and Escape in it back to the lobby.
 	using CheeseStrikeMenu::LobbyMenuKey;
-	TestTrue(TEXT("Escape in the lobby opens the settings over it"), LobbyMenuKey(EMenuPage::Main) == EMenuPage::Options && LobbyMenuKey(EMenuPage::Find) == EMenuPage::Options && SettingsOverLobby(EMenuPage::Lobby, LobbyMenuKey(EMenuPage::Main)));
-	TestTrue(TEXT("and Escape in them goes back to the lobby"), PageFor(false, false, true, false, LobbyMenuKey(EMenuPage::Options)) == EMenuPage::Lobby && !SettingsOverLobby(EMenuPage::Lobby, LobbyMenuKey(EMenuPage::Options)));
+	using CheeseStrikeMenu::LobbyOverlay;
+	TestTrue(TEXT("Escape in the lobby puts its menu over it"), LobbyMenuKey(EMenuPage::Main) == EMenuPage::LobbyMenu && LobbyMenuKey(EMenuPage::Find) == EMenuPage::LobbyMenu && LobbyOverlay(EMenuPage::Lobby, LobbyMenuKey(EMenuPage::Main)) == EMenuPage::LobbyMenu);
+	TestTrue(TEXT("the lobby stays the page shown under it"), PageFor(false, false, true, false, EMenuPage::LobbyMenu) == EMenuPage::Lobby && !SettingsOverLobby(EMenuPage::Lobby, EMenuPage::LobbyMenu));
+	TestTrue(TEXT("its settings and its loadout are over the lobby in its place"), SettingsOverLobby(EMenuPage::Lobby, EMenuPage::Options) && LobbyOverlay(EMenuPage::Lobby, EMenuPage::Loadout) == EMenuPage::Loadout);
+	TestTrue(TEXT("Escape in them goes back to the lobby's menu"), LobbyMenuKey(EMenuPage::Options) == EMenuPage::LobbyMenu && LobbyMenuKey(EMenuPage::Loadout) == EMenuPage::LobbyMenu);
+	TestTrue(TEXT("and Escape in it back to the lobby"), PageFor(false, false, true, false, LobbyMenuKey(EMenuPage::LobbyMenu)) == EMenuPage::Lobby && LobbyOverlay(EMenuPage::Lobby, LobbyMenuKey(EMenuPage::LobbyMenu)) == EMenuPage::None);
+	TestTrue(TEXT("the lobby's menu is the lobby's alone: on the front end it is no page"), PageFor(false, false, false, false, EMenuPage::LobbyMenu) == EMenuPage::Main && LobbyOverlay(EMenuPage::Main, EMenuPage::LobbyMenu) == EMenuPage::None);
+	// Dropdowns open and shut as the mouse goes down on them, once a click: a press shuts an open list, a press opens a shut
+	// one, and the press whose taking the focus shut the list (the same frame) doesn't open it again.
+	using CheeseStrikeMenu::DropdownOpensOnPress;
+	TestTrue(TEXT("a press opens a shut dropdown"), DropdownOpensOnPress(false, false));
+	TestFalse(TEXT("a press shuts an open one"), DropdownOpensOnPress(true, false));
+	TestFalse(TEXT("and the press that shut it as its list lost the focus doesn't open it again"), DropdownOpensOnPress(false, true));
 	// The host's Close Lobby can't be pressed once the countdown has begun.
 	using CheeseStrikeMenu::CanCloseLobby;
 	using CheeseStrikeMenu::ELobbyStatus;
@@ -694,16 +706,28 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 	using LobbyTests::Watched;
 	// A host and a joiner in the lobby, with the bots a hosted match starts with, and The Creamery picked.
 	StartPlaying({2, TEXT("?KillLimit=50?Map=0"), false, true});
-	// Escape in the lobby opens the settings over it (an overlay on the lobby's page, which stays shown and is never drawn
-	// afresh for them, its items out of reach under them), and Escape in them goes back to it.
+	// Escape in the lobby puts its menu over it in the pages' panel (an overlay on the lobby's page, which stays shown and
+	// is never drawn afresh for it, its items out of reach under it): SETTINGS and LOADOUT, and BACK. Its SETTINGS put the
+	// settings over the lobby in its place, Escape in them goes back to the menu, and Escape in it back to the lobby.
 	WaitUntil(TEXT("the host's lobby"), 10.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::Lobby; });
 	TSharedRef<int32> BuildsBefore = MakeShared<int32>(0);
-	Then([BuildsBefore]()
+	Then([this, BuildsBefore]()
 	{
 		*BuildsBefore = Controller(0)->GetMenu().IsValid() ? Controller(0)->GetMenu()->GetLobbyBuilds() : 0;
+		TestFalse(TEXT("the lobby has no LOADOUT button of its own: its menu has"), Controller(0)->GetMenu().IsValid() && Controller(0)->GetMenu()->GetFocusableNames().Contains(TEXT("LOADOUT")));
 		Controller(0)->MenuPressed();
 	});
-	WaitUntil(TEXT("Escape opening the settings over the lobby"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenu().IsValid() && Controller(0)->GetMenu()->AreSettingsOverLobby(); });
+	WaitUntil(TEXT("Escape putting the lobby's menu over the lobby"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenu().IsValid() && Controller(0)->GetMenu()->GetLobbyOverlay() == EMenuPage::LobbyMenu; });
+	Then([this, BuildsBefore]()
+	{
+		const TSharedPtr<SCheeseStrikeMenu> Menu = Controller(0)->GetMenu();
+		TestTrue(TEXT("the lobby stays the page shown under its menu"), Controller(0)->GetMenuPage() == EMenuPage::Lobby && Controller(0)->GetChosenPage() == EMenuPage::LobbyMenu);
+		TestEqual(TEXT("its menu's items are the ones in reach, SETTINGS first"), Menu->GetFocusableNames(), TArray<FString>({TEXT("SETTINGS"), TEXT("LOADOUT"), TEXT("BACK")}));
+		TestEqual(TEXT("with the focus, for a pad"), Menu->GetFocusName(), FString(TEXT("SETTINGS")));
+		TestEqual(TEXT("and the lobby wasn't drawn afresh for it"), Menu->GetLobbyBuilds(), *BuildsBefore);
+		Controller(0)->ChooseMenu(EMenuPage::Options);
+	});
+	WaitUntil(TEXT("its SETTINGS putting the settings over the lobby"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenu().IsValid() && Controller(0)->GetMenu()->AreSettingsOverLobby(); });
 	Then([this, BuildsBefore]()
 	{
 		const TSharedPtr<SCheeseStrikeMenu> Menu = Controller(0)->GetMenu();
@@ -713,7 +737,13 @@ bool FEveryoneEntersTheMatchTogether::RunTest(const FString& Parameters)
 		TestTrue(TEXT("the settings' items are the ones in reach, their first tab first"), Items.Num() > 0 && Items[0] == TEXT("CONTROLS") && Items.Last() == TEXT("BACK") && !Items.ContainsByPredicate([](const FString& Name) { return Name.StartsWith(TEXT("Dropdown")); }));
 		Controller(0)->MenuPressed();
 	});
-	WaitUntil(TEXT("Escape going back to the lobby"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::Lobby && Controller(0)->GetMenu().IsValid() && !Controller(0)->GetMenu()->AreSettingsOverLobby(); });
+	WaitUntil(TEXT("Escape going back to the lobby's menu"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenu().IsValid() && Controller(0)->GetMenu()->GetLobbyOverlay() == EMenuPage::LobbyMenu; });
+	Then([this]()
+	{
+		TestEqual(TEXT("back on the lobby's menu, the focus on SETTINGS again"), Controller(0)->GetMenu()->GetFocusName(), FString(TEXT("SETTINGS")));
+		Controller(0)->MenuPressed();
+	});
+	WaitUntil(TEXT("Escape going back to the lobby"), 3.0f, []() { return Controller(0) != nullptr && Controller(0)->GetMenuPage() == EMenuPage::Lobby && Controller(0)->GetMenu().IsValid() && Controller(0)->GetMenu()->GetLobbyOverlay() == EMenuPage::None; });
 	Then([this, BuildsBefore]()
 	{
 		const TSharedPtr<SCheeseStrikeMenu> Menu = Controller(0)->GetMenu();

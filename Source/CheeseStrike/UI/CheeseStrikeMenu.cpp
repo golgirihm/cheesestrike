@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeMenu.h"
 #include "Brushes/SlateDynamicImageBrush.h"
+#include "Brushes/SlateNoResource.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -47,9 +48,13 @@
 #include "CheeseStrikePlayerState.h"
 #include "Animation/CheeseStrikeBodies.h"
 #include "Engine/Texture2D.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "Rules/CheeseStrikeLoadout.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeGrenadeRules.h"
+#include "Streaks/CheeseStrikeSynth.h"
+#include "Streaks/CheeseStrikeSynthWave.h"
+#include "UObject/Package.h"
 
 namespace CheeseStrikeMenu
 {
@@ -88,7 +93,7 @@ namespace CheeseStrikeMenu
 
 	EMenuPage LobbyOverlay(EMenuPage Shown, EMenuPage Chosen)
 	{
-		return Shown == EMenuPage::Lobby && (Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout) ? Chosen : EMenuPage::None;
+		return Shown == EMenuPage::Lobby && (Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout || Chosen == EMenuPage::LobbyMenu) ? Chosen : EMenuPage::None;
 	}
 
 	bool SettingsOverLobby(EMenuPage Shown, EMenuPage Chosen)
@@ -142,7 +147,7 @@ namespace CheeseStrikeMenu
 
 	EMenuPage LobbyMenuKey(EMenuPage Chosen)
 	{
-		return Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout ? EMenuPage::Main : EMenuPage::Options;
+		return Chosen == EMenuPage::LobbyMenu ? EMenuPage::Main : EMenuPage::LobbyMenu;
 	}
 
 	int32 FocusAfterRedraw(const TArray<FString>& Names, const FString& Name, int32 Index)
@@ -218,6 +223,25 @@ namespace CheeseStrikeMenu
 		return Length <= 16 ? 22 : (Length <= 22 ? 19 : (Length <= 27 ? 17 : 15));
 	}
 
+	USoundBase* UISound(bool bClick)
+	{
+		static UCheeseStrikeSynthWave* Waves[2] = {nullptr, nullptr};
+		UCheeseStrikeSynthWave*& Wave = Waves[bClick ? 1 : 0];
+		if (Wave == nullptr)
+		{
+			Wave = NewObject<UCheeseStrikeSynthWave>(GetTransientPackage());
+			Wave->AddToRoot();
+			Wave->SetSamples(bClick ? CheeseStrikeSynth::ThemeClick(ClickSoundTheme) : CheeseStrikeSynth::ThemeHover(HoverSoundTheme), CheeseStrikeSynth::SampleRate);
+			Wave->SoundClassObject = UCheeseStrikeSettings::MenuSoundClass();
+		}
+		return Wave;
+	}
+
+	bool DropdownOpensOnPress(bool bOpen, bool bShutThisFrame)
+	{
+		return !bOpen && !bShutThisFrame;
+	}
+
 	ELobbyStatus LobbyStatus(bool bHaveMatch, bool bTravelling, bool bCounting, float SecondsLeft, bool bHost)
 	{
 		if (bTravelling)
@@ -248,14 +272,43 @@ static TAutoConsoleVariable<int32> CVarFriendsOpen(TEXT("CheeseStrike.FriendsOpe
 
 namespace
 {
-	const FLinearColor Ink(0.92f, 0.9f, 0.86f);
-	const FLinearColor Muted(0.6f, 0.58f, 0.55f);
-	const FLinearColor Cheese(0.96f, 0.72f, 0.2f);
-	const FLinearColor PanelColour(0.04f, 0.04f, 0.045f, 0.82f);
+	// The menus' look is Cave Aged (wave 16; the third of the theme sampler's, UI/CheeseStrikeThemes.cpp): near-black slate,
+	// thin gold hairlines round what can be pressed, light wide-set capitals, and a gold glow under the mouse.
+	const FLinearColor Ink(0.9f, 0.87f, 0.8f);
+	const FLinearColor Muted(0.55f, 0.53f, 0.48f);
+	/** The accent: titles, what is chosen, the focus's ring, the primary button. */
+	const FLinearColor Cheese(0.8f, 0.63f, 0.28f);
+	const FLinearColor CheeseLit(0.92f, 0.75f, 0.36f);
+	/** Words on the accent. */
+	const FLinearColor AccentInk(0.1f, 0.08f, 0.05f);
+	/** The hairline round a button, and the glow that comes up round it under the mouse. */
+	const FLinearColor Hairline(0.8f, 0.63f, 0.28f);
+	const FLinearColor GlowColour(0.95f, 0.75f, 0.3f);
+	const FLinearColor Surface(0.1f, 0.105f, 0.12f);
+	const FLinearColor SurfaceLit(0.15f, 0.155f, 0.17f);
+	const FLinearColor PanelColour(0.065f, 0.07f, 0.08f, 0.92f);
+	/** The game's name over the front end keeps the cheese's own bright gold. */
+	const FLinearColor MastheadGold(0.96f, 0.72f, 0.2f);
 
 	FSlateFontInfo Font(int32 Size, const FName& Style = FName("Regular"))
 	{
 		return FCoreStyle::GetDefaultFontStyle(Style, Size);
+	}
+
+	/** Cave Aged's type: titles light and wide-set, buttons' labels regular capitals spaced a little apart. */
+	FSlateFontInfo Spaced(int32 Size, const FName& Style, int32 Tracking)
+	{
+		FSlateFontInfo Made = FCoreStyle::GetDefaultFontStyle(Style, Size);
+		Made.LetterSpacing = Tracking;
+		return Made;
+	}
+	FSlateFontInfo TitleFont(int32 Size)
+	{
+		return Spaced(Size, FName("Light"), 160);
+	}
+	FSlateFontInfo LabelFont(int32 Size)
+	{
+		return Spaced(Size, FName("Regular"), 110);
 	}
 
 	/** `Text` in capitals, accents and all (Gruyère's è, which FString's ToUpper leaves). */
@@ -416,10 +469,10 @@ namespace
 
 		FLooks()
 			: BotChip(FLinearColor(0.1f, 0.1f, 0.11f, 1.0f), 8.0f)
-			, PrimaryFace(FLinearColor(0.1f, 0.42f, 0.9f), CheeseStrikeMenu::Rounding)
-			, DropdownList(FLinearColor(0.025f, 0.025f, 0.028f, 1.0f), CheeseStrikeMenu::Rounding, FLinearColor(0.22f, 0.22f, 0.24f), 1.0f)
-			, ReadOnlyValue(FLinearColor(0.12f, 0.12f, 0.13f, 0.9f), CheeseStrikeMenu::Rounding)
-			, FocusRing(FLinearColor::Transparent, CheeseStrikeMenu::Rounding, Cheese, 3.0f)
+			, PrimaryFace(Cheese, CheeseStrikeMenu::Rounding, Hairline, CheeseStrikeMenu::HairlineWidth)
+			, DropdownList(FLinearColor(0.05f, 0.055f, 0.065f, 1.0f), CheeseStrikeMenu::Rounding, Hairline, CheeseStrikeMenu::HairlineWidth)
+			, ReadOnlyValue(FLinearColor(Surface.R, Surface.G, Surface.B, 0.9f), CheeseStrikeMenu::Rounding, FLinearColor(0.38f, 0.37f, 0.34f, 0.6f), CheeseStrikeMenu::HairlineWidth)
+			, FocusRing(FLinearColor::Transparent, CheeseStrikeMenu::Rounding, CheeseLit, 3.0f)
 			, MapBack(FLinearColor(0.1f, 0.1f, 0.11f, 1.0f), CheeseStrikeMenu::MapPictureRounding)
 			, MapNameBar(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f), FVector4(0.0, 0.0, CheeseStrikeMenu::MapPictureRounding, CheeseStrikeMenu::MapPictureRounding))
 			, DialogCard(FLinearColor(PanelColour.R, PanelColour.G, PanelColour.B, 1.0f), 16.0f)
@@ -427,31 +480,41 @@ namespace
 			, FriendsPanel(FLinearColor::White, FVector4(CheeseStrikeMenu::PanelRounding, 0.0, 0.0, CheeseStrikeMenu::PanelRounding))
 			, TooltipCard(FLinearColor::White, 10.0f)
 		{
-			const auto Make = [](FButtonStyle& Style, const FLinearColor& Rest, const FLinearColor& Hover, const FLinearColor& Press)
+			// Cave Aged's buttons: a fill edged with a gold hairline (`Edge`; none for a clear one), lighter under the mouse,
+			// where a glow comes up round it too (SCheeseStrikeButton); and the menu's sounds: Tactical's mechanical click under
+			// the mouse, Cave Aged's stone tap on a press (CheeseStrikeMenu::UISound).
+			FSlateSound Hover;
+			Hover.SetResourceObject(CheeseStrikeMenu::UISound(false));
+			FSlateSound Press;
+			Press.SetResourceObject(CheeseStrikeMenu::UISound(true));
+			const auto Make = [&Hover, &Press](FButtonStyle& Style, const FLinearColor& Rest, const FLinearColor& Lit, const FLinearColor& Down, const FLinearColor& Edge, const FLinearColor& Words, const FLinearColor& LitWords)
 			{
-				Style.SetNormal(FSlateRoundedBoxBrush(Rest, CheeseStrikeMenu::Rounding));
-				Style.SetHovered(FSlateRoundedBoxBrush(Hover, CheeseStrikeMenu::Rounding));
-				Style.SetPressed(FSlateRoundedBoxBrush(Press, CheeseStrikeMenu::Rounding));
-				Style.SetNormalForeground(Ink);
-				Style.SetHoveredForeground(FLinearColor::White);
-				Style.SetPressedForeground(FLinearColor::White);
+				const float Width = Edge.A > 0.0f ? CheeseStrikeMenu::HairlineWidth : 0.0f;
+				Style.SetNormal(FSlateRoundedBoxBrush(Rest, CheeseStrikeMenu::Rounding, Edge, Width));
+				Style.SetHovered(FSlateRoundedBoxBrush(Lit, CheeseStrikeMenu::Rounding, Edge.A > 0.0f ? CheeseLit : Edge, Width));
+				Style.SetPressed(FSlateRoundedBoxBrush(Down, CheeseStrikeMenu::Rounding, Edge, Width));
+				Style.SetNormalForeground(Words);
+				Style.SetHoveredForeground(LitWords);
+				Style.SetPressedForeground(LitWords);
 				Style.SetNormalPadding(FMargin(0.0f));
 				Style.SetPressedPadding(FMargin(0.0f, 1.0f, 0.0f, -1.0f));
-				// What can't be pressed now (the start before there is anyone to play): the same, faded.
-				Style.SetDisabled(FSlateRoundedBoxBrush(FLinearColor(Rest.R * 0.45f + 0.04f, Rest.G * 0.45f + 0.04f, Rest.B * 0.45f + 0.04f, Rest.A), CheeseStrikeMenu::Rounding));
-				Style.SetDisabledForeground(Muted);
+				// What can't be pressed now (the start before there is anyone to play): dark, its hairline faint, its words dim.
+				Style.SetDisabled(FSlateRoundedBoxBrush(FLinearColor(0.085f, 0.09f, 0.1f, Rest.A), CheeseStrikeMenu::Rounding, FLinearColor(0.38f, 0.37f, 0.34f, Edge.A * 0.5f), Width));
+				Style.SetDisabledForeground(FLinearColor(0.38f, 0.37f, 0.34f));
+				Style.SetHoveredSound(Hover);
+				Style.SetPressedSound(Press);
 			};
-			Make(Plain, FLinearColor(0.18f, 0.18f, 0.19f), FLinearColor(0.28f, 0.28f, 0.3f), FLinearColor(0.12f, 0.12f, 0.13f));
-			Make(Primary, FLinearColor(0.1f, 0.42f, 0.9f), FLinearColor(0.2f, 0.52f, 1.0f), FLinearColor(0.08f, 0.32f, 0.72f));
-			Make(Danger, FLinearColor(0.72f, 0.16f, 0.14f), FLinearColor(0.85f, 0.24f, 0.2f), FLinearColor(0.55f, 0.1f, 0.1f));
-			Make(Quiet, FLinearColor(0.0f, 0.0f, 0.0f, 0.0f), FLinearColor(0.24f, 0.24f, 0.26f), FLinearColor(0.12f, 0.12f, 0.13f));
-			// A slider: a thin rounded bar, and a cheese-coloured knob that lights under the mouse.
-			Slider.SetNormalBarImage(FSlateRoundedBoxBrush(FLinearColor(0.22f, 0.22f, 0.24f), 3.0f));
-			Slider.SetHoveredBarImage(FSlateRoundedBoxBrush(FLinearColor(0.3f, 0.3f, 0.32f), 3.0f));
+			Make(Plain, Surface, SurfaceLit, Shade(Surface, 0.8f), Hairline, Ink, FLinearColor::White);
+			Make(Primary, Cheese, CheeseLit, Shade(Cheese, 0.85f), Hairline, AccentInk, AccentInk);
+			Make(Danger, FLinearColor(0.26f, 0.06f, 0.05f), FLinearColor(0.38f, 0.09f, 0.07f), FLinearColor(0.2f, 0.05f, 0.04f), FLinearColor(0.85f, 0.32f, 0.24f), Ink, FLinearColor::White);
+			Make(Quiet, FLinearColor(0.0f, 0.0f, 0.0f, 0.0f), FLinearColor(SurfaceLit.R, SurfaceLit.G, SurfaceLit.B, 0.9f), Surface, FLinearColor::Transparent, Ink, FLinearColor::White);
+			// A slider: a thin bar, and an upright gold knob rounded a little, lighter under the mouse.
+			Slider.SetNormalBarImage(FSlateRoundedBoxBrush(FLinearColor(0.18f, 0.185f, 0.2f), 3.0f));
+			Slider.SetHoveredBarImage(FSlateRoundedBoxBrush(FLinearColor(0.24f, 0.245f, 0.26f), 3.0f));
 			Slider.SetDisabledBarImage(FSlateRoundedBoxBrush(FLinearColor(0.12f, 0.12f, 0.13f), 3.0f));
-			Slider.SetNormalThumbImage(FSlateRoundedBoxBrush(Cheese, 9.0f, FVector2f(18.0f, 18.0f)));
-			Slider.SetHoveredThumbImage(FSlateRoundedBoxBrush(FLinearColor(1.0f, 0.82f, 0.36f), 9.0f, FVector2f(18.0f, 18.0f)));
-			Slider.SetDisabledThumbImage(FSlateRoundedBoxBrush(Muted, 9.0f, FVector2f(18.0f, 18.0f)));
+			Slider.SetNormalThumbImage(FSlateRoundedBoxBrush(Cheese, CheeseStrikeMenu::Rounding, FVector2f(12.0f, 20.0f)));
+			Slider.SetHoveredThumbImage(FSlateRoundedBoxBrush(CheeseLit, CheeseStrikeMenu::Rounding, FVector2f(12.0f, 20.0f)));
+			Slider.SetDisabledThumbImage(FSlateRoundedBoxBrush(Muted, CheeseStrikeMenu::Rounding, FVector2f(12.0f, 20.0f)));
 			Slider.SetBarThickness(6.0f);
 			const FString Folder = FPaths::ProjectContentDir() / TEXT("UI");
 			PlayerIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("player.png"))), FVector2D(22.0, 22.0));
@@ -520,6 +583,47 @@ namespace
 	{
 		return MakeChevron(bOpen ? 0.0f : -90.0f, Colour, bTurning ? TOptional<float>(bOpen ? -90.0f : 0.0f) : TOptional<float>());
 	}
+
+	/**
+	 * A picture drawn at its own shape (its texture's width to its height, read as it is drawn), as big as fits the box it
+	 * is given and in its middle: a weapon's icon on the loadout page.
+	 */
+	class SCheeseStrikeFitImage : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SCheeseStrikeFitImage) : _Image(nullptr) {}
+			SLATE_ARGUMENT(const FSlateBrush*, Image)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			Image = InArgs._Image;
+		}
+
+		virtual FVector2D ComputeDesiredSize(float) const override
+		{
+			return Image != nullptr ? FVector2D(Image->ImageSize) : FVector2D::ZeroVector;
+		}
+
+		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
+		{
+			if (Image == nullptr)
+			{
+				return LayerId;
+			}
+			const FVector2f Room(AllottedGeometry.GetLocalSize());
+			const UTexture* Texture = Cast<UTexture>(Image->GetResourceObject());
+			const float Width = Texture != nullptr ? Texture->GetSurfaceWidth() : 0.0f;
+			const float Height = Texture != nullptr ? Texture->GetSurfaceHeight() : 0.0f;
+			const float Aspect = Width > 0.0f && Height > 0.0f ? Width / Height : (Room.Y > 0.0f ? Room.X / Room.Y : 1.0f);
+			const FVector2f Size = Room.X / FMath::Max(Room.Y, 1.0f) > Aspect ? FVector2f(Room.Y * Aspect, Room.Y) : FVector2f(Room.X, Room.X / Aspect);
+			FSlateDrawElement::MakeBox(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform((Room - Size) * 0.5f)), Image, ESlateDrawEffect::None, InWidgetStyle.GetColorAndOpacityTint() * Image->GetTint(InWidgetStyle));
+			return LayerId;
+		}
+
+	private:
+		const FSlateBrush* Image = nullptr;
+	};
 
 	/** A round dot 8 across in its colour: where a friend is (CheeseStrikeFriends::StatusDotColour). */
 	class SCheeseStrikeDot : public SLeafWidget
@@ -650,7 +754,23 @@ namespace
 	/** Whether the item with the focus is ringed: not while the player uses the mouse, which has its hover. */
 	bool MenuFocusRingsShown = true;
 
-	/** The menu's button: Slate's, ringed in cheese when it has the focus from a gamepad or the keyboard. */
+	/** A white rounded box `Radius` round, tinted as it is drawn: the rings of a button's glow; made once a radius. */
+	const FSlateBrush* GlowRing(float Radius)
+	{
+		static TMap<int32, TUniquePtr<FSlateRoundedBoxBrush>> Made;
+		const int32 Key = FMath::RoundToInt(Radius * 4.0f);
+		if (!Made.Contains(Key))
+		{
+			Made.Add(Key, MakeUnique<FSlateRoundedBoxBrush>(FLinearColor::White, Radius));
+		}
+		return Made[Key].Get();
+	}
+
+	/**
+	 * The menu's button: Slate's, ringed in cheese when it has the focus from a gamepad or the keyboard; one edged with a
+	 * hairline (Cave Aged's) has a gold glow come up round it under the mouse, over CheeseStrikeMenu::GlowSeconds, and go
+	 * again as the mouse leaves: rings widening out from its edge, fainter each, under the button.
+	 */
 	class SCheeseStrikeButton : public SButton
 	{
 	public:
@@ -658,6 +778,38 @@ namespace
 		{
 			return MenuFocusRingsShown ? &Looks().FocusRing : nullptr;
 		}
+
+		virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override
+		{
+			SButton::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+			const float Step = FMath::Min(InDeltaTime, 0.1f) / CheeseStrikeMenu::GlowSeconds;
+			Glow = FMath::Clamp(Glow + (IsHovered() && IsEnabled() ? Step : -Step), 0.0f, 1.0f);
+		}
+
+		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
+		{
+			const FSlateBrush* Face = GetBorderImage();
+			if (Glow > 0.0f && Face != nullptr && Face->OutlineSettings.Width > 0.0f)
+			{
+				const float Eased = 1.0f - FMath::Square(1.0f - Glow);
+				const float Radius = static_cast<float>(Face->OutlineSettings.CornerRadii.X);
+				const float Grow[] = {3.0f, 6.0f, 10.0f};
+				const float Alphas[] = {0.45f, 0.25f, 0.1f};
+				const FVector2f Size(AllottedGeometry.GetLocalSize());
+				for (int32 Ring = 0; Ring < UE_ARRAY_COUNT(Grow); ++Ring)
+				{
+					FLinearColor Colour = GlowColour;
+					Colour.A = Alphas[Ring] * Eased * InWidgetStyle.GetColorAndOpacityTint().A;
+					FSlateDrawElement::MakeBox(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(Size + FVector2f(2.0f * Grow[Ring]), FSlateLayoutTransform(FVector2f(-Grow[Ring]))),
+						GlowRing(Radius + Grow[Ring]), ESlateDrawEffect::None, Colour);
+				}
+			}
+			return SButton::OnPaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 1, InWidgetStyle, bParentEnabled);
+		}
+
+	private:
+		/** How far its glow is up, 0 to 1. */
+		float Glow = 0.0f;
 	};
 
 	/** The menu's slider, likewise. */
@@ -844,7 +996,7 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 			SAssignNew(Masthead, SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("CHEESESTRIKE"))).Font(Font(CheeseStrikeMenu::TitleSize, FName("Bold"))).ColorAndOpacity(Cheese)
+				SNew(STextBlock).Text(FText::FromString(TEXT("CHEESESTRIKE"))).Font(Font(CheeseStrikeMenu::TitleSize, FName("Bold"))).ColorAndOpacity(MastheadGold)
 				.ShadowOffset(FVector2D(3.0f, 3.0f)).ShadowColorAndOpacity(FLinearColor(0.0f, 0.0f, 0.0f, 0.8f))
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, -6.0f, 0.0f, 0.0f))
@@ -933,6 +1085,14 @@ void SCheeseStrikeMenu::Refresh()
 	// The settings or the loadout over the lobby: shown while the player has one chosen there, the lobby's own items out of reach under it.
 	const EMenuPage OverlayPage = Controller.IsValid() ? CheeseStrikeMenu::LobbyOverlay(Page, Controller->GetChosenPage()) : EMenuPage::None;
 	const bool bOverlay = OverlayPage != EMenuPage::None;
+	// From one overlay to another (the lobby's menu to its settings and back): each has the focus back where it was left.
+	if (bOverlay && bLobbyOverlayShown && OverlayPage != LobbyOverlayPage && LobbyOverlayPage != EMenuPage::None)
+	{
+		OverlayFocus.Add(static_cast<uint8>(LobbyOverlayPage), FocusName);
+		FocusName = OverlayFocus.FindRef(static_cast<uint8>(OverlayPage));
+		FocusIndex = 0;
+		bFocusPending = true;
+	}
 	LobbyOverlayPage = OverlayPage;
 	if (bOverlay != bLobbyOverlayShown)
 	{
@@ -946,6 +1106,7 @@ void SCheeseStrikeMenu::Refresh()
 		else
 		{
 			FocusName = FocusBeforeLobbyOverlay;
+			OverlayFocus.Reset();
 			ShownLobbyOverlayKey.Reset();
 			LobbyOverlayFocusables.Reset();
 			if (LobbyOverlayContent.IsValid())
@@ -1100,8 +1261,9 @@ void SCheeseStrikeMenu::Refresh()
 	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options || Page == EMenuPage::Loadout || Page == EMenuPage::Themes;
 	if (Content.IsValid())
 	{
-		Content->SetWidthOverride(Page == EMenuPage::Options || Page == EMenuPage::Themes ? 900.0f : (bWide ? 640.0f : CheeseStrikeMenu::PanelContentWidth));
-		Content->SetVAlign(bWide && Page != EMenuPage::Loadout ? VAlign_Fill : VAlign_Center);
+		Content->SetWidthOverride(Page == EMenuPage::Options || Page == EMenuPage::Themes ? 900.0f : (Page == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : (bWide ? 640.0f : CheeseStrikeMenu::PanelContentWidth)));
+		// (The front end's main page fills the panel's height: its buttons in the middle, the credits' link at the foot.)
+		Content->SetVAlign((bWide && Page != EMenuPage::Loadout) || Page == EMenuPage::Main ? VAlign_Fill : VAlign_Center);
 	}
 	if (Lobby.IsValid())
 	{
@@ -1153,15 +1315,19 @@ void SCheeseStrikeMenu::Refresh()
 		}
 		if (bOverlay && LobbyOverlayContent.IsValid())
 		{
-			const FString OverlayKey = FString::FromInt(static_cast<int32>(OverlayPage)) + TEXT("|") + (OverlayPage == EMenuPage::Options ? OptionsKey() : LoadoutKey());
+			const FString OverlayKey = FString::FromInt(static_cast<int32>(OverlayPage)) + TEXT("|") + (OverlayPage == EMenuPage::Options ? OptionsKey() : (OverlayPage == EMenuPage::Loadout ? LoadoutKey() : FString()));
 			if (OverlayKey != ShownLobbyOverlayKey)
 			{
-				const bool bFade = ShownLobbyOverlayKey.IsEmpty() || ShownLobbyOverlayKey[0] != OverlayKey[0];
+				const bool bFade = ShownLobbyOverlayKey.IsEmpty() || !ShownLobbyOverlayKey.StartsWith(FString::FromInt(static_cast<int32>(OverlayPage)) + TEXT("|"));
 				ShownLobbyOverlayKey = OverlayKey;
 				LobbyOverlayFocusables.Reset();
 				bFocusPending = true;
 				bBuildingLobbyOverlay = true;
-				const TSharedRef<SWidget> Made = OverlayPage == EMenuPage::Options ? MakeOptions() : MakeLoadout();
+				// In the pages' panel, as wide as the page is on the front end: the menu's buttons in the middle of its height,
+				// as the pause menu's are; the settings and the loadout from its top.
+				LobbyOverlayContent->SetWidthOverride(OverlayPage == EMenuPage::Options ? 900.0f : (OverlayPage == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : CheeseStrikeMenu::PanelContentWidth));
+				LobbyOverlayContent->SetVAlign(OverlayPage == EMenuPage::LobbyMenu ? VAlign_Center : VAlign_Fill);
+				const TSharedRef<SWidget> Made = OverlayPage == EMenuPage::Options ? MakeOptions() : (OverlayPage == EMenuPage::Loadout ? MakeLoadout() : MakeLobbyMenu());
 				LobbyOverlayContent->SetContent(bFade ? MenuFadeIn(Made) : Made);
 				bBuildingLobbyOverlay = false;
 			}
@@ -1726,13 +1892,17 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSpinner(float Radius) const
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeTitle(const FString& Text)
 {
-	return SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(34, FName("Bold"))).ColorAndOpacity(Cheese).Margin(FMargin(0.0f, 0.0f, 0.0f, 20.0f));
+	return SNew(STextBlock).Text(FText::FromString(Text)).Font(TitleFont(34)).ColorAndOpacity(Cheese).Margin(FMargin(0.0f, 0.0f, 0.0f, 20.0f));
 }
 
 float SCheeseStrikeMenu::WrapWidth() const
 {
 	// The same widths as the content box is given in Refresh (the settings over the lobby have the settings page's).
-	return (Page == EMenuPage::Options || Page == EMenuPage::Themes || bBuildingLobbyOverlay ? 900.0f : (Page == EMenuPage::Credits || Page == EMenuPage::Loadout ? 640.0f : 400.0f)) - 24.0f;
+	if (bBuildingLobbyOverlay)
+	{
+		return (LobbyOverlayPage == EMenuPage::Options ? 900.0f : (LobbyOverlayPage == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : CheeseStrikeMenu::PanelContentWidth)) - 24.0f;
+	}
+	return (Page == EMenuPage::Options || Page == EMenuPage::Themes ? 900.0f : (Page == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : (Page == EMenuPage::Credits ? 640.0f : 400.0f))) - 24.0f;
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim, bool bWrap, float WrapAt)
@@ -1745,7 +1915,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeButton(const FString& Text, TFunction
 	TSharedRef<SHorizontalBox> Label = SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 		[
-			SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(18, FName("Bold")))
+			SNew(STextBlock).Text(FText::FromString(Text)).Font(LabelFont(18))
 		];
 	if (Inside.IsValid())
 	{
@@ -1777,7 +1947,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeChoiceButtons(const TArray<FString>& 
 			.ContentPadding(FMargin(12.0f, 6.0f))
 			.OnClicked_Lambda([Pick, Index]() { Pick(Index); return FReply::Handled(); })
 			[
-				SNew(STextBlock).Text(FText::FromString(Choices[Index])).Font(Font(15, FName("Bold")))
+				SNew(STextBlock).Text(FText::FromString(Choices[Index])).Font(LabelFont(15))
 			])
 		];
 	}
@@ -1803,7 +1973,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeReadOnly(TAttribute<FText> Value)
 		.BorderImage(&Looks().ReadOnlyValue)
 		.Padding(FMargin(16.0f, 10.0f))
 		[
-			SNew(STextBlock).Text(Value).Font(Font(18, FName("Bold"))).ColorAndOpacity(Ink)
+			SNew(STextBlock).Text(Value).Font(LabelFont(17)).ColorAndOpacity(Ink)
 		];
 }
 
@@ -1845,7 +2015,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 			}
 			Inside->AddSlot().FillWidth(1.0f).VAlign(VAlign_Center)
 			[
-				SNew(STextBlock).Text(FText::FromString(Choices[Index])).Font(Font(18, FName("Bold")))
+				SNew(STextBlock).Text(FText::FromString(Choices[Index])).Font(LabelFont(17))
 			];
 			TSharedRef<SButton> Item = SNew(SCheeseStrikeButton)
 				.ButtonStyle(&ButtonStyle(Index == Chosen ? EButtonKind::Primary : EButtonKind::Quiet))
@@ -1891,22 +2061,28 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 				]
 			];
 	};
+	// When its list last shut, by the frame's number: a press on the button takes the focus from the list, which shuts it.
+	const TSharedRef<uint64> ShutIn = MakeShared<uint64>(0);
 	TSharedRef<SMenuAnchor> Anchor = SNew(SMenuAnchor)
 		.Placement(MenuPlacement_ComboBox)
 		.Method(EPopupMethod::UseCurrentWindow)
 		.ShowMenuBackground(false)
-		.OnGetMenuContent_Lambda(List);
+		.OnGetMenuContent_Lambda(List)
+		.OnMenuOpenChanged_Lambda([ShutIn](bool bIsOpen) { if (!bIsOpen) { *ShutIn = GFrameCounter; } });
 	*Holder = Anchor;
 	Dropdowns.Add(Anchor);
 	TWeakPtr<SMenuAnchor> Weak = Anchor;
+	// It opens and shuts as the mouse goes down on it, once a click (CheeseStrikeMenu::DropdownOpensOnPress): acting on the
+	// release, a press shut the open list (the focus leaving it) and its release opened it again.
 	TSharedRef<SButton> Button = SNew(SCheeseStrikeButton)
 		.ButtonStyle(&ButtonStyle(EButtonKind::Plain))
 		.ContentPadding(FMargin(16.0f, 10.0f))
-		.OnClicked_Lambda([this, Weak, ChosenItem]()
+		.ClickMethod(EButtonClickMethod::MouseDown)
+		.OnClicked_Lambda([this, Weak, ChosenItem, ShutIn]()
 		{
 			if (const TSharedPtr<SMenuAnchor> Open = Weak.Pin())
 			{
-				Open->SetIsOpen(!Open->IsOpen());
+				Open->SetIsOpen(CheeseStrikeMenu::DropdownOpensOnPress(Open->IsOpen(), *ShutIn == GFrameCounter));
 				// Opened, its chosen item has the focus, for a gamepad to pick with.
 				DropFocus = Open->IsOpen() ? *ChosenItem : TWeakPtr<SWidget>();
 				KeepFocus();
@@ -1917,7 +2093,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 			[
-				SNew(STextBlock).Text(Shown).Font(Font(18, FName("Bold")))
+				SNew(STextBlock).Text(Shown).Font(LabelFont(17))
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(12.0f, 0.0f, 0.0f, 0.0f))
 			[
@@ -1959,31 +2135,53 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 	{
 		Host = SNew(SBox).Padding(FMargin(0.0f, 4.0f))
 			[
-				SNew(SBorder).BorderImage(&Looks().PrimaryFace).Padding(FMargin(18.0f, 10.0f)).ForegroundColor(FLinearColor::White)
+				SNew(SBorder).BorderImage(&Looks().PrimaryFace).Padding(FMargin(18.0f, 10.0f)).ForegroundColor(AccentInk)
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ SNew(STextBlock).Text(FText::FromString(TEXT("HOSTING A MATCH"))).Font(Font(18, FName("Bold"))).ColorAndOpacity(FLinearColor::White) ]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center) [ SNew(STextBlock).Text(FText::FromString(TEXT("HOSTING A MATCH"))).Font(LabelFont(18)).ColorAndOpacity(AccentInk) ]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14.0f, 0.0f, 0.0f, 0.0f)) [ MakeSpinner(9.0f) ]
 				]
 			];
 	}
+	// The buttons in the middle of the panel's height, in the order a player wants them: to play with others first, then
+	// what to play with, alone, the settings; Quit apart at the foot. The credits are no button: a small link at the
+	// panel's foot (MakeCreditsLink).
 	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SSpacer) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeFarewell() ]
 		+ SVerticalBox::Slot().AutoHeight() [ Host ]
 		+ SVerticalBox::Slot().AutoHeight()
 		[
 			SNew(SVerticalBox).IsEnabled(!bHosting)
-			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("PRACTICE"), [Player]() { if (Player.IsValid()) Player->PracticeFromMenu(); }) ]
-			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("LOADOUT"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Loadout); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("LOADOUT"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Loadout); }) ]
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("PRACTICE"), [Player]() { if (Player.IsValid()) Player->PracticeFromMenu(); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
-			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
 #if !UE_BUILD_SHIPPING
 			// TEMPORARY: the sampler of UI themes (UI/CheeseStrikeThemes.h), for picking a look from; never in a shipping build.
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("THEMES"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Themes); }) ]
 #endif
 			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeQuitButton() ]
-		];
+		]
+		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SSpacer) ]
+		+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left) [ MakeCreditsLink() ];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeCreditsLink()
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	// Words alone, no box: muted and small, brighter under the mouse (the button's foreground); a pad reaches it too.
+	static const FButtonStyle Link = FButtonStyle(Looks().Quiet)
+		.SetNormal(FSlateNoResource()).SetHovered(FSlateNoResource()).SetPressed(FSlateNoResource())
+		.SetNormalForeground(Muted).SetHoveredForeground(Ink).SetPressedForeground(CheeseLit)
+		.SetNormalPadding(FMargin(0.0f)).SetPressedPadding(FMargin(0.0f));
+	return Focusable(TEXT("CREDITS"), SNew(SCheeseStrikeButton)
+		.ButtonStyle(&Link)
+		.ContentPadding(FMargin(2.0f, 2.0f))
+		.OnClicked_Lambda([Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); return FReply::Handled(); })
+		[
+			SNew(STextBlock).Text(FText::FromString(TEXT("CREDITS"))).Font(LabelFont(CheeseStrikeMenu::CreditsLinkSize)).ColorAndOpacity(FSlateColor::UseForeground())
+		]);
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLoadoutChoice(const FString& Name, const FSlateBrush* Picture, const FVector2D& PictureSize, bool bChosen, TFunction<void()> Pick)
@@ -2005,7 +2203,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLoadoutChoice(const FString& Name, co
 				[
 					SNew(SBox).WidthOverride(PictureSize.X).HeightOverride(PictureSize.Y)
 					[
-						Picture != nullptr ? StaticCastSharedRef<SWidget>(SNew(SImage).Image(Picture)) : StaticCastSharedRef<SWidget>(SNew(SBorder).BorderImage(&Looks().ReadOnlyValue))
+						Picture != nullptr ? StaticCastSharedRef<SWidget>(SNew(SCheeseStrikeFitImage).Image(Picture)) : StaticCastSharedRef<SWidget>(SNew(SBorder).BorderImage(&Looks().ReadOnlyValue))
 					]
 				]
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, 6.0f, 0.0f, 0.0f))
@@ -2070,10 +2268,11 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLoadout()
 	{
 		const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Id);
 		const FSlateBrush* Icon = Looks().WeaponIcon(Id);
-		const float Aspect = Icon != nullptr && Icon->ImageSize.X > 0.0f ? static_cast<float>(Icon->ImageSize.Y / Icon->ImageSize.X) : 0.4f;
+		// A box of the icons' own shape, the picture drawn in it at the texture's (SCheeseStrikeFitImage): not at whatever size
+		// its texture had when it was first asked for, which was square while the editor still built it.
 		Primaries->AddSlot().AutoWidth()
 		[
-			MakeLoadoutChoice(Stats != nullptr ? Stats->DisplayName.ToString().ToUpper() : Id.ToString().ToUpper(), Icon, FVector2D(CheeseStrikeMenu::WeaponIconWidth, CheeseStrikeMenu::WeaponIconWidth * Aspect), Id == Primary, [Kept, Keep, Id]()
+			MakeLoadoutChoice(Stats != nullptr ? Stats->DisplayName.ToString().ToUpper() : Id.ToString().ToUpper(), Icon, FVector2D(CheeseStrikeMenu::WeaponIconWidth, CheeseStrikeMenu::WeaponIconWidth * CheeseStrikeMenu::WeaponIconAspect), Id == Primary, [Kept, Keep, Id]()
 			{
 				if (Kept.IsValid())
 				{
@@ -2106,18 +2305,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLoadout()
 	{
 		return FText::FromString(Match.IsValid() ? CheeseStrikeLoadout::CountText(Match->GetRound() > 1, Match->SecondsToGo()) : FString());
 	};
-	return SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOADOUT")) ]
-		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, bOffered ? 8.0f : 0.0f))
-		[
-			bOffered ? StaticCastSharedRef<SWidget>(SNew(STextBlock).Text_Lambda(Count).Font(Font(22, FName("Bold"))).ColorAndOpacity(Cheese)) : SNullWidget::NullWidget
-		]
+	// The choices on the left, the hero (holding the primary) whole on the right, against a plain fog.
+	const TSharedRef<SWidget> Choices = SNew(SVerticalBox)
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLoadoutRow(TEXT("HERO"), Heroes) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLoadoutRow(TEXT("PRIMARY"), Primaries) ]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeLoadoutRow(TEXT("GRENADE"), Grenades) ]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 14.0f, 0.0f, 0.0f))
 		[
-			MakeLine(bOffered ? TEXT("Taken up as you stand: the match begins when the count ends.") : TEXT("Kept for every match; the figure wears it."), true)
+			MakeLine(bOffered ? TEXT("Taken up as you stand: the match begins when the count ends.") : TEXT("Kept for every match."), true, true, CheeseStrikeMenu::LoadoutChoicesWidth - 24.0f)
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 8.0f, 0.0f, 0.0f)).HAlign(HAlign_Left)
 		[
@@ -2126,6 +2321,59 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLoadout()
 				bOffered ? MakeButton(TEXT("OK"), [Player]() { if (Player.IsValid()) Player->DismissLoadout(); }, EButtonKind::Primary)
 					: MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); })
 			]
+		];
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOADOUT")) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, bOffered ? 8.0f : 0.0f))
+		[
+			bOffered ? StaticCastSharedRef<SWidget>(SNew(STextBlock).Text_Lambda(Count).Font(Font(22, FName("Bold"))).ColorAndOpacity(Cheese)) : SNullWidget::NullWidget
+		]
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top) [ SNew(SBox).WidthOverride(CheeseStrikeMenu::LoadoutChoicesWidth) [ Choices ] ]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(FMargin(CheeseStrikeMenu::LoadoutGap, 10.0f, 0.0f, 0.0f)) [ MakeHeroView() ]
+		];
+}
+
+const FSlateBrush* SCheeseStrikeMenu::HeroViewBrush()
+{
+	UTextureRenderTarget2D* Picture = Controller.IsValid() ? Controller->GetHeroPicture() : nullptr;
+	if (Picture == nullptr)
+	{
+		return nullptr;
+	}
+	if (!HeroViewPicture.IsValid() || HeroViewPicture->GetResourceObject() != Picture)
+	{
+		// Rounded as the page's cards are.
+		HeroViewPicture = MakeShared<FSlateBrush>();
+		HeroViewPicture->SetResourceObject(Picture);
+		HeroViewPicture->ImageSize = FVector2D(CheeseStrikeMenu::HeroViewWidth, CheeseStrikeMenu::HeroViewHeight);
+		HeroViewPicture->DrawAs = ESlateBrushDrawType::RoundedBox;
+		HeroViewPicture->OutlineSettings = FSlateBrushOutlineSettings(10.0f);
+	}
+	return HeroViewPicture.Get();
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeHeroView()
+{
+	// The picture read as it is drawn (it comes a frame after the page, as the view starts capturing), over a plain card of
+	// the fog's grey, a hairline round it.
+	static const FSlateRoundedBoxBrush Card(FLinearColor(0.78f, 0.79f, 0.8f, 1.0f), 10.0f);
+	static const FSlateRoundedBoxBrush Edge(FLinearColor::Transparent, 10.0f, FLinearColor(Hairline.R, Hairline.G, Hairline.B, 0.55f), CheeseStrikeMenu::HairlineWidth);
+	return SNew(SBox).WidthOverride(CheeseStrikeMenu::HeroViewWidth).HeightOverride(CheeseStrikeMenu::HeroViewHeight)
+		[
+			SNew(SOverlay)
+			+ SOverlay::Slot() [ SNew(SBorder).BorderImage(&Card) ]
+			+ SOverlay::Slot()
+			[
+				SNew(SImage).Image_Lambda([this]() -> const FSlateBrush*
+				{
+					const FSlateBrush* Picture = HeroViewBrush();
+					return Picture != nullptr ? Picture : FCoreStyle::Get().GetBrush("NoBrush");
+				})
+			]
+			+ SOverlay::Slot() [ SNew(SBorder).BorderImage(&Edge) ]
 		];
 }
 
@@ -2477,7 +2725,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSmallButton(const FString& Text, cons
 		.VAlign(VAlign_Center)
 		.OnClicked_Lambda([Do]() { Do(); return FReply::Handled(); })
 		[
-			SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(14, FName("Bold")))
+			SNew(STextBlock).Text(FText::FromString(Text)).Font(LabelFont(14))
 		]);
 }
 
@@ -2554,7 +2802,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeRowButton(const FString& Text, const 
 				.VAlign(VAlign_Center)
 				.OnClicked_Lambda([Do]() { Do(); return FReply::Handled(); })
 				[
-					SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(13, FName("Bold")))
+					SNew(STextBlock).Text(FText::FromString(Text)).Font(LabelFont(13))
 				])
 		]
 	], Says);
@@ -2777,7 +3025,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeStepper(const FString& Label, const F
 			.ContentPadding(FMargin(14.0f, 6.0f))
 			.OnClicked_Lambda([Do]() { Do(); return FReply::Handled(); })
 			[
-				SNew(STextBlock).Text(FText::FromString(Text)).Font(Font(15, FName("Bold")))
+				SNew(STextBlock).Text(FText::FromString(Text)).Font(LabelFont(15))
 			]);
 	};
 	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
@@ -3263,16 +3511,8 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobby()
 					Rules
 				]
 			]
-			+ SHorizontalBox::Slot().FillWidth(1.0f)
-			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().FillHeight(1.0f) [ MakeSeatColumns(bTeams) ]
-				// The loadout, for the host and every joiner alike (over the lobby, as the settings are), until the match is on.
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(FMargin(0.0f, 10.0f, 0.0f, 0.0f))
-				[
-					MakeButton(TEXT("LOADOUT"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Loadout); })
-				]
-			]
+			// (The loadout is the lobby's menu's, Escape: MakeLobbyMenu.)
+			+ SHorizontalBox::Slot().FillWidth(1.0f) [ MakeSeatColumns(bTeams) ]
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 24.0f, 0.0f, 0.0f)) [ Bottom ];
 }
@@ -3301,6 +3541,18 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePause()
 			bHost ? MakeButton(TEXT("BACK TO LOBBY"), [this]() { ConfirmBackToLobby(true); }) : MakeButton(TEXT("LEAVE THE MATCH"), [Player]() { if (Player.IsValid()) Player->LeaveFromMenu(); })
 		]
 		+ SVerticalBox::Slot().AutoHeight() [ MakeQuitButton() ];
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeLobbyMenu()
+{
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
+	// As the pause menu: a title, a line, and the buttons; each page over the lobby in its place, BACK to the lobby.
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight() [ MakeTitle(TEXT("LOBBY")) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeLine(TEXT("The lobby waits behind."), true) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
+		+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("LOADOUT"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Loadout); }) ]
+		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeButton(TEXT("BACK"), [Player]() { if (Player.IsValid()) Player->BackFromMenu(); }) ];
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeOptionRow(const FString& Label, TSharedRef<SWidget> Setter)

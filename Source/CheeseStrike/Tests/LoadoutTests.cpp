@@ -97,7 +97,7 @@ bool FTheLoadoutIsPickedBeforePlayAndLengthensTheCount::RunTest(const FString& P
 	TestTrue(TEXT("over the lobby, which stays the page shown"), PageFor(false, false, true, false, EMenuPage::Loadout) == EMenuPage::Lobby && LobbyOverlay(EMenuPage::Lobby, EMenuPage::Loadout) == EMenuPage::Loadout);
 	TestTrue(TEXT("as the settings are"), LobbyOverlay(EMenuPage::Lobby, EMenuPage::Options) == EMenuPage::Options && CheeseStrikeMenu::SettingsOverLobby(EMenuPage::Lobby, EMenuPage::Options));
 	TestTrue(TEXT("and nothing else"), LobbyOverlay(EMenuPage::Lobby, EMenuPage::Main) == EMenuPage::None && LobbyOverlay(EMenuPage::Main, EMenuPage::Loadout) == EMenuPage::None);
-	TestTrue(TEXT("Escape in the loadout over the lobby goes back to it"), CheeseStrikeMenu::LobbyMenuKey(EMenuPage::Loadout) == EMenuPage::Main);
+	TestTrue(TEXT("Escape in the loadout over the lobby goes back to the lobby's menu, and from that to the lobby"), CheeseStrikeMenu::LobbyMenuKey(EMenuPage::Loadout) == EMenuPage::LobbyMenu && CheeseStrikeMenu::LobbyMenuKey(EMenuPage::LobbyMenu) == EMenuPage::Main);
 	TestTrue(TEXT("a count-in that offers it shows it over the match"), PageFor(true, false, true, false, EMenuPage::Main, false, false, true) == EMenuPage::Loadout);
 	TestTrue(TEXT("not when paused"), PageFor(true, false, true, true, EMenuPage::Main, false, false, true) == EMenuPage::Pause);
 	TestTrue(TEXT("nor once put away"), PageFor(true, false, true, false, EMenuPage::Main, false, false, false) == EMenuPage::None);

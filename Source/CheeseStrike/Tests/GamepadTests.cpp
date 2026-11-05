@@ -272,7 +272,9 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(nullptr);
 	Menu->Show(EMenuPage::Main);
 	// (THEMES is the temporary sampler of UI themes, UI/CheeseStrikeThemes.h, never in a shipping build; the tests are never one.)
-	TestEqual(TEXT("the front end's items, LOADOUT among them (the hero is picked there, every hero a pick, none automatic)"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("PRACTICE"), TEXT("LOADOUT"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("THEMES"), TEXT("QUIT")}));
+	// Playing with others first, then the loadout, practice alone and the settings, Quit apart; the credits a small link at
+	// the panel's foot, last (wave 16).
+	TestEqual(TEXT("the front end's items, in their order, LOADOUT among them (the hero is picked there, every hero a pick, none automatic)"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("FIND A MATCH"), TEXT("LOADOUT"), TEXT("PRACTICE"), TEXT("SETTINGS"), TEXT("THEMES"), TEXT("QUIT"), TEXT("CREDITS")}));
 	TestEqual(TEXT("the first has the focus"), Menu->GetFocusName(), FString(TEXT("HOST A MATCH")));
 	// The loadout page: the heroes' portraits, the primaries, the grenades, then Back; the first hero has the focus.
 	Menu->FocusItem(TEXT("LOADOUT"));

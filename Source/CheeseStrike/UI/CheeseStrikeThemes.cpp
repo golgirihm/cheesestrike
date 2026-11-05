@@ -905,25 +905,29 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeThemedDropdown(int32 Index, const TAr
 				]
 			];
 	};
+	// As MakeDropdown: once a click, on the press (CheeseStrikeMenu::DropdownOpensOnPress).
+	const TSharedRef<uint64> ShutIn = MakeShared<uint64>(0);
 	TSharedRef<SMenuAnchor> Anchor = SNew(SMenuAnchor)
 		.Placement(MenuPlacement_ComboBox)
 		.Method(EPopupMethod::UseCurrentWindow)
 		.ShowMenuBackground(false)
-		.OnGetMenuContent_Lambda(List);
+		.OnGetMenuContent_Lambda(List)
+		.OnMenuOpenChanged_Lambda([ShutIn](bool bIsOpen) { if (!bIsOpen) { *ShutIn = GFrameCounter; } });
 	*Holder = Anchor;
 	Dropdowns.Add(Anchor);
 	TWeakPtr<SMenuAnchor> Weak = Anchor;
 	const TAttribute<bool> IsOpen = TAttribute<bool>::CreateLambda([Weak]() { const TSharedPtr<SMenuAnchor> Open = Weak.Pin(); return Open.IsValid() && Open->IsOpen(); });
-	TSharedRef<SThemedButton> Button = MakeThemedButton(Index, EFace::Dropdown, Shown, IsOpen, FOnClicked::CreateLambda([this, Weak, ChosenItem]()
+	TSharedRef<SThemedButton> Button = MakeThemedButton(Index, EFace::Dropdown, Shown, IsOpen, FOnClicked::CreateLambda([this, Weak, ChosenItem, ShutIn]()
 	{
 		if (const TSharedPtr<SMenuAnchor> Open = Weak.Pin())
 		{
-			Open->SetIsOpen(!Open->IsOpen());
+			Open->SetIsOpen(CheeseStrikeMenu::DropdownOpensOnPress(Open->IsOpen(), *ShutIn == GFrameCounter));
 			DropFocus = Open->IsOpen() ? *ChosenItem : TWeakPtr<SWidget>();
 			KeepFocus();
 		}
 		return FReply::Handled();
 	}), Player, FMargin(14.0f, 9.0f, 40.0f, 9.0f), HAlign_Left);
+	Button->SetClickMethod(EButtonClickMethod::MouseDown);
 	*Opener = Button;
 	DropdownButtons.Add(Button);
 	Anchor->SetContent(Focusable(FString::Printf(TEXT("Dropdown %d"), Dropdowns.Num()), Button));

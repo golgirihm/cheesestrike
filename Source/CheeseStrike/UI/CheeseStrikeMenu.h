@@ -14,6 +14,7 @@
 class ACheeseStrikePlayerController;
 class UCheeseStrikeSessionSubsystem;
 class APlayerState;
+class USoundBase;
 class SBox;
 class SScrollBox;
 struct FButtonStyle;
@@ -44,6 +45,12 @@ enum class EMenuPage : uint8
 	Loadout,
 	/** TEMPORARY: the sampler of UI themes (UI/CheeseStrikeThemes.h), a dev page of the front end's, to pick a look from. */
 	Themes,
+	/**
+	 * The lobby's menu: Escape in the lobby puts it over the lobby (an overlay, CheeseStrikeMenu::LobbyOverlay) in the pages'
+	 * panel on the left, as the pause menu is over a match: SETTINGS and LOADOUT, each over the lobby in its place, and
+	 * BACK; Escape, B or BACK put it away.
+	 */
+	LobbyMenu,
 };
 
 /** The settings page's tabs. */
@@ -134,6 +141,13 @@ namespace CheeseStrikeMenu
 	 */
 	bool ShouldRedrawLobby(bool bChanged, bool bStatusChanged, bool bDropdownOpen);
 	/**
+	 * Whether a press on a dropdown's own button (every dropdown of the menu's: the lobby's rules, the party's, the theme
+	 * sampler's) leaves its list open: shut, it opens, unless it shut in this same frame (`bShutThisFrame`: the press took
+	 * the focus from the list, which shuts it as the focus goes); open, it shuts. The button acts as the mouse goes down,
+	 * once a click; acting on the release too, a long click shut the list on the press and opened it again on the release.
+	 */
+	bool DropdownOpensOnPress(bool bOpen, bool bShutThisFrame);
+	/**
 	 * Whether the host's Close Lobby can be pressed with the lobby's bottom
 	 * saying `Status`: not once the countdown has begun (nothing in the lobby
 	 * can change then, ACheeseStrikeGameMode::CanChangeLobby), nor while it
@@ -142,33 +156,59 @@ namespace CheeseStrikeMenu
 	bool CanCloseLobby(ELobbyStatus Status);
 	/**
 	 * The page chosen after the menu key (Escape, a pad's Menu or B) in the
-	 * lobby, from the one chosen now: the settings over the lobby, and from
-	 * them (or from the loadout over it) back to it (the lobby's own page,
-	 * which PageFor shows for anything chosen; the settings and the loadout
-	 * are overlays on it, LobbyOverlay).
+	 * lobby, from the one chosen now: the lobby's menu over it (SETTINGS and
+	 * LOADOUT), from it back to the lobby (its own page, which PageFor shows
+	 * for anything chosen; the menu, the settings and the loadout are
+	 * overlays on it, LobbyOverlay), and from the settings or the loadout
+	 * back to the lobby's menu, as from the pause menu's settings to it.
 	 */
 	EMenuPage LobbyMenuKey(EMenuPage Chosen);
 	/**
-	 * What shows over the lobby: the settings or the loadout, when the page
-	 * `Shown` is the lobby and the player `Chosen` one of them (Escape,
-	 * LobbyMenuKey; the lobby's LOADOUT button); None otherwise. They are an
-	 * overlay within the lobby's page, the lobby under them blurred and
-	 * darkened and taking no press, so that nothing of the lobby is drawn
-	 * afresh for them; Escape, B or Back puts them away.
+	 * What shows over the lobby: its menu, the settings or the loadout, when
+	 * the page `Shown` is the lobby and the player `Chosen` one of them
+	 * (Escape, LobbyMenuKey; the menu's SETTINGS and LOADOUT); None
+	 * otherwise. They are an overlay within the lobby's page, the lobby under
+	 * them blurred and darkened and taking no press, so that nothing of the
+	 * lobby is drawn afresh for them; Escape, B or Back puts them away.
 	 */
 	EMenuPage LobbyOverlay(EMenuPage Shown, EMenuPage Chosen);
 	/** Whether the settings show over the lobby (LobbyOverlay is the settings). */
 	bool SettingsOverLobby(EMenuPage Shown, EMenuPage Chosen);
-	/** The loadout page's pictures: a hero's portrait (Content/UI/Heroes, tools/art/hero_portraits.py), a weapon's icon and a grenade's (Content/UI/Loadout), in Slate units. */
+	/**
+	 * The loadout page's pictures: a hero's portrait (Content/UI/Heroes, tools/art/hero_portraits.py), a weapon's icon (its
+	 * HUD picture, tools/art/weapon_icons.py: 256 x 96, WeaponIconAspect, drawn at its own shape in a box of it) and a
+	 * grenade's (Content/UI/Loadout, rendered from its model by tools/art/grenade_icons.py), in Slate units; and the hero
+	 * view (ACheeseStrikeHeroView) right of the choices, the whole page's content LoadoutWidth across.
+	 */
 	constexpr float PortraitSize = 108.0f;
 	constexpr float WeaponIconWidth = 150.0f;
-	constexpr float GrenadeIconSize = 72.0f;
-	/** Corners, in Slate units. */
-	constexpr float Rounding = 6.0f;
+	constexpr float WeaponIconAspect = 96.0f / 256.0f;
+	constexpr float GrenadeIconSize = 84.0f;
+	constexpr float HeroViewWidth = 330.0f;
+	constexpr float HeroViewHeight = HeroViewWidth * 900.0f / 520.0f;
+	constexpr float LoadoutChoicesWidth = 540.0f;
+	constexpr float LoadoutGap = 28.0f;
+	constexpr float LoadoutWidth = LoadoutChoicesWidth + LoadoutGap + HeroViewWidth;
+	/** Corners, in Slate units, and the gold hairline round what can be pressed (Cave Aged's, the menus' look since wave 16). */
+	constexpr float Rounding = 4.0f;
+	constexpr float HairlineWidth = 1.0f;
+	/** How long a button's glow takes to come up under the mouse, and to go. */
+	constexpr float GlowSeconds = 0.2f;
+	/**
+	 * The menus' sounds: under the mouse the Tactical theme's mechanical click, on a press Cave Aged's stone tap (the theme
+	 * sampler's, CheeseStrikeSynth::ThemeHover and ThemeClick of these themes), each a wave made once and kept, in the
+	 * menu's sound class, whose every playing ends with it (UCheeseStrikeSynthWave), so that none ever keeps a voice the
+	 * music needs.
+	 */
+	constexpr int32 HoverSoundTheme = 4;
+	constexpr int32 ClickSoundTheme = 2;
+	USoundBase* UISound(bool bClick);
 	/** The front end's masthead: the game's name and under it the subtitle, their font sizes, and how far down from the top. */
 	constexpr int32 TitleSize = 84;
 	constexpr int32 SubtitleSize = 40;
 	constexpr float MastheadTop = 24.0f;
+	/** The credits' link at the foot of the front end's panel: its words' size, smaller than a button's (18). */
+	constexpr int32 CreditsLinkSize = 13;
 	/** Seconds a new page (not one drawn again) and a dialog take to fade in, and how big a dialog starts (it grows to its size meanwhile). Only drawn so: they take presses at once. */
 	constexpr float FadeSeconds = 0.15f;
 	constexpr float DialogFromScale = 0.94f;
@@ -341,6 +381,8 @@ private:
 
 	TSharedRef<SWidget> MakePage();
 	TSharedRef<SWidget> MakeMain();
+	/** The front end's credits: a small link of muted words at the foot of the pages' panel (CreditsLinkSize), brighter under the mouse, that opens the Credits page. */
+	TSharedRef<SWidget> MakeCreditsLink();
 	/**
 	 * The loadout page (EMenuPage::Loadout, Rules/CheeseStrikeLoadout.h): HERO as the four heroes' portraits, PRIMARY as
 	 * the three weapons' icons with their names, GRENADE as the two kinds', the one picked of each ringed in cheese, each
@@ -352,6 +394,10 @@ private:
 	TSharedRef<SWidget> MakeLoadoutChoice(const FString& Name, const FSlateBrush* Picture, const FVector2D& PictureSize, bool bChosen, TFunction<void()> Pick);
 	/** A row of the loadout page: `Label` over `Choices`. */
 	TSharedRef<SWidget> MakeLoadoutRow(const FString& Label, TSharedRef<SWidget> Choices);
+	/** The loadout page's hero view: the picture of ACheeseStrikeHeroView (GetHeroPicture), rounded and edged in a hairline; a plain panel while there is none. */
+	TSharedRef<SWidget> MakeHeroView();
+	/** The brush the hero view is drawn with, made for the picture there is now; null without one. */
+	const FSlateBrush* HeroViewBrush();
 	/** What the loadout page is made of (the picks, and whether a count-in offers it): drawn again when it changes. */
 	FString LoadoutKey() const;
 	TSharedRef<SWidget> MakeFind();
@@ -370,6 +416,8 @@ private:
 	TSharedRef<SWidget> MakeLobby();
 	TSharedRef<SWidget> MakeLobbyRules();
 	TSharedRef<SWidget> MakePause();
+	/** The lobby's menu (EMenuPage::LobbyMenu), over the lobby as the pause menu is over a match: SETTINGS, LOADOUT and BACK. */
+	TSharedRef<SWidget> MakeLobbyMenu();
 	TSharedRef<SWidget> MakeCredits();
 	/** The settings: a tab for each kind (EOptionsTab), each setting on a row, applied as it changes and kept. */
 	TSharedRef<SWidget> MakeOptions();
@@ -571,8 +619,9 @@ private:
 	FString ShownLobbyOverlayKey;
 	bool bLobbyOverlayShown = false;
 	EMenuPage LobbyOverlayPage = EMenuPage::None;
-	/** The lobby's item that had the focus as the overlay came over it, to have it back as it goes. */
+	/** The lobby's item that had the focus as the overlay came over it, to have it back as it goes; and each overlay's when left for another (the lobby's menu's SETTINGS, back from them). */
 	FString FocusBeforeLobbyOverlay;
+	TMap<uint8, FString> OverlayFocus;
 	/** The lobby's dropdowns as last drawn. */
 	TArray<TWeakPtr<class SMenuAnchor>> Dropdowns;
 	/** The blur over the game behind the pause menu. */
@@ -611,6 +660,8 @@ private:
 	int32 TurningFriendSection = INDEX_NONE;
 	/** The pictures of the friends in the rows drawn (kept while they are). */
 	TArray<TSharedPtr<FSlateBrush>> FriendBrushes;
+	/** The hero view's brush (HeroViewBrush), for the picture it was made for. */
+	TSharedPtr<FSlateBrush> HeroViewPicture;
 	int32 LobbyBuilds = 0;
 	/** The widgets given a tooltip (WithTooltip), with its words; the dead are dropped as they are looked through. */
 	struct FTooltipOwner
