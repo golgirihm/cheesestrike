@@ -185,3 +185,60 @@ bool FAFriendsRowSaysWhereTheyAre::RunTest(const FString& Parameters)
 	TestEqual(TEXT("none for no name"), Initials(TEXT("  ")), FString(TEXT("?")));
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheFriendsPanelOpensOnHoverOrAPin, "CheeseStrike.Friends.PanelOpensOnHoverOrAPin", FriendsTests::Flags)
+
+bool FTheFriendsPanelOpensOnHoverOrAPin::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeFriends;
+	const TOptional<bool> Unpinned;
+	// Unpinned: open while hovered, and for half a second after the mouse leaves, so brushing off it doesn't snap it shut.
+	TestTrue(TEXT("hovered, it opens"), PanelOpen(false, Unpinned, true, 1000.0f));
+	TestTrue(TEXT("just left, it stays open"), PanelOpen(false, Unpinned, false, 0.2f));
+	TestTrue(TEXT("up to half a second"), PanelOpen(false, Unpinned, false, HoverCloseDelay - 0.01f));
+	TestFalse(TEXT("then it shuts"), PanelOpen(false, Unpinned, false, HoverCloseDelay));
+	TestFalse(TEXT("and stays shut unhovered"), PanelOpen(false, Unpinned, false, 1000.0f));
+	TestEqual(TEXT("half a second's grace"), HoverCloseDelay, 0.5f);
+	// Pinned by a click on its chevron: open or shut whatever the mouse does.
+	TestTrue(TEXT("pinned open, it stays open with the mouse away"), PanelOpen(false, TOptional<bool>(true), false, 1000.0f));
+	TestFalse(TEXT("pinned shut, hovering doesn't open it"), PanelOpen(false, TOptional<bool>(false), true, 0.0f));
+	TestFalse(TEXT("nor having just left"), PanelOpen(false, TOptional<bool>(false), false, 0.1f));
+	// The find page is about the friends' games: open there whatever else.
+	TestTrue(TEXT("always open on the find page"), PanelOpen(true, TOptional<bool>(false), false, 1000.0f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheFriendsPanelSlidesOpenAndFades, "CheeseStrike.Friends.PanelSlidesOpenAndFades", FriendsTests::Flags)
+
+bool FTheFriendsPanelSlidesOpenAndFades::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeFriends;
+	TestEqual(TEXT("a quarter of a second to open or shut"), PanelSeconds, 0.25f);
+	// The width follows the curve from the tab's to the open panel's, never in a step.
+	TestEqual(TEXT("shut: the tab's width"), PanelWidthAt(0.0f, 120.0f, 496.0f), 120.0f);
+	TestEqual(TEXT("open: the panel's"), PanelWidthAt(1.0f, 120.0f, 496.0f), 496.0f);
+	TestEqual(TEXT("halfway: halfway"), PanelWidthAt(0.5f, 120.0f, 496.0f), 308.0f);
+	float Last = PanelWidthAt(0.0f, 120.0f, 496.0f);
+	for (int32 Step = 1; Step <= 20; ++Step)
+	{
+		const float Width = PanelWidthAt(Step / 20.0f, 120.0f, 496.0f);
+		TestTrue(TEXT("each step a little wider, by less than a tenth of the way"), Width > Last && Width - Last < (496.0f - 120.0f) * 0.1f);
+		Last = Width;
+	}
+	TestEqual(TEXT("past the end it is open, not wider"), PanelWidthAt(1.5f, 120.0f, 496.0f), 496.0f);
+	// The content is clear over the first half of an expand and fades in over the second; played backwards it fades out
+	// over the first half of a collapse.
+	TestEqual(TEXT("clear at the start"), ContentOpacityAt(0.0f), 0.0f);
+	TestEqual(TEXT("still clear halfway"), ContentOpacityAt(0.5f), 0.0f);
+	TestEqual(TEXT("half seen three quarters of the way"), ContentOpacityAt(0.75f), 0.5f);
+	TestEqual(TEXT("whole at the end"), ContentOpacityAt(1.0f), 1.0f);
+	TestTrue(TEXT("fading in all the way through the second half"), ContentOpacityAt(0.6f) > ContentOpacityAt(0.55f) && ContentOpacityAt(0.9f) > ContentOpacityAt(0.8f));
+	// Collapsing is the expanding played backwards: the tall content stays while the width shrinks, and only shut does
+	// the panel fold to its tab.
+	TestTrue(TEXT("opening: the content"), ShowsContent(true, 0.0f));
+	TestTrue(TEXT("open: the content"), ShowsContent(true, 1.0f));
+	TestTrue(TEXT("shutting, still wide: the content"), ShowsContent(false, 0.7f));
+	TestTrue(TEXT("shutting, nearly shut: still the content"), ShowsContent(false, 0.05f));
+	TestFalse(TEXT("shut: the tab"), ShowsContent(false, 0.0f));
+	return true;
+}

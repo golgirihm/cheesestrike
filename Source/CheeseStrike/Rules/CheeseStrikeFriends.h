@@ -168,4 +168,30 @@ namespace CheeseStrikeFriends
 	FString EmptySectionLine();
 	/** The letters shown for a friend with no picture: the first of their name's first two words, in capitals ("?" for none). */
 	FString Initials(const FString& Name);
+
+	/**
+	 * The panel's motion: how long it takes to open or shut (a Slate curve, eased in and out, played backwards to shut),
+	 * and, unpinned, how long the mouse may be off it after leaving before it shuts (a mouse brushing off it doesn't snap
+	 * it shut).
+	 */
+	constexpr float PanelSeconds = 0.25f;
+	constexpr float HoverCloseDelay = 0.5f;
+	/**
+	 * Whether the panel should be open now: always where it is the page's point (`bAlwaysOpen`, the find page); else as
+	 * pinned by a click on its chevron (`Pinned`, set: open or shut, whatever the mouse does); else while the mouse is
+	 * over it (`bHovered`) and for HoverCloseDelay seconds after it left (`SinceLeft`).
+	 */
+	bool PanelOpen(bool bAlwaysOpen, const TOptional<bool>& Pinned, bool bHovered, float SinceLeft);
+	/** The panel's width `Along` the way (0 shut, 1 open: the curve's eased value) from the tab's width to the open panel's: never a step. */
+	float PanelWidthAt(float Along, float TabWidth, float OpenWidth);
+	/**
+	 * The opacity of the open panel's content `Along` the way: clear through the first half of an expand, then fading in
+	 * over the second; the same played backwards over a collapse, so it fades out over the collapse's first half.
+	 */
+	float ContentOpacityAt(float Along);
+	/**
+	 * Whether the panel shows its tall content (open, or on its way open or shut) rather than folded to its tab: collapsing,
+	 * the content stays while the width shrinks (`Along` above 0), and only shut does it fold to the tab.
+	 */
+	bool ShowsContent(bool bWantOpen, float Along);
 }

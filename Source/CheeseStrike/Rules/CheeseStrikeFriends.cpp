@@ -257,4 +257,32 @@ namespace CheeseStrikeFriends
 		}
 		return FString();
 	}
+
+	bool PanelOpen(bool bAlwaysOpen, const TOptional<bool>& Pinned, bool bHovered, float SinceLeft)
+	{
+		if (bAlwaysOpen)
+		{
+			return true;
+		}
+		if (Pinned.IsSet())
+		{
+			return Pinned.GetValue();
+		}
+		return bHovered || SinceLeft < HoverCloseDelay;
+	}
+
+	float PanelWidthAt(float Along, float TabWidth, float OpenWidth)
+	{
+		return FMath::Lerp(TabWidth, OpenWidth, FMath::Clamp(Along, 0.0f, 1.0f));
+	}
+
+	float ContentOpacityAt(float Along)
+	{
+		return FMath::Clamp((Along - 0.5f) * 2.0f, 0.0f, 1.0f);
+	}
+
+	bool ShowsContent(bool bWantOpen, float Along)
+	{
+		return bWantOpen || Along > 0.0f;
+	}
 }
