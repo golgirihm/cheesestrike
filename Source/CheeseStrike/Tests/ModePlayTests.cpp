@@ -681,7 +681,7 @@ bool FExecutionDownsRevivesAndFinishes::RunTest(const FString& Parameters)
 		{
 			const FVector Target = OnServer->GetMesh()->GetBoneLocation(FName(Bone));
 			const FVector From = Target + FVector(0.0f, 0.0f, 25.0f) + OnServer->GetActorRightVector() * 400.0f;
-			TestTrue(FString::Printf(TEXT("a shot from the side at its %s hits it"), Bone), FHitHistory::RayHitsBody(From, (Target - From).GetSafeNormal(), Lying) > 0.0f);
+			TestTrue(FString::Printf(TEXT("a shot from the side at its %s hits it (the bone at %s; the shape's hips %s, shoulders %s, legs to %s)"), Bone, *Target.ToString(), *Lying.Hips.ToString(), *Lying.Shoulders.ToString(), *Lying.LegsTo.ToString()), FHitHistory::RayHitsBody(From, (Target - From).GetSafeNormal(), Lying) > 0.0f);
 		}
 		const FVector Standing = OnServer->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
 		TestEqual(TEXT("but a shot where a standing chest would be misses"), FHitHistory::RayHitsBody(Standing + OnServer->GetActorRightVector() * 400.0f, -OnServer->GetActorRightVector(), Lying), -1.0f);
