@@ -41,6 +41,7 @@ frame; a lintel over each opening, wider than it; floors on beams or on walls ei
 import math
 import traceback
 import unreal
+import block_mesh
 
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 MATS = "/Game/CheeseStrike/Materials/"
@@ -356,17 +357,22 @@ def keep(low, high):
 
 def cheese(label, structure, centre, size, mesh=None, material=None, edible=True, rotation=(0, 0, 0)):
     """A block of cheese: its own actor, part of `structure` (a name a map's notes use: "WheelStack", "HouseWest"), with a
-    block's 400 of eating in it whatever its size. Not `edible`: the mice leave it, and it wears wax."""
+    block's 400 of eating in it whatever its size. Not `edible`: the mice leave it, and it wears wax. A box (no `mesh`)
+    is a rounded block of its own size (block_mesh.py: its edges rounded off and its faces a little proud of its box
+    collision, so that blocks laid edge to edge run together); `mesh` is a metre across and scaled to `size`."""
     actor = place(unreal.CheeseStrikeCheese, label, "Cheese/" + structure, centre, rotation)
     actor.set_editor_property("structure", structure)
     component = actor.get_component_by_class(unreal.StaticMeshComponent)
-    component.set_static_mesh(mesh or CUBE)
+    if mesh is None:
+        component.set_static_mesh(block_mesh.rounded_block(size, lines))
+    else:
+        component.set_static_mesh(mesh)
+        actor.set_actor_scale3d(v(size[0] / 100.0, size[1] / 100.0, size[2] / 100.0))
     if not edible:
         actor.set_editor_property("edible", False)
         component.set_material(0, wax())
     elif material is not None:
         component.set_material(0, material)
-    actor.set_actor_scale3d(v(size[0] / 100.0, size[1] / 100.0, size[2] / 100.0))
     count("cheese:" + structure)
     return actor
 
@@ -658,18 +664,32 @@ def building(name, structure, low, high, storeys=2, storey=350, wall=50, column=
         s = walls[side][0]
         mid = at - (s[0] if side in "NS" else s[1])
         openings[side].append((mid - w / 2.0, mid + w / 2.0, level * storey + sill, level * storey + top))
+    sills = []
     for way in doorways:
         side, at, level = way[0], way[1], way[2]
         w = way[3] if len(way) > 3 else 120
         s = walls[side][0]
         mid = at - (s[0] if side in "NS" else s[1])
         openings[side].append((mid - w / 2.0, mid + w / 2.0, level * storey, level * storey + 220))
+        if level > 0:
+            sills.append((side, at, w, level))
     for side in SIDES:
         start, end = walls[side]
         cheese_wall(f"{name}_{side}", structure, start, end, bottom, courses, wall, column, openings[side], edible)
     # The frame: posts inside along the north and south walls (not in a doorway or a stairwell), and a deck on them at
     # each storey's top, with a hole over each flight of stairs.
     m_deck = deck or floor()
+    # An upper doorway's sill: the deck carried through the wall under it, which stays, so that the way out onto what
+    # is beyond (a gallery, a landing) is still a floor once the wall's course under the doorway is eaten (until wave
+    # 15 the bots and mice lost the way to Rind Market's galleries once the arcade houses' walls were gone).
+    for i, (side, at, w, level) in enumerate(sills):
+        z = bottom + level * storey
+        if side in "NS":
+            sy0, sy1 = (y0, y0 + wall) if side == "S" else (y1 - wall, y1)
+            box(f"{name}_Sill_{i}", f, (at - w / 2.0, sy0, z - 25), (at + w / 2.0, sy1, z), m_deck)
+        else:
+            sx0, sx1 = (x0, x0 + wall) if side == "W" else (x1 - wall, x1)
+            box(f"{name}_Sill_{i}", f, (sx0, at - w / 2.0, z - 25), (sx1, at + w / 2.0, z), m_deck)
     flights = [] if stairway is None else ([stairway] if isinstance(stairway[0], str) else list(stairway))
 
     def hole_for(flight):
@@ -804,14 +824,16 @@ def tunnel(name, structure, start, end, width=400, height=300, wall=50, bottom=0
 
 
 def bridge(name, structure, start, end, width=250, beams=2, beam=40, depth=30, deck=30, cheese_deck=True, rails=True,
-           supports=(), material=None, edible=True, wax_beams=False, frame_material=None):
+           supports=(), material=None, edible=True, wax_beams=False, frame_material=None, cheese_beams=False):
     """A level bridge along x or y from `start` (x, y, z: the middle of one end, at its deck's top) to `end`: steel
     beams under it, the length of it, which the mice never eat, and a deck of cheese tiles across them that they do
     (or of `material`, if not `cheese_deck`). Eaten, it leaves its beams: `beams` of them, `beam` cm wide (one 60 cm
     beam down the middle is a way across for a careful player; bots and mice need 70). Rails at its sides if `rails`.
     `supports`: points along it (from `start`) where a post goes down to the ground (z 0). `wax_beams`: the beams are
-    cheese in wax (never eaten) rather than steel: the cheese's own skeleton. `frame_material`: what its beams, rails
-    and supports are made of, if not painted steel (timber)."""
+    cheese in wax (never eaten) rather than steel: the cheese's own skeleton. `cheese_beams`: the beams are cheese the
+    mice eat, so that the whole bridge goes with the cheese and what it led to is cut off (hang its rails and posts on
+    its structure, kit.hang, so that they go with it). `frame_material`: what its beams, rails and supports are made
+    of, if not painted steel (timber)."""
     f = f"Bridges/{name}"
     along_x = abs(end[0] - start[0]) >= abs(end[1] - start[1])
     length = abs(end[0] - start[0]) if along_x else abs(end[1] - start[1])
@@ -829,7 +851,9 @@ def bridge(name, structure, start, end, width=250, beams=2, beam=40, depth=30, d
     under = z - (deck if cheese_deck else 0)
     for i, c in enumerate(centres):
         low, high = span(0, length, c - beam / 2.0, c + beam / 2.0, under - depth, under)
-        if wax_beams:
+        if cheese_beams:
+            cheese_box(f"Cheese_{name}_Beam_{i}", structure, low, high, edible=edible)
+        elif wax_beams:
             cheese_box(f"Cheese_{name}_Beam_{i}", structure, low, high, edible=False)
         else:
             box(f"{name}_Beam_{i}", f, low, high, frame_material or painted("Dark"))
@@ -1111,7 +1135,7 @@ def mouse_entries(x0, y0, x1, y1, top, xs=(), ys=()):
         mouse_entry(x1 + 50, y, top, 180)
 
 
-def pickup(weapon, x, y, z=0, name="", instant=False):
+def pickup(weapon, x, y, z=0, name="", instant=False, stranded=False):
     """A weapon's stand (ACheeseStrikePickup): a low plinth at (x, y) on the floor at `z`, its weapon (a primary's id:
     blaster, grater, munster, shotgun, burratas, roquefort, babybomb, stick; never the carbine everyone comes in with) floating
     over it, labelled Pickup_<weapon>_<name>. Four to eight a map, the better weapons at the riskier spots (the power weapons,
@@ -1119,12 +1143,18 @@ def pickup(weapon, x, y, z=0, name="", instant=False):
     each side reaching them alike: on a mirrored map in pairs (x and -x) or on the middle line. It blocks nothing, so
     put it on open floor with room round it (a metre and a half across, two metres up), off the lanes' choke points
     unless that is the risk; the cheese under it is kept (keep()), so that the mice never eat its floor away.
-    `instant`: taken, its weapon is back at once, so that the stand is never empty (the Practice Range's)."""
+    `instant`: taken, its weapon is back at once, so that the stand is never empty (the Practice Range's). `stranded`:
+    the map means it to be out of reach once the mice have eaten the cheese that led to it (the Grotto's Roquefort in
+    the Spine's arch, over bridges of cheese): tagged Stranded, so that the tests of every map (Tests/PickupChecks.h)
+    ask for a way to it before the mice only, and none after."""
     label = f"Pickup_{weapon.capitalize()}_{name or counts.get('pickups', 0)}"
     actor = place(unreal.CheeseStrikePickup, label, "Pickups", (x, y, z))
     actor.set_editor_property("weapon", weapon)
     if instant:
         actor.set_editor_property("instant", True)
+    if stranded:
+        actor.set_editor_property("tags", [unreal.Name("Stranded")])
+        count("stranded stands")
     keep((x - 60, y - 60, z - 400), (x + 60, y + 60, z + 5))
     count("pickups")
     lines.append(f"pickup: {weapon} at ({x:.0f}, {y:.0f}, {z:.0f})")
@@ -1311,6 +1341,29 @@ def _keep_cheese():
     return n
 
 
+def strip_navigation_data():
+    """Takes every navigation mesh actor (RecastNavMesh) out of the level open, so that the game builds the mesh afresh
+    when the level starts. The editor spawns one as a level with navigation bounds is opened or built, with an empty
+    tile grid that it would fill over the frames to come; a script saves before any frame comes, and a mesh saved with
+    its grid set up but no tiles counts as built (RuntimeGeneration=Dynamic keeps what was saved and rebuilds only
+    where something changes), so bots and mice saved that way had nowhere to walk. Returns how many were taken out."""
+    world = unreal.EditorLevelLibrary.get_editor_world()
+    stripped = 0
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.RecastNavMesh):
+        eas.destroy_actor(actor)
+        stripped += 1
+    return stripped
+
+
+def save_level():
+    """Saves the level open with no navigation mesh in it (strip_navigation_data); every script that saves a map goes
+    through this. Returns what the editor's save said."""
+    stripped = strip_navigation_data()
+    saved = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).save_current_level()
+    lines.append(f"saved {saved} ({stripped} navigation mesh left out, for the game to build)")
+    return saved
+
+
 def build_level(level, build, report=None):
     """Builds `level` (a package path, /Game/CheeseStrike/Maps/Lvl_<Name>) afresh with `build()`, saves it, writes
     Saved/<report or the level's name>.txt and quits the editor. Nothing is saved if the build fails."""
@@ -1334,7 +1387,7 @@ def build_level(level, build, report=None):
         in_areas = _keep_cheese()
         uneaten = sum(1 for a in eas.get_all_level_actors() if isinstance(a, unreal.CheeseStrikeCheese) and not a.get_editor_property("edible"))
         lines.append(f"never eaten (in wax): {uneaten} blocks, {in_areas} of them in kept areas")
-        lines.append("saved " + str(levels.save_current_level()))
+        save_level()
         for name in sorted(counts):
             lines.append(f"  {name}: {counts[name]}")
         blocks = sum(n for k, n in counts.items() if k.startswith("cheese:"))
