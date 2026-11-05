@@ -450,17 +450,9 @@ void ACheeseStrikeWeapon::FitToHands()
 	// The second gun of two, in the left hand as the first is in the right, mirrored across the body.
 	if (Stats->bDual)
 	{
-		static const FName LeftHand(TEXT("hand_l"));
 		for (const TPair<UStaticMeshComponent*, bool>& Off : {TPair<UStaticMeshComponent*, bool>(FirstPersonOffHand, true), TPair<UStaticMeshComponent*, bool>(ThirdPersonOffHand, false)})
 		{
-			USkeletalMeshComponent* Body = Off.Value ? Holder->GetFirstPersonMesh() : Holder->GetMesh();
-			const UPrimitiveComponent* First = GetModel(Off.Value);
-			if (Body == nullptr || First == nullptr || Body->GetBoneIndex(LeftHand) == INDEX_NONE)
-			{
-				continue;
-			}
-			Off.Key->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, LeftHand);
-			Off.Key->SetRelativeTransform(MirroredGrip(Body, First->GetAttachSocketName(), First->GetRelativeTransform(), LeftHand));
+			PutInOffHand(Off.Key, Off.Value ? Holder->GetFirstPersonMesh() : Holder->GetMesh(), GetModel(Off.Value));
 		}
 	}
 	PutFlashOn(false);
@@ -557,12 +549,29 @@ bool ACheeseStrikeWeapon::GetSight(FVector& Out) const
 bool ACheeseStrikeWeapon::LeftHandHoldFor(const USkeletalMeshComponent* Body, FVector& OutHold) const
 {
 	const UPrimitiveComponent* Model = Holder != nullptr ? GetModel(Body == Holder->GetFirstPersonMesh()) : nullptr;
-	if (Look == nullptr || !Look->LeftHand.IsSet() || Model == nullptr)
+	return Look != nullptr && LeftHandHoldOn(*Look, Model, OutHold);
+}
+
+bool ACheeseStrikeWeapon::LeftHandHoldOn(const FWeaponLook& Look, const USceneComponent* Model, FVector& OutHold)
+{
+	if (!Look.LeftHand.IsSet() || Model == nullptr)
 	{
 		return false;
 	}
 	// The model rides the bone the hand follows (hand_r, or the mannequin's weapon_r): from its space into the bone's.
-	OutHold = Model->GetRelativeTransform().TransformPosition(Look->LeftHand.GetValue());
+	OutHold = Model->GetRelativeTransform().TransformPosition(Look.LeftHand.GetValue());
+	return true;
+}
+
+bool ACheeseStrikeWeapon::PutInOffHand(USceneComponent* OffHand, USkeletalMeshComponent* Body, const USceneComponent* First)
+{
+	static const FName LeftHand(TEXT("hand_l"));
+	if (OffHand == nullptr || Body == nullptr || First == nullptr || Body->GetBoneIndex(LeftHand) == INDEX_NONE)
+	{
+		return false;
+	}
+	OffHand->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, LeftHand);
+	OffHand->SetRelativeTransform(MirroredGrip(Body, First->GetAttachSocketName(), First->GetRelativeTransform(), LeftHand));
 	return true;
 }
 
