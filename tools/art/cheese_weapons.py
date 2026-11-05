@@ -253,21 +253,25 @@ def ribbon(mat, path, width, thickness, normal_of):
     return part(bm, mat, "ribbon")
 
 
-# The lettering's face: the engine's Roboto Black (Apache 2.0), as the countdown's.
+# The lettering's face: the engine's Roboto Black (Apache 2.0), as the countdown's; and its Black Italic, for the
+# BabyBomb's slanted "BabyBomb" across its strip.
 FONT = os.environ.get("CHEESESTRIKE_FONT", r"C:\Program Files\Epic Games\UE_5.8\Engine\Content\Slate\Fonts\Roboto-Black.ttf")
+FONT_ITALIC = os.path.join(os.path.dirname(FONT), "Roboto-BlackItalic.ttf")
 
 
-def text(mat, body, size, depth, origin, normal, up):
+def text(mat, body, size, depth, origin, normal, up, font=None, shear=0.0):
     """Lettering standing `depth` out of a surface at `origin`, facing `normal`, its top toward `up`, reading as the
-    game's left-handed space has it."""
+    game's left-handed space has it; in `font` (a .ttf, else FONT), slanted further by `shear`."""
     curve = bpy.data.curves.new("text", 'FONT')
     curve.body = body
     curve.size = size
     curve.extrude = depth / 2.0
     curve.align_x = 'CENTER'
     curve.align_y = 'CENTER'
-    if os.path.exists(FONT):
-        curve.font = bpy.data.fonts.load(FONT, check_existing=True)
+    curve.shear = shear
+    face = font or FONT
+    if os.path.exists(face):
+        curve.font = bpy.data.fonts.load(face, check_existing=True)
     temp = link(bpy.data.objects.new("text", curve))
     dg = bpy.context.evaluated_depsgraph_get()
     me = bpy.data.meshes.new_from_object(temp.evaluated_get(dg))
@@ -720,8 +724,10 @@ def grater():
 def babybomb():
     """The BabyBomb: one big red-waxed Babybel lying flat (its face up) on the end of a short black haft, held in both
     hands like a sledgehammer (the right at the haft's end, where it bends down into the hand, the left ahead on it),
-    the white pull-strip wide across its top, its bore out of the wheel's front rim in a steel ring, a little wheel
-    waiting in it."""
+    the white band across its top as a Babybel's (wave 16: rising a little to the right, its far edge in a wave with a
+    dip, its near edge a long curve, over the rounded edge and down the sides), "BabyBomb" across it in raised red
+    slanted lettering as a Babybel's name is (the engine's Roboto Black Italic, slanted more: no one's logo), its bore
+    out of the wheel's front rim in a steel ring, a little wheel waiting in it."""
     axis_z, radius, thick, centre_y = 5.5, 15.0, 9.0, 44.0
     bottom = axis_z - thick / 2.0
     wheel = lathe("BabyWax", wheel_profile(radius, thick, 3.0, 0.3), centre=(0.0, centre_y, bottom), axis="Z", sides=72,
@@ -731,33 +737,60 @@ def babybomb():
     lathe("BabyCheese", [(4.12, centre_y + 3.5), (4.12, centre_y + 8.5), (3.95, centre_y + 8.5), (3.95, centre_y + 3.5)], centre=(0.0, 0.0, axis_z), sides=32)
     bore_end(0.0, axis_z, centre_y + 8.0, centre_y + 16.5, 4.5, 3.9, 7.5, sides=32)
     lathe("BabyWax", wheel_profile(3.4, 4.5, 1.2), centre=(0.0, centre_y + 9.0, axis_z), sides=32)
-    # The pull-strip: a wide white band across the top's diameter (side to side, clear of the bore), over the rounded
-    # edge and a little way down each side, its tab loose at the left end.
+    # The band, a Babybel's: white across the red wax from side to side, clear of the bore, a sheet laid on the wheel's
+    # surface (its flat top, the rounded edge and 2.4 cm down the side), its edges as a Babybel's run (x is the gun's
+    # left, so it rises toward -x, the player's right): the far edge in a wave with a dip left of the middle, the near
+    # edge a long curve sagging toward the player, the band about 10 cm across in the middle, narrower at the sides.
     fillet, top = 3.0, bottom + thick
-    path, normals = [], []
     flat = radius - fillet
-    for k in range(25):
-        x = -flat + 2 * flat * k / 24
-        path.append((x, centre_y, top))
-        normals.append((0.0, 0.0, 1.0))
-    for sign in (1.0, -1.0):
-        over = []
-        for k in range(1, 10):
-            a = math.pi / 2 * k / 9
-            over.append(((sign * (flat + fillet * math.sin(a)), centre_y, top - fillet + fillet * math.cos(a)), (sign * math.sin(a), 0.0, math.cos(a))))
-        for z in (top - fillet - 1.2, top - fillet - 2.4):
-            over.append(((sign * (radius + 0.06), centre_y, z), (sign, 0.0, 0.0)))
-        if sign < 0:
-            over.reverse()
-            path = [q for q, n in over] + path
-            normals = [n for q, n in over] + normals
+    down = 2.4
+
+    def far_edge(x):
+        return 4.6 - 0.2 * x + 1.3 * math.sin(2.0 * math.pi * (x + 17.0) / 23.0) - 1.4 * math.exp(-((x - 3.5) / 2.2) ** 2)
+
+    def near_edge(x):
+        return -4.6 - 0.2 * x - 2.6 * math.sin(math.pi * (x + 17.4) / 34.8)
+
+    def on_wheel(x, y, lift):
+        """The wheel's skin over (x, y) of its top (from its middle), lifted `lift` off it: flat, round the edge, down the side."""
+        r = math.hypot(x, y)
+        out = Vector((x / r, y / r, 0.0)) if r > 1e-6 else Vector((1.0, 0.0, 0.0))
+        if r <= flat:
+            at, normal = Vector((x, y, top)), Vector((0.0, 0.0, 1.0))
+        elif r <= flat + fillet * math.pi / 2.0:
+            a = (r - flat) / fillet
+            at = out * (flat + fillet * math.sin(a)) + Vector((0.0, 0.0, top - fillet + fillet * math.cos(a)))
+            normal = out * math.sin(a) + Vector((0.0, 0.0, math.cos(a)))
         else:
-            path += [q for q, n in over]
-            normals += [n for q, n in over]
-    lookup = {tuple(round(c, 3) for c in q): n for q, n in zip(path, normals)}
-    ribbon("Strip", path, 10.0, 0.14, lambda q: lookup[tuple(round(c, 3) for c in q)])
-    end = Vector(path[-1])
-    ribbon("Strip", [tuple(end), tuple(end + Vector((1.4, 0.0, -0.6))), tuple(end + Vector((3.0, 0.0, -0.2)))], 10.0, 0.14, lambda q: (1.0, 0.0, 0.0))
+            at = out * radius + Vector((0.0, 0.0, top - fillet - (r - flat - fillet * math.pi / 2.0)))
+            normal = out
+        return at + Vector((0.0, centre_y, 0.0)) + normal * lift
+
+    # Across the top's whole width and down each side: the skin's length from the middle to `down` below the edge.
+    reach = flat + fillet * math.pi / 2.0 + down
+    bm = bmesh.new()
+    rows, cols = 18, 140
+    grid = []
+    for i in range(cols + 1):
+        x = -reach + 2.0 * reach * i / cols
+        lo, hi = near_edge(x), far_edge(x)
+        ring = []
+        for j in range(rows + 1):
+            y = lo + (hi - lo) * j / rows
+            ring.append(bm.verts.new(on_wheel(x, y, 0.13)))
+        grid.append(ring)
+    for i in range(cols):
+        for j in range(rows):
+            bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+    band = part(bm, "Strip", "band")
+    solid = band.modifiers.new("solid", 'SOLIDIFY')
+    solid.thickness = 0.12
+    solid.offset = 0.0
+    # Its name across it in raised red slanted lettering, along the band's rise, a little toward its near edge.
+    rise = math.atan(0.2)
+    mid = (far_edge(0.0) + near_edge(0.0)) / 2.0 - 0.4
+    text("BabyWax", "BabyBomb", 4.8, 0.3, (0.0, centre_y + mid, top + 0.19 + 0.15), (0.0, 0.0, 1.0),
+         (math.sin(rise), math.cos(rise), 0.0), font=FONT_ITALIC, shear=0.18)
     # The haft: a black bar under the wheel, from its middle back and bending down into the hand, a steel ferrule where it
     # meets the wheel.
     tube("Black", [(0, 46.0, 1.2), (0, 12.0, 1.2), (0, -1.0, 1.0), (0, -3.0, -2.5), (0, -4.0, -7.0), (0, -4.3, -11.5)], 2.2,
