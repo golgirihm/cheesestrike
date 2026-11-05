@@ -3,10 +3,11 @@
 // Tests that play the arms in the editor (see PlayTesting.h): every hero's
 // left hand on every weapon, in both bodies, before and after the knife;
 // the weapon in its own player's view at the hip and down the sights, held
-// steadier than the animations hold it; nothing of the body before the eyes
-// at a sprint; a slide's sprawl and lean; the knife's swipe reaching someone
-// off to the side, without a lunge; and the view of a player down kept out
-// of the floor.
+// steadier than the animations hold it, and following a look without a jump
+// at any frame rate; nothing of the body before the eyes at a sprint; a
+// slide's sprawl and lean; the knife's swipe reaching someone off to the
+// side, without a lunge; and the view of a player down kept out of the
+// floor.
 
 #include "Misc/AutomationTest.h"
 #include "Camera/CameraComponent.h"
@@ -199,6 +200,97 @@ bool FTheWeaponIsSteadyInView::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("and shifts less (%.4f against %.4f cm a frame)"), Held.X, Tremble.X), Held.X < Tremble.X * 0.8f + 0.001f);
 		}
 	});
+	StopPlaying();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheWeaponFollowsTheLookWithoutReversing, "CheeseStrike.Play.TheWeaponFollowsTheLookWithoutReversing", ArmsPlayTests::Flags)
+
+bool FTheWeaponFollowsTheLookWithoutReversing::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace ArmsPlayTests;
+	StartPlaying({1});
+	PutAt(0, Spot, SpotYaw);
+	// At 60 and at 144 frames a second (a fixed step, as tools/play.ps1 -FixedFps plays), with the pistol and then the
+	// Blaster: a look up for a second at 0.3 degrees a frame, then the view held half a second; then the same down. The
+	// weapon never jumps in view from one frame to the next (a dip as a look up begins and a pop as it ends, which arms
+	// animated from the frame before the camera's gave: 0.18 cm at this look; the hold's own movement is under 0.04), and
+	// through a look and after it its height in view goes one way (a smooth lag) but for the idle's slow breathing, which
+	// the hold keeps (CheeseStrikeArms::MostBob) and which wanders up to half a centimetre back over a second's look.
+	constexpr float MostJump = 0.08f;
+	constexpr float MostBack = 1.0f;
+	for (const int32 Fps : {60, 144})
+	{
+		Then([Fps]()
+		{
+			FApp::SetUseFixedTimeStep(true);
+			FApp::SetFixedDeltaTime(1.0 / Fps);
+		});
+		for (const TCHAR* Draw : {TEXT("Sidearm"), TEXT("Primary")})
+		{
+			Play(0, FString::Printf(TEXT("tap %s\nwait 1"), Draw));
+			for (const float Way : {1.0f, -1.0f})
+			{
+				// 0.12 of a mouse's count a frame is 0.3 degrees (CheeseStrikeInput::MouseDegreesPerCount), at any rate.
+				const float Counts = 0.12f * Way;
+				Then([]() { if (ACheeseStrikeCharacter* Character = Pawn(0)) { Character->TakeViewTrack(); } });
+				Play(0, FString::Printf(TEXT("hold MouseLook 0 %.4f\nwait 1\nrelease MouseLook\nwait 0.5"), Counts));
+				Then([this, Fps, Draw, Way]()
+				{
+					ACheeseStrikeCharacter* Character = Pawn(0);
+					if (Character == nullptr)
+					{
+						return;
+					}
+					const TArray<ACheeseStrikeCharacter::FViewFrame> Track = Character->TakeViewTrack();
+					const FString What = FString::Printf(TEXT("at %d fps, the %s, looking %s"), Fps, Draw, Way > 0.0f ? TEXT("up") : TEXT("down"));
+					// The frames the view turned through, and those after it stopped.
+					int32 First = INDEX_NONE;
+					int32 Last = INDEX_NONE;
+					for (int32 Frame = 1; Frame < Track.Num(); ++Frame)
+					{
+						if (FMath::Abs(Track[Frame].Pitch - Track[Frame - 1].Pitch) > 0.05f)
+						{
+							First = First == INDEX_NONE ? Frame - 1 : First;
+							Last = Frame;
+						}
+					}
+					if (!TestTrue(FString::Printf(TEXT("%s: the view turned for a second (%d frames of %d)"), *What, Last - First, Track.Num()), First != INDEX_NONE && Last - First > Fps * 0.8f && Track.Num() - Last > Fps * 0.3f))
+					{
+						return;
+					}
+					// The furthest the weapon went back against the way it was going, over each stretch.
+					const auto FurthestBack = [&Track](int32 From, int32 To, float& OutMoved)
+					{
+						OutMoved = Track[To].WeaponAt.Z - Track[From].WeaponAt.Z;
+						const float Direction = OutMoved >= 0.0f ? 1.0f : -1.0f;
+						float Back = 0.0f;
+						float Furthest = Track[From].WeaponAt.Z * Direction;
+						for (int32 Frame = From; Frame <= To; ++Frame)
+						{
+							const float Along = Track[Frame].WeaponAt.Z * Direction;
+							Furthest = FMath::Max(Furthest, Along);
+							Back = FMath::Max(Back, Furthest - Along);
+						}
+						return Back;
+					};
+					float Jump = 0.0f;
+					for (int32 Frame = First + 1; Frame < Track.Num(); ++Frame)
+					{
+						Jump = FMath::Max(Jump, FMath::Abs(Track[Frame].WeaponAt.Z - Track[Frame - 1].WeaponAt.Z));
+					}
+					TestTrue(FString::Printf(TEXT("%s: the weapon never jumps in view from one frame to the next (at most %.3f cm)"), *What, Jump), Jump < MostJump);
+					float Moved = 0.0f;
+					const float Through = FurthestBack(First, Last, Moved);
+					TestTrue(FString::Printf(TEXT("%s: through the look the weapon's height in view goes one way but for its breathing (%.2f cm, at most %.3f back)"), *What, Moved, Through), Through < MostBack);
+					const float After = FurthestBack(Last, Track.Num() - 1, Moved);
+					TestTrue(FString::Printf(TEXT("%s: and settles one way after it (%.2f cm, at most %.3f back)"), *What, Moved, After), After < MostBack);
+				});
+			}
+		}
+	}
+	Then([]() { FApp::SetUseFixedTimeStep(false); });
 	StopPlaying();
 	return true;
 }

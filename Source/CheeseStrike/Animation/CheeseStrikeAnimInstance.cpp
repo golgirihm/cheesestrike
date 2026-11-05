@@ -198,9 +198,18 @@ void UCheeseStrikeAnimInstance::DestroyAnimInstanceProxy(FAnimInstanceProxy* InP
 	// Ours lives and dies with the instance.
 }
 
-void UCheeseStrikeAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
+void UCheeseStrikeAnimInstance::PreUpdateAnimation(float DeltaSeconds)
 {
-	Super::NativeUpdateAnimation(DeltaSeconds);
+	// Read before the engine's PreUpdateAnimation, whose proxy PreUpdate copies these fields: the engine calls
+	// NativeUpdateAnimation only after that, so anything read there would reach the proxy a frame late, and the whole pose
+	// (the arms placed in view, the aim offsets) would follow the character a frame behind the camera, the weapon dipping
+	// in view as a look up began and popping back as it ended.
+	ReadCharacter(DeltaSeconds);
+	Super::PreUpdateAnimation(DeltaSeconds);
+}
+
+void UCheeseStrikeAnimInstance::ReadCharacter(float DeltaSeconds)
+{
 	const APawn* Pawn = TryGetPawnOwner();
 	if (Pawn == nullptr)
 	{
