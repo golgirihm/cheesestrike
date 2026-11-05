@@ -41,8 +41,8 @@ namespace CheeseStrikeVoice
 
 	/** The sound of a line (in /Game/CheeseStrike/Voice), empty for None. */
 	FString PathOf(ELine Line);
-	/** How loud a line is heard. */
-	constexpr float Volume = 1.0f;
+	/** How loud a line is heard: a little under full (wave 15), still well over the gunfire, which CheeseStrikeGunfire::Loudness keeps down. */
+	constexpr float Volume = 0.7f;
 
 	/** A streak of `Kind` called in, by the listener's side (or the listener) or not. */
 	ELine ForStreak(CheeseStrikeStreaks::EStreak Kind, bool bOurs);

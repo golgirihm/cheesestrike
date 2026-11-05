@@ -7,6 +7,7 @@
 #include "Rules/CheeseStrikeModes.h"
 #include "Rules/CheeseStrikeVoice.h"
 #include "Sound/SoundWave.h"
+#include "Weapons/CheeseStrikeGunfire.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -77,6 +78,9 @@ bool FEveryLineIsThere::RunTest(const FString& Parameters)
 		}
 	}
 	TestEqual(TEXT("thirteen lines, each its own"), Paths.Num(), 13);
+	// A little under full, still well over the gunfire.
+	TestTrue(TEXT("heard a little quieter than full"), Volume > 0.6f && Volume < 0.8f);
+	TestTrue(TEXT("and over the gunfire"), Volume > CheeseStrikeGunfire::Loudness);
 	return true;
 }
 
