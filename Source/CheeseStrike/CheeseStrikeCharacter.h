@@ -10,6 +10,7 @@
 #include "Rules/CheeseStrikeDowned.h"
 #include "Input/CheeseStrikeAimAssist.h"
 #include "Rules/CheeseStrikeBadges.h"
+#include "Rules/CheeseStrikeSounds.h"
 #include "CheeseStrikeCharacter.generated.h"
 
 class ACheeseStrikeGameState;
@@ -101,7 +102,7 @@ public:
 	void MulticastBleed(FVector_NetQuantize10 FromFeet, FVector_NetQuantizeNormal Way, uint8 Damage);
 	/** Where its feet are now: the bottom of its capsule. */
 	FVector FeetNow() const;
-	/** Every machine: it took a weapon from a stand or the floor, which clacks where it stands (CheeseStrikeSynth::MetalClack). */
+	/** Every machine: it took a weapon from a stand or the floor, which clacks where it stands (CheeseStrikeSounds::PickupClackPath). */
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastPickedUp();
 	/** Server: whether a reload begun now is called out ("Reloading!"), at most once every few seconds (CheeseStrikeVoice::CallsReload). */
@@ -126,6 +127,8 @@ public:
 	void CheeseStrikeBody(int32 Index = -1, int32 Team = 0);
 
 	/** Which of CheeseStrikeBodies::All it has here, and in which side's colours (INDEX_NONE for its own); INDEX_NONE until it has one. */
+	/** The voice its hurt grunts are in: its hero's (CheeseStrikeSounds::VoiceOf). */
+	CheeseStrikeSounds::EVoice GruntVoice() const;
 	int32 GetBody() const { return BodyIndex; }
 	int32 GetBodyTeam() const { return BodyTeam; }
 

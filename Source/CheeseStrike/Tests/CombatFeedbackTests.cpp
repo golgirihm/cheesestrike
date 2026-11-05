@@ -11,6 +11,7 @@
 #include "Rules/CheeseStrikeSounds.h"
 #include "Sound/SoundWave.h"
 #include "Streaks/CheeseStrikeSynth.h"
+#include "Animation/CheeseStrikeBodies.h"
 #include "UI/CheeseStrikeHUDRules.h"
 #include "Weapons/CheeseStrikeGunfire.h"
 
@@ -121,20 +122,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTakingAWeaponAndScoringSound, "CheeseStrike.Fe
 bool FTakingAWeaponAndScoringSound::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeSounds;
-	// Taking a weapon: a short clack of gun metal, bright (its sign changes thousands of times a second), in at once, over
-	// in 70 ms, never clipped.
-	const TArray<int16> Clack = CheeseStrikeSynth::MetalClack();
-	TestTrue(FString::Printf(TEXT("the clack is 60 to 80 ms (%d samples)"), Clack.Num()), Clack.Num() >= CheeseStrikeSynth::SampleRate * 6 / 100 && Clack.Num() <= CheeseStrikeSynth::SampleRate * 8 / 100);
-	const float PerSecond = CombatFeedbackTests::CrossingsPerSecond(Clack);
-	TestTrue(FString::Printf(TEXT("and metallic, bright (%.0f crossings a second)"), PerSecond), PerSecond > 2000.0f && PerSecond < 8000.0f);
-	int32 LoudestAt = 0;
-	for (int32 Index = 0; Index < Clack.Num(); ++Index)
+	// Taking a weapon: a real clack, one syllable of a reload, 80 to 120 ms (its look, its body of 1-3 kHz and its low knock
+	// were measured as tools/art/wave16_sounds.py made it).
+	const USoundWave* Clack = LoadObject<USoundWave>(nullptr, PickupClackPath);
+	if (TestNotNull(TEXT("the clack is there"), Clack))
 	{
-		LoudestAt = FMath::Abs(static_cast<int32>(Clack[Index])) > FMath::Abs(static_cast<int32>(Clack[LoudestAt])) ? Index : LoudestAt;
+		TestTrue(FString::Printf(TEXT("and is 80 to 120 ms (%.3f s)"), Clack->Duration), Clack->Duration >= 0.08f && Clack->Duration <= 0.12f);
 	}
-	TestTrue(FString::Printf(TEXT("with a sharp attack (loudest at %.1f ms)"), LoudestAt * 1000.0f / CheeseStrikeSynth::SampleRate), LoudestAt < CheeseStrikeSynth::SampleRate * 5 / 1000);
-	TestTrue(TEXT("loud enough"), CombatFeedbackTests::Loudest(Clack) > 20000);
-	TestTrue(TEXT("and never clipped"), !Clack.ContainsByPredicate([](int16 Value) { return Value == 32767 || Value == -32768; }));
 	TestTrue(TEXT("a kill rings the till"), ScoreSound(3, 4, 1, 1) == EScore::Kill);
 	TestTrue(TEXT("a kill with an assist too rings it once"), ScoreSound(3, 4, 1, 2) == EScore::Kill);
 	TestTrue(TEXT("an assist a softer ching"), ScoreSound(3, 3, 1, 2) == EScore::Assist);
@@ -152,5 +146,103 @@ bool FTheFallFlashFadesInAndOut::RunTest(const FString& Parameters)
 	TestEqual(TEXT("at its strongest as the fall lands"), FallFlashAlpha(0.0f), FallFlashPeak);
 	TestTrue(TEXT("fading as it goes"), FallFlashAlpha(FallFlashTime * 0.5f) < FallFlashPeak && FallFlashAlpha(FallFlashTime * 0.5f) > 0.0f);
 	TestEqual(TEXT("gone after its time"), FallFlashAlpha(FallFlashTime), 0.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEachHeroGruntsInItsOwnVoice, "CheeseStrike.Feedback.GruntVoices", CombatFeedbackTests::Flags)
+
+bool FEachHeroGruntsInItsOwnVoice::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeSounds;
+	// Of the four heroes Lt. Belica is the woman: hers are a woman's grunts, the men's the men's; a body unknown a man's.
+	int32 Women = 0;
+	for (const CheeseStrikeBodies::FBody& Body : CheeseStrikeBodies::All())
+	{
+		const bool bWoman = FString(Body.Name) == TEXT("Lt. Belica");
+		TestTrue(FString::Printf(TEXT("%s grunts in %s voice"), Body.Name, bWoman ? TEXT("a woman's") : TEXT("a man's")), VoiceOf(Body.Name) == (bWoman ? EVoice::Female : EVoice::Male));
+		Women += bWoman ? 1 : 0;
+	}
+	TestEqual(TEXT("Lt. Belica is among the heroes"), Women, 1);
+	TestTrue(TEXT("anyone else, a man's"), VoiceOf(TEXT("Mannequin")) == EVoice::Male);
+	// Ten of each, every one there, short, and none of the one voice's the other's.
+	TSet<FString> Paths;
+	for (const EVoice Voice : {EVoice::Male, EVoice::Female})
+	{
+		for (int32 Variant = 0; Variant < Oofs; ++Variant)
+		{
+			const FString Path = OofPath(Variant, Voice);
+			Paths.Add(Path);
+			const USoundWave* Wave = LoadObject<USoundWave>(nullptr, *Path);
+			if (TestNotNull(FString::Printf(TEXT("%s is there"), *Path), Wave))
+			{
+				TestTrue(FString::Printf(TEXT("and is short (%.2f s)"), Wave->Duration), Wave->Duration > 0.1f && Wave->Duration < 0.5f);
+			}
+		}
+	}
+	TestEqual(TEXT("twenty grunts, ten a voice, all different"), Paths.Num(), 2 * Oofs);
+	TestTrue(TEXT("the woman's in a folder of their own"), OofPath(3, EVoice::Female).Contains(TEXT("HurtFemale")) && !OofPath(3, EVoice::Male).Contains(TEXT("HurtFemale")));
+	TestEqual(TEXT("a man's by default"), OofPath(3), OofPath(3, EVoice::Male));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSirenIsAnAirRaidSiren, "CheeseStrike.Feedback.Siren", CombatFeedbackTests::Flags)
+
+bool FTheSirenIsAnAirRaidSiren::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeSynth;
+	// The Gouda Overload's warning: one slow wail, rising with no warble to its top, held, and winding down, never back up.
+	constexpr float Seconds = 4.0f;
+	float Last = SirenPitch(0.0f, Seconds);
+	float Top = 0.0f;
+	bool bRisingOnly = true;
+	bool bFallingOnly = true;
+	bool bTopped = false;
+	for (float Time = 0.01f; Time <= Seconds; Time += 0.01f)
+	{
+		const float Pitch = SirenPitch(Time, Seconds);
+		Top = FMath::Max(Top, Pitch);
+		if (!bTopped && Pitch < Last - 0.001f)
+		{
+			bTopped = true;
+		}
+		bRisingOnly &= bTopped || Pitch >= Last - 0.001f;
+		bFallingOnly &= !bTopped || Pitch <= Last + 0.001f;
+		Last = Pitch;
+	}
+	TestTrue(TEXT("it rises steadily"), bRisingOnly);
+	TestTrue(TEXT("then falls steadily, once"), bTopped && bFallingOnly);
+	TestEqual(TEXT("to its top note"), Top, SirenTopHertz);
+	TestTrue(FString::Printf(TEXT("from low (%.0f Hz)"), SirenPitch(0.0f, Seconds)), SirenPitch(0.0f, Seconds) < SirenTopHertz * 0.3f);
+	TestTrue(TEXT("taking over a second to get there, slowly"), SirenPitch(1.0f, Seconds) < SirenTopHertz * 0.95f);
+	// Its samples: the wail and its tail, at SirenPeak, never clipped.
+	const TArray<int16> Samples = Siren(Seconds);
+	TestEqual(TEXT("the wail and its reverberant tail"), Samples.Num(), FMath::RoundToInt(Seconds * SampleRate) + FMath::RoundToInt(SirenTail * SampleRate));
+	const int32 Peak = CombatFeedbackTests::Loudest(Samples);
+	TestTrue(FString::Printf(TEXT("peaking at %.2f of full scale (%.1f dBFS)"), Peak / 32767.0f, 20.0f * FMath::LogX(10.0f, Peak / 32767.0f)), FMath::Abs(Peak / 32767.0f - SirenPeak) < 0.01f);
+	// The tail rings on after the wail: its first half second is far from silent.
+	int32 TailPeak = 0;
+	for (int32 Index = FMath::RoundToInt(Seconds * SampleRate); Index < FMath::RoundToInt((Seconds + 0.5f) * SampleRate); ++Index)
+	{
+		TailPeak = FMath::Max(TailPeak, FMath::Abs(static_cast<int32>(Samples[Index])));
+	}
+	TestTrue(FString::Printf(TEXT("its echo rings on after the wail (%.2f of the peak)"), static_cast<float>(TailPeak) / Peak), TailPeak > Peak * 0.05f);
+	// The motor's hum under it: at 50 Hz, in the wail's first half second, before the rotors are loud (Goertzel's power
+	// against the whole's).
+	const int32 From = FMath::RoundToInt(0.3f * SampleRate);
+	const int32 To = FMath::RoundToInt(0.8f * SampleRate);
+	double Q1 = 0.0;
+	double Q2 = 0.0;
+	double Energy = 0.0;
+	const double Coefficient = 2.0 * FMath::Cos(2.0 * PI * 50.0 / SampleRate);
+	for (int32 Index = From; Index < To; ++Index)
+	{
+		const double Value = Samples[Index];
+		const double Q0 = Coefficient * Q1 - Q2 + Value;
+		Q2 = Q1;
+		Q1 = Q0;
+		Energy += Value * Value;
+	}
+	const double Hum = (Q1 * Q1 + Q2 * Q2 - Coefficient * Q1 * Q2) * 2.0 / (To - From);
+	TestTrue(FString::Printf(TEXT("with its motor's low hum (%.2f of the energy at 50 Hz)"), Hum / Energy), Hum / Energy > 0.1);
 	return true;
 }

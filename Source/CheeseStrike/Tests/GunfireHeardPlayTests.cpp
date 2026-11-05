@@ -12,12 +12,13 @@
 //
 // It needs the audio engine: `python tools/run_tests.py --sound
 // CheeseStrike.Play.GunfireIsHeard`. Run without (the suite runs -nosound),
-// it plays the match and says it could not listen.
+// it says so and plays nothing.
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #include "Misc/AutomationTest.h"
 #include "Containers/Ticker.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -110,6 +111,12 @@ bool FGunfireIsHeardThroughALongMatch::RunTest(const FString& Parameters)
 {
 	using namespace PlayTesting;
 	using namespace GunfireHeardPlayTests;
+	if (GEngine == nullptr || !GEngine->UseSound())
+	{
+		// Three minutes of play with nothing to listen with would prove nothing.
+		AddInfo(TEXT("no audio engine (the tests run -nosound): not played; python tools/run_tests.py --sound CheeseStrike.Play.GunfireIsHeard listens"));
+		return true;
+	}
 	FSession Session;
 	Session.Options = TEXT("?Bots=3?BotSkill=1");
 	StartPlaying(Session);

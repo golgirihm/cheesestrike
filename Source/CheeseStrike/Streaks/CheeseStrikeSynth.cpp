@@ -32,22 +32,115 @@ namespace CheeseStrikeSynth
 		return Samples;
 	}
 
+	float SirenPitch(float Time, float Seconds)
+	{
+		const float Rise = SirenRise * Seconds;
+		const float Top = Rise + SirenHold * Seconds;
+		if (Time <= Rise)
+		{
+			// The rotor spinning up: quick at first, easing into its top note.
+			const float Along = FMath::Clamp(Time / FMath::Max(Rise, 0.01f), 0.0f, 1.0f);
+			return SirenTopHertz * FMath::Lerp(SirenLowest, 1.0f, 1.0f - FMath::Pow(1.0f - Along, 2.2f));
+		}
+		if (Time <= Top)
+		{
+			return SirenTopHertz;
+		}
+		// Winding down, the power cut.
+		const float Along = FMath::Clamp((Time - Top) / FMath::Max(Seconds - Top, 0.01f), 0.0f, 1.0f);
+		return SirenTopHertz * FMath::Lerp(1.0f, SirenWoundDown, FMath::Pow(Along, 0.8f));
+	}
+
 	TArray<int16> Siren(float Seconds)
 	{
-		const int32 Count = FMath::Max(1, FMath::RoundToInt(Seconds * SampleRate));
-		TArray<int16> Samples;
-		Samples.SetNumUninitialized(Count);
+		// An air-raid siren heard across a town: one slow wail, rising as its rotors spin up, held, and winding down
+		// (SirenPitch); two tones a minor third apart, as a dual-tone siren's two rotors, each buzzing with its harmonics,
+		// louder the faster they turn; under it the low hum of its motor; and the distance: dulled above 3 kHz, a slap of
+		// echo off far walls and a reverberant tail that runs SirenTail past the wail.
+		const int32 Dry = FMath::Max(1, FMath::RoundToInt(Seconds * SampleRate));
+		const int32 Count = Dry + FMath::RoundToInt(SirenTail * SampleRate);
+		TArray<float> Wave;
+		Wave.SetNumZeroed(Count);
 		double Phase = 0.0;
-		for (int32 Index = 0; Index < Count; ++Index)
+		double Third = 0.0;
+		for (int32 Index = 0; Index < Dry; ++Index)
 		{
 			const float Time = static_cast<float>(Index) / SampleRate;
-			// Up and down between 420 and 880 Hz every two seconds, like a hand-cranked siren.
-			const float Wail = 0.5f - 0.5f * FMath::Cos(2.0f * PI * Time / 2.0f);
-			const float Frequency = FMath::Lerp(420.0f, 880.0f, Wail);
-			Phase += 2.0 * PI * Frequency / SampleRate;
-			const float Envelope = FMath::Min(1.0f, Time / 0.3f) * FMath::Min(1.0f, (Seconds - Time) / 0.4f);
-			const float Value = (FMath::Sin(Phase) + 0.45f * FMath::Sin(2.0 * Phase) + 0.2f * FMath::Sin(3.0 * Phase)) * Envelope * 0.32f;
-			Samples[Index] = static_cast<int16>(FMath::Clamp(Value, -1.0f, 1.0f) * 32767.0f);
+			const float Pitch = SirenPitch(Time, Seconds);
+			Phase += 2.0 * PI * Pitch / SampleRate;
+			Third += 2.0 * PI * Pitch * 1.1892 / SampleRate;
+			float Tone = 0.0f;
+			for (int32 Harmonic = 1; Harmonic <= 8; ++Harmonic)
+			{
+				const float Weight = 1.0f / FMath::Pow(static_cast<float>(Harmonic), 1.3f);
+				Tone += Weight * (FMath::Sin(Harmonic * Phase) + 0.55f * FMath::Sin(Harmonic * Third));
+			}
+			const float Speed = Pitch / SirenTopHertz;
+			const float Edges = FMath::Min(1.0f, Time / 0.15f) * FMath::Min(1.0f, (Seconds - Time) / 0.3f);
+			const float Hum = 0.3f * FMath::Sin(2.0f * PI * 50.0f * Time) + 0.15f * FMath::Sin(2.0f * PI * 100.0f * Time);
+			const float HumEdges = FMath::Min(1.0f, Time / 0.3f) * FMath::Min(1.0f, (Seconds - Time) / 0.5f);
+			Wave[Index] = Tone * FMath::Pow(Speed, 1.5f) * Edges * 0.5f + Hum * HumEdges;
+		}
+		// Far off: nothing bright left (a one-pole low-pass near 3 kHz, twice).
+		const float Smooth = 1.0f - FMath::Exp(-2.0f * PI * 3000.0f / SampleRate);
+		for (int32 Pass = 0; Pass < 2; ++Pass)
+		{
+			float Last = 0.0f;
+			for (float& Value : Wave)
+			{
+				Last += Smooth * (Value - Last);
+				Value = Last;
+			}
+		}
+		// A slap of echo off far walls, then the town's reverberation: four combs into two all-passes (Schroeder's).
+		TArray<float> Wet;
+		Wet.SetNumZeroed(Count);
+		for (const TPair<float, float>& Echo : {TPair<float, float>(0.23f, 0.3f), TPair<float, float>(0.41f, 0.18f)})
+		{
+			const int32 Delay = FMath::RoundToInt(Echo.Key * SampleRate);
+			for (int32 Index = Delay; Index < Count; ++Index)
+			{
+				Wet[Index] += Wave[Index - Delay] * Echo.Value;
+			}
+		}
+		TArray<float> Room;
+		Room.SetNumZeroed(Count);
+		for (const TPair<float, float>& Comb : {TPair<float, float>(0.0297f, 0.84f), TPair<float, float>(0.0371f, 0.83f), TPair<float, float>(0.0411f, 0.82f), TPair<float, float>(0.0437f, 0.81f)})
+		{
+			const int32 Delay = FMath::RoundToInt(Comb.Key * SampleRate);
+			TArray<float> Line;
+			Line.SetNumZeroed(Count);
+			for (int32 Index = 0; Index < Count; ++Index)
+			{
+				Line[Index] = Wave[Index] + (Index >= Delay ? Line[Index - Delay] * Comb.Value : 0.0f);
+				Room[Index] += Line[Index] * 0.25f;
+			}
+		}
+		for (const int32 Delay : {FMath::RoundToInt(0.005f * SampleRate), FMath::RoundToInt(0.0017f * SampleRate)})
+		{
+			TArray<float> Passed;
+			Passed.SetNumZeroed(Count);
+			for (int32 Index = 0; Index < Count; ++Index)
+			{
+				const float Back = Index >= Delay ? Passed[Index - Delay] : 0.0f;
+				const float In = Index >= Delay ? Room[Index - Delay] : 0.0f;
+				Passed[Index] = -0.7f * Room[Index] + In + 0.7f * Back;
+			}
+			Room = MoveTemp(Passed);
+		}
+		float Peak = 0.0f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			Wave[Index] = Wave[Index] * 0.75f + Wet[Index] + Room[Index] * 0.35f;
+			Peak = FMath::Max(Peak, FMath::Abs(Wave[Index]));
+		}
+		// At SirenPeak of full scale.
+		TArray<int16> Samples;
+		Samples.SetNumUninitialized(Count);
+		const float Gain = Peak > 0.0f ? SirenPeak / Peak : 0.0f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			Samples[Index] = static_cast<int16>(FMath::Clamp(Wave[Index] * Gain, -1.0f, 1.0f) * 32767.0f);
 		}
 		return Samples;
 	}
@@ -150,38 +243,6 @@ namespace CheeseStrikeSynth
 		return Normalised(Values, FMath::Clamp(0.71f * Weight, 0.05f, 0.95f));
 	}
 
-	TArray<int16> MetalClack()
-	{
-		// Gun metal knocked: a burst of white noise in at once and over in a few hundredths, through three resonant
-		// band-passes (two-pole, narrow) near 1.2, 2.4 and 3.6 kHz that ring a little past the burst, with a click of the
-		// bare burst at the front; 70 ms in all.
-		const int32 Count = FMath::RoundToInt(0.07f * SampleRate);
-		TArray<float> Values;
-		Values.SetNumUninitialized(Count);
-		uint32 Seed = 2468u;
-		const float Hertz[] = {1200.0f, 2400.0f, 3600.0f};
-		const float Shares[] = {1.0f, 0.7f, 0.45f};
-		// A resonator each: y = x + r*2cos(w)*y1 - r*r*y2, the ring set by r.
-		float Y1[3] = {0.0f, 0.0f, 0.0f};
-		float Y2[3] = {0.0f, 0.0f, 0.0f};
-		for (int32 Index = 0; Index < Count; ++Index)
-		{
-			const float Time = static_cast<float>(Index) / SampleRate;
-			const float Burst = Noise(Seed) * FMath::Min(1.0f, Time / 0.0004f) * FMath::Exp(-Time / 0.009f);
-			float Value = Burst * 0.25f;
-			for (int32 Band = 0; Band < 3; ++Band)
-			{
-				const float Ring = 0.985f;
-				const float Cosine = FMath::Cos(2.0f * PI * Hertz[Band] / SampleRate);
-				const float Y = Burst * (1.0f - Ring) + 2.0f * Ring * Cosine * Y1[Band] - Ring * Ring * Y2[Band];
-				Y2[Band] = Y1[Band];
-				Y1[Band] = Y;
-				Value += Y * Shares[Band] * 3.0f;
-			}
-			Values[Index] = Value * FMath::Min(1.0f, (Count - Index) / (0.012f * SampleRate));
-		}
-		return Normalised(Values, 0.8f);
-	}
 
 	TArray<int16> KaChing(bool bAssist)
 	{

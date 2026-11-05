@@ -4,10 +4,16 @@
 
 namespace CheeseStrikeSounds
 {
-	FString OofPath(int32 Variant)
+	EVoice VoiceOf(const FString& Hero)
+	{
+		return Hero == TEXT("Lt. Belica") ? EVoice::Female : EVoice::Male;
+	}
+
+	FString OofPath(int32 Variant, EVoice Voice)
 	{
 		const int32 Number = FMath::Abs(Variant) % Oofs + 1;
-		return FString::Printf(TEXT("/Game/OpenGameArt/Hurt/SW_Oof%d.SW_Oof%d"), Number, Number);
+		return Voice == EVoice::Female ? FString::Printf(TEXT("/Game/OpenGameArt/HurtFemale/SW_OofFemale%d.SW_OofFemale%d"), Number, Number)
+			: FString::Printf(TEXT("/Game/OpenGameArt/Hurt/SW_Oof%d.SW_Oof%d"), Number, Number);
 	}
 
 	bool ShouldOof(float Lost, float SinceLast)

@@ -22,6 +22,8 @@ namespace CheeseStrikeCredits
 		{TEXT("The Swiss Shotgun's shots"), TEXT("From \"The Free Firearm Sound Library\" by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney, from OpenGameArt.org, CC0.")},
 		{TEXT("Footsteps"), TEXT("From \"Footsteps\" by GboxMikeFozzy, from OpenGameArt.org, CC0.")},
 		{TEXT("Hurt"), TEXT("From \"Hurt Sound Effects\" by EZduzziteh, from OpenGameArt.org, CC0; and \"11 male human pain/death sounds\" by Michel Baradari, from OpenGameArt.org, licensed under Creative Commons Attribution 3.0 (CC BY 3.0): creativecommons.org/licenses/by/3.0.")},
+		{TEXT("Hurt, her voice"), TEXT("From \"Female Hurt Grunts & Groans\" by Nocturnal_Vanguard (AuraVoice), from OpenGameArt.org, CC0; and \"RPG Voice Starter Pack\" by cicifyre, from OpenGameArt.org, CC0.")},
+		{TEXT("A weapon taken"), TEXT("From \"equipment clicks III\" by LFA, from OpenGameArt.org, CC0.")},
 		{TEXT("The voice"), TEXT("Spoken by Piper (piper-tts) with its \"norman\" voice by Bryce Beattie, trained on public-domain LibriVox recordings.")},
 		{TEXT("Online play"), TEXT("Steamworks, by Valve.")},
 	};
