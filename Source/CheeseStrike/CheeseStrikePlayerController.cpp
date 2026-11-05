@@ -372,7 +372,7 @@ bool ACheeseStrikePlayerController::IsLobbyReady() const
 
 bool ACheeseStrikePlayerController::IsDoneWithTheResults() const
 {
-	const bool bFrontEnd = ShownPage == EMenuPage::Main || ShownPage == EMenuPage::Find || ShownPage == EMenuPage::Credits || ShownPage == EMenuPage::Options || ShownPage == EMenuPage::Loadout;
+	const bool bFrontEnd = ShownPage == EMenuPage::Main || ShownPage == EMenuPage::Find || ShownPage == EMenuPage::Credits || ShownPage == EMenuPage::Options || ShownPage == EMenuPage::Loadout || ShownPage == EMenuPage::Themes;
 	// A level that skips the lobby (?StartNow, as the play scripts' do) goes straight into a match: the player's in it.
 	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
 	const bool bPlaying = State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded() && GetPawn() != nullptr && GetViewTarget() == GetPawn();
@@ -1061,6 +1061,10 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 	{
 		Chosen = EMenuPage::Loadout;
 	}
+	else if (Page.Equals(TEXT("Themes"), ESearchCase::IgnoreCase))
+	{
+		Chosen = EMenuPage::Themes;
+	}
 	else if (Page.Equals(TEXT("Pause"), ESearchCase::IgnoreCase))
 	{
 		// The pause menu: during a match, paused (or still paused) on it; with `Tab` "Ask", the host's Back to Lobby asks.
@@ -1080,6 +1084,15 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 		{
 			Menu->SetOptionsTab(static_cast<EOptionsTab>(Index));
 		}
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeThemes(int32 Theme)
+{
+	ChooseMenu(EMenuPage::Themes);
+	if (Menu.IsValid() && Theme > 0)
+	{
+		Menu->ShowTheme(Theme - 1);
 	}
 }
 

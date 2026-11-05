@@ -334,6 +334,284 @@ namespace CheeseStrikeSynth
 		return Normalised(Values, 0.25f);
 	}
 
+	namespace
+	{
+		/** A two-pole resonator at `Hertz` ringing by `Ring` (0.9 dull to 0.999 long), fed `In` a sample at a time. */
+		struct FResonator
+		{
+			float Cosine;
+			float Ring;
+			float Y1 = 0.0f;
+			float Y2 = 0.0f;
+			FResonator(float Hertz, float InRing) : Cosine(FMath::Cos(2.0f * PI * Hertz / SampleRate)), Ring(InRing) {}
+			float Feed(float In)
+			{
+				const float Y = In * (1.0f - Ring) + 2.0f * Ring * Cosine * Y1 - Ring * Ring * Y2;
+				Y2 = Y1;
+				Y1 = Y;
+				return Y;
+			}
+		};
+
+		/** `Seconds` of silence to fill in. */
+		TArray<float> Blank(float Seconds)
+		{
+			TArray<float> Values;
+			Values.SetNumZeroed(FMath::Max(1, FMath::RoundToInt(Seconds * SampleRate)));
+			return Values;
+		}
+
+		/** A short fade at the very end, so that nothing clicks as it stops. */
+		void FadeOut(TArray<float>& Values, float Seconds)
+		{
+			const int32 Count = Values.Num();
+			for (int32 Index = 0; Index < Count; ++Index)
+			{
+				Values[Index] *= FMath::Min(1.0f, (Count - Index) / (Seconds * SampleRate));
+			}
+		}
+
+		// The Cheese Board: a fingertip on a wooden board (two short wood resonances, 30 ms), and a knuckle's knock on it
+		// (deeper resonances with a soft slap, 90 ms).
+		TArray<int16> WoodTick()
+		{
+			TArray<float> Values = Blank(0.03f);
+			uint32 Seed = 1101u;
+			FResonator High(1900.0f, 0.975f);
+			FResonator Mid(950.0f, 0.98f);
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				const float Burst = Noise(Seed) * FMath::Exp(-Time / 0.0012f);
+				Values[Index] = High.Feed(Burst) * 1.0f + Mid.Feed(Burst) * 0.7f;
+			}
+			FadeOut(Values, 0.006f);
+			return Normalised(Values, 0.3f);
+		}
+
+		TArray<int16> WoodKnock()
+		{
+			TArray<float> Values = Blank(0.09f);
+			uint32 Seed = 1102u;
+			FResonator Low(190.0f, 0.994f);
+			FResonator Body(420.0f, 0.99f);
+			FResonator Top(1300.0f, 0.96f);
+			const float SlapPole = PoleFor(700.0f);
+			float A = 0.0f;
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				const float White = Noise(Seed);
+				const float Burst = White * FMath::Exp(-Time / 0.003f);
+				A += (White - A) * SlapPole;
+				const float Slap = A * 2.0f * FMath::Min(1.0f, Time / 0.001f) * FMath::Exp(-Time / 0.008f);
+				Values[Index] = Low.Feed(Burst) * 1.0f + Body.Feed(Burst) * 0.6f + Top.Feed(Burst) * 0.25f + Slap;
+			}
+			FadeOut(Values, 0.012f);
+			return Normalised(Values, 0.6f);
+		}
+
+		// The Deli Counter: a slip of paper flicked (a breath of high noise, 22 ms), and a ticket punched (a click, then
+		// the punch's chunk 18 ms after it, 100 ms).
+		TArray<int16> PaperTick()
+		{
+			TArray<float> Values = Blank(0.022f);
+			uint32 Seed = 2201u;
+			const float Pole = PoleFor(3000.0f);
+			float Low = 0.0f;
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				const float White = Noise(Seed);
+				Low += (White - Low) * Pole;
+				Values[Index] = (White - Low) * FMath::Min(1.0f, Time / 0.0008f) * FMath::Exp(-Time / 0.006f);
+			}
+			FadeOut(Values, 0.004f);
+			return Normalised(Values, 0.25f);
+		}
+
+		TArray<int16> TicketPunch()
+		{
+			TArray<float> Values = Blank(0.1f);
+			uint32 Seed = 2202u;
+			const float ChunkPole = PoleFor(900.0f);
+			float A = 0.0f;
+			float B = 0.0f;
+			FResonator Lever(2600.0f, 0.95f);
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				const float White = Noise(Seed);
+				// The lever's click at the start.
+				const float Click = Lever.Feed(White * FMath::Exp(-Time / 0.0015f)) * 1.2f;
+				// The punch through the card, 18 ms on: low noise and a thud at 140 Hz.
+				const float Since = Time - 0.018f;
+				float Chunk = 0.0f;
+				if (Since >= 0.0f)
+				{
+					A += (White - A) * ChunkPole;
+					B += (A - B) * ChunkPole;
+					Chunk = B * 3.0f * FMath::Min(1.0f, Since / 0.001f) * FMath::Exp(-Since / 0.02f) + FMath::Sin(2.0f * PI * 140.0f * Since) * 0.6f * FMath::Exp(-Since / 0.03f);
+				}
+				Values[Index] = Click + Chunk;
+			}
+			FadeOut(Values, 0.012f);
+			return Normalised(Values, 0.65f);
+		}
+
+		// Cave Aged: a fingernail on a glass (three inharmonic partials ringing 320 ms), and a tap on stone (a damped low
+		// knock with a little grit, 80 ms).
+		TArray<int16> GlassPing()
+		{
+			TArray<float> Values = Blank(0.32f);
+			const float Partials[] = {2600.0f, 5420.0f, 8150.0f};
+			const float Shares[] = {1.0f, 0.4f, 0.15f};
+			const float Rings[] = {0.09f, 0.05f, 0.03f};
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				float Value = 0.0f;
+				for (int32 Partial = 0; Partial < UE_ARRAY_COUNT(Partials); ++Partial)
+				{
+					Value += FMath::Sin(2.0f * PI * Partials[Partial] * Time) * Shares[Partial] * FMath::Exp(-Time / Rings[Partial]);
+				}
+				Values[Index] = Value * FMath::Min(1.0f, Time / 0.001f);
+			}
+			FadeOut(Values, 0.03f);
+			return Normalised(Values, 0.3f);
+		}
+
+		TArray<int16> StoneTap()
+		{
+			TArray<float> Values = Blank(0.08f);
+			uint32 Seed = 3302u;
+			const float GritPole = PoleFor(500.0f);
+			float A = 0.0f;
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				const float White = Noise(Seed);
+				A += (White - A) * GritPole;
+				const float Knock = FMath::Sin(2.0f * PI * (160.0f + 60.0f * FMath::Exp(-Time / 0.01f)) * Time) * FMath::Min(1.0f, Time / 0.0015f) * FMath::Exp(-Time / 0.025f);
+				const float Grit = A * 2.5f * FMath::Exp(-Time / 0.01f);
+				Values[Index] = Knock + Grit;
+			}
+			FadeOut(Values, 0.01f);
+			return Normalised(Values, 0.6f);
+		}
+
+		// Cartoon Cheese: a pop (a tone dropping from 700 to 180 Hz in a few hundredths with a click at the front, 70 ms),
+		// and a boing (a spring's pitch bouncing down and settling, 350 ms).
+		TArray<int16> Pop()
+		{
+			TArray<float> Values = Blank(0.07f);
+			uint32 Seed = 4401u;
+			double Phase = 0.0;
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				const float Frequency = 180.0f + 520.0f * FMath::Exp(-Time / 0.012f);
+				Phase += 2.0 * PI * Frequency / SampleRate;
+				const float Tone = static_cast<float>(FMath::Sin(Phase)) * FMath::Exp(-Time / 0.025f);
+				const float Click = Noise(Seed) * 0.5f * FMath::Exp(-Time / 0.0008f);
+				Values[Index] = Tone * FMath::Min(1.0f, Time / 0.0005f) + Click;
+			}
+			FadeOut(Values, 0.01f);
+			return Normalised(Values, 0.45f);
+		}
+
+		TArray<int16> Boing()
+		{
+			TArray<float> Values = Blank(0.35f);
+			double Phase = 0.0;
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				// The spring: a pitch that falls fast, then wobbles about 240 Hz, the wobble dying away.
+				const float Frequency = 240.0f + 320.0f * FMath::Exp(-Time / 0.06f) + 110.0f * FMath::Exp(-Time / 0.14f) * FMath::Sin(2.0f * PI * 11.0f * Time);
+				Phase += 2.0 * PI * Frequency / SampleRate;
+				const float Tone = static_cast<float>(FMath::Sin(Phase) + 0.35 * FMath::Sin(2.0 * Phase) + 0.12 * FMath::Sin(3.0 * Phase));
+				Values[Index] = Tone * FMath::Min(1.0f, Time / 0.004f) * FMath::Exp(-Time / 0.11f);
+			}
+			FadeOut(Values, 0.03f);
+			return Normalised(Values, 0.6f);
+		}
+
+		// Tactical: a switch's mechanical click (two ticks 9 ms apart through a metal resonance, 35 ms), and a radio's
+		// blip (two short tones with a breath of static, 140 ms).
+		TArray<int16> MechanicalClick()
+		{
+			TArray<float> Values = Blank(0.035f);
+			uint32 Seed = 5501u;
+			FResonator Metal(2800.0f, 0.955f);
+			const float BodyPole = PoleFor(1200.0f);
+			float A = 0.0f;
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				const float White = Noise(Seed);
+				const float Second = FMath::Max(0.0f, Time - 0.009f);
+				const float Ticks = White * (FMath::Exp(-Time / 0.0009f) + (Time >= 0.009f ? 0.8f * FMath::Exp(-Second / 0.0012f) : 0.0f));
+				A += (Ticks - A) * BodyPole;
+				Values[Index] = Metal.Feed(Ticks) * 1.5f + A * 1.2f;
+			}
+			FadeOut(Values, 0.005f);
+			return Normalised(Values, 0.4f);
+		}
+
+		TArray<int16> RadioBlip()
+		{
+			TArray<float> Values = Blank(0.14f);
+			uint32 Seed = 5502u;
+			double Phase = 0.0;
+			const float Low = PoleFor(3000.0f);
+			const float High = PoleFor(1500.0f);
+			float A = 0.0f;
+			float B = 0.0f;
+			for (int32 Index = 0; Index < Values.Num(); ++Index)
+			{
+				const float Time = static_cast<float>(Index) / SampleRate;
+				// Two tones, 45 ms each, gated with a 4 ms edge.
+				const float Frequency = Time < 0.045f ? 1150.0f : 1500.0f;
+				Phase += 2.0 * PI * Frequency / SampleRate;
+				const float InTone = Time < 0.09f ? FMath::Min(1.0f, Time / 0.004f) * FMath::Min(1.0f, (0.09f - Time) / 0.004f) * (Time < 0.045f ? FMath::Min(1.0f, (0.045f - Time) / 0.004f) : FMath::Min(1.0f, (Time - 0.045f) / 0.004f)) : 0.0f;
+				const float Tone = static_cast<float>(FMath::Sin(Phase) + 0.3 * FMath::Sin(3.0 * Phase)) * InTone;
+				// Static under it, through a band of 1.5 to 3 kHz, fading over the whole blip.
+				const float White = Noise(Seed);
+				A += (White - A) * Low;
+				B += (A - B) * High;
+				const float Static = (A - B) * 0.9f * FMath::Exp(-Time / 0.06f);
+				Values[Index] = Tone + Static;
+			}
+			FadeOut(Values, 0.02f);
+			return Normalised(Values, 0.55f);
+		}
+	}
+
+	TArray<int16> ThemeHover(int32 Theme)
+	{
+		switch (Theme)
+		{
+		case 1: return PaperTick();
+		case 2: return GlassPing();
+		case 3: return Pop();
+		case 4: return MechanicalClick();
+		default: return WoodTick();
+		}
+	}
+
+	TArray<int16> ThemeClick(int32 Theme)
+	{
+		switch (Theme)
+		{
+		case 1: return TicketPunch();
+		case 2: return StoneTap();
+		case 3: return Boing();
+		case 4: return RadioBlip();
+		default: return WoodKnock();
+		}
+	}
+
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples)
 	{
 		USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(Outer);

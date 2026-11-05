@@ -1,0 +1,62 @@
+# TEMPORARY: the sampler of UI themes on the front end (CheeseStrikeThemes n;
+# UI/CheeseStrikeThemes.h), one picture a theme, each again with its primary
+# button held as hovered (CheeseStrike.ThemeHover 4: the fourth themed button,
+# after the sample's three tabs; the Cartoon's caught 0.1 s in as its bounce
+# overshoots), the first and last themes' dropdowns open, the last's card
+# tooltip (CheeseStrike.MenuTooltip 1), then all five stacked. Run with
+# tools/play.ps1 -Lobby -Res 1280x720 -FixedFps 60 -Tag themes (and -Sound to
+# hear each theme's hover and click when a person moves the mouse).
+wait 3
+cmd CheeseStrikeThemes 1
+wait 1
+shot themes_1_cheese_board
+cmd CheeseStrike.ThemeHover 4
+wait 0.5
+shot themes_1_cheese_board_hover
+cmd CheeseStrike.ThemeHover 0
+cmd CheeseStrikeDropdown 0
+wait 0.5
+shot themes_1_cheese_board_dropdown
+cmd CheeseStrikeDropdown -1
+cmd CheeseStrikeThemes 2
+wait 1
+shot themes_2_deli_counter
+cmd CheeseStrike.ThemeHover 4
+wait 0.5
+shot themes_2_deli_counter_hover
+cmd CheeseStrike.ThemeHover 0
+cmd CheeseStrikeThemes 3
+wait 1
+shot themes_3_cave_aged
+cmd CheeseStrike.ThemeHover 4
+wait 0.5
+shot themes_3_cave_aged_hover
+cmd CheeseStrike.ThemeHover 0
+cmd CheeseStrikeThemes 4
+wait 1
+shot themes_4_cartoon_cheese
+cmd CheeseStrike.ThemeHover 4
+wait 0.1
+shot themes_4_cartoon_cheese_midhover
+wait 0.6
+shot themes_4_cartoon_cheese_hover
+cmd CheeseStrike.ThemeHover 0
+cmd CheeseStrikeThemes 5
+wait 1
+shot themes_5_tactical
+cmd CheeseStrike.ThemeHover 4
+wait 0.5
+shot themes_5_tactical_hover
+cmd CheeseStrikeDropdown 0
+wait 0.5
+shot themes_5_tactical_dropdown
+cmd CheeseStrikeDropdown -1
+cmd CheeseStrike.ThemeHover 0
+cmd CheeseStrike.MenuTooltip 1
+wait 0.5
+shot themes_5_tactical_tooltip
+cmd CheeseStrike.MenuTooltip 0
+cmd CheeseStrikeThemes 6
+wait 1
+shot themes_6_show_all
+quit

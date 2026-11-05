@@ -50,6 +50,7 @@ namespace CheeseStrikeMusic
 		case EMenuPage::Main:
 		case EMenuPage::Find:
 		case EMenuPage::Credits:
+		case EMenuPage::Themes:
 			return true;
 		// The settings and the loadout, from the front end or over the lobby (whose countdown fades it out as the lobby's
 		// does); the loadout page over a match's count-in is the match's, with no music.
