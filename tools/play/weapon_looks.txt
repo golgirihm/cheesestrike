@@ -1,6 +1,6 @@
 # Looks at every weapon in hand (CheeseStrikeArm puts each in hand at once): in first person from the hip and down the
 # sights, and on the body from its right side, for checking how each is held and how its cheese looks; the streak's
-# Gouda Gatling and the Cheese Stick's swing too.
+# Gouda Gatling and the Cheese Stick's swing too; the two-gun weapons aimed from outside as well.
 wait 3.5
 cmd CheeseStrikeArm blaster
 wait 0.8
@@ -45,6 +45,21 @@ release Aim
 cmd CheeseStrikeOutside 130 75 45
 wait 0.6
 shot looks_munster_3
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1.2
+shot looks_burratas_1
+hold Aim
+wait 0.7
+shot looks_burratas_2
+release Aim
+cmd CheeseStrikeOutside 130 75 45
+wait 0.6
+shot looks_burratas_3
+hold Aim
+wait 0.7
+shot looks_burratas_4_aimed_outside
+release Aim
 cmd CheeseStrikeOutside
 cmd CheeseStrikeArm shotgun
 wait 0.8
