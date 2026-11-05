@@ -1,7 +1,8 @@
 # The friends panel on the front end, for looking at it: on the main page as
 # its tab, then held open (CheeseStrike.FriendsOpen) with nobody in it and
-# with made-up friends in every state (CheeseStrikeSampleFriends), and on the
-# Find a Match page. Run with
+# with made-up friends in every state (CheeseStrikeSampleFriends), with a
+# row's tooltip and a faded INVITE's shown as if hovered
+# (CheeseStrike.MenuTooltip), and on the Find a Match page. Run with
 # tools/play.ps1 -Script tools/play/friends_panel.txt -Lobby -Res 1600x900 -Tag friends_panel
 # and the lobby's with tools/play/friends_lobby.txt.
 wait 5
@@ -12,6 +13,13 @@ shot friends_main_open_empty
 cmd CheeseStrikeSampleFriends 1
 wait 1.5
 shot friends_main_open
+cmd CheeseStrike.MenuTooltip 3
+wait 0.5
+shot friends_main_tooltip_row
+cmd CheeseStrike.MenuTooltip 2
+wait 0.5
+shot friends_main_tooltip_invite
+cmd CheeseStrike.MenuTooltip 0
 cmd CheeseStrike.FriendsOpen 0
 cmd CheeseStrikePage Find
 wait 1.5
