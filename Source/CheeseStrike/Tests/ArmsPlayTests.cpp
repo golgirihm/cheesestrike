@@ -6,22 +6,28 @@
 // steadier than the animations hold it, and following a look without a jump
 // at any frame rate; nothing of the body before the eyes at a sprint; a
 // slide's sprawl and lean; the knife's swipe reaching someone off to the
-// side, without a lunge; and the view of a player down kept out of the
-// floor.
+// side, without a lunge; a body down lying on the floor, as every hero, on
+// flat ground and against a wall; and the view of a player down kept out of
+// the floor.
 
 #include "Misc/AutomationTest.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Animation/CheeseStrikeArmsPose.h"
 #include "Animation/CheeseStrikeBodies.h"
 #include "Animation/CheeseStrikeGripIK.h"
+#include "CheeseStrike.h"
 #include "CheeseStrikeCharacter.h"
 #include "CheeseStrikePlayerController.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Movement/CheeseStrikeMovementComponent.h"
 #include "PlayTesting.h"
+#include "Rendering/SkeletalMeshLODRenderData.h"
+#include "Rendering/SkeletalMeshRenderData.h"
+#include "Rules/CheeseStrikeDowned.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 
@@ -42,6 +48,7 @@ namespace ArmsPlayTests
 	FVector2D Tremble = FVector2D::ZeroVector;
 	float StandingEye = 0.0f;
 	float HealthBefore = 0.0f;
+	FVector AtWall = FVector::ZeroVector;
 
 	ACheeseStrikeCharacter* Pawn(int32 Player)
 	{
@@ -389,6 +396,156 @@ bool FTheKnifeSwipesAcross::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("without the striker lunging (%.0f cm)"), FVector::Dist2D(Striker->GetActorLocation(), Spot)), FVector::Dist2D(Striker->GetActorLocation(), Spot) < 10.0f);
 		}
 	});
+	StopPlaying();
+	return true;
+}
+
+namespace ArmsPlayTests
+{
+	/** How far under the floor a bone of a body lying on it may be (cm). */
+	constexpr float FloorSlack = 2.0f;
+	/** The heroes' own guns' bones (hidden with their sections, or skinned into a body section: Murdock's sniper can; as tools/art/ragdolls.py knows them), whose children are no part of the body. */
+	const TCHAR* const OwnGunBones[] = {TEXT("gun"), TEXT("shotgun_base"), TEXT("sniper_can_arm_01"), TEXT("trap_handle"), TEXT("weapon"), TEXT("weapon_l"), TEXT("pistol"), TEXT("ult_weapon_l"), TEXT("ult_weapon_r"), TEXT("grenade")};
+
+	/** Whether `Bone` of `Body` is one of the heroes' own guns' bones, or hangs from one. */
+	bool IsOwnGunBone(const USkeletalMeshComponent* Body, FName Bone)
+	{
+		for (FName Each = Bone; Each != NAME_None; Each = Body->GetParentBone(Each))
+		{
+			for (const TCHAR* Gun : OwnGunBones)
+			{
+				if (Each == FName(Gun))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Checks every bone of `Body` that its drawn parts are skinned to (not the hero's own guns, hidden with their sections
+	 * and parked far from the body by Paragon's animators, nor a bone hidden for the view) lies on or over the floor under
+	 * it, and inside no wall; `What` says whose body, where.
+	 */
+	void CheckOnTheFloor(const ACheeseStrikeCharacter* Character, USkeletalMeshComponent* Body, const FString& What)
+	{
+		FAutomationTestBase* Test = PlayTesting::Test();
+		const FSkeletalMeshRenderData* Render = Body != nullptr ? Body->GetSkeletalMeshRenderData() : nullptr;
+		if (Body == nullptr || Body->GetSkeletalMeshAsset() == nullptr || Render == nullptr || Render->LODRenderData.IsEmpty())
+		{
+			Test->AddError(What + TEXT(": no body"));
+			return;
+		}
+		TSet<int32> Skinned;
+		for (const FSkelMeshRenderSection& Section : Render->LODRenderData[0].RenderSections)
+		{
+			if (Body->IsMaterialSectionShown(Section.MaterialIndex, 0))
+			{
+				for (const FBoneIndexType Bone : Section.BoneMap)
+				{
+					Skinned.Add(Bone);
+				}
+			}
+		}
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeTest), false);
+		for (TActorIterator<ACheeseStrikeCharacter> It(Character->GetWorld()); It; ++It)
+		{
+			Params.AddIgnoredActor(*It);
+		}
+		float Deepest = 0.0f;
+		FString DeepestBone;
+		TArray<FString> Under;
+		for (int32 Bone = 0; Bone < Body->GetNumBones(); ++Bone)
+		{
+			const FName Name = Body->GetBoneName(Bone);
+			if (!Skinned.Contains(Bone) || Body->IsBoneHiddenByName(Name) || IsOwnGunBone(Body, Name))
+			{
+				continue;
+			}
+			const FVector At = Body->GetBoneLocation(Name);
+			FHitResult Floor;
+			if (!Character->GetWorld()->LineTraceSingleByChannel(Floor, At + FVector(0.0f, 0.0f, 30.0f), At - FVector(0.0f, 0.0f, 200.0f), ECC_Visibility, Params))
+			{
+				continue;
+			}
+			const float Depth = Floor.bStartPenetrating ? 30.0f : Floor.ImpactPoint.Z - At.Z;
+			if (Depth > FloorSlack)
+			{
+				Under.Add(FString::Printf(TEXT("%s %.1f%s"), *Name.ToString(), Depth, Floor.bStartPenetrating ? TEXT(" (inside something)") : TEXT("")));
+			}
+			if (Depth > Deepest)
+			{
+				Deepest = Depth;
+				DeepestBone = Name.ToString();
+				for (FName Parent = Body->GetParentBone(Name); Parent != NAME_None; Parent = Body->GetParentBone(Parent))
+				{
+					DeepestBone += TEXT(" < ") + Parent.ToString();
+				}
+			}
+		}
+		Test->TestTrue(FString::Printf(TEXT("%s: every bone lies on or over the floor (%s is %.1f cm under it%s%s)"), *What, *DeepestBone, Deepest, Under.Num() > 1 ? TEXT("; under: ") : TEXT(""), Under.Num() > 1 ? *FString::Join(Under, TEXT(", ")) : TEXT("")), Deepest <= FloorSlack);
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FADownedBodyLiesOnTheFloor, "CheeseStrike.Play.ADownedBodyLiesOnTheFloor", ArmsPlayTests::Flags)
+
+bool FADownedBodyLiesOnTheFloor::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace ArmsPlayTests;
+	StartPlaying({1, TEXT("?Mode=Execution")});
+	// Down on flat ground, then against a wall (walked into until stopped by it, as downed_wall.txt does; going down backs
+	// the body off it as far as the legs are short of room), as every hero: nothing of the body others see, nor of its own
+	// player's, goes under the floor.
+	for (const bool bWall : {false, true})
+	{
+		PutAt(0, Spot, bWall ? 0.0f : SpotYaw);
+		if (bWall)
+		{
+			Play(0, TEXT("hold Move 0 1\nwait 1.5"));
+			WaitUntil(TEXT("the host walking into a wall"), 20.0f, []()
+			{
+				const ACheeseStrikeCharacter* Host = Character(0);
+				return Host != nullptr && FVector::Dist2D(Host->GetActorLocation(), Spot) > 200.0f && Host->GetVelocity().Size2D() < 5.0f;
+			});
+			Play(0, TEXT("release Move\nwait 0.3"));
+			Then([this]()
+			{
+				if (const ACheeseStrikeCharacter* Host = Pawn(0))
+				{
+					AtWall = Host->GetActorLocation();
+					UE_LOG(LogCheeseStrike, Display, TEXT("ADownedBodyLiesOnTheFloor: at the wall at (%.0f, %.0f, %.0f) facing %.0f, %.0f cm of room for the legs"), AtWall.X, AtWall.Y, AtWall.Z, Host->GetActorRotation().Yaw, Host->MeasureLegRoom());
+					TestTrue(FString::Printf(TEXT("standing at the wall, the legs would be short of room (%.0f cm)"), Host->MeasureLegRoom()), Host->MeasureLegRoom() < CheeseStrikeDowned::LegLength);
+				}
+			});
+		}
+		Play(0, TEXT("cmd CheeseStrikeDie\nwait 1.6"));
+		for (int32 Hero = 0; Hero < CheeseStrikeBodies::All().Num(); ++Hero)
+		{
+			Play(0, FString::Printf(TEXT("cmd CheeseStrikeBody %d %d\nwait 1.2"), Hero, Hero % 2));
+			Then([this, Hero, bWall]()
+			{
+				const ACheeseStrikeCharacter* Host = Pawn(0);
+				if (Host == nullptr || !TestTrue(TEXT("down"), Host->IsDowned()))
+				{
+					return;
+				}
+				const FString Where = bWall ? TEXT("against a wall") : TEXT("on flat ground");
+				const FString Who = CheeseStrikeBodies::All()[Hero].Name;
+				if (bWall)
+				{
+					// Going down backed the body off the wall as far as the legs were short of room (MakeRoomToLieDown), or
+					// as far as there was room behind, and the legs lie out as far as there is room.
+					const float BackedOff = FVector::DotProduct(AtWall - Host->GetActorLocation(), FVector::ForwardVector);
+					TestTrue(FString::Printf(TEXT("%s %s: the body backed off the wall (%.0f cm) and the legs lie out as far as there is room (%.0f cm)"), *Who, *Where, BackedOff, Host->GetDownLegRoom()), BackedOff > 30.0f && Host->GetDownLegRoom() < CheeseStrikeDowned::LegLength + CheeseStrikeDowned::ToeGap + 15.0f);
+				}
+				CheckOnTheFloor(Host, Host->GetMesh(), FString::Printf(TEXT("%s %s, the body others see"), *Who, *Where));
+				CheckOnTheFloor(Host, Host->GetFirstPersonMesh(), FString::Printf(TEXT("%s %s, in its own view"), *Who, *Where));
+			});
+		}
+		Play(0, TEXT("cmd CheeseStrikeBody\ncmd CheeseStrikeRevive\nwait 1.5"));
+	}
 	StopPlaying();
 	return true;
 }
