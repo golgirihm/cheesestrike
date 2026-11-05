@@ -1,0 +1,70 @@
+# Gruyère Grotto's rocks once the cheese is gone, for any that read hollow (a
+# Megascans cliff seen from its open back or side): each boulder of the east
+# floor from four sides, the Spine's corners, an end wall from the floor and the
+# hollow's walls from inside. Run with
+# -Map /Game/CheeseStrike/Maps/Lvl_Grotto -StartAt 4200,-1900,500,180.
+wait 20
+cmd showhud
+cmd CheeseStrikeEatCheese 1
+wait 3
+cmd CheeseStrikeViewFrom 2200 -850 170 -4 0
+wait 3
+shot rocks_1_boulderA_west
+cmd CheeseStrikeViewFrom 3200 -850 170 -4 180
+wait 3
+shot rocks_2_boulderA_east
+cmd CheeseStrikeViewFrom 2700 -1400 170 -4 90
+wait 3
+shot rocks_3_boulderA_south
+cmd CheeseStrikeViewFrom 2700 -300 170 -4 -90
+wait 3
+shot rocks_4_boulderA_north
+cmd CheeseStrikeViewFrom 1000 1020 170 -4 0
+wait 3
+shot rocks_5_boulderB_west
+cmd CheeseStrikeViewFrom 2050 1020 170 -4 180
+wait 3
+shot rocks_6_boulderB_east
+cmd CheeseStrikeViewFrom 1520 500 170 -4 90
+wait 3
+shot rocks_7_boulderB_south
+cmd CheeseStrikeViewFrom 1520 1550 170 -4 -90
+wait 3
+shot rocks_8_boulderB_north
+cmd CheeseStrikeViewFrom 700 -925 170 -4 0
+wait 3
+shot rocks_9_boulderC_west
+cmd CheeseStrikeViewFrom 1700 -925 170 -4 180
+wait 3
+shot rocks_10_boulderC_east
+cmd CheeseStrikeViewFrom 1170 -1450 170 -4 90
+wait 3
+shot rocks_11_boulderC_south
+cmd CheeseStrikeViewFrom 1170 -400 170 -4 -90
+wait 3
+shot rocks_12_boulderC_north
+cmd CheeseStrikeViewFrom 900 900 170 6 -140
+wait 3
+shot rocks_13_spine_ne
+cmd CheeseStrikeViewFrom 900 -900 170 6 140
+wait 3
+shot rocks_14_spine_se
+cmd CheeseStrikeViewFrom 2600 1900 170 10 0
+wait 3
+shot rocks_15_north_cliff
+cmd CheeseStrikeViewFrom 2600 -1900 170 10 0
+wait 3
+shot rocks_16_south_walk
+cmd CheeseStrikeViewFrom 3300 0 560 4 0
+wait 3
+shot rocks_17_hollow_wall
+cmd CheeseStrikeViewFrom 2000 0 170 20 0
+wait 3
+shot rocks_18_end_wall
+cmd CheeseStrikeViewFrom 2600 0 170 55 90
+wait 3
+shot rocks_19_crags_up
+cmd CheeseStrikeViewFrom -2200 -850 170 -4 180
+wait 3
+shot rocks_20_west_boulderA
+quit
