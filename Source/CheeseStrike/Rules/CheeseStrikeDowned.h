@@ -82,7 +82,8 @@ namespace CheeseStrikeDowned
 	FVector ShouldersAt();
 	/** The radius of the torso and of the legs, for shots. */
 	constexpr float TorsoRadius = 18.0f;
-	constexpr float LegRadius = 11.0f;
+	/** The legs are two, out from the hip joints either side of the body's line with the knees a little up, so one segment along that line is as wide as the pair. */
+	constexpr float LegRadius = 19.0f;
 	/** How far along the floor the legs reach from the hips with `Room` there (from the hips to whatever is ahead). */
 	float LegReach(float Room);
 

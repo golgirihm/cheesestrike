@@ -37,7 +37,10 @@ bool FAMatchIsOfferedAsALobby::RunTest(const FString& Parameters)
 	float RespawnDelay = 0.0f;
 	TestTrue(TEXT("and the respawn delay"), Steam.Get(RespawnDelayKey, RespawnDelay) && RespawnDelay == 1.0f);
 	FString Map;
-	TestTrue(FString::Printf(TEXT("and the map, by name (%s)"), *Map), Steam.Get(SETTING_MAPNAME, Map) && Map == CheeseStrikeRules::Maps[CheeseStrikeRules::MapIndexFor(Level)].Name);
+	// Without a map picked, the level hosted on (the template's shooter level, no map of the game's) by its path.
+	TestTrue(FString::Printf(TEXT("and the level, by its path (%s)"), *Map), Steam.Get(SETTING_MAPNAME, Map) && Map == Level);
+	const FOnlineSessionSettings Picked = HostSettings(TEXT("?Map=0"), false);
+	TestTrue(FString::Printf(TEXT("and a map picked, by name (%s)"), *Map), Picked.Get(SETTING_MAPNAME, Map) && Map == CheeseStrikeRules::Maps[0].Name);
 
 	const FOnlineSessionSettings Lan = HostSettings(TEXT(""), true);
 	TestTrue(TEXT("on the local network, a LAN match"), Lan.bIsLANMatch);
@@ -90,7 +93,8 @@ bool FAFoundMatchIsDescribed::RunTest(const FString& Parameters)
 	TestTrue(TEXT("it is ours"), IsOurs(Result));
 	TestEqual(TEXT("and reads"), Describe(Result), FString::Printf(TEXT("Ash's game, 3 of 16 in, first to 10 kills on %s, 42 ms"), CheeseStrikeRules::Maps[0].Name));
 	Result.Session.SessionSettings = HostSettings(TEXT("?KillLimit=10"), false);
-	TestEqual(TEXT("without a map picked, the level it is hosted on"), Describe(Result), FString::Printf(TEXT("Ash's game, 3 of 16 in, first to 10 kills on %s, 42 ms"), CheeseStrikeRules::Maps[CheeseStrikeRules::MapIndexFor(Level)].Name));
+	// Without a map picked the settings carry the level's path (the template's shooter level, no map of the game's), which the line leaves out.
+	TestEqual(TEXT("without a map picked, no map is named"), Describe(Result), FString(TEXT("Ash's game, 3 of 16 in, first to 10 kills, 42 ms")));
 
 	FOnlineSessionSearchResult Other;
 	Other.Session.SessionSettings.NumPublicConnections = 4;
