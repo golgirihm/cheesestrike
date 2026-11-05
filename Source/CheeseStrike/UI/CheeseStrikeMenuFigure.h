@@ -13,8 +13,10 @@ class UTexture;
 
 /**
  * The figure on the front end: the player's hero standing with the primary
- * of their loadout in hand (the Colby Carbine to begin with; placed as a
- * character holds it, CheeseStrikeWeaponLooks) on a low round pedestal in
+ * of their loadout in hand (the Colby Carbine to begin with; placed and posed
+ * as a character holds it, CheeseStrikeWeaponLooks, the Munster Twin SMGs
+ * two guns in the dual hold, UCheeseStrikeAnimInstance::HoldWithoutCharacter)
+ * on a low round pedestal in
  * the middle of the view, turning slowly. Made on
  * each machine for its own menu, never replicated. Every hero's meshes,
  * materials and textures are held and kept resident while it exists, so that
@@ -55,9 +57,14 @@ public:
 	FName GetPrimary() const { return Primary; }
 	/** Whether the body shows (not hidden through a change of hero). */
 	bool IsShown() const;
-	/** The body, and the weapon in its right hand. */
+	/** The body, the weapon in its right hand, and the second gun of two in its left (none shows for one gun). */
 	const USkeletalMeshComponent* GetBody() const { return Body; }
 	const UStaticMeshComponent* GetWeapon() const { return Weapon; }
+	const UStaticMeshComponent* GetOffHand() const { return OffHand; }
+	/** Whether it holds two guns (the Munster Twin SMGs): the second shows in its left hand. */
+	bool HoldsTwo() const;
+	/** How fast it turns, as a share of TurnRate (the loadout page's hero view turns it slower). */
+	void SetTurnShare(float Share) { TurnShare = Share; }
 	/** Whether every texture of the hero shown is fully streamed in. */
 	bool AreTexturesResident() const;
 	/** Whether the figure is ready to be looked at: its textures resident, or TexturesWaitSeconds gone by waiting for them. The loading cover waits on it (ACheeseStrikePlayerController::IsViewReady). */
@@ -74,6 +81,7 @@ protected:
 	int32 HiddenTicks = INDEX_NONE;
 	/** When it began, by the PC's clock (IsReady's wait). */
 	double BegunAt = 0.0;
+	float TurnShare = 1.0f;
 
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<UStaticMeshComponent> Pedestal;
@@ -81,6 +89,9 @@ protected:
 	TObjectPtr<USkeletalMeshComponent> Body;
 	UPROPERTY(VisibleAnywhere, Category="Components")
 	TObjectPtr<UStaticMeshComponent> Weapon;
+	/** The second gun of a weapon with two, in the left hand as the weapon's own off-hand model is (ACheeseStrikeWeapon::PutInOffHand). */
+	UPROPERTY(VisibleAnywhere, Category="Components")
+	TObjectPtr<UStaticMeshComponent> OffHand;
 	/**
 	 * Every hero's body besides, tiny inside the pedestal where nothing sees it, drawn by the renderer all the same: so
 	 * that the shaders and pipeline states of every hero's materials are made before one is switched to (a mesh first
@@ -89,8 +100,12 @@ protected:
 	UPROPERTY()
 	TArray<TObjectPtr<USkeletalMeshComponent>> WarmBodies;
 
-	/** Hides the hero shown's own guns (its weapon slots and bones) and puts the weapon in its hand at its grip. */
+	/** Hides the hero shown's own guns (its weapon slots and bones) and puts the weapon in its hand at its grip, and a second gun in the other (HoldsTwo). */
 	void ArmHero();
+	/** Dresses the weapon (and the second gun, or none) as the primary held. */
+	void DressWeapons();
+	/** Tells the body's animation how the primary is held (UCheeseStrikeAnimInstance::HoldWithoutCharacter): its set, two guns or one, the left hand on it. */
+	void TellHold();
 	/** Makes WarmBodies. */
 	void WarmUpHeroes();
 	/** The textures of hero `Hero`'s materials. */

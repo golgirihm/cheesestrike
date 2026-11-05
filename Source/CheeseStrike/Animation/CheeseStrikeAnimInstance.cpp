@@ -208,6 +208,18 @@ void UCheeseStrikeAnimInstance::PreUpdateAnimation(float DeltaSeconds)
 	Super::PreUpdateAnimation(DeltaSeconds);
 }
 
+void UCheeseStrikeAnimInstance::HoldWithoutCharacter(const FWeaponLook& Look, bool bTwo, const USceneComponent* Model)
+{
+	// What ReadCharacter reads off a character's weapon, read off the look and the model instead (no pawn: ReadCharacter
+	// leaves these as they are set).
+	Hold = Look.Hold;
+	bDual = bTwo;
+	ModelInHand = Model != nullptr ? Model->GetRelativeTransform() : FTransform::Identity;
+	ModelAlong = Look.Along;
+	GuardPitchUp = Look.GuardPitchUp;
+	bLeftHandHolds = ACheeseStrikeWeapon::LeftHandHoldOn(Look, Model, LeftHandHold);
+}
+
 void UCheeseStrikeAnimInstance::ReadCharacter(float DeltaSeconds)
 {
 	const APawn* Pawn = TryGetPawnOwner();

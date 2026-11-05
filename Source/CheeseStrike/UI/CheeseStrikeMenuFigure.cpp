@@ -12,6 +12,7 @@
 #include "Animation/CheeseStrikeAnimInstance.h"
 #include "Animation/CheeseStrikeBodies.h"
 #include "Rules/CheeseStrikeLoadout.h"
+#include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeWeaponLooks.h"
@@ -67,13 +68,45 @@ ACheeseStrikeMenuFigure::ACheeseStrikeMenuFigure()
 	Weapon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Weapon"));
 	Weapon->SetupAttachment(Body);
 	Weapon->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	OffHand = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("OffHand"));
+	OffHand->SetupAttachment(Body);
+	OffHand->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+bool ACheeseStrikeMenuFigure::HoldsTwo() const
+{
+	const FWeaponStats* Stats = CheeseStrikeArsenal::Find(Primary);
+	return Stats != nullptr && Stats->bDual;
+}
+
+void ACheeseStrikeMenuFigure::DressWeapons()
+{
+	const FWeaponLook& Look = CheeseStrikeWeaponLooks::For(Primary);
+	ACheeseStrikeWeapon::DressModel(Weapon, Look);
+	// Two guns: the same model in the left hand; one: nothing there.
+	if (HoldsTwo())
+	{
+		ACheeseStrikeWeapon::DressModel(OffHand, Look);
+	}
+	else
+	{
+		OffHand->SetStaticMesh(nullptr);
+	}
+}
+
+void ACheeseStrikeMenuFigure::TellHold()
+{
+	if (UCheeseStrikeAnimInstance* Animation = Cast<UCheeseStrikeAnimInstance>(Body->GetAnimInstance()))
+	{
+		Animation->HoldWithoutCharacter(CheeseStrikeWeaponLooks::For(Primary), HoldsTwo(), Weapon);
+	}
 }
 
 void ACheeseStrikeMenuFigure::BeginPlay()
 {
 	Super::BeginPlay();
 	BegunAt = FPlatformTime::Seconds();
-	ACheeseStrikeWeapon::DressModel(Weapon, CheeseStrikeWeaponLooks::For(Primary));
+	DressWeapons();
 	ArmHero();
 	KeepTexturesResident(true);
 	WarmUpHeroes();
@@ -129,8 +162,14 @@ void ACheeseStrikeMenuFigure::ArmHero()
 		}
 	}
 	ACheeseStrikeWeapon::HideBuiltInWeapons(Body);
-	// In the hand as the game holds it, at this hero's grip.
+	// In the hand as the game holds it, at this hero's grip; a second gun in the other as a player holding two has it, and
+	// the body posed as theirs is.
 	ACheeseStrikeWeapon::PutInHand(Weapon, Body, CheeseStrikeWeaponLooks::For(Primary));
+	if (HoldsTwo())
+	{
+		ACheeseStrikeWeapon::PutInOffHand(OffHand, Body, Weapon);
+	}
+	TellHold();
 }
 
 void ACheeseStrikeMenuFigure::ShowPrimary(FName Id)
@@ -142,9 +181,8 @@ void ACheeseStrikeMenuFigure::ShowPrimary(FName Id)
 	Primary = Id;
 	if (HasActorBegunPlay())
 	{
-		const FWeaponLook& Look = CheeseStrikeWeaponLooks::For(Primary);
-		ACheeseStrikeWeapon::DressModel(Weapon, Look);
-		ACheeseStrikeWeapon::PutInHand(Weapon, Body, Look);
+		DressWeapons();
+		ArmHero();
 	}
 }
 
@@ -194,8 +232,10 @@ void ACheeseStrikeMenuFigure::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	// Held still (CheeseStrike.FigureTurn 0): neither turning nor breathing, so that two screenshots of it differ in nothing but their drawing.
 	const float Turn = CVarFigureTurn.GetValueOnGameThread();
-	AddActorWorldRotation(FRotator(0.0f, TurnRate * Turn * DeltaSeconds, 0.0f));
+	AddActorWorldRotation(FRotator(0.0f, TurnRate * TurnShare * Turn * DeltaSeconds, 0.0f));
 	Body->bPauseAnims = Turn <= 0.0f;
+	// The hold, told afresh (the animation is made anew with each hero).
+	TellHold();
 	// The tick after a change of hero: the body has its first pose (ShowHero evaluated one, and its own animation tick
 	// follows this), so it can be seen again, weapon and all.
 	if (HiddenTicks != INDEX_NONE && ++HiddenTicks >= 1)

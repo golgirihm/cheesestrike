@@ -423,6 +423,13 @@ public:
 
 	/** Reads the character (ReadCharacter) before the proxy copies these fields: the engine calls NativeUpdateAnimation only after that copy, a frame late for the pose. */
 	virtual void PreUpdateAnimation(float DeltaSeconds) override;
+	/**
+	 * Holds `Look`'s weapon on a body with no character (the front end's figure, ACheeseStrikeMenuFigure), as a character
+	 * holding it would be posed: by its hold's set, two guns (`bTwo`, FWeaponStats::bDual) held apart and mirrored by
+	 * FCheeseStrikeDualHold, the left hand on the fore-end where it closes on one (FCheeseStrikeGripIK), `Model` the first
+	 * gun's model as it rides the right hand (ACheeseStrikeWeapon::PutInHand). Kept until it is called again.
+	 */
+	void HoldWithoutCharacter(const struct FWeaponLook& Look, bool bTwo, const USceneComponent* Model);
 
 protected:
 	/** Reads what the character is doing into the fields above, on the game thread, each frame. */

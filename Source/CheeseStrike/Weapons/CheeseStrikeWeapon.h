@@ -158,6 +158,14 @@ public:
 	 * across the body (left for right), by the reference pose: the second gun's grip in the left hand.
 	 */
 	static FTransform MirroredGrip(const USkeletalMeshComponent* Body, FName FromBone, const FTransform& InFromBone, FName ToBone);
+	/**
+	 * Puts `OffHand`, the second gun of two, in `Body`'s left hand, held as `First` (the first, PutInHand) is in the right,
+	 * mirrored across the body (MirroredGrip); false if the body has no left hand. A weapon's own models and the front
+	 * end's figure (ACheeseStrikeMenuFigure) are placed by this alike.
+	 */
+	static bool PutInOffHand(USceneComponent* OffHand, USkeletalMeshComponent* Body, const USceneComponent* First);
+	/** Where `Look`'s left hand closes on its model `Model` (riding the right hand's bone, PutInHand), in that bone's space; false if it leaves the hand free. */
+	static bool LeftHandHoldOn(const FWeaponLook& Look, const USceneComponent* Model, FVector& OutHold);
 	/** The second gun, in its player's view or on the body, if it has one in hand. */
 	UStaticMeshComponent* GetOffHandModel(bool bFirstPerson) const { return bFirstPerson ? FirstPersonOffHand : ThirdPersonOffHand; }
 	/** Hides any weapon a body's mesh was modelled holding (Belica's own guns), so only ours shows. */
