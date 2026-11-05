@@ -9,9 +9,9 @@ x runs west (the Gouda Guys' end) to east (the Mozza Radicals'), y south to nort
 | Place | Where | What it is |
 |---|---|---|
 | Gouda End, Mozza End | x beyond ±2200 | each side's eight starts in a file at x ±2700, 4 m apart from y -1400 to 1400, facing the middle, behind a screen of waxed cheese at x ±2200 (two walls of two courses, 2 m high, from y 100 to 1600 and -100 to -1600: a 2 m gap in the middle and 4 m open at each end), so that every way out of a spawn turns a corner and no line reaches a start from the arena |
-| Gouda Lane, Mozza Lane | x ±800 to ±2200 | the open floor between the screen and the middle: a wall of cheese two courses high at x ±1200 north and south of the lane's middle (y 500 to 1500 and -500 to -1500), a 2 m stack at (±600, ±800), a crouching block a metre high by each side wall at (±2000, ±1700), and a Munster Twin SMGs stand on the lane's middle line at (±1600, 0) |
+| Gouda Lane, Mozza Lane | x ±800 to ±2200 | the open floor between the screen and the middle: a wall of cheese two courses high at x ±1200 north and south of the lane's middle (y 500 to 1500 and -500 to -1500), a 2 m stack at (±600, ±500), a crouching block a metre high by each side wall at (±2000, ±1700), and a Munster Twin SMGs stand on the lane's middle line at (±1600, 0) |
 | The Middle | x -800 to 800 | the first hill spot at (0, 0) on the floor, a low wall of cheese two blocks high at x ±450 either side of it, and a yellow line down the middle of the map |
-| North Platform, South Platform | (0, ±1100) | a platform of waxed cheese 7 m square and a metre up, stepped up from the west and the east by two half-metre steps, never eaten: the second and third hill spots, on its top |
+| North Platform, South Platform | (0, ±1100) | a platform of waxed cheese 7 m square and a metre up, stepped up from the west and the east by three steps a metre deep with risers of 25 cm (which the bots' navigation mesh walks; 35 is its most), never eaten: the second and third hill spots, on its top |
 | the stands at the walls | (0, ±1750) | the BabyBomb by the north wall and the Cheese Stick by the south, on the middle line: the power weapons where both sides reach them alike, in the open |
 
 Free-for-all adds six starts: at the four corners of the lanes by the north and south walls and one in each lane at (±900, 0), facing in.

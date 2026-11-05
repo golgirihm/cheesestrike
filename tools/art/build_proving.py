@@ -25,7 +25,7 @@ START_X = 2700                  # the starts, at the ends
 SCREEN_X = 2200                 # the waxed screen in front of each side's starts
 PLATFORM_Y = 1100               # the platforms' middles, north and south of the middle
 PLATFORM = (700, 700, 100)      # a platform's top: x, y and height
-STEP = 50                       # its steps, west and east, half its height
+STEPS = 3                       # its steps, west and east: 25 cm risers, which the bots' navigation mesh steps (35 at most)
 COURSE = 100                    # the cover's blocks are a metre high
 
 
@@ -53,7 +53,7 @@ def cover(s, side):
     x = s * 1200
     kit.cheese_wall(f"Wall{team}South", structure, (x, -1500), (x, -500), 0, (COURSE, COURSE), thickness=50, column=250)
     kit.cheese_wall(f"Wall{team}North", structure, (x, 500), (x, 1500), 0, (COURSE, COURSE), thickness=50, column=250)
-    for name, y in (("South", -800), ("North", 800)):
+    for name, y in (("South", -500), ("North", 500)):
         x0, x1 = sorted((s * 500, s * 700))
         kit.cheese_stack(f"Stack{team}{name}", structure, (x0, y - 100, 0), (x1, y + 100, 2 * COURSE), 2, 2, 2)
     # Crouching cover along the side walls, a block from each wall.
@@ -67,14 +67,16 @@ def cover(s, side):
 
 def platforms():
     """Two low platforms of waxed cheese, a metre up, north and south of the middle, stepped up from the west and the
-    east by two half-metre steps: high ground to hold, never eaten."""
+    east by three steps a metre deep (risers of 25 cm, which the bots walk): high ground to hold, never eaten."""
     for name, y in (("South", -PLATFORM_Y), ("North", PLATFORM_Y)):
         structure = f"Platform{name}"
         w, d, h = PLATFORM
         kit.cheese_stack(f"{structure}Top", structure, (-w / 2.0, y - d / 2.0, 0), (w / 2.0, y + d / 2.0, h), 2, 2, 1, edible=False)
         for s in (-1, 1):
-            x0, x1 = sorted((s * w / 2.0, s * (w / 2.0 + 100)))
-            kit.cheese_box(f"Cheese_{structure}Step_{'West' if s < 0 else 'East'}", structure, (x0, y - d / 2.0, 0), (x1, y + d / 2.0, STEP), edible=False)
+            for k in range(STEPS):
+                x0, x1 = sorted((s * (w / 2.0 + 100 * k), s * (w / 2.0 + 100 * (k + 1))))
+                rise = h * (STEPS - k) / (STEPS + 1)
+                kit.cheese_box(f"Cheese_{structure}Step_{'West' if s < 0 else 'East'}_{k}", structure, (x0, y - d / 2.0, 0), (x1, y + d / 2.0, rise), edible=False)
 
 
 def stands():
