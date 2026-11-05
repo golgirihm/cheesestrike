@@ -163,11 +163,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Pickup")
 	TObjectPtr<UStaticMeshComponent> PairModel;
 
-	/** The sound of its weapon being taken, heard near it. */
-	UPROPERTY(Transient)
-	TObjectPtr<USoundBase> TakenSound;
-	UPROPERTY(Transient)
-	TObjectPtr<USoundAttenuation> TakenReach;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> PadGlow;
 	UPROPERTY(Transient)

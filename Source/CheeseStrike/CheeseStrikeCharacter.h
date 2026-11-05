@@ -101,7 +101,7 @@ public:
 	void MulticastBleed(FVector_NetQuantize10 FromFeet, FVector_NetQuantizeNormal Way, uint8 Damage);
 	/** Where its feet are now: the bottom of its capsule. */
 	FVector FeetNow() const;
-	/** Every machine: it took a weapon from a stand or the floor, which sounds where it stands (CheeseStrikeSounds::PickupPath). */
+	/** Every machine: it took a weapon from a stand or the floor, which clacks where it stands (CheeseStrikeSynth::MetalClack). */
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastPickedUp();
 	/** Server: whether a reload begun now is called out ("Reloading!"), at most once every few seconds (CheeseStrikeVoice::CallsReload). */
@@ -471,9 +471,10 @@ protected:
 	float LastHurtAt = -1000.0f;
 	/** On this machine: when the character last fell hard, for the red flash (the local player only). */
 	float FallFlashAt = -1000.0f;
-	/** On this machine: the health it last heard, so that losing any of it gives an "oof", and when the last was. */
+	/** On this machine: the health at the last grunt (or any gain since), so that losing ten of it gives another, when the last was, and which it was (never the same twice running). */
 	float HeardHealth = 100.0f;
 	float LastOofAt = -100.0f;
+	int32 LastOof = -1;
 	/** Server: when it last called out a reload (the world's time). */
 	float ReloadCalledAt = -100.0f;
 	/** Gives the "oof" for health lost since last heard, to the local player alone (CheeseStrikeSounds::ShouldOof). */

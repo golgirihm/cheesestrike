@@ -8,29 +8,34 @@
  * What a player hears of being hurt, taking a weapon and scoring, as plain
  * rules (tested in CheeseStrike.Feedback.*):
  *
- * - Hurt, the one hurt hears a quiet breathy "oof" (OpenGameArt's "Hurt
- *   Sound Effects" by EZduzziteh, CC0, imported by tools/art/wave14_sounds.py),
- *   at most one for a burst of hits; the one who hit hears a muted thud
- *   (CheeseStrikeSynth::Thump), which is nothing like it.
- * - Taking a weapon from a stand or the floor sounds Lyra's weapon swap there.
+ * - Hurt, the one hurt hears a recorded grunt (ten of them: OpenGameArt's
+ *   "Hurt Sound Effects" by EZduzziteh, CC0, and "11 male human pain/death
+ *   sounds" by Michel Baradari, CC BY 3.0, imported by tools/art/wave14_sounds.py
+ *   and wave15_sounds.py), plainly over the gunfire, once for every ten health
+ *   lost since the last and at most one for a burst of hits, never the same one
+ *   twice running; the one who hit hears a thud (CheeseStrikeSynth::Thump),
+ *   which is nothing like it.
+ * - Taking a weapon from a stand or the floor sounds a short metallic clack
+ *   where it is taken (CheeseStrikeSynth::MetalClack); drawing a weapon in hand
+ *   keeps Lyra's weapon swap (CheeseStrikeWeaponLooks::DrawSounds).
  * - A kill sounds a cash register's ka-ching on the killer's machine with the
  *   kill pop, an assist a softer ching (CheeseStrikeSynth::KaChing).
  */
 namespace CheeseStrikeSounds
 {
-	/** The hurt "oof"s, and the path of number `Variant` (any number). */
-	constexpr int32 Oofs = 5;
+	/** The hurt grunts, and the path of number `Variant` (any number). */
+	constexpr int32 Oofs = 10;
 	FString OofPath(int32 Variant);
-	/** How loud an "oof" is: quiet, under the shots. */
-	constexpr float OofVolume = 0.45f;
-	/** At most one "oof" this often (seconds): a burst of hits is one. */
+	/** How loud a grunt is: plainly heard over the shots (which CheeseStrikeGunfire::Loudness keeps down). */
+	constexpr float OofVolume = 0.9f;
+	/** At most one grunt this often (seconds): a burst of hits is one. */
 	constexpr float OofEvery = 0.35f;
-	/** Whether losing `Lost` health, `SinceLast` seconds after the last "oof", says another. */
+	/** Health lost since the last grunt that says another: a hit that takes this much is always heard; smaller ones add up to it. */
+	constexpr float OofFrom = 10.0f;
+	/** Whether losing `Lost` health since the last grunt, `SinceLast` seconds after it, says another. */
 	bool ShouldOof(float Lost, float SinceLast);
-
-	/** Lyra's weapon swaps, and the path of number `Variant` (any number). */
-	constexpr int32 Pickups = 3;
-	FString PickupPath(int32 Variant);
+	/** The grunt to say after `Last` (none: -1), given `Random` (any number): never the same one twice running. */
+	int32 NextOof(int32 Last, int32 Random);
 
 	/** The sound a change in the player's own kills and assists makes. */
 	enum class EScore : uint8

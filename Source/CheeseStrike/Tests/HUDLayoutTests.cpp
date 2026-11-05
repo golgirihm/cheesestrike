@@ -285,15 +285,15 @@ bool FTheVerminWordsComeInBigAndAHitThumpsSoftly::RunTest(const FString& Paramet
 	const FVerminLook Settled = VerminLook(VerminEntrance + 1.0f, -1.0f);
 	TestTrue(TEXT("and settle solid at 1"), Settled.Scale == 1.0f && Settled.Alpha == 1.0f);
 	TestTrue(TEXT("each counted second swells them"), VerminLook(VerminEntrance + 1.0f, 0.0f).Scale > 1.1f && VerminLook(VerminEntrance + 1.0f, VerminPulse).Scale == 1.0f);
-	// A hit's thump is short, soft and not silent.
+	// A hit's thump is short, loud and never clipped (CheeseStrike.Feedback.Hurt has the rest).
 	const TArray<int16> Thump = CheeseStrikeSynth::Thump(1.0f);
 	int32 Loudest = 0;
 	for (const int16 Sample : Thump)
 	{
 		Loudest = FMath::Max(Loudest, FMath::Abs(static_cast<int32>(Sample)));
 	}
-	TestTrue(TEXT("about 80 ms"), FMath::Abs(Thump.Num() - CheeseStrikeSynth::SampleRate * 8 / 100) <= 2);
-	TestTrue(TEXT("audible but not loud"), Loudest > 2000 && Loudest < 30000);
+	TestTrue(TEXT("about 110 ms"), FMath::Abs(Thump.Num() - CheeseStrikeSynth::SampleRate * 11 / 100) <= 2);
+	TestTrue(TEXT("loud but not clipped"), Loudest > 20000 && Loudest < 30000);
 	return true;
 }
 
