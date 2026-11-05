@@ -44,7 +44,7 @@ namespace CheeseStrikeRules
 		const TCHAR* Level;
 		const TCHAR* Picture;
 	};
-	/** The maps, in the order the lobby offers them (MapsOffered: all but the Practice Range). */
+	/** The maps, each by its index (?Map=, the lobby's pick); the lobby offers them in this order, the default first (MapsOffered: all but the Practice Range). */
 	extern const FMapChoice Maps[];
 	int32 NumMaps();
 	/** The map a lobby hosted from the front end begins with (HostOptions): Gruyère Grotto. */
@@ -55,7 +55,7 @@ namespace CheeseStrikeRules
 	 * MapFrom, the cook and PracticeFromMenu.
 	 */
 	bool IsOffered(int32 MapIndex);
-	/** The maps the lobby offers, as indices of Maps, in its order. */
+	/** The maps the lobby offers, as indices of Maps, in its order: the default (DefaultMap, Gruyère Grotto) first, then the others in Maps' order. */
 	TArray<int32> MapsOffered();
 	/** Whether a match with these URL `Options` is hosted for others (`?listen`: the lobby's host), rather than played alone. */
 	bool IsHosted(const FString& Options);
