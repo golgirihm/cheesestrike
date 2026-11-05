@@ -10,9 +10,9 @@ class USoundWaveProcedural;
  * Sounds that have no recording yet, made in code: a falling bomb's
  * whistle and an air-raid siren, a jet's fly-by, heavy explosions, a hit's
  * thud, a kill's ka-ching and a taken weapon's clack. Each is a few seconds of
- * 16-bit mono at SampleRate, played once by a procedural sound wave made
- * for that one playing. Recorded, licensed sounds may replace them, as
- * the design's "Audio" says.
+ * 16-bit mono at SampleRate, played by a sound wave that ends with it
+ * (UCheeseStrikeSynthWave), as often as it is played. Recorded, licensed
+ * sounds may replace them, as the design's "Audio" says.
  */
 namespace CheeseStrikeSynth
 {
@@ -42,6 +42,6 @@ namespace CheeseStrikeSynth
 	 */
 	TArray<int16> ThemeHover(int32 Theme);
 	TArray<int16> ThemeClick(int32 Theme);
-	/** A sound, owned by `Outer`, that plays `Samples` once. */
+	/** A sound, owned by `Outer`, that plays `Samples` each time it is played, each playing ending with them (UCheeseStrikeSynthWave). */
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples);
 }
