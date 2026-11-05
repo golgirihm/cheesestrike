@@ -210,8 +210,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSpinnerIsACheeseWedge, "CheeseStrike.Projec
 bool FTheSpinnerIsACheeseWedge::RunTest(const FString& Parameters)
 {
 	// The spinner's frames (tools/art/spinner_frames.py): a loop of 48 PNGs of 64 x 64 in Content/UI/Spinner, read as files so
-	// that the loading screen can draw them before any asset is loaded, shown at 24 a second.
+	// that the loading screen can draw them before any asset is loaded, shown at 24 a second; and the same loop at 320 x 320
+	// in Spinner/Large for the loading screen's big spinner, a fifth of the screen's height (of the cover's 1080 units).
 	using namespace CheeseStrikeLoader;
+	TestTrue(TEXT("the loading screen's spinner is about a fifth of the screen's height (of the cover's 1080 units)"), LargeRadius * 2.0f >= 1080.0f * 0.2f && LargeRadius * 2.0f <= 1080.0f * 0.25f);
+	TestTrue(TEXT("drawn from frames at least as big as it is drawn at 1080p"), LargeFrameSize >= LargeRadius * 2.0f * DrawnOver);
 	TestEqual(TEXT("a loop of 48 frames"), Frames, 48);
 	TestEqual(TEXT("at 24 a second"), FramesPerSecond, 24);
 	TestEqual(TEXT("the first frame at the start"), FrameAt(0.0), 0);
@@ -219,19 +222,23 @@ bool FTheSpinnerIsACheeseWedge::RunTest(const FString& Parameters)
 	TestEqual(TEXT("round in two seconds"), FrameAt(2.0 + 0.001), 0);
 	TestEqual(TEXT("never past the loop"), FrameAt(1.999), 47);
 	TestTrue(TEXT("never back"), FrameAt(-0.5) >= 0 && FrameAt(-0.5) < Frames);
-	for (int32 Frame = 0; Frame < Frames; ++Frame)
+	for (const bool bLarge : {false, true})
 	{
-		TArray<uint8> Bytes;
-		const FString Path = FramePath(Frame);
-		if (!TestTrue(FString::Printf(TEXT("%s is there"), *Path), FFileHelper::LoadFileToArray(Bytes, *Path)) || Bytes.Num() < 24)
+		const int32 Size = bLarge ? LargeFrameSize : FrameSize;
+		for (int32 Frame = 0; Frame < Frames; ++Frame)
 		{
-			continue;
+			TArray<uint8> Bytes;
+			const FString Path = FramePath(Frame, bLarge);
+			if (!TestTrue(FString::Printf(TEXT("%s is there"), *Path), FFileHelper::LoadFileToArray(Bytes, *Path)) || Bytes.Num() < 24)
+			{
+				continue;
+			}
+			// A PNG's size is in its header: the width and height as big-endian 32-bit numbers at 16 and 20.
+			const auto At = [&Bytes](int32 Offset) { return (Bytes[Offset] << 24) | (Bytes[Offset + 1] << 16) | (Bytes[Offset + 2] << 8) | Bytes[Offset + 3]; };
+			TestTrue(TEXT("a PNG"), Bytes[1] == 'P' && Bytes[2] == 'N' && Bytes[3] == 'G');
+			TestEqual(FString::Printf(TEXT("%d across"), Size), At(16), Size);
+			TestEqual(FString::Printf(TEXT("and %d high"), Size), At(20), Size);
 		}
-		// A PNG's size is in its header: the width and height as big-endian 32-bit numbers at 16 and 20.
-		const auto At = [&Bytes](int32 Offset) { return (Bytes[Offset] << 24) | (Bytes[Offset + 1] << 16) | (Bytes[Offset + 2] << 8) | Bytes[Offset + 3]; };
-		TestTrue(TEXT("a PNG"), Bytes[1] == 'P' && Bytes[2] == 'N' && Bytes[3] == 'G');
-		TestEqual(TEXT("64 across"), At(16), FrameSize);
-		TestEqual(TEXT("and 64 high"), At(20), FrameSize);
 	}
 	return true;
 }
