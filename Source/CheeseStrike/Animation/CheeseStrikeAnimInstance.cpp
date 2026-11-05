@@ -572,7 +572,8 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	// so there it is pushed out no further.
 	DualBlend = FMath::FInterpTo(DualBlend, bDual ? 1.0f : 0.0f, DeltaSeconds, BlendRate);
 	DualHold.Alpha = DualBlend * SourceWeight;
-	DualHold.Spread = bFirstPersonBody ? 0.0f : CheeseStrikeDual::Spread;
+	DualHold.Spread = bFirstPersonBody ? 0.0f : CheeseStrikeDual::HipHalfApart;
+	DualHold.bFromMiddle = !bFirstPersonBody;
 	DualHold.AimSpread = bFirstPersonBody ? 0.0f : CheeseStrikeDual::AimSpread;
 	DualHold.Aim = bFirstPersonBody ? View.Aimed : AimBlend;
 	DualHold.ModelInHand = ModelInHand;

@@ -505,8 +505,8 @@ bool FTheDualBurratasFireInTurn::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("%s: aimed, shot 3 within %.1f degrees"), *Name, Two->SpreadDegrees), SpreadFor(*Two, 3, true) < SpreadFor(*Two, 3, false) && SpreadFor(*Two, Two->BloomShots, true) == Two->SpreadDegrees);
 	}
 	TestTrue(TEXT("a weapon of one gun aims down its middle"), FMath::IsNearlyZero(CheeseStrikeWeaponLooks::For(Blaster().Id).Sight->X, 0.5f));
-	TestTrue(TEXT("the two a hand's width apart, turned in a few degrees"), CheeseStrikeDual::AimHalfApart >= 5.0f && CheeseStrikeDual::AimHalfApart <= 9.0f && CheeseStrikeDual::Converge >= 1.0f && CheeseStrikeDual::Converge <= 6.0f
-		&& CheeseStrikeDual::AimSpread < CheeseStrikeDual::Spread);
+	TestTrue(TEXT("the two a hand's width apart, turned in a few degrees; at the hip about a shoulder's width apart"), CheeseStrikeDual::AimHalfApart >= 5.0f && CheeseStrikeDual::AimHalfApart <= 9.0f && CheeseStrikeDual::Converge >= 1.0f && CheeseStrikeDual::Converge <= 6.0f
+		&& CheeseStrikeDual::AimSpread < CheeseStrikeDual::HipHalfApart && CheeseStrikeDual::HipHalfApart >= 15.0f && CheeseStrikeDual::HipHalfApart <= 25.0f);
 	// Aligned: the body faces +Y (its right is -X); a hand whose gun lies along the hand's Y (as a weapon rides the hand:
 	// the mirror above keeps a frame's Y and Z and turns its X back) points 15 degrees right of that and 10 up; it is
 	// turned, in place, so that the gun points the forward's way turned in to the left by the angle, still 10 up; mirrored
@@ -643,7 +643,7 @@ bool FTheCheeseStickFellsAWideArc::RunTest(const FString& Parameters)
 	// hands (its look: the guard tipped up to about 60 degrees, the left hand on it above the right).
 	TestTrue(FString::Printf(TEXT("the swing takes 1.28 s (%.2f)"), SwipeSecondsOf(Stick)), FMath::IsNearlyEqual(SwipeSecondsOf(Stick), 0.8f * 1.6f, 0.001f));
 	const FWeaponLook& StickLook = CheeseStrikeWeaponLooks::For(Stick.Id);
-	TestTrue(FString::Printf(TEXT("held about 60 degrees up at rest (%.0f over the knife's guard)"), StickLook.GuardPitchUp), StickLook.GuardPitchUp > 25.0f && StickLook.GuardPitchUp < 40.0f);
+	TestTrue(FString::Printf(TEXT("held about 60 degrees up at rest (%.0f over the knife's guard)"), StickLook.GuardPitchUp), StickLook.GuardPitchUp > 40.0f && StickLook.GuardPitchUp < 55.0f);
 	TestTrue(TEXT("in both hands: the left on the stick above the right"), StickLook.LeftHand.IsSet() && StickLook.LeftHand->Y < -10.0f && StickLook.Hold == ECheeseStrikeHold::Knife);
 	TestTrue(TEXT("the knife in one hand, the other free"), !CheeseStrikeWeaponLooks::For(Knife().Id).LeftHand.IsSet() && CheeseStrikeWeaponLooks::For(Knife().Id).GuardPitchUp == 0.0f);
 	const CheeseStrikeArms::FKnifeAt Upright = CheeseStrikeArms::KnifeGuard(StickLook.GuardPitchUp);

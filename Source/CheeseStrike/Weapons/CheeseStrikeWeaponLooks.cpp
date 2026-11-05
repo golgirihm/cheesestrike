@@ -192,7 +192,9 @@ namespace
 			Look.Sight = FVector(0.0f, -32.0f, 10.6f);
 			Look.Muzzle = FVector(0.0f, 20.8f, 7.6f);
 			Look.FlashSize = 0.6f;
-			Look.LeftHand = FVector(-3.0f, 9.5f, 1.5f);
+			// The left hand cupped round the right on the grip (a two-handed hold): its fingers close over the right hand's,
+			// a little below the grip's top and ahead of it.
+			Look.LeftHand = FVector(-4.5f, 2.5f, -2.5f);
 			Look.Shots[0] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_01.Weapons_Pistol_Punch-Close_01");
 			Look.Shots[1] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_02.Weapons_Pistol_Punch-Close_02");
 			Look.Shots[2] = TEXT("/Game/Audio/Sounds/Weapons/Pistol/Weapons_Pistol_Punch-Close_03.Weapons_Pistol_Punch-Close_03");
@@ -294,7 +296,8 @@ namespace
 			Look.PlainModel = Model(TEXT("Stick"), TEXT("CheeseStick"));
 			Look.Model = FTransform(FQuat(FRotator(0.0f, 180.0f, 0.0f)) * FQuat(FRotator(0.0f, 0.0f, 40.0f)) * FQuat(FRotator(60.0f, 0.0f, 0.0f)));
 			Look.Along = FVector(0.0f, -1.0f, 0.0f);
-			Look.GuardPitchUp = 31.0f;
+			// Up to about 60 degrees from the knife guard's 13.
+			Look.GuardPitchUp = 47.0f;
 			Look.LeftHand = FVector(0.0f, -24.0f, 0.0f);
 			Look.Materials[0] = Material(TEXT("MI_StringCheese"));
 			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));

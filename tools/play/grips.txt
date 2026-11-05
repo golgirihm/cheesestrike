@@ -1,0 +1,210 @@
+# Looks at the grips wave 15 set right, as every hero: the Curd Pistol (first person at the hip and aimed, then from
+# outside on the right and from the front right), the Cheese Knife (first person on guard, then from outside on the
+# right and from the front) and the Dual Burratas (first person at the hip and aimed, from outside on the right, from
+# the front, and aimed from the front). tools/play.ps1 -Script tools/play/grips.txt -Tag grips.
+wait 3
+cmd CheeseStrikeBody 0 1
+wait 0.5
+tap Sidearm
+wait 1
+shot grip_0_pistol_fp
+hold Aim
+wait 0.7
+shot grip_0_pistol_fp_aimed
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_0_pistol_aimed_right
+cmd CheeseStrikeOutside 140 30 45
+wait 0.5
+shot grip_0_pistol_aimed_front
+release Aim
+wait 0.5
+shot grip_0_pistol_front
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_0_pistol_right
+cmd CheeseStrikeOutside
+tap Knife
+wait 1
+shot grip_0_knife_fp
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_0_knife_right
+cmd CheeseStrikeOutside 140 10 45
+wait 0.5
+shot grip_0_knife_front
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1
+shot grip_0_burratas_fp
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot grip_0_burratas_right
+cmd CheeseStrikeOutside 160 5 45
+wait 0.5
+shot grip_0_burratas_front
+hold Aim
+wait 0.7
+shot grip_0_burratas_aimed_front
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot grip_0_burratas_aimed_right
+cmd CheeseStrikeOutside
+wait 0.3
+shot grip_0_burratas_fp_aimed
+release Aim
+wait 0.3
+cmd CheeseStrikeBody 1 0
+wait 0.5
+tap Sidearm
+wait 1
+shot grip_1_pistol_fp
+hold Aim
+wait 0.7
+shot grip_1_pistol_fp_aimed
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_1_pistol_aimed_right
+cmd CheeseStrikeOutside 140 30 45
+wait 0.5
+shot grip_1_pistol_aimed_front
+release Aim
+wait 0.5
+shot grip_1_pistol_front
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_1_pistol_right
+cmd CheeseStrikeOutside
+tap Knife
+wait 1
+shot grip_1_knife_fp
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_1_knife_right
+cmd CheeseStrikeOutside 140 10 45
+wait 0.5
+shot grip_1_knife_front
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1
+shot grip_1_burratas_fp
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot grip_1_burratas_right
+cmd CheeseStrikeOutside 160 5 45
+wait 0.5
+shot grip_1_burratas_front
+hold Aim
+wait 0.7
+shot grip_1_burratas_aimed_front
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot grip_1_burratas_aimed_right
+cmd CheeseStrikeOutside
+wait 0.3
+shot grip_1_burratas_fp_aimed
+release Aim
+wait 0.3
+cmd CheeseStrikeBody 2 1
+wait 0.5
+tap Sidearm
+wait 1
+shot grip_2_pistol_fp
+hold Aim
+wait 0.7
+shot grip_2_pistol_fp_aimed
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_2_pistol_aimed_right
+cmd CheeseStrikeOutside 140 30 45
+wait 0.5
+shot grip_2_pistol_aimed_front
+release Aim
+wait 0.5
+shot grip_2_pistol_front
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_2_pistol_right
+cmd CheeseStrikeOutside
+tap Knife
+wait 1
+shot grip_2_knife_fp
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_2_knife_right
+cmd CheeseStrikeOutside 140 10 45
+wait 0.5
+shot grip_2_knife_front
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1
+shot grip_2_burratas_fp
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot grip_2_burratas_right
+cmd CheeseStrikeOutside 160 5 45
+wait 0.5
+shot grip_2_burratas_front
+hold Aim
+wait 0.7
+shot grip_2_burratas_aimed_front
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot grip_2_burratas_aimed_right
+cmd CheeseStrikeOutside
+wait 0.3
+shot grip_2_burratas_fp_aimed
+release Aim
+wait 0.3
+cmd CheeseStrikeBody 3 0
+wait 0.5
+tap Sidearm
+wait 1
+shot grip_3_pistol_fp
+hold Aim
+wait 0.7
+shot grip_3_pistol_fp_aimed
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_3_pistol_aimed_right
+cmd CheeseStrikeOutside 140 30 45
+wait 0.5
+shot grip_3_pistol_aimed_front
+release Aim
+wait 0.5
+shot grip_3_pistol_front
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_3_pistol_right
+cmd CheeseStrikeOutside
+tap Knife
+wait 1
+shot grip_3_knife_fp
+cmd CheeseStrikeOutside 120 75 45
+wait 0.5
+shot grip_3_knife_right
+cmd CheeseStrikeOutside 140 10 45
+wait 0.5
+shot grip_3_knife_front
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1
+shot grip_3_burratas_fp
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot grip_3_burratas_right
+cmd CheeseStrikeOutside 160 5 45
+wait 0.5
+shot grip_3_burratas_front
+hold Aim
+wait 0.7
+shot grip_3_burratas_aimed_front
+cmd CheeseStrikeOutside 130 75 45
+wait 0.5
+shot grip_3_burratas_aimed_right
+cmd CheeseStrikeOutside
+wait 0.3
+shot grip_3_burratas_fp_aimed
+release Aim
+wait 0.3
+quit
