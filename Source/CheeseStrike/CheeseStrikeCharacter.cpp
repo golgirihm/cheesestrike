@@ -1208,13 +1208,22 @@ void ACheeseStrikeCharacter::HearReloadCall()
 
 void ACheeseStrikeCharacter::MulticastPickedUp_Implementation()
 {
-	// A short metallic clack of gun metal, from the hands, as near footsteps are heard (wave 15: in place of Lyra's
-	// weapon swap, which drawing a weapon in hand keeps).
+	// A real clack, one syllable of a reload, from the hands, as near footsteps are heard (wave 16: a recording, in place
+	// of wave 15's clack made in code; drawing a weapon in hand keeps Lyra's weapon swap).
 	if (GetNetMode() == NM_DedicatedServer)
 	{
 		return;
 	}
-	UGameplayStatics::SpawnSoundAtLocation(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::MetalClack()), GetActorLocation(), FRotator::ZeroRotator, 1.0f, FMath::FRandRange(0.95f, 1.05f), 0.0f, NearbyAttenuation());
+	if (USoundBase* Clack = LoadObject<USoundBase>(nullptr, CheeseStrikeSounds::PickupClackPath))
+	{
+		UGameplayStatics::SpawnSoundAtLocation(this, Clack, GetActorLocation(), FRotator::ZeroRotator, 1.0f, FMath::FRandRange(0.97f, 1.03f), 0.0f, NearbyAttenuation());
+	}
+}
+
+CheeseStrikeSounds::EVoice ACheeseStrikeCharacter::GruntVoice() const
+{
+	const TConstArrayView<CheeseStrikeBodies::FBody> Bodies = CheeseStrikeBodies::All();
+	return Bodies.IsValidIndex(BodyIndex) ? CheeseStrikeSounds::VoiceOf(Bodies[BodyIndex].Name) : CheeseStrikeSounds::EVoice::Male;
 }
 
 void ACheeseStrikeCharacter::HearHealth()
@@ -1228,14 +1237,23 @@ void ACheeseStrikeCharacter::HearHealth()
 	}
 	const float Lost = HeardHealth - Health;
 	const float Now = GetWorld() != nullptr ? GetWorld()->GetTimeSeconds() : 0.0f;
-	if (IsAlive() && IsLocallyControlled() && CheeseStrikeSounds::ShouldOof(Lost, Now - LastOofAt))
+	if (IsAlive() && IsLocallyControlled() && GetNetMode() != NM_DedicatedServer && CheeseStrikeSounds::ShouldOof(Lost, Now - LastOofAt))
 	{
 		LastOofAt = Now;
 		HeardHealth = Health;
 		LastOof = CheeseStrikeSounds::NextOof(LastOof, FMath::RandHelper(CheeseStrikeSounds::Oofs));
-		if (USoundBase* Oof = LoadObject<USoundBase>(nullptr, *CheeseStrikeSounds::OofPath(LastOof)))
+		// In the voice of the hero it wears (Lt. Belica's a woman's); a player hears their own whole, a bot (on the server's
+		// machine, the host's) is heard from where it is hurt, as its footsteps are.
+		if (USoundBase* Oof = LoadObject<USoundBase>(nullptr, *CheeseStrikeSounds::OofPath(LastOof, GruntVoice())))
 		{
-			UGameplayStatics::PlaySound2D(this, Oof, CheeseStrikeSounds::OofVolume, FMath::FRandRange(0.96f, 1.04f));
+			if (IsPlayerControlled())
+			{
+				UGameplayStatics::PlaySound2D(this, Oof, CheeseStrikeSounds::OofVolume, FMath::FRandRange(0.96f, 1.04f));
+			}
+			else
+			{
+				UGameplayStatics::SpawnSoundAtLocation(this, Oof, GetActorLocation() + FVector(0.0f, 0.0f, 60.0f), FRotator::ZeroRotator, CheeseStrikeSounds::OofVolume, FMath::FRandRange(0.96f, 1.04f), 0.0f, NearbyAttenuation());
+			}
 		}
 	}
 }

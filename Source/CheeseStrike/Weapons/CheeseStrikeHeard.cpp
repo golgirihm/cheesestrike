@@ -3,7 +3,6 @@
 #include "CheeseStrikeHeard.h"
 #include "ActiveSound.h"
 #include "AudioDevice.h"
-#include "AudioThread.h"
 #include "Components/AudioComponent.h"
 #include "Engine/World.h"
 
@@ -41,32 +40,22 @@ namespace CheeseStrikeHeard
 		{
 			return;
 		}
-		// Only what is still waiting, and not long gone: a sound not heard within a few seconds never will be.
+		// Only what is still waiting, and not long gone: a sound not heard within a few seconds never will be. Each asked on
+		// the audio thread, as the mixer's last update left it: among the voices it chose to play, audibly.
 		const double Now = FPlatformTime::Seconds();
-		TArray<TPair<uint64, TSharedRef<std::atomic<bool>, ESPMode::ThreadSafe>>> Waiting;
 		for (const FHeard& Sound : Noted())
 		{
 			if (!Sound.Heard->load() && Now - Sound.At < 5.0)
 			{
-				Waiting.Emplace(Sound.ComponentId, Sound.Heard);
-			}
-		}
-		if (Waiting.Num() == 0)
-		{
-			return;
-		}
-		FAudioThread::RunCommandOnAudioThread([Device, Waiting = MoveTemp(Waiting)]()
-		{
-			for (const TPair<uint64, TSharedRef<std::atomic<bool>, ESPMode::ThreadSafe>>& Each : Waiting)
-			{
-				// As the mixer's last update left it: among the voices it chose to play, audibly.
-				const FActiveSound* Active = Device->FindActiveSound(Each.Key);
-				if (Active != nullptr && Active->IsPlayingAudio())
+				Device->SendCommandToActiveSounds(Sound.ComponentId, [Heard = Sound.Heard](FActiveSound& Active)
 				{
-					Each.Value->store(true);
-				}
+					if (Active.IsPlayingAudio())
+					{
+						Heard->store(true);
+					}
+				});
 			}
-		});
+		}
 	}
 
 	void Reset()
