@@ -88,6 +88,13 @@ namespace CheeseStrikePickups
 	ETake HowToTake(FName Carried, FName Offered, bool bRoundsFull, bool bDropped = false);
 	/** The rounds taken by topping up from a stand (its weapon's usual reserve, `StandReserve`) or from a weapon on the floor (all it has). */
 	int32 TopUpRounds(bool bDropped, int32 StandReserve, int32 DroppedMagazine, int32 DroppedReserve);
+	/**
+	 * The rounds the sidearm (the Curd Pistol, no longer endless since wave 16) gets from any press that takes a weapon or
+	 * its rounds, at a stand or on the floor: its usual reserve, `SidearmReserve` (up to the most it holds).
+	 */
+	int32 SidearmTopUp(int32 SidearmReserve);
+	/** Whether rounds would be full for HowToTake's own-weapon top-up: the primary's, and the sidearm's (an endless reserve, below 0, is full). */
+	bool RoundsFull(int32 PrimaryReserve, int32 PrimaryMost, int32 SidearmReserve, int32 SidearmMost);
 	/** Whether someone may take anything now: alive, free to act (not held by a count), not down, and allowed their primary (Execution's last stand allows only the sidearm). */
 	bool MayTake(bool bAlive, bool bCanAct, bool bDowned, bool bPrimaryAllowed);
 	/** Whether feet at `Feet` are within `Across` (cm) of a stand whose floor is at `Stand`, and within ReachUp above or below it. */

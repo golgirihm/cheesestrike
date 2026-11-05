@@ -39,7 +39,7 @@ namespace CheeseStrikeArms
 		const FSwipeKey SwipeKeys[] = {
 			{0.0f, FVector(0.0f, 0.0f, 0.0f), 0.0f, 0.0f},
 			{0.2f, FVector(-6.0f, 14.0f, 14.0f), 70.0f, 20.0f},
-			{0.38f, FVector(20.0f, -10.0f, 4.0f), 0.0f, 0.0f},
+			{SwipeContactPhase, FVector(20.0f, -10.0f, 4.0f), 0.0f, 0.0f},
 			{0.58f, FVector(12.0f, -34.0f, -12.0f), -75.0f, -15.0f},
 			{1.0f, FVector(0.0f, 0.0f, 0.0f), 0.0f, 0.0f},
 		};
@@ -279,8 +279,10 @@ void FCheeseStrikeViewHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FQuat Sprinted = FQuat::Slerp(FQuat::Identity, FQuat(SprintTurn), Sprinting);
 	const FQuat Slid = FQuat::Slerp(FQuat::Identity, FQuat(SlideTurn), Slide * (1.0f - Aimed));
 	const FQuat Drawn = FQuat::Slerp(FQuat::Identity, FQuat(FRotator(-DrawTip, 0.0f, 0.0f)), Lowered);
-	TargetTurn = (Drawn * Slid * Sprinted * TargetTurn).GetNormalized();
-	TargetAt += SprintShift * Sprinting + SlideShift * Slide * (1.0f - Aimed) - FVector::UpVector * DrawDrop * Lowered;
+	// A heavy shot's kick: thrown back toward the eye and tipped up, easing back (CheeseStrikeWeapons::KickAt).
+	const FQuat Kicked = FQuat::Slerp(FQuat::Identity, FQuat(FRotator(ViewKickTip, 0.0f, 0.0f)), Kick);
+	TargetTurn = (Kicked * Drawn * Slid * Sprinted * TargetTurn).GetNormalized();
+	TargetAt += SprintShift * Sprinting + SlideShift * Slide * (1.0f - Aimed) - FVector::UpVector * DrawDrop * Lowered - FVector::ForwardVector * KickBack * Kick;
 
 	// Into the body's space, as much as it is placed.
 	const FVector Target = FMath::Lerp(HandNow.GetLocation(), Eye + View.RotateVector(TargetAt), Alpha);

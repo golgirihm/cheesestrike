@@ -122,7 +122,8 @@ bool FItChangesWeapons::RunTest(const FString& Parameters)
 			const ACheeseStrikeWeapon* Pistol = Character->GetWeapon();
 			TestEqual(TEXT("a pull while it came up fired once it was up"), Pistol->ShotsFired, 1);
 			TestEqual(TEXT("from its own magazine"), Pistol->GetMagazine(), Pistol->GetStats().MagazineSize - 1);
-			TestEqual(TEXT("with rounds without end"), Pistol->DescribeRounds(), FString::Printf(TEXT("%d"), Pistol->GetStats().MagazineSize - 1));
+			// Wave 16: no longer endless, a reserve as the other guns have.
+			TestEqual(TEXT("and its reserve beside it"), Pistol->DescribeRounds(), FString::Printf(TEXT("%d / %d"), Pistol->GetStats().MagazineSize - 1, Pistol->GetStats().Reserve));
 			const ACheeseStrikeWeapon* Blaster = Character->GetInventory()->GetInSlot(EWeaponSlot::Primary);
 			TestEqual(TEXT("the rifle's magazine untouched"), Blaster->GetMagazine(), Blaster->GetStats().MagazineSize);
 		}
@@ -423,7 +424,8 @@ bool FTheNewWeaponsStrikeOverTheNetwork::RunTest(const FString& Parameters)
 		TestTrue(TEXT("at the supercombine: the rounds fired are about sixteen, not a magazine"), Grater != nullptr && Grater->GetMagazine() >= Grater->GetStats().MagazineSize - Grater->GetStats().SuperShards - 3);
 	});
 	WaitUntil(TEXT("the joiner coming back again"), 6.0f, []() { return CharacterOf(1, 0) != nullptr && CharacterOf(1, 0)->IsAlive() && Character(1) != nullptr; });
-	// The Cheese Stick: a swing fells someone a metre off to the side in front.
+	// The Cheese Stick: a swing fells someone a metre off to the side in front, as its head comes round to them (wave 16),
+	// not as it starts.
 	PutAt(0, HostSpot, HostYaw);
 	PutAt(1, BesideHost + FVector(-120.0f, 0.0f, 0.0f), JoinerYaw);
 	Then([]() { Arm(CheeseStrikeWeapons::Stick().Id); });
@@ -433,13 +435,19 @@ bool FTheNewWeaponsStrikeOverTheNetwork::RunTest(const FString& Parameters)
 		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
 		TestTrue(TEXT("the stick is a little slow to carry"), Host != nullptr && Host->GetCheeseStrikeMovement()->IsCarryingLong() && !Host->GetCheeseStrikeMovement()->IsCarryingHeavy());
 	});
-	Play(0, TEXT("tap Fire\nwait 0.5"));
+	Play(0, TEXT("tap Fire\nwait 0.15"));
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Host = Character(0);
 		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
 		TestTrue(TEXT("the host swung"), Host != nullptr && Host->GetWeapon() != nullptr && Host->GetWeapon()->ShotsFired > 0);
-		TestTrue(TEXT("and felled the joiner at its side"), Joiner == nullptr || !Joiner->IsAlive());
+		TestTrue(FString::Printf(TEXT("the swing just begun, the joiner is unhurt (health %.0f)"), Joiner != nullptr ? Joiner->GetHealth() : -1.0f), Joiner != nullptr && Joiner->IsAlive() && Joiner->GetHealth() >= CheeseStrikeWeapons::MaxHealth);
+	});
+	Wait(CheeseStrikeWeapons::ContactDelay(CheeseStrikeWeapons::Stick()) + 0.3f);
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
+		TestTrue(TEXT("its head come round, it felled the joiner at its side"), Joiner == nullptr || !Joiner->IsAlive());
 	});
 	StopPlaying();
 	return true;

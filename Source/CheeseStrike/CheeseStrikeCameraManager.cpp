@@ -46,6 +46,11 @@ void ACheeseStrikeCameraManager::UpdateViewTarget(FTViewTarget& OutVT, float Del
 	const FRotator Sway = Character->GetScopeSway();
 	OutVT.POV.Rotation.Pitch += Sway.Pitch;
 	OutVT.POV.Rotation.Yaw += Sway.Yaw;
+	// A heavy shot's kick (the Roquefort's): the view thrown up and eased back (CheeseStrikeWeapons::KickAt).
+	if (const ACheeseStrikeWeapon* Held = Character->GetWeapon(); Held != nullptr && Character->IsLocallyControlled())
+	{
+		OutVT.POV.Rotation.Pitch += Held->GetStats().KickPitch * Held->KickShare();
+	}
 	// Where the weapon in hand is in the view, for how steadily it is held (and for the trace).
 	const UPrimitiveComponent* Model = Character->GetWeapon() != nullptr ? Character->GetWeapon()->GetModel(true) : nullptr;
 	if (Model == nullptr)

@@ -126,6 +126,25 @@ namespace CheeseStrikeWeapons
 		return Weapon.SwipeSeconds > 0.0f ? Weapon.SwipeSeconds : CheeseStrikeArms::SwipeSeconds;
 	}
 
+	float ContactDelay(const FWeaponStats& Weapon)
+	{
+		return Weapon.ArcDegrees > 0.0f ? SwipeSecondsOf(Weapon) * CheeseStrikeArms::SwipeContactPhase : 0.0f;
+	}
+
+	float KickAt(const FWeaponStats& Weapon, float Since)
+	{
+		if (Weapon.KickPitch <= 0.0f || Since < 0.0f || Since >= Weapon.KickSeconds)
+		{
+			return 0.0f;
+		}
+		if (Since < KickRise)
+		{
+			return FMath::Sin(0.5f * PI * Since / KickRise);
+		}
+		const float Back = (Since - KickRise) / FMath::Max(Weapon.KickSeconds - KickRise, KINDA_SMALL_NUMBER);
+		return FMath::Square(1.0f - Back);
+	}
+
 	float SplashAt(const FWeaponStats& Weapon, float Distance)
 	{
 		if (Weapon.SplashRadius <= 0.0f || Distance > Weapon.SplashRadius)
@@ -146,20 +165,25 @@ namespace CheeseStrikeWeapons
 		return !Way.IsZero() && FVector::DotProduct(Aim, Way) >= FMath::Cos(FMath::DegreesToRadians(Degrees));
 	}
 
-	int32 HomingPick(const FVector& From, const FVector& Aim, const TArray<FVector>& Targets, float Cone)
+	int32 HomingPick(const FVector& From, const FVector& Aim, const TArray<FVector>& Targets, float Cone, float Reach)
 	{
 		int32 Best = INDEX_NONE;
 		float Nearest = TNumericLimits<float>::Max();
 		for (int32 Index = 0; Index < Targets.Num(); ++Index)
 		{
 			const FVector ToThem = Targets[Index] - From;
-			if (WithinCone(Aim, ToThem, Cone) && ToThem.Size() < Nearest)
+			if (WithinCone(Aim, ToThem, Cone) && ToThem.Size() < Nearest && (Reach <= 0.0f || ToThem.Size() <= Reach))
 			{
 				Nearest = ToThem.Size();
 				Best = Index;
 			}
 		}
 		return Best;
+	}
+
+	bool CountsForSuper(const FWeaponStats& Weapon, float Distance)
+	{
+		return Weapon.SuperShards > 0 && (Weapon.SuperReach <= 0.0f || Distance <= Weapon.SuperReach);
 	}
 
 	FVector TurnToward(const FVector& Velocity, const FVector& ToTarget, float MostDegrees)

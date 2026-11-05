@@ -98,6 +98,14 @@ bool FAWeaponIsTakenByWhatIsCarried::RunTest(const FString& Parameters)
 	TestTrue(TEXT("never a sidearm"), HowToTake(Carbine, CheeseStrikeArsenal::Sidearm(), false, true) == ETake::None);
 	TestEqual(TEXT("a stand tops up its weapon's reserve"), TopUpRounds(false, 40, 7, 9), 40);
 	TestEqual(TEXT("a weapon on the floor everything it has"), TopUpRounds(true, 40, 7, 9), 16);
+	// Wave 16: the Curd Pistol runs dry, and any weapon or rounds taken top up its reserve, a stand's or the floor's alike.
+	const FWeaponStats& Pistol = CheeseStrikeWeapons::Pistol();
+	TestEqual(TEXT("any take tops up the sidearm by its usual reserve"), SidearmTopUp(Pistol.Reserve), Pistol.Reserve);
+	TestTrue(TEXT("the sidearm's rounds have an end"), Pistol.Reserve > 0 && Pistol.ReserveMax > Pistol.Reserve);
+	TestTrue(TEXT("one's own weapon full, the sidearm short: its rounds are still worth pressing for"), !RoundsFull(120, 120, 10, Pistol.ReserveMax));
+	TestTrue(TEXT("both full, nothing is"), RoundsFull(120, 120, Pistol.ReserveMax, Pistol.ReserveMax));
+	TestTrue(TEXT("the primary short, as before"), !RoundsFull(40, 120, Pistol.ReserveMax, Pistol.ReserveMax));
+	TestTrue(TEXT("an endless reserve (Gun Game's) is full"), RoundsFull(-1, 120, -1, Pistol.ReserveMax));
 
 	// Dropped weapons: twenty seconds, at most twelve, blinking before they go.
 	TestEqual(TEXT("twenty seconds on the floor"), DroppedSeconds, 20.0f);

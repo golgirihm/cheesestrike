@@ -153,6 +153,9 @@ struct FCheeseStrikeAnimInstanceView
 	float Aimed = 0.0f;
 	float Lowered = 0.0f;
 	bool bSprinting = false;
+	/** A heavy shot's kick in view (0 to 1, CheeseStrikeWeapons::KickAt), and how far back toward the eye a whole one throws the weapon (cm). */
+	float Kick = 0.0f;
+	float KickBack = 0.0f;
 };
 
 /** A grenade in hand (FCheeseStrikeGrenadeHold), read from the character's UCheeseStrikeGrenades each frame. */

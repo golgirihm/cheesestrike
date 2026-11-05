@@ -39,9 +39,9 @@ bool FEveryWeaponKillsInTheDesignsTime::RunTest(const FString& Parameters)
 	// The design's TTK column (docs/unreal/design.md, "Weapons"): body shots, close, holding the trigger. The Colby
 	// Carbine, the spawn primary, is softened from it: three bursts to a kill. Wave 14: the Cheese Grater's shards (before
 	// the supercombine), the Munster Twin SMGs, the Swiss Shotgun's whole blast close, the BabyBomb's wheel and the Cheese
-	// Stick's swing.
-	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 5, 0.48f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 20, 1.9f},
-		FWanted{Munster(), 8, 0.525f}, FWanted{Shotgun(), 1, 0.0f}, FWanted{Roquefort(), 2, 1.3f}, FWanted{Knife(), 2, 0.75f}, FWanted{Burratas(), 7, 0.6f},
+	// Stick's swing. Wave 16: the Cheddar Blaster a tenth softer (six hits, not five), the Roquefort 40% slower between shots.
+	for (const FWanted& Wanted : {FWanted{Pistol(), 9, 2.0f}, FWanted{Blaster(), 6, 0.6f}, FWanted{Carbine(), 7, 0.96f}, FWanted{Grater(), 20, 1.9f},
+		FWanted{Munster(), 8, 0.525f}, FWanted{Shotgun(), 1, 0.0f}, FWanted{Roquefort(), 2, 1.82f}, FWanted{Knife(), 2, 0.75f}, FWanted{Burratas(), 7, 0.6f},
 		FWanted{BabyBomb(), 1, 0.0f}, FWanted{Stick(), 1, 0.0f}})
 	{
 		const FString Name = Wanted.Weapon.DisplayName.ToString();
@@ -60,6 +60,41 @@ bool FEveryWeaponKillsInTheDesignsTime::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("a Roquefort headshot takes a full health at any range (the least %.0f)"), Least), Least >= MaxHealth);
 	}
 	TestTrue(TEXT("the Curd Pistol is the weakest gun"), Pistol().Damage / Pistol().FireInterval < Blaster().Damage / Blaster().FireInterval);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWave16TunesTheWeapons, "CheeseStrike.Weapons.Wave16TunesTheWeapons", WeaponTests::Flags)
+
+bool FWave16TunesTheWeapons::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeWeapons;
+	// The Cheddar Blaster: a tenth less damage, a little less accurate aimed (which tells at long range).
+	TestEqual(TEXT("the Cheddar Blaster's hit 18, a tenth under its 20"), Blaster().Damage, 18.0f);
+	TestTrue(FString::Printf(TEXT("and its aimed cone a little wider (%.2f degrees, from 0.3)"), Blaster().SpreadDegrees), Blaster().SpreadDegrees > 0.3f && Blaster().SpreadDegrees <= 0.5f);
+	const float BlasterAt50 = FMath::Tan(FMath::DegreesToRadians(Blaster().SpreadDegrees / 2.0f)) * 5000.0f;
+	TestTrue(FString::Printf(TEXT("at 50 m a shot strays up to %.0f cm, still within a body's width"), BlasterAt50), BlasterAt50 > 13.0f && BlasterAt50 < 34.0f);
+	// The Munster Twin SMGs: less accurate at long range.
+	TestTrue(FString::Printf(TEXT("the Munster Twin SMGs' aimed cone wider (%.1f degrees, from 1.5)"), Munster().SpreadDegrees), Munster().SpreadDegrees >= 2.5f);
+	// The Roquefort: 40% longer between shots, and a heavy kick each shot.
+	TestTrue(FString::Printf(TEXT("the Roquefort's shots 40 percent further apart (%.2f s)"), Roquefort().FireInterval), FMath::IsNearlyEqual(Roquefort().FireInterval, 1.3f * 1.4f, 0.01f));
+	TestTrue(TEXT("a heavy kick: the view thrown up several degrees"), Roquefort().KickPitch >= 5.0f && Roquefort().KickKept > 0.0f && Roquefort().KickKept < Roquefort().KickPitch && Roquefort().KickBack > 0.0f);
+	TestEqual(TEXT("no kick before the shot"), KickAt(Roquefort(), -0.01f), 0.0f);
+	TestTrue(FString::Printf(TEXT("all of it at once (%.2f at 40 ms)"), KickAt(Roquefort(), KickRise)), FMath::IsNearlyEqual(KickAt(Roquefort(), KickRise), 1.0f, 0.001f) && KickAt(Roquefort(), 0.02f) > 0.5f);
+	TestTrue(TEXT("eased back"), KickAt(Roquefort(), 0.2f) < KickAt(Roquefort(), 0.1f) && KickAt(Roquefort(), 0.1f) < 1.0f);
+	TestEqual(TEXT("gone by its seconds"), KickAt(Roquefort(), Roquefort().KickSeconds), 0.0f);
+	TestTrue(TEXT("long before the next shot"), Roquefort().KickSeconds < Roquefort().FireInterval / 2.0f);
+	TestEqual(TEXT("a gun without one never kicks so"), KickAt(Blaster(), 0.02f), 0.0f);
+	// The Curd Pistol: a magazine and a reserve, as the other guns have.
+	TestFalse(TEXT("the Curd Pistol's rounds run out now"), Pistol().HasEndlessReserve());
+	TestTrue(FString::Printf(TEXT("a sidearm's magazine (%d) and three more (%d, %d at most)"), Pistol().MagazineSize, Pistol().Reserve, Pistol().ReserveMax),
+		Pistol().MagazineSize >= 10 && Pistol().MagazineSize <= 15 && Pistol().Reserve == 3 * Pistol().MagazineSize && Pistol().ReserveMax == 6 * Pistol().MagazineSize);
+	// The Cheese Stick: the blow lands as the head comes round to the aim, not as the swing starts.
+	const float Contact = ContactDelay(Stick());
+	TestTrue(FString::Printf(TEXT("the stick's blow lands %.2f s into its swing"), Contact), Contact > 0.3f && Contact < SwipeSecondsOf(Stick()) * 0.5f && Contact < Stick().FireInterval);
+	const CheeseStrikeArms::FKnifeAt AtContact = CheeseStrikeArms::KnifeSwipe(CheeseStrikeArms::SwipeContactPhase);
+	TestTrue(TEXT("when its head points straight ahead"), AtContact.Blade.X > 0.9f && FMath::Abs(AtContact.Blade.Y) < 0.05f);
+	TestTrue(TEXT("having come across from the right"), CheeseStrikeArms::KnifeSwipe(0.25f).Blade.Y > 0.3f && CheeseStrikeArms::KnifeSwipe(0.5f).Blade.Y < -0.3f);
+	TestEqual(TEXT("the knife's stroke lands as it is made"), ContactDelay(Knife()), 0.0f);
 	return true;
 }
 
@@ -380,11 +415,10 @@ bool FWeaponsAreLifeSizeAndComeUpInTime::RunTest(const FString& Parameters)
 	TestTrue(TEXT("a heavy weapon slows its carrier"), FMath::IsNearlyEqual(CheeseStrikeMovement::WithWeapon(450.0f, true), 450.0f * 0.85f));
 	TestTrue(TEXT("a long one less"), FMath::IsNearlyEqual(CheeseStrikeMovement::WithWeapon(450.0f, false, true), 450.0f * 0.9f));
 	TestEqual(TEXT("another doesn't"), CheeseStrikeMovement::WithWeapon(675.0f, false), 675.0f);
-	// Rounds.
-	TestTrue(TEXT("the Curd Pistol's rounds never run out"), Pistol().HasEndlessReserve());
+	// Rounds (wave 16: the Curd Pistol too).
 	for (const FWeaponStats* Weapon : CheeseStrikeArsenal::All())
 	{
-		if (Weapon->Slot == EWeaponSlot::Primary && !Weapon->bSpecial)
+		if ((Weapon->Slot == EWeaponSlot::Primary || Weapon->Slot == EWeaponSlot::Sidearm) && !Weapon->bSpecial)
 		{
 			TestTrue(FString::Printf(TEXT("the %s carries a magazine or three besides and holds at most about five"), *Weapon->DisplayName.ToString()),
 				Weapon->Reserve >= Weapon->MagazineSize && Weapon->Reserve <= 3 * Weapon->MagazineSize && Weapon->ReserveMax <= 6 * Weapon->MagazineSize);
@@ -557,16 +591,28 @@ bool FTheBabyBombBurstsAndHurtsItsShooter::RunTest(const FString& Parameters)
 	TestEqual(TEXT("two more"), Bomb.Reserve, 2);
 	TestEqual(TEXT("a wheel a second"), Bomb.FireInterval, 1.0f);
 	TestEqual(TEXT("a 2.5 s reload"), Bomb.ReloadTime, 2.5f);
-	TestEqual(TEXT("at 12.5 m/s (wave 15: half what it was)"), Bomb.ProjectileSpeed, 1250.0f);
-	TestTrue(TEXT("with a little drop"), Bomb.GravityShare > 0.0f && Bomb.GravityShare < 0.5f);
-	// Fired level from the eyes it comes down to the floor about 25 m out, as the faster wheel with more drop did (the
-	// gravity share was lowered with the speed, by the ballistics: reach = v sqrt(2h / g')).
+	// Wave 16: half as fast again as wave 15's 12.5 m/s, a heavier drop and a shorter reach, so that it must be lobbed.
+	TestEqual(TEXT("at 18.75 m/s, half as fast again"), Bomb.ProjectileSpeed, 1250.0f * 1.5f);
+	TestTrue(FString::Printf(TEXT("with a heavy drop (%.2f of gravity, from 0.08)"), Bomb.GravityShare), Bomb.GravityShare >= 0.3f && Bomb.GravityShare < 0.5f);
+	// Fired level from the eyes it comes down to the floor about 18 m out (reach = v sqrt(2h / g')), short of wave 15's 25.
 	const float Reach = LevelReach(Bomb, ReachEyeHeight);
-	TestTrue(FString::Printf(TEXT("a level wheel comes down about 25 m out (%.1f m)"), Reach / 100.0f), FMath::IsNearlyEqual(Reach, 2500.0f, 150.0f));
-	FWeaponStats Old = Bomb;
-	Old.ProjectileSpeed = 2500.0f;
-	Old.GravityShare = 0.15f;
-	TestTrue(FString::Printf(TEXT("about as far as the old wheel went before falling 75 cm (%.1f m)"), LevelReach(Old, 75.0f) / 100.0f), FMath::IsNearlyEqual(LevelReach(Old, 75.0f), Reach, 200.0f));
+	TestTrue(FString::Printf(TEXT("a level wheel comes down about 18 m out (%.1f m)"), Reach / 100.0f), FMath::IsNearlyEqual(Reach, 1800.0f, 150.0f));
+	FWeaponStats Wave15 = Bomb;
+	Wave15.ProjectileSpeed = 1250.0f;
+	Wave15.GravityShare = 0.08f;
+	Wave15.ProjectileLife = 3.0f;
+	TestTrue(FString::Printf(TEXT("short of wave 15's wheel (%.1f m)"), LevelReach(Wave15, ReachEyeHeight) / 100.0f), Reach < LevelReach(Wave15, ReachEyeHeight) - 500.0f);
+	TestTrue(FString::Printf(TEXT("and a shorter reach at all (%.1f m, from %.1f)"), Bomb.ProjectileSpeed * Bomb.ProjectileLife / 100.0f, Wave15.ProjectileSpeed * Wave15.ProjectileLife / 100.0f),
+		Bomb.ProjectileSpeed * Bomb.ProjectileLife < Wave15.ProjectileSpeed * Wave15.ProjectileLife - 500.0f);
+	// Lobbed 30 degrees up from the eyes it carries further than fired level, before its life is out.
+	{
+		const float Up = FMath::DegreesToRadians(30.0f);
+		const float Fall = 980.0f * Bomb.GravityShare;
+		const float Vz = Bomb.ProjectileSpeed * FMath::Sin(Up);
+		const float Down = (Vz + FMath::Sqrt(Vz * Vz + 2.0f * Fall * ReachEyeHeight)) / Fall;
+		const float Lobbed = Bomb.ProjectileSpeed * FMath::Cos(Up) * FMath::Min(Down, Bomb.ProjectileLife);
+		TestTrue(FString::Printf(TEXT("lobbed 30 degrees up it carries further (%.1f m)"), Lobbed / 100.0f), Lobbed > Reach + 500.0f);
+	}
 	TestTrue(TEXT("within its life"), Reach / Bomb.ProjectileSpeed < Bomb.ProjectileLife);
 	TestTrue(TEXT("a round without gravity reaches as far as it flies"), FMath::IsNearlyEqual(LevelReach(Grater(), ReachEyeHeight), Grater().ProjectileSpeed * Grater().ProjectileLife));
 	TestEqual(TEXT("a direct hit 150"), Bomb.Damage, 150.0f);
@@ -592,6 +638,28 @@ bool FTheGratersShardsHomeAndBurstTogether::RunTest(const FString& Parameters)
 	TestTrue(TEXT("20 shards a magazine, ten a second, held"), Grater.MagazineSize == 20 && FMath::IsNearlyEqual(Grater.FireInterval, 0.1f) && Grater.bAutomatic);
 	TestTrue(TEXT("5 a shard, at 40 m/s"), Grater.Damage == 5.0f && Grater.ProjectileSpeed == 4000.0f && Grater.GravityShare == 0.0f);
 	TestTrue(TEXT("homing at up to 25 degrees a second, on someone within 10 degrees of the aim"), Grater.HomingTurn == 25.0f && Grater.HomingCone == 10.0f);
+	// Wave 16: much less accurate at range: homing only within 20 m, a wider cone, its damage falling off past 15 m, and only
+	// shards that struck within 25 m counting toward the supercombine; close in, as it was.
+	TestEqual(TEXT("homing on nobody 40 m off"), HomingPick(FVector::ZeroVector, FVector::ForwardVector, {FVector(4000.0f, 0.0f, 0.0f)}, Grater.HomingCone, Grater.HomingReach), static_cast<int32>(INDEX_NONE));
+	TestEqual(TEXT("but on someone 15 m off"), HomingPick(FVector::ZeroVector, FVector::ForwardVector, {FVector(1500.0f, 0.0f, 0.0f)}, Grater.HomingCone, Grater.HomingReach), 0);
+	TestTrue(TEXT("its whole damage close in"), DamageAt(Grater, 1000.0f, false) == Grater.Damage && CountsForSuper(Grater, 1000.0f));
+	TestTrue(FString::Printf(TEXT("less than half at 40 m (%.1f)"), DamageAt(Grater, 4000.0f, false)), DamageAt(Grater, 4000.0f, false) < Grater.Damage * 0.5f);
+	TestFalse(TEXT("and a shard 40 m off never adds to a supercombine"), CountsForSuper(Grater, 4000.0f));
+	{
+		// Every round it carries (a magazine and its reserve) fired aimed, fully bloomed, at a body 40 m off: what lands
+		// (its shards straight, as none homes that far) doesn't add up to a kill.
+		FRandomStream Random(1616);
+		const FVector Feet(4000.0f, 0.0f, -160.0f);
+		int32 Hits = 0;
+		const int32 Rounds = Grater.MagazineSize + Grater.Reserve;
+		for (int32 Shot = 0; Shot < Rounds; ++Shot)
+		{
+			const FVector Way = Spread(FVector::ForwardVector, SpreadFor(Grater, Grater.BloomShots, true), Random);
+			Hits += RayHitsCapsule(FVector::ZeroVector, Way, Feet, 34.0f, 180.0f) >= 0.0f ? 1 : 0;
+		}
+		const float Total = Hits * DamageAt(Grater, 4000.0f, false);
+		TestTrue(FString::Printf(TEXT("all %d of its rounds at someone 40 m off: %d land, %.0f in all, no kill"), Rounds, Hits, Total), Total < MaxHealth);
+	}
 	// Whom it homes on: the nearest within the cone.
 	const FVector Eye = FVector::ZeroVector;
 	const TArray<FVector> Targets = {FVector(2000.0f, 100.0f, 0.0f), FVector(1000.0f, 120.0f, 0.0f), FVector(500.0f, 400.0f, 0.0f), FVector(-800.0f, 0.0f, 0.0f)};

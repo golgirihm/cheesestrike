@@ -177,7 +177,12 @@ namespace
 			Look.Muzzle = FVector(0.0f, 72.1f, 5.5f);
 			Look.FlashSize = 1.4f;
 			Look.LeftHand = FVector(0.0f, 25.0f, 1.7f);
-			RifleSounds(Look, 1.25f, 0.62f);
+			RifleSounds(Look, 1.0f, 1.0f);
+			// Wave 16: a powerful report, real bolt-action rifles (the Tikka T3, the Arisaka and the M1917 of "The Free Firearm
+			// Sound Library", CC0) with a deep thump under the crack and a long rolling tail (tools/art/wave16_sounds.py).
+			Look.Shots[0] = TEXT("/Game/OpenGameArt/Rifle/SW_RoquefortShot1.SW_RoquefortShot1");
+			Look.Shots[1] = TEXT("/Game/OpenGameArt/Rifle/SW_RoquefortShot2.SW_RoquefortShot2");
+			Look.Shots[2] = TEXT("/Game/OpenGameArt/Rifle/SW_RoquefortShot3.SW_RoquefortShot3");
 			Looks.Add(Look);
 		}
 		// The Curd Pistol: lumps of fresh curd melted into a pistol with a steel muzzle, sights and trigger guard; Lyra's
@@ -302,12 +307,13 @@ namespace
 			Look.Materials[0] = Material(TEXT("MI_StringCheese"));
 			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
 			Look.FlashSize = 0.0f;
-			// A heavy, slow whoosh for its swing (about 350 ms of body, for the slower stroke) and a deep thump as its blow
-			// lands (tools/art/wave15_sounds.py), in place of the knife's.
+			// A heavy, slow whoosh for its swing (about 350 ms of body, for the slower stroke, tools/art/wave15_sounds.py), in
+			// place of the knife's; and (wave 16) a deep, heavy pound as its blow lands on someone, heard by everyone from there
+			// (tools/art/wave16_sounds.py).
 			Look.Shots[0] = Sound(TEXT("SW_StickSwing1"));
 			Look.Shots[1] = Sound(TEXT("SW_StickSwing2"));
 			Look.Shots[2] = Sound(TEXT("SW_StickSwing3"));
-			Look.StrikeSound = Sound(TEXT("SW_StickHit"));
+			Look.StrikeSound = Sound(TEXT("SW_StickPound"));
 			Look.ShotVolume = 1.0f;
 			Look.ShotPitch = 1.0f;
 			Looks.Add(Look);

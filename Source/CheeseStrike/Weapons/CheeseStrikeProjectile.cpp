@@ -341,7 +341,9 @@ void ACheeseStrikeProjectile::HitPlayer(ACheeseStrikeCharacter* Victim, const FV
 	Struck = Victim;
 	ACheeseStrikeCharacter* Firer = Shooter.IsValid() && Shooter->IsAlive() ? Shooter.Get() : nullptr;
 	ACheeseStrikeWeapon* Gun = Weapon.Get();
-	const float Damage = Stats->Damage * (bHead ? Stats->HeadMultiplier : 1.0f);
+	// Its damage by how far it flew (the Cheese Grater's falls off with distance; the BabyBomb's doesn't).
+	const float Flown = FVector::Dist(FiredFrom, At);
+	const float Damage = CheeseStrikeWeapons::DamageAt(*Stats, Flown, bHead);
 	bool bHurt = false;
 	if (Firer != nullptr)
 	{
@@ -361,8 +363,8 @@ void ACheeseStrikeProjectile::HitPlayer(ACheeseStrikeCharacter* Victim, const FV
 		Victim->MulticastBleed(At - ProjectileFeetOf(Victim), Way, static_cast<uint8>(FMath::Clamp(Damage, 1.0f, 255.0f)));
 		UE_LOG(LogCheeseStrike, Display, TEXT("Projectile: %s's %s hit %s%s for %.0f (health %.0f)"), Firer != nullptr ? *Firer->DisplayName() : TEXT("someone gone"),
 			*Stats->DisplayName.ToString(), *Victim->DisplayName(), bHead ? TEXT(" on the head") : TEXT(""), Damage, Victim->GetHealth());
-		// The supercombine: enough shards in one player in a short while burst for a kill.
-		if (Stats->SuperShards > 0 && Gun != nullptr && Victim->IsAlive() && Gun->AddShard(Victim, Now()))
+		// The supercombine: enough shards in one player in a short while burst for a kill (only those that struck near enough).
+		if (CheeseStrikeWeapons::CountsForSuper(*Stats, Flown) && Gun != nullptr && Victim->IsAlive() && Gun->AddShard(Victim, Now()))
 		{
 			bool bBurst = false;
 			if (Firer != nullptr)

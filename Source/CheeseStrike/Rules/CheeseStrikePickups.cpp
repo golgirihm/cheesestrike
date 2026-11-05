@@ -65,6 +65,17 @@ namespace CheeseStrikePickups
 		return bDropped ? FMath::Max(0, DroppedMagazine) + FMath::Max(0, DroppedReserve) : FMath::Max(0, StandReserve);
 	}
 
+	int32 SidearmTopUp(int32 SidearmReserve)
+	{
+		return FMath::Max(0, SidearmReserve);
+	}
+
+	bool RoundsFull(int32 PrimaryReserve, int32 PrimaryMost, int32 SidearmReserve, int32 SidearmMost)
+	{
+		const auto Full = [](int32 Reserve, int32 Most) { return Reserve < 0 || Reserve >= Most; };
+		return Full(PrimaryReserve, PrimaryMost) && Full(SidearmReserve, SidearmMost);
+	}
+
 	bool DroppedShown(float Age)
 	{
 		const float Left = DroppedSeconds - Age;

@@ -19,7 +19,7 @@ namespace CheeseStrikeCredits
 		{TEXT("Rind Market's surfaces and props"), TEXT("From Poly Haven (polyhaven.com), CC0: textures by Rob Tuytel, Amal Kumar, Dario Barresi and Dimitrios Savva, colormass and Rico Cilliers; lamps, a barrel, a crate, a basket and a bench by Josh Dean, James Ray Cock, Kuutti Siitonen and Kirill Sannikov.")},
 		{TEXT("The music"), TEXT("\"FREE Cyber Metal Music Pack\" by Intersonic Sound (Fab). \"Aggression - Adaptive Metal Combat Loop (Free Demo)\" by RiffFuel (Fab).")},
 		{TEXT("The knife's stab"), TEXT("From \"8 Wet Squish, Slurp Impacts\" by Independent.nu, from OpenGameArt.org, CC0.")},
-		{TEXT("The Swiss Shotgun's shots"), TEXT("From \"The Free Firearm Sound Library\" by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney, from OpenGameArt.org, CC0.")},
+		{TEXT("The Swiss Shotgun's and the Roquefort Rifle's shots"), TEXT("From \"The Free Firearm Sound Library\" by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney, from OpenGameArt.org, CC0.")},
 		{TEXT("Footsteps"), TEXT("From \"Footsteps\" by GboxMikeFozzy, from OpenGameArt.org, CC0.")},
 		{TEXT("Hurt"), TEXT("From \"Hurt Sound Effects\" by EZduzziteh, from OpenGameArt.org, CC0; and \"11 male human pain/death sounds\" by Michel Baradari, from OpenGameArt.org, licensed under Creative Commons Attribution 3.0 (CC BY 3.0): creativecommons.org/licenses/by/3.0.")},
 		{TEXT("Hurt, her voice"), TEXT("From \"Female Hurt Grunts & Groans\" by Nocturnal_Vanguard (AuraVoice), from OpenGameArt.org, CC0; and \"RPG Voice Starter Pack\" by cicifyre, from OpenGameArt.org, CC0.")},

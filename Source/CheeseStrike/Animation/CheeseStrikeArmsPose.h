@@ -60,6 +60,14 @@ namespace CheeseStrikeArms
 	FKnifeAt KnifeGuard(float PitchUp = 0.0f);
 	/** At `Phase` of a swipe from the right shoulder down and across to the left, the edge leading: raised, swept, back on guard (tipped up `PitchUp` more, as KnifeGuard). */
 	FKnifeAt KnifeSwipe(float Phase, float Size = 1.0f, float PitchUp = 0.0f);
+	/**
+	 * The phase of a swipe at which the blade (the Cheese Stick's head) comes round to straight ahead, sweeping across from
+	 * the right: where a blow lands on someone before the swinger (CheeseStrikeWeapons::ContactDelay). The swipe's keys
+	 * have it pointing straight ahead there.
+	 */
+	constexpr float SwipeContactPhase = 0.38f;
+	/** A heavy shot's kick in view: the weapon in hand tipped up this many degrees for a whole kick (FWeaponStats::KickPitch moves the view; this the weapon in it). */
+	constexpr float ViewKickTip = 9.0f;
 
 	/** Whether someone crouched and going at `Speed` (cm/s) is sliding, as any machine can tell: faster than a crouched walk can go. */
 	bool LooksSliding(bool bCrouched, float Speed);
@@ -117,6 +125,9 @@ struct FCheeseStrikeViewHold : public FAnimNode_Base
 	float GuardPitchUp = 0.0f;
 	/** How much a montage moves the arms (1 - the slot's source weight). */
 	float Montage = 0.0f;
+	/** A heavy shot's kick (0 to 1): the weapon thrown back KickBack cm toward the eye and tipped up (CheeseStrikeArms::ViewKickTip for a whole one). */
+	float Kick = 0.0f;
+	float KickBack = 0.0f;
 
 	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
 	virtual void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;

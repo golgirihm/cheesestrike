@@ -210,6 +210,7 @@ void ACheeseStrikeWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME_CONDITION(ACheeseStrikeWeapon, Reserve, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(ACheeseStrikeWeapon, ReloadEndsAt, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(ACheeseStrikeWeapon, bTriggerShown, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(ACheeseStrikeWeapon, ArrivedAt, COND_InitialOnly);
 }
 
 void ACheeseStrikeWeapon::SetWeapon(FName Id)
@@ -634,15 +635,23 @@ void ACheeseStrikeWeapon::SetSeenFromOutside(bool bOutside)
 
 void ACheeseStrikeWeapon::BeginDraw(float Now)
 {
-	DrawnAt = Now;
-	// Drawn in play (not put in hand at once): the hands bring it up, and it is heard.
-	if (Now > -999.0f)
+	// Just taken from a stand or the floor: drawn from when it was taken, on every machine, however it was put in hand (its
+	// clack is its sound, MulticastPickedUp).
+	const bool bArrival = IsArriving();
+	if (bArrival)
 	{
-		ShowDraw();
+		Now = ArrivedAt;
+	}
+	bArrivalShown = true;
+	DrawnAt = Now;
+	// Drawn in play (not put in hand at once), and still coming up: the hands bring it up, and it is heard.
+	if (Now > -999.0f && ServerTime(GetWorld()) - Now < Stats->DrawTime)
+	{
+		ShowDraw(!bArrival);
 	}
 }
 
-void ACheeseStrikeWeapon::ShowDraw()
+void ACheeseStrikeWeapon::ShowDraw(bool bSound)
 {
 	if (Holder == nullptr || Stats->DrawTime <= 0.0f)
 	{
@@ -650,7 +659,15 @@ void ACheeseStrikeWeapon::ShowDraw()
 	}
 	const float DrawTime = Stats->DrawTime;
 	PlayOnBodies(&FCheeseStrikeAnimSet::Equip, [DrawTime](const UAnimSequence* Equip) { return Equip->GetPlayLength() > 0.0f ? Equip->GetPlayLength() / DrawTime : 1.0f; });
-	PlaySound(AnyOf(DrawSounds));
+	if (bSound)
+	{
+		PlaySound(AnyOf(DrawSounds));
+	}
+}
+
+float ACheeseStrikeWeapon::KickShare() const
+{
+	return GetWorld() != nullptr ? CheeseStrikeWeapons::KickAt(*Stats, GetWorld()->GetTimeSeconds() - KickShownAt) : 0.0f;
 }
 
 void ACheeseStrikeWeapon::Flash()
@@ -684,7 +701,10 @@ void ACheeseStrikeWeapon::PutAway()
 	GetWorldTimerManager().ClearTimer(BurstTimer);
 	GetWorldTimerManager().ClearTimer(PendingShotTimer);
 	StrokeShownAt = -1000.0f;
+	KickShownAt = -1000.0f;
 	RemoteShowAt.Reset();
+	// A blow still on its way doesn't land once the stick is put away.
+	GetWorldTimerManager().ClearTimer(ContactTimer);
 	if (Holder != nullptr && Holder->IsLocallyControlled())
 	{
 		if (UCheeseStrikeMovementComponent* Movement = Holder->GetCheeseStrikeMovement())
@@ -1440,6 +1460,13 @@ void ACheeseStrikeWeapon::FireShot(int32 InBurst, float ShowDelay)
 	const FVector2D Kick = CheeseStrikeWeapons::RecoilFor(*Stats, Index, bAimed) - CheeseStrikeWeapons::RecoilFor(*Stats, Index - 1, bAimed);
 	Holder->AddControllerYawInput(Kick.X);
 	Holder->AddControllerPitchInput(Kick.Y);
+	// A heavy shot's kick (the Roquefort's): the view thrown up and eased back (the camera manager's), the weapon in view
+	// with it, and a little of it kept.
+	if (Stats->KickPitch > 0.0f)
+	{
+		Holder->AddControllerPitchInput(Stats->KickKept);
+		KickShownAt = GetWorld()->GetTimeSeconds();
+	}
 	if (!HasAuthority())
 	{
 		--Magazine;
@@ -1668,7 +1695,14 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 	MulticastShot();
 	if (Stats->ArcDegrees > 0.0f)
 	{
-		StrikeArc(Origin, FVector(AimDirection).GetSafeNormal(), When);
+		// Wave 16: the blow lands as the head comes round to the aim, on whoever is in the arc then, not as the swing starts.
+		const float Delay = CheeseStrikeWeapons::ContactDelay(*Stats);
+		if (Delay <= 0.0f)
+		{
+			StrikeArc(Origin, FVector(AimDirection).GetSafeNormal(), When);
+			return;
+		}
+		GetWorldTimerManager().SetTimer(ContactTimer, FTimerDelegate::CreateUObject(this, &ACheeseStrikeWeapon::LandStroke, When + Delay), Delay, false);
 		return;
 	}
 	// Straight ahead first, then fanned out to the sides: the first that reaches someone lands.
@@ -1742,7 +1776,7 @@ void ACheeseStrikeWeapon::LaunchProjectiles(const FVector& Origin, const FVector
 			Candidates.Add(Other);
 			Chests.Add(Other->ChestAt());
 		}
-		const int32 Picked = CheeseStrikeWeapons::HomingPick(Origin, Aim, Chests, Stats->HomingCone);
+		const int32 Picked = CheeseStrikeWeapons::HomingPick(Origin, Aim, Chests, Stats->HomingCone, Stats->HomingReach);
 		Homing = Picked != INDEX_NONE ? Candidates[Picked] : nullptr;
 	}
 	for (const FVector& Way : Directions)
@@ -1760,7 +1794,31 @@ void ACheeseStrikeWeapon::LaunchProjectiles(const FVector& Origin, const FVector
 	UE_LOG(LogCheeseStrike, Verbose, TEXT("Shot: %s fires the %s%s"), *Holder->GetName(), *Stats->DisplayName.ToString(), Homing != nullptr ? *FString::Printf(TEXT(" homing on %s"), *Homing->DisplayName()) : TEXT(""));
 }
 
-void ACheeseStrikeWeapon::StrikeArc(const FVector& Origin, const FVector& Aim, float When)
+void ACheeseStrikeWeapon::LandStroke(float When)
+{
+	UWorld* World = GetWorld();
+	if (Holder == nullptr || World == nullptr || !bInHand || !Holder->IsAlive() || Holder->IsDowned() || Holder->InExecution())
+	{
+		return;
+	}
+	// Where the striker's eyes are now and their aim now: a bot's by its control rotation, a player's as their view turned.
+	const FVector Origin = Holder->GetFirstPersonCameraComponent()->GetComponentLocation();
+	const FVector Aim = Holder->GetControlRotation().Vector();
+	const bool bStruck = StrikeArc(Origin, Aim, FMath::Min(When, ServerTime(World)));
+	UE_LOG(LogCheeseStrike, Verbose, TEXT("Stroke: %s's %s lands %.2f s into its swing%s"), *Holder->GetName(), *Stats->DisplayName.ToString(), CheeseStrikeWeapons::ContactDelay(*Stats), bStruck ? TEXT("") : TEXT(", on nobody"));
+}
+
+void ACheeseStrikeWeapon::MulticastBlowLanded_Implementation(FVector_NetQuantize At)
+{
+	USoundBase* Pound = AnyOf(HitSounds);
+	if (Pound != nullptr && GetWorld() != nullptr && GetNetMode() != NM_DedicatedServer)
+	{
+		CheeseStrikeHeard::Note(UGameplayStatics::SpawnSoundAtLocation(this, Pound, At, FRotator::ZeroRotator, ShotVolume, 1.0f, 0.0f, CheeseStrikeGunfire::AttenuationAsset()),
+			CheeseStrikeHeard::EKind::OthersHandling, Pound->GetName());
+	}
+}
+
+bool ACheeseStrikeWeapon::StrikeArc(const FVector& Origin, const FVector& Aim, float When)
 {
 	UWorld* World = GetWorld();
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(CheeseStrikeArc), false, Holder);
@@ -1805,12 +1863,17 @@ void ACheeseStrikeWeapon::StrikeArc(const FVector& Origin, const FVector& Aim, f
 			++Struck;
 			ClientHit(Stats->Damage, false, !Player->IsAlive());
 			Player->MulticastBleed(Nearest - Then.Feet, Way, 255);
+			// The blow pounds, heard by everyone from where it lands (once a stroke).
+			if (Struck == 1)
+			{
+				MulticastBlowLanded(Nearest);
+			}
 			UE_LOG(LogCheeseStrike, Display, TEXT("Stroke: %s's %s fells %s at %.0f cm (health %.0f)"), *Holder->GetName(), *Stats->DisplayName.ToString(), *Player->GetName(), FVector::Dist(Origin, Nearest), Player->GetHealth());
 		}
 	}
 	if (Struck > 0)
 	{
-		return;
+		return true;
 	}
 	// Nobody: a mouse or anything else of the engine's in front takes its blow.
 	FHitResult Thing;
@@ -1819,7 +1882,10 @@ void ACheeseStrikeWeapon::StrikeArc(const FVector& Origin, const FVector& Aim, f
 	{
 		UGameplayStatics::ApplyPointDamage(Thing.GetActor(), Stats->Damage, Aim, Thing, Holder->GetController(), this, nullptr);
 		ClientHit(Stats->Damage, false, false);
+		MulticastBlowLanded(Thing.ImpactPoint);
+		return true;
 	}
+	return false;
 }
 
 bool ACheeseStrikeWeapon::AddShard(const ACheeseStrikeCharacter* Victim, float Now)
@@ -1842,8 +1908,8 @@ void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead, boo
 	{
 		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Thump(bKill ? 1.3f : 1.0f)), 1.0f);
 	}
-	// The knife's stroke landing, heard by the one who struck.
-	if (Stats->IsMelee())
+	// The knife's stroke landing, heard by the one who struck (a melee arc's blow is heard by everyone, MulticastBlowLanded).
+	if (Stats->IsMelee() && Stats->ArcDegrees <= 0.0f)
 	{
 		UGameplayStatics::PlaySound2D(this, AnyOf(HitSounds));
 	}
