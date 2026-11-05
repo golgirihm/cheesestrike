@@ -85,6 +85,19 @@ public:
 	/** Whether it is still coming up after being drawn, and how far up it is (0 to 1). */
 	bool IsDrawing() const;
 	float DrawnFraction() const;
+	/** The server time it was last drawn (far in the past for one put in hand at once). */
+	float GetDrawnAt() const { return DrawnAt; }
+	/**
+	 * A weapon just taken from a stand or the floor (UCheeseStrikeInventory::SwapPrimary) is drawn as a change of weapons
+	 * is, from the server time it was taken, on every machine, the first time it is shown (wave 16): before it is spawned,
+	 * on the server, it is told when (sent once, as it is made).
+	 */
+	void SetArrived(float ServerNow) { ArrivedAt = ServerNow; }
+	float GetArrivedAt() const { return ArrivedAt; }
+	/** Whether it was just taken and hasn't yet been shown being drawn on this machine. */
+	bool IsArriving() const { return ArrivedAt > 0.0f && !bArrivalShown; }
+	/** How much of a heavy shot's kick (FWeaponStats::KickPitch) shows now in its own player's view, 0 to 1. */
+	float KickShare() const;
 	/** Whether a pull of the trigger now would fire: drawn, not reloading, the last shot's interval past, and a round or a blade. */
 	bool IsReady() const;
 	/** Whether it has nothing left: no round in the magazine or in reserve. The knife never has. */
@@ -234,8 +247,8 @@ protected:
 	void ShowShot();
 	/** Notes a step of a shot for the beat (CheeseStrikeBeat), and in the log with the trace on. */
 	void NoteBeat(CheeseStrikeBeat::EEvent Event) const;
-	/** Shows a draw on this machine: the body's animation for bringing it up, and its sound. */
-	void ShowDraw();
+	/** Shows a draw on this machine: the body's animation for bringing it up, and its sound (not for a weapon just taken, whose clack is heard). */
+	void ShowDraw(bool bSound = true);
 	/** Lights the muzzle for a moment. */
 	void Flash();
 	/** Shows a reload on this machine: the body's and the rifle's animations, and the sounds along the way. */
@@ -404,6 +417,12 @@ protected:
 	/** Whether it is the one in hand on this machine, and the server time it was drawn. */
 	bool bInHand = false;
 	float DrawnAt = -1000.0f;
+	/** The server time it was taken from a stand or the floor (0 for one given otherwise), and whether this machine has shown it drawn since. */
+	UPROPERTY(Replicated)
+	float ArrivedAt = 0.0f;
+	bool bArrivalShown = false;
+	/** The world time (this machine's) its own player last fired it, for a heavy shot's kick in view. */
+	float KickShownAt = -1000.0f;
 	/** The owner's side of firing. */
 	bool bTriggerHeld = false;
 	bool bAimed = false;
@@ -449,6 +468,16 @@ protected:
 	TMap<TWeakObjectPtr<const ACheeseStrikeCharacter>, CheeseStrikeWeapons::FShardTally> Shards;
 	/** Server only: fires a shot of projectiles (ACheeseStrikeProjectile), each pellet its own, from `Origin` along `Directions`. */
 	void LaunchProjectiles(const FVector& Origin, const FVector& Aim, const TArray<FVector>& Directions);
-	/** Server only: a melee arc's stroke (the Cheese Stick): everyone in it, at `When`. */
-	void StrikeArc(const FVector& Origin, const FVector& Aim, float When);
+	/** Server only: a melee arc's stroke (the Cheese Stick): everyone in it, at `When`; true if it struck anyone. */
+	bool StrikeArc(const FVector& Origin, const FVector& Aim, float When);
+	/**
+	 * Server only: a melee arc's stroke made at `When` (server time, as its striker saw it), landing now, as its head comes
+	 * round to the aim (CheeseStrikeWeapons::ContactDelay): from where its striker's eyes are now and along their aim now, on
+	 * whoever is in the arc as the striker sees them now. Nothing if the striker is dead, down or has put it away.
+	 */
+	void LandStroke(float When);
+	FTimerHandle ContactTimer;
+	/** Every machine: a melee arc's blow landed on someone at `At`: its look's StrikeSound (the Cheese Stick's deep, heavy pound), heard from there. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastBlowLanded(FVector_NetQuantize At);
 };

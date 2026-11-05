@@ -152,9 +152,16 @@ void UCheeseStrikeInventory::Show(uint8 Slot, bool bAtOnce)
 		}
 		if (After != nullptr)
 		{
+			// A weapon just taken from a stand or the floor is drawn from when it was taken, whatever is asked here.
 			After->BeginDraw(bAtOnce ? -1000.0f : ServerNow());
 		}
 	}
+	else if (After != nullptr && After != ShownWeapon.Get() && After->IsArriving())
+	{
+		// Another machine's copy of the slot has a new weapon in it, taken from a stand or the floor: drawn too.
+		After->BeginDraw(-1000.0f);
+	}
+	ShownWeapon = After;
 	ShownSlot = After != nullptr ? Slot : NoSlot;
 	for (int32 Index = 0; Index < Weapons.Num(); ++Index)
 	{
@@ -560,6 +567,11 @@ bool UCheeseStrikeInventory::TakePickup(ACheeseStrikePickup* Pickup)
 		return false;
 	}
 	ACheeseStrikeWeapon* Carried = At(static_cast<uint8>(EWeaponSlot::Primary));
+	// Wave 16: the sidearm's rounds are topped up by any weapon or rounds taken, at a stand or on the floor.
+	if (ACheeseStrikeWeapon* Sidearm = At(static_cast<uint8>(EWeaponSlot::Sidearm)))
+	{
+		Sidearm->AddReserve(CheeseStrikePickups::SidearmTopUp(Sidearm->GetStats().Reserve));
+	}
 	if (How == ETake::TopUp && Carried != nullptr)
 	{
 		Carried->AddReserve(CheeseStrikePickups::TopUpRounds(Pickup->IsDropped(), Carried->GetStats().Reserve, Pickup->GetDroppedMagazine(), Pickup->GetDroppedReserve()));
@@ -613,6 +625,8 @@ void UCheeseStrikeInventory::SwapPrimary(FName Weapon)
 		return;
 	}
 	Fresh->SetWeapon(Stats->Id);
+	// Drawn from now, here and on every machine, as a change of weapons is (wave 16), its rising in view and the body's draw.
+	Fresh->SetArrived(ServerNow());
 	UGameplayStatics::FinishSpawningActor(Fresh, Where);
 	Weapons[Slot] = Fresh;
 	bSpawnLoadout = false;
@@ -620,7 +634,6 @@ void UCheeseStrikeInventory::SwapPrimary(FName Weapon)
 	{
 		LastSlot = HeldSlot;
 	}
-	// In hand at once, here and on every machine (whose own copy of the slot has a new weapon in it, never drawn).
 	SetHeld(Slot, true);
 }
 

@@ -197,8 +197,9 @@ protected:
 	/** The player's machine: the last request sent, and the slot before this one. */
 	uint8 Asked = 0;
 	uint8 LastSlot = NoSlot;
-	/** The slot shown in hand on this machine. */
+	/** The slot shown in hand on this machine, and the weapon shown in it (a slot's weapon may be replaced by a new one). */
 	uint8 ShownSlot = NoSlot;
+	TWeakObjectPtr<ACheeseStrikeWeapon> ShownWeapon;
 	/** The weapons this machine last saw carried, to know when they are replaced. */
 	TArray<TWeakObjectPtr<ACheeseStrikeWeapon>> Seen;
 	/** Server: whether what it carries is the loadout it was given on coming in, untouched by a mode, so that a choice made now can take its place. */

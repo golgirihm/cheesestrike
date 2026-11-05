@@ -286,6 +286,8 @@ void UCheeseStrikeAnimInstance::ReadCharacter(float DeltaSeconds)
 			View.bHasSight = Character->WeaponSight(View.Sight);
 			View.Aimed = Character->GetAimFraction();
 			View.Lowered = FMath::Max(FMath::Square(1.0f - Weapon->DrawnFraction()), CheeseStrikeGrenades::WeaponDown(Switch));
+			View.Kick = Weapon->KickShare();
+			View.KickBack = Weapon->GetStats().KickBack;
 			const UCheeseStrikeMovementComponent* Movement = Character->GetCheeseStrikeMovement();
 			View.bSprinting = Movement != nullptr && Movement->IsSprinting();
 		}
@@ -657,6 +659,8 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	ViewHold.KnifeHand = CheeseStrikeWeaponLooks::KnifeHand();
 	ViewHold.Aimed = View.Aimed;
 	ViewHold.Lowered = View.Lowered;
+	ViewHold.Kick = View.Kick;
+	ViewHold.KickBack = View.KickBack;
 	ViewHold.Sprint = SprintBlend;
 	ViewHold.Slide = SlideBlend;
 	ViewHold.bKnife = bKnife;

@@ -291,6 +291,10 @@ bool FAWeaponIsTakenFromItsStandAndComesBack::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("pressed, Interact takes the Roquefort"), PrimaryOf(CharacterOf(0, 0)), Roquefort);
 		TestEqual(TEXT("in hand"), HeldId(CharacterOf(0, 0)), Roquefort);
+		// Wave 16: drawn as a change of weapons is, from the moment it was taken.
+		const ACheeseStrikeWeapon* Taken = CharacterOf(0, 0)->GetWeapon();
+		TestTrue(FString::Printf(TEXT("drawn from when it was taken (at %.2f, taken at %.2f), as a change of weapons is"), Taken != nullptr ? Taken->GetDrawnAt() : -1.0f, Taken != nullptr ? Taken->GetArrivedAt() : -1.0f),
+			Taken != nullptr && Taken->GetArrivedAt() > 0.0f && FMath::IsNearlyEqual(Taken->GetDrawnAt(), Taken->GetArrivedAt()));
 		TestFalse(TEXT("the stand is empty"), StandIn(0, Roquefort)->IsThere());
 		TestTrue(FString::Printf(TEXT("for its seconds (%.1f)"), StandIn(0, Roquefort)->SecondsLeft()), StandIn(0, Roquefort)->SecondsLeft() > TestSeconds - 1.5f);
 		const ACheeseStrikePickup* Dropped = DroppedIn(0, Carbine);
@@ -302,6 +306,16 @@ bool FAWeaponIsTakenFromItsStandAndComesBack::RunTest(const FString& Parameters)
 	{
 		const ACheeseStrikePickup* Stand = StandIn(1, Roquefort);
 		return Stand != nullptr && !Stand->IsThere() && Stand->SecondsLeft() > 0.0f && HeldId(CharacterOf(0, 1)) == Roquefort && DroppedIn(1, Carbine) != nullptr;
+	});
+	Then([this]()
+	{
+		// Seen drawn on the host's own machine and the joiner's too, not merely there.
+		for (const ACheeseStrikeCharacter* Seen : {Character(0), CharacterOf(0, 1)})
+		{
+			const ACheeseStrikeWeapon* Taken = Seen != nullptr ? Seen->GetWeapon() : nullptr;
+			TestTrue(FString::Printf(TEXT("another machine shows the Roquefort drawn from when it was taken (%.2f)"), Taken != nullptr ? Taken->GetDrawnAt() : -1.0f),
+				Taken != nullptr && Taken->GetDrawnAt() > 0.0f && FMath::IsNearlyEqual(Taken->GetDrawnAt(), Taken->GetArrivedAt()));
+		}
 	});
 
 	// Over the Blaster's stand with the Roquefort: nothing by walking; pressed, a swap, the Roquefort dropped with its rounds.

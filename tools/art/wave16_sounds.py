@@ -12,8 +12,18 @@ import array, math, os, sys, traceback, wave
 #   C:\Hamid\code\FabDownloads\oga_female_hurt) and the three "damaged" takes of the mature voice (Type 3) of
 #   "RPG Voice Starter Pack" by cicifyre (CC0, in C:\Hamid\code\FabDownloads\oga_rpg_voice_starter), made as the male
 #   ones were: mono, the highs softened, cut to 0.45 s at most, faded, at the same peak.
+# The Roquefort Rifle's shot (/Game/OpenGameArt/Rifle/SW_RoquefortShot1..3): a heavy, powerful report with a long tail,
+#   three bolt-action rifles of "The Free Firearm Sound Library" (CC0, OpenGameArt.org; the Tikka T3, the Arisaka and the
+#   M1917, W_24P, E_18P and B_16P, in C:\Hamid\code\FabDownloads\firearms\Prepared SFX Library, out of its lib.7z),
+#   each cut from just before its blast, with a deep thump of 50-110 Hz under the crack, a rumble of low noise and two
+#   far, dull echoes rolling on after the recording's own, 2.8 s in all, just under full scale.
+# The Cheese Stick's blow landing on someone (/Game/CheeseStrike/Sounds/SW_StickPound), made from nothing: a deep,
+#   heavy pound, a body tone falling from 75 Hz to 36, a knock of low noise, a dull slap of mid noise at its front and a
+#   smaller second knock 70 ms on, driven a little into saturation for its weight, with a short crunch over it, 0.6 s.
 #
 # Two steps, from the repository's root:
+#   0. The Roquefort's rifles out of the library's archive, once (7-Zip):
+#      7z x C:\Hamid\code\FabDownloads\firearms\lib.7z "Prepared SFX Library/Tikka/*.wav" "Prepared SFX Library/Arisaka/*.wav" "Prepared SFX Library/1917/*.wav"
 #   1. C:\Hamid\code\FabDownloads\piper\venv\Scripts\python.exe -I tools/art/wave16_sounds.py prepare
 #      (any Python with numpy and soundfile) writes the WAVs to C:\Hamid\code\FabDownloads\wave16_prepared and prints
 #      each one's length, peak and RMS.
@@ -33,8 +43,17 @@ FEMALE_GROANS = os.path.join(DOWNLOADS, "oga_female_hurt", "female_hurt_grunts_g
 # The seven grunts in the groans' recording (seconds), as an envelope over -35 dB of its peak finds them.
 GROANS = [(0.34, 1.14), (2.10, 2.70), (3.72, 4.12), (4.92, 6.09), (7.34, 8.09), (9.33, 10.30), (11.70, 12.56)]
 STARTER = os.path.join(DOWNLOADS, "oga_rpg_voice_starter", "RPG Voice Starter Pack", "Type 3")
+FIREARMS = os.environ.get("CHEESESTRIKE_FIREARMS", os.path.join(DOWNLOADS, "firearms", "Prepared SFX Library"))
+# The Roquefort's three reports: the Tikka T3's, the Arisaka's and the M1917's.
+RIFLES = [os.path.join("Tikka", "W_24P.wav"), os.path.join("Arisaka", "E_18P.wav"), os.path.join("1917", "B_16P.wav")]
+RATE = 48000
 SOUNDS = [("SW_PickupClack.wav", "/Game/OpenGameArt/Clicks", "SW_PickupClack")] \
-    + [(f"SW_OofFemale{i}.wav", "/Game/OpenGameArt/HurtFemale", f"SW_OofFemale{i}") for i in range(1, 11)]
+    + [(f"SW_OofFemale{i}.wav", "/Game/OpenGameArt/HurtFemale", f"SW_OofFemale{i}") for i in range(1, 11)] \
+    + [(f"SW_RoquefortShot{i}.wav", "/Game/OpenGameArt/Rifle", f"SW_RoquefortShot{i}") for i in range(1, 4)] \
+    + [("SW_StickPound.wav", "/Game/CheeseStrike/Sounds", "SW_StickPound")]
+# The editor's step imports only the sounds whose names hold one of these words, if any are given in the environment
+# (e.g. CHEESESTRIKE_ONLY="Roquefort Stick"); all of them otherwise.
+ONLY = os.environ.get("CHEESESTRIKE_ONLY", "").split()
 
 
 def write(samples, rate, path):
@@ -80,6 +99,10 @@ def prepare():
         first = int(np.argmax(np.abs(x) >= peak * share))
         return x[max(0, first - int(lead * rate)):]
 
+    def to_rate(x, rate, wanted):
+        n = int(len(x) * wanted / rate)
+        return np.interp(np.arange(n) * rate / wanted, np.arange(len(x)), x)
+
     def shaped(x, rate, keep, fade_in, fade_out, peak):
         x = x[:int(keep * rate)].copy()
         n_in = max(1, int(fade_in * rate))
@@ -116,6 +139,51 @@ def prepare():
     clack = cut + knock * 0.45 + thud * 0.25
     save("SW_PickupClack", shaped(clack, rate, CLACK_KEEP, 0.0005, 0.03, 0.7), rate)
 
+    rng16 = np.random.default_rng(1616)
+    # The Roquefort's report: each rifle's blast from just before it, taken to 48 kHz mono; under its crack a thump (a tone
+    # from 110 Hz down to 50 over 120 ms, in over 4 ms) and a rumble of low noise that rolls on for over a second; after
+    # the recording's own echoes, two more, far and dull (low-passed copies 0.31 and 0.67 s on); 2.8 s, faded over 0.9 s.
+    for number, name in enumerate(RIFLES, 1):
+        x, rate = mono(os.path.join(FIREARMS, name))
+        peak = np.abs(x).max()
+        start = max(0, int(np.argmax(np.abs(x) >= peak * 0.4)) - int(0.015 * rate))
+        keep = 2.8
+        blast = to_rate(x[start:start + int(keep * rate)], rate, RATE)
+        blast = blast / (np.abs(blast).max() or 1.0)
+        count = len(blast)
+        t = np.arange(count) / RATE
+        at = 0.015
+        since = np.maximum(0.0, t - at)
+        on = np.where(t < at, 0.0, 1.0)
+        phase = np.cumsum(2 * math.pi * (50.0 + 60.0 * np.exp(-since / 0.04)) / RATE)
+        thump = np.sin(phase) * on * np.minimum(1.0, since / 0.004) * np.exp(-since / 0.09)
+        rumble = biquad(biquad(rng16.uniform(-1, 1, count), "low", RATE, 120.0), "low", RATE, 120.0) * 9.0
+        rumble *= on * np.minimum(1.0, since / 0.02) * np.exp(-since / 0.7)
+        dull = biquad(biquad(blast, "low", RATE, 900.0), "low", RATE, 900.0)
+        echoes = np.zeros(count)
+        for delay, share in ((0.31, 0.32), (0.67, 0.2)):
+            k = int(delay * RATE)
+            echoes[k:] += dull[:count - k] * share
+        report = np.tanh(1.2 * (blast + thump * 0.42 + rumble * 0.14 + echoes))
+        save(f"SW_RoquefortShot{number}", shaped(report, RATE, keep, 0.001, 0.9, 0.95), RATE)
+
+    # The Cheese Stick's pound: a body tone falling from 75 Hz to 36 over a fifth of a second, a knock of noise under 260 Hz
+    # at its front, a dull slap of mid noise (400 Hz to 2 kHz) for its first 15 ms, and a smaller second knock 70 ms on
+    # (the blow's bounce), driven into a little saturation; 0.6 s.
+    count = int(0.6 * RATE)
+    t = np.arange(count) / RATE
+    phase = np.cumsum(2 * math.pi * (36.0 + 39.0 * np.exp(-t / 0.07)) / RATE)
+    tone = np.sin(phase) * np.minimum(1.0, t / 0.003) * np.exp(-t / 0.16)
+    knock = biquad(biquad(rng16.uniform(-1, 1, count), "low", RATE, 260.0), "low", RATE, 260.0) * 7.0 * np.exp(-t / 0.045)
+    slap = biquad(biquad(rng16.uniform(-1, 1, count), "high", RATE, 400.0), "low", RATE, 2000.0) * 1.5 * np.exp(-t / 0.008)
+    later = np.maximum(0.0, t - 0.07)
+    bounce = biquad(biquad(rng16.uniform(-1, 1, count), "low", RATE, 200.0), "low", RATE, 200.0) * 3.0 * np.where(t < 0.07, 0.0, np.exp(-later / 0.03))
+    pound = np.tanh(1.8 * (tone * 1.0 + knock * 0.8 + slap + bounce * 0.5))
+    # Over the saturated low end, the blow's crunch, heard on small speakers too: noise of 250 Hz to 1.2 kHz for 25 ms.
+    crunch = biquad(biquad(rng16.uniform(-1, 1, count), "high", RATE, 250.0), "low", RATE, 1200.0) * np.minimum(1.0, t / 0.001) * np.exp(-t / 0.025)
+    pound = pound + crunch * 1.1
+    save("SW_StickPound", shaped(pound, RATE, 0.6, 0.0005, 0.15, 0.95), RATE)
+
     # The female grunts: AuraVoice's seven, then the starter pack's three.
     groans, rate = mono(FEMALE_GROANS)
     takes = [(groans[int(a * rate):int(b * rate)], rate) for a, b in GROANS]
@@ -134,6 +202,8 @@ def import_sounds():
     try:
         tools = unreal.AssetToolsHelpers.get_asset_tools()
         for source, destination, name in SOUNDS:
+            if ONLY and not any(word.lower() in name.lower() for word in ONLY):
+                continue
             task = unreal.AssetImportTask()
             task.set_editor_property("filename", os.path.join(PREPARED, source))
             task.set_editor_property("destination_path", destination)

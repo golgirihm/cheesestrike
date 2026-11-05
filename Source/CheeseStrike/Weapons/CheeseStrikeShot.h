@@ -73,6 +73,16 @@ struct FWeaponStats
 	float RecoilCap = 9.0f;
 	float RecoilSide = 0.35f;
 	float RecoilReset = 0.3f;
+	/**
+	 * A heavy shot's kick (wave 16, the Roquefort Rifle's), on top of the recoil above, which a rifle fired a shot at a time
+	 * never gets (each shot is the first of its run): the view thrown up KickPitch degrees at once and eased back over
+	 * KickSeconds (CheeseStrikeWeapons::KickAt), KickKept of them kept (the aim climbs that much, as a run's recoil does),
+	 * and the weapon in view thrown back KickBack cm toward the eye and tipped up with it. 0: none.
+	 */
+	float KickPitch = 0.0f;
+	float KickSeconds = 0.0f;
+	float KickKept = 0.0f;
+	float KickBack = 0.0f;
 	/** The field of view aimed down the sights, as a share of the usual, and whether that is through a scope. */
 	float AimZoom = 0.6f;
 	bool bScoped = false;
@@ -117,12 +127,20 @@ struct FWeaponStats
 	float SplashInner = 0.0f;
 	float SplashDamage = 0.0f;
 	float SplashEdgeDamage = 0.0f;
-	/** Homing: degrees a second a projectile turns toward the nearest enemy within HomingCone degrees of the aim it was fired along (0: none). */
+	/**
+	 * Homing: degrees a second a projectile turns toward the nearest enemy within HomingCone degrees of the aim it was fired
+	 * along (0: none), if they are within HomingReach of the shooter (cm; 0: however far).
+	 */
 	float HomingTurn = 0.0f;
 	float HomingCone = 0.0f;
-	/** The supercombine (the Cheese Grater's): SuperShards of its projectiles in one player within SuperWindow seconds burst for a kill (0: none). */
+	float HomingReach = 0.0f;
+	/**
+	 * The supercombine (the Cheese Grater's): SuperShards of its projectiles in one player within SuperWindow seconds burst
+	 * for a kill (0: none); a shard counts only if it struck within SuperReach of where it was fired (cm; 0: however far).
+	 */
 	int32 SuperShards = 0;
 	float SuperWindow = 0.0f;
+	float SuperReach = 0.0f;
 	/**
 	 * A melee weapon's arc (the Cheese Stick): everyone within Reach and within ArcDegrees in front, about the aim, is
 	 * struck at once by Damage (0: the knife's swipe, which strikes the first it meets along its sweep).
@@ -216,13 +234,21 @@ namespace CheeseStrikeWeapons
 	bool InArc(const FWeaponStats& Weapon, const FVector& Aim, const FVector& ToThem);
 	/** How long a melee weapon's swing is shown (s). */
 	float SwipeSecondsOf(const FWeaponStats& Weapon);
+	/**
+	 * Seconds from a melee arc's stroke (the Cheese Stick's) to the moment its head comes round to the aim
+	 * (CheeseStrikeArms::SwipeContactPhase of its swing), when it strikes whoever is in its arc then; 0 for the knife, whose
+	 * short stroke lands as it is made.
+	 */
+	float ContactDelay(const FWeaponStats& Weapon);
 
 	/** A projectile's burst on someone `Distance` from it: SplashDamage within SplashInner, falling in a line to SplashEdgeDamage at SplashRadius, none past it. */
 	float SplashAt(const FWeaponStats& Weapon, float Distance);
 	/** Whether `ToThem` is within `Degrees` of `Aim` (normalized). */
 	bool WithinCone(const FVector& Aim, const FVector& ToThem, float Degrees);
-	/** Which of `Targets` (places, from `From`) a homing projectile fired along `Aim` goes for: the nearest within `Cone` degrees of it, or INDEX_NONE. */
-	int32 HomingPick(const FVector& From, const FVector& Aim, const TArray<FVector>& Targets, float Cone);
+	/** Which of `Targets` (places, from `From`) a homing projectile fired along `Aim` goes for: the nearest within `Cone` degrees of it (and within `Reach` cm, if more than 0), or INDEX_NONE. */
+	int32 HomingPick(const FVector& From, const FVector& Aim, const TArray<FVector>& Targets, float Cone, float Reach = 0.0f);
+	/** Whether a shard of `Weapon`'s that struck `Distance` cm from where it was fired counts toward its supercombine. */
+	bool CountsForSuper(const FWeaponStats& Weapon, float Distance);
 	/** A projectile's `Velocity` turned toward `ToTarget` by at most `MostDegrees`, its speed kept. */
 	FVector TurnToward(const FVector& Velocity, const FVector& ToTarget, float MostDegrees);
 	/** What a supercombine does: a kill, or a down in Execution. */
@@ -244,6 +270,14 @@ namespace CheeseStrikeWeapons
 	 * and a wander from side to side along a pattern a player can learn.
 	 */
 	FVector2D RecoilFor(const FWeaponStats& Weapon, int32 Index, bool bAimed);
+
+	/**
+	 * How much of a heavy shot's kick (FWeaponStats::KickPitch) shows `Since` seconds after the shot: up to all of it in its
+	 * first 40 ms, eased back to nothing by KickSeconds; 0 before the shot, after, and for a weapon without one.
+	 */
+	float KickAt(const FWeaponStats& Weapon, float Since);
+	/** How fast a kick comes up (s). */
+	constexpr float KickRise = 0.04f;
 
 	/** Which hand fires shot number `Index` of a run (0 the first) of a weapon with two guns: 0 the right, 1 the left, in turn; always the right for one gun. */
 	int32 DualHand(const FWeaponStats& Weapon, int32 Index);

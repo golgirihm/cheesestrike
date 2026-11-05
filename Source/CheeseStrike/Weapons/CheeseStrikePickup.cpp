@@ -190,7 +190,10 @@ CheeseStrikePickups::ETake ACheeseStrikePickup::HowFor(const ACheeseStrikeCharac
 		return ETake::None;
 	}
 	const ACheeseStrikeWeapon* Carried = Inventory->GetInSlot(EWeaponSlot::Primary);
-	const bool bFull = Carried != nullptr && (Carried->GetStats().HasEndlessReserve() || Carried->GetReserve() >= Carried->GetStats().ReserveMax);
+	// Full: the primary's rounds, and the sidearm's, which any take tops up too.
+	const ACheeseStrikeWeapon* Sidearm = Inventory->GetInSlot(EWeaponSlot::Sidearm);
+	const bool bFull = Carried != nullptr && CheeseStrikePickups::RoundsFull(Carried->GetReserve(), Carried->GetStats().ReserveMax,
+		Sidearm != nullptr ? Sidearm->GetReserve() : -1, Sidearm != nullptr ? Sidearm->GetStats().ReserveMax : 0);
 	return CheeseStrikePickups::HowToTake(Carried != nullptr ? Carried->GetWeaponId() : NAME_None, Weapon, bFull, bDropped);
 }
 
