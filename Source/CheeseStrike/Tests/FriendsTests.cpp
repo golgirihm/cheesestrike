@@ -177,6 +177,8 @@ bool FAFriendsRowSaysWhereTheyAre::RunTest(const FString& Parameters)
 			TestTrue(TEXT("offline is the dimmest"), All[One].GetLuminance() > All.Last().GetLuminance());
 		}
 	}
+	const FLinearColor OnlineDot = StatusDotColour(EStatus::NotInGame, On);
+	TestTrue(TEXT("an online friend's dot is green"), OnlineDot.G > 0.7f && OnlineDot.G > OnlineDot.R + 0.2f && OnlineDot.G > OnlineDot.B + 0.4f);
 	TestTrue(TEXT("busy's dot is away's"), StatusDotColour(EStatus::NotInGame, EOnline::Busy).Equals(StatusDotColour(EStatus::NotInGame, EOnline::Away)));
 	TestFalse(TEXT("an empty section says so"), EmptySectionLine().IsEmpty());
 	TestEqual(TEXT("initials of two words"), Initials(TEXT("gorgon zola")), FString(TEXT("GZ")));
@@ -186,25 +188,45 @@ bool FAFriendsRowSaysWhereTheyAre::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheFriendsPanelOpensOnHoverOrAPin, "CheeseStrike.Friends.PanelOpensOnHoverOrAPin", FriendsTests::Flags)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheFriendsPanelOpensOnAClick, "CheeseStrike.Friends.PanelOpensOnAClick", FriendsTests::Flags)
 
-bool FTheFriendsPanelOpensOnHoverOrAPin::RunTest(const FString& Parameters)
+bool FTheFriendsPanelOpensOnAClick::RunTest(const FString& Parameters)
 {
 	using namespace CheeseStrikeFriends;
-	const TOptional<bool> Unpinned;
-	// Unpinned: open while hovered, and for half a second after the mouse leaves, so brushing off it doesn't snap it shut.
-	TestTrue(TEXT("hovered, it opens"), PanelOpen(false, Unpinned, true, 1000.0f));
-	TestTrue(TEXT("just left, it stays open"), PanelOpen(false, Unpinned, false, 0.2f));
-	TestTrue(TEXT("up to half a second"), PanelOpen(false, Unpinned, false, HoverCloseDelay - 0.01f));
-	TestFalse(TEXT("then it shuts"), PanelOpen(false, Unpinned, false, HoverCloseDelay));
-	TestFalse(TEXT("and stays shut unhovered"), PanelOpen(false, Unpinned, false, 1000.0f));
-	TestEqual(TEXT("half a second's grace"), HoverCloseDelay, 0.5f);
-	// Pinned by a click on its chevron: open or shut whatever the mouse does.
-	TestTrue(TEXT("pinned open, it stays open with the mouse away"), PanelOpen(false, TOptional<bool>(true), false, 1000.0f));
-	TestFalse(TEXT("pinned shut, hovering doesn't open it"), PanelOpen(false, TOptional<bool>(false), true, 0.0f));
-	TestFalse(TEXT("nor having just left"), PanelOpen(false, TOptional<bool>(false), false, 0.1f));
+	// Only a click opens or shuts it: the tile opens it, the open panel's chevron or its word FRIENDS shut it; hovering does nothing.
+	TestTrue(TEXT("clicked open, it is open"), PanelOpen(false, true));
+	TestFalse(TEXT("not clicked open (or clicked shut), it is shut, the mouse over it or not"), PanelOpen(false, false));
 	// The find page is about the friends' games: open there whatever else.
-	TestTrue(TEXT("always open on the find page"), PanelOpen(true, TOptional<bool>(false), false, 1000.0f));
+	TestTrue(TEXT("always open on the find page"), PanelOpen(true, false));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheFriendsListRefreshesWithACooldown, "CheeseStrike.Friends.TheListRefreshesWithACooldown", FriendsTests::Flags)
+
+bool FTheFriendsListRefreshesWithACooldown::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeFriends;
+	TestEqual(TEXT("five seconds' rest after a refresh"), RefreshCooldown, 5.0f);
+	TestEqual(TEXT("every thirty seconds by itself while open"), AutoRefreshSeconds, 30.0f);
+	TestFalse(TEXT("just refreshed: the button rests"), CanRefresh(100.0, 100.0));
+	TestEqual(TEXT("with all its cooldown left"), RefreshCooldownLeft(100.0, 100.0), RefreshCooldown);
+	TestEqual(TEXT("two seconds on, three left"), RefreshCooldownLeft(102.0, 100.0), 3.0f);
+	TestFalse(TEXT("nor a moment before the end"), CanRefresh(104.9, 100.0));
+	TestTrue(TEXT("after the cooldown it can be pressed"), CanRefresh(105.0, 100.0));
+	TestEqual(TEXT("with nothing left"), RefreshCooldownLeft(200.0, 100.0), 0.0f);
+	TestTrue(TEXT("never refreshed: it can be"), CanRefresh(0.0, -1000.0));
+	// Opened by a click: a refresh at once (unless one was just made), which starts the cooldown.
+	TestTrue(TEXT("opened by a click: a refresh"), ShouldAutoRefresh(true, true, 50.0, 10.0));
+	TestFalse(TEXT("opened by a click within the cooldown: none"), ShouldAutoRefresh(true, true, 12.0, 10.0));
+	// Open: again every thirty seconds; shut: never by itself.
+	TestFalse(TEXT("open, ten seconds on: none"), ShouldAutoRefresh(true, false, 20.0, 10.0));
+	TestTrue(TEXT("open, thirty seconds on: one"), ShouldAutoRefresh(true, false, 40.0, 10.0));
+	TestFalse(TEXT("shut: none, however long"), ShouldAutoRefresh(false, false, 1000.0, 10.0));
+	// The glyph turns once, eased out, and is still after.
+	TestEqual(TEXT("not turned at the click"), RefreshSpinAt(0.0f), 0.0f);
+	TestTrue(TEXT("partway round"), RefreshSpinAt(RefreshSpinSeconds * 0.5f) > 180.0f && RefreshSpinAt(RefreshSpinSeconds * 0.5f) < 360.0f);
+	TestEqual(TEXT("once round"), RefreshSpinAt(RefreshSpinSeconds), 360.0f);
+	TestEqual(TEXT("and still after"), RefreshSpinAt(4.0f), 360.0f);
 	return true;
 }
 
@@ -226,6 +248,21 @@ bool FTheFriendsPanelSlidesOpenAndFades::RunTest(const FString& Parameters)
 		Last = Width;
 	}
 	TestEqual(TEXT("past the end it is open, not wider"), PanelWidthAt(1.5f, 120.0f, 496.0f), 496.0f);
+	// The height and the top move along the same curve: the tile grows into the whole height and up to the top, and back.
+	TestEqual(TEXT("shut: the tile's height"), PanelHeightAt(0.0f, 156.0f, 900.0f), 156.0f);
+	TestEqual(TEXT("open: the screen's"), PanelHeightAt(1.0f, 156.0f, 900.0f), 900.0f);
+	TestEqual(TEXT("halfway: halfway"), PanelHeightAt(0.5f, 156.0f, 900.0f), 528.0f);
+	TestEqual(TEXT("shut: the tile's top"), PanelTopAt(0.0f, 40.0f), 40.0f);
+	TestEqual(TEXT("open: the screen's top"), PanelTopAt(1.0f, 40.0f), 0.0f);
+	TestEqual(TEXT("halfway up"), PanelTopAt(0.5f, 40.0f), 20.0f);
+	TestEqual(TEXT("a screen not yet measured never makes it shorter than the tile"), PanelHeightAt(1.0f, 156.0f, 0.0f), 156.0f);
+	float LastHeight = PanelHeightAt(0.0f, 156.0f, 900.0f);
+	for (int32 Step = 1; Step <= 20; ++Step)
+	{
+		const float Height = PanelHeightAt(Step / 20.0f, 156.0f, 900.0f);
+		TestTrue(TEXT("each step a little taller, by less than a tenth of the way"), Height > LastHeight && Height - LastHeight < (900.0f - 156.0f) * 0.1f);
+		LastHeight = Height;
+	}
 	// The content is clear over the first half of an expand and fades in over the second; played backwards it fades out
 	// over the first half of a collapse.
 	TestEqual(TEXT("clear at the start"), ContentOpacityAt(0.0f), 0.0f);

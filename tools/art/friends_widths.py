@@ -1,22 +1,26 @@
-"""Reads the friends panel's width, frame by frame, off the game's log from
-tools/play/friends_expand.txt ("Friends panel: N wide", written each frame it
-moves) and off the screenshots the script takes through its slide open
-(friends_expand_NN.png) and shut (friends_collapse_NN.png), to show the slide
-is smooth: a different width every frame through the quarter second, never a
-step.
+"""Reads the friends panel's width, height and top, frame by frame, off the
+game's log from tools/play/friends_expand.txt ("Friends panel: W wide, H high,
+T down", written each frame it moves) and off the screenshots the script takes
+through its growing open (friends_expand_NN.png) and shrinking shut
+(friends_collapse_NN.png), to show the motion is smooth both ways at once: a
+different width and height every frame through the quarter second, never a
+step, the tile growing into the panel and back.
 
 Run with any Python that has Pillow, after the play script:
     python -I tools/art/friends_widths.py [Saved/Screenshots/WindowsEditor] [Saved/Logs/friends_expand.log]
 
 The log is the proof: its first run of growing widths (the slide open) and
 the first run of shrinking ones (the slide shut) must each have at least six
-distinct widths, with no step most of the way. The pictures are read too, for
-looking at: the panel darkens the scene it lies over, so each is compared with
-the first (friends_expand_00.png, the panel folded to its tab, which is at the
-top only) down a band of rows under the tab and clear of the figure, and the
-width is counted from the right edge to the first column that still looks as it
-did without the panel. (The slide runs on Slate's clock, and a screenshot takes
-a while to write, so the pictures catch fewer frames of it than the log.)
+distinct widths, with no step most of the way, and the heights and tops logged
+on the same frames likewise (growing and rising open, shrinking and dropping
+shut). The pictures are read too, for looking at: the panel darkens the scene
+it lies over, so each is compared with the first (friends_expand_00.png, the
+panel folded to its tile, which is at the top only) down a band of rows low on
+the screen and clear of the figure, the width counted from the right edge to the
+first column that still looks as it did without the panel (none until the panel
+has grown down to the band), and the height down a column near the right edge to
+the last row that differs. (It moves on Slate's clock, and a screenshot takes a
+while to write, so the pictures catch fewer frames of it than the log.)
 """
 import glob
 import os
@@ -51,10 +55,25 @@ def width_of(path, bare):
     return len(mine)
 
 
+def column_near_edge(path):
+    """The brightness of each row of a column near the right edge, inside both the tile and the open panel."""
+    image = Image.open(path).convert("L")
+    w, h = image.size
+    x = w - max(8, w // 60)
+    return [image.getpixel((x, y)) for y in range(h)]
+
+
+def height_of(path, bare):
+    mine = column_near_edge(path)
+    differing = [y for y in range(len(mine)) if abs(mine[y] - bare[y]) >= DIFFERENT]
+    return differing[-1] + 1 if differing else 0
+
+
 def widths(prefix):
     bare = columns(os.path.join(SHOTS, "friends_expand_00.png"))
+    bare_column = column_near_edge(os.path.join(SHOTS, "friends_expand_00.png"))
     files = sorted(glob.glob(os.path.join(SHOTS, prefix + "_[0-9][0-9].png")))
-    return [(os.path.basename(f), width_of(f, bare)) for f in files]
+    return [(os.path.basename(f), width_of(f, bare), height_of(f, bare_column)) for f in files]
 
 
 def smooth(values, grows):
@@ -68,17 +87,17 @@ def smooth(values, grows):
 
 
 def runs(values):
-    """The first run of growing widths (the slide open) and the run of shrinking ones that follows it (the slide shut)."""
+    """Where the first run of growing widths is (the slide open) and the run of shrinking ones that follows it (the slide shut), as index ranges."""
     start = next((i for i in range(len(values) - 1) if values[i + 1] > values[i]), None)
     if start is None:
-        return [], []
+        return (0, 0), (0, 0)
     top = start
     while top + 1 < len(values) and values[top + 1] >= values[top]:
         top += 1
     bottom = top
     while bottom + 1 < len(values) and values[bottom + 1] <= values[bottom]:
         bottom += 1
-    return values[start:top + 1], values[top:bottom + 1]
+    return (start, top + 1), (top, bottom + 1)
 
 
 def main():
@@ -86,20 +105,30 @@ def main():
     if not os.path.exists(LOG):
         print(f"no log at {LOG}")
         sys.exit(1)
-    logged = [float(m.group(1)) for m in re.finditer(r"Friends panel: ([0-9.]+) wide", open(LOG, encoding="utf-8", errors="replace").read())]
-    print(f"the log: {len(logged)} frames of the panel moving: {', '.join(f'{w:.0f}' for w in logged)}")
-    opening, shutting = runs(logged)
-    for name, values, grows in (("open", opening, True), ("shut", shutting, False)):
-        fine, distinct, monotonic, biggest, span = smooth(values, grows)
-        print(f"  the first slide {name}: {len(values)} frames, {distinct} distinct widths, {'growing' if grows else 'shrinking'} throughout: {monotonic}, the biggest step {biggest:.0f} of {span:.0f} units: {'smooth' if fine else 'NOT SMOOTH'}")
-        ok = ok and fine
+    text = open(LOG, encoding="utf-8", errors="replace").read()
+    logged = [(float(m.group(1)), float(m.group(2)), float(m.group(3)))
+              for m in re.finditer(r"Friends panel: ([0-9.]+) wide, ([0-9.]+) high, ([0-9.]+) down", text)]
+    if not logged:
+        print("the log has no \"Friends panel: W wide, H high, T down\" lines")
+        sys.exit(1)
+    widths_logged = [w for w, _, _ in logged]
+    print(f"the log: {len(logged)} frames of the panel moving (width x height, top):")
+    print("  " + ", ".join(f"{w:.0f}x{h:.0f}@{t:.0f}" for w, h, t in logged))
+    opening, shutting = runs(widths_logged)
+    for name, (first, last), grows in (("open", opening, True), ("shut", shutting, False)):
+        for what, index, rises in (("widths", 0, grows), ("heights", 1, grows), ("tops", 2, not grows)):
+            values = [frame[index] for frame in logged[first:last]]
+            fine, distinct, monotonic, biggest, span = smooth(values, rises)
+            print(f"  the first move {name}: {len(values)} frames, {distinct} distinct {what}, {'growing' if rises else 'shrinking'} throughout: {monotonic}, the biggest step {biggest:.1f} of {span:.1f} units: {'smooth' if fine else 'NOT SMOOTH'}")
+            ok = ok and fine
     for name, prefix, grows in (("open", "friends_expand", True), ("shut", "friends_collapse", False)):
         series = widths(prefix)
         print(f"the pictures on the way {name}:")
-        for file, width in series:
-            print(f"  {file}: {width} px")
-        fine, distinct, monotonic, biggest, span = smooth([w for _, w in series], grows)
-        print(f"  {distinct} distinct widths, {'growing' if grows else 'shrinking'} throughout: {monotonic}, the biggest step {biggest} px of {span}")
+        for file, width, height in series:
+            print(f"  {file}: {width} px wide (low on the screen), {height} px down to its foot")
+        for what, index in (("widths", 1), ("heights", 2)):
+            fine, distinct, monotonic, biggest, span = smooth([s[index] for s in series], grows)
+            print(f"  {distinct} distinct {what}, {'growing' if grows else 'shrinking'} throughout: {monotonic}, the biggest step {biggest} px of {span}")
     print("OK" if ok else "NOT SMOOTH")
     sys.exit(0 if ok else 1)
 

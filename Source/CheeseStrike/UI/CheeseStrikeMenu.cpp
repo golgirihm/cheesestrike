@@ -268,7 +268,19 @@ static bool IsInAGameHere(const APlayerController* Player)
 }
 
 static TAutoConsoleVariable<int32> CVarFriendsOpen(TEXT("CheeseStrike.FriendsOpen"), 0,
-	TEXT("1: the friends panel stays open in the lobby as if hovered, for looking at it."));
+	TEXT("1: the friends panel stays open on the front end and in the lobby as if clicked open, for looking at it."));
+
+/**
+ * A chevron's turn, kept apart from its widget (SCheeseStrikeMenu::ChevronTurns, by the chevron's name), so that a chevron
+ * drawn again in another's place carries on from where that one pointed: it turns only when where it points changes.
+ */
+struct FChevronTurn
+{
+	/** Where it points now, in degrees clockwise from down, and when that was worked out. */
+	float Shown = 0.0f;
+	double LastTime = 0.0;
+	bool bSet = false;
+};
 
 namespace
 {
@@ -358,6 +370,7 @@ namespace
 		TUniquePtr<FSlateDynamicImageBrush> CrownIcon;
 		/** The menu's one chevron (tools/art/chevron_icon.py): a white V pointing down, 16 across, turned to point the other ways. */
 		TUniquePtr<FSlateDynamicImageBrush> ChevronIcon;
+		TUniquePtr<FSlateDynamicImageBrush> RefreshIcon;
 		TUniquePtr<FSlateDynamicImageBrush> LobbyTile;
 		TMap<FString, TUniquePtr<FSlateDynamicImageBrush>> MapPictures;
 		TMap<FString, TUniquePtr<FSlateRoundedBoxBrush>> Chips;
@@ -521,6 +534,7 @@ namespace
 			BotIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("bot.png"))), FVector2D(22.0, 22.0));
 			CrownIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("crown.png"))), FVector2D(22.0, 22.0));
 			ChevronIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("chevron.png"))), FVector2D(16.0, 16.0));
+			RefreshIcon = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("refresh.png"))), FVector2D(CheeseStrikeMenu::RefreshGlyphSize, CheeseStrikeMenu::RefreshGlyphSize));
 			LobbyTile = MakeUnique<FSlateDynamicImageBrush>(FName(*(Folder / TEXT("lobby_tile.png"))), FVector2D(512.0, 512.0), FLinearColor::White, ESlateBrushTileType::Both);
 		}
 	};
@@ -532,56 +546,93 @@ namespace
 	}
 
 	/**
-	 * The menu's one chevron: Content/UI/chevron.png (tools/art/chevron_icon.py), a white V pointing down, 16 across,
-	 * anti-aliased, turned by a render transform to point `Angle` degrees clockwise from down: 0 down (a section open, a
-	 * dropdown shut), -90 right (a section folded; the open friends panel, which folds that way), 90 left (the friends tab,
-	 * which opens that way), 180 up (a dropdown open). Shown in `Colour` (a button's own foreground, if that is given). When
-	 * the angle it is given changes, or it is made afresh in place of one pointing elsewhere (`From`), it turns there at
-	 * 900 degrees a second: a tenth of a second for a quarter turn.
+	 * A picture turned `Angle` degrees clockwise about its exact middle, drawn by itself: its box a whole number of the
+	 * window's pixels across, in the middle of the room it is given with its corner on a pixel, so that the middle it turns
+	 * about stays on the same spot and nothing of it shifts sideways as it turns. (An SImage turned by a render transform
+	 * was turned about a middle on no pixel in particular, which Slate snapped to the pixels while the picture was square
+	 * to them and not while it turned, so that it jittered sideways across every turn.) `Colour` may be a button's
+	 * foreground; disabled, it is drawn so.
 	 */
-	class SCheeseStrikeChevron : public SImage
+	class SCheeseStrikeTurnedImage : public SLeafWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SCheeseStrikeChevron) : _Angle(0.0f), _From(), _Colour(FLinearColor::White) {}
+		SLATE_BEGIN_ARGS(SCheeseStrikeTurnedImage) : _Image(nullptr), _Angle(0.0f), _Colour(FLinearColor::White) {}
+			SLATE_ARGUMENT(const FSlateBrush*, Image)
 			SLATE_ATTRIBUTE(float, Angle)
-			SLATE_ARGUMENT(TOptional<float>, From)
-			SLATE_ARGUMENT(FSlateColor, Colour)
+			SLATE_ATTRIBUTE(FSlateColor, Colour)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
 		{
+			Image = InArgs._Image;
 			Angle = InArgs._Angle;
-			Shown = InArgs._From.IsSet() ? InArgs._From.GetValue() : Angle.Get(0.0f);
-			LastTime = FPlatformTime::Seconds();
-			SImage::Construct(SImage::FArguments().Image(Looks().ChevronIcon.Get()).ColorAndOpacity(InArgs._Colour));
-			SetRenderTransformPivot(FVector2D(0.5, 0.5));
-			SetRenderTransform(TAttribute<TOptional<FSlateRenderTransform>>::CreateSP(this, &SCheeseStrikeChevron::Turned));
+			Colour = InArgs._Colour;
+		}
+
+		virtual FVector2D ComputeDesiredSize(float) const override
+		{
+			return Image != nullptr ? FVector2D(Image->ImageSize) : FVector2D::ZeroVector;
+		}
+
+		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
+		{
+			if (Image == nullptr)
+			{
+				return LayerId;
+			}
+			const float Scale = FMath::Max(AllottedGeometry.Scale, 0.01f);
+			const FVector2f Pixels(FMath::RoundToFloat(static_cast<float>(Image->ImageSize.X) * Scale), FMath::RoundToFloat(static_cast<float>(Image->ImageSize.Y) * Scale));
+			const FVector2f Size = Pixels / Scale;
+			FVector2f Corner = (FVector2f(AllottedGeometry.GetLocalSize()) - Size) * 0.5f;
+			const FVector2f Absolute = FVector2f(AllottedGeometry.LocalToAbsolute(Corner));
+			Corner += (FVector2f(FMath::RoundToFloat(Absolute.X), FMath::RoundToFloat(Absolute.Y)) - Absolute) / Scale;
+			const FLinearColor Tint = Colour.Get().GetColor(InWidgetStyle) * InWidgetStyle.GetColorAndOpacityTint() * Image->GetTint(InWidgetStyle);
+			FSlateDrawElement::MakeRotatedBox(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform(Corner)), Image,
+				bParentEnabled ? ESlateDrawEffect::None : ESlateDrawEffect::DisabledEffect, FMath::DegreesToRadians(Angle.Get(0.0f)),
+				TOptional<FVector2f>(), FSlateDrawElement::RelativeToElement, Tint);
+			return LayerId;
 		}
 
 	private:
-		/** The turn to where it points now, eased from where it was (read as it is drawn, every frame). */
-		TOptional<FSlateRenderTransform> Turned() const
-		{
-			const double Now = FPlatformTime::Seconds();
-			Shown = FMath::FixedTurn(Shown, Angle.Get(0.0f), static_cast<float>(FMath::Min(0.1, Now - LastTime)) * 900.0f);
-			LastTime = Now;
-			return FSlateRenderTransform(FQuat2D(FMath::DegreesToRadians(Shown)));
-		}
-
+		const FSlateBrush* Image = nullptr;
 		TAttribute<float> Angle;
-		mutable float Shown = 0.0f;
-		mutable double LastTime = 0.0;
+		TAttribute<FSlateColor> Colour;
 	};
 
-	/** The chevron pointing `Angle` degrees clockwise from down, turning there from `From` if that is given. */
-	TSharedRef<SWidget> MakeChevron(float Angle, const FSlateColor& Colour, TOptional<float> From = TOptional<float>())
+	/**
+	 * The menu's one chevron: Content/UI/chevron.png (tools/art/chevron_icon.py), a white V pointing down, 16 across,
+	 * anti-aliased, turned to point `Angle` degrees clockwise from down: 0 down (a section open, a dropdown shut), -90 right
+	 * (a section folded; the open friends panel, which folds that way), 90 left (the friends tab, which opens that way), 180
+	 * up (a dropdown open). Shown in `Colour` (a button's own foreground, if that is given). When the angle changes it turns
+	 * there at 900 degrees a second, a tenth of a second for a quarter turn, from where it pointed (`From`, the first time),
+	 * which `Turn` keeps: given one kept by the menu, a chevron drawn again carries on from the last one's place, so that
+	 * it turns only when what it shows changes.
+	 */
+	TSharedRef<SWidget> MakeChevron(TAttribute<float> Angle, const FSlateColor& Colour, TOptional<float> From = TOptional<float>(), TSharedPtr<FChevronTurn> Turn = nullptr)
 	{
-		return SNew(SCheeseStrikeChevron).Angle(Angle).Colour(Colour).From(From);
+		if (!Turn.IsValid())
+		{
+			Turn = MakeShared<FChevronTurn>();
+		}
+		if (!Turn->bSet)
+		{
+			Turn->Shown = From.IsSet() ? From.GetValue() : Angle.Get(0.0f);
+			Turn->bSet = true;
+		}
+		Turn->LastTime = FPlatformTime::Seconds();
+		return SNew(SCheeseStrikeTurnedImage).Image(Looks().ChevronIcon.Get()).Colour(Colour)
+			.Angle_Lambda([Turn, Angle]()
+			{
+				const double Now = FPlatformTime::Seconds();
+				Turn->Shown = FMath::FixedTurn(Turn->Shown, Angle.Get(0.0f), static_cast<float>(FMath::Clamp(Now - Turn->LastTime, 0.0, 0.1)) * 900.0f);
+				Turn->LastTime = Now;
+				return Turn->Shown;
+			});
 	}
-	/** A section's chevron: down while it is open, right while folded, turning from the other if it has just changed. */
-	TSharedRef<SWidget> MakeFoldChevron(bool bOpen, const FSlateColor& Colour, bool bTurning)
+	/** A section's chevron: down while it is open, right while folded, turning (by its kept `Turn`) when that changes. */
+	TSharedRef<SWidget> MakeFoldChevron(bool bOpen, const FSlateColor& Colour, TSharedPtr<FChevronTurn> Turn)
 	{
-		return MakeChevron(bOpen ? 0.0f : -90.0f, Colour, bTurning ? TOptional<float>(bOpen ? -90.0f : 0.0f) : TOptional<float>());
+		return MakeChevron(bOpen ? 0.0f : -90.0f, Colour, TOptional<float>(), Turn);
 	}
 
 	/**
@@ -1016,14 +1067,19 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 				SAssignNew(Content, SBox).WidthOverride(CheeseStrikeMenu::PanelContentWidth).VAlign(VAlign_Center)
 			]
 		]
-		// The friends, on the right: a tab, opened by hovering it on the main page and in the lobby or pinned by its chevron,
-		// and open on the find page. As wide as its curve says each frame (the tab's width to the pages' panel's), what is
-		// in it cut at that width while it slides.
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Fill)
+		// The friends, on the right: a tile, opened by a click on it on the main page and in the lobby and shut by a click on
+		// the open panel's chevron or FRIENDS, and open on the find page. As wide and as tall as its curve says each frame (the
+		// tile's size to the pages' panel's width and the screen's height), its top rising from the tile's to the screen's,
+		// what is in it cut at that size while it moves.
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)
 		[
-			SAssignNew(FriendsBox, SBox).WidthOverride(this, &SCheeseStrikeMenu::FriendsWidthNow).Visibility(EVisibility::Collapsed).Clipping(EWidgetClipping::ClipToBounds)
+			SNew(SBox).Padding(this, &SCheeseStrikeMenu::FriendsTopNow).Visibility(EVisibility::SelfHitTestInvisible)
 			[
-				SAssignNew(FriendsContent, SBox)
+				SAssignNew(FriendsBox, SBox).WidthOverride(this, &SCheeseStrikeMenu::FriendsWidthNow).HeightOverride(this, &SCheeseStrikeMenu::FriendsHeightNow)
+				.Visibility(EVisibility::Collapsed).Clipping(EWidgetClipping::ClipToBounds)
+				[
+					SAssignNew(FriendsContent, SBox)
+				]
 			]
 		]
 		// The tooltip of whatever is hovered, beside the mouse (UpdateTooltip): over the pages, the lobby and the friends,
@@ -1123,19 +1179,15 @@ void SCheeseStrikeMenu::Refresh()
 		UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Controller.Get());
 		// (Not under the settings over the lobby, as not on the settings page.)
 		const bool bPanel = (Page == EMenuPage::Lobby && !bOverlay) || Page == EMenuPage::Find || Page == EMenuPage::Main;
-		FriendsBox->SetVisibility(bPanel ? EVisibility::Visible : EVisibility::Collapsed);
-		// Open on the find page; on the front end's main page and in the lobby as pinned by its chevron, else while hovered
-		// and for half a second after the mouse leaves (CheeseStrikeFriends::PanelOpen); and held open for looking at it.
+		FriendsBox->SetVisibility(bPanel ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+		// Open on the find page; on the front end's main page and in the lobby as last clicked (CheeseStrikeFriends::PanelOpen:
+		// the tile opens it, the open panel's chevron or FRIENDS shut it; the mouse merely over it does nothing); and held open
+		// for looking at it.
 		const double Now = FPlatformTime::Seconds();
-		const bool bHovered = bPanel && FriendsBox->IsHovered();
-		if (bFriendsHovered && !bHovered)
-		{
-			FriendsLeftAt = Now;
-		}
-		bFriendsHovered = bHovered;
-		const bool bOpen = bPanel && (CVarFriendsOpen.GetValueOnGameThread() != 0 || PanelOpen(Page == EMenuPage::Find, FriendsPinned, bHovered, static_cast<float>(Now - FriendsLeftAt)));
-		// Slid open and shut along its curve (PanelSeconds, eased in and out), the width read off it every frame
-		// (FriendsWidthNow): shutting is opening played backwards, from wherever it has got to.
+		const bool bOpen = bPanel && (CVarFriendsOpen.GetValueOnGameThread() != 0 || PanelOpen(Page == EMenuPage::Find, bFriendsClickedOpen));
+		// Grown open and shrunk shut along its curve (PanelSeconds, eased in and out), the width, height and top read off it
+		// every frame (FriendsWidthNow, FriendsHeightNow, FriendsTopNow): shutting is opening played backwards, from wherever it
+		// has got to.
 		if (bOpen != bFriendsWantOpen)
 		{
 			bFriendsWantOpen = bOpen;
@@ -1155,20 +1207,37 @@ void SCheeseStrikeMenu::Refresh()
 		const float Along = FriendsCurve.GetLerp();
 		if (FriendsCurve.IsPlaying())
 		{
-			UE_LOG(LogCheeseStrike, Log, TEXT("Friends panel: %.1f wide"), PanelWidthAt(Along, CheeseStrikeMenu::FriendsTabWidth, CheeseStrikeMenu::PanelWidth));
+			UE_LOG(LogCheeseStrike, Log, TEXT("Friends panel: %.1f wide, %.1f high, %.1f down"), PanelWidthAt(Along, CheeseStrikeMenu::FriendsTabWidth, CheeseStrikeMenu::PanelWidth),
+				FriendsHeightNow().Get(), PanelTopAt(Along, CheeseStrikeMenu::FriendsTabTop));
 		}
 		// The tall content while open or on the way (collapsing, it stays while the width shrinks), the tab only once shut;
 		// the content fading in over the second half of an expand and out over the first half of a collapse.
 		const bool bContent = ShowsContent(bFriendsWantOpen, Along);
-		if (FriendsInside.IsValid())
+		// Hidden outright while clear: a rounded box's hairline (a button's) is drawn at its own colour whatever the opacity it
+		// is in, and would stand alone in the empty panel.
+		const auto FadeFriendsInside = [this](float AlongNow)
 		{
-			FriendsInside->SetRenderOpacity(ContentOpacityAt(Along));
+			if (FriendsInside.IsValid())
+			{
+				const float Opacity = CheeseStrikeFriends::ContentOpacityAt(AlongNow);
+				FriendsInside->SetRenderOpacity(Opacity);
+				const EVisibility Shown = Opacity > 0.0f ? EVisibility::Visible : EVisibility::Hidden;
+				if (FriendsInside->GetVisibility() != Shown)
+				{
+					FriendsInside->SetVisibility(Shown);
+				}
+			}
+		};
+		FadeFriendsInside(Along);
+		// Refreshed as it is opened by a click (ClickFriends), and again every AutoRefreshSeconds while it is open, so that a
+		// friend who joins a game shows; REFRESH meanwhile shows the cooldown as if it had been pressed.
+		if (bOpen && Sessions != nullptr && ShouldAutoRefresh(true, false, Now, FriendsRefreshedAt))
+		{
+			RefreshFriends(TEXT("while open"));
 		}
-		// Asked for when it opens, and again every 20 s while it is open, so that a friend who joins a game shows.
-		if (bOpen && Sessions != nullptr && Now - FriendsReadAt > 20.0)
+		else if (bFriendsRefreshPending && CanRefresh(Now, FriendsRefreshedAt))
 		{
-			FriendsReadAt = Now;
-			Sessions->RefreshFriends();
+			RefreshFriends(TEXT("asked for during the cooldown"));
 		}
 		// Drawn again only when a friend or a player changes (rebuilding it would restart a spinner). The session's status is not in
 		// it: the dropdown and its line say how friends may join, and a failure says why where it happened (the lobby, the matches found).
@@ -1215,10 +1284,7 @@ void SCheeseStrikeMenu::Refresh()
 		{
 			ShownFriendsKey = Key;
 			FriendsContent->SetContent(MakeFriendsPanel(bContent));
-			if (FriendsInside.IsValid())
-			{
-				FriendsInside->SetRenderOpacity(ContentOpacityAt(Along));
-			}
+			FadeFriendsInside(Along);
 		}
 	}
 	// The question whether to close the lobby goes once the countdown begins: it can't be closed then.
@@ -1353,9 +1419,69 @@ void SCheeseStrikeMenu::Refresh()
 	UpdateTooltip();
 }
 
-void SCheeseStrikeMenu::PinFriends(bool bOpen)
+void SCheeseStrikeMenu::ClickFriends(bool bOpen)
 {
-	FriendsPinned = bOpen;
+	bFriendsClickedOpen = bOpen;
+	// Opened by a click: a refresh at once, which counts as one (the cooldown starts).
+	if (bOpen && CheeseStrikeFriends::ShouldAutoRefresh(true, true, FPlatformTime::Seconds(), FriendsRefreshedAt))
+	{
+		RefreshFriends(TEXT("opened by a click"));
+	}
+	Refresh();
+}
+
+void SCheeseStrikeMenu::FoldFriendSection(int32 Section)
+{
+	const uint8 Id = static_cast<uint8>(Section);
+	if (ClosedFriendSections.Contains(Id))
+	{
+		ClosedFriendSections.Remove(Id);
+	}
+	else
+	{
+		ClosedFriendSections.Add(Id);
+	}
+	// Drawn again at the next refresh, its chevron (alone) turning.
+	ShownFriendsKey.Reset();
+}
+
+bool SCheeseStrikeMenu::RefreshFriends(const TCHAR* Why, bool bOnceCooled)
+{
+	const double Now = FPlatformTime::Seconds();
+	UCheeseStrikeSessionSubsystem* Sessions = SessionsOf(Controller.Get());
+	if (Sessions == nullptr || !CheeseStrikeFriends::CanRefresh(Now, FriendsRefreshedAt))
+	{
+		bFriendsRefreshPending = bFriendsRefreshPending || (bOnceCooled && Sessions != nullptr);
+		UE_LOG(LogCheeseStrike, Log, TEXT("Friends: not refreshed (%s): %.1f s of the cooldown left%s"), Why, CheeseStrikeFriends::RefreshCooldownLeft(Now, FriendsRefreshedAt),
+			bFriendsRefreshPending ? TEXT(", then it will be") : TEXT(""));
+		return false;
+	}
+	FriendsRefreshedAt = Now;
+	bFriendsRefreshPending = false;
+	UE_LOG(LogCheeseStrike, Log, TEXT("Friends: refreshed (%s)"), Why);
+	Sessions->RefreshFriends();
+	return true;
+}
+
+FOptionalSize SCheeseStrikeMenu::FriendsHeightNow() const
+{
+	// Open, the menu's whole height (as the pages' panel on the left), which is this widget's.
+	return CheeseStrikeFriends::PanelHeightAt(FriendsCurve.GetLerp(), CheeseStrikeMenu::FriendsTabHeight, static_cast<float>(GetCachedGeometry().GetLocalSize().Y));
+}
+
+FMargin SCheeseStrikeMenu::FriendsTopNow() const
+{
+	return FMargin(0.0f, CheeseStrikeFriends::PanelTopAt(FriendsCurve.GetLerp(), CheeseStrikeMenu::FriendsTabTop), 0.0f, 0.0f);
+}
+
+TSharedPtr<FChevronTurn> SCheeseStrikeMenu::ChevronTurn(const FString& Name)
+{
+	TSharedPtr<FChevronTurn>& Turn = ChevronTurns.FindOrAdd(Name);
+	if (!Turn.IsValid())
+	{
+		Turn = MakeShared<FChevronTurn>();
+	}
+	return Turn;
 }
 
 FOptionalSize SCheeseStrikeMenu::FriendsWidthNow() const
@@ -1365,18 +1491,34 @@ FOptionalSize SCheeseStrikeMenu::FriendsWidthNow() const
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsChevron(bool bOpen)
 {
-	return SNew(SButton)
-		.ButtonStyle(&ButtonStyle(EButtonKind::Quiet))
-		.ContentPadding(FMargin(6.0f))
-		.IsFocusable(false)
-		.OnClicked_Lambda([this]()
-		{
-			PinFriends(!bFriendsWantOpen);
-			return FReply::Handled();
-		})
-		[
-			MakeChevron(bOpen ? -90.0f : 90.0f, Ink, bOpen ? 90.0f : -90.0f)
-		];
+	// The tile's and the open panel's are the one chevron's turn: it turns as the panel opens or shuts, and never for the
+	// panel being drawn again for anything else (a section folded, a friend's state).
+	return MakeChevron(bOpen ? -90.0f : 90.0f, FSlateColor::UseForeground(), TOptional<float>(bOpen ? 90.0f : -90.0f), ChevronTurn(TEXT("Friends panel")));
+}
+
+TSharedRef<SWidget> SCheeseStrikeMenu::MakeRefreshButton()
+{
+	using namespace CheeseStrikeFriends;
+	// A rounded square in the plain buttons' looks, the glyph in its middle; after any refresh the glyph turns once and the
+	// button is greyed and takes no click until the cooldown is over.
+	return WithTooltip(SNew(SBox)
+	[
+		Focusable(TEXT("Refresh friends"), SNew(SCheeseStrikeButton)
+			.ButtonStyle(&ButtonStyle(EButtonKind::Plain))
+			.ContentPadding(FMargin(0.0f))
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			.IsEnabled_Lambda([this]() { return CanRefresh(FPlatformTime::Seconds(), FriendsRefreshedAt); })
+			.OnClicked_Lambda([this]() { RefreshFriends(TEXT("REFRESH pressed")); return FReply::Handled(); })
+			[
+				SNew(SBox).WidthOverride(CheeseStrikeMenu::RefreshButtonSize).HeightOverride(CheeseStrikeMenu::RefreshButtonSize).HAlign(HAlign_Center).VAlign(VAlign_Center)
+				[
+					SNew(SCheeseStrikeTurnedImage).Image(Looks().RefreshIcon.Get()).Colour(FSlateColor::UseForeground())
+					.Angle_Lambda([this]() { return RefreshSpinAt(static_cast<float>(FPlatformTime::Seconds() - FriendsRefreshedAt)); })
+				]
+			])
+	], FString::Printf(TEXT("Refresh the list of friends and their games. It rests %d seconds after each refresh, and refreshes by itself as the panel opens and every %d seconds while it is open."),
+		FMath::RoundToInt32(RefreshCooldown), FMath::RoundToInt32(AutoRefreshSeconds)), TEXT("Refresh"));
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeTooltip(const FString& Text, const FString& Title)
@@ -2098,7 +2240,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeDropdown(const TArray<FString>& Choic
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(12.0f, 0.0f, 0.0f, 0.0f))
 			[
 				// Down, and up while the list is open, in the button's own colour.
-				SNew(SCheeseStrikeChevron).Colour(FSlateColor::UseForeground()).Angle_Lambda([Weak]() { const TSharedPtr<SMenuAnchor> Open = Weak.Pin(); return Open.IsValid() && Open->IsOpen() ? 180.0f : 0.0f; })
+				MakeChevron(TAttribute<float>::CreateLambda([Weak]() { const TSharedPtr<SMenuAnchor> Open = Weak.Pin(); return Open.IsValid() && Open->IsOpen() ? 180.0f : 0.0f; }), FSlateColor::UseForeground())
 			]
 		];
 	*Opener = Button;
@@ -2557,8 +2699,6 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 				Friends->AddSlot().AutoHeight().Padding(FMargin(0.0f, 3.0f)) [ Row ];
 			}
 		}
-		// The chevron just turned has turned.
-		TurningFriendSection = INDEX_NONE;
 	}
 	else
 	{
@@ -2568,21 +2708,32 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 	// rounded. Its chevron, pointing right to the edge it folds to, is hidden on the find page, where it can't fold. The
 	// content inside is what fades as the panel slides (FriendsInside).
 	const TSharedRef<SWidget> Inside = SNew(SVerticalBox)
-		// The chevron and the title, and Refresh beside them.
+		// The chevron and the title, one button that shuts the panel (not on the find page, where it can't shut: the title
+		// alone), and REFRESH beside them.
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 0.0f, 0.0f, 14.0f))
 		[
 			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 8.0f, 0.0f))
+			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center).HAlign(HAlign_Left)
 			[
-				SNew(SBox).Visibility(Page == EMenuPage::Find ? EVisibility::Collapsed : EVisibility::Visible) [ MakeFriendsChevron(true) ]
-			]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
-			[
-				SNew(STextBlock).Text(FText::FromString(TEXT("FRIENDS"))).Font(Font(30, FName("Bold"))).ColorAndOpacity(Cheese)
+				Page == EMenuPage::Find
+				? StaticCastSharedRef<SWidget>(SNew(STextBlock).Text(FText::FromString(TEXT("FRIENDS"))).Font(Font(30, FName("Bold"))).ColorAndOpacity(Cheese))
+				: StaticCastSharedRef<SWidget>(SNew(SCheeseStrikeButton)
+					.ButtonStyle(&ButtonStyle(EButtonKind::Quiet))
+					.ContentPadding(FMargin(6.0f, 2.0f, 10.0f, 2.0f))
+					.IsFocusable(false)
+					.OnClicked_Lambda([this]() { ClickFriends(false); return FReply::Handled(); })
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 10.0f, 0.0f)) [ MakeFriendsChevron(true) ]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(STextBlock).Text(FText::FromString(TEXT("FRIENDS"))).Font(Font(30, FName("Bold"))).ColorAndOpacity(Cheese)
+						]
+					])
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				MakeSmallButton(TEXT("REFRESH"), TEXT("Refresh friends"), [Player]() { if (Player.IsValid()) Player->FindFromMenu(); })
+				MakeRefreshButton()
 			]
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(6.0f, 0.0f, 6.0f, 12.0f)) [ bInGame ? MakePartyPermission(bHost, Sessions) : SNullWidget::NullWidget ]
@@ -2604,14 +2755,37 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsTab(UCheeseStrikeSessionSubsys
 			Online += Each.Online != CheeseStrikeFriends::EOnline::Offline ? 1 : 0;
 		}
 	}
-	// A card at the top of the edge, as high as the lobby's page starts, in the panels' looks (its left corners rounded):
-	// it opens to the left as it is hovered, or as its chevron is clicked.
-	return SNew(SBox).VAlign(VAlign_Top).Padding(FMargin(0.0f, 40.0f, 0.0f, 0.0f))
-	[
-		SNew(SBorder).BorderImage(&Looks().FriendsPanel).BorderBackgroundColor(PanelColour).Padding(FMargin(10.0f, 12.0f, 10.0f, 18.0f)).HAlign(HAlign_Center)
+	// A card at the top of the edge, as high as the lobby's page starts (the box it is in, FriendsTopNow), in the panels'
+	// looks (its left corners rounded), the whole of it a button: a click anywhere on it opens the panel, the mouse merely
+	// over it lighting it a little.
+	// (No face of its own, the card being its face; the menu's buttons' sounds.)
+	static const FButtonStyle TileStyle = [this]()
+	{
+		FButtonStyle Style = FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder");
+		Style.SetHoveredSound(ButtonStyle(EButtonKind::Quiet).HoveredSlateSound);
+		Style.SetPressedSound(ButtonStyle(EButtonKind::Quiet).PressedSlateSound);
+		return Style;
+	}();
+	TSharedPtr<SButton> Tile;
+	SAssignNew(Tile, SButton)
+		.ButtonStyle(&TileStyle)
+		.ContentPadding(FMargin(0.0f))
+		.HAlign(HAlign_Fill)
+		.VAlign(VAlign_Fill)
+		.IsFocusable(false)
+		.OnClicked_Lambda([this]() { ClickFriends(true); return FReply::Handled(); });
+	const TWeakPtr<SButton> Weak = Tile;
+	Tile->SetContent(
+		SNew(SBorder).BorderImage(&Looks().FriendsPanel).Padding(FMargin(10.0f, 12.0f)).HAlign(HAlign_Center).VAlign(VAlign_Center)
+		.BorderBackgroundColor_Lambda([Weak]()
+		{
+			const TSharedPtr<SButton> Me = Weak.Pin();
+			const float Lift = Me.IsValid() && Me->IsHovered() ? 0.05f : 0.0f;
+			return FSlateColor(FLinearColor(PanelColour.R + Lift, PanelColour.G + Lift, PanelColour.B + Lift, PanelColour.A));
+		})
 		[
 			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center) [ MakeFriendsChevron(false) ]
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(6.0f)) [ SNew(SBox).Visibility(EVisibility::HitTestInvisible) [ MakeFriendsChevron(false) ] ]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, 10.0f, 0.0f, 6.0f))
 			[
 				SNew(SBox).WidthOverride(30.0f).HeightOverride(30.0f) [ SNew(SImage).Image(Looks().PlayerIcon.Get()).ColorAndOpacity(Cheese) ]
@@ -2625,15 +2799,15 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsTab(UCheeseStrikeSessionSubsys
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(0.0f, 0.0f, 6.0f, 0.0f))
 				[
-					SNew(SCheeseStrikeDot).Colour(Online > 0 ? CheeseStrikeFriends::StatusDotColour(CheeseStrikeFriends::EStatus::InMatch, CheeseStrikeFriends::EOnline::Online) : CheeseStrikeFriends::StatusDotColour(CheeseStrikeFriends::EStatus::NotInGame, CheeseStrikeFriends::EOnline::Offline))
+					SNew(SCheeseStrikeDot).Colour(Online > 0 ? CheeseStrikeFriends::StatusDotColour(CheeseStrikeFriends::EStatus::NotInGame, CheeseStrikeFriends::EOnline::Online) : CheeseStrikeFriends::StatusDotColour(CheeseStrikeFriends::EStatus::NotInGame, CheeseStrikeFriends::EOnline::Offline))
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
 					SNew(STextBlock).Text(FText::FromString(FString::Printf(TEXT("%d online"), Online))).Font(Font(13)).ColorAndOpacity(Muted)
 				]
 			]
-		]
-	];
+		]);
+	return Tile.ToSharedRef();
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakePartyPermission(bool bHost, UCheeseStrikeSessionSubsystem* Sessions)
@@ -2673,24 +2847,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeSectionHeader(CheeseStrikeFriends::ES
 		.HAlign(HAlign_Fill)
 		.OnClicked_Lambda([this, Id]()
 		{
-			if (ClosedFriendSections.Contains(Id))
-			{
-				ClosedFriendSections.Remove(Id);
-			}
-			else
-			{
-				ClosedFriendSections.Add(Id);
-			}
-			// Drawn again at the next refresh, its chevron turning.
-			TurningFriendSection = Id;
-			ShownFriendsKey.Reset();
+			FoldFriendSection(Id);
 			return FReply::Handled();
 		})
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(2.0f, 0.0f, 8.0f, 0.0f))
 			[
-				MakeFoldChevron(!bClosed, Muted, TurningFriendSection == Id)
+				MakeFoldChevron(!bClosed, Muted, ChevronTurn(FString::Printf(TEXT("Section %d"), Id)))
 			]
 			+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
 			[
@@ -2823,7 +2987,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendRow(int32 Index, CheeseStrikeFr
 	TSharedRef<SHorizontalBox> Action = SNew(SHorizontalBox);
 	if (Section == ESection::Joinable)
 	{
-		const FString WhyNotJoin = Friend.State == EState::Join ? FString() : FString(TEXT("Their game is still being looked up: REFRESH"));
+		const FString WhyNotJoin = Friend.State == EState::Join ? FString() : FString(TEXT("Their game is still being looked up: refresh the list (the arrow by FRIENDS)"));
 		Action->AddSlot().AutoWidth() [ MakeRowButton(TEXT("JOIN"), TEXT("Join ") + Friend.Name, [Sessions, Index]() { Sessions->JoinFriend(Index); }, EButtonKind::Primary, WhyNotJoin, TEXT("Join ") + Friend.Name + TEXT("'s game")) ];
 	}
 	if (Section != ESection::YourParty)

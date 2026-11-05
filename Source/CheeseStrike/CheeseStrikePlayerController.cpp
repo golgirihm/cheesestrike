@@ -1020,6 +1020,26 @@ void ACheeseStrikePlayerController::CheeseStrikeSampleFriends(int32 Show)
 	}
 }
 
+void ACheeseStrikePlayerController::CheeseStrikeFriends(int32 Click)
+{
+	if (!Menu.IsValid())
+	{
+		return;
+	}
+	if (Click == 2)
+	{
+		Menu->RefreshFriends(TEXT("REFRESH pressed"));
+	}
+	else if (Click >= 10)
+	{
+		Menu->FoldFriendSection(Click - 10);
+	}
+	else
+	{
+		Menu->ClickFriends(Click != 0);
+	}
+}
+
 void ACheeseStrikePlayerController::CheeseStrikeCover(float Seconds)
 {
 	if (UCheeseStrikeCurtainSubsystem* Curtain = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeCurtainSubsystem>() : nullptr)
@@ -1101,8 +1121,13 @@ void ACheeseStrikePlayerController::CheeseStrikeMice()
 
 void ACheeseStrikePlayerController::FindFromMenu()
 {
-	// The friends and their games: there is no public search.
-	if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
+	// The friends and their games: there is no public search. Through the menu, whose friends panel counts every refresh
+	// for its cooldown (CheeseStrikeFriends::RefreshCooldown), when there is one.
+	if (Menu.IsValid())
+	{
+		Menu->RefreshFriends(TEXT("the find page"), true);
+	}
+	else if (UCheeseStrikeSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UCheeseStrikeSessionSubsystem>())
 	{
 		Sessions->RefreshFriends();
 	}

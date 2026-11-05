@@ -136,7 +136,7 @@ namespace CheeseStrikeFriends
 		}
 		switch (Online)
 		{
-		case EOnline::Online: return FLinearColor(0.72f, 0.71f, 0.68f);
+		case EOnline::Online: return FLinearColor(0.56f, 0.86f, 0.22f);
 		case EOnline::Away:
 		case EOnline::Busy: return FLinearColor(0.62f, 0.42f, 0.24f);
 		default: return FLinearColor(0.3f, 0.29f, 0.28f);
@@ -258,22 +258,24 @@ namespace CheeseStrikeFriends
 		return FString();
 	}
 
-	bool PanelOpen(bool bAlwaysOpen, const TOptional<bool>& Pinned, bool bHovered, float SinceLeft)
+	bool PanelOpen(bool bAlwaysOpen, bool bClickedOpen)
 	{
-		if (bAlwaysOpen)
-		{
-			return true;
-		}
-		if (Pinned.IsSet())
-		{
-			return Pinned.GetValue();
-		}
-		return bHovered || SinceLeft < HoverCloseDelay;
+		return bAlwaysOpen || bClickedOpen;
 	}
 
 	float PanelWidthAt(float Along, float TabWidth, float OpenWidth)
 	{
 		return FMath::Lerp(TabWidth, OpenWidth, FMath::Clamp(Along, 0.0f, 1.0f));
+	}
+
+	float PanelHeightAt(float Along, float TabHeight, float OpenHeight)
+	{
+		return FMath::Lerp(TabHeight, FMath::Max(OpenHeight, TabHeight), FMath::Clamp(Along, 0.0f, 1.0f));
+	}
+
+	float PanelTopAt(float Along, float TabTop)
+	{
+		return FMath::Lerp(TabTop, 0.0f, FMath::Clamp(Along, 0.0f, 1.0f));
 	}
 
 	float ContentOpacityAt(float Along)
@@ -284,5 +286,30 @@ namespace CheeseStrikeFriends
 	bool ShowsContent(bool bWantOpen, float Along)
 	{
 		return bWantOpen || Along > 0.0f;
+	}
+
+	float RefreshCooldownLeft(double Now, double LastRefresh)
+	{
+		return FMath::Max(0.0f, RefreshCooldown - static_cast<float>(Now - LastRefresh));
+	}
+
+	bool CanRefresh(double Now, double LastRefresh)
+	{
+		return RefreshCooldownLeft(Now, LastRefresh) <= 0.0f;
+	}
+
+	bool ShouldAutoRefresh(bool bOpen, bool bJustClickedOpen, double Now, double LastRefresh)
+	{
+		if (!CanRefresh(Now, LastRefresh))
+		{
+			return false;
+		}
+		return bJustClickedOpen || (bOpen && Now - LastRefresh >= AutoRefreshSeconds);
+	}
+
+	float RefreshSpinAt(float Since)
+	{
+		const float Along = FMath::Clamp(Since / RefreshSpinSeconds, 0.0f, 1.0f);
+		return 360.0f * (1.0f - FMath::Square(1.0f - Along));
 	}
 }
