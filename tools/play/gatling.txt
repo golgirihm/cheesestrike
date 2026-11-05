@@ -1,6 +1,9 @@
 # The Gouda Overload's Gouda Gatling in the caller's hands: called in, held,
-# fired (its spin-up, its yellow tracers, the HUD's rounds and time left),
-# and seen from outside. Run with tools/play.ps1 -Map
+# fired (its spin-up, its barrels turning: two frames 0.13 s apart show the
+# offset, its yellow tracers, the HUD's rounds and time left), winding down
+# once let go, and seen from outside: firing from the side, and from the front
+# as the barrels wind down with no flash (two frames 0.1 s apart show the
+# bores' hexagon turned). Run with tools/play.ps1 -Map
 # /Game/CheeseStrike/Maps/Lvl_Creamery -StartAt none.
 wait 3
 cmd CheeseStrikeGiveStreak 3
@@ -17,10 +20,21 @@ look 20 0
 wait 0.2
 shot gatling_4_firing_turned
 release Fire
-cmd CheeseStrikeOutside 250 150
+wait 0.4
+shot gatling_5_winding_down
+wait 1.5
+shot gatling_6_still
+cmd CheeseStrikeOutside 140 75 45
 wait 0.3
 hold Fire
 wait 0.6
-shot gatling_5_outside
+shot gatling_7_outside
+wait 0.13
+shot gatling_8_outside
 release Fire
+cmd CheeseStrikeOutside 220 5 45 20
+wait 0.15
+shot gatling_9_front_winding
+wait 0.1
+shot gatling_10_front_winding
 quit
