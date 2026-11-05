@@ -72,7 +72,7 @@ class CHEESESTRIKE_API UCheeseStrikeLastStand : public UActorComponent
 public:
 	UCheeseStrikeLastStand();
 
-	/** Chunks of cheese flying from `At`, on this machine only, for show: a stomp's burst head, a supercombine's burst. */
+	/** Chunks of cheese flying from `At`, on this machine only, for show: the Cheese Grater's supercombine (the stomp bleeds a jet of cheese instead, Bleed). */
 	static void ShowCheeseBurst(UWorld* World, const FVector& At);
 
 	bool IsDowned() const { return bDowned; }

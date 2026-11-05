@@ -42,7 +42,7 @@ namespace
 	/** The view down: dark, washed of colour and red, blurred past arm's length. */
 	constexpr float HurtViewRate = 2.5f;
 	constexpr float HurtFocus = 90.0f;
-	/** The blows' sounds (the knife's own, in and out, made by tools/art/stab_sound.py), and the chunks' cheese. */
+	/** The blows' sounds (the knife's own, in and out, made by tools/art/stab_sound.py), and the cheese of the chunks a supercombine bursts into (ShowCheeseBurst). */
 	const TCHAR* const ExecutionWhooshPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeWhoosh_02.Lyra_MeleeWhoosh_02");
 	const TCHAR* const ExecutionStabInPath = TEXT("/Game/OpenGameArt/Stab/SW_KnifeStabIn.SW_KnifeStabIn");
 	const TCHAR* const ExecutionStabOutPath = TEXT("/Game/OpenGameArt/Stab/SW_KnifeStabOut.SW_KnifeStabOut");
@@ -82,7 +82,7 @@ namespace
 		return Floor + FRotator(0.0f, Down->GetActorRotation().Yaw, 0.0f).RotateVector(InBody);
 	}
 
-	/** Chunks of cheese flying from `At`: on this machine only, for show. */
+	/** Chunks of cheese flying from `At`: on this machine only, for show (the Cheese Grater's supercombine; the stomp bleeds a jet instead). */
 	void BurstIntoCheese(UWorld* World, const FVector& At)
 	{
 		UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, ChunkMeshPath);
@@ -774,7 +774,8 @@ void UCheeseStrikeLastStand::Bleed(float DeltaTime)
 	{
 		return;
 	}
-	// The stomp: a fire-hydrant jet from where the head was, out the way it was and up, swaying a little as it throbs, a
+	// The stomp: a fire-hydrant jet of bright cheese from where the head was, out the way it was and up in an arc onto
+	// the floor, swaying a little, one unbroken stream of small drops (each placed by its own moment in the frame), a
 	// sheath of mist where it leaves the body, and a pool spreading under it.
 	const FVector Neck = Mesh->GetBoneLocation(TEXT("neck_01"));
 	const FVector Head = Mesh->GetBoneLocation(TEXT("head"));
@@ -805,7 +806,7 @@ void UCheeseStrikeLastStand::Bleed(float DeltaTime)
 		return;
 	}
 	BleedOwed -= Now;
-	Blood->Spray(Source, Way, Now, CheeseStrikeBlood::StompSpeed(Elapsed), 0.12f, CheeseStrikeBlood::HoseCone, CheeseStrikeBlood::StompDropSize(Elapsed), CheeseStrikeBlood::DropLife, DeltaTime);
+	Blood->Spray(Source, Way, Now, CheeseStrikeBlood::HoseSpray(Elapsed), DeltaTime);
 }
 
 void UCheeseStrikeLastStand::UpdateBurst(float DeltaTime)
@@ -834,7 +835,7 @@ void UCheeseStrikeLastStand::UpdateBurst(float DeltaTime)
 		}
 		++BeatsDone;
 	}
-	// The boot lands: the head bursts into cheese, and is gone.
+	// The boot lands: the head is gone, and the jet runs from where it was (Bleed).
 	if (Kind == EKind::Stomp && !bBurst && (Elapsed >= CheeseStrikeExecution::StompLands || (bExecuted && !Me->IsAlive())))
 	{
 		bBurst = true;
@@ -846,7 +847,6 @@ void UCheeseStrikeLastStand::UpdateBurst(float DeltaTime)
 				Mesh->HideBoneByName(HeadBone, PBO_None);
 			}
 		}
-		BurstIntoCheese(World, Head + FVector(0.0f, 0.0f, 6.0f));
 	}
 	Bleed(DeltaTime);
 }

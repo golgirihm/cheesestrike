@@ -24,6 +24,23 @@ namespace
 	/** How deep a decal projects, through the surface it lies on. */
 	constexpr float SplatDepth = 12.0f;
 	constexpr float PoolDepth = 40.0f;
+	/** The stomp's jet: the drops' look with its colours set to a bright cheese yellow (its deep one and its paler top). */
+	const FLinearColor JetColour(0.95f, 0.66f, 0.05f, 1.0f);
+	const FLinearColor JetPale(1.0f, 0.86f, 0.22f, 1.0f);
+
+	UInstancedStaticMeshComponent* MakeDropMeshes(AActor* Owner, const TCHAR* Name)
+	{
+		UInstancedStaticMeshComponent* Meshes = Owner->CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
+		Meshes->SetMobility(EComponentMobility::Movable);
+		Meshes->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Meshes->SetCanEverAffectNavigation(false);
+		Meshes->SetCastShadow(false);
+		Meshes->SetGenerateOverlapEvents(false);
+		// Instances move every frame: never culled by stale bounds.
+		Meshes->SetCullDistances(0, 0);
+		Meshes->bUseAsOccluder = false;
+		return Meshes;
+	}
 }
 
 ACheeseStrikeCheeseBlood::ACheeseStrikeCheeseBlood()
@@ -31,25 +48,12 @@ ACheeseStrikeCheeseBlood::ACheeseStrikeCheeseBlood()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
 	SetReplicates(false);
-	DropMeshes = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Drops"));
+	DropMeshes = MakeDropMeshes(this, TEXT("Drops"));
 	RootComponent = DropMeshes;
-	DropMeshes->SetMobility(EComponentMobility::Movable);
-	DropMeshes->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	DropMeshes->SetCanEverAffectNavigation(false);
-	DropMeshes->SetCastShadow(false);
-	DropMeshes->SetGenerateOverlapEvents(false);
-	// Instances move every frame: never culled by stale bounds.
-	DropMeshes->SetCullDistances(0, 0);
-	DropMeshes->bUseAsOccluder = false;
-	MistMeshes = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Mist"));
+	JetMeshes = MakeDropMeshes(this, TEXT("Jet"));
+	JetMeshes->SetupAttachment(DropMeshes);
+	MistMeshes = MakeDropMeshes(this, TEXT("Mist"));
 	MistMeshes->SetupAttachment(DropMeshes);
-	MistMeshes->SetMobility(EComponentMobility::Movable);
-	MistMeshes->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MistMeshes->SetCanEverAffectNavigation(false);
-	MistMeshes->SetCastShadow(false);
-	MistMeshes->SetGenerateOverlapEvents(false);
-	MistMeshes->SetCullDistances(0, 0);
-	MistMeshes->bUseAsOccluder = false;
 	// Each puff's thickness, for the mist's material (PerInstanceCustomData 0).
 	MistMeshes->NumCustomDataFloats = 1;
 }
@@ -99,6 +103,7 @@ void ACheeseStrikeCheeseBlood::LoadLooks()
 		Mesh = LoadObject<UStaticMesh>(nullptr, FallbackDropMeshPath);
 	}
 	DropMeshes->SetStaticMesh(Mesh);
+	JetMeshes->SetStaticMesh(Mesh);
 	if (Mesh != nullptr)
 	{
 		// Across the drop: its bounds' half width.
@@ -107,6 +112,13 @@ void ACheeseStrikeCheeseBlood::LoadLooks()
 	if (UMaterialInterface* Look = LoadObject<UMaterialInterface>(nullptr, CheeseDropLookPath))
 	{
 		DropMeshes->SetMaterial(0, Look);
+		// The jet's drops: the same look in a bright cheese yellow.
+		if (UMaterialInstanceDynamic* Bright = UMaterialInstanceDynamic::Create(Look, this))
+		{
+			Bright->SetVectorParameterValue(TEXT("Colour"), JetColour);
+			Bright->SetVectorParameterValue(TEXT("Pale"), JetPale);
+			JetMeshes->SetMaterial(0, Bright);
+		}
 	}
 	if (UStaticMesh* Card = LoadObject<UStaticMesh>(nullptr, MistCardPath))
 	{
@@ -122,17 +134,30 @@ void ACheeseStrikeCheeseBlood::LoadLooks()
 
 void ACheeseStrikeCheeseBlood::Spray(const FVector& At, const FVector& Way, int32 Count, float Speed, float SpeedJitter, float ConeDegrees, float Size, float Life, float Over)
 {
+	CheeseStrikeBlood::FSpray Made;
+	Made.Speed = Speed;
+	Made.SpeedJitter = SpeedJitter;
+	Made.ConeDegrees = ConeDegrees;
+	Made.Size = Size;
+	Made.Life = Life;
+	Spray(At, Way, Count, Made, Over);
+}
+
+void ACheeseStrikeCheeseBlood::Spray(const FVector& At, const FVector& Way, int32 Count, const CheeseStrikeBlood::FSpray& Made, float Over)
+{
 	LoadLooks();
 	const int32 Allowed = CheeseStrikeBlood::DropsAllowed(Count, Drops.Num());
 	const FVector Along = Way.GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector);
-	const float Cone = FMath::DegreesToRadians(ConeDegrees);
+	const float Cone = FMath::DegreesToRadians(Made.ConeDegrees);
 	for (int32 Each = 0; Each < Allowed; ++Each)
 	{
 		FDrop Drop;
 		Drop.At = At + FMath::VRand() * 1.5f;
-		Drop.Velocity = FMath::VRandCone(Along, Cone) * Speed * FMath::FRandRange(1.0f - SpeedJitter, 1.0f + SpeedJitter);
-		Drop.Size = Size * FMath::FRandRange(1.0f - CheeseStrikeBlood::SizeJitter, 1.0f + CheeseStrikeBlood::SizeJitter);
-		Drop.Life = Life;
+		Drop.Velocity = FMath::VRandCone(Along, Cone * CheeseStrikeBlood::ConeShare(FMath::FRand(), Made.Core)) * Made.Speed * FMath::FRandRange(1.0f - Made.SpeedJitter, 1.0f + Made.SpeedJitter);
+		Drop.Size = Made.Size * FMath::FRandRange(1.0f - CheeseStrikeBlood::SizeJitter, 1.0f + CheeseStrikeBlood::SizeJitter);
+		Drop.Life = Made.Life;
+		Drop.Stretch = Made.Stretch;
+		Drop.bBright = Made.bBright;
 		if (Over > 0.0f)
 		{
 			// Left at its own moment in the frame: as far on as it has flown since.
@@ -302,6 +327,7 @@ void ACheeseStrikeCheeseBlood::Land(const FDrop& Drop, const FHitResult& Hit)
 void ACheeseStrikeCheeseBlood::ShowDrops()
 {
 	Shown.Reset(Drops.Num());
+	JetShown.Reset();
 	LongestDrop = 0.0f;
 	for (const FDrop& Drop : Drops)
 	{
@@ -309,27 +335,33 @@ void ACheeseStrikeCheeseBlood::ShowDrops()
 		{
 			continue;
 		}
-		// Drawn out along the way it flies, the faster the longer (CheeseStrikeBlood::DropStretch); shrinking away at the end
-		// of its life.
+		// Drawn out along the way it flies, the faster the longer (CheeseStrikeBlood::DropStretch, as far as its spray
+		// says); shrinking away at the end of its life.
 		const float Speed = Drop.Velocity.Size();
-		const float Stretch = CheeseStrikeBlood::DropStretch(Speed);
+		const float Stretch = CheeseStrikeBlood::DropStretch(Speed, Drop.Stretch);
 		const float Shrink = FMath::Clamp((Drop.Life - Drop.Age) / FMath::Min(0.3f, Drop.Life * 0.4f), 0.0f, 1.0f);
 		const float Scale = Drop.Size * Shrink / DropMeshRadius;
 		const FQuat Turn = Speed > 1.0f ? Drop.Velocity.ToOrientationQuat() : FQuat::Identity;
-		Shown.Add(FTransform(Turn, Drop.At, FVector(Scale * Stretch, Scale, Scale)));
-		LongestDrop = FMath::Max(LongestDrop, CheeseStrikeBlood::DropLength(Drop.Size * Shrink, Speed));
+		(Drop.bBright ? JetShown : Shown).Add(FTransform(Turn, Drop.At, FVector(Scale * Stretch, Scale, Scale)));
+		LongestDrop = FMath::Max(LongestDrop, CheeseStrikeBlood::DropLength(Drop.Size * Shrink, Speed, Drop.Stretch));
 	}
-	if (Shown.Num() != DropMeshes->GetInstanceCount())
+	ShowInstances(DropMeshes, Shown);
+	ShowInstances(JetMeshes, JetShown);
+}
+
+void ACheeseStrikeCheeseBlood::ShowInstances(UInstancedStaticMeshComponent* Meshes, const TArray<FTransform>& Transforms)
+{
+	if (Transforms.Num() != Meshes->GetInstanceCount())
 	{
-		DropMeshes->ClearInstances();
-		if (Shown.Num() > 0)
+		Meshes->ClearInstances();
+		if (Transforms.Num() > 0)
 		{
-			DropMeshes->AddInstances(Shown, false, true, false);
+			Meshes->AddInstances(Transforms, false, true, false);
 		}
 	}
-	else if (Shown.Num() > 0)
+	else if (Transforms.Num() > 0)
 	{
-		DropMeshes->BatchUpdateInstancesTransforms(0, Shown, true, true, true);
+		Meshes->BatchUpdateInstancesTransforms(0, Transforms, true, true, true);
 	}
 }
 

@@ -5,14 +5,20 @@
 
 namespace CheeseStrikeBlood
 {
-	float DropStretch(float Speed)
+	float DropStretch(float Speed, float Most)
 	{
-		return 1.0f + (MostStretch - 1.0f) * FMath::Clamp(Speed / 900.0f, 0.0f, 1.0f);
+		return 1.0f + (Most - 1.0f) * FMath::Clamp(Speed / 900.0f, 0.0f, 1.0f);
 	}
 
-	float DropLength(float Size, float Speed)
+	float DropLength(float Size, float Speed, float Most)
 	{
-		return DropShapeLength * Size * DropStretch(Speed);
+		return DropShapeLength * Size * DropStretch(Speed, Most);
+	}
+
+	float ConeShare(float Roll, float Core)
+	{
+		// Evenly over the cone for a fan; for a jet most drops within a sliver of it, a few out to its edge.
+		return FMath::Pow(FMath::Clamp(Roll, 0.0f, 1.0f), 1.0f + 3.0f * FMath::Clamp(Core, 0.0f, 1.0f));
 	}
 
 	FSpray ShotSpray(float Damage)
@@ -154,22 +160,29 @@ namespace CheeseStrikeBlood
 		{
 			return 0.0f;
 		}
-		// Throbbing three times a second, and slackening over its last half second.
-		const float Throb = 0.9f + 0.1f * FMath::Sin(Since * 3.0f * UE_TWO_PI);
-		const float Slack = FMath::Clamp((HoseSeconds - Since) / 0.5f, 0.0f, 1.0f);
-		return 520.0f * Throb * Slack;
+		// One steady stream, slackening over its last moments.
+		return HoseRate * FMath::Clamp((HoseSeconds - Since) / HoseSlackSeconds, 0.0f, 1.0f);
 	}
 
 	float StompSpeed(float Elapsed)
 	{
 		const float Since = FMath::Clamp((Elapsed - CheeseStrikeExecution::StompLands) / HoseSeconds, 0.0f, 1.0f);
-		return FMath::Lerp(1150.0f, 850.0f, Since);
+		return FMath::Lerp(1200.0f, 900.0f, Since);
 	}
 
-	float StompDropSize(float Elapsed)
+	FSpray HoseSpray(float Elapsed)
 	{
-		const float Since = FMath::Clamp((Elapsed - CheeseStrikeExecution::StompLands) / HoseSeconds, 0.0f, 1.0f);
-		return FMath::Lerp(0.45f, 0.35f, Since);
+		FSpray Spray;
+		Spray.Speed = StompSpeed(Elapsed);
+		// Nearly all at one speed and crowded along the cone's line, so that the stream holds together as one.
+		Spray.SpeedJitter = 0.06f;
+		Spray.ConeDegrees = HoseCone;
+		Spray.Size = HoseDropSize;
+		Spray.Life = DropLife;
+		Spray.Stretch = HoseStretch;
+		Spray.Core = 1.0f;
+		Spray.bBright = true;
+		return Spray;
 	}
 
 	FMist HoseMist()

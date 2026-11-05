@@ -26,7 +26,7 @@ namespace CheeseStrikeExecution
 		None,
 		/** Knelt beside the chest, the cheese knife thrust once into it, held there a moment, and pulled out. */
 		Stab,
-		/** Stood at the head, a boot raised high and brought down on it: the head bursts into chunks of cheese. */
+		/** Stood at the head, a boot raised high and brought down on it: the head is gone, and a jet of cheese runs from where it was (CheeseStrikeBlood's stomp). */
 		Stomp,
 	};
 	constexpr int32 NumKinds = 2;
@@ -100,7 +100,7 @@ namespace CheeseStrikeExecution
 	constexpr float ViewBlendOut = 0.35f;
 	constexpr float ViewBlendBack = 0.3f;
 
-	/** How many chunks of cheese the head bursts into, and how fast they fly (cm/s). */
+	/** How many chunks of cheese a body bursts into (the Cheese Grater's supercombine, UCheeseStrikeLastStand::ShowCheeseBurst; a stomp no longer throws any), and how fast they fly (cm/s). */
 	constexpr int32 Chunks = 16;
 	constexpr float ChunkSpeed = 380.0f;
 	constexpr float ChunkLife = 6.0f;
