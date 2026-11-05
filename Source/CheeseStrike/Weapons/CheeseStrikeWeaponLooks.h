@@ -44,12 +44,17 @@ struct FWeaponLook
 	 * weapon held in one hand, the other free (the knife).
 	 */
 	TOptional<FVector> LeftHand;
-	/** Its sounds: shots (one at random), the dry click, a reload's three, and how loud and how high its shots are. */
+	/**
+	 * Its sounds: shots (one at random; a melee weapon's swings, or none for the knife's), the dry click, a reload's three,
+	 * and how loud and how high its shots are (every shot is also kept down by CheeseStrikeGunfire::Loudness).
+	 */
 	const TCHAR* Shots[4] = {nullptr, nullptr, nullptr, nullptr};
 	const TCHAR* DryFire = nullptr;
 	const TCHAR* ReloadSounds[3] = {nullptr, nullptr, nullptr};
 	float ShotVolume = 1.0f;
 	float ShotPitch = 1.0f;
+	/** A melee weapon's blow landing (none: the knife's stab). */
+	const TCHAR* StrikeSound = nullptr;
 	/** The colour of the streak of light each shot leaves (a tracer, M_Tracer); none where its alpha is 0. */
 	FLinearColor Tracer = FLinearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	/** The weapon whose HUD picture it borrows (tools/art/weapon_icons.py's), if not its own. */
