@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Sound/SoundConcurrency.h"
 #include "Sound/SoundWave.h"
 #include "CheeseStrike.h"
 #include "Settings/CheeseStrikeSettings.h"
@@ -238,6 +239,15 @@ void UCheeseStrikeMusicSubsystem::PlaySong(int32 Index, float Offset, float Fade
 			return;
 		}
 		Player->bIsUISound = true;
+		// Never stopped for another sound: the highest priority of anything playing, so that it is the last voice taken
+		// when they run short, and a concurrency group of its own, so that no other sound's limit counts it (a sound
+		// with no concurrency of its own shares the engine's default group with every other such, the oldest stopped).
+		Player->bOverridePriority = true;
+		Player->Priority = CheeseStrikeMusic::Priority;
+		USoundConcurrency* Alone = NewObject<USoundConcurrency>(this);
+		Alone->Concurrency.MaxCount = 1;
+		Alone->Concurrency.ResolutionRule = EMaxConcurrentResolutionRule::StopOldest;
+		Player->ConcurrencySet.Add(Alone);
 		Player->OnAudioFinishedNative.AddUObject(this, &UCheeseStrikeMusicSubsystem::SongEnded);
 		UCheeseStrikeSettings::ApplySound();
 	}

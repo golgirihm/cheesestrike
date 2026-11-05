@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeSynth.h"
 #include "Sound/SoundWaveProcedural.h"
+#include "CheeseStrikeSynthWave.h"
 
 namespace CheeseStrikeSynth
 {
@@ -614,13 +615,10 @@ namespace CheeseStrikeSynth
 
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples)
 	{
-		USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(Outer);
-		Wave->SetSampleRate(SampleRate);
-		Wave->NumChannels = 1;
-		Wave->Duration = static_cast<float>(Samples.Num()) / SampleRate;
-		Wave->SoundGroup = SOUNDGROUP_Effects;
-		Wave->bLooping = false;
-		Wave->QueueAudio(reinterpret_cast<const uint8*>(Samples.GetData()), Samples.Num() * sizeof(int16));
+		// A wave whose every playing ends with its samples (UCheeseStrikeSynthWave), never one fed through the procedural
+		// queue, which the mixer never sees end: each would hold a voice playing silence for as long as it lived.
+		UCheeseStrikeSynthWave* Wave = NewObject<UCheeseStrikeSynthWave>(Outer);
+		Wave->SetSamples(Samples, SampleRate);
 		return Wave;
 	}
 }

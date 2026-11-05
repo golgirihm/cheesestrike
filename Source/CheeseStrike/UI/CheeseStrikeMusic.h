@@ -24,6 +24,8 @@ namespace CheeseStrikeMusic
 	/** Seconds the music takes to come in, and to go out other than into a match. */
 	constexpr float FadeInSeconds = 2.0f;
 	constexpr float FadeOutSeconds = 1.5f;
+	/** The music's priority among the sounds playing (the engine's range is 0 to 100; a sound's own is 1 by default): the last to lose its voice. */
+	constexpr float Priority = 100.0f;
 
 	/**
 	 * Whether the menu's music plays: under the front end's pages and the
