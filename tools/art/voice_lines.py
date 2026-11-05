@@ -19,6 +19,9 @@ import array, math, os, random, subprocess, sys, traceback, wave
 #    and `speak` keeps a .raw.wav already there, only filtering it again; delete one to have it spoken afresh.
 #    A line recorded by a person instead goes in as <name>.raw.wav too (48 kHz mono, dry, no effects: this script
 #    adds them).
+#      C:\Hamid\code\FabDownloads\piper\venv\Scripts\python.exe -I tools/art/voice_lines.py check [names]
+#    measures every take (or the named ones): its length, every pause inside it over 120 ms (a hitch, as "U A C"
+#    had after the U), and the words Whisper hears, if faster-whisper is installed there; `speak` runs it last.
 #
 # 2. Import them, with the editor closed:
 #      UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/voice_lines.py" -unattended -nullrhi
@@ -30,25 +33,32 @@ VOICE = "en_US-norman-medium"
 LINES_DIR = os.path.join(PIPER, "lines")
 
 # (asset name, what is said, how it is heard): "radio" is a voice on the command net; "shout" a teammate near by.
-# What is said is Piper's input: a word it says wrongly is given as phonemes, [[ ... ]] (UAC spelt out) or spelt as
-# said (Gouda as "Gowda"). Piper garbles a sentence of one word, so such a line is said with more after a comma and
-# cut at the pause before the last word as it is spoken (a fourth field, "first"; the take of "Victory" in use
-# was cut where the transcription put "sir", since its own "vic-tory" has a pause in it).
+# What is said is Piper's input: a word it says wrongly is given as phonemes, [[ ... ]] (espeak's IPA, which
+# `speak` writes out beside each take, <name>.phonemes.txt, so that what the phonemizer took can be checked): "UAC"
+# as one word, jˌuːˈeɪsˈiː (spelt out as three, "U A C", it paused a quarter of a second after the U), and "Gouda"
+# as ɡˈuːdə (spelt "Gowda" it said "gow-der"). Piper garbles a sentence of one word, so such a line is said with
+# more after a comma and cut at the pause before the last word as it is spoken (a fourth field, "first"; the take
+# of "Victory" in use was cut where the transcription put "sir", since its own "vic-tory" has a pause in it).
+# Wave 15: "Round won" and "Round lost" are said "Won the round" and "Lost the round" (the asset names stay).
 LINES = [
-    ("SW_UacOnline", "[[ jˈuː ˈeɪ sˈiː ]] online.", "radio"),
-    ("SW_UacEnemy", "Enemy [[ jˈuː ˈeɪ sˈiː ]] online.", "radio"),
+    ("SW_UacOnline", "[[ jˌuːˈeɪsˈiː ]] online.", "radio"),
+    ("SW_UacEnemy", "Enemy [[ jˌuːˈeɪsˈiː ]] online.", "radio"),
     ("SW_StrikeInbound", "Cheese Strike inbound.", "radio"),
     ("SW_StrikeEnemy", "Enemy Cheese Strike inbound.", "radio"),
-    ("SW_OverloadIncoming", "Gowda overload incoming.", "radio"),
-    ("SW_OverloadEnemy", "Enemy Gowda overload incoming.", "radio"),
+    ("SW_OverloadIncoming", "[[ ɡˈuːdə ]] overload incoming.", "radio"),
+    ("SW_OverloadEnemy", "Enemy [[ ɡˈuːdə ]] overload incoming.", "radio"),
     ("SW_VerminInbound", "Vermin inbound.", "radio"),
     ("SW_Reloading", "Reloading!", "shout"),
     ("SW_EnemyDown", "Enemy down.", "radio"),
-    ("SW_RoundWon", "Round won.", "radio"),
-    ("SW_RoundLost", "Round lost.", "radio"),
+    ("SW_RoundWon", "Won the round.", "radio"),
+    ("SW_RoundLost", "Lost the round.", "radio"),
     ("SW_Victory", "Victory, sir.", "radio", "first"),
     ("SW_Defeat", "Defeat, sir.", "radio", "first"),
 ]
+
+# A pause inside a line longer than this (seconds) is a hitch in the speech, not a breath: `check` reports them.
+LONGEST_PAUSE = 0.12
+QUIET_DB = -40.0
 
 
 def read(path):
@@ -198,19 +208,102 @@ def before_pause(samples, rate, gap=0.05):
     return samples[:last * window + int(0.03 * rate)] if last is not None else samples
 
 
-def speak():
-    """Step 1, outside the editor: each line spoken by Piper (unless a take is there already) and put through its filter."""
+def pauses(samples, rate, longest=LONGEST_PAUSE, quiet_db=QUIET_DB):
+    """The pauses inside the speech longer than `longest` seconds: stretches of 10 ms windows whose RMS is under
+    `quiet_db` (re full scale), between the first loud window and the last (the silence round the line isn't a
+    pause). Each is (where it starts, how long), in seconds."""
+    window = max(1, int(0.01 * rate))
+    levels = []
+    for start in range(0, len(samples) - window + 1, window):
+        piece = samples[start:start + window]
+        rms = math.sqrt(sum(s * s for s in piece) / window)
+        levels.append(20.0 * math.log10(rms) if rms > 0.0 else -200.0)
+    loud = [k for k, level in enumerate(levels) if level >= quiet_db]
+    if not loud:
+        return []
+    found = []
+    run_start = None
+    for k in range(loud[0], loud[-1] + 1):
+        if levels[k] < quiet_db:
+            run_start = k if run_start is None else run_start
+        elif run_start is not None:
+            if (k - run_start) * window / rate > longest:
+                found.append((run_start * window / rate, (k - run_start) * window / rate))
+            run_start = None
+    return found
+
+
+def transcribed(path):
+    """What Whisper hears in a take (faster-whisper, if it is installed in the venv), or None."""
+    try:
+        import numpy as np
+        from faster_whisper import WhisperModel
+    except ImportError:
+        return None
+    global _WHISPER
+    if "_WHISPER" not in globals():
+        _WHISPER = WhisperModel("base.en", device="cpu", compute_type="int8")
+    # Decoded here (16 kHz mono floats, what Whisper takes) rather than by its own decoder, whose av package may not match.
+    samples, rate = read(path)
+    audio = np.array(resampled(samples, rate / 16000.0), dtype=np.float32)
+    segments, _ = _WHISPER.transcribe(audio, beam_size=5)
+    return " ".join(segment.text.strip() for segment in segments)
+
+
+def check(names=None):
+    """Every take (<name>.raw.wav, the speech before the radio, whose hiss sits at about -26 dB and would hide a
+    pause) measured: its length, and every pause inside it longer than LONGEST_PAUSE, which a line shouldn't
+    have (a breath before "online" shorter than that is fine); and, with faster-whisper installed, the words heard.
+    Returns the names of the lines with a pause in them."""
+    hitched = []
+    for name, text, how, *cut in LINES:
+        if names and name not in names:
+            continue
+        raw = os.path.join(LINES_DIR, name + ".raw.wav")
+        if not os.path.exists(raw):
+            print(f"{name}: no take")
+            continue
+        samples, rate = read(raw)
+        found = pauses(samples, rate)
+        words = transcribed(raw)
+        print(f"{name}: {len(samples) / rate:.2f} s, "
+              + (", ".join(f"a pause of {length * 1000:.0f} ms at {at:.2f} s" for at, length in found) if found else "no pause over 120 ms")
+              + (f'; heard "{words}"' if words is not None else ""))
+        if found:
+            hitched.append(name)
+    return hitched
+
+
+def speak_take(model, text, raw):
+    """One take of `text` by Piper into `raw`, its phonemes written beside it."""
+    # A little slower than its own pace: measured, as a voice on a net is. Piper reads its text from stdin in the
+    # console's encoding unless told, which on Windows mangles the phonemes' IPA (the wave 14 takes of UAC got
+    # garbage for ˈ and ː, which is why they were odd), so it is told UTF-8.
+    done = subprocess.run([sys.executable, "-m", "piper", "-m", model, "-f", raw, "--length-scale", "1.05", "--debug"],
+                          input=text.encode("utf-8"), check=True, capture_output=True, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    phonemes = [line for line in done.stderr.decode("utf-8", "replace").splitlines() if "phonemes=" in line]
+    with open(raw[:-len(".raw.wav")] + ".phonemes.txt", "w", encoding="utf-8") as o:
+        o.write("\n".join(phonemes) + "\n")
+
+
+def speak(takes=6):
+    """Step 1, outside the editor: each line spoken by Piper (unless a take is there already) and put through its filter.
+    A line spoken afresh is tried up to `takes` times until a take has no pause inside it over LONGEST_PAUSE (Piper
+    hitches now and then); the last take stays if none does, and `check` says so."""
     os.makedirs(LINES_DIR, exist_ok=True)
     model = os.path.join(PIPER, "voices", VOICE + ".onnx")
     for seed, (name, text, how, *cut) in enumerate(LINES, 1):
         raw = os.path.join(LINES_DIR, name + ".raw.wav")
         if not os.path.exists(raw):
-            # A little slower than its own pace: measured, as a voice on a net is.
-            subprocess.run([sys.executable, "-m", "piper", "-m", model, "-f", raw, "--length-scale", "1.05"],
-                           input=text.encode("utf-8"), check=True, capture_output=True)
-            if cut:
+            for take in range(takes):
+                speak_take(model, text, raw)
+                if cut:
+                    said, rate = read(raw)
+                    write(before_pause(said, rate), rate, raw)
                 said, rate = read(raw)
-                write(before_pause(said, rate), rate, raw)
+                if not pauses(said, rate):
+                    break
+                print(f"{name}: take {take + 1} has a pause of {max(length for _, length in pauses(said, rate)) * 1000:.0f} ms; again")
         samples, rate = read(raw)
         heard = radio(samples, rate, seed) if how == "radio" else shout(samples, rate)
         write(faded(heard, rate, 0.002, 0.05, 0.9), rate, os.path.join(LINES_DIR, name + ".wav"))
@@ -247,5 +340,8 @@ def import_lines():
 
 if len(sys.argv) > 1 and sys.argv[1] == "speak":
     speak()
+    check()
+elif len(sys.argv) > 1 and sys.argv[1] == "check":
+    check(sys.argv[2:])
 elif __name__ == "__main__" or "unreal" in sys.modules:
     import_lines()
