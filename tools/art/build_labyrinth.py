@@ -665,7 +665,9 @@ def pickups():
     """The weapons' stands (kit.pickup), turned half round for Mozza as the map is: the Roquefort on the Mother Wheel,
     under the oculus, reached by the gallery's bridges; a Munster in each room, where the sides first meet; a Cheddar
     Blaster in each side's ring 2 (West 2, East 2) and a Swiss Shotgun in each side's near gutter (West, East)."""
-    kit.pickup("roquefort", 0, 0, GALLERY_Z, "MotherWheel")
+    # Reached by the gallery's bridges of cheese: once they are eaten, only a careful player balances out along their
+    # waxed beams, and for the bots and mice (the navigation mesh) it is stranded, by design.
+    kit.pickup("roquefort", 0, 0, GALLERY_Z, "MotherWheel", stranded=True)
     for half in (0, 1):
         team = team_of(half)
         room = at(rot(135.0, half), 0, APOTHEM + WALL + 300)

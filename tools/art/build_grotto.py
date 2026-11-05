@@ -1,6 +1,7 @@
 import os, sys, unreal
 sys.path.insert(0, os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), "tools", "art"))
 import map_kit as kit
+import boulder_mesh
 from map_kit import box, fill, mesh, place, painted
 
 # Run with the editor closed, after import_fab.py, build_materials.py, cheese_material.py, wax_material.py and
@@ -422,14 +423,15 @@ def cover(s, side):
         kit.cheese_box(f"Cheese_PulpitEdge_{team}_{i}", "PulpitEdge", (min(X(x0), X(x1)), PULPIT_Y[0], L1), (max(X(x0), X(x1)), PULPIT_Y[0] + 50, L1 + 100))
     # In the hollow, in front of its opening: a wall of cheese that hides the hollow from the stairs until eaten.
     kit.cheese_stack(f"HollowScreen_{team}", f"Hollow{team}", (min(X(3800), X(3900)), -300, L1), (max(X(3800), X(3900)), 300, L1 + 200), 1, 3, 2)
-    # Rock that stays: boulders on the floor, and mine carts on their rails.
-    boulder = mesh("QuarryCliff")
-    for name, (x0, y0, x1, y1, h, yaw) in {
-        "A": (2600, -1000, 2800, -700, 150, 90),
-        "B": (1400, 900, 1650, 1150, 180, 0),
-        "C": (1050, -1050, 1300, -800, 120, 0),
+    # Rock that stays: boulders on the floor, and mine carts on their rails. A boulder is a closed lump (boulder_mesh.py:
+    # until wave 15 it was a quarry cliff, a facade whose open back showed as a slab in the air from the far side),
+    # sunk 40 cm into the floor so that its underside is buried, each a lump of its own turned its own way.
+    for name, (x0, y0, x1, y1, h, yaw, seed) in {
+        "A": (2600, -1000, 2800, -700, 150, 90, 0),
+        "B": (1400, 900, 1650, 1150, 180, 0, 1),
+        "C": (1050, -1050, 1300, -800, 120, 35, 2),
     }.items():
-        fill(f"Boulder_{side}_{name}", f, boulder, (min(X(x0), X(x1)), y0, 0), (max(X(x0), X(x1)), y1, h), yaw)
+        fill(f"Boulder_{side}_{name}", f, boulder_mesh.boulder(seed, kit.lines), (min(X(x0), X(x1)), y0, -40), (max(X(x0), X(x1)), y1, h), yaw + (180 if s > 0 else 0))
     cart = mesh("MineCart")
     fill(f"Cart_{side}", f, cart, (min(X(2500), X(2650)), 1140, 0), (max(X(2500), X(2650)), 1360, 150), 90)
     # The rails the carts stand on, in front of the Colonnade: dressing, sunk into the floor and walked over.
@@ -461,11 +463,14 @@ def tunnel():
 
 def spans():
     """The two rope bridges at L1: from the Pulpit to the Spine's arch, and from the arch to the landing. Their decks
-    are cheese on waxed beams that rest on rock at either end; eaten, each is two red beams to balance along."""
+    are cheese on beams of cheese that rest on rock at either end, and the mice eat beams and decks alike: once they
+    have, nothing reaches the arch and the Roquefort Rifle on its perch there is stranded, by design (its stand is
+    tagged so; until wave 15 the beams were waxed walkways that kept it in reach). The rope rails and their posts
+    hang on the span and fall away with it."""
     timber = kit.material("MI_Timber")
     rope = kit.material("MI_Timber")
     for name, y0, y1 in (("NorthSpan", SPINE[1], PULPIT_Y[0]), ("SouthSpan", LEDGE_Y[1], -SPINE[1])):
-        kit.bridge(name, name, (0, y0, L1), (0, y1, L1), width=SPAN_WIDTH, beams=2, beam=40, depth=30, deck=30, rails=False, wax_beams=True)
+        kit.bridge(name, name, (0, y0, L1), (0, y1, L1), width=SPAN_WIDTH, beams=2, beam=40, depth=30, deck=30, rails=False, cheese_beams=True)
         # Where the beams' ends rest: corbels of rock standing against the rock faces at either end, under the beams.
         middle = (y0 + y1) / 2.0
         for y in (y0, y1):
@@ -478,9 +483,9 @@ def spans():
             x = side * (SPAN_WIDTH / 2.0 + 6)
             for i in range(posts + 1):
                 y = y0 + (y1 - y0) * i / posts
-                box(f"{name}_Post_{side}_{i}", f, (x - 5, y - 5, L1 - 70), (x + 5, y + 5, L1 + 110), timber)
+                kit.hang(box(f"{name}_Post_{side}_{i}", f, (x - 5, y - 5, L1 - 70), (x + 5, y + 5, L1 + 110), timber), name)
             for h in (100, 55):
-                no_collision(kit.pipe_y(f"{name}_Rope_{side}_{h}", f, x, y0, y1, L1 + h, 4, rope))
+                kit.hang(no_collision(kit.pipe_y(f"{name}_Rope_{side}_{h}", f, x, y0, y1, L1 + h, 4, rope)), name)
     # Under the arch, the beams' middle: the arch's floor carries them through the Spine (part of Spine_Under).
 
 
@@ -618,8 +623,9 @@ def pickups():
     """The weapons' stands (kit.pickup), on rock and floor the mice never eat, and clear of the hills (on the Pulpit's
     middle, the landing and the pools): the Roquefort in the Spine's arch, between the bridges; a Munster at each end of
     the Pulpit; a Cheddar Blaster at the top of each gallery's stairs and a Swiss Shotgun in each Cheese Store; the Dual
-    Cheese Stick in the Rind Tunnel's middle, behind the landing, where it is fought close."""
-    kit.pickup("roquefort", 0, 0, L1, "Arch")
+    Cheese Stick in the Rind Tunnel's middle, behind the landing, where it is fought close. The Roquefort is stranded
+    once the mice have eaten the spans (kit.pickup(stranded=True)): the arch is reached over them alone."""
+    kit.pickup("roquefort", 0, 0, L1, "Arch", stranded=True)
     kit.pickup("stick", 0, -2400, L1, "RindTunnel")
     for s, side in ((-1, "West"), (1, "East")):
         kit.pickup("munster", s * 850, 2050, L1, f"Pulpit{side}")
