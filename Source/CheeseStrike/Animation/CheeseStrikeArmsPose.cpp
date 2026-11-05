@@ -16,8 +16,9 @@ namespace CheeseStrikeArms
 	FKnifeAt KnifeGuard(float PitchUp)
 	{
 		FKnifeAt Guard;
-		// Tipped up about the axis across the blade (its spine stays up over it), so that the stick stands up out of the fist.
-		const FVector Blade = FVector(0.85f, -0.2f, 0.48f).GetSafeNormal();
+		// The blade forward out of the fist, a little up and in (a hammer grip on guard, the blade along the forearm);
+		// tipped up about the axis across the blade (its spine stays up over it), so that the stick stands up out of the fist.
+		const FVector Blade = FVector(0.93f, -0.18f, 0.22f).GetSafeNormal();
 		const FVector Across = FVector::CrossProduct(FVector::UpVector, Blade).GetSafeNormal();
 		Guard.Blade = Blade.RotateAngleAxis(-PitchUp, Across).GetSafeNormal();
 		Guard.Spine = (FVector::UpVector - Guard.Blade * FVector::DotProduct(FVector::UpVector, Guard.Blade)).GetSafeNormal();
@@ -245,9 +246,10 @@ void FCheeseStrikeViewHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	FQuat TargetTurn;
 	if (bKnife)
 	{
-		// On guard low on the right, or swiped across the view, the fist round the handle.
+		// On guard low on the right, or swiped across the view, the fist round the handle; the blade tipped up more than on
+		// the body (ViewKnifeTip), so that it shows over the fist rather than pointing straight away from the eye.
 		constexpr float ViewSize = 0.8f;
-		const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, ViewSize * SwipeSize, GuardPitchUp) : KnifeGuard(GuardPitchUp);
+		const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, ViewSize * SwipeSize, GuardPitchUp + ViewKnifeTip) : KnifeGuard(GuardPitchUp + ViewKnifeTip);
 		TargetAt = KnifeHand + Knife.Hand + Bob;
 		const FQuat Laid = ArmsLaid(ModelAlong, FVector(0.0, 0.0, 1.0), Knife.Blade, Knife.Spine);
 		TargetTurn = (Swaying * Laid * RelTurn.Inverse()).GetNormalized();
@@ -355,15 +357,15 @@ void FCheeseStrikeKnifeHold::EvaluateComponentSpace_AnyThread(FComponentSpacePos
 			const FVector Right = FVector::CrossProduct(Up, Ahead);
 			const auto InBody = [&](const FVector& V) { return Ahead * V.X + Right * V.Y + Up * V.Z; };
 			const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, SwipeSize, GuardPitchUp) : KnifeGuard(GuardPitchUp);
-			// On guard ahead of the chest, low on the right.
-			const FVector Guard(26.0f, 16.0f, 2.0f);
+			// On guard low on the right, ahead of the hip: a hammer grip, the fist below the chest.
+			const FVector Guard(24.0f, 17.0f, -22.0f);
 			const FVector ChestAt = Posed.GetComponentSpaceTransform(IndexOf(Chest)).GetLocation();
 			const FVector Target = ChestAt + InBody(Guard + Knife.Hand);
 			const FQuat Laid = ArmsLaid(ModelAlong, ModelSpine, InBody(Knife.Blade), InBody(Knife.Spine));
 			const FQuat Turn = Laid * ModelInHand.GetRotation().Inverse();
-			const FVector Shoulder = Posed.GetComponentSpaceTransform(IndexOf(UpperArm)).GetLocation();
-			// The elbow out to the side and down, behind the hand.
-			const FVector Pole = (Shoulder + Target) * 0.5 + Right * 25.0f - Up * 30.0f - Ahead * 5.0f;
+			// The wrist straight: the elbow behind the fist along the blade (a forearm's length back), a little out and down.
+			const float Forearm = FVector::Dist(Posed.GetComponentSpaceTransform(IndexOf(LowerArm)).GetLocation(), Posed.GetComponentSpaceTransform(IndexOf(Hand)).GetLocation());
+			const FVector Pole = Target - InBody(Knife.Blade) * Forearm + Right * 10.0f - Up * 8.0f;
 			ArmsReach(Posed, IndexOf(UpperArm), IndexOf(LowerArm), IndexOf(Hand), Target, Turn, Pole);
 		}
 		// The fist closed: the index finger curled as the middle one is.

@@ -47,6 +47,8 @@ namespace CheeseStrikeArms
 
 	/** The knife's swipe: seconds it takes from the stroke to the knife back on guard. */
 	constexpr float SwipeSeconds = 0.45f;
+	/** In its own player's view the knife's blade is tipped up this many degrees more than on the body, so that it shows from behind the fist. */
+	constexpr float ViewKnifeTip = 18.0f;
 	/** Where the knife hand is at `Phase` (0 to 1) of a swipe, from where it is on guard (cm: forward, right, up), and which way the blade points and its spine faces (unit vectors in the same axes), for a frame scaled by `Size` (1 for the body, smaller for the view). */
 	struct FKnifeAt
 	{
@@ -54,7 +56,7 @@ namespace CheeseStrikeArms
 		FVector Blade = FVector::ForwardVector;
 		FVector Spine = FVector::UpVector;
 	};
-	/** On guard: the blade forward, up and a little in, its spine up; tipped up `PitchUp` degrees more (the Cheese Stick held upright). */
+	/** On guard: the blade forward out of the fist, a little up and in (a hammer grip, the blade along the forearm), its spine up; tipped up `PitchUp` degrees more (the Cheese Stick held upright). */
 	FKnifeAt KnifeGuard(float PitchUp = 0.0f);
 	/** At `Phase` of a swipe from the right shoulder down and across to the left, the edge leading: raised, swept, back on guard (tipped up `PitchUp` more, as KnifeGuard). */
 	FKnifeAt KnifeSwipe(float Phase, float Size = 1.0f, float PitchUp = 0.0f);
@@ -143,10 +145,12 @@ private:
 /**
  * The knife in hand, on either body: the fist closed round its handle (the
  * index finger curled as the middle one is, where the pistol's stance has
- * it along the frame); for the body others see, the knife hand drawn in on
- * guard ahead of the chest, and its swipe (CheeseStrikeArms::KnifeSwipe), in
- * the frame of the way the body faces and aims. (The first-person body's
- * hand is placed in view by FCheeseStrikeViewHold, after it.)
+ * it along the frame); for the body others see, the knife hand on guard low
+ * on the right ahead of the hip, a hammer grip with the blade forward and the
+ * wrist straight (the elbow bent toward a point a forearm behind the fist
+ * along the blade), and its swipe (CheeseStrikeArms::KnifeSwipe), in the
+ * frame of the way the body faces and aims. (The first-person body's hand is
+ * placed in view by FCheeseStrikeViewHold, after it.)
  */
 struct FCheeseStrikeKnifeHold : public FAnimNode_Base
 {

@@ -54,18 +54,23 @@ namespace
 		return Reference.IsValidToEvaluate(Bones);
 	}
 
-	/** Puts an arm so that its hand is at `Target`, turned as it says, bending as it was. */
-	void DualReach(FCSPose<FCompactPose>& Pose, FCompactPoseBoneIndex Upper, FCompactPoseBoneIndex Lower, FCompactPoseBoneIndex End, const FTransform& Target)
+	/** Puts an arm so that its hand is at `Target`, turned as it says, its elbow bent toward `Pole`; returns where the elbow went. */
+	FVector DualReach(FCSPose<FCompactPose>& Pose, FCompactPoseBoneIndex Upper, FCompactPoseBoneIndex Lower, FCompactPoseBoneIndex End, const FTransform& Target, const FVector& Pole)
 	{
 		FTransform UpperNow = Pose.GetComponentSpaceTransform(Upper);
 		FTransform LowerNow = Pose.GetComponentSpaceTransform(Lower);
 		FTransform EndNow = Pose.GetComponentSpaceTransform(End);
-		const FVector Joint = LowerNow.GetLocation();
-		const FVector Pole = Joint + (Joint - (UpperNow.GetLocation() + EndNow.GetLocation()) * 0.5).GetSafeNormal() * 50.0;
 		AnimationCore::SolveTwoBoneIK(UpperNow, LowerNow, EndNow, Pole, Target.GetLocation(), true, 0.97, 1.08);
 		EndNow.SetRotation(Target.GetRotation());
 		const FBoneTransform Set[] = {FBoneTransform(Upper, UpperNow), FBoneTransform(Lower, LowerNow), FBoneTransform(End, EndNow)};
 		Pose.SafeSetCSBoneTransforms(Set);
+		return LowerNow.GetLocation();
+	}
+
+	/** `At` mirrored across the plane through `Origin` whose normal is `Across`. */
+	FVector DualMirrored(const FVector& At, const FVector& Origin, const FVector& Across)
+	{
+		return At - 2.0 * FVector::DotProduct(At - Origin, Across) * Across;
 	}
 }
 
@@ -121,18 +126,35 @@ void FCheeseStrikeDualHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FVector Across = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
 	const FTransform RightNow = Pose.GetComponentSpaceTransform(RightHand);
 	const FTransform LeftNow = Pose.GetComponentSpaceTransform(LeftHand);
-	// The right hand out to the right (less so aimed, when the stance has brought it up before the eyes) and, aimed, its
-	// gun laid along the aim turned in a little toward the middle; the left where it would be held the mirror way.
+	// The right gun laid along the body's forward (the stance's own yaw may be a little out), turned in a little toward
+	// the middle when aimed; the right hand out to the right: on the body others see, to HipHalfApart of the middle at
+	// the hip (the two about a shoulder's width apart) and AimSpread out from where the aimed stance has it (the two side
+	// by side before the eyes); in its own player's view, pushed out no further (Spread and AimSpread are 0 there).
 	const float Aimed = FMath::Clamp(Aim, 0.0f, 1.0f);
 	const FVector AlongInHand = ModelInHand.GetRotation().RotateVector(ModelAlong);
-	const FTransform Laid = CheeseStrikeDual::Aligned(RightNow, AlongInHand, Forward, FVector::UpVector, CheeseStrikeDual::Converge);
+	const FTransform Laid = CheeseStrikeDual::Aligned(RightNow, AlongInHand, Forward, FVector::UpVector, CheeseStrikeDual::Converge * Aimed);
 	FTransform RightTarget = RightNow;
-	RightTarget.SetRotation(FQuat::Slerp(RightNow.GetRotation(), Laid.GetRotation(), Aimed * Alpha).GetNormalized());
-	RightTarget.AddToTranslation(Across * FMath::Lerp(Spread, AimSpread, Aimed) * Alpha);
+	RightTarget.SetRotation(FQuat::Slerp(RightNow.GetRotation(), Laid.GetRotation(), Alpha).GetNormalized());
+	const float HipOut = bFromMiddle ? FMath::Max(0.0f, Spread - static_cast<float>(FVector::DotProduct(RightNow.GetLocation() - Origin, Across))) : Spread;
+	RightTarget.AddToTranslation(Across * FMath::Lerp(HipOut, AimSpread, Aimed) * Alpha);
+	// The left hand where the right would be held the mirror way round.
 	const FTransform Mirror = Correction * CheeseStrikeDual::Mirrored(RightTarget, Origin, Across);
 	FTransform LeftTarget = LeftNow;
 	LeftTarget.SetLocation(FMath::Lerp(LeftNow.GetLocation(), Mirror.GetLocation(), static_cast<double>(Alpha)));
 	LeftTarget.SetRotation(FQuat::Slerp(LeftNow.GetRotation(), Mirror.GetRotation(), Alpha).GetNormalized());
-	DualReach(Pose, UpperR.GetCompactPoseIndex(Bones), LowerR.GetCompactPoseIndex(Bones), RightHand, RightTarget);
-	DualReach(Pose, UpperL.GetCompactPoseIndex(Bones), LowerL.GetCompactPoseIndex(Bones), LeftHand, LeftTarget);
+	// The right wrist straight: its elbow bent toward a point a forearm behind the hand along its gun, a little out and
+	// down (the stance's bend, which brought the elbow in under a two-handed hold, otherwise); and the left arm the mirror
+	// of the right, elbow and all, so that the two are held alike.
+	const FCompactPoseBoneIndex LowerRight = LowerR.GetCompactPoseIndex(Bones);
+	const FVector ElbowNow = Pose.GetComponentSpaceTransform(LowerRight).GetLocation();
+	const FVector Bore = RightTarget.GetRotation().RotateVector(AlongInHand).GetSafeNormal();
+	const float Forearm = FVector::Dist(ElbowNow, RightNow.GetLocation());
+	const FVector StancePole = ElbowNow + (ElbowNow - (Pose.GetComponentSpaceTransform(UpperR.GetCompactPoseIndex(Bones)).GetLocation() + RightNow.GetLocation()) * 0.5).GetSafeNormal() * 50.0;
+	const FVector StraightPole = RightTarget.GetLocation() - Bore * Forearm + Across * CheeseStrikeDual::ElbowOut - FVector::UpVector * CheeseStrikeDual::ElbowDown;
+	const FVector RightPole = FMath::Lerp(StancePole, StraightPole, static_cast<double>(Alpha));
+	const FVector RightElbow = DualReach(Pose, UpperR.GetCompactPoseIndex(Bones), LowerRight, RightHand, RightTarget, RightPole);
+	const FVector LeftElbowNow = Pose.GetComponentSpaceTransform(LowerL.GetCompactPoseIndex(Bones)).GetLocation();
+	const FVector LeftStancePole = LeftElbowNow + (LeftElbowNow - (Pose.GetComponentSpaceTransform(UpperL.GetCompactPoseIndex(Bones)).GetLocation() + LeftNow.GetLocation()) * 0.5).GetSafeNormal() * 50.0;
+	const FVector LeftPole = FMath::Lerp(LeftStancePole, DualMirrored(RightElbow, Origin, Across), static_cast<double>(Alpha));
+	DualReach(Pose, UpperL.GetCompactPoseIndex(Bones), LowerL.GetCompactPoseIndex(Bones), LeftHand, LeftTarget, LeftPole);
 }
