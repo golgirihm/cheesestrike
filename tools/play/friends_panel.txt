@@ -1,26 +1,52 @@
 # The friends panel on the front end, for looking at it: on the main page as
-# its tab, then held open (CheeseStrike.FriendsOpen) with nobody in it and
-# with made-up friends in every state (CheeseStrikeSampleFriends), with a
-# row's tooltip and a faded INVITE's shown as if hovered
-# (CheeseStrike.MenuTooltip), and on the Find a Match page. Run with
+# its tile, then opened as a click on the tile opens it (CheeseStrikeFriends 1,
+# which refreshes the list: REFRESH greyed, its arrow turning), with nobody in
+# it and with made-up friends in every state (CheeseStrikeSampleFriends), REFRESH
+# again once its cooldown is over and pressed (CheeseStrikeFriends 2), a
+# section folded and opened (CheeseStrikeFriends 11: the panel's own chevron by
+# FRIENDS must not turn for it), a row's tooltip and a faded INVITE's shown as
+# if hovered (CheeseStrike.MenuTooltip; the 21st is REFRESH's with the sample
+# friends), shut as a click on FRIENDS shuts it
+# (CheeseStrikeFriends 0), and on the Find a Match page. Run with
 # tools/play.ps1 -Script tools/play/friends_panel.txt -Lobby -Res 1600x900 -Tag friends_panel
 # and the lobby's with tools/play/friends_lobby.txt.
 wait 5
 shot friends_main_tab
-cmd CheeseStrike.FriendsOpen 1
-wait 1
+cmd CheeseStrikeFriends 1
+wait 0.3
+shot friends_main_open_refreshing
+wait 0.7
 shot friends_main_open_empty
 cmd CheeseStrikeSampleFriends 1
 wait 1.5
 shot friends_main_open
+wait 3.5
+shot friends_main_refresh_ready
+cmd CheeseStrikeFriends 2
+shot friends_main_refresh_turning_1
+shot friends_main_refresh_turning_2
+shot friends_main_refresh_turning_3
+cmd CheeseStrikeFriends 11
+shot friends_section_fold_1
+shot friends_section_fold_2
+shot friends_section_fold_3
+wait 0.5
+shot friends_section_folded
+cmd CheeseStrikeFriends 11
+wait 0.5
 cmd CheeseStrike.MenuTooltip 3
 wait 0.5
 shot friends_main_tooltip_row
 cmd CheeseStrike.MenuTooltip 2
 wait 0.5
 shot friends_main_tooltip_invite
+cmd CheeseStrike.MenuTooltip 21
+wait 0.5
+shot friends_main_tooltip_refresh
 cmd CheeseStrike.MenuTooltip 0
-cmd CheeseStrike.FriendsOpen 0
+cmd CheeseStrikeFriends 0
+wait 1
+shot friends_main_shut
 cmd CheeseStrikePage Find
 wait 1.5
 shot friends_find

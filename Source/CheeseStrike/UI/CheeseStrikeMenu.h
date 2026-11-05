@@ -221,6 +221,12 @@ namespace CheeseStrikeMenu
 	constexpr float LobbyGap = 44.0f;
 	/** The friends panel's width when it is collapsed to its tab: the lobby leaves this much room at its right, so nothing is under it. */
 	constexpr float FriendsTabWidth = 120.0f;
+	/** The folded tile's height, and how far down from the screen's top it is (as high as the lobby's page starts); open, the panel is the screen's whole height. */
+	constexpr float FriendsTabHeight = 156.0f;
+	constexpr float FriendsTabTop = 40.0f;
+	/** The friends panel's REFRESH: a rounded square this many units across, its glyph (Content/UI/refresh.png) this big in it. */
+	constexpr float RefreshButtonSize = 36.0f;
+	constexpr float RefreshGlyphSize = 22.0f;
 	/**
 	 * The pages' panel on the left: how far its content is in from its sides, how wide its content is on the front end, so
 	 * how wide the panel is; the friends panel open on the right is as wide (the one width for both), drawn with the same
@@ -344,14 +350,28 @@ public:
 	 * row in the party (ourself, or another with the host's KICK).
 	 */
 	TSharedRef<SWidget> MakeFriendsPanel(bool bOpen);
-	/** Pins the friends panel open or shut (a click on its chevron): it then stays so whatever the mouse does, for as long as the menu lasts. */
-	void PinFriends(bool bOpen);
-	/** Whether the friends panel is pinned, and which way. */
-	const TOptional<bool>& GetFriendsPin() const { return FriendsPinned; }
+	/**
+	 * What a click on the friends panel does: `bOpen`, a click on the folded tile, opens it (and refreshes the list, as
+	 * REFRESH would, starting its cooldown); else a click on the open panel's chevron or its word FRIENDS shuts it. It stays
+	 * as clicked for as long as the menu lasts; the mouse merely over it does nothing.
+	 */
+	void ClickFriends(bool bOpen);
+	/** Folds the friends panel's section `Section` (CheeseStrikeFriends::ESection), or opens it again: a click on its header. */
+	void FoldFriendSection(int32 Section);
 	/** Whether the friends panel is open, or on its way open (CheeseStrikeFriends::PanelOpen). */
 	bool IsFriendsPanelOpen() const { return bFriendsWantOpen; }
+	/**
+	 * Refreshes the friends' list now, unless the last refresh was within CheeseStrikeFriends::RefreshCooldown (`Why` is
+	 * logged); whether it did. REFRESH, the panel opened by a click, the find page and every AutoRefreshSeconds while the
+	 * panel is open all come here, so that the cooldown counts them all. `bOnceCooled`: if it can't be made now, it is made
+	 * as soon as the cooldown is over (the find page, opened just after a refresh, still has its friends' games looked up).
+	 */
+	bool RefreshFriends(const TCHAR* Why, bool bOnceCooled = false);
 	/** The friends panel's width now, from its curve (CheeseStrikeFriends::PanelWidthAt): the tab's shut, PanelWidth open, between on the way. */
 	FOptionalSize FriendsWidthNow() const;
+	/** Its height and how far down it is now, along the same curve (PanelHeightAt, PanelTopAt): the tile's shut, the screen's whole height open. */
+	FOptionalSize FriendsHeightNow() const;
+	FMargin FriendsTopNow() const;
 	TSharedRef<SWidget> MakeFriendRow(int32 Index, CheeseStrikeFriends::ESection Section);
 	TSharedRef<SWidget> MakePartyRow(const APlayerState* Who, bool bSelf, bool bHost);
 	/** The host's choice of who can join the party (read-only for everyone else). */
@@ -445,14 +465,23 @@ private:
 	/** How wide the current page's content is, less room for a scroll bar: what a line of text there wraps at. */
 	float WrapWidth() const;
 	TSharedRef<SWidget> MakeButton(const FString& Text, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain, TSharedPtr<SWidget> Inside = nullptr);
-	/** The friends panel folded to its tab: a chevron, the friends' figure, the word and how many are online. */
+	/**
+	 * The friends panel folded to its tab: a chevron, the friends' figure, the word and how many are online, the whole tile
+	 * a button that a click opens (ClickFriends), lit under the mouse. It takes no focus: a pad's stays on the page's items.
+	 */
 	TSharedRef<SWidget> MakeFriendsTab(UCheeseStrikeSessionSubsystem* Sessions);
 	/**
-	 * The friends panel's chevron, a button: pointing right (to the edge it folds to) while the panel is open, left (the
-	 * way it opens) on its tab, turning from the other's way as it is made afresh; a click pins the panel the other way
-	 * (PinFriends). It takes no focus: a pad's stays on the page's items.
+	 * The friends panel's chevron: pointing right (to the edge it folds to) while the panel is open, left (the way it opens)
+	 * on its tab, turning from the other's way as the panel opens or shuts (its turn kept in ChevronTurns, so that the panel
+	 * drawn again for anything else doesn't turn it).
 	 */
 	TSharedRef<SWidget> MakeFriendsChevron(bool bOpen);
+	/**
+	 * The open panel's REFRESH: a rounded square with the refresh glyph (Content/UI/refresh.png, tools/art/refresh_icon.py),
+	 * which turns once after any refresh and is greyed, taking no click, through the cooldown (CheeseStrikeFriends::
+	 * RefreshCooldown); its tooltip says so.
+	 */
+	TSharedRef<SWidget> MakeRefreshButton();
 	/**
 	 * A tooltip in the menu's own looks: `Text` (lines, wrapped at TooltipWrap) on a rounded box in the panel's colour, the
 	 * menu's font, no border, with `Title` in cheese over it when there is one. Drawn by the menu itself, beside the mouse,
@@ -477,7 +506,7 @@ private:
 	TSharedRef<SWidget> MakeCountPill(int32 Count);
 	/** A faint line between sections. */
 	TSharedRef<SWidget> MakeDivider();
-	/** A small button in the menu's looks (its kinds and rounding), for a row: Join, Invite, Kick, Refresh. */
+	/** A small button in the menu's looks (its kinds and rounding). */
 	TSharedRef<SWidget> MakeSmallButton(const FString& Text, const FString& ItemName, TFunction<void()> Do, EButtonKind Kind = EButtonKind::Plain);
 	/**
 	 * A friend row's button, smaller than MakeSmallButton so that two fit beside a name: faded, with no click and no focus,
@@ -636,28 +665,33 @@ private:
 	TSharedPtr<SWidget> Dialog;
 	TSharedPtr<SBox> DialogContent;
 	/**
-	 * The friends panel on the right: a tab, opened by hovering it on the front end and in the lobby (shut again half a
-	 * second after the mouse leaves) or pinned open or shut by a click on its chevron, and open on the find page
-	 * (CheeseStrikeFriends::PanelOpen). Its width is bound to a curve (FriendsCurve, CheeseStrikeFriends::PanelSeconds,
-	 * eased in and out) played forward to open and backward to shut, read off it every frame; its content (FriendsInside)
-	 * fades in over the second half of an expand and out over the first half of a collapse, and the tall content stays
-	 * until the panel is shut, when it folds to its tab.
+	 * The friends panel on the right: a tile, opened by a click on it on the front end and in the lobby and shut by a click
+	 * on the open panel's chevron or its word FRIENDS (bFriendsClickedOpen), and open on the find page
+	 * (CheeseStrikeFriends::PanelOpen). Its width, height and top are bound to a curve (FriendsCurve,
+	 * CheeseStrikeFriends::PanelSeconds, eased in and out) played forward to open and backward to shut, read off it every
+	 * frame; its content (FriendsInside) fades in over the second half of an expand and out over the first half of a
+	 * collapse, and the tall content stays until the panel is shut, when it folds to its tile.
 	 */
 	TSharedPtr<SBox> FriendsBox;
 	TSharedPtr<SBox> FriendsContent;
 	TSharedPtr<SWidget> FriendsInside;
 	FCurveSequence FriendsCurve;
-	TOptional<bool> FriendsPinned;
+	bool bFriendsClickedOpen = false;
 	bool bFriendsWantOpen = false;
-	bool bFriendsHovered = false;
-	double FriendsLeftAt = -1000.0;
 	/** What the panel was last drawn for. */
 	FString ShownFriendsKey;
-	/** When the friends were last asked for. */
-	double FriendsReadAt = -1000.0;
-	/** The friends sections folded shut (remembered while the menu lasts), and the one just folded or opened, whose chevron turns. */
+	/** When the friends were last refreshed (RefreshFriends), for the cooldown and the refresh every AutoRefreshSeconds. */
+	double FriendsRefreshedAt = -1000.0;
+	/** A refresh asked for during the cooldown, to be made once it is over (RefreshFriends' `bOnceCooled`). */
+	bool bFriendsRefreshPending = false;
+	/** The friends sections folded shut (remembered while the menu lasts). */
 	TSet<uint8> ClosedFriendSections;
-	int32 TurningFriendSection = INDEX_NONE;
+	/**
+	 * Each chevron's turn, by name (the friends panel's, each section's), kept across the panel being drawn again, so that
+	 * a chevron turns only when what it shows changes: never for another being clicked.
+	 */
+	TMap<FString, TSharedPtr<struct FChevronTurn>> ChevronTurns;
+	TSharedPtr<struct FChevronTurn> ChevronTurn(const FString& Name);
 	/** The pictures of the friends in the rows drawn (kept while they are). */
 	TArray<TSharedPtr<FSlateBrush>> FriendBrushes;
 	/** The hero view's brush (HeroViewBrush), for the picture it was made for. */

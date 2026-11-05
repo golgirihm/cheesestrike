@@ -266,6 +266,13 @@ public:
 	/** From the console or a play script: the friends panel lists made-up friends in every state (1), or the service's again (0), for looking at it. */
 	UFUNCTION(Exec)
 	void CheeseStrikeSampleFriends(int32 Show = 1);
+	/**
+	 * From the console or a play script, what a click on the friends panel does: 1 a click on its folded tile (it opens and
+	 * refreshes), 0 a click on the open panel's chevron or FRIENDS (it shuts), 2 a press of its REFRESH, 10 + n a click on
+	 * the header of its section n (0 Your party, 1 Joinable, 2 Others), which folds or opens it.
+	 */
+	UFUNCTION(Exec)
+	void CheeseStrikeFriends(int32 Click = 1);
 	/** From the console or a play script: puts the loading cover up for `Seconds` (the loading screen's own widget, its spinner turning), for looking at it. */
 	UFUNCTION(Exec)
 	void CheeseStrikeCover(float Seconds = 3.0f);

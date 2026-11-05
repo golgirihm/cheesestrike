@@ -160,8 +160,8 @@ namespace CheeseStrikeFriends
 	 */
 	FString RowStatus(EState State, EStatus Status, int32 Humans, EOnline Online, EPlaying Playing);
 	/**
-	 * The colour of the dot before that line: in a match green, in a lobby blue, on the menu cheese; not in the game, a pale grey
-	 * online, a dull amber away or busy, and dark grey offline.
+	 * The colour of the dot before that line: in a match green, in a lobby blue, on the menu cheese; not in the game, a
+	 * lighter, yellower green online (as Steam's own lists show an online friend), a dull amber away or busy, and dark grey offline.
 	 */
 	FLinearColor StatusDotColour(EStatus Status, EOnline Online);
 	/** What a section with nobody in it says, faintly, so that it still looks meant. */
@@ -169,21 +169,23 @@ namespace CheeseStrikeFriends
 	/** The letters shown for a friend with no picture: the first of their name's first two words, in capitals ("?" for none). */
 	FString Initials(const FString& Name);
 
-	/**
-	 * The panel's motion: how long it takes to open or shut (a Slate curve, eased in and out, played backwards to shut),
-	 * and, unpinned, how long the mouse may be off it after leaving before it shuts (a mouse brushing off it doesn't snap
-	 * it shut).
-	 */
+	/** The panel's motion: how long it takes to open or shut (a Slate curve, eased in and out, played backwards to shut). */
 	constexpr float PanelSeconds = 0.25f;
-	constexpr float HoverCloseDelay = 0.5f;
 	/**
-	 * Whether the panel should be open now: always where it is the page's point (`bAlwaysOpen`, the find page); else as
-	 * pinned by a click on its chevron (`Pinned`, set: open or shut, whatever the mouse does); else while the mouse is
-	 * over it (`bHovered`) and for HoverCloseDelay seconds after it left (`SinceLeft`).
+	 * Whether the panel should be open now: always where it is the page's point (`bAlwaysOpen`, the find page); else as the
+	 * player last clicked it (`bClickedOpen`: a click anywhere on the folded tile opens it, a click on the open panel's chevron
+	 * or its word FRIENDS shuts it). The mouse merely over it does nothing.
 	 */
-	bool PanelOpen(bool bAlwaysOpen, const TOptional<bool>& Pinned, bool bHovered, float SinceLeft);
+	bool PanelOpen(bool bAlwaysOpen, bool bClickedOpen);
 	/** The panel's width `Along` the way (0 shut, 1 open: the curve's eased value) from the tab's width to the open panel's: never a step. */
 	float PanelWidthAt(float Along, float TabWidth, float OpenWidth);
+	/**
+	 * Its height and its top `Along` the same curve: the folded tile's (`TabHeight`, `TabTop` down from the top of the screen)
+	 * to the open panel's (`OpenHeight`, the screen's whole height, from its top), so that the tile grows into the panel and
+	 * back in both directions at once, its header moving up with its top.
+	 */
+	float PanelHeightAt(float Along, float TabHeight, float OpenHeight);
+	float PanelTopAt(float Along, float TabTop);
 	/**
 	 * The opacity of the open panel's content `Along` the way: clear through the first half of an expand, then fading in
 	 * over the second; the same played backwards over a collapse, so it fades out over the collapse's first half.
@@ -194,4 +196,25 @@ namespace CheeseStrikeFriends
 	 * the content stays while the width shrinks (`Along` above 0), and only shut does it fold to the tab.
 	 */
 	bool ShowsContent(bool bWantOpen, float Along);
+
+	/**
+	 * Refreshing the list (REFRESH, the panel opened by a click, and every AutoRefreshSeconds while it is open): reading the
+	 * friends is the local Steam client's cache, but each friend in a lobby of ours is then looked up on Steam's servers
+	 * (FindFriendSession: RequestLobbyData), which Steam rate-limits; so the button rests for RefreshCooldown seconds after any
+	 * refresh, greyed and taking no click, its glyph turning once over RefreshSpinSeconds.
+	 */
+	constexpr float RefreshCooldown = 5.0f;
+	constexpr float RefreshSpinSeconds = 0.6f;
+	constexpr float AutoRefreshSeconds = 30.0f;
+	/** The seconds left of the cooldown at `Now`, the last refresh having been at `LastRefresh` (0 once it can be pressed again). */
+	float RefreshCooldownLeft(double Now, double LastRefresh);
+	/** Whether a refresh may be made now: not within RefreshCooldown of the last. */
+	bool CanRefresh(double Now, double LastRefresh);
+	/**
+	 * Whether the panel refreshes of itself now: as it is opened by a click (`bJustClickedOpen`), and while it is open
+	 * (`bOpen`) once AutoRefreshSeconds have passed since the last refresh; never within the cooldown.
+	 */
+	bool ShouldAutoRefresh(bool bOpen, bool bJustClickedOpen, double Now, double LastRefresh);
+	/** How far round the refresh glyph has turned `Since` seconds after a refresh, in degrees: once round, eased out, then still. */
+	float RefreshSpinAt(float Since);
 }

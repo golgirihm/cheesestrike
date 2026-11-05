@@ -1,18 +1,18 @@
-# The friends panel in the lobby, for looking at it: held open
-# (CheeseStrike.FriendsOpen) with made-up friends in every state
-# (CheeseStrikeSampleFriends), folded to its tab, and open with nobody in it.
-# Run with
+# The friends panel in the lobby, for looking at it: opened as a click on its
+# tile opens it (CheeseStrikeFriends 1) with made-up friends in every state
+# (CheeseStrikeSampleFriends), shut as a click on FRIENDS shuts it (0) to its
+# tile, and open again with nobody in it. Run with
 # tools/play.ps1 -Script tools/play/friends_lobby.txt -Lobby -Extra "?listen" -Res 1600x900 -Tag friends_lobby
 wait 6
 cmd CheeseStrikeSampleFriends 1
-cmd CheeseStrike.FriendsOpen 1
+cmd CheeseStrikeFriends 1
 wait 1.5
 shot friends_lobby_open
-cmd CheeseStrike.FriendsOpen 0
+cmd CheeseStrikeFriends 0
 wait 1
 shot friends_lobby_tab
 cmd CheeseStrikeSampleFriends 0
-cmd CheeseStrike.FriendsOpen 1
+cmd CheeseStrikeFriends 1
 wait 1
 shot friends_lobby_empty
 quit
