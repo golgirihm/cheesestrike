@@ -868,10 +868,12 @@ void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, int64 Slot)
 	const bool bOwn = Holder != nullptr && Holder->IsLocallyControlled() && Holder->IsPlayerControlled();
 	UAudioComponent* Player = nullptr;
 	const FVector From = Holder != nullptr ? Holder->GetActorLocation() : GetActorLocation();
+	// Gunfire is kept down under the voice and the grunts, one's own and everyone else's alike.
+	const float Volume = ShotVolume * CheeseStrikeGunfire::Loudness;
 	if (bOwn)
 	{
 		// Its own player hears it from their own hands, whole.
-		Player = UGameplayStatics::CreateSound2D(this, Sound, ShotVolume, ShotPitch);
+		Player = UGameplayStatics::CreateSound2D(this, Sound, Volume, ShotPitch);
 	}
 	else if (GEngine != nullptr && GEngine->UseSound() && World->bAllowAudioPlayback && !World->IsNetMode(NM_DedicatedServer))
 	{
@@ -884,7 +886,7 @@ void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, int64 Slot)
 		if (Player != nullptr)
 		{
 			Player->SetWorldLocation(From);
-			Player->SetVolumeMultiplier(ShotVolume);
+			Player->SetVolumeMultiplier(Volume);
 			Player->SetPitchMultiplier(ShotPitch);
 			Player->bAllowSpatialization = Params.ShouldUseAttenuation();
 			Player->bAutoDestroy = true;
@@ -923,7 +925,7 @@ void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, int64 Slot)
 			Listener->GetAudioListenerPosition(Ear, Front, Right);
 			const float Distance = FVector::Dist(Ear, From);
 			UE_LOG(LogCheeseStrike, Display, TEXT("Gunfire: %s's %s heard %.0f m off at %.2f of its volume, nothing above %.0f Hz"),
-				Holder != nullptr ? *Holder->DisplayName() : *GetName(), *Stats->DisplayName.ToString(), Distance / 100.0f, CheeseStrikeGunfire::Volume(Distance) * ShotVolume, CheeseStrikeGunfire::LowPass(Distance));
+				Holder != nullptr ? *Holder->DisplayName() : *GetName(), *Stats->DisplayName.ToString(), Distance / 100.0f, CheeseStrikeGunfire::Volume(Distance) * Volume, CheeseStrikeGunfire::LowPass(Distance));
 		}
 	}
 }
@@ -1738,10 +1740,11 @@ int32 ACheeseStrikeWeapon::ShardsIn(const ACheeseStrikeCharacter* Victim, float 
 
 void ACheeseStrikeWeapon::ClientHit_Implementation(float Damage, bool bHead, bool bKill)
 {
-	// A muted thud, like a smack on a pillow, for a hit by this machine's own player (a kill's ka-ching is the player controller's).
+	// A heavy thud, like a smack on a pillow, plainly over the gunfire, for a hit by this machine's own player (a kill's
+	// ka-ching is the player controller's).
 	if (!Stats->IsMelee() && Holder != nullptr && Holder->IsLocallyControlled())
 	{
-		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Thump(bKill ? 1.3f : 1.0f)), 0.6f);
+		UGameplayStatics::PlaySound2D(this, CheeseStrikeSynth::MakeSound(this, CheeseStrikeSynth::Thump(bKill ? 1.3f : 1.0f)), 1.0f);
 	}
 	// The knife's stroke landing, heard by the one who struck.
 	if (Stats->IsMelee())

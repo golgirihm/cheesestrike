@@ -108,24 +108,72 @@ namespace CheeseStrikeSynth
 
 	TArray<int16> Thump(float Weight)
 	{
-		// Wave 14: a pillow thud and nothing else, unlike the hurt "oof": noise through two low-pass poles at 260 Hz
-		// (so no pitch to it), a soft start and a quick fall, about 80 ms.
-		const int32 Count = FMath::RoundToInt(0.08f * SampleRate);
+		// Wave 14: a pillow thud and nothing else, unlike the hurt grunt: noise through two low-pass poles at 260 Hz (so no
+		// pitch to it), a soft start and a quick fall. Wave 15: much louder (its peak near -3 dBFS, where it was -5 and
+		// played at 0.6) and heavier, 110 ms with a body of noise through two poles at 120 Hz under it, which rings on
+		// a little longer in the 80-150 Hz band.
+		const int32 Count = FMath::RoundToInt(0.11f * SampleRate);
 		TArray<float> Values;
 		Values.SetNumUninitialized(Count);
 		uint32 Seed = 987654u;
 		const float Pole = PoleFor(260.0f);
+		const float BodyPole = PoleFor(120.0f);
+		const float BodyHigh = PoleFor(70.0f);
 		float A = 0.0f;
 		float B = 0.0f;
+		float C = 0.0f;
+		float D = 0.0f;
+		float Under = 0.0f;
 		for (int32 Index = 0; Index < Count; ++Index)
 		{
 			const float Time = static_cast<float>(Index) / SampleRate;
-			A += (Noise(Seed) - A) * Pole;
+			const float White = Noise(Seed);
+			A += (White - A) * Pole;
 			B += (A - B) * Pole;
-			const float Envelope = FMath::Min(1.0f, Time / 0.006f) * FMath::Exp(-Time / 0.022f) * FMath::Min(1.0f, (Count - Index) / (0.01f * SampleRate));
-			Values[Index] = B * Envelope;
+			C += (White - C) * BodyPole;
+			D += (C - D) * BodyPole;
+			// The body's rumble below 70 Hz taken off, so that it is a thud and not a hum.
+			Under += (D - Under) * BodyHigh;
+			const float Body = (D - Under) * 4.0f;
+			const float End = FMath::Min(1.0f, (Count - Index) / (0.015f * SampleRate));
+			const float Slap = B * FMath::Min(1.0f, Time / 0.006f) * FMath::Exp(-Time / 0.022f);
+			const float Weighty = Body * FMath::Min(1.0f, Time / 0.008f) * FMath::Exp(-Time / 0.04f);
+			Values[Index] = (Slap + Weighty) * End;
 		}
-		return Normalised(Values, FMath::Clamp(0.55f * Weight, 0.05f, 0.9f));
+		return Normalised(Values, FMath::Clamp(0.71f * Weight, 0.05f, 0.95f));
+	}
+
+	TArray<int16> MetalClack()
+	{
+		// Gun metal knocked: a burst of white noise in at once and over in a few hundredths, through three resonant
+		// band-passes (two-pole, narrow) near 1.2, 2.4 and 3.6 kHz that ring a little past the burst, with a click of the
+		// bare burst at the front; 70 ms in all.
+		const int32 Count = FMath::RoundToInt(0.07f * SampleRate);
+		TArray<float> Values;
+		Values.SetNumUninitialized(Count);
+		uint32 Seed = 2468u;
+		const float Hertz[] = {1200.0f, 2400.0f, 3600.0f};
+		const float Shares[] = {1.0f, 0.7f, 0.45f};
+		// A resonator each: y = x + r*2cos(w)*y1 - r*r*y2, the ring set by r.
+		float Y1[3] = {0.0f, 0.0f, 0.0f};
+		float Y2[3] = {0.0f, 0.0f, 0.0f};
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const float Time = static_cast<float>(Index) / SampleRate;
+			const float Burst = Noise(Seed) * FMath::Min(1.0f, Time / 0.0004f) * FMath::Exp(-Time / 0.009f);
+			float Value = Burst * 0.25f;
+			for (int32 Band = 0; Band < 3; ++Band)
+			{
+				const float Ring = 0.985f;
+				const float Cosine = FMath::Cos(2.0f * PI * Hertz[Band] / SampleRate);
+				const float Y = Burst * (1.0f - Ring) + 2.0f * Ring * Cosine * Y1[Band] - Ring * Ring * Y2[Band];
+				Y2[Band] = Y1[Band];
+				Y1[Band] = Y;
+				Value += Y * Shares[Band] * 3.0f;
+			}
+			Values[Index] = Value * FMath::Min(1.0f, (Count - Index) / (0.012f * SampleRate));
+		}
+		return Normalised(Values, 0.8f);
 	}
 
 	TArray<int16> KaChing(bool bAssist)

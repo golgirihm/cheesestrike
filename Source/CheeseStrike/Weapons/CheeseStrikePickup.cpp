@@ -289,13 +289,7 @@ void ACheeseStrikePickup::BeginPlay()
 		BeamGlow->SetScalarParameterValue(TEXT("Amount"), 0.5f);
 		Beam->SetMaterial(0, BeamGlow);
 	}
-	// Taken, it is heard near it: the weapons' draw sound, which carries no attenuation of its own.
-	TakenSound = LoadPickupAsset<USoundBase>(CheeseStrikeWeaponLooks::DrawSounds[0]);
-	TakenReach = NewObject<USoundAttenuation>(this);
-	TakenReach->Attenuation.bAttenuate = true;
-	TakenReach->Attenuation.bSpatialize = true;
-	TakenReach->Attenuation.AttenuationShapeExtents = FVector(300.0f);
-	TakenReach->Attenuation.FalloffDistance = 2000.0f;
+	// Taken, it is heard from the taker's hands (ACheeseStrikeCharacter::MulticastPickedUp's clack), not from here.
 	// Each stand turns from its own start, so that they don't all turn as one.
 	Spin = FMath::Fmod(GetActorLocation().X * 0.37f + GetActorLocation().Y * 0.61f, 360.0f);
 	// Again, now that its pad's glow is made, if its weapon arrived before.
@@ -508,7 +502,6 @@ void ACheeseStrikePickup::UpdateLook(bool bForce)
 	{
 		return;
 	}
-	const bool bTaken = bShownThere && !bThere && !bForce;
 	bShownThere = bThere;
 	for (UMeshComponent* Model : Models())
 	{
@@ -525,10 +518,6 @@ void ACheeseStrikePickup::UpdateLook(bool bForce)
 	}
 	Light->SetIntensity(bThere ? PickupLight : PickupLight * 0.15f);
 	Beam->SetVisibility(bThere && !bDropped);
-	if (bTaken && TakenSound != nullptr && GetNetMode() != NM_DedicatedServer)
-	{
-		UGameplayStatics::PlaySoundAtLocation(this, TakenSound, Spinner->GetComponentLocation(), 1.0f, 1.0f, 0.0f, TakenReach);
-	}
 }
 
 FString ACheeseStrikePickup::DescribeLook() const

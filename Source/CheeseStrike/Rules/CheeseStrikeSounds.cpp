@@ -12,13 +12,18 @@ namespace CheeseStrikeSounds
 
 	bool ShouldOof(float Lost, float SinceLast)
 	{
-		return Lost > 0.0f && SinceLast >= OofEvery;
+		return Lost >= OofFrom && SinceLast >= OofEvery;
 	}
 
-	FString PickupPath(int32 Variant)
+	int32 NextOof(int32 Last, int32 Random)
 	{
-		const int32 Number = FMath::Abs(Variant) % Pickups + 1;
-		return FString::Printf(TEXT("/Game/Audio/Sounds/Foley_Misc/Lyra_WeaponSwap_0%d.Lyra_WeaponSwap_0%d"), Number, Number);
+		// One of the others: counted past the last one, so that every other grunt is as likely.
+		const int32 Pick = FMath::Abs(Random) % (Oofs - 1);
+		if (Last < 0 || Last >= Oofs)
+		{
+			return FMath::Abs(Random) % Oofs;
+		}
+		return Pick >= Last ? Pick + 1 : Pick;
 	}
 
 	EScore ScoreSound(int32 KillsBefore, int32 Kills, int32 AssistsBefore, int32 Assists)

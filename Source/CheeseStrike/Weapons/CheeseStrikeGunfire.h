@@ -34,6 +34,8 @@ namespace CheeseStrikeGunfire
 	constexpr float BrightHertz = 20000.0f;
 	/** The most shots heard at once: past this, the furthest stops for the new one. */
 	constexpr int32 MostAtOnce = 10;
+	/** How loud gunfire is against everything else: every shot, the listener's own and the others', at this share of its look's volume (wave 15: 0.6 of what it was), the voice, the grunts and the HUD untouched. */
+	constexpr float Loudness = 0.6f;
 
 	/** The settings, as the engine takes them. */
 	FSoundAttenuationSettings Attenuation();

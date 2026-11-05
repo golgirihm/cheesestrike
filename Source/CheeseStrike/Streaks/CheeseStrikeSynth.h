@@ -9,7 +9,7 @@ class USoundWaveProcedural;
 /**
  * Sounds that have no recording yet, made in code: a falling bomb's
  * whistle and an air-raid siren, a jet's fly-by, heavy explosions, a hit's
- * thud and a kill's ka-ching. Each is a few seconds of
+ * thud, a kill's ka-ching and a taken weapon's clack. Each is a few seconds of
  * 16-bit mono at SampleRate, played once by a procedural sound wave made
  * for that one playing. Recorded, licensed sounds may replace them, as
  * the design's "Audio" says.
@@ -22,8 +22,10 @@ namespace CheeseStrikeSynth
 	TArray<int16> Whistle(float Seconds);
 	/** An air-raid siren, rising and falling, for `Seconds`. */
 	TArray<int16> Siren(float Seconds);
-	/** A hit's thud, muted and low like a smack on a pillow: about 80 ms of low-passed noise, no tone, `Weight` times as loud. */
+	/** A hit's thud, low and heavy like a smack on a pillow with weight behind it: about 110 ms of low-passed noise with a body of 80-150 Hz under it, no tone, peaking near -3 dBFS, `Weight` times as loud (clamped under full scale). */
 	TArray<int16> Thump(float Weight);
+	/** A short clack of gun metal, a weapon taken from a stand or the floor: 70 ms of a noise burst with a sharp attack through resonances near 1.2, 2.4 and 3.6 kHz. */
+	TArray<int16> MetalClack();
 	/** A cash register's "ka-ching" for a kill (about 0.7 s: the drawer's clack, its bell struck twice, coins), or for an assist the bell alone, softer. */
 	TArray<int16> KaChing(bool bAssist);
 	/** A jet passing low overhead in `Seconds`: a roar swelling to the fly-by and dropping away as it leaves, with a whine and a rumble under it. */
