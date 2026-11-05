@@ -55,7 +55,7 @@ namespace CheeseStrikeMenu
 {
 	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling, bool bResultsHeld, bool bLoadoutOffered)
 	{
-		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout;
+		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout || Chosen == EMenuPage::Themes;
 		const EMenuPage FrontEnd = bFrontEndPage ? Chosen : EMenuPage::Main;
 		// Going to the map the host picked: the lobby, saying so. Back to the lobby after the results: the results, held up
 		// until the lobby is there.
@@ -1096,11 +1096,11 @@ void SCheeseStrikeMenu::Refresh()
 	}
 	const bool bLobby = Page == EMenuPage::Lobby;
 	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
-	// The credits, the options and the loadout are wide: a wider panel, and the game's name out of their way.
-	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options || Page == EMenuPage::Loadout;
+	// The credits, the options, the loadout and the themes are wide: a wider panel, and the game's name out of their way.
+	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options || Page == EMenuPage::Loadout || Page == EMenuPage::Themes;
 	if (Content.IsValid())
 	{
-		Content->SetWidthOverride(Page == EMenuPage::Options ? 900.0f : (bWide ? 640.0f : CheeseStrikeMenu::PanelContentWidth));
+		Content->SetWidthOverride(Page == EMenuPage::Options || Page == EMenuPage::Themes ? 900.0f : (bWide ? 640.0f : CheeseStrikeMenu::PanelContentWidth));
 		Content->SetVAlign(bWide && Page != EMenuPage::Loadout ? VAlign_Fill : VAlign_Center);
 	}
 	if (Lobby.IsValid())
@@ -1246,6 +1246,17 @@ TSharedRef<SWidget> SCheeseStrikeMenu::WithTooltip(TSharedRef<SWidget> Widget, c
 	return Widget;
 }
 
+TSharedRef<SWidget> SCheeseStrikeMenu::WithTooltipMade(TSharedRef<SWidget> Widget, TFunction<TSharedRef<SWidget>()> Make)
+{
+	TooltipOwners.Add({Widget, FString(), FString(), MoveTemp(Make)});
+	return Widget;
+}
+
+bool SCheeseStrikeMenu::AreFocusRingsShown()
+{
+	return MenuFocusRingsShown;
+}
+
 static TAutoConsoleVariable<int32> CVarMenuTooltip(TEXT("CheeseStrike.MenuTooltip"), 0,
 	TEXT("n: the menu shows the tooltip of its n-th widget that has one (in the order they were made), as if hovered, for looking at it; 0: none."));
 
@@ -1304,7 +1315,7 @@ void SCheeseStrikeMenu::UpdateTooltip()
 	{
 		TooltipShownFor = HoveredWidget;
 		bTooltipShown = true;
-		TooltipCard = MakeTooltip(Hovered->Text, Hovered->Title);
+		TooltipCard = Hovered->Make ? Hovered->Make() : MakeTooltip(Hovered->Text, Hovered->Title);
 		TooltipBox->SetContent(MenuFadeIn(TooltipCard.ToSharedRef()));
 		// Measured now, so that it is put right from its first frame.
 		TooltipCard->SlatePrepass(Mine.Scale);
@@ -1703,6 +1714,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePage()
 	case EMenuPage::Credits: return MakeCredits();
 	case EMenuPage::Options: return MakeOptions();
 	case EMenuPage::Loadout: return MakeLoadout();
+	case EMenuPage::Themes: return MakeThemes();
 	default: return SNullWidget::NullWidget;
 	}
 }
@@ -1720,7 +1732,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeTitle(const FString& Text)
 float SCheeseStrikeMenu::WrapWidth() const
 {
 	// The same widths as the content box is given in Refresh (the settings over the lobby have the settings page's).
-	return (Page == EMenuPage::Options || bBuildingLobbyOverlay ? 900.0f : (Page == EMenuPage::Credits || Page == EMenuPage::Loadout ? 640.0f : 400.0f)) - 24.0f;
+	return (Page == EMenuPage::Options || Page == EMenuPage::Themes || bBuildingLobbyOverlay ? 900.0f : (Page == EMenuPage::Credits || Page == EMenuPage::Loadout ? 640.0f : 400.0f)) - 24.0f;
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim, bool bWrap, float WrapAt)
@@ -1966,6 +1978,10 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("FIND A MATCH"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Find); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("CREDITS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Credits); }) ]
+#if !UE_BUILD_SHIPPING
+			// TEMPORARY: the sampler of UI themes (UI/CheeseStrikeThemes.h), for picking a look from; never in a shipping build.
+			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("THEMES"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Themes); }) ]
+#endif
 			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeQuitButton() ]
 		];
 }
@@ -3054,6 +3070,10 @@ FString SCheeseStrikeMenu::PageKey() const
 	if (Page == EMenuPage::Options)
 	{
 		Key += TEXT("|") + OptionsKey();
+	}
+	if (Page == EMenuPage::Themes)
+	{
+		Key += TEXT("|") + ThemesKey();
 	}
 	return Key;
 }

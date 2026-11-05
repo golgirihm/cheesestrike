@@ -42,6 +42,8 @@ enum class EMenuPage : uint8
 	 * (ACheeseStrikePlayerController::IsLoadoutOffered: the HUD's count shows through, the page says the seconds).
 	 */
 	Loadout,
+	/** TEMPORARY: the sampler of UI themes (UI/CheeseStrikeThemes.h), a dev page of the front end's, to pick a look from. */
+	Themes,
 };
 
 /** The settings page's tabs. */
@@ -329,6 +331,10 @@ public:
 	FVector2D PanelWants() const;
 	/** Shuts any dropdown open, giving the focus back to its button; true if one was. */
 	bool CloseDropdowns();
+	/** Whether the item with the focus is ringed: not while the player uses the mouse, which has its hover. */
+	static bool AreFocusRingsShown();
+	/** TEMPORARY: the theme sampler shows theme `Index` (0 to 4), or all of them stacked for any index past them. */
+	void ShowTheme(int32 Index);
 
 private:
 	enum class EButtonKind : uint8 { Plain, Primary, Danger, Quiet };
@@ -349,6 +355,18 @@ private:
 	/** What the loadout page is made of (the picks, and whether a count-in offers it): drawn again when it changes. */
 	FString LoadoutKey() const;
 	TSharedRef<SWidget> MakeFind();
+	/**
+	 * TEMPORARY (UI/CheeseStrikeThemes.cpp): the sampler of UI themes: tabs across the top for each theme and SHOW ALL,
+	 * then the theme's sample, or every sample stacked in a scroll box; each sample a title, the buttons, a dropdown, a
+	 * slider, a toggle, a text field, tabs, a card with a tooltip and a chip in that theme's looks, with its own hover and
+	 * click sounds. Its picks (ThemeSamples) are read live, so nothing is drawn afresh for them.
+	 */
+	TSharedRef<SWidget> MakeThemes();
+	TSharedRef<SWidget> MakeThemeSample(int32 Theme);
+	/** A dropdown in a theme's looks (as MakeDropdown, kept in Dropdowns likewise), its chosen one of `Choices` read live. */
+	TSharedRef<SWidget> MakeThemedDropdown(int32 Theme, const TArray<FString>& Choices, TFunction<int32()> GetChosen, TFunction<void(int32)> Pick);
+	/** What the themes page is made of: the theme shown, or all. */
+	FString ThemesKey() const;
 	TSharedRef<SWidget> MakeLobby();
 	TSharedRef<SWidget> MakeLobbyRules();
 	TSharedRef<SWidget> MakePause();
@@ -396,6 +414,8 @@ private:
 	TSharedRef<SWidget> MakeTooltip(const FString& Text, const FString& Title = FString());
 	/** Gives `Widget` the tooltip MakeTooltip makes of `Text` and `Title` (none for an empty `Text`); returns `Widget`. */
 	TSharedRef<SWidget> WithTooltip(TSharedRef<SWidget> Widget, const FString& Text, const FString& Title = FString());
+	/** Gives `Widget` a tooltip of its own making (the theme sampler's, in its theme's looks), shown as MakeTooltip's are; returns `Widget`. */
+	TSharedRef<SWidget> WithTooltipMade(TSharedRef<SWidget> Widget, TFunction<TSharedRef<SWidget>()> Make);
 	/** Shows the tooltip of whichever widget with one is hovered (the innermost), after TooltipDelay, beside the mouse; run every frame. */
 	void UpdateTooltip();
 	/**
@@ -521,6 +541,20 @@ private:
 	TWeakPtr<SScrollBox> CreditsScroll;
 
 	EMenuPage Page = EMenuPage::None;
+	/**
+	 * TEMPORARY: the theme sampler's state (MakeThemes): which theme's sample shows, or all of them, and each sample's own
+	 * picks (its tab, its dropdown's choice, its toggle and its slider), read live by the sample's widgets.
+	 */
+	int32 ThemeShown = 0;
+	bool bAllThemes = false;
+	struct FThemeSample
+	{
+		int32 Tab = 0;
+		int32 Choice = 0;
+		bool bOn = true;
+		float Value = 0.7f;
+	};
+	TArray<FThemeSample> ThemeSamples;
 	/** The page last built afresh: a page shown in its place fades in, the same one drawn again doesn't. */
 	EMenuPage BuiltPage = EMenuPage::None;
 	EOptionsTab OptionsTab = EOptionsTab::Controls;
@@ -584,6 +618,8 @@ private:
 		TWeakPtr<SWidget> Widget;
 		FString Text;
 		FString Title;
+		/** Makes the tooltip itself, in place of MakeTooltip, when set (WithTooltipMade). */
+		TFunction<TSharedRef<SWidget>()> Make;
 	};
 	TArray<FTooltipOwner> TooltipOwners;
 	/**

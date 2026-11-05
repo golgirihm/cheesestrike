@@ -34,6 +34,14 @@ namespace CheeseStrikeSynth
 	TArray<int16> Explosion(float Seconds, int32 Seed);
 	/** A soft hiss for `Seconds` (the Smoked Gouda's cloud): band-limited noise, in over a third of a second, wavering gently, and out over the last fifth. Peaks at a quarter of full scale. */
 	TArray<int16> Hiss(float Seconds);
+	/**
+	 * The UI theme sampler's sounds (UI/CheeseStrikeThemes.h, temporary), a hover and a click a theme, each a few tenths of
+	 * a second at most: the Cheese Board's soft wooden tick and wooden knock, the Deli Counter's paper tick and ticket
+	 * punch, Cave Aged's glass ping and low stone tap, Cartoon Cheese's pop and boing, Tactical's mechanical click and radio
+	 * blip. `Theme` is the theme's index (CheeseStrikeThemes::NumThemes); out of range, the first's.
+	 */
+	TArray<int16> ThemeHover(int32 Theme);
+	TArray<int16> ThemeClick(int32 Theme);
 	/** A sound, owned by `Outer`, that plays `Samples` once. */
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples);
 }

@@ -271,7 +271,8 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	}
 	const TSharedRef<SCheeseStrikeMenu> Menu = SNew(SCheeseStrikeMenu).Controller(nullptr);
 	Menu->Show(EMenuPage::Main);
-	TestEqual(TEXT("the front end's items, LOADOUT among them (the hero is picked there, every hero a pick, none automatic)"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("PRACTICE"), TEXT("LOADOUT"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("QUIT")}));
+	// (THEMES is the temporary sampler of UI themes, UI/CheeseStrikeThemes.h, never in a shipping build; the tests are never one.)
+	TestEqual(TEXT("the front end's items, LOADOUT among them (the hero is picked there, every hero a pick, none automatic)"), Menu->GetFocusableNames(), TArray<FString>({TEXT("HOST A MATCH"), TEXT("PRACTICE"), TEXT("LOADOUT"), TEXT("FIND A MATCH"), TEXT("SETTINGS"), TEXT("CREDITS"), TEXT("THEMES"), TEXT("QUIT")}));
 	TestEqual(TEXT("the first has the focus"), Menu->GetFocusName(), FString(TEXT("HOST A MATCH")));
 	// The loadout page: the heroes' portraits, the primaries, the grenades, then Back; the first hero has the focus.
 	Menu->FocusItem(TEXT("LOADOUT"));
@@ -302,6 +303,18 @@ bool FTheMenuKeepsItsFocus::RunTest(const FString& Parameters)
 	TestEqual(TEXT("back on the front end, on Settings again"), Menu->GetFocusName(), FString(TEXT("SETTINGS")));
 	Menu->Show(EMenuPage::Credits);
 	TestEqual(TEXT("the credits' Back"), Menu->GetFocusName(), FString(TEXT("BACK")));
+	// TEMPORARY: the theme sampler's page: the themes' tabs first (the first has the focus), then the sample's items, in
+	// rows, then Back; a dropdown among them, so CheeseStrikeDropdown opens it.
+	Menu->Show(EMenuPage::Themes);
+	const TArray<FString> Themes = Menu->GetFocusableNames();
+	TestEqual(TEXT("the themes page focuses the first theme's tab"), Menu->GetFocusName(), FString(TEXT("CHEESE BOARD")));
+	TestTrue(TEXT("its tabs, then the sample's tabs, buttons, dropdown, toggle, slider and field, then Back"), Themes.Num() > 12 && Themes[0] == TEXT("CHEESE BOARD") && Themes[4] == TEXT("TACTICAL") && Themes[5] == TEXT("SHOW ALL")
+		&& Themes.Contains(TEXT("Overview")) && Themes.Contains(TEXT("Start the match")) && Themes.Contains(TEXT("Leave")) && Themes.Contains(TEXT("Dropdown 1")) && Themes.Contains(TEXT("Toggle"))
+		&& Themes.Contains(TEXT("Slider")) && Themes.Contains(TEXT("Text field")) && Themes.Last() == TEXT("BACK"));
+	TestTrue(TEXT("a disabled button is listed but never takes the focus"), Themes.Contains(TEXT("Waiting for players")));
+	Menu->FocusItem(TEXT("Waiting for players"));
+	Menu->Refresh();
+	TestTrue(TEXT("(the focus goes on to the next that can)"), Menu->GetFocusName() != TEXT("Waiting for players"));
 	return true;
 }
 
