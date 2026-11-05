@@ -107,6 +107,18 @@ bool FEveryWeaponHasItsOwnLook::RunTest(const FString& Parameters)
 		else
 		{
 			TestEqual(FString::Printf(TEXT("%s doesn't flash"), *Name), Look.FlashSize, 0.0f);
+			// Its own swings and blow, if it has them (the Cheese Stick's whoosh and thump), else the knife's.
+			for (const TCHAR* Swing : Look.Shots)
+			{
+				if (Swing != nullptr)
+				{
+					TestNotNull(FString::Printf(TEXT("%s's swing loads"), *Name), Load<USoundBase>(Swing));
+				}
+			}
+			if (Look.StrikeSound != nullptr)
+			{
+				TestNotNull(FString::Printf(TEXT("%s's blow loads"), *Name), Load<USoundBase>(Look.StrikeSound));
+			}
 		}
 		TestTrue(FString::Printf(TEXT("%s's shots are about as loud as the rest"), *Name), Look.ShotVolume > 0.5f && Look.ShotVolume <= 1.3f);
 

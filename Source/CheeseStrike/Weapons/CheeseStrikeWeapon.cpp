@@ -256,16 +256,27 @@ void ACheeseStrikeWeapon::ApplyWeapon()
 	ModelFire = LoadLook<UAnimSequence>(Look->FireAnimation);
 	ModelReload = LoadLook<UAnimSequence>(Look->ReloadAnimation);
 	FireSounds.Reset();
-	// The knife has none of a gun's shots (the rifle's punch-close): its own swing, and its own stab when it hits.
+	// A melee weapon has none of a gun's shots: its look's swings, or the knife's, and its look's blow landing, or the
+	// knife's stab.
 	const bool bKnife = Stats->IsMelee();
 	if (bKnife)
 	{
-		for (const TCHAR* Path : CheeseStrikeWeaponLooks::KnifeSwings)
+		if (Look->Shots[0] != nullptr)
 		{
-			FireSounds.Add(LoadLook<USoundBase>(Path));
+			for (const TCHAR* Path : Look->Shots)
+			{
+				FireSounds.Add(LoadLook<USoundBase>(Path));
+			}
+		}
+		else
+		{
+			for (const TCHAR* Path : CheeseStrikeWeaponLooks::KnifeSwings)
+			{
+				FireSounds.Add(LoadLook<USoundBase>(Path));
+			}
 		}
 		HitSounds.Reset();
-		HitSounds.Add(LoadLook<USoundBase>(CheeseStrikeWeaponLooks::KnifeStab));
+		HitSounds.Add(LoadLook<USoundBase>(Look->StrikeSound != nullptr ? Look->StrikeSound : CheeseStrikeWeaponLooks::KnifeStab));
 	}
 	else
 	{

@@ -54,6 +54,11 @@ namespace
 		{
 			return *Kept.Add_GetRef(FString::Printf(TEXT("/Game/CheeseStrike/Weapons/%s/SM_%s.SM_%s"), Folder, Name, Name));
 		};
+		// The game's own sounds, made by tools/art/wave15_sounds.py.
+		const auto Sound = [](const TCHAR* Name) -> const TCHAR*
+		{
+			return *Kept.Add_GetRef(FString::Printf(TEXT("/Game/CheeseStrike/Sounds/%s.%s"), Name, Name));
+		};
 
 		// The Cheddar Blaster: blocks of cheddar for its receiver, handguard and stock on a steel barrel, rail and sights; Lyra's
 		// rifle's length, and its sight line, fore-end and muzzle where the rifle's were.
@@ -101,7 +106,11 @@ namespace
 			Look.FlashSize = 0.5f;
 			// Under the box, holding it up.
 			Look.LeftHand = FVector(0.0f, 8.2f, -14.2f);
-			RifleSounds(Look, 0.7f, 1.5f);
+			// Its own rasping "zzzip" (tools/art/wave15_sounds.py), not a gun's; the rifle's dry click and reload.
+			RifleSounds(Look, 0.9f, 1.0f);
+			Look.Shots[0] = Sound(TEXT("SW_GraterShot1"));
+			Look.Shots[1] = Sound(TEXT("SW_GraterShot2"));
+			Look.Shots[2] = Sound(TEXT("SW_GraterShot3"));
 			Look.ProjectileModel = Model(TEXT("Grater"), TEXT("GraterShard"));
 			Look.ProjectileMaterials[0] = Material(TEXT("MI_Parmesan"));
 			Look.ProjectileShape = FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(1.2f));
@@ -141,10 +150,11 @@ namespace
 			Look.Muzzle = FVector(0.0f, 48.0f, 3.0f);
 			Look.FlashSize = 1.5f;
 			Look.LeftHand = FVector(0.0f, 40.0f, 0.8f);
-			// Real shotgun blasts (OpenGameArt, CC0; tools/art/wave8_sounds.py), not Lyra's.
-			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot1.SW_ShotgunShot1");
-			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot2.SW_ShotgunShot2");
-			Look.Shots[2] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot3.SW_ShotgunShot3");
+			// Real shotgun blasts (OpenGameArt, CC0), not Lyra's, with a thump of 60-120 Hz laid under each crack and a
+			// longer rumbling tail (tools/art/wave15_sounds.py).
+			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBoom1.SW_ShotgunBoom1");
+			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBoom2.SW_ShotgunBoom2");
+			Look.Shots[2] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBoom3.SW_ShotgunBoom3");
 			Look.DryFire = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_DryFire_01.Weapons_Shotgun_DryFire_01");
 			Look.ReloadSounds[0] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_ClipOut_01.Weapons_Shotgun_ClipOut_01");
 			Look.ReloadSounds[1] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_ClipIn_01.Weapons_Shotgun_ClipIn_01");
@@ -272,8 +282,14 @@ namespace
 			Look.Materials[0] = Material(TEXT("MI_StringCheese"));
 			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
 			Look.FlashSize = 0.0f;
-			Look.ShotVolume = 0.9f;
-			Look.ShotPitch = 0.7f;
+			// A heavy, slow whoosh for its swing (about 350 ms of body, for the slower stroke) and a deep thump as its blow
+			// lands (tools/art/wave15_sounds.py), in place of the knife's.
+			Look.Shots[0] = Sound(TEXT("SW_StickSwing1"));
+			Look.Shots[1] = Sound(TEXT("SW_StickSwing2"));
+			Look.Shots[2] = Sound(TEXT("SW_StickSwing3"));
+			Look.StrikeSound = Sound(TEXT("SW_StickHit"));
+			Look.ShotVolume = 1.0f;
+			Look.ShotPitch = 1.0f;
 			Looks.Add(Look);
 		}
 		// The Cheese Knife: our own (tools/art/weapon_models.py), its handle in red wax. It came in pointing back.
