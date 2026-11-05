@@ -194,8 +194,9 @@ bool UCheeseStrikePlayScript::Run(const FCommand& Command)
 	{
 		// With the interface in it: the menus are drawn in Slate, over the view.
 		FScreenshotRequest::RequestScreenshot(Name + TEXT(".png"), true, false);
-		// Taken at the end of this frame: nothing more this frame, or it would be in the picture.
-		Waiting = 0.05f;
+		// Taken at the end of this frame: nothing more this frame, or it would be in the picture. (Three hundredths: a
+		// frame at 30 a second, two at 60, so that a run of shots can follow a motion, the friends panel's slide.)
+		Waiting = 0.03f;
 		return false;
 	}
 	else if (Command.Verb == TEXT("state"))

@@ -1,0 +1,43 @@
+# The friends panel sliding open and shut on the front end
+# (CheeseStrike.FriendsOpen holds it open as if hovered): once with nothing
+# slowing the frames, the width logged each frame it moves ("Friends panel: N
+# wide"; the slide runs on Slate's clock, so a screenshot a frame, which takes
+# a while to write, would leave it few frames), and once more with a screenshot
+# every 0.03 s for the pictures. tools/art/friends_widths.py reads both. Run with
+# tools/play.ps1 -Script tools/play/friends_expand.txt -Lobby -Res 1600x900 -FixedFps 60 -Tag friends_expand
+wait 5
+cmd CheeseStrikeSampleFriends 1
+shot friends_expand_00
+cmd CheeseStrike.FriendsOpen 1
+wait 0.6
+cmd CheeseStrike.FriendsOpen 0
+wait 0.8
+cmd CheeseStrike.FriendsOpen 1
+shot friends_expand_01
+shot friends_expand_02
+shot friends_expand_03
+shot friends_expand_04
+shot friends_expand_05
+shot friends_expand_06
+shot friends_expand_07
+shot friends_expand_08
+shot friends_expand_09
+shot friends_expand_10
+shot friends_expand_11
+shot friends_expand_12
+wait 0.5
+shot friends_expand_open
+cmd CheeseStrike.FriendsOpen 0
+shot friends_collapse_01
+shot friends_collapse_02
+shot friends_collapse_03
+shot friends_collapse_04
+shot friends_collapse_05
+shot friends_collapse_06
+shot friends_collapse_07
+shot friends_collapse_08
+shot friends_collapse_09
+shot friends_collapse_10
+wait 0.5
+shot friends_expand_shut
+quit
