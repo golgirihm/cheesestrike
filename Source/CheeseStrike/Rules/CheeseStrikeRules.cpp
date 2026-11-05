@@ -105,10 +105,16 @@ namespace CheeseStrikeRules
 
 	TArray<int32> MapsOffered()
 	{
+		// The default first, as it is the one a lobby begins with; then the rest in the maps' order. Maps keeps its order,
+		// so that ?Map=, the settings and everything else keyed by a map's index stay as they were.
 		TArray<int32> Offered;
+		if (IsOffered(DefaultMap()))
+		{
+			Offered.Add(DefaultMap());
+		}
 		for (int32 Index = 0; Index < NumMaps(); ++Index)
 		{
-			if (IsOffered(Index))
+			if (IsOffered(Index) && Index != DefaultMap())
 			{
 				Offered.Add(Index);
 			}

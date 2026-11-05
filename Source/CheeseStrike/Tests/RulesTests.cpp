@@ -179,7 +179,15 @@ bool FAHostPicksAMap::RunTest(const FString& Parameters)
 	const TArray<int32> Offered = MapsOffered();
 	TestEqual(TEXT("the lobby offers every map but the range"), Offered.Num(), NumMaps() - 1);
 	TestFalse(TEXT("not the range"), Offered.Contains(Range));
-	TestTrue(TEXT("in the maps' order"), Offered.Num() > 1 && Offered[0] == 0 && Offered.Last() > Offered[0]);
+	TestEqual(TEXT("the default, Gruyère Grotto, first (the lobby begins with it)"), Offered.Num() > 0 ? Offered[0] : INDEX_NONE, DefaultMap());
+	TestEqual(TEXT("which is the Grotto"), DefaultMap(), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/Lvl_Grotto")));
+	bool bInOrder = true;
+	for (int32 Index = 2; Index < Offered.Num(); ++Index)
+	{
+		bInOrder &= Offered[Index] > Offered[Index - 1];
+	}
+	TestTrue(TEXT("then the rest in the maps' order"), Offered.Num() > 2 && Offered[1] == 0 && bInOrder && Offered.Find(DefaultMap()) == 0 && Offered.FindLast(DefaultMap()) == 0);
+	TestEqual(TEXT("the maps' indices are as they were (?Map=0 is The Creamery)"), MapIndexFor(TEXT("/Game/CheeseStrike/Maps/Lvl_Creamery")), 0);
 	TestTrue(TEXT("a match with ?listen is hosted for others"), IsHosted(TEXT("?listen?Bots=0")) && IsHosted(CheeseStrikeRules::HostOptions() + TEXT("?listen")));
 	TestFalse(TEXT("PRACTICE plays alone"), IsHosted(CheeseStrikeRange::PracticeOptions()));
 	TestEqual(TEXT("a match hosted on the range plays the default map instead"), MapForMatch(Range, true), DefaultMap());
