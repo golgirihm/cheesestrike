@@ -1,0 +1,262 @@
+# Wave 16's grips, as every hero: the Curd Pistol in the right hand alone, the knife upright in the fist, the Munster
+# Twin SMGs and the Dual Burratas a gun in each hand with the reticle clear aimed, the Cheese Stick held as a sledgehammer
+# (at rest and through its swing); each in first person, the pistol, knife and SMGs from outside too.
+# tools/play.ps1 -Script tools/play/w16_arms.txt -Tag arms -FixedFps 30
+wait 3
+cmd CheeseStrikeBody 0 0
+wait 0.5
+tap Sidearm
+wait 1
+shot a0_pistol_fp
+hold Aim
+wait 0.7
+shot a0_pistol_fp_aimed
+cmd CheeseStrikeOutside 170 40 20
+wait 0.5
+shot a0_pistol_aimed_right
+release Aim
+wait 0.5
+shot a0_pistol_right
+cmd CheeseStrikeOutside 170 10 20
+wait 0.5
+shot a0_pistol_front
+cmd CheeseStrikeOutside
+tap Knife
+wait 1
+shot a0_knife_fp
+cmd CheeseStrikeOutside 170 40 20
+wait 0.5
+shot a0_knife_right
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 1
+shot a0_munster_fp
+hold Aim
+wait 0.7
+shot a0_munster_fp_aimed
+cmd CheeseStrikeOutside 160 5 45
+wait 0.5
+shot a0_munster_aimed_front
+release Aim
+wait 0.5
+shot a0_munster_front
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1
+shot a0_burratas_fp
+hold Aim
+wait 0.7
+shot a0_burratas_fp_aimed
+release Aim
+cmd CheeseStrikeArm stick
+wait 1.2
+shot a0_stick_fp
+tap Fire
+wait 0.25
+shot a0_stick_s1
+wait 0.24
+shot a0_stick_s2_contact
+wait 0.25
+shot a0_stick_s3
+wait 0.8
+cmd CheeseStrikeOutside 200 60 30
+wait 0.5
+shot a0_stick_right
+cmd CheeseStrikeOutside 220 15 30
+wait 0.5
+shot a0_stick_front
+cmd CheeseStrikeOutside
+wait 0.3
+cmd CheeseStrikeBody 1 1
+wait 0.5
+tap Sidearm
+wait 1
+shot a1_pistol_fp
+hold Aim
+wait 0.7
+shot a1_pistol_fp_aimed
+cmd CheeseStrikeOutside 170 40 20
+wait 0.5
+shot a1_pistol_aimed_right
+release Aim
+wait 0.5
+shot a1_pistol_right
+cmd CheeseStrikeOutside 170 10 20
+wait 0.5
+shot a1_pistol_front
+cmd CheeseStrikeOutside
+tap Knife
+wait 1
+shot a1_knife_fp
+cmd CheeseStrikeOutside 170 40 20
+wait 0.5
+shot a1_knife_right
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 1
+shot a1_munster_fp
+hold Aim
+wait 0.7
+shot a1_munster_fp_aimed
+cmd CheeseStrikeOutside 160 5 45
+wait 0.5
+shot a1_munster_aimed_front
+release Aim
+wait 0.5
+shot a1_munster_front
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1
+shot a1_burratas_fp
+hold Aim
+wait 0.7
+shot a1_burratas_fp_aimed
+release Aim
+cmd CheeseStrikeArm stick
+wait 1.2
+shot a1_stick_fp
+tap Fire
+wait 0.25
+shot a1_stick_s1
+wait 0.24
+shot a1_stick_s2_contact
+wait 0.25
+shot a1_stick_s3
+wait 0.8
+cmd CheeseStrikeOutside 200 60 30
+wait 0.5
+shot a1_stick_right
+cmd CheeseStrikeOutside 220 15 30
+wait 0.5
+shot a1_stick_front
+cmd CheeseStrikeOutside
+wait 0.3
+cmd CheeseStrikeBody 2 0
+wait 0.5
+tap Sidearm
+wait 1
+shot a2_pistol_fp
+hold Aim
+wait 0.7
+shot a2_pistol_fp_aimed
+cmd CheeseStrikeOutside 170 40 20
+wait 0.5
+shot a2_pistol_aimed_right
+release Aim
+wait 0.5
+shot a2_pistol_right
+cmd CheeseStrikeOutside 170 10 20
+wait 0.5
+shot a2_pistol_front
+cmd CheeseStrikeOutside
+tap Knife
+wait 1
+shot a2_knife_fp
+cmd CheeseStrikeOutside 170 40 20
+wait 0.5
+shot a2_knife_right
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 1
+shot a2_munster_fp
+hold Aim
+wait 0.7
+shot a2_munster_fp_aimed
+cmd CheeseStrikeOutside 160 5 45
+wait 0.5
+shot a2_munster_aimed_front
+release Aim
+wait 0.5
+shot a2_munster_front
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1
+shot a2_burratas_fp
+hold Aim
+wait 0.7
+shot a2_burratas_fp_aimed
+release Aim
+cmd CheeseStrikeArm stick
+wait 1.2
+shot a2_stick_fp
+tap Fire
+wait 0.25
+shot a2_stick_s1
+wait 0.24
+shot a2_stick_s2_contact
+wait 0.25
+shot a2_stick_s3
+wait 0.8
+cmd CheeseStrikeOutside 200 60 30
+wait 0.5
+shot a2_stick_right
+cmd CheeseStrikeOutside 220 15 30
+wait 0.5
+shot a2_stick_front
+cmd CheeseStrikeOutside
+wait 0.3
+cmd CheeseStrikeBody 3 1
+wait 0.5
+tap Sidearm
+wait 1
+shot a3_pistol_fp
+hold Aim
+wait 0.7
+shot a3_pistol_fp_aimed
+cmd CheeseStrikeOutside 170 40 20
+wait 0.5
+shot a3_pistol_aimed_right
+release Aim
+wait 0.5
+shot a3_pistol_right
+cmd CheeseStrikeOutside 170 10 20
+wait 0.5
+shot a3_pistol_front
+cmd CheeseStrikeOutside
+tap Knife
+wait 1
+shot a3_knife_fp
+cmd CheeseStrikeOutside 170 40 20
+wait 0.5
+shot a3_knife_right
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm munster
+wait 1
+shot a3_munster_fp
+hold Aim
+wait 0.7
+shot a3_munster_fp_aimed
+cmd CheeseStrikeOutside 160 5 45
+wait 0.5
+shot a3_munster_aimed_front
+release Aim
+wait 0.5
+shot a3_munster_front
+cmd CheeseStrikeOutside
+cmd CheeseStrikeArm burratas
+wait 1
+shot a3_burratas_fp
+hold Aim
+wait 0.7
+shot a3_burratas_fp_aimed
+release Aim
+cmd CheeseStrikeArm stick
+wait 1.2
+shot a3_stick_fp
+tap Fire
+wait 0.25
+shot a3_stick_s1
+wait 0.24
+shot a3_stick_s2_contact
+wait 0.25
+shot a3_stick_s3
+wait 0.8
+cmd CheeseStrikeOutside 200 60 30
+wait 0.5
+shot a3_stick_right
+cmd CheeseStrikeOutside 220 15 30
+wait 0.5
+shot a3_stick_front
+cmd CheeseStrikeOutside
+wait 0.3
+quit

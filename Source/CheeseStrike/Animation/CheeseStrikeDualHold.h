@@ -17,10 +17,11 @@ namespace CheeseStrikeDual
 	/**
 	 * Aimed: on the body others see, how far out each hand goes from where the aimed stance has the weapon hand (the two
 	 * side by side at eye level); and in its own player's view, half of how far apart the two guns sit either side of the
-	 * eye, which the look's Sight gives (FWeaponLook::Sight, its X), so that the view's hold needs no push at all.
+	 * eye, which the look's Sight gives (FWeaponLook::Sight, its X), so that the view's hold needs no push at all: far
+	 * enough apart that neither hand comes over the middle of the view, where the crosshair is.
 	 */
 	constexpr float AimSpread = 6.0f;
-	constexpr float AimHalfApart = 7.0f;
+	constexpr float AimHalfApart = 11.0f;
 	/** Aimed, each gun is turned in toward the middle by this many degrees (the right to the left, the left to the right). */
 	constexpr float Converge = 3.0f;
 
@@ -55,9 +56,14 @@ namespace CheeseStrikeDual
  * side and alike. Aimed (Aim), the spread is the aimed one (in its own
  * player's view none: the look's Sight has put the right gun beside the eye
  * already) and the right gun is turned in a little (Converge) before the
- * mirror, so that the two converge. After the first-person hold, so that it
- * moves the hand placed in view; the left hand's grip (FCheeseStrikeGripIK)
- * has nothing to do then, the weapon being held in one hand each.
+ * mirror, so that the two converge. In its own player's view the mirror is
+ * the view's own middle (the upright plane through the eye along the view,
+ * bAboutEye), so that the pair sits evenly either side of the crosshair
+ * whatever the head's lean. The left hand's fingers close round its gun as
+ * the right's round theirs (mirrored joint by joint). After the first-person
+ * hold, so that it moves the hand placed in view; the left hand's grip
+ * (FCheeseStrikeGripIK) has nothing to do then, the weapon being held in one
+ * hand each.
  */
 struct FCheeseStrikeDualHold : public FAnimNode_Base
 {
@@ -76,6 +82,10 @@ struct FCheeseStrikeDualHold : public FAnimNode_Base
 	/** The way the body faces in component space, and where the capsule's axis meets the floor. */
 	FVector Forward = FVector(0.0, 1.0, 0.0);
 	FVector Origin = FVector::ZeroVector;
+	/** Mirrored across the view's middle (its own player's body): the view's turn in component space, and the camera's place in the head bone's space. */
+	bool bAboutEye = false;
+	FQuat View = FQuat::Identity;
+	FVector CameraAtHead = FVector::ZeroVector;
 
 	virtual void Initialize_AnyThread(const FAnimationInitializeContext& Context) override;
 	virtual void CacheBones_AnyThread(const FAnimationCacheBonesContext& Context) override;
@@ -89,7 +99,12 @@ private:
 	FBoneReference UpperL;
 	FBoneReference LowerL;
 	FBoneReference HandL;
+	FBoneReference Head;
 	bool bBones = false;
 	/** The left hand's frame against the right's mirrored, from the reference pose. */
 	FTransform Correction = FTransform::Identity;
+	/** Each finger's joints (thumb, index, middle, ring, little; three each) on both hands (right, left), and each left joint's frame against its right one's mirrored. */
+	FBoneReference Fingers[2][5][3];
+	FQuat FingerCorrection[5][3];
+	bool bFingers = false;
 };

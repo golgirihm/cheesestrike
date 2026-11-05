@@ -89,4 +89,38 @@ namespace CheeseStrikeDowned
 	{
 		return FMath::Lerp(Body.Shoulders, Body.Hips, 0.35f);
 	}
+
+	FVector2D FFloor::Point(int32 Column, int32 Row)
+	{
+		return FVector2D(FloorBehind + Column * FloorStep, (Row - (FloorRows - 1) * 0.5f) * FloorStep);
+	}
+
+	float FFloor::At(float X, float Y) const
+	{
+		// Where it is in the grid, kept to it; then between the four points round it, bilinearly.
+		const float Across = FMath::Clamp((X - FloorBehind) / FloorStep, 0.0f, FloorColumns - 1.0f);
+		const float Down = FMath::Clamp(Y / FloorStep + (FloorRows - 1) * 0.5f, 0.0f, FloorRows - 1.0f);
+		const int32 Column = FMath::Min(FMath::FloorToInt(Across), FloorColumns - 2);
+		const int32 Row = FMath::Min(FMath::FloorToInt(Down), FloorRows - 2);
+		const float U = Across - Column;
+		const float V = Down - Row;
+		const float Near = FMath::Lerp(Heights[Column][Row], Heights[Column][Row + 1], V);
+		const float Far = FMath::Lerp(Heights[Column + 1][Row], Heights[Column + 1][Row + 1], V);
+		return FMath::Lerp(Near, Far, U);
+	}
+
+	bool FFloor::IsFlat() const
+	{
+		for (int32 Column = 0; Column < FloorColumns; ++Column)
+		{
+			for (int32 Row = 0; Row < FloorRows; ++Row)
+			{
+				if (FMath::Abs(Heights[Column][Row]) > 0.5f)
+				{
+					return false;
+				}
+			}
+		}
+		return true;
+	}
 }

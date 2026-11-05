@@ -99,4 +99,31 @@ namespace CheeseStrikeDowned
 	FShape Shape(const FVector& Floor, float Yaw, float LegRoom);
 	/** Its middle (the chest, or between the chest and the hips), for aiming at it. */
 	FVector Middle(const FShape& Body);
+
+	/**
+	 * The floor round a body lying down, as the character measures it (ACheeseStrikeCharacter::MeasureDownFloor): how high
+	 * it is over the capsule's floor (cm, under it negative) at the points of a grid in the body's frame, FloorColumns
+	 * from FloorBehind behind the capsule's axis to past the feet, FloorRows across from the left to the right, FloorStep
+	 * apart; so that on a slope or a step the pose lays every part of the body on the floor under it, not on a level one
+	 * (FCheeseStrikeDownedPose). Flat (all 0) until measured.
+	 */
+	constexpr int32 FloorColumns = 10;
+	constexpr int32 FloorRows = 5;
+	constexpr float FloorStep = 25.0f;
+	constexpr float FloorBehind = -75.0f;
+	/** A floor point measured this far up or down from the capsule's floor at most (cm): what is further is no floor of the body's. */
+	constexpr float FloorReach = 60.0f;
+	/** Nothing of the body lying down goes nearer the floor under it than this (cm): the pose raises it whole if anything would. */
+	constexpr float FloorClear = 1.0f;
+	/** The bones of the heroes' own guns (hidden with their sections, or parked far from the body by Paragon's animators, as tools/art/ragdolls.py knows them), which with what hangs from them are no part of the body lying on the floor. */
+	inline const TCHAR* const OwnGunBones[] = {TEXT("gun"), TEXT("shotgun_base"), TEXT("sniper_can_arm_01"), TEXT("trap_handle"), TEXT("weapon"), TEXT("weapon_l"), TEXT("pistol"), TEXT("ult_weapon_l"), TEXT("ult_weapon_r"), TEXT("grenade")};
+	struct FFloor
+	{
+		float Heights[FloorColumns][FloorRows] = {};
+		/** The point of the grid at `Column`, `Row`, in the body's frame (X ahead, Y right). */
+		static FVector2D Point(int32 Column, int32 Row);
+		/** How high the floor is at `X` ahead and `Y` to the right of the capsule's axis: between the four points of the grid round it, bilinearly (the edge's beyond it). */
+		float At(float X, float Y) const;
+		bool IsFlat() const;
+	};
 }

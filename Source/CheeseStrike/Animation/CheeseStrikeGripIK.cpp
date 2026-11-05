@@ -4,6 +4,7 @@
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimSequence.h"
 #include "CheeseStrike.h"
+#include "CheeseStrikeArmsPose.h"
 
 void FCheeseStrikeGripIK::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context)
 {
@@ -20,6 +21,11 @@ void FCheeseStrikeGripIK::CacheBones_AnyThread(const FAnimationCacheBonesContext
 	}
 	// The bones may have changed with the mesh: measured afresh.
 	bGripMeasured = false;
+	CheeseStrikeArms::FFist Fist;
+	bFistKnown = CheeseStrikeArms::FistOfSkeleton(Bones.GetReferenceSkeleton(), Side == TEXT("_r"), Fist);
+	FistCentre = Fist.Centre;
+	FistHandle = Fist.Handle;
+	FistFingers = Fist.Fingers;
 }
 
 bool FCheeseStrikeGripIK::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
@@ -86,7 +92,21 @@ void FCheeseStrikeGripIK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseC
 	const FTransform Anchor = Output.Pose.GetComponentSpaceTransform(AnchorBone.GetCompactPoseIndex(Bones));
 	const FTransform Hand = Output.Pose.GetComponentSpaceTransform(HandIndex);
 	// The target, where the grip is on the anchor as it stands now.
-	const FTransform Target = HandOnAnchor() * Anchor;
+	FTransform Target = HandOnAnchor() * Anchor;
+	if (bFist && bHasHold && bFistKnown)
+	{
+		// The fist round the handle there, the fingers pointing on from the forearm, which comes up to it from under the
+		// shoulder: the wrist straight.
+		CheeseStrikeArms::FFist Fist;
+		Fist.Centre = FistCentre;
+		Fist.Handle = FistHandle;
+		Fist.Fingers = FistFingers;
+		const FVector At = Anchor.TransformPosition(Hold);
+		const FVector Along = Anchor.TransformVectorNoScale(HandleAlong).GetSafeNormal();
+		const FVector Shoulder = Output.Pose.GetComponentSpaceTransform(CachedUpperLimbIndex).GetTranslation();
+		const FQuat Turn = CheeseStrikeArms::FistTurn(Fist, Along, At - (Shoulder - FVector::UpVector * CheeseStrikeArms::FistElbowDrop));
+		Target = FTransform(Turn, At - Turn.RotateVector(Fist.Centre));
+	}
 	EffectorLocationSpace = BCS_ComponentSpace;
 	EffectorLocation = Target.GetTranslation();
 	// The elbow bends as the animation has it: a point beyond the elbow, away from the line from shoulder to hand.

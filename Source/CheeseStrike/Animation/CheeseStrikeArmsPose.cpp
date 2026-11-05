@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeArmsPose.h"
 #include "Animation/AnimInstanceProxy.h"
+#include "AnimationRuntime.h"
 #include "TwoBoneIK.h"
 #include "Movement/CheeseStrikeMovement.h"
 #include "Weapons/CheeseStrikeGrenadeRules.h"
@@ -13,15 +14,74 @@ namespace CheeseStrikeArms
 		return DeltaSeconds > 0.0f ? 1.0f - FMath::Exp(-Rate * DeltaSeconds) : 0.0f;
 	}
 
+	FFist FistOf(const FVector (&Knuckles)[4], bool bRight)
+	{
+		const FVector Roots = (Knuckles[0] + Knuckles[1] + Knuckles[2] + Knuckles[3]) * 0.25;
+		const float Length = Roots.Size();
+		FFist Fist;
+		Fist.Fingers = Roots.GetSafeNormal();
+		// Across the palm from the little finger to the index, square to the fingers; out of the palm, the side they close to.
+		FVector Across = Knuckles[0] - Knuckles[3];
+		Across = (Across - Fist.Fingers * FVector::DotProduct(Across, Fist.Fingers)).GetSafeNormal();
+		const FVector Palm = FVector::CrossProduct(Fist.Fingers, Across).GetSafeNormal() * (bRight ? 1.0f : -1.0f);
+		const float Slant = FMath::DegreesToRadians(FistSlant);
+		Fist.Handle = (Across * FMath::Cos(Slant) + Fist.Fingers * FMath::Sin(Slant)).GetSafeNormal();
+		Fist.Centre = Roots + Palm * (Length * FistInset) - Fist.Fingers * (Length * FistBack);
+		return Fist;
+	}
+
+	bool FistOfSkeleton(const FReferenceSkeleton& Skeleton, bool bRight, FFist& Out)
+	{
+		const FString Side = bRight ? TEXT("_r") : TEXT("_l");
+		const int32 HandBone = Skeleton.FindBoneIndex(FName(TEXT("hand") + Side));
+		if (HandBone == INDEX_NONE)
+		{
+			return false;
+		}
+		const FTransform HandInBody = FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, HandBone);
+		const TCHAR* const Names[] = {TEXT("index_01"), TEXT("middle_01"), TEXT("ring_01"), TEXT("pinky_01")};
+		FVector Knuckles[4];
+		for (int32 Each = 0; Each < 4; ++Each)
+		{
+			const int32 Bone = Skeleton.FindBoneIndex(FName(Names[Each] + Side));
+			if (Bone == INDEX_NONE)
+			{
+				return false;
+			}
+			Knuckles[Each] = HandInBody.InverseTransformPosition(FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, Bone).GetLocation());
+		}
+		Out = FistOf(Knuckles, bRight);
+		return true;
+	}
+
+	FTransform HeldInFist(const FFist& Fist, const FVector& Along, const FVector& Up, const FVector& Scale, float GripAlong)
+	{
+		const FVector Back = -(Fist.Fingers - Fist.Handle * FVector::DotProduct(Fist.Fingers, Fist.Handle)).GetSafeNormal();
+		const FQuat Turn = FRotationMatrix::MakeFromXZ(Fist.Handle, Back).ToQuat() * FRotationMatrix::MakeFromXZ(Along, Up).ToQuat().Inverse();
+		return FTransform(Turn.GetNormalized(), Fist.Centre - Turn.RotateVector(Along.GetSafeNormal() * Scale * GripAlong), Scale);
+	}
+
+	FQuat FistTurn(const FFist& Fist, const FVector& Handle, const FVector& Away)
+	{
+		const FVector Along = Handle.GetSafeNormal();
+		// Fingers can't point along the handle: then any way square to it.
+		FVector Fingers = Away - Along * FVector::DotProduct(Away, Along);
+		if (Fingers.SizeSquared() < 1.0e-4)
+		{
+			Fingers = FVector::CrossProduct(Along, FMath::Abs(Along.Z) < 0.9 ? FVector::UpVector : FVector::ForwardVector);
+		}
+		const FQuat Wanted = FRotationMatrix::MakeFromXY(Along, Fingers).ToQuat();
+		const FQuat Own = FRotationMatrix::MakeFromXY(Fist.Handle, Fist.Fingers).ToQuat();
+		return (Wanted * Own.Inverse()).GetNormalized();
+	}
+
 	FKnifeAt KnifeGuard(float PitchUp)
 	{
 		FKnifeAt Guard;
-		// The blade forward out of the fist, a little up and in (a hammer grip on guard, the blade along the forearm);
-		// tipped up about the axis across the blade (its spine stays up over it), so that the stick stands up out of the fist.
-		const FVector Blade = FVector(0.93f, -0.18f, 0.22f).GetSafeNormal();
-		const FVector Across = FVector::CrossProduct(FVector::UpVector, Blade).GetSafeNormal();
-		Guard.Blade = Blade.RotateAngleAxis(-PitchUp, Across).GetSafeNormal();
-		Guard.Spine = (FVector::UpVector - Guard.Blade * FVector::DotProduct(FVector::UpVector, Guard.Blade)).GetSafeNormal();
+		// The blade standing up out of the top of the fist, leaning forward and a little in (a hammer grip on guard), its
+		// spine back toward the forearm.
+		Guard.Blade = FRotator(GuardPitch + PitchUp, GuardYaw, 0.0f).Vector();
+		Guard.Spine = (-FVector::ForwardVector - Guard.Blade * FVector::DotProduct(-FVector::ForwardVector, Guard.Blade)).GetSafeNormal();
 		return Guard;
 	}
 
@@ -38,7 +98,7 @@ namespace CheeseStrikeArms
 		// Raised back by the right shoulder, then swept down and across to the left, the edge leading, and back on guard.
 		const FSwipeKey SwipeKeys[] = {
 			{0.0f, FVector(0.0f, 0.0f, 0.0f), 0.0f, 0.0f},
-			{0.2f, FVector(-6.0f, 14.0f, 14.0f), 70.0f, 20.0f},
+			{0.2f, FVector(-6.0f, 14.0f, 14.0f), 70.0f, 40.0f},
 			{SwipeContactPhase, FVector(20.0f, -10.0f, 4.0f), 0.0f, 0.0f},
 			{0.58f, FVector(12.0f, -34.0f, -12.0f), -75.0f, -15.0f},
 			{1.0f, FVector(0.0f, 0.0f, 0.0f), 0.0f, 0.0f},
@@ -89,6 +149,52 @@ namespace CheeseStrikeArms
 		return Out;
 	}
 
+	namespace
+	{
+		/** One pose of the sledgehammer's swing: when, where the right hand is from where it rests, and which way the stick runs. */
+		struct FSledgeKey
+		{
+			float Phase;
+			FVector Hand;
+			FVector Along;
+		};
+		// At rest the head over the right shoulder; wound further back over it; brought down and across to straight ahead;
+		// on round to the lower left; and back up onto the shoulder.
+		const FVector SledgeResting = FVector(-0.35f, 0.6f, 0.72f).GetSafeNormal();
+		const FSledgeKey SledgeKeys[] = {
+			{0.0f, FVector(0.0f, 0.0f, 0.0f), SledgeResting},
+			{0.2f, FVector(-6.0f, 8.0f, 10.0f), FVector(-0.65f, 0.35f, 0.68f).GetSafeNormal()},
+			{SwipeContactPhase, FVector(14.0f, -10.0f, -4.0f), FVector::ForwardVector},
+			{0.58f, FVector(8.0f, -28.0f, -14.0f), FVector(0.25f, -0.8f, -0.55f).GetSafeNormal()},
+			{1.0f, FVector(0.0f, 0.0f, 0.0f), SledgeResting},
+		};
+	}
+
+	FSledgeAt SledgeRest()
+	{
+		FSledgeAt Rest;
+		Rest.Along = SledgeResting;
+		return Rest;
+	}
+
+	FSledgeAt SledgeSwing(float Phase, float Size)
+	{
+		const float At = FMath::Clamp(Phase, 0.0f, 1.0f);
+		int32 Key = 0;
+		while (Key < UE_ARRAY_COUNT(SledgeKeys) - 2 && At > SledgeKeys[Key + 1].Phase)
+		{
+			++Key;
+		}
+		const FSledgeKey& From = SledgeKeys[Key];
+		const FSledgeKey& To = SledgeKeys[Key + 1];
+		const float Along = FMath::SmoothStep(0.0f, 1.0f, (At - From.Phase) / FMath::Max(To.Phase - From.Phase, KINDA_SMALL_NUMBER));
+		FSledgeAt Out;
+		Out.Hand = FMath::Lerp(From.Hand, To.Hand, Along) * Size;
+		// The stick turns the short way round from one key's to the next's (over the shoulder, then down onto the aim).
+		Out.Along = FQuat::Slerp(FQuat::Identity, FQuat::FindBetweenNormals(From.Along, To.Along), Along).RotateVector(From.Along).GetSafeNormal();
+		return Out;
+	}
+
 	bool LooksSliding(bool bCrouched, float Speed)
 	{
 		return bCrouched && Speed > CheeseStrikeMovement::WalkSpeed * CheeseStrikeMovement::CrouchFactor * 1.25f;
@@ -103,12 +209,6 @@ namespace CheeseStrikeArms
 
 namespace
 {
-	/** The turn of a model whose own `Along` and `Spine` should lie along `Blade` and `Up`. */
-	FQuat ArmsLaid(const FVector& Along, const FVector& Spine, const FVector& Blade, const FVector& Up)
-	{
-		return FRotationMatrix::MakeFromXZ(Blade, Up).ToQuat() * FRotationMatrix::MakeFromXZ(Along, Spine).ToQuat().Inverse();
-	}
-
 	/** Puts an arm (upper, lower, hand) so that the hand is at `Target` turned `Turn`, bending towards `Pole`, stretching a little if it must. */
 	void ArmsReach(FCSPose<FCompactPose>& Pose, FCompactPoseBoneIndex Upper, FCompactPoseBoneIndex Lower, FCompactPoseBoneIndex End, const FVector& Target, const FQuat& Turn, const FVector& Pole)
 	{
@@ -190,6 +290,10 @@ void FCheeseStrikeViewHold::CacheBones_AnyThread(const FAnimationCacheBonesConte
 	bBones &= ArmsBone(OtherUpperArm, TEXT("upperarm_l"), Bones);
 	bBones &= ArmsBone(OtherLowerArm, TEXT("lowerarm_l"), Bones);
 	bBones &= ArmsBone(OtherHand, TEXT("hand_l"), Bones);
+	if (!CheeseStrikeArms::FistOfSkeleton(Bones.GetReferenceSkeleton(), true, Fist))
+	{
+		Fist = CheeseStrikeArms::FFist();
+	}
 }
 
 void FCheeseStrikeViewHold::Update_AnyThread(const FAnimationUpdateContext& Context)
@@ -240,19 +344,34 @@ void FCheeseStrikeViewHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FQuat Turn = FQuat::Slerp(SteadyTurn, TurnNow, Montage).GetNormalized();
 	const FVector Bob = (At - SettledAt).GetClampedToMaxSize(MostBob);
 	const FQuat Swaying = (Turn * SettledTurn.Inverse()).GetNormalized();
-	const FQuat RelTurn = ModelInHand.GetRotation();
 
 	FVector TargetAt;
 	FQuat TargetTurn;
 	if (bKnife)
 	{
-		// On guard low on the right, or swiped across the view, the fist round the handle; the blade tipped up more than on
-		// the body (ViewKnifeTip), so that it shows over the fist rather than pointing straight away from the eye.
+		// The knife on guard low on the right, its blade standing up out of the top of the fist, or swiped across the view;
+		// or the Cheese Stick held as a sledgehammer, its head over the right shoulder, or swung. The hand turned so that
+		// the handle runs through its fist that way and its fingers point on from the forearm, which comes up to it from
+		// under the shoulder: the wrist straight.
 		constexpr float ViewSize = 0.8f;
-		const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, ViewSize * SwipeSize, GuardPitchUp + ViewKnifeTip) : KnifeGuard(GuardPitchUp + ViewKnifeTip);
-		TargetAt = KnifeHand + Knife.Hand + Bob;
-		const FQuat Laid = ArmsLaid(ModelAlong, FVector(0.0, 0.0, 1.0), Knife.Blade, Knife.Spine);
-		TargetTurn = (Swaying * Laid * RelTurn.Inverse()).GetNormalized();
+		FVector HandAt;
+		FVector Along;
+		if (bSledge)
+		{
+			const FSledgeAt Sledge = SwipePhase >= 0.0f ? SledgeSwing(SwipePhase, ViewSize * SwipeSize) : SledgeRest();
+			HandAt = SledgeViewHand + Sledge.Hand;
+			Along = Sledge.Along;
+		}
+		else
+		{
+			const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, ViewSize * SwipeSize, ViewKnifeTip) : KnifeGuard(ViewKnifeTip);
+			HandAt = KnifeHand + Knife.Hand;
+			Along = Knife.Blade;
+		}
+		TargetAt = HandAt + Bob;
+		const FVector Shoulder = Unview.RotateVector(Pose.GetComponentSpaceTransform(UpperArm.GetCompactPoseIndex(Bones)).GetLocation() - Eye);
+		const FVector Elbow = Shoulder - Unview.RotateVector(FVector::UpVector) * FistElbowDrop;
+		TargetTurn = (Swaying * FistTurn(Fist, Along, TargetAt - Elbow)).GetNormalized();
 	}
 	else if (bHasSight)
 	{
@@ -295,7 +414,10 @@ void FCheeseStrikeViewHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FCompactPoseBoneIndex OtherLowerIndex = OtherLowerArm.GetCompactPoseIndex(Bones);
 	const FCompactPoseBoneIndex OtherIndex = OtherHand.GetCompactPoseIndex(Bones);
 	const FTransform OtherWas = Pose.GetComponentSpaceTransform(OtherIndex).GetRelativeTransform(HandNow) * FTransform(Turned, Target);
-	ArmsReach(Pose, UpperIndex, LowerIndex, HandIndex, Target, Turned, ArmsPole(Pose, UpperIndex, LowerIndex, HandIndex));
+	// A fist's elbow bent toward a point a forearm back along the fingers from the hand, and down: the wrist straight.
+	const float Forearm = FVector::Dist(Pose.GetComponentSpaceTransform(LowerIndex).GetLocation(), HandNow.GetLocation());
+	const FVector Pole = bKnife ? Target - Turned.RotateVector(Fist.Fingers) * Forearm - FVector::UpVector * 15.0f : ArmsPole(Pose, UpperIndex, LowerIndex, HandIndex);
+	ArmsReach(Pose, UpperIndex, LowerIndex, HandIndex, Target, Turned, Pole);
 	if (Montage > 0.001f)
 	{
 		const FTransform OtherNow = Pose.GetComponentSpaceTransform(OtherIndex);
@@ -306,6 +428,56 @@ void FCheeseStrikeViewHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 }
 
 // The knife.
+
+void CheeseStrikeCloseFist(FCSPose<FCompactPose>& Pose, const FBoneReference& Hand, const FBoneReference (&Fingers)[4][3], const FBoneReference (&Thumb)[3], bool bRight, bool bTrigger)
+{
+	const FBoneContainer& Bones = Pose.GetPose().GetBoneContainer();
+	const auto IndexOf = [&Bones](const FBoneReference& Reference) { return Reference.GetCompactPoseIndex(Bones); };
+	const auto At = [&Pose, &IndexOf](const FBoneReference& Bone) { return Pose.GetComponentSpaceTransform(IndexOf(Bone)).GetLocation(); };
+	// The hand's frame from its bones, whichever way its axes turn: along the fingers, out of the palm, and across.
+	const FVector Along = (At(Fingers[1][0]) - At(Hand)).GetSafeNormal();
+	const FVector Palm = FVector::CrossProduct(Along, (At(Fingers[0][0]) - At(Fingers[3][0])).GetSafeNormal()).GetSafeNormal() * (bRight ? 1.0f : -1.0f);
+	const FVector Across = FVector::CrossProduct(Along, Palm).GetSafeNormal();
+	if (Along.IsNearlyZero() || Across.IsNearlyZero())
+	{
+		return;
+	}
+	const auto Reset = [&](FCompactPoseBoneIndex Bone)
+	{
+		const FTransform Open = Bones.GetRefPoseTransform(Bone) * Pose.GetComponentSpaceTransform(Bones.GetParentBoneIndex(Bone));
+		const FBoneTransform Set(Bone, Open);
+		Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
+	};
+	// Each finger's joints as the skeleton's own (open) pose has them, then each bent toward the palm.
+	for (int32 Finger = 0; Finger < 4; ++Finger)
+	{
+		for (int32 Joint = 0; Joint < 3; ++Joint)
+		{
+			const FCompactPoseBoneIndex Bone = IndexOf(Fingers[Finger][Joint]);
+			Reset(Bone);
+			const float Share = bTrigger && Finger == 0 ? 0.45f : 1.0f;
+			ArmsTurn(Pose, Bone, FQuat(Across, FMath::DegreesToRadians(CheeseStrikeArms::FistBends[Joint] * Share)));
+		}
+	}
+	if (bTrigger)
+	{
+		return;
+	}
+	// The thumb folded over the fingers, toward the palm.
+	const float ThumbBends[3] = {10.0f, 25.0f, 30.0f};
+	for (int32 Joint = 0; Joint < 3; ++Joint)
+	{
+		const FCompactPoseBoneIndex Bone = IndexOf(Thumb[Joint]);
+		Reset(Bone);
+		const FVector Tip = Joint < 2 ? At(Thumb[Joint + 1]) : At(Thumb[Joint]) + (At(Thumb[Joint]) - At(Thumb[Joint - 1]));
+		const FVector Way = (Tip - At(Thumb[Joint])).GetSafeNormal();
+		const FVector Axis = FVector::CrossProduct(Way, Palm).GetSafeNormal();
+		if (!Axis.IsNearlyZero())
+		{
+			ArmsTurn(Pose, Bone, FQuat(Axis, FMath::DegreesToRadians(ThumbBends[Joint])));
+		}
+	}
+}
 
 void FCheeseStrikeKnifeHold::Initialize_AnyThread(const FAnimationInitializeContext& Context)
 {
@@ -321,13 +493,23 @@ void FCheeseStrikeKnifeHold::CacheBones_AnyThread(const FAnimationCacheBonesCont
 	bBones &= ArmsBone(UpperArm, TEXT("upperarm_r"), Bones);
 	bBones &= ArmsBone(LowerArm, TEXT("lowerarm_r"), Bones);
 	bBones &= ArmsBone(Hand, TEXT("hand_r"), Bones);
-	const TCHAR* const IndexNames[] = {TEXT("index_01_r"), TEXT("index_02_r"), TEXT("index_03_r")};
-	const TCHAR* const MiddleNames[] = {TEXT("middle_01_r"), TEXT("middle_02_r"), TEXT("middle_03_r")};
-	bFingers = true;
-	for (int32 Joint = 0; Joint < 3; ++Joint)
+	const TCHAR* const FingerNames[] = {TEXT("index"), TEXT("middle"), TEXT("ring"), TEXT("pinky")};
+	const TCHAR* const Sides[] = {TEXT("_r"), TEXT("_l")};
+	for (int32 Side = 0; Side < 2; ++Side)
 	{
-		bFingers &= ArmsBone(Index[Joint], IndexNames[Joint], Bones);
-		bFingers &= ArmsBone(Middle[Joint], MiddleNames[Joint], Bones);
+		bFingers[Side] = ArmsBone(Side == 0 ? Hand : OtherHand, *(FString(TEXT("hand")) + Sides[Side]), Bones);
+		for (int32 Joint = 0; Joint < 3; ++Joint)
+		{
+			for (int32 Finger = 0; Finger < 4; ++Finger)
+			{
+				bFingers[Side] &= ArmsBone(Fingers[Side][Finger][Joint], *FString::Printf(TEXT("%s_0%d%s"), FingerNames[Finger], Joint + 1, Sides[Side]), Bones);
+			}
+			bFingers[Side] &= ArmsBone(Thumb[Side][Joint], *FString::Printf(TEXT("thumb_0%d%s"), Joint + 1, Sides[Side]), Bones);
+		}
+	}
+	if (!CheeseStrikeArms::FistOfSkeleton(Bones.GetReferenceSkeleton(), true, Fist))
+	{
+		Fist = CheeseStrikeArms::FFist();
 	}
 }
 
@@ -358,34 +540,98 @@ void FCheeseStrikeKnifeHold::EvaluateComponentSpace_AnyThread(FComponentSpacePos
 			const FVector Up = Tip.RotateVector(FVector::UpVector);
 			const FVector Right = FVector::CrossProduct(Up, Ahead);
 			const auto InBody = [&](const FVector& V) { return Ahead * V.X + Right * V.Y + Up * V.Z; };
-			const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, SwipeSize, GuardPitchUp) : KnifeGuard(GuardPitchUp);
-			// On guard low on the right, ahead of the hip: a hammer grip, the fist below the chest.
-			const FVector Guard(24.0f, 17.0f, -22.0f);
 			const FVector ChestAt = Posed.GetComponentSpaceTransform(IndexOf(Chest)).GetLocation();
-			const FVector Target = ChestAt + InBody(Guard + Knife.Hand);
-			const FQuat Laid = ArmsLaid(ModelAlong, ModelSpine, InBody(Knife.Blade), InBody(Knife.Spine));
-			const FQuat Turn = Laid * ModelInHand.GetRotation().Inverse();
-			// The wrist straight: the elbow behind the fist along the blade (a forearm's length back), a little out and down.
+			FVector Target;
+			FVector Along;
+			if (bSledge)
+			{
+				// The stick held as a sledgehammer, the right hand low before the belly and its head over the right shoulder.
+				const FSledgeAt Sledge = SwipePhase >= 0.0f ? SledgeSwing(SwipePhase, SwipeSize) : SledgeRest();
+				Target = ChestAt + InBody(SledgeBodyHand + Sledge.Hand);
+				Along = InBody(Sledge.Along);
+			}
+			else
+			{
+				// On guard low on the right, ahead of the hip, the fist below the chest, the blade standing up out of it.
+				const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, SwipeSize) : KnifeGuard();
+				const FVector Guard(26.0f, 16.0f, -12.0f);
+				Target = ChestAt + InBody(Guard + Knife.Hand);
+				Along = InBody(Knife.Blade);
+			}
+			// The fingers point on from the forearm, which comes up to the fist from under the shoulder: the wrist straight;
+			// the elbow bent toward a point a forearm back along the fingers, and down.
+			const FVector Shoulder = Posed.GetComponentSpaceTransform(IndexOf(UpperArm)).GetLocation();
+			const FQuat Turn = FistTurn(Fist, Along, Target - (Shoulder - FVector::UpVector * FistElbowDrop));
 			const float Forearm = FVector::Dist(Posed.GetComponentSpaceTransform(IndexOf(LowerArm)).GetLocation(), Posed.GetComponentSpaceTransform(IndexOf(Hand)).GetLocation());
-			const FVector Pole = Target - InBody(Knife.Blade) * Forearm + Right * 10.0f - Up * 8.0f;
+			const FVector Pole = Target - Turn.RotateVector(Fist.Fingers) * Forearm - FVector::UpVector * 15.0f + Right * 8.0f;
 			ArmsReach(Posed, IndexOf(UpperArm), IndexOf(LowerArm), IndexOf(Hand), Target, Turn, Pole);
 		}
-		// The fist closed: the index finger curled as the middle one is.
-		if (bFingers)
+		// The fist closed round the handle; and holding the stick, the left too (FCheeseStrikeGripIK puts it on the stick).
+		if (bFingers[0])
 		{
-			for (int32 Joint = 0; Joint < 3; ++Joint)
-			{
-				const FCompactPoseBoneIndex MiddleIndex = IndexOf(Middle[Joint]);
-				const FCompactPoseBoneIndex IndexIndex = IndexOf(Index[Joint]);
-				const FCompactPoseBoneIndex MiddleParent = Bones.GetParentBoneIndex(MiddleIndex);
-				const FCompactPoseBoneIndex IndexParent = Bones.GetParentBoneIndex(IndexIndex);
-				const FQuat Bend = Posed.GetComponentSpaceTransform(MiddleParent).GetRotation().Inverse() * Posed.GetComponentSpaceTransform(MiddleIndex).GetRotation();
-				FTransform Curled = Posed.GetComponentSpaceTransform(IndexIndex);
-				Curled.SetRotation((Posed.GetComponentSpaceTransform(IndexParent).GetRotation() * Bend).GetNormalized());
-				const FBoneTransform Set(IndexIndex, Curled);
-				Posed.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
-			}
+			CheeseStrikeCloseFist(Posed, Hand, Fingers[0], Thumb[0], true);
 		}
+		if (bSledge && bFingers[1])
+		{
+			CheeseStrikeCloseFist(Posed, OtherHand, Fingers[1], Thumb[1], false);
+		}
+	});
+}
+
+// The free arm.
+
+void CheeseStrikeLowerArm(FCSPose<FCompactPose>& Pose, FCompactPoseBoneIndex Upper, FCompactPoseBoneIndex Lower, FCompactPoseBoneIndex End, const FVector& Ahead, const FVector& Out)
+{
+	const FBoneContainer& Bones = Pose.GetPose().GetBoneContainer();
+	const FVector Up = FVector::UpVector;
+	const FVector Shoulder = Pose.GetComponentSpaceTransform(Upper).GetLocation();
+	const FVector Elbow = Pose.GetComponentSpaceTransform(Lower).GetLocation();
+	const float Length = FVector::Dist(Shoulder, Elbow) + FVector::Dist(Elbow, Pose.GetComponentSpaceTransform(End).GetLocation());
+	const FVector Low = Shoulder - Up * (Length * 0.9f) + Ahead * 8.0f + Out * 7.0f;
+	const FVector Pole = (Shoulder + Low) * 0.5 - Ahead * 40.0f + Out * 10.0f;
+	FTransform UpperNow = Pose.GetComponentSpaceTransform(Upper);
+	FTransform LowerNow = Pose.GetComponentSpaceTransform(Lower);
+	FTransform EndNow = Pose.GetComponentSpaceTransform(End);
+	AnimationCore::SolveTwoBoneIK(UpperNow, LowerNow, EndNow, Pole, Low, false, 1.0, 1.0);
+	EndNow.SetRotation((LowerNow.GetRotation() * Bones.GetRefPoseTransform(End).GetRotation()).GetNormalized());
+	const FBoneTransform Set[] = {FBoneTransform(Upper, UpperNow), FBoneTransform(Lower, LowerNow), FBoneTransform(End, EndNow)};
+	Pose.SafeSetCSBoneTransforms(Set);
+}
+
+void FCheeseStrikeFreeArm::Initialize_AnyThread(const FAnimationInitializeContext& Context)
+{
+	FAnimNode_Base::Initialize_AnyThread(Context);
+	ComponentPose.Initialize(Context);
+}
+
+void FCheeseStrikeFreeArm::CacheBones_AnyThread(const FAnimationCacheBonesContext& Context)
+{
+	ComponentPose.CacheBones(Context);
+	const FBoneContainer& Bones = Context.AnimInstanceProxy->GetRequiredBones();
+	bBones = ArmsBone(UpperArm, TEXT("upperarm_l"), Bones);
+	bBones &= ArmsBone(LowerArm, TEXT("lowerarm_l"), Bones);
+	bBones &= ArmsBone(Hand, TEXT("hand_l"), Bones);
+}
+
+void FCheeseStrikeFreeArm::Update_AnyThread(const FAnimationUpdateContext& Context)
+{
+	ComponentPose.Update(Context);
+}
+
+void FCheeseStrikeFreeArm::EvaluateComponentSpace_AnyThread(FComponentSpacePoseContext& Output)
+{
+	ComponentPose.EvaluateComponentSpace(Output);
+	const FVector Ahead = FVector(Forward.X, Forward.Y, 0.0).GetSafeNormal();
+	if (Alpha <= 0.001f || !bBones || Ahead.IsNearlyZero())
+	{
+		return;
+	}
+	const FBoneContainer& Bones = Output.Pose.GetPose().GetBoneContainer();
+	ArmsBlendIn(Output.Pose, Alpha, [this, &Bones, &Ahead](FCSPose<FCompactPose>& Posed)
+	{
+		// The left arm, hanging on the body's left.
+		const FVector Left = -FVector::CrossProduct(FVector::UpVector, Ahead);
+		CheeseStrikeLowerArm(Posed, UpperArm.GetCompactPoseIndex(Bones), LowerArm.GetCompactPoseIndex(Bones), Hand.GetCompactPoseIndex(Bones), Ahead, Left);
 	});
 }
 
@@ -508,22 +754,7 @@ void FCheeseStrikeGrenadeHold::PoseArms(FCSPose<FCompactPose>& Pose) const
 	}
 
 	// The left arm let go and lowered by the side, the hand turned on the forearm as the skeleton's own pose has it.
-	{
-		const FCompactPoseBoneIndex UpperIndex = IndexOf(OtherUpperArm);
-		const FCompactPoseBoneIndex LowerIndex = IndexOf(OtherLowerArm);
-		const FCompactPoseBoneIndex EndIndex = IndexOf(OtherHand);
-		const FVector OtherShoulder = At(OtherUpperArm);
-		const float Length = FVector::Dist(OtherShoulder, At(OtherLowerArm)) + FVector::Dist(At(OtherLowerArm), At(OtherHand));
-		const FVector Low = OtherShoulder - Up * (Length * 0.9f) + Ahead * 8.0f - Right * 7.0f;
-		const FVector OtherPole = (OtherShoulder + Low) * 0.5 - Ahead * 40.0f - Right * 10.0f;
-		FTransform UpperNow = Pose.GetComponentSpaceTransform(UpperIndex);
-		FTransform LowerNow = Pose.GetComponentSpaceTransform(LowerIndex);
-		FTransform EndNow = Pose.GetComponentSpaceTransform(EndIndex);
-		AnimationCore::SolveTwoBoneIK(UpperNow, LowerNow, EndNow, OtherPole, Low, false, 1.0, 1.0);
-		EndNow.SetRotation((LowerNow.GetRotation() * Bones.GetRefPoseTransform(EndIndex).GetRotation()).GetNormalized());
-		const FBoneTransform Set[] = {FBoneTransform(UpperIndex, UpperNow), FBoneTransform(LowerIndex, LowerNow), FBoneTransform(EndIndex, EndNow)};
-		Pose.SafeSetCSBoneTransforms(Set);
-	}
+	CheeseStrikeLowerArm(Pose, IndexOf(OtherUpperArm), IndexOf(OtherLowerArm), IndexOf(OtherHand), Ahead, -Right);
 }
 
 // The slide.

@@ -92,6 +92,31 @@ void FCheeseStrikeDownedPose::CacheBones_AnyThread(const FAnimationCacheBonesCon
 			bLeftFingers &= Bone(LeftFingers[Finger][Joint], *FString::Printf(TEXT("%s_0%d_l"), FingerNames[Finger], Joint + 1));
 		}
 	}
+	// The bones that lie on the floor: under the pelvis, but not the heroes' own guns or what hangs from them.
+	BodyBones.Reset();
+	if (bAll)
+	{
+		const FReferenceSkeleton& Skeleton = Bones.GetReferenceSkeleton();
+		const FCompactPoseBoneIndex PelvisIndex = Pelvis.GetCompactPoseIndex(Bones);
+		for (int32 Each = 0; Each < Bones.GetCompactPoseNumBones(); ++Each)
+		{
+			bool bUnderPelvis = false;
+			bool bGun = false;
+			for (FCompactPoseBoneIndex Above(Each); Above.IsValid(); Above = Bones.GetParentBoneIndex(Above))
+			{
+				bUnderPelvis |= Above == PelvisIndex;
+				const FName Name = Skeleton.GetBoneName(Bones.MakeMeshPoseIndex(Above).GetInt());
+				for (const TCHAR* Gun : CheeseStrikeDowned::OwnGunBones)
+				{
+					bGun |= Name == FName(Gun);
+				}
+			}
+			if (bUnderPelvis && !bGun)
+			{
+				BodyBones.Add(FCompactPoseBoneIndex(Each));
+			}
+		}
+	}
 	// A body cut down to fewer bones (at a distance) does without the pose rather than half of it.
 	bBones = bAll;
 	if (!bAll && !bToldMissing && Bones.GetCompactPoseNumBones() > 40)
@@ -160,6 +185,12 @@ void FCheeseStrikeDownedPose::GoDown(FCSPose<FCompactPose>& Pose) const
 	const FQuat HandWas = TurnOf(Index(HandR));
 	// Where the legs are in their pushes, -1 to 1, as much as they are pushing.
 	const float Push = FMath::Sin(ScootPhase) * Scoot;
+	// How high the floor is under a place (on a slope or a step not where the capsule stands), as the character measured it.
+	const auto FloorUnder = [this, &Ahead, &Right](const FVector& At)
+	{
+		const FVector From = At - Origin;
+		return Origin.Z + Floor.At(FVector::DotProduct(From, Ahead), FVector::DotProduct(From, Right));
+	};
 
 	// The chest squared to the hips first (the pistol stance turns it), so that lying back doesn't roll it onto a side.
 	{
@@ -176,7 +207,8 @@ void FCheeseStrikeDownedPose::GoDown(FCSPose<FCompactPose>& Pose) const
 		FTransform Hips = Pose.GetComponentSpaceTransform(Index(Pelvis));
 		const FQuat Lain = DownedToward(Ahead, Right, HipTwist * Push) * DownedToward(Up, -Ahead, PelvisRecline);
 		Hips.SetRotation((Lain * Hips.GetRotation()).GetNormalized());
-		Hips.SetLocation(Origin + Ahead * HipsAhead + Up * (PelvisHeight + HipLift * FMath::Abs(Push)) + Right * HipShuffle * Push);
+		const FVector Under = Origin + Ahead * HipsAhead + Right * HipShuffle * Push;
+		Hips.SetLocation(FVector(Under.X, Under.Y, FloorUnder(Under) + PelvisHeight + HipLift * FMath::Abs(Push)));
 		const FBoneTransform Set(Index(Pelvis), Hips);
 		Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
 	}
@@ -203,7 +235,7 @@ void FCheeseStrikeDownedPose::GoDown(FCSPose<FCompactPose>& Pose) const
 		if (Length > 1.0f)
 		{
 			const float Now = FMath::Atan2(Torso.Z, -FVector::DotProduct(Torso, Ahead));
-			const float Wanted = FMath::Asin(FMath::Clamp((UpperArmLength * 0.95f + ElbowHeight - Hips.Z) / Length, -0.2f, 0.95f));
+			const float Wanted = FMath::Asin(FMath::Clamp((UpperArmLength * 0.95f + ElbowHeight + FloorUnder(At(Index(UpperArmL))) - Hips.Z) / Length, -0.2f, 0.95f));
 			DownedTurn(Pose, Index(Pelvis), DownedToward(Up, Ahead, FMath::RadiansToDegrees(Wanted - Now)));
 		}
 	}
@@ -227,9 +259,10 @@ void FCheeseStrikeDownedPose::GoDown(FCSPose<FCompactPose>& Pose) const
 	{
 		// The left elbow on the floor under the shoulder, a little out and back, the forearm along the floor ahead.
 		const FVector Shoulder = At(Index(UpperArmL));
-		const FVector Elbow = FVector(Shoulder.X, Shoulder.Y, PropElbowHeight) - Right * 7.0f - Ahead * 4.0f;
+		FVector Elbow = FVector(Shoulder.X, Shoulder.Y, 0.0) - Right * 7.0f - Ahead * 4.0f;
+		Elbow.Z = FloorUnder(Elbow) + PropElbowHeight;
 		FVector Hand = Elbow + (Ahead - Right * 0.25f).GetSafeNormal() * ForearmLength * 0.95f;
-		Hand.Z = PropHandHeight;
+		Hand.Z = FloorUnder(Hand) + PropHandHeight;
 		DownedReach(Pose, Index(UpperArmL), Index(LowerArmL), Index(HandL), FMath::Lerp(At(Index(HandL)), Hand, ArmsOwn), Elbow - Up * 10.0f - Right * 5.0f, true);
 		// The hand flat on the floor, palm down, its fingers open along it: the stance's are closed round the pistol's
 		// grip, and a fist laid on its back would put them into the floor. Each joint as the skeleton's own (open) pose
@@ -295,13 +328,38 @@ void FCheeseStrikeDownedPose::GoDown(FCSPose<FCompactPose>& Pose) const
 	for (const auto& Leg : Legs)
 	{
 		const FVector Hip = At(Index(Leg.Thigh));
-		const float Drop = FMath::Max(0.0f, Hip.Z - AnkleHeight);
-		const float Flat = FMath::Sqrt(FMath::Max(0.0f, FMath::Square(LegFull * 0.99f) - Drop * Drop));
 		const float Phase = ScootPhase + Leg.Phase;
 		const float Share = FMath::Lerp(Leg.Out, FMath::Lerp(PushFrom, PushTo, 0.5f + 0.5f * FMath::Sin(Phase)), Scoot);
 		const float Lift = FootLift * Scoot * FMath::Max(0.0f, -FMath::Cos(Phase));
-		const float Along = FMath::Max(FMath::Min(Flat * Share, LegReach), LegFull * 0.35f);
-		const FVector Foot = FVector(Hip.X, Hip.Y, AnkleHeight + Lift) + Ahead * Along + Right * Leg.Side * 4.0f;
+		// How far along the floor the leg reaches lying out, from how far the hip is over the floor where the foot will be
+		// (found again once, from where the foot would be on a level floor: a slope or a step ahead moves it).
+		float Along = 0.0f;
+		FVector Foot = Hip;
+		for (int32 Pass = 0; Pass < 2; ++Pass)
+		{
+			const float Ankle = (Pass == 0 ? FloorUnder(Hip) : FloorUnder(Foot)) + AnkleHeight;
+			const float Drop = Hip.Z - Ankle;
+			const float Flat = FMath::Sqrt(FMath::Max(0.0f, FMath::Square(LegFull * 0.99f) - Drop * Drop));
+			Along = FMath::Max(FMath::Min(Flat * Share, LegReach), LegFull * 0.35f);
+			Foot = FVector(Hip.X, Hip.Y, 0.0) + Ahead * Along + Right * Leg.Side * 4.0f;
+			Foot.Z = FloorUnder(Foot) + AnkleHeight + Lift;
+		}
 		DownedReach(Pose, Index(Leg.Thigh), Index(Leg.Calf), Index(Leg.Foot), Foot, Hip + Ahead * Along * 0.5f + Up * 60.0f + Right * Leg.Side * 10.0f, true);
+	}
+
+	// Last, whatever of the body would still be under the floor under it (the floor rising behind, a step's edge), the
+	// whole raised until nothing is.
+	float Raise = 0.0f;
+	for (const FCompactPoseBoneIndex Bone : BodyBones)
+	{
+		const FVector Where = At(Bone);
+		Raise = FMath::Max(Raise, FloorUnder(Where) + FloorClear - static_cast<float>(Where.Z));
+	}
+	if (Raise > 0.0f)
+	{
+		FTransform Hips = Pose.GetComponentSpaceTransform(Index(Pelvis));
+		Hips.AddToTranslation(Up * Raise);
+		const FBoneTransform Set(Index(Pelvis), Hips);
+		Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
 	}
 }

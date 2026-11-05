@@ -216,7 +216,7 @@ void UCheeseStrikeAnimInstance::HoldWithoutCharacter(const FWeaponLook& Look, bo
 	bDual = bTwo;
 	ModelInHand = Model != nullptr ? Model->GetRelativeTransform() : FTransform::Identity;
 	ModelAlong = Look.Along;
-	GuardPitchUp = Look.GuardPitchUp;
+	bSledge = Look.bSledge;
 	bLeftHandHolds = ACheeseStrikeWeapon::LeftHandHoldOn(Look, Model, LeftHandHold);
 }
 
@@ -252,6 +252,7 @@ void UCheeseStrikeAnimInstance::ReadCharacter(float DeltaSeconds)
 		DownAimYaw = Character->GetDownAimYaw();
 		bFirstPersonBody = Character->GetFirstPersonMesh() == GetSkelMeshComponent();
 		LegRoom = Character->GetDownLegRoom();
+		DownFloor = Character->GetDownFloor();
 		ScootSpeed = FVector::DotProduct(Velocity, Pawn->GetActorForwardVector());
 		const float Yaw = Pawn->GetActorRotation().Yaw;
 		TurnSpeed = bLastYawKnown && DeltaSeconds > 0.0f ? FMath::FindDeltaAngleDegrees(LastYaw, Yaw) / DeltaSeconds : 0.0f;
@@ -266,7 +267,7 @@ void UCheeseStrikeAnimInstance::ReadCharacter(float DeltaSeconds)
 		ModelAlong = Weapon != nullptr ? Weapon->GetModelAlong() : FVector(0.0, 1.0, 0.0);
 		SwipePhase = Weapon != nullptr ? Weapon->SwipePhase() : -1.0f;
 		SwipeSize = Weapon != nullptr ? Weapon->GetStats().SwipeSize : 1.0f;
-		GuardPitchUp = Weapon != nullptr ? Weapon->GetGuardPitchUp() : 0.0f;
+		bSledge = Weapon != nullptr && Weapon->IsSledge();
 		// Its own player's body: the arms placed in view.
 		const bool bOwnView = bFirstPersonBody && Character->IsLocallyControlled() && Character->IsAlive();
 		View.bPlace = bOwnView && Weapon != nullptr && CVarHipHold.GetValueOnGameThread() != 0;
@@ -427,8 +428,10 @@ void FCheeseStrikeAnimProxy::Link(FName GripAnchor)
 	// Two guns, one in each hand: the hands apart, the left the mirror of the right.
 	DualHold.ComponentPose.SetLinkNode(&ViewHold);
 	LeftHand.ComponentPose.SetLinkNode(&DualHold);
+	// A weapon in the right hand alone, the left let go.
+	FreeArm.ComponentPose.SetLinkNode(&LeftHand);
 	// A grenade in the right hand, the left let go.
-	GrenadeHold.ComponentPose.SetLinkNode(&LeftHand);
+	GrenadeHold.ComponentPose.SetLinkNode(&FreeArm);
 	// Last, down: on the back, propped on the left elbow, the pistol out.
 	Downed.ComponentPose.SetLinkNode(&GrenadeHold);
 	Executing.ComponentPose.SetLinkNode(&Downed);
@@ -494,6 +497,7 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		BodyOrigin = Instance->BodyOrigin;
 		DownAimYaw = Instance->DownAimYaw;
 		LegRoom = Instance->LegRoom;
+		DownFloor = Instance->DownFloor;
 		ScootSpeed = Instance->ScootSpeed;
 		TurnSpeed = Instance->TurnSpeed;
 		bFirstPersonBody = Instance->bFirstPersonBody;
@@ -511,7 +515,7 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		ModelAlong = Instance->ModelAlong;
 		SwipePhase = Instance->SwipePhase;
 		SwipeSize = Instance->SwipeSize;
-		GuardPitchUp = Instance->GuardPitchUp;
+		bSledge = Instance->bSledge;
 		View = Instance->View;
 		Grenade = Instance->Grenade;
 		// A change of weapon to one held another way: its animations on the same nodes (and the left hand's grip on it,
@@ -581,6 +585,15 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	LeftHand.Alpha = SourceWeight * (1.0f - GuardBlend) * TwoHandBlend;
 	LeftHand.bHasHold = bLeftHandHolds;
 	LeftHand.Hold = LeftHandHold;
+	// The stick's handle in the left fist, which runs up it toward the head (FWeaponLook::bInFist).
+	LeftHand.bFist = bSledge && bKnife;
+	LeftHand.HandleAlong = ModelInHand.GetRotation().RotateVector(ModelAlong);
+	// A weapon held in the right hand alone (the Curd Pistol): the left let go and lowered by the side, except while a
+	// montage (a reload) has it; not down, nor in an execution, which pose the arms themselves.
+	const bool bOneHand = !bLeftHandHolds && !bDual && !bKnife;
+	OneHandBlend = FMath::FInterpTo(OneHandBlend, bOneHand ? 1.0f : 0.0f, DeltaSeconds, BlendRate);
+	FreeArm.Alpha = OneHandBlend * SourceWeight * (1.0f - Downed.Alpha) * (ExecutionKind != 0 ? 0.0f : 1.0f);
+	FreeArm.Forward = BodyForward;
 	// Two guns: held apart and mirrored, except while a montage (a reload) has the hands; aimed, side by side before the
 	// eyes and turned in a little. In its own player's view the look's Sight has put the right gun beside the eye already,
 	// so there it is pushed out no further.
@@ -594,6 +607,9 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	DualHold.ModelAlong = ModelAlong;
 	DualHold.Forward = BodyForward;
 	DualHold.Origin = BodyOrigin;
+	DualHold.bAboutEye = bFirstPersonBody && View.bPlace;
+	DualHold.View = View.Turn;
+	DualHold.CameraAtHead = View.CameraAtHead;
 
 	// Down, the legs push in turn as the body scoots along or round (a push a stride, the phase running on as it goes
 	// toward the head, back as it goes toward the feet); the breath comes hard, all the while (so that it doesn't start
@@ -614,6 +630,7 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	Downed.Scoot = ScootBlend;
 	Downed.ScootPhase = ScootPhase;
 	Downed.bFirstPerson = bFirstPersonBody;
+	Downed.Floor = DownFloor;
 	Executing.Kind = CheeseStrikeExecution::KindAt(ExecutionKind);
 	Executing.bExecutor = bExecutor;
 	Executing.Time = ExecutionTime;
@@ -641,11 +658,9 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	KnifeHold.bPlaceHand = !bFirstPersonBody;
 	KnifeHold.Forward = BodyForward;
 	KnifeHold.AimPitch = AimPitch;
-	KnifeHold.ModelInHand = ModelInHand;
-	KnifeHold.ModelAlong = ModelAlong;
 	KnifeHold.SwipePhase = SwipePhase;
 	KnifeHold.SwipeSize = SwipeSize;
-	KnifeHold.GuardPitchUp = GuardPitchUp;
+	KnifeHold.bSledge = bSledge && bKnife;
 	// Its own player's arms, placed in view.
 	SprintBlend = FMath::FInterpTo(SprintBlend, View.bSprinting ? 1.0f : 0.0f, DeltaSeconds, CheeseStrikeArms::HoldBlendRate);
 	ViewHold.Alpha = View.bPlace ? Up : 0.0f;
@@ -666,7 +681,7 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	ViewHold.bKnife = bKnife;
 	ViewHold.SwipePhase = SwipePhase;
 	ViewHold.SwipeSize = SwipeSize;
-	ViewHold.GuardPitchUp = GuardPitchUp;
+	ViewHold.bSledge = bSledge && bKnife;
 	ViewHold.Montage = 1.0f - SourceWeight;
 	// A grenade in hand: as far as the switch has it up, or all of it as a throw goes on.
 	GrenadeHold.Alpha = FMath::Max(Grenade.Up, CheeseStrikeGrenades::ThrowWeight(Grenade.ThrowPhase)) * Up;

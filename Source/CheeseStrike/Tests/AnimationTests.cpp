@@ -350,10 +350,11 @@ bool FTheArmsKeepToTheirRules::RunTest(const FString& Parameters)
 	TestTrue(TEXT("and never past where it follows"), Follow(SteadyRate, 10.0f) <= 1.0f && Follow(SteadyRate, 0.0f) == 0.0f);
 	TestTrue(TEXT("the steady follow takes out a 30 Hz shake but keeps a walk's bob"), SteadyRate < UE_TWO_PI * 30.0f / 5.0f && SteadyRate > UE_TWO_PI * 2.0f);
 
-	// The knife: on guard the blade points ahead and up, its spine up; a swipe starts and ends on guard.
+	// The knife: on guard the blade stands up out of the top of the fist, leaning ahead, its spine back toward the forearm
+	// (wave 16); a swipe starts and ends on guard.
 	const FKnifeAt Guard = KnifeGuard();
-	TestTrue(TEXT("on guard the blade points ahead and up"), Guard.Blade.X > 0.7f && Guard.Blade.Z > 0.2f);
-	TestTrue(TEXT("its spine is across the blade"), FMath::Abs(FVector::DotProduct(Guard.Blade, Guard.Spine)) < 1.0e-3f && Guard.Spine.Z > 0.5f);
+	TestTrue(TEXT("on guard the blade stands up, leaning ahead"), Guard.Blade.X > 0.4f && Guard.Blade.Z > 0.7f);
+	TestTrue(TEXT("its spine is across the blade, back"), FMath::Abs(FVector::DotProduct(Guard.Blade, Guard.Spine)) < 1.0e-3f && Guard.Spine.X < -0.5f);
 	for (const float Phase : {0.0f, 1.0f})
 	{
 		const FKnifeAt At = KnifeSwipe(Phase);
