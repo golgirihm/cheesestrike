@@ -13,10 +13,13 @@ namespace CheeseStrikeArms
 		return DeltaSeconds > 0.0f ? 1.0f - FMath::Exp(-Rate * DeltaSeconds) : 0.0f;
 	}
 
-	FKnifeAt KnifeGuard()
+	FKnifeAt KnifeGuard(float PitchUp)
 	{
 		FKnifeAt Guard;
-		Guard.Blade = FVector(0.85f, -0.2f, 0.48f).GetSafeNormal();
+		// Tipped up about the axis across the blade (its spine stays up over it), so that the stick stands up out of the fist.
+		const FVector Blade = FVector(0.85f, -0.2f, 0.48f).GetSafeNormal();
+		const FVector Across = FVector::CrossProduct(FVector::UpVector, Blade).GetSafeNormal();
+		Guard.Blade = Blade.RotateAngleAxis(-PitchUp, Across).GetSafeNormal();
 		Guard.Spine = (FVector::UpVector - Guard.Blade * FVector::DotProduct(FVector::UpVector, Guard.Blade)).GetSafeNormal();
 		return Guard;
 	}
@@ -49,7 +52,7 @@ namespace CheeseStrikeArms
 		}
 	}
 
-	FKnifeAt KnifeSwipe(float Phase, float Size)
+	FKnifeAt KnifeSwipe(float Phase, float Size, float PitchUp)
 	{
 		const float At = FMath::Clamp(Phase, 0.0f, 1.0f);
 		int32 Key = 0;
@@ -63,7 +66,7 @@ namespace CheeseStrikeArms
 		FKnifeAt Out;
 		Out.Hand = FMath::Lerp(From.Hand, To.Hand, Along) * Size;
 		// Out of guard and back into it the knife turns between the guard's and the swipe's; through the swipe it sweeps.
-		const FKnifeAt Guard = KnifeGuard();
+		const FKnifeAt Guard = KnifeGuard(PitchUp);
 		FVector FromBlade, FromSpine, ToBlade, ToSpine;
 		Swept(From.Yaw, From.Pitch, FromBlade, FromSpine);
 		Swept(To.Yaw, To.Pitch, ToBlade, ToSpine);
@@ -244,7 +247,7 @@ void FCheeseStrikeViewHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	{
 		// On guard low on the right, or swiped across the view, the fist round the handle.
 		constexpr float ViewSize = 0.8f;
-		const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, ViewSize * SwipeSize) : KnifeGuard();
+		const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, ViewSize * SwipeSize, GuardPitchUp) : KnifeGuard(GuardPitchUp);
 		TargetAt = KnifeHand + Knife.Hand + Bob;
 		const FQuat Laid = ArmsLaid(ModelAlong, FVector(0.0, 0.0, 1.0), Knife.Blade, Knife.Spine);
 		TargetTurn = (Swaying * Laid * RelTurn.Inverse()).GetNormalized();
@@ -351,7 +354,7 @@ void FCheeseStrikeKnifeHold::EvaluateComponentSpace_AnyThread(FComponentSpacePos
 			const FVector Up = Tip.RotateVector(FVector::UpVector);
 			const FVector Right = FVector::CrossProduct(Up, Ahead);
 			const auto InBody = [&](const FVector& V) { return Ahead * V.X + Right * V.Y + Up * V.Z; };
-			const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, SwipeSize) : KnifeGuard();
+			const FKnifeAt Knife = SwipePhase >= 0.0f ? KnifeSwipe(SwipePhase, SwipeSize, GuardPitchUp) : KnifeGuard(GuardPitchUp);
 			// On guard ahead of the chest, low on the right.
 			const FVector Guard(26.0f, 16.0f, 2.0f);
 			const FVector ChestAt = Posed.GetComponentSpaceTransform(IndexOf(Chest)).GetLocation();

@@ -544,7 +544,14 @@ bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Paramete
 	});
 	// The Gatling spins up before it fires, then fires twenty a second.
 	Play(1, TEXT("release Move\nhold Fire\nwait 0.25"));
-	Then([this]() { TestEqual(TEXT("nothing fired while it spins up"), Character(1)->GetWeapon()->ShotsFired, ShotsBefore); });
+	Then([this]()
+	{
+		TestEqual(TEXT("nothing fired while it spins up"), Character(1)->GetWeapon()->ShotsFired, ShotsBefore);
+		// Its barrels are turning already, on the caller's machine and (the trigger told to the server) on the host's.
+		TestTrue(FString::Printf(TEXT("the barrels spinning up on the caller's machine (%.0f degrees a second)"), Character(1)->GetWeapon()->GetBarrelSpeed()), Character(1)->GetWeapon()->GetBarrelSpeed() > 100.0f);
+		const ACheeseStrikeWeapon* Seen = CharacterOf(1, 0) != nullptr ? CharacterOf(1, 0)->GetWeapon() : nullptr;
+		TestTrue(FString::Printf(TEXT("and on the host's (%.0f)"), Seen != nullptr ? Seen->GetBarrelSpeed() : -1.0f), Seen != nullptr && Seen->GetBarrelSpeed() > 100.0f);
+	});
 	Play(1, TEXT("wait 0.85\nrelease Fire\nwait 0.3"));
 	Then([this]()
 	{
@@ -553,6 +560,10 @@ bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Paramete
 		const ACheeseStrikeWeapon* Gatling = CharacterOf(1, 0)->GetWeapon();
 		TestTrue(TEXT("the server counting them off its belt"), Gatling != nullptr && Gatling->GetWeaponId() == CheeseStrikeWeapons::Gatling().Id
 			&& Gatling->GetMagazine() <= CheeseStrikeWeapons::Gatling().MagazineSize - 10);
+		// Let go, the barrels wind down: still turning a third of a second on, slower than at full speed.
+		const float Full = CheeseStrikeWeapons::FullBarrelSpeed(CheeseStrikeWeapons::Gatling());
+		const float Winding = Character(1)->GetWeapon()->GetBarrelSpeed();
+		TestTrue(FString::Printf(TEXT("the barrels winding down on the caller's machine (%.0f of %.0f)"), Winding, Full), Winding > 0.0f && Winding < Full);
 	});
 	// The host, splatted as the warning ends: slowed and unable to sprint.
 	WaitUntil(TEXT("the gouda on the host"), CheeseStrikeStreaks::OverloadWarning + 1.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->GetGooUntil() > 0.0f; });

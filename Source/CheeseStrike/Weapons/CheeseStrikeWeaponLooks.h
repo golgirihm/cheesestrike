@@ -30,11 +30,25 @@ struct FWeaponLook
 	/** How the model sits in the grip: its size, turn and place. */
 	FTransform Model = FTransform::Identity;
 	/** Its materials, slot by slot (none keeps the model's own). */
-	const TCHAR* Materials[4] = {nullptr, nullptr, nullptr, nullptr};
+	const TCHAR* Materials[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 	/** Which way its business end points in the model's space: a gun's muzzle (+Y), a blade's tip. */
 	FVector Along = FVector(0.0f, 1.0f, 0.0f);
-	/** Where the eye goes down the sights, in the model's space; none for the rifle's own (from its bounds and the console's sight variables). */
+	/**
+	 * Where the eye goes down the sights, in the model's space; none for the rifle's own (from its bounds and the console's
+	 * sight variables). For two guns (FWeaponStats::bDual) a point between them: CheeseStrikeDual::AimHalfApart to the
+	 * right gun's left, so that aimed, the two come up side by side either side of the eye.
+	 */
 	TOptional<FVector> Sight;
+	/** A melee weapon's: how many degrees more than the knife's guard its tip is tipped up at rest (the Cheese Stick held upright). */
+	float GuardPitchUp = 0.0f;
+	/**
+	 * A part of the model that turns while it fires (the Gouda Gatling's barrels): a second plain model in the same frame,
+	 * its materials slot by slot, and the axis it turns about (a direction and a point on it, in the model's space).
+	 */
+	const TCHAR* SpinningPart = nullptr;
+	const TCHAR* SpinningMaterials[6] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+	FVector SpinAxis = FVector(0.0f, 1.0f, 0.0f);
+	FVector SpinCentre = FVector::ZeroVector;
 	/** Where the muzzle is, and how big its flash (1 the rifle's). */
 	FVector Muzzle = FVector(0.0f, 70.0f, 4.0f);
 	float FlashSize = 1.0f;

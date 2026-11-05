@@ -234,6 +234,7 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	FVector ModelAlong = FVector(0.0, 1.0, 0.0);
 	float SwipePhase = -1.0f;
 	float SwipeSize = 1.0f;
+	float GuardPitchUp = 0.0f;
 	FCheeseStrikeAnimInstanceView View;
 	float SprintBlend = 0.0f;
 	float SlideBlend = 0.0f;
@@ -411,9 +412,10 @@ public:
 	/** The weapon's model in this body's hand bone's space, and which way its business end points in its own space. */
 	FTransform ModelInHand = FTransform::Identity;
 	FVector ModelAlong = FVector(0.0, 1.0, 0.0);
-	/** The knife's swipe (none below 0), and how wide (1 the knife's; the Cheese Stick's wider). */
+	/** The knife's swipe (none below 0), and how wide (1 the knife's; the Cheese Stick's wider); and how far up beyond the knife's its guard holds it at rest (degrees, the Cheese Stick's). */
 	float SwipePhase = -1.0f;
 	float SwipeSize = 1.0f;
+	float GuardPitchUp = 0.0f;
 	/** The arms in view, for its own player's body. */
 	FCheeseStrikeAnimInstanceView View;
 	/** A grenade in hand. */

@@ -162,12 +162,13 @@ namespace CheeseStrikeWeapons
 		static const FWeaponStats Stats = []
 		{
 			// Wave 14: twelve pellets of 14, the whole of them from 4 m in, falling to 0.15 of it at 12 m: a kill a shot up
-			// to about 4 m, weak past 8; a tighter cone, so that they land together that close.
+			// to about 4 m, weak past 8. Wave 15: a wider cone (9 degrees aimed, 14 from the hip: most land on a body at
+			// 4 m, few at 8) and a slower shot, 1.19 s between.
 			FWeaponStats Weapon = MakeWeapon(TEXT("shotgun"), NSLOCTEXT("CheeseStrike", "Shotgun", "Swiss Shotgun"), EWeaponSlot::Primary);
 			Weapon.Damage = 14.0f;
 			Weapon.Pellets = 12;
 			Weapon.HeadMultiplier = 1.5f;
-			Weapon.FireInterval = 0.85f;
+			Weapon.FireInterval = 1.19f;
 			Weapon.bAutomatic = false;
 			Weapon.MagazineSize = 6;
 			Weapon.ReloadTime = 2.2f;
@@ -177,8 +178,8 @@ namespace CheeseStrikeWeapons
 			Weapon.FalloffStart = 400.0f;
 			Weapon.FalloffEnd = 1200.0f;
 			Weapon.FalloffFloor = 0.15f;
-			Weapon.SpreadDegrees = 6.0f;
-			Weapon.HipSpreadDegrees = 10.0f;
+			Weapon.SpreadDegrees = 9.0f;
+			Weapon.HipSpreadDegrees = 14.0f;
 			Weapon.BloomShots = 1;
 			SetKick(Weapon, 3.0f, 2.0f, 0.6f, 1.0f);
 			Weapon.AimZoom = 0.8f;
@@ -205,7 +206,8 @@ namespace CheeseStrikeWeapons
 			Weapon.Reserve = 90;
 			Weapon.ReserveMax = 150;
 			SetReach(Weapon, 90.0f, 20.0f, 55.0f, 0.5f);
-			// No sights to aim down: from the hip only, a little tighter than a pistol's at full bloom.
+			// Aimed (wave 15: both guns up side by side before the eyes) a degree; from the hip a little tighter than a
+			// pistol's at full bloom.
 			Weapon.SpreadDegrees = 1.0f;
 			Weapon.HipSpreadDegrees = 6.0f;
 			Weapon.BloomShots = 10;
@@ -248,8 +250,10 @@ namespace CheeseStrikeWeapons
 	{
 		static const FWeaponStats Stats = []
 		{
-			// Wave 14's power weapon: a launcher of red-waxed wheels, two in the tube and two more, a wheel a second at 25 m/s
-			// with a little drop; a direct hit 150, its burst 110 within 3 m falling to 30 at 5 m, its shooter not spared.
+			// Wave 14's power weapon: a launcher of red-waxed wheels, two in the tube and two more, a wheel a second; a direct
+			// hit 150, its burst 110 within 3 m falling to 30 at 5 m, its shooter not spared. Wave 15: a slow, lobbed wheel at
+			// 12.5 m/s, falling at a twelfth of gravity so that, fired level from the eyes, it comes down about 25 m out
+			// (CheeseStrikeWeapons::LevelReach), as the faster wheel with more drop did.
 			FWeaponStats Weapon = MakeWeapon(TEXT("babybomb"), NSLOCTEXT("CheeseStrike", "BabyBomb", "BabyBomb"), EWeaponSlot::Primary);
 			Weapon.Damage = 150.0f;
 			Weapon.HeadMultiplier = 1.0f;
@@ -259,8 +263,8 @@ namespace CheeseStrikeWeapons
 			Weapon.ReloadTime = 2.5f;
 			Weapon.Reserve = 2;
 			Weapon.ReserveMax = 4;
-			Weapon.ProjectileSpeed = 2500.0f;
-			Weapon.GravityShare = 0.15f;
+			Weapon.ProjectileSpeed = 1250.0f;
+			Weapon.GravityShare = 0.08f;
 			Weapon.ProjectileLife = 3.0f;
 			Weapon.MaxRange = Weapon.ProjectileSpeed * Weapon.ProjectileLife;
 			Weapon.FalloffStart = 0.0f;
@@ -287,13 +291,14 @@ namespace CheeseStrikeWeapons
 	{
 		static const FWeaponStats Stats = []
 		{
-			// Wave 14's melee power weapon: a 1.2 m baton of string cheese, a slow heavy swing every 1.1 s that fells everyone
-			// within 3 m in a 120-degree arc in front (down in Execution), never a teammate; no rounds; a little slow to carry.
+			// Wave 14's melee power weapon: a 1.2 m baton of string cheese, a slow heavy swing that fells everyone within 3 m
+			// in a 120-degree arc in front (down in Execution), never a teammate; no rounds; a little slow to carry. Wave 15:
+			// the swing shown 1.6 times slower (1.28 s, the whoosh's length), so a swing every 1.4 s.
 			FWeaponStats Weapon = MakeWeapon(TEXT("stick"), NSLOCTEXT("CheeseStrike", "Stick", "Cheese Stick"), EWeaponSlot::Primary);
 			Weapon.Damage = 500.0f;
 			Weapon.BackstabDamage = 500.0f;
 			Weapon.HeadMultiplier = 1.0f;
-			Weapon.FireInterval = 1.1f;
+			Weapon.FireInterval = 1.4f;
 			Weapon.bAutomatic = false;
 			Weapon.MagazineSize = 0;
 			Weapon.Reserve = 0;
@@ -305,7 +310,7 @@ namespace CheeseStrikeWeapons
 			Weapon.FalloffEnd = 0.0f;
 			Weapon.ArcDegrees = 120.0f;
 			Weapon.SwingTime = 0.5f;
-			Weapon.SwipeSeconds = 0.8f;
+			Weapon.SwipeSeconds = 1.28f;
 			Weapon.SwipeSize = 1.25f;
 			Weapon.SpreadDegrees = 0.0f;
 			Weapon.HipSpreadDegrees = 0.0f;
@@ -390,6 +395,7 @@ namespace CheeseStrikeWeapons
 			Weapon.FireInterval = 0.05f;
 			Weapon.bAutomatic = true;
 			Weapon.SpinUp = 0.4f;
+			Weapon.Barrels = 6;
 			Weapon.MagazineSize = 200;
 			Weapon.ReloadTime = 0.0f;
 			Weapon.Reserve = 0;

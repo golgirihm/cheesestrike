@@ -110,6 +110,10 @@ public:
 	ECheeseStrikeHold GetHold() const;
 	/** Which way its business end (muzzle, blade) points in its model's own space. */
 	FVector GetModelAlong() const;
+	/** A melee weapon's: how far up beyond the knife's guard it rests (degrees, FWeaponLook::GuardPitchUp). */
+	float GetGuardPitchUp() const;
+	/** The barrels' turn (degrees a second) now, on this machine: the Gouda Gatling's spinner. */
+	float GetBarrelSpeed() const { return BarrelSpeed; }
 	/** Where `Body`'s left hand closes round this weapon, in the space of the bone the weapon rides (cm); false if it is held in one hand. */
 	bool LeftHandHoldFor(const USkeletalMeshComponent* Body, FVector& OutHold) const;
 	/** The model drawn in its player's view, or on the body: the skinned or the plain one, whichever it has. */
@@ -305,6 +309,25 @@ protected:
 	TObjectPtr<UStaticMeshComponent> ThirdPersonOffHand;
 	/** Shots shown on this machine: which of two guns fires the next (CheeseStrikeWeapons::DualHand). */
 	int32 ShotsShown = 0;
+	/**
+	 * A part of the model that turns while it fires (FWeaponLook::SpinningPart: the Gouda Gatling's barrels), in its
+	 * player's view and on the body, in the model's own frame; turned at BarrelSpeed (CheeseStrikeWeapons::BarrelSpeed:
+	 * spun up as the trigger is held, wound down after) about the look's axis, on every machine from the trigger as the
+	 * server tells it (bTriggerShown).
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> FirstPersonSpinner;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> ThirdPersonSpinner;
+	float BarrelSpeed = 0.0f;
+	float BarrelAngle = 0.0f;
+	/** Whether the owner holds the trigger of a weapon that spins up, as the server has it, for the other machines. */
+	UPROPERTY(Replicated)
+	bool bTriggerShown = false;
+	UFUNCTION(Server, Reliable)
+	void ServerSetTrigger(bool bHeld);
+	/** Every frame: the spinning part turns, spinning up and winding down. */
+	void UpdateSpinner(float DeltaSeconds);
 	/** Puts the flash at the muzzle of the right gun or (`bLeft`) the left one. */
 	void PutFlashOn(bool bLeft);
 	/** The muzzle's flash, in its player's view and on the body, and its light. */

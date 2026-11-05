@@ -97,6 +97,8 @@ struct FWeaponStats
 	bool bSpecial = false;
 	/** Seconds the trigger is held before the first shot, as a rotary barrel spins up (0 for none). */
 	float SpinUp = 0.0f;
+	/** A rotary barrel's barrels (the Gouda Gatling's six): each shot comes from the next, so at full speed they turn a shot's share of a turn a shot. */
+	int32 Barrels = 0;
 
 	/**
 	 * Projectiles (wave 14): with a speed (cm/s), each shot is an ACheeseStrikeProjectile the server flies and decides
@@ -245,6 +247,25 @@ namespace CheeseStrikeWeapons
 
 	/** Which hand fires shot number `Index` of a run (0 the first) of a weapon with two guns: 0 the right, 1 the left, in turn; always the right for one gun. */
 	int32 DualHand(const FWeaponStats& Weapon, int32 Index);
+
+	/** A rotary barrel's full turn (degrees a second): a barrel a shot, at its rate; 0 for a weapon without barrels. */
+	float FullBarrelSpeed(const FWeaponStats& Weapon);
+	/** Seconds a rotary barrel takes to wind down from full speed once the trigger is let go. */
+	constexpr float BarrelSpinDown = 1.5f;
+	/**
+	 * The barrels' turn (degrees a second) `DeltaSeconds` after it was `Speed`, going for `Wanted` (`Full`, the full speed,
+	 * while the trigger is held, else 0): up at the spin-up's rate (from nothing to full in `SpinUp` seconds), down at the
+	 * rate that takes full to nothing over BarrelSpinDown.
+	 */
+	float BarrelSpeed(float Speed, float Wanted, float DeltaSeconds, float SpinUp, float Full);
+
+	/**
+	 * How far out (cm) a projectile fired level from `Height` above the floor comes down to the floor, by its weapon's speed
+	 * and share of gravity (`Gravity`, cm/s^2, the world's); as far as it flies (speed by life) if it never comes down.
+	 */
+	float LevelReach(const FWeaponStats& Weapon, float Height, float Gravity = 980.0f);
+	/** How high a shot leaves from, for LevelReach: about a standing player's eyes (cm). */
+	constexpr float ReachEyeHeight = 160.0f;
 
 	/** Which shot of a run the next is, `SinceLast` seconds after one that was number `Last` (-1 for none). */
 	int32 NextInRun(const FWeaponStats& Weapon, int32 Last, float SinceLast);

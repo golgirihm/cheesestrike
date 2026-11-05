@@ -11,7 +11,10 @@ the order CheeseStrikeWeaponLooks gives their cheeses. Every one is cheese-
 shaped rather than a gun with a cheese texture:
 
   - blaster: the Cheddar Blaster, a block of cheddar for a receiver and a
-    handguard and stock of it, on a steel barrel, rail and sights;
+    handguard and stock of it, on a steel barrel, rail and sights, the
+    receiver's block still in its wrapper (dark blue, a yellow band, CRAFT in
+    plain white letters: nobody's trade dress), the cheddar bare at the cut
+    end;
   - carbine: the Colby Carbine, its stock and handguard Colby longhorns (logs
     of marbled cheese) on a steel receiver;
   - roquefort: the Roquefort Rifle, a thumbhole stock of blue-veined cheese
@@ -22,14 +25,22 @@ shaped rather than a gun with a cheese texture:
     tip forward, a double barrel out of the tip and the rind its stock;
   - munster: one of the Munster Twin SMGs, a stubby block of Munster in its
     orange rind with a belt of cheese slices hanging from it;
-  - grater: the Cheese Grater, a steel box grater held by its handle over the
-    top and down the back, its punched face forward, Parmesan inside;
-  - babybomb: the BabyBomb, a shoulder tube of three red-waxed Babybel wheels
-    with the white pull-strip spiralling round them and BABYBOMB embossed;
-  - stick: the Cheese Stick, a 1.2 m baton of string cheese in its wrapper at
-    the hand, peeled strands splaying at the striking end;
-  - gatling: the Gouda Gatling, six barrels through gouda wheels before a
-    housing that is a wheel of gouda in yellow wax;
+  - grater: the Cheese Grater, a steel box grater lying along the aim, its
+    open end (where the shreds come out) forward as the muzzle, its coarse
+    face up, a small plain steel handle at the back in the hand, Parmesan
+    inside;
+  - babybomb: the BabyBomb, one big red-waxed Babybel lying flat on the end of
+    a short haft (a sledgehammer, held in both hands), the white pull-strip
+    wide across its top, its bore out of the wheel's front rim;
+  - stick: the Cheese Stick, a 1.2 m baton of string cheese 9 cm across in its
+    wrapper at the hand, peeled strands splaying at the striking end;
+  - burrata: one of the Dual Burratas, a pistol that is a white burrata pouch
+    (its tied knot at the top the hammer) with a creamy short barrel and a
+    grip of cheese rind, in the grip frame the M1911 had;
+  - gatling: the Gouda Gatling's body, a housing that is a wheel of gouda in
+    yellow wax on an axle, with its handle and grips; and gatling_barrels, its
+    six barrels through three gouda wheels, a part of its own that the game
+    turns about the axle while it fires (FWeaponLook::SpinningPart);
   - babybomb_round and grater_shard: the BabyBomb's wheel (along X, as a
     projectile flies) and the Grater's sliver of grated cheese.
 
@@ -60,7 +71,8 @@ COLOURS = {
     "Parmesan": (0.9, 0.78, 0.45), "StringCheese": (0.96, 0.94, 0.86), "Wrapper": (0.62, 0.03, 0.03), "BabyWax": (0.75, 0.02, 0.02),
     "Strip": (0.95, 0.95, 0.95), "BabyCheese": (0.98, 0.85, 0.45), "Gouda": (0.98, 0.72, 0.15), "GoudaWax": (0.95, 0.75, 0.05),
     "Steel": (0.45, 0.45, 0.47), "Black": (0.05, 0.05, 0.05), "ScopeWax": (0.3, 0.03, 0.05), "GraterSteel": (0.8, 0.8, 0.82),
-    "Grip": (0.6, 0.04, 0.04),
+    "Grip": (0.6, 0.04, 0.04), "Burrata": (0.95, 0.94, 0.9), "Cream": (0.93, 0.86, 0.66), "WrapBlue": (0.02, 0.05, 0.25),
+    "WrapYellow": (0.95, 0.8, 0.1),
 }
 
 PARTS = []
@@ -419,11 +431,16 @@ def mark(name, sight=None, muzzle=None, left=None):
 def blaster():
     """The Cheddar Blaster: Lyra's rifle's length, sights and hold, its receiver, handguard and stock blocks of cheddar."""
     box("Cheddar", (0, 11.0, 4.5), (5.6, 34.0, 13.0), 0.9, 3)
-    # A crumb or two broken off the block's edges.
+    # A crumb or two broken off the block's bare edges.
     chunk = box("Cheddar", (0, 39.5, 3.6), (5.4, 22.0, 9.0), 1.5, 3)
-    cut(PARTS[0], [cutter_box((2.9, 22.0, 10.8), (2.4, 4.0, 2.6), Matrix.Rotation(0.5, 4, 'Y')),
-                   cutter_box((-2.9, 1.0, -1.6), (2.2, 3.0, 2.2), Matrix.Rotation(0.6, 4, 'Z'))])
+    cut(PARTS[0], [cutter_box((2.9, 22.0, 10.8), (2.4, 4.0, 2.6), Matrix.Rotation(0.5, 4, 'Y'))])
     cut(chunk, [cutter_box((2.8, 48.5, 7.8), (2.2, 3.6, 2.2), Matrix.Rotation(0.6, 4, 'X'))])
+    # The wrapper: a dark-blue sleeve round the back of the block (the cheddar cut bare ahead of it, its cut end showing),
+    # a yellow band round the sleeve and CRAFT in plain white letters on both sides: no logo, nobody's trade dress.
+    box("WrapBlue", (0, 5.0, 4.5), (6.2, 22.0, 13.6), 0.35, 2)
+    box("WrapYellow", (0, 12.0, 4.5), (6.5, 3.4, 13.9), 0.3, 1)
+    for side in (1.0, -1.0):
+        text("Strip", "CRAFT", 3.4, 0.3, (side * 3.12, 3.0, 4.6), (side, 0, 0), (0, 0, 1))
     prism("Cheddar", [(-6.0, 10.2), (-6.0, 0.5), (-12.0, -1.0), (-26.0, -6.5), (-26.0, 9.6), (-14.0, 10.2)], -2.4, 2.4, 0.8, 3)
     prism("Black", [(-26.0, 9.8), (-26.0, -6.7), (-27.4, -6.9), (-27.4, 10.0)], -2.5, 2.5, 0.35, 2)
     rail(-5.0, 27.5, 11.0)
@@ -442,7 +459,7 @@ def blaster():
     rifle_grip("Black")
     rifle_trigger()
     mark("blaster", sight=(-0.25, -13.0, 16.2), muzzle=(0, 69.0, 4.0), left=(0, 33.0, 3.5))
-    return ["Cheddar", "Steel", "Black"]
+    return ["Cheddar", "Steel", "Black", "WrapBlue", "WrapYellow", "Strip"]
 
 
 def carbine():
@@ -609,15 +626,16 @@ def munster():
 
 
 def grater():
-    """The Cheese Grater: a steel box grater, its coarse face forward, held by a D handle over its top and down its back
-    (the grip in red), a block of Parmesan inside it."""
-    top_z, bottom_z = 9.0, -13.0
-    top = {"x": 4.0, "y0": 5.2, "y1": 11.2}
-    bot = {"x": 5.0, "y0": 4.2, "y1": 12.2}
+    """The Cheese Grater: a steel box grater lying along the aim, its open end (where the shreds come out) forward as the
+    muzzle, its coarse face up, fine holes down one side and slicer slots down the other, a small plain steel handle at
+    the back in the hand, a block of Parmesan inside it with shavings spilling out of the front."""
+    y0, y1 = 3.0, 37.0
+    back = {"x": 5.0, "z0": -0.5, "z1": 9.5}
+    front = {"x": 6.0, "z0": -1.5, "z1": 10.5}
 
-    def corner(sx, front, z):
-        k = top if z == top_z else bot
-        return Vector((sx * k["x"], k["y1"] if front else k["y0"], z))
+    def corner(sx, sz, at_front):
+        k = front if at_front else back
+        return Vector((sx * k["x"], y1 if at_front else y0, k["z1"] if sz > 0 else k["z0"]))
 
     def plate(points):
         bm = bmesh.new()
@@ -628,118 +646,130 @@ def grater():
         m.offset = 0.0
         return obj
 
-    front = plate([corner(-1, True, bottom_z), corner(1, True, bottom_z), corner(1, True, top_z), corner(-1, True, top_z)])
-    back = plate([corner(1, False, bottom_z), corner(-1, False, bottom_z), corner(-1, False, top_z), corner(1, False, top_z)])
-    left = plate([corner(1, True, bottom_z), corner(1, False, bottom_z), corner(1, False, top_z), corner(1, True, top_z)])
-    right = plate([corner(-1, False, bottom_z), corner(-1, True, bottom_z), corner(-1, True, top_z), corner(-1, False, top_z)])
-    plate([corner(-1, False, top_z), corner(1, False, top_z), corner(1, True, top_z), corner(-1, True, top_z)])
+    top = plate([corner(-1, 1, False), corner(1, 1, False), corner(1, 1, True), corner(-1, 1, True)])
+    bottom = plate([corner(1, -1, False), corner(-1, -1, False), corner(-1, -1, True), corner(1, -1, True)])
+    left = plate([corner(1, -1, False), corner(1, 1, False), corner(1, 1, True), corner(1, -1, True)])
+    right = plate([corner(-1, 1, False), corner(-1, -1, False), corner(-1, -1, True), corner(-1, 1, True)])
+    plate([corner(-1, -1, False), corner(1, -1, False), corner(1, 1, False), corner(-1, 1, False)])
 
-    def on_face(sx_frac, z, front_face, across=True):
-        """A point on the front or back face, a share across it, at a height."""
-        f = (z - bottom_z) / (top_z - bottom_z)
-        half = bot["x"] + (top["x"] - bot["x"]) * f
-        y = (bot["y1"] + (top["y1"] - bot["y1"]) * f) if front_face else (bot["y0"] + (top["y0"] - bot["y0"]) * f)
-        return Vector((sx_frac * half, y, z))
+    def along(y):
+        """The box's half width and its top and bottom at `y`, which widens a little toward the open end."""
+        f = (y - y0) / (y1 - y0)
+        return (back["x"] + (front["x"] - back["x"]) * f, back["z0"] + (front["z0"] - back["z0"]) * f, back["z1"] + (front["z1"] - back["z1"]) * f)
 
-    # The coarse face: rows of raised, punched teeth's holes.
+    # The coarse face on top: rows of raised, punched teeth's holes, elongated across.
     holes = []
-    for row in range(12):
-        z = bottom_z + 1.8 + row * 1.62
-        for col in range(6):
-            share = -0.78 + col * 0.312 + (0.156 if row % 2 else 0.0)
-            if share > 0.82:
+    for row in range(14):
+        y = y0 + 3.0 + row * 2.2
+        for col in range(5):
+            share = -0.68 + col * 0.34 + (0.17 if row % 2 else 0.0)
+            if share > 0.72:
                 continue
-            p = on_face(share, z, True)
-            holes.append(cutter_cylinder(p - Vector((0, 1.0, 0)), p + Vector((0, 1.0, 0)), 0.5, 12, (1.5, 1.0)))
-    cut(front, holes)
+            half, _, z1 = along(y)
+            p = Vector((share * half, y, z1))
+            holes.append(cutter_cylinder(p - Vector((0, 0, 1.0)), p + Vector((0, 0, 1.0)), 0.5, 12, (1.5, 1.0)))
+    cut(top, holes)
+    # Fine holes down the left side.
     holes = []
-    for row in range(16):
-        z = bottom_z + 1.4 + row * 1.25
-        for col in range(9):
-            share = -0.8 + col * 0.2
-            p = on_face(share, z, False)
-            holes.append(cutter_cylinder(p - Vector((0, 1.0, 0)), p + Vector((0, 1.0, 0)), 0.26, 8))
-    cut(back, holes)
-    holes = []
-    for row in range(9):
-        z = bottom_z + 2.0 + row * 2.2
-        for col in range(4):
-            f = (z - bottom_z) / (top_z - bottom_z)
-            y0 = bot["y0"] + (top["y0"] - bot["y0"]) * f
-            y1 = bot["y1"] + (top["y1"] - bot["y1"]) * f
-            y = y0 + (y1 - y0) * (0.2 + 0.2 * col + (0.1 if row % 2 else 0.0))
-            if y > y1 - 0.8:
-                continue
-            x = bot["x"] + (top["x"] - bot["x"]) * f
-            holes.append(cutter_cylinder((x - 1.0, y, z), (x + 1.0, y, z), 0.55, 6))
+    for row in range(7):
+        for col in range(21):
+            y = y0 + 2.2 + col * 1.5
+            half, z0, z1 = along(y)
+            z = z0 + 1.4 + row * (z1 - z0 - 2.8) / 6.0
+            holes.append(cutter_cylinder((half - 1.0, y, z), (half + 1.0, y, z), 0.26, 8))
     cut(left, holes)
-    cut(right, [cutter_box((-4.6, 8.2, -3.0), (2.0, 4.8, 0.9), Matrix.Rotation(math.radians(-2.6), 4, 'Y'))])
-    # Rolled edges: the corners and the rims.
+    # Slicer slots down the right side.
+    slots = []
+    for y in (9.0, 18.0, 27.0):
+        half, z0, z1 = along(y)
+        slots.append(cutter_box((-half, y, (z0 + z1) / 2.0), (2.0, 5.0, 0.9), Matrix.Rotation(math.radians(-2.6), 4, 'Y')))
+    cut(right, slots)
+    # A few star holes underneath.
+    holes = []
+    for row in range(8):
+        y = y0 + 3.5 + row * 3.6
+        half, z0, _ = along(y)
+        for share in (-0.4, 0.4):
+            holes.append(cutter_cylinder((share * half, y, z0 - 1.0), (share * half, y, z0 + 1.0), 0.45, 6))
+    cut(bottom, holes)
+    # Rolled edges: the four long corners and the rims round the back plate and the open end.
     for sx in (-1, 1):
-        for fr in (True, False):
-            cylinder("GraterSteel", corner(sx, fr, bottom_z), corner(sx, fr, top_z), 0.22, sides=8)
-    rim = [corner(-1, False, bottom_z), corner(1, False, bottom_z), corner(1, True, bottom_z), corner(-1, True, bottom_z), corner(-1, False, bottom_z)]
-    tube("GraterSteel", [tuple(p) for p in rim], 0.3, smooth=False)
-    rim = [corner(-1, False, top_z), corner(1, False, top_z), corner(1, True, top_z), corner(-1, True, top_z), corner(-1, False, top_z)]
-    tube("GraterSteel", [tuple(p) for p in rim], 0.3, smooth=False)
-    # The handle: a steel D from the top's front edge back over it and down the back of the grip, round under the
-    # hand and into the box's back; the grip itself red.
-    tube("GraterSteel", [(0, 10.6, 9.0), (0, 10.0, 12.2), (0, 7.0, 13.2), (0, 1.0, 13.1), (0, -2.8, 11.6), (0, -4.6, 7.0), (0, -4.0, 0.6)], 0.55)
-    tube("GraterSteel", [(0, -6.6, -11.6), (0, -5.0, -12.8), (0, 0.0, -12.9), (0, 3.0, -12.0), (0, 4.4, -10.6)], 0.5)
-    rifle_grip("Grip", 1.35)
-    # Parmesan inside it, its block seen through the holes, a few shavings caught in the coarse face.
-    box("Parmesan", (0, 8.0, -0.8), (6.6, 4.6, 14.0), 0.6, 2, Matrix.Rotation(0.12, 4, 'Y'))
+        for sz in (-1, 1):
+            cylinder("GraterSteel", corner(sx, sz, False), corner(sx, sz, True), 0.22, sides=8)
+    for at_front in (False, True):
+        rim = [corner(-1, -1, at_front), corner(1, -1, at_front), corner(1, 1, at_front), corner(-1, 1, at_front), corner(-1, -1, at_front)]
+        tube("GraterSteel", [tuple(p) for p in rim], 0.3, smooth=False)
+    # The handle: a small plain steel D at the back, from the plate's top down behind it and back in under it, the bar in
+    # the hand raked back a little, with a trigger inside it.
+    tube("Steel", [(0, 3.5, 8.8), (0, 0.3, 7.6), (0, -0.8, 3.5), (0, -1.6, -2.5), (0, -1.0, -6.0), (0, 1.5, -7.0), (0, 3.5, -5.5), (0, 3.6, -1.0)], 0.8)
+    prism("Steel", [(1.6, -1.4), (2.2, -2.4), (1.8, -4.2), (1.3, -4.2), (1.4, -2.4), (1.0, -1.4)], -0.3, 0.3)
+    # Sights along the top: a bead at the front, a notch at the back.
+    box("Steel", (0, 35.5, 11.0), (0.5, 1.0, 1.3), 0.1, 1)
+    for x in (-0.6, 0.6):
+        box("Steel", (x, 4.8, 10.4), (0.4, 0.8, 1.4), 0.1, 1)
+    # Parmesan inside it, seen through the holes and the open end, a few shavings caught at the mouth.
+    box("Parmesan", (0, 19.5, 4.5), (9.6, 30.0, 9.4), 0.6, 2, Matrix.Rotation(0.06, 4, 'Y'))
     rng = random.Random(5)
-    for k in range(5):
-        p = on_face(rng.uniform(-0.6, 0.6), rng.uniform(-10.0, 4.0), True) + Vector((0, 0.5, 0))
-        path = [p + Vector((0.0, 0.15 * j, -0.5 * j)) + Vector((0.25 * math.sin(j * 1.6), 0.4 * math.sin(j * 1.1), 0.0)) for j in range(5)]
-        ribbon("Parmesan", [tuple(q) for q in path], 0.55, 0.12, lambda q: (0.0, 1.0, 0.0))
-    mark("grater", sight=(6.5, -16.0, 10.0), muzzle=(0, 11.9, -2.0), left=(0, 8.2, -14.2))
-    return ["GraterSteel", "Grip", "Parmesan"]
-
+    for k in range(6):
+        p = Vector((rng.uniform(-3.5, 3.5), y1 - 0.5, rng.uniform(-0.5, 8.5)))
+        path = [p + Vector((0.0, 0.7 * j, 0.0)) + Vector((0.3 * math.sin(j * 1.6 + k), 0.0, 0.35 * math.sin(j * 1.1 + k))) for j in range(5)]
+        ribbon("Parmesan", [tuple(q) for q in path], 0.6, 0.12, lambda q: (0.0, 0.0, 1.0))
+    mark("grater", sight=(0, -14.0, 12.6), muzzle=(0, 37.5, 4.5), left=(0, 24.0, -1.6))
+    return ["GraterSteel", "Parmesan", "Steel"]
 
 def babybomb():
-    """The BabyBomb: a shoulder tube of three red-waxed Babybel wheels, the white pull-strip spiralling round them,
-    BABYBOMB embossed in the middle one's wax, a wheel waiting in its bore."""
-    axis_z, radius, length = 9.0, 9.0, 15.0
-    starts = (-20.0, -4.5, 11.0)
-    wheels = []
-    for k, y in enumerate(starts):
-        wheels.append(lathe("BabyWax", wheel_profile(radius, length, 3.3, 0.25), centre=(0.0, y, axis_z), sides=56,
-                            wobble=lambda a, t: 0.04 * math.sin(7 * a + 0.3 * t)))
-    front = starts[-1] + length
-    cut(wheels[-1], [cutter_cylinder((0, front - 8.0, axis_z), (0, front + 2.0, axis_z), 4.6, 40)])
-    # The wax cut through shows the cheese: the bore's lining and the ring round it.
-    lathe("BabyCheese", [(4.62, front - 7.6), (4.62, front - 0.02), (4.45, front - 0.02), (4.45, front - 7.6)], centre=(0.0, 0.0, axis_z), sides=40)
-    lathe("BabyCheese", [(4.6, front - 0.05), (6.1, front - 0.05), (6.1, front + 0.04), (4.6, front + 0.04)], centre=(0.0, 0.0, axis_z), sides=40)
-    lathe("BabyWax", wheel_profile(4.3, 5.0, 1.6), centre=(0.0, front - 7.4, axis_z), sides=32)
-    # The pull-strip: a helix a little proud of the wax, its tab loose at the front.
-    turns, path = 1.75, []
-    steps = 140
-    for k in range(steps + 1):
-        t = k / steps
-        a = 2 * math.pi * turns * t + 0.9
-        path.append((radius * 1.045 * math.cos(a), starts[0] + 0.6 + (front - starts[0] - 1.2) * t, axis_z + radius * 1.045 * math.sin(a)))
-    ribbon("Strip", path, 1.25, 0.1, lambda p: (p[0], 0.0, p[2] - axis_z))
-    a = 2 * math.pi * turns + 0.9
+    """The BabyBomb: one big red-waxed Babybel lying flat (its face up) on the end of a short black haft, held in both
+    hands like a sledgehammer (the right at the haft's end, where it bends down into the hand, the left ahead on it),
+    the white pull-strip wide across its top, its bore out of the wheel's front rim in a steel ring, a little wheel
+    waiting in it."""
+    axis_z, radius, thick, centre_y = 5.5, 15.0, 9.0, 44.0
+    bottom = axis_z - thick / 2.0
+    wheel = lathe("BabyWax", wheel_profile(radius, thick, 3.0, 0.3), centre=(0.0, centre_y, bottom), axis="Z", sides=72,
+                  wobble=lambda a, t: 0.04 * math.sin(9 * a + 0.4 * t))
+    # The bore, out of the front rim, in a steel ring: the cheese shows inside it, and a wheel waits in it.
+    cut(wheel, [cutter_cylinder((0, centre_y + 3.0, axis_z), (0, centre_y + radius + 2.0, axis_z), 4.1, 32)])
+    lathe("BabyCheese", [(4.12, centre_y + 3.5), (4.12, centre_y + 8.5), (3.95, centre_y + 8.5), (3.95, centre_y + 3.5)], centre=(0.0, 0.0, axis_z), sides=32)
+    bore_end(0.0, axis_z, centre_y + 8.0, centre_y + 16.5, 4.5, 3.9, 7.5, sides=32)
+    lathe("BabyWax", wheel_profile(3.4, 4.5, 1.2), centre=(0.0, centre_y + 9.0, axis_z), sides=32)
+    # The pull-strip: a wide white band across the top's diameter (side to side, clear of the bore), over the rounded
+    # edge and a little way down each side, its tab loose at the left end.
+    fillet, top = 3.0, bottom + thick
+    path, normals = [], []
+    flat = radius - fillet
+    for k in range(25):
+        x = -flat + 2 * flat * k / 24
+        path.append((x, centre_y, top))
+        normals.append((0.0, 0.0, 1.0))
+    for sign in (1.0, -1.0):
+        over = []
+        for k in range(1, 10):
+            a = math.pi / 2 * k / 9
+            over.append(((sign * (flat + fillet * math.sin(a)), centre_y, top - fillet + fillet * math.cos(a)), (sign * math.sin(a), 0.0, math.cos(a))))
+        for z in (top - fillet - 1.2, top - fillet - 2.4):
+            over.append(((sign * (radius + 0.06), centre_y, z), (sign, 0.0, 0.0)))
+        if sign < 0:
+            over.reverse()
+            path = [q for q, n in over] + path
+            normals = [n for q, n in over] + normals
+        else:
+            path += [q for q, n in over]
+            normals += [n for q, n in over]
+    lookup = {tuple(round(c, 3) for c in q): n for q, n in zip(path, normals)}
+    ribbon("Strip", path, 10.0, 0.14, lambda q: lookup[tuple(round(c, 3) for c in q)])
     end = Vector(path[-1])
-    out = Vector((math.cos(a), 0.0, math.sin(a)))
-    ribbon("Strip", [tuple(end), tuple(end + Vector((0, 1.0, 0)) + out * 0.3), tuple(end + Vector((0, 2.2, 0)) + out * 1.2)], 1.25, 0.1,
-           lambda p: (out.x, 0.0, out.z))
-    for side in (1.0, -1.0):
-        text("BabyWax", "BABYBOMB", 2.2, 0.36, (side * (radius + 0.13), starts[1] + length / 2.0, axis_z), (side, 0, 0), (0, 0, 1))
-    rifle_grip("Black")
-    rifle_trigger()
-    lathe("Black", [(0.0, 0.8), (1.35, 0.8), (1.45, -1.0), (1.4, -8.0), (1.2, -8.8), (0.0, -8.8)], centre=(0.0, 17.5, 0.0), axis="Z", sides=20)
-    box("Steel", (0, -14.0, 18.4), (2.4, 1.2, 1.0), 0.15, 1)
-    for x in (-0.85, 0.85):
-        box("Steel", (x, -14.0, 20.0), (0.45, 0.8, 2.6), 0.1, 1)
-    box("Steel", (0, 23.0, 18.4), (1.4, 1.4, 1.0), 0.15, 1)
-    prism("Steel", [(22.6, 18.6), (23.4, 18.6), (23.2, 21.0), (22.8, 21.0)], -0.3, 0.3)
-    mark("babybomb", sight=(0, -26.0, 21.0), muzzle=(0, front, axis_z), left=(0, 17.5, -4.0))
-    # Four slots at most: its little steel is black.
-    return ["BabyWax", "Strip", "Black", "BabyCheese"]
-
+    ribbon("Strip", [tuple(end), tuple(end + Vector((1.4, 0.0, -0.6))), tuple(end + Vector((3.0, 0.0, -0.2)))], 10.0, 0.14, lambda q: (1.0, 0.0, 0.0))
+    # The haft: a black bar under the wheel, from its middle back and bending down into the hand, a steel ferrule where it
+    # meets the wheel.
+    tube("Black", [(0, 46.0, 1.2), (0, 12.0, 1.2), (0, -1.0, 1.0), (0, -3.0, -2.5), (0, -4.0, -7.0), (0, -4.3, -11.5)], 2.2,
+         radii=[1.0, 1.0, 1.0, 1.0, 1.0, 0.75], resolution=4)
+    cylinder("Steel", (0, 26.0, 1.2), (0, 29.5, 1.2), 2.6)
+    # Sights: a bead on the wheel's front top, a notched post on the haft's bend.
+    box("Steel", (0, 56.0, 10.8), (0.5, 1.0, 1.8), 0.1, 1)
+    box("Steel", (0, 1.5, 6.8), (0.6, 1.2, 7.6), 0.1, 1)
+    for x in (-0.55, 0.55):
+        box("Steel", (x, 1.5, 11.3), (0.4, 1.0, 1.6), 0.1, 1)
+    mark("babybomb", sight=(0, -20.0, 12.6), muzzle=(0, centre_y + 15.5, axis_z), left=(0, 22.0, -1.0))
+    return ["BabyWax", "Strip", "Black", "BabyCheese", "Steel"]
 
 def babybomb_round():
     """The BabyBomb's round: a little red-waxed Babybel, its faces fore and aft along X, its strip round its middle."""
@@ -761,30 +791,31 @@ def grater_shard():
 
 
 def stick():
-    """The Cheese Stick: 1.2 m of string cheese along -Y from the butt (+15) to the striking end (-105), in its red
-    wrapper where the hand holds it, its strands peeled and splaying at the end."""
-    sides = 32
-    profile = [(0.0, 15.4), (1.6, 15.4), (2.45, 14.9), (2.6, 14.0)]
+    """The Cheese Stick: 1.2 m of string cheese, 9 cm across, along -Y from the butt (+15) to the striking end (-105), in
+    its red wrapper where the hand holds it, its strands peeled and splaying at the end."""
+    sides = 36
+    radius = 4.5
+    profile = [(0.0, 15.4), (2.8, 15.4), (4.3, 14.9), (radius, 14.0)]
     for k in range(1, 16):
-        profile.append((2.6, 14.0 - (14.0 + 72.0) * k / 15.0))
-    profile += [(2.4, -74.0), (1.8, -77.0), (1.55, -80.0), (1.5, -92.0), (1.4, -98.0), (1.1, -100.5), (0.0, -101.6)]
+        profile.append((radius, 14.0 - (14.0 + 72.0) * k / 15.0))
+    profile += [(4.2, -74.0), (3.3, -77.0), (2.9, -80.0), (2.7, -92.0), (2.5, -98.0), (2.0, -100.5), (0.0, -101.6)]
     lathe("StringCheese", [(r, t) for r, t in profile], centre=(0.0, 0.0, 0.0), sides=sides,
-          wobble=lambda a, t: 0.07 * math.sin(16 * a + 0.05 * t) + 0.04 * math.sin(7 * a - 0.11 * t))
-    # The strands, peeled off the last 30 cm and splaying out and back.
+          wobble=lambda a, t: 0.12 * math.sin(18 * a + 0.05 * t) + 0.07 * math.sin(7 * a - 0.11 * t))
+    # The strands, peeled off the last 30 cm and splaying out and back: string cheese.
     rng = random.Random(3)
-    for k in range(8):
-        a = 2 * math.pi * k / 8 + rng.uniform(-0.2, 0.2)
-        reach = rng.uniform(4.0, 7.0)
-        length = rng.uniform(26.0, 32.0)
+    for k in range(12):
+        a = 2 * math.pi * k / 12 + rng.uniform(-0.15, 0.15)
+        reach = rng.uniform(5.0, 9.0)
+        length = rng.uniform(27.0, 34.0)
         points, radii = [], []
         for j in range(8):
             t = j / 7.0
-            r = 2.2 + reach * t ** 1.5
-            aa = a + 0.25 * t * (1 if k % 2 else -1)
+            r = 3.6 + reach * t ** 1.5
+            aa = a + 0.3 * t * (1 if k % 2 else -1)
             y = -74.0 - length * t + 2.5 * t ** 3
             points.append((r * math.cos(aa), y, r * math.sin(aa)))
-            radii.append(1.0 - 0.6 * t)
-        tube("StringCheese", points, 0.95, radii=radii, resolution=2)
+            radii.append(1.0 - 0.55 * t)
+        tube("StringCheese", points, 1.15, radii=radii, resolution=2)
     # The wrapper: red, crimped at the butt, torn off below the hand.
     bm = bmesh.new()
     rings = []
@@ -793,8 +824,8 @@ def stick():
         ring = []
         for k in range(sides):
             a = 2 * math.pi * k / sides
-            r = 2.82 if i else 2.0
-            yy = y + ((0.7 if k % 2 else -0.5) if i == len(ys) - 1 else 0.0)
+            r = radius + 0.25 if i else 3.6
+            yy = y + ((0.8 if k % 2 else -0.6) if i == len(ys) - 1 else 0.0)
             ring.append(bm.verts.new((r * math.cos(a), yy, r * math.sin(a))))
         rings.append(ring)
     for r0, r1 in zip(rings, rings[1:]):
@@ -804,17 +835,49 @@ def stick():
     wrapper = part(bm, "Wrapper", "wrapper")
     m = wrapper.modifiers.new("solid", 'SOLIDIFY')
     m.thickness = 0.12
-    box("Wrapper", (0.0, 16.3, 0.0), (4.4, 1.4, 0.18), 0.05, 1)
-    mark("stick", muzzle=(0, -101.0, 0))
+    box("Wrapper", (0.0, 16.3, 0.0), (7.2, 1.4, 0.18), 0.05, 1)
+    mark("stick", muzzle=(0, -101.0, 0), left=(0, -24.0, 0))
     return ["StringCheese", "Wrapper"]
 
+def burrata():
+    """One of the Dual Burratas: a pistol that is a white burrata pouch, lumpy and soft, its tied knot at the top-back
+    the hammer, a creamy short barrel out of its front, a grip of cheese rind and a steel trigger and sights; in the
+    grip frame the M1911 had (the hand round the grip's middle, the bore 7.5 up, the muzzle 19 ahead)."""
+    rng = random.Random(13)
+    balls = []
+    # The pouch: lumps crowded along the bore, fat at the back and narrowing toward the barrel.
+    for y0, y1, z, radius, wide in ((-5.0, 11.5, 7.6, (2.6, 3.3), 0.78), (-3.5, 9.5, 5.4, (2.0, 2.6), 0.85)):
+        y = y0
+        while y < y1:
+            taper = 1.0 - 0.4 * max(0.0, (y - 1.0) / 10.0)
+            balls.append(((rng.uniform(-0.3, 0.3), y, z + rng.uniform(-0.4, 0.4)), rng.uniform(*radius) * taper, (wide, 1.0, 0.9)))
+            y += rng.uniform(1.2, 1.9)
+    for k in range(6):
+        # Little swellings on its skin.
+        balls.append(((rng.choice((-1.0, 1.0)) * rng.uniform(1.4, 2.0), rng.uniform(-4.0, 8.0), rng.uniform(5.5, 9.5)), rng.uniform(0.9, 1.3), (0.8, 0.9, 0.8)))
+    metaballs("Burrata", balls, 0.3)
+    # The knot: the pouch's neck twisted and tied, standing up at the back and leaning back, where a hammer would be.
+    knot = lathe("Burrata", [(0.0, 0.0), (2.0, 0.0), (1.4, 1.3), (1.1, 2.3), (1.7, 3.3), (2.0, 4.1), (1.3, 4.9), (0.0, 5.3)], centre=(0.0, 0.0, 0.0), axis="Z",
+                 sides=24, wobble=lambda a, t: 0.2 * math.sin(3 * a + 1.4 * t))
+    knot.matrix_world = Matrix.Translation((0.0, -5.5, 9.0)) @ Matrix.Rotation(math.radians(32.0), 4, 'X')
+    # The barrel: cream, short, its bore open.
+    lathe("Cream", [(0.0, 9.0), (1.7, 9.0), (1.85, 10.5), (1.75, 18.3), (1.55, 19.0), (1.15, 19.0), (1.15, 16.0), (0.0, 16.0)], centre=(0.0, 0.0, 7.5), sides=24,
+          wobble=lambda a, t: 0.05 * math.sin(5 * a + 0.8 * t))
+    box("Steel", (0, 17.3, 9.8), (0.4, 1.0, 1.3), 0.1, 1)
+    for x in (-0.55, 0.55):
+        box("Steel", (x, -2.0, 10.3), (0.4, 0.9, 1.4), 0.1, 1)
+    pistol_grip("Rind")
+    pistol_trigger()
+    box("Steel", (0, -3.6, -5.7), (3.2, 4.6, 0.6), 0.2, 1)
+    mark("burrata", sight=(0, -31.6, 10.7), muzzle=(0, 19.0, 7.5), left=(-3.0, 9.5, 1.5))
+    return ["Burrata", "Cream", "Rind", "Steel"]
 
-def gatling():
-    """The Gouda Gatling: six steel barrels through three gouda wheels before a housing that is a whole gouda in
-    yellow wax, a carry handle over it, a waxed grip under the barrels for the other hand."""
+
+def gatling_barrels():
+    """The Gouda Gatling's barrels: six steel barrels through three gouda wheels, clamped by a steel ring at the muzzle; a
+    part of their own, in the same frame as the body, that the game turns about the axle (along Y at the body's axis
+    height) while it fires."""
     axis_z = 6.0
-    lathe("GoudaWax", wheel_profile(11.0, 14.0, 3.6, 0.5), centre=(0.0, -5.0, axis_z), sides=56)
-    cylinder("Steel", (0, 8.0, axis_z), (0, 71.0, axis_z), 1.1)
     for k in range(6):
         a = 2 * math.pi * k / 6 + math.pi / 6
         x, z = 2.7 * math.cos(a), axis_z + 2.7 * math.sin(a)
@@ -823,6 +886,17 @@ def gatling():
     for y in (20.0, 40.0, 59.0):
         lathe("Gouda", wheel_profile(5.8, 4.2, 1.7, 0.2), centre=(0.0, y, axis_z), sides=40)
     lathe("Steel", [(0.0, 67.0), (4.1, 67.0), (4.1, 68.6), (0.0, 68.6)], centre=(0.0, 0.0, axis_z), sides=32)
+    return ["Gouda", "Steel"]
+
+
+def gatling():
+    """The Gouda Gatling's body: a housing that is a whole gouda in yellow wax on a steel axle the barrels (gatling_barrels,
+    a part of their own) turn about, a carry handle over it, a waxed grip under the barrels for the other hand."""
+    axis_z = 6.0
+    lathe("GoudaWax", wheel_profile(11.0, 14.0, 3.6, 0.5), centre=(0.0, -5.0, axis_z), sides=56)
+    cylinder("Steel", (0, 8.0, axis_z), (0, 71.0, axis_z), 1.1)
+    # A gouda collar on the axle where the barrels begin, so that every slot is used (the OBJ keeps only those).
+    lathe("Gouda", wheel_profile(2.2, 2.0, 0.6), centre=(0.0, 8.5, axis_z), sides=24)
     tube("Steel", [(0, -3.0, 15.4), (0, -2.0, 19.0), (0, 2.0, 19.6), (0, 6.0, 19.0), (0, 7.0, 15.4)], 0.6)
     for x in (-0.7, 0.7):
         box("Steel", (x, -1.8, 20.0), (0.4, 0.8, 1.6), 0.1, 1)
@@ -836,7 +910,8 @@ def gatling():
 
 
 WEAPONS = {"blaster": blaster, "carbine": carbine, "roquefort": roquefort, "pistol": pistol, "shotgun": shotgun, "munster": munster,
-           "grater": grater, "babybomb": babybomb, "stick": stick, "gatling": gatling, "babybomb_round": babybomb_round, "grater_shard": grater_shard}
+           "grater": grater, "babybomb": babybomb, "stick": stick, "burrata": burrata, "gatling": gatling, "gatling_barrels": gatling_barrels,
+           "babybomb_round": babybomb_round, "grater_shard": grater_shard}
 
 
 # ---------------------------------------------------------------------------------------------------------------------

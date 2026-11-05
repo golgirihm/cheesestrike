@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeWeaponLooks.h"
+#include "Animation/CheeseStrikeDualHold.h"
 
 namespace
 {
@@ -16,12 +17,6 @@ namespace
 		TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_ClipIn_01.Weapons_Rifle_ClipIn_01"),
 		TEXT("/Game/Audio/Sounds/Weapons/Rifle/Weapons_Rifle_Bolt_01.Weapons_Rifle_Bolt_01"),
 	};
-
-	/** A model made along its Y axis, sized by `Scale`, whose grip is at `Grip`: put with the grip at the origin. */
-	FTransform Gripped(const FVector& Grip, float Scale, const FRotator& Turn = FRotator::ZeroRotator)
-	{
-		return FTransform(Turn, -Turn.RotateVector(Grip) * Scale, FVector(Scale));
-	}
 
 	void RifleSounds(FWeaponLook& Look, float Volume, float Pitch)
 	{
@@ -60,8 +55,10 @@ namespace
 			return *Kept.Add_GetRef(FString::Printf(TEXT("/Game/CheeseStrike/Sounds/%s.%s"), Name, Name));
 		};
 
-		// The Cheddar Blaster: blocks of cheddar for its receiver, handguard and stock on a steel barrel, rail and sights; Lyra's
-		// rifle's length, and its sight line, fore-end and muzzle where the rifle's were.
+		// The Cheddar Blaster: blocks of cheddar for its receiver, handguard and stock on a steel barrel, rail and sights, the
+		// receiver's block still in its wrapper (dark blue with a yellow band and CRAFT in plain white letters: nobody's trade
+		// dress), the cheddar showing at the cut end; Lyra's rifle's length, and its sight line, fore-end and muzzle where the
+		// rifle's were.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("blaster");
@@ -69,6 +66,9 @@ namespace
 			Look.Materials[0] = Material(TEXT("MI_Cheddar"));
 			Look.Materials[1] = Material(TEXT("MI_GunSteel"));
 			Look.Materials[2] = Material(TEXT("MI_GunBlack"));
+			Look.Materials[3] = Material(TEXT("MI_WrapBlue"));
+			Look.Materials[4] = Material(TEXT("MI_WrapYellow"));
+			Look.Materials[5] = Material(TEXT("MI_BabyStrip"));
 			Look.Sight = FVector(-0.25f, -13.0f, 16.2f);
 			Look.Muzzle = FVector(0.0f, 69.0f, 4.0f);
 			Look.LeftHand = FVector(0.0f, 33.0f, 3.5f);
@@ -91,21 +91,22 @@ namespace
 			RifleSounds(Look, 0.95f, 1.08f);
 			Looks.Add(Look);
 		}
-		// The Cheese Grater, a needler: a steel box grater, its coarse face forward, held by the D handle over its top and down
-		// its back (the grip in red wax), Parmesan inside; its shards curled slivers of grated Parmesan, glowing.
+		// The Cheese Grater, a needler: a steel box grater lying along the aim, the open end the shreds come out of forward
+		// (the muzzle), its small plain steel handle at the back in the hand, Parmesan inside; its shards curled slivers of
+		// grated Parmesan, glowing.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("grater");
 			Look.PlainModel = Model(TEXT("Grater"), TEXT("CheeseGrater"));
 			Look.Materials[0] = Material(TEXT("MI_KnifeSteel"));
-			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
-			Look.Materials[2] = Material(TEXT("MI_Parmesan"));
-			// The eye beside its handle rather than over it, so that the box stands up in view to the right.
-			Look.Sight = FVector(6.5f, -16.0f, 10.0f);
-			Look.Muzzle = FVector(0.0f, 11.9f, -2.0f);
+			Look.Materials[1] = Material(TEXT("MI_Parmesan"));
+			Look.Materials[2] = Material(TEXT("MI_GunSteel"));
+			// Along the top of the box, over its bead.
+			Look.Sight = FVector(0.0f, -14.0f, 12.6f);
+			Look.Muzzle = FVector(0.0f, 37.5f, 4.5f);
 			Look.FlashSize = 0.5f;
-			// Under the box, holding it up.
-			Look.LeftHand = FVector(0.0f, 8.2f, -14.2f);
+			// Under the box, ahead, holding it up.
+			Look.LeftHand = FVector(0.0f, 24.0f, -1.6f);
 			// Its own rasping "zzzip" (tools/art/wave15_sounds.py), not a gun's; the rifle's dry click and reload.
 			RifleSounds(Look, 0.9f, 1.0f);
 			Look.Shots[0] = Sound(TEXT("SW_GraterShot1"));
@@ -128,7 +129,8 @@ namespace
 			Look.Materials[1] = Material(TEXT("MI_MunsterRind"));
 			Look.Materials[2] = Material(TEXT("MI_GunSteel"));
 			Look.Materials[3] = Material(TEXT("MI_GunBlack"));
-			Look.Sight = FVector(0.0f, -14.0f, 11.0f);
+			// Aimed, the eye between the two guns (FCheeseStrikeDualHold brings them up side by side either side of it).
+			Look.Sight = FVector(CheeseStrikeDual::AimHalfApart, -14.0f, 11.0f);
 			Look.Muzzle = FVector(0.0f, 25.3f, 6.0f);
 			Look.FlashSize = 0.7f;
 			// Each hand holds its own.
@@ -202,19 +204,21 @@ namespace
 			Look.ShotVolume = 0.85f;
 			Looks.Add(Look);
 		}
-		// The Dual Burratas: a pair of Xeradev's M1911s, one in each hand, soft white burrata with creamy grips, at life size
-		// (turned along Y as it came in); the hand at the grip, a little behind and under the bore.
+		// The Dual Burratas: a pair of pistols that are each a white burrata pouch, its tied knot at the top the hammer, a
+		// creamy short barrel and a grip of cheese rind, in the grip frame the M1911 had (tools/art/cheese_weapons.py); one in
+		// each hand, the hand round the grip's middle, a little behind and under the bore.
 		{
 			FWeaponLook Look = Looks.Last();
 			Look.Id = TEXT("burratas");
-			Look.PlainModel = TEXT("/Game/Fab/Xeradev/M1911/SM_M1911.SM_M1911");
-			Look.Model = Gripped(FVector(0.0f, -3.4f, -3.5f), 1.0f);
-			Look.Materials[0] = Material(TEXT("MI_BurratasCream"));
-			Look.Materials[1] = Material(TEXT("MI_Burratas"));
-			Look.Materials[2] = Material(TEXT("MI_Burratas"));
-			Look.Materials[3] = Material(TEXT("MI_BurratasSteel"));
-			Look.Sight = FVector(0.0f, -35.0f, 7.2f);
-			Look.Muzzle = FVector(0.0f, 15.6f, 4.0f);
+			Look.PlainModel = Model(TEXT("Burratas"), TEXT("Burrata"));
+			Look.Model = FTransform::Identity;
+			Look.Materials[0] = Material(TEXT("MI_Burratas"));
+			Look.Materials[1] = Material(TEXT("MI_BurratasCream"));
+			Look.Materials[2] = Material(TEXT("MI_SwissRind"));
+			Look.Materials[3] = Material(TEXT("MI_GunSteel"));
+			// Aimed, the eye between the two guns (FCheeseStrikeDualHold brings them up side by side either side of it).
+			Look.Sight = FVector(CheeseStrikeDual::AimHalfApart, -31.6f, 10.7f);
+			Look.Muzzle = FVector(0.0f, 19.0f, 7.5f);
 			// Each hand holds its own: the left hand isn't on the first gun (FCheeseStrikeDualHold places it).
 			Look.LeftHand.Reset();
 			Look.ShotVolume = 0.8f;
@@ -236,11 +240,19 @@ namespace
 			Look.LeftHand = FVector(0.0f, 29.0f, 1.5f);
 			Look.FlashSize = 1.0f;
 			Look.Tracer = FLinearColor(1.0f, 0.72f, 0.08f, 1.0f);
+			// The six barrels, their gouda wheels and their clamp turn about the axle while it fires (ACheeseStrikeWeapon's
+			// spinner, CheeseStrikeWeapons::BarrelSpeed).
+			Look.SpinningPart = Model(TEXT("Gatling"), TEXT("GoudaGatlingBarrels"));
+			Look.SpinningMaterials[0] = Material(TEXT("MI_Gatling"));
+			Look.SpinningMaterials[1] = Material(TEXT("MI_GunSteel"));
+			Look.SpinAxis = FVector(0.0f, 1.0f, 0.0f);
+			Look.SpinCentre = FVector(0.0f, 0.0f, 6.0f);
 			RifleSounds(Look, 0.8f, 1.25f);
 			Looks.Add(Look);
 		}
-		// The BabyBomb: a shoulder tube of three red-waxed Babybel wheels, the white pull-strip spiralling round them, BABYBOMB
-		// embossed in the wax, a wheel waiting in its bore; it fires little red-waxed Babybels, spinning as they fly.
+		// The BabyBomb: one big red-waxed Babybel lying flat on the end of a short haft, the white pull-strip wide across its
+		// top, held in both hands like a sledgehammer (the right at the haft's end, the left ahead on it), its bore out of the
+		// wheel's front rim; it fires little red-waxed Babybels, spinning as they fly.
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("babybomb");
@@ -249,11 +261,13 @@ namespace
 			Look.Materials[1] = Material(TEXT("MI_BabyStrip"));
 			Look.Materials[2] = Material(TEXT("MI_GunBlack"));
 			Look.Materials[3] = Material(TEXT("MI_BabyCheese"));
-			Look.Sight = FVector(0.0f, -26.0f, 21.0f);
-			Look.Muzzle = FVector(0.0f, 26.0f, 9.0f);
+			Look.Materials[4] = Material(TEXT("MI_GunSteel"));
+			// Over the wheel's top, along the strip.
+			Look.Sight = FVector(0.0f, -20.0f, 12.6f);
+			Look.Muzzle = FVector(0.0f, 59.5f, 5.5f);
 			Look.FlashSize = 1.6f;
-			// On the fore-grip under the front wheel.
-			Look.LeftHand = FVector(0.0f, 17.5f, -4.0f);
+			// Ahead on the haft.
+			Look.LeftHand = FVector(0.0f, 22.0f, -1.0f);
 			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot1.SW_ShotgunShot1");
 			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot2.SW_ShotgunShot2");
 			Look.DryFire = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_DryFire_01.Weapons_Shotgun_DryFire_01");
@@ -270,8 +284,9 @@ namespace
 			Look.ProjectileGlow = FLinearColor(1.0f, 0.35f, 0.12f, 1.0f);
 			Looks.Add(Look);
 		}
-		// The Cheese Stick: 1.2 m of string cheese in its red wrapper at the hand, peeled strands splaying at the striking end;
-		// made along -Y from its butt, gripped 15 cm from it, and turned as the knife is.
+		// The Cheese Stick: 1.2 m of string cheese, 9 cm across, in its red wrapper at the hand, peeled strands splaying at the
+		// striking end; made along -Y from its butt, gripped 15 cm from it, and turned as the knife is, but held upright in
+		// both hands (its tip pitched up about 60 degrees at rest, the left hand on it above the right).
 		{
 			FWeaponLook Look;
 			Look.Id = TEXT("stick");
@@ -279,6 +294,8 @@ namespace
 			Look.PlainModel = Model(TEXT("Stick"), TEXT("CheeseStick"));
 			Look.Model = FTransform(FQuat(FRotator(0.0f, 180.0f, 0.0f)) * FQuat(FRotator(0.0f, 0.0f, 40.0f)) * FQuat(FRotator(60.0f, 0.0f, 0.0f)));
 			Look.Along = FVector(0.0f, -1.0f, 0.0f);
+			Look.GuardPitchUp = 31.0f;
+			Look.LeftHand = FVector(0.0f, -24.0f, 0.0f);
 			Look.Materials[0] = Material(TEXT("MI_StringCheese"));
 			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
 			Look.FlashSize = 0.0f;
