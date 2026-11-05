@@ -39,6 +39,7 @@
 #include "CheeseStrikePlayerState.h"
 #include "CheeseStrikeBeat.h"
 #include "CheeseStrikeGunfire.h"
+#include "CheeseStrikeHeard.h"
 #include "CheeseStrikeInventory.h"
 #include "CheeseStrikeWeaponLooks.h"
 #include "Map/CheeseStrikeMouse.h"
@@ -842,12 +843,14 @@ void ACheeseStrikeWeapon::PlaySound(USoundBase* Sound) const
 	{
 		return;
 	}
+	// Played on components of their own (which end with the sound), so that CheeseStrikeHeard can ask after each.
 	if (Holder != nullptr && Holder->IsLocallyControlled() && Holder->IsPlayerControlled())
 	{
-		UGameplayStatics::PlaySound2D(this, Sound);
+		CheeseStrikeHeard::Note(UGameplayStatics::SpawnSound2D(this, Sound), CheeseStrikeHeard::EKind::OwnHandling, Sound->GetName());
 		return;
 	}
-	UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), FRotator::ZeroRotator, 1.0f, 1.0f, 0.0f, CheeseStrikeGunfire::AttenuationAsset());
+	CheeseStrikeHeard::Note(UGameplayStatics::SpawnSoundAtLocation(this, Sound, GetActorLocation(), FRotator::ZeroRotator, 1.0f, 1.0f, 0.0f, CheeseStrikeGunfire::AttenuationAsset()),
+		CheeseStrikeHeard::EKind::OthersHandling, Sound->GetName());
 }
 
 UQuartzClockHandle* ACheeseStrikeWeapon::GetShotClock(double Interval)
@@ -981,6 +984,7 @@ void ACheeseStrikeWeapon::StartShotSound(USoundBase* Sound, int64 Slot)
 	}
 	if (Player != nullptr)
 	{
+		CheeseStrikeHeard::Note(Player, bOwn ? CheeseStrikeHeard::EKind::OwnShot : CheeseStrikeHeard::EKind::OthersShot, Stats->Id.ToString());
 		if (bOnBeat && ShotClock != nullptr)
 		{
 			FQuartzQuantizationBoundary Boundary = CheeseStrikeBeat::AtTick(Slot);

@@ -4,6 +4,8 @@ exactly this.
     python tools/run_tests.py                     every CheeseStrike test
     python tools/run_tests.py CheeseStrike.Project  only those under a name
     python tools/run_tests.py --no-build          skip building first
+    python tools/run_tests.py --sound <name>      with the audio engine (on the PC's speakers), for the tests that
+                                                  listen (CheeseStrike.Play.GunfireIsHeardThroughALongMatch)
 
 The engine is found through the UE_ROOT environment variable, or else at
 Epic's default install path for the version the project names
@@ -52,12 +54,14 @@ def build(root):
     return subprocess.run(command, cwd=ROOT).returncode == 0
 
 
-def run_tests(root, name):
+def run_tests(root, name, sound=False):
     LOG.parent.mkdir(parents=True, exist_ok=True)
     command = [str(root / "Engine" / "Binaries" / "Win64" / "UnrealEditor-Cmd.exe"), str(PROJECT),
                f"-ExecCmds=Automation RunTests {name}", "-TestExit=Automation Test Queue Empty",
-               "-unattended", "-nullrhi", "-nosplash", "-nosound", "-stdout", "-FullStdOutLogOutput", f"-abslog={LOG}",
+               "-unattended", "-nullrhi", "-nosplash", "-stdout", "-FullStdOutLogOutput", f"-abslog={LOG}",
                f"-BuildIdOverride={checkout_id()}"]
+    if not sound:
+        command.append("-nosound")
     print("+", " ".join(command), flush=True)
     process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     results = []
@@ -93,13 +97,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("name", nargs="?", default="CheeseStrike", help="run the tests whose names begin with this")
     parser.add_argument("--no-build", action="store_true", help="don't build the editor first")
+    parser.add_argument("--sound", action="store_true", help="run with the audio engine, for the tests that listen")
     arguments = parser.parse_args()
     root = engine()
     if not (root / "Engine").is_dir():
         sys.exit(f"error: no engine at {root}; set UE_ROOT to where Unreal is installed")
     if not arguments.no_build and not build(root):
         sys.exit("error: the build failed")
-    sys.exit(0 if run_tests(root, arguments.name) else 1)
+    sys.exit(0 if run_tests(root, arguments.name, arguments.sound) else 1)
 
 
 if __name__ == "__main__":
