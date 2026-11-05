@@ -50,8 +50,8 @@ namespace
 	constexpr float DropAhead = 45.0f;
 	constexpr float DropFallFrom = 70.0f;
 	/** Two guns (the Dual Burratas): how far apart they float on a stand, and lie on the floor (cm, middle to middle). */
-	constexpr float PairApartOnStand = 10.0f;
-	constexpr float PairApartOnFloor = 9.0f;
+	constexpr float PairApartOnStand = 24.0f;
+	constexpr float PairApartOnFloor = 14.0f;
 
 	TAutoConsoleVariable<float> CVarPickupSeconds(TEXT("CheeseStrike.PickupSeconds"), 0.0f,
 		TEXT("Seconds a weapon's stand stays empty once taken, in place of CheeseStrikePickups::RespawnSeconds (for the play tests); 0 for the usual."), ECVF_Cheat);
