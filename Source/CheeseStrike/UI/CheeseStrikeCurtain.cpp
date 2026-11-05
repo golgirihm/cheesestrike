@@ -15,6 +15,7 @@
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectGlobals.h"
 #include "Widgets/Images/SImage.h"
+#include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Engine/UserInterfaceSettings.h"
 #include "Engine/GameViewportClient.h"
@@ -88,12 +89,17 @@ namespace
 	};
 
 	/**
-	 * The cover's looks: the lobby's dark tile, a spinner and `Saying`. Made
-	 * of Slate alone, nothing of the game, so that the loading screen can draw
-	 * it on its own thread while the game's is busy loading a level.
+	 * The cover's looks: the lobby's dark tile, the big spinner (the cheese
+	 * wedge turning, a fifth of the screen's height, from the large frames)
+	 * in the middle and `Saying` under it. Made of Slate alone, nothing of the
+	 * game, so that the loading screen can draw it on its own thread while
+	 * the game's is busy loading a level.
 	 */
 	TSharedRef<SWidget> MakeCover(const TAttribute<FText>& Saying, float Target, bool bCountFrames = false)
 	{
+		// The words under the spinner, and as much room again over it, so that the spinner is in the screen's middle.
+		constexpr float WordsGap = 26.0f;
+		constexpr float WordsHigh = 34.0f;
 		return SNew(SOverlay)
 			+ SOverlay::Slot() [ bCountFrames ? StaticCastSharedRef<SWidget>(SNew(SCheeseStrikeFrameCounter)) : SNullWidget::NullWidget ]
 			+ SOverlay::Slot()
@@ -105,14 +111,18 @@ namespace
 			[
 				SNew(SCheeseStrikeSteadyScale).Target(Target)
 				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight() [ SNew(SBox).HeightOverride(WordsGap + WordsHigh) ]
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 					[
-						SNew(SCheeseStrikeLoader).Radius(16.0f)
+						SNew(SCheeseStrikeLoader).Radius(CheeseStrikeLoader::LargeRadius).Large(true)
 					]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(FMargin(14.0f, 0.0f, 0.0f, 0.0f))
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, WordsGap, 0.0f, 0.0f))
 					[
-						SNew(STextBlock).Text(Saying).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
+						SNew(SBox).HeightOverride(WordsHigh).VAlign(VAlign_Center)
+						[
+							SNew(STextBlock).Text(Saying).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
+						]
 					]
 				]
 			];

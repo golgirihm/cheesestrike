@@ -1,17 +1,19 @@
 """Renders the game's spinner: a 3D wedge of cheese with rounded corners
 turning about its vertical axis, from left to right, as a loop of 48 frames
-(one turn), 64 x 64 pixels each on a clear background, lit as the countdown's
+(one turn), 64 x 64 pixels each (or as big as asked) on a clear background, lit as the countdown's
 glyphs are (tools/art/countdown_glyphs.py: a warm key from the upper left, a
 cool fill, a rim from behind). Cheese gold, with the wheel's rind along the
 wedge's outer edge, a few holes in its cut faces. Run by Blender, headless:
 
-    blender.exe -b --factory-startup -P tools/art/spinner_frames.py -- <out folder>
+    blender.exe -b --factory-startup -P tools/art/spinner_frames.py -- <out folder> [size]
 
 It writes spinner_00.png to spinner_47.png into the folder (Content/UI/Spinner
 by default, next to this repository's root), where the game reads them as
 files (UI/CheeseStrikeLoader.cpp: SCheeseStrikeLoader shows them at 24 a
-second, the menu's spinners, the loading screen and the post-game wait
-alike), and spinner_frames.txt saying what it did.
+second, the menu's spinners and the post-game wait), and spinner_frames.txt
+saying what it did. The loading screen's big spinner, a fifth of the screen's
+height, is the same loop rendered at 320 pixels into Content/UI/Spinner/Large
+(`-- Content/UI/Spinner/Large 320`), so that it is sharp.
 """
 
 import math
@@ -246,6 +248,8 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     here = os.path.dirname(os.path.abspath(__file__))
     out = os.path.abspath(argv[0] if argv else os.path.join(here, "..", "..", "Content", "UI", "Spinner"))
+    global SIZE
+    SIZE = int(argv[1]) if len(argv) > 1 else SIZE
     os.makedirs(out, exist_ok=True)
     clear()
     scene = bpy.context.scene

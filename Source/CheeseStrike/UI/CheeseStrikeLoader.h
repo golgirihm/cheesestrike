@@ -17,16 +17,27 @@
  */
 namespace CheeseStrikeLoader
 {
-	/** How many frames the loop has, how many are shown a second (one turn in two seconds), and each frame's size in pixels (square). */
+	/**
+	 * How many frames the loop has, how many are shown a second (one turn in two seconds), and each frame's size in pixels
+	 * (square): the small set's, for the menu's spinners, and the large set's (Content/UI/Spinner/Large), for the loading
+	 * screen's big one, drawn at a fifth of the screen's height (LargeRadius) and sharp up to 1440p.
+	 */
 	constexpr int32 Frames = 48;
 	constexpr int32 FramesPerSecond = 24;
 	constexpr int32 FrameSize = 64;
+	constexpr int32 LargeFrameSize = 320;
+	/**
+	 * The loading screen's spinner's half-size, in the cover's units (the screen 1080 of them high, by the DPI curve, at
+	 * any resolution): the wedge, which is drawn a little bigger than the box (DrawnOver) and fills most of its frame
+	 * across but less of it up and down, about a fifth of the screen's height.
+	 */
+	constexpr float LargeRadius = 130.0f;
 	/** How much bigger than its box a frame is drawn: the wedge fills about 85% of its frame, so drawn so it is the box's size. */
 	constexpr float DrawnOver = 1.18f;
 	/** Which frame shows `Seconds` into the loop (any time: it goes round, and round again). */
 	int32 FrameAt(double Seconds);
-	/** The file frame `Frame` is in (Content/UI/Spinner/spinner_NN.png). */
-	FString FramePath(int32 Frame);
+	/** The file frame `Frame` is in (Content/UI/Spinner/spinner_NN.png; the large set's in Spinner/Large). */
+	FString FramePath(int32 Frame, bool bLarge = false);
 }
 
 /**
@@ -38,8 +49,10 @@ namespace CheeseStrikeLoader
 class SCheeseStrikeLoader : public SLeafWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SCheeseStrikeLoader) : _Radius(12.0f) {}
+	SLATE_BEGIN_ARGS(SCheeseStrikeLoader) : _Radius(12.0f), _Large(false) {}
 		SLATE_ARGUMENT(float, Radius)
+		/** Drawn from the large frames (the loading screen's big spinner). */
+		SLATE_ARGUMENT(bool, Large)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -48,6 +61,7 @@ public:
 
 private:
 	float Radius = 12.0f;
+	bool bLarge = false;
 };
 
 /**

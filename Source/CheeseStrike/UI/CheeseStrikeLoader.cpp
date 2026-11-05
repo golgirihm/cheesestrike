@@ -14,25 +14,28 @@ namespace CheeseStrikeLoader
 		return Frame < 0 ? Frame + Frames : Frame;
 	}
 
-	FString FramePath(int32 Frame)
+	FString FramePath(int32 Frame, bool bLarge)
 	{
-		return FPaths::ProjectContentDir() / TEXT("UI") / TEXT("Spinner") / FString::Printf(TEXT("spinner_%02d.png"), FMath::Clamp(Frame, 0, Frames - 1));
+		const FString Folder = bLarge ? FPaths::ProjectContentDir() / TEXT("UI") / TEXT("Spinner") / TEXT("Large") : FPaths::ProjectContentDir() / TEXT("UI") / TEXT("Spinner");
+		return Folder / FString::Printf(TEXT("spinner_%02d.png"), FMath::Clamp(Frame, 0, Frames - 1));
 	}
 
 	namespace
 	{
-		/** The frames' brushes, made once from their files the first time a spinner is made (the game's thread), kept for good. */
-		const TArray<TUniquePtr<FSlateDynamicImageBrush>>& Brushes()
+		/** The frames' brushes, small or large, made once from their files the first time a spinner of them is made (the game's thread), kept for good. */
+		const TArray<TUniquePtr<FSlateDynamicImageBrush>>& Brushes(bool bLarge)
 		{
-			static TArray<TUniquePtr<FSlateDynamicImageBrush>> Made;
-			if (Made.IsEmpty())
+			static TArray<TUniquePtr<FSlateDynamicImageBrush>> Made[2];
+			TArray<TUniquePtr<FSlateDynamicImageBrush>>& Set = Made[bLarge ? 1 : 0];
+			if (Set.IsEmpty())
 			{
+				const int32 Size = bLarge ? LargeFrameSize : FrameSize;
 				for (int32 Frame = 0; Frame < Frames; ++Frame)
 				{
-					Made.Add(MakeUnique<FSlateDynamicImageBrush>(FName(*FramePath(Frame)), FVector2D(FrameSize, FrameSize)));
+					Set.Add(MakeUnique<FSlateDynamicImageBrush>(FName(*FramePath(Frame, bLarge)), FVector2D(Size, Size)));
 				}
 			}
-			return Made;
+			return Set;
 		}
 	}
 }
@@ -40,8 +43,9 @@ namespace CheeseStrikeLoader
 void SCheeseStrikeLoader::Construct(const FArguments& InArgs)
 {
 	Radius = InArgs._Radius;
+	bLarge = InArgs._Large;
 	// Loaded now, on the game's thread, so that the loading screen's thread only draws them.
-	CheeseStrikeLoader::Brushes();
+	CheeseStrikeLoader::Brushes(bLarge);
 }
 
 FVector2D SCheeseStrikeLoader::ComputeDesiredSize(float) const
@@ -53,7 +57,7 @@ int32 SCheeseStrikeLoader::OnPaint(const FPaintArgs&, const FGeometry& AllottedG
 {
 	// The frame the clock says, drawn a little bigger than the spinner's own box (the wedge fills most of its frame, not
 	// all), in the middle of what it was given.
-	const TArray<TUniquePtr<FSlateDynamicImageBrush>>& Frames = CheeseStrikeLoader::Brushes();
+	const TArray<TUniquePtr<FSlateDynamicImageBrush>>& Frames = CheeseStrikeLoader::Brushes(bLarge);
 	const int32 Frame = CheeseStrikeLoader::FrameAt(FPlatformTime::Seconds());
 	if (!Frames.IsValidIndex(Frame) || !Frames[Frame].IsValid())
 	{
