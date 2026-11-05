@@ -18,6 +18,7 @@
 #include "Modes/CheeseStrikeLastStand.h"
 #include "HAL/IConsoleManager.h"
 #include "Rules/CheeseStrikeFalls.h"
+#include "Rules/CheeseStrikeRange.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Kismet/GameplayStatics.h"
 #include "Weapons/CheeseStrikeGrenade.h"
@@ -149,6 +150,9 @@ void ACheeseStrikeBotController::OnPossess(APawn* InPawn)
 	if (InPawn != nullptr)
 	{
 		FaceTo(InPawn->GetActorRotation());
+		DummyHome = InPawn->GetActorLocation();
+		DummyRight = InPawn->GetActorRightVector();
+		DummyWay = 1.0f;
 	}
 	// On a map where a fall kills (a vat of fondue), a bot never walks off an edge; it can still fall when the floor
 	// under it is eaten.
@@ -160,6 +164,21 @@ void ACheeseStrikeBotController::OnPossess(APawn* InPawn)
 	}
 	// A moment's pause on coming in, a little different for each, so that they don't all move as one.
 	NextThinkAt = Now() + FMath::FRandRange(0.2f, 0.6f);
+}
+
+bool ACheeseStrikeBotController::StrafeAsDummy(ACheeseStrikeCharacter* Me)
+{
+	using namespace CheeseStrikeRange;
+	const EDummyMotion Motion = DummyMotion(DummySpot);
+	if (Motion == EDummyMotion::Still)
+	{
+		return false;
+	}
+	const float Offset = FVector::DotProduct(Me->GetActorLocation() - DummyHome, DummyRight);
+	DummyWay = StrafeWay(Offset, DummyWay, StrafeHalfWidth(Motion));
+	Me->DoSprint(Motion == EDummyMotion::SprintStrafe);
+	Me->AddMovementInput(DummyRight, DummyWay);
+	return true;
 }
 
 void ACheeseStrikeBotController::FaceTo(const FRotator& Rotation)
@@ -234,15 +253,17 @@ bool ACheeseStrikeBotController::CanSeeInto(const ACheeseStrikeCharacter* Other)
 void ACheeseStrikeBotController::Tick(float DeltaSeconds)
 {
 	ACheeseStrikeCharacter* Me = Body();
-	// A dummy stands where it came in, facing the way it came in, and does nothing: it is there to be shot.
+	// A dummy stands where it came in, facing the way it came in, and does nothing: it is there to be shot. Two of the
+	// range's strafe in their lanes instead (never aiming or firing either).
 	if (Me == nullptr || !Me->CanAct() || bDummy)
 	{
 		if (bTriggerHeld)
 		{
 			LetGoOfTrigger();
 		}
+		const bool bStrafing = bDummy && Me != nullptr && Me->IsAlive() && Me->CanAct() && StrafeAsDummy(Me);
 		// Held by the count before the match or its round, or the round or the match is over: going nowhere either.
-		if (Me != nullptr && Me->IsAlive())
+		if (Me != nullptr && Me->IsAlive() && !bStrafing)
 		{
 			StopMovement();
 		}
@@ -1165,7 +1186,9 @@ void ACheeseStrikeBotController::ChooseWeapon()
 	}
 	CheeseStrikeBots::FArmed Armed;
 	Armed.bPrimary = Inventory->CanDraw(EWeaponSlot::Primary);
-	Armed.bSidearm = Inventory->CanDraw(EWeaponSlot::Sidearm);
+	// The Curd Pistol runs dry since wave 16: a sidearm with nothing left is no choice.
+	const ACheeseStrikeWeapon* Sidearm = Inventory->GetInSlot(EWeaponSlot::Sidearm);
+	Armed.bSidearm = Inventory->CanDraw(EWeaponSlot::Sidearm) && Sidearm != nullptr && !Sidearm->IsDry();
 	Armed.bKnife = Inventory->CanDraw(EWeaponSlot::Knife);
 	if (const ACheeseStrikeWeapon* Primary = Inventory->GetInSlot(EWeaponSlot::Primary))
 	{

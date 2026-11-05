@@ -35,6 +35,39 @@ namespace CheeseStrikeRange
 		return Taken.Num() % Spots;
 	}
 
+	EDummyMotion DummyMotion(int32 Spot)
+	{
+		switch (Spot)
+		{
+		case 1: return EDummyMotion::Strafe;
+		case 2: return EDummyMotion::SprintStrafe;
+		default: return EDummyMotion::Still;
+		}
+	}
+
+	float StrafeHalfWidth(EDummyMotion Motion)
+	{
+		switch (Motion)
+		{
+		case EDummyMotion::Strafe: return 250.0f;
+		case EDummyMotion::SprintStrafe: return 400.0f;
+		default: return 0.0f;
+		}
+	}
+
+	float StrafeWay(float Offset, float Way, float HalfWidth)
+	{
+		if (Offset >= HalfWidth)
+		{
+			return -1.0f;
+		}
+		if (Offset <= -HalfWidth)
+		{
+			return 1.0f;
+		}
+		return Way < 0.0f ? -1.0f : 1.0f;
+	}
+
 	int32 TargetStage(float Health)
 	{
 		const float Share = FMath::Clamp(Health / TargetHealth, 0.0f, 1.0f);

@@ -52,8 +52,11 @@ public:
 	bool SeesTarget() const { return bSeesTarget; }
 	/** The skill it plays at (CheeseStrikeBots::Skills). */
 	int32 GetSkill() const { return SkillIndex; }
-	/** Whether it is one of the Practice Range's dummies (`?BotSkill=dummy`): it stands where it came in and never moves, aims or fires. */
+	/** Whether it is one of the Practice Range's dummies (`?BotSkill=dummy`): it stays where it came in (or strafes in its lane, CheeseStrikeRange::DummyMotion) and never aims or fires. */
 	bool IsDummy() const { return bDummy; }
+	/** A dummy's place it came in at, and its right (the way it strafes). */
+	FVector GetDummyHome() const { return DummyHome; }
+	FVector GetDummyRight() const { return DummyRight; }
 	/** A dummy's spot, of the map's (ACheeseStrikeGameMode::ChooseDummySpot), where it comes back each time; INDEX_NONE until it has one. */
 	int32 GetDummySpot() const { return DummySpot; }
 	void SetDummySpot(int32 Spot) { DummySpot = Spot; }
@@ -151,6 +154,11 @@ protected:
 	int32 SkillIndex = CheeseStrikeBots::DefaultSkill;
 	bool bDummy = false;
 	int32 DummySpot = INDEX_NONE;
+	FVector DummyHome = FVector::ZeroVector;
+	FVector DummyRight = FVector::RightVector;
+	float DummyWay = 1.0f;
+	/** A dummy that strafes (CheeseStrikeRange::DummyMotion): left and right in its lane, at a walk or a sprint; false for one standing still. */
+	bool StrafeAsDummy(ACheeseStrikeCharacter* Me);
 
 	TWeakObjectPtr<ACheeseStrikeCharacter> Target;
 	bool bSeesTarget = false;
