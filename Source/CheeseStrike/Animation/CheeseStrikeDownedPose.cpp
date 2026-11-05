@@ -83,6 +83,15 @@ void FCheeseStrikeDownedPose::CacheBones_AnyThread(const FAnimationCacheBonesCon
 	bAll &= Bone(UpperArmR, TEXT("upperarm_r"));
 	bAll &= Bone(LowerArmR, TEXT("lowerarm_r"));
 	bAll &= Bone(HandR, TEXT("hand_r"));
+	const TCHAR* const FingerNames[] = {TEXT("index"), TEXT("middle"), TEXT("ring"), TEXT("pinky"), TEXT("thumb")};
+	bLeftFingers = true;
+	for (int32 Finger = 0; Finger < 5; ++Finger)
+	{
+		for (int32 Joint = 0; Joint < 3; ++Joint)
+		{
+			bLeftFingers &= Bone(LeftFingers[Finger][Joint], *FString::Printf(TEXT("%s_0%d_l"), FingerNames[Finger], Joint + 1));
+		}
+	}
 	// A body cut down to fewer bones (at a distance) does without the pose rather than half of it.
 	bBones = bAll;
 	if (!bAll && !bToldMissing && Bones.GetCompactPoseNumBones() > 40)
@@ -218,10 +227,42 @@ void FCheeseStrikeDownedPose::GoDown(FCSPose<FCompactPose>& Pose) const
 	{
 		// The left elbow on the floor under the shoulder, a little out and back, the forearm along the floor ahead.
 		const FVector Shoulder = At(Index(UpperArmL));
-		const FVector Elbow = FVector(Shoulder.X, Shoulder.Y, 4.0) - Right * 7.0f - Ahead * 4.0f;
+		const FVector Elbow = FVector(Shoulder.X, Shoulder.Y, PropElbowHeight) - Right * 7.0f - Ahead * 4.0f;
 		FVector Hand = Elbow + (Ahead - Right * 0.25f).GetSafeNormal() * ForearmLength * 0.95f;
-		Hand.Z = 3.0f;
+		Hand.Z = PropHandHeight;
 		DownedReach(Pose, Index(UpperArmL), Index(LowerArmL), Index(HandL), FMath::Lerp(At(Index(HandL)), Hand, ArmsOwn), Elbow - Up * 10.0f - Right * 5.0f, true);
+		// The hand flat on the floor, palm down, its fingers open along it: the stance's are closed round the pistol's
+		// grip, and a fist laid on its back would put them into the floor. Each joint as the skeleton's own (open) pose
+		// has it; then the hand turned so that its fingers lie level and the back of it faces up.
+		if (bLeftFingers && ArmsOwn > 0.999f)
+		{
+			for (int32 Finger = 0; Finger < 5; ++Finger)
+			{
+				for (int32 Joint = 0; Joint < 3; ++Joint)
+				{
+					const FCompactPoseBoneIndex Bone = Index(LeftFingers[Finger][Joint]);
+					const FTransform Open = Bones.GetRefPoseTransform(Bone) * Pose.GetComponentSpaceTransform(Bones.GetParentBoneIndex(Bone));
+					const FBoneTransform Set(Bone, Open);
+					Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
+				}
+			}
+			const FCompactPoseBoneIndex HandIndex = Index(HandL);
+			const auto Fingers = [&]() { return (At(Index(LeftFingers[1][0])) - At(HandIndex)).GetSafeNormal(); };
+			const FVector Pointing = Fingers();
+			const FVector Level = FVector(Pointing.X, Pointing.Y, 0.0).GetSafeNormal();
+			if (!Pointing.IsNearlyZero() && !Level.IsNearlyZero())
+			{
+				DownedTurn(Pose, HandIndex, FQuat::FindBetweenNormals(Pointing, Level));
+			}
+			// The back of the hand: across it from the little finger to the index, crossed with its length.
+			const FVector Along = Fingers();
+			const FVector Back = FVector::CrossProduct(Along, (At(Index(LeftFingers[0][0])) - At(Index(LeftFingers[3][0]))).GetSafeNormal()).GetSafeNormal();
+			const FVector BackUp = (Up - Along * FVector::DotProduct(Up, Along)).GetSafeNormal();
+			if (!Back.IsNearlyZero() && !BackUp.IsNearlyZero())
+			{
+				DownedTurn(Pose, HandIndex, FQuat::FindBetweenNormals(Back, BackUp));
+			}
+		}
 	}
 	if (ArmsOwn > 0.001f)
 	{

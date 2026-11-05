@@ -33,6 +33,9 @@ namespace CheeseStrikeDowned
 	constexpr float ScootBlendRate = 5.0f;
 	/** How high the left elbow's joint is, the forearm flat on the floor: the shoulder is an upper arm over it. */
 	constexpr float ElbowHeight = 12.0f;
+	/** How high the propped arm's elbow joint and wrist are: the forearm resting on the floor (a forearm, and the armour some heroes wear on it, is that thick), the hand flat, palm down, its fingers open along the floor. */
+	constexpr float PropElbowHeight = 7.5f;
+	constexpr float PropHandHeight = 5.5f;
 	/** How much of the aim to the side the chest turns with (the rest is the head's and the arm's). */
 	constexpr float ChestTurn = 0.8f;
 	/** How much of the head's turn to look along the aim is taken in the neck. */
@@ -124,6 +127,9 @@ private:
 	FBoneReference UpperArmR;
 	FBoneReference LowerArmR;
 	FBoneReference HandR;
+	/** The left hand's fingers' joints (index, middle, ring, little, thumb; three each), laid open on the floor; if the body has them all. */
+	FBoneReference LeftFingers[5][3];
+	bool bLeftFingers = false;
 	bool bBones = false;
 	bool bToldMissing = false;
 };

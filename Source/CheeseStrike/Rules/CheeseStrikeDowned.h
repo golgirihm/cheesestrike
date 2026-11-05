@@ -75,8 +75,8 @@ namespace CheeseStrikeDowned
 	constexpr float LegLength = 95.0f;
 	/** The least the legs reach along the floor, knees right up (the feet then may touch what is in the way). */
 	constexpr float LegReachLeast = 40.0f;
-	/** The toes kept this far from anything in front of the feet. */
-	constexpr float ToeGap = 10.0f;
+	/** The ankles kept this far from anything in front of the feet: a foot's length, the toes lying ahead of them, and a little clear. */
+	constexpr float ToeGap = 22.0f;
 	/** Where the head and the shoulders are in the body's frame. */
 	FVector HeadAt();
 	FVector ShouldersAt();
