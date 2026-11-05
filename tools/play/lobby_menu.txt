@@ -1,0 +1,38 @@
+# The lobby's menu (wave 16): a lobby hosted alone; Escape puts its menu over
+# it in the pages' panel on the left (SETTINGS, LOADOUT, BACK; the lobby has
+# no LOADOUT button of its own any more), its LOADOUT the loadout page over
+# the lobby with the hero view, Escape back to the menu, Escape back to the
+# lobby; then the map's dropdown open, Gruyère Grotto first. Run with
+# tools/play.ps1 -Lobby -Res 1280x720 (it sets 1920 x 1080 itself).
+wait 2
+cmd r.SetRes 1920x1080w
+wait 1
+cmd CheeseStrikeHost
+wait 14
+shot lobby_menu_1_lobby
+key Escape
+wait 1
+shot lobby_menu_2_menu
+cmd CheeseStrikePage Loadout
+wait 2
+shot lobby_menu_3_loadout
+key Escape
+wait 1
+shot lobby_menu_4_back_to_menu
+key Escape
+wait 1
+shot lobby_menu_5_lobby
+cmd CheeseStrikeDropdown 0
+wait 1
+shot lobby_menu_6_maps
+cmd CheeseStrikeDropdown -1
+cmd r.SetRes 1280x720w
+wait 2
+key Escape
+wait 1
+shot lobby_menu_7_menu_720
+cmd CheeseStrikePage Loadout
+wait 2
+shot lobby_menu_8_loadout_720
+wait 1
+quit

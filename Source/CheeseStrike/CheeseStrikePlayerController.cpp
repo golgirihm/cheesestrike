@@ -24,6 +24,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundWave.h"
+#include "Sound/SoundWaveProcedural.h"
+#include "AudioDevice.h"
+#include "AudioThread.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Streaks/CheeseStrikeSynth.h"
 #include "CheeseStrikeBotController.h"
@@ -45,6 +48,7 @@
 #include "UI/CheeseStrikeMenu.h"
 #include "UI/CheeseStrikeCurtain.h"
 #include "UI/CheeseStrikeMenuFigure.h"
+#include "UI/CheeseStrikeHeroView.h"
 #include "UI/CheeseStrikeMenuMouse.h"
 #include "UI/CheeseStrikeMusic.h"
 #include "UI/CheeseStrikePostGame.h"
@@ -146,7 +150,7 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 	const bool bResultsHeld = PostGame != nullptr && PostGame->IsHeld();
 	PublishPresence(bStarted);
 	// Settings (or the loadout) left open over the lobby as the match began are gone: back in the lobby later, it shows, not them.
-	if (bStarted && !bPaused && (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Loadout))
+	if (bStarted && !bPaused && (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Loadout || ChosenPage == EMenuPage::LobbyMenu))
 	{
 		ChosenPage = EMenuPage::Main;
 	}
@@ -172,13 +176,46 @@ void ACheeseStrikePlayerController::Tick(float DeltaSeconds)
 		HideMenuCamera();
 	}
 	// The figure wears the hero picked and holds the primary, at once; and the loadout goes with the player into the match.
+	// On the loadout page, which has the hero in a view of its own, the figure stands aside.
 	if (MenuFigure != nullptr)
 	{
 		const FWantedLoadout Loadout = WantedLoadout();
 		MenuFigure->ShowHero(Loadout.Hero);
 		MenuFigure->ShowPrimary(CheeseStrikeLoadout::PrimaryOrDefault(Loadout.Primary));
+		MenuFigure->SetActorHiddenInGame(ShownPage == EMenuPage::Loadout);
 	}
+	UpdateHeroView();
 	SendLoadout();
+}
+
+void ACheeseStrikePlayerController::UpdateHeroView()
+{
+	const bool bLoadout = ShownPage == EMenuPage::Loadout || (Menu.IsValid() && Menu->GetLobbyOverlay() == EMenuPage::Loadout);
+	if (bLoadout && HeroView == nullptr && GetWorld() != nullptr && IsLocalController())
+	{
+		FActorSpawnParameters Parameters;
+		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Parameters.Owner = this;
+		HeroView = GetWorld()->SpawnActor<ACheeseStrikeHeroView>(ACheeseStrikeHeroView::StaticClass(), ACheeseStrikeHeroView::StageAt, FRotator::ZeroRotator, Parameters);
+	}
+	if (HeroView == nullptr)
+	{
+		return;
+	}
+	if (HeroView->IsShown() != bLoadout)
+	{
+		HeroView->SetShown(bLoadout);
+	}
+	if (bLoadout)
+	{
+		const FWantedLoadout Loadout = WantedLoadout();
+		HeroView->Show(Loadout.Hero, CheeseStrikeLoadout::PrimaryOrDefault(Loadout.Primary));
+	}
+}
+
+UTextureRenderTarget2D* ACheeseStrikePlayerController::GetHeroPicture() const
+{
+	return HeroView != nullptr && HeroView->IsShown() ? HeroView->GetPicture() : nullptr;
 }
 
 ACheeseStrikePlayerController::FWantedLoadout ACheeseStrikePlayerController::WantedLoadout() const
@@ -833,8 +870,11 @@ void ACheeseStrikePlayerController::ChooseMenu(EMenuPage Page)
 
 void ACheeseStrikePlayerController::BackFromMenu()
 {
-	// To the front end's main page, or, during a match, to the pause menu, still paused.
-	ChosenPage = EMenuPage::Main;
+	// To the front end's main page, or, during a match, to the pause menu, still paused; in the lobby, from the settings or
+	// the loadout over it to the lobby's menu, and from that to the lobby.
+	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
+	const bool bInLobby = (IsInAMatch() || bLeaving) && (State == nullptr || !State->HasMatchStarted());
+	ChosenPage = bInLobby && (ChosenPage == EMenuPage::Options || ChosenPage == EMenuPage::Loadout) ? EMenuPage::LobbyMenu : EMenuPage::Main;
 }
 
 void ACheeseStrikePlayerController::HostFromMenu()
@@ -988,6 +1028,52 @@ void ACheeseStrikePlayerController::CheeseStrikeCover(float Seconds)
 	}
 }
 
+void ACheeseStrikePlayerController::CheeseStrikeUISound(const FString& Which, int32 Count, const FString& Queued)
+{
+	const bool bClick = Which.Equals(TEXT("Click"), ESearchCase::IgnoreCase);
+	for (int32 Index = 0; Index < FMath::Clamp(Count, 0, 200); ++Index)
+	{
+		USoundBase* Sound = CheeseStrikeMenu::UISound(bClick);
+		if (!Queued.IsEmpty())
+		{
+			// As MakeSound made every sound until wave 16: the samples queued on a plain procedural wave, which the mixer never sees end.
+			const TArray<int16> Samples = bClick ? CheeseStrikeSynth::ThemeClick(2) : CheeseStrikeSynth::ThemeHover(4);
+			USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(this);
+			Wave->SetSampleRate(CheeseStrikeSynth::SampleRate);
+			Wave->NumChannels = 1;
+			Wave->Duration = static_cast<float>(Samples.Num()) / CheeseStrikeSynth::SampleRate;
+			Wave->bLooping = false;
+			Wave->QueueAudio(reinterpret_cast<const uint8*>(Samples.GetData()), Samples.Num() * sizeof(int16));
+			Sound = Wave;
+		}
+		if (Sound != nullptr)
+		{
+			UGameplayStatics::PlaySound2D(this, Sound, 1.0f);
+		}
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("UI sound: the %s %d times%s"), bClick ? TEXT("click") : TEXT("hover"), Count, Queued.IsEmpty() ? TEXT("") : TEXT(", queued as before wave 16"));
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeSoundsPlaying()
+{
+	const UCheeseStrikeMusicSubsystem* Music = GetGameInstance() != nullptr ? GetGameInstance()->GetSubsystem<UCheeseStrikeMusicSubsystem>() : nullptr;
+	FAudioDeviceHandle Device = GetWorld() != nullptr ? GetWorld()->GetAudioDevice() : FAudioDeviceHandle();
+	if (!Device.IsValid())
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Sounds: no audio device; the music %s"), Music != nullptr && Music->IsPlaying() ? TEXT("plays") : TEXT("doesn't play"));
+		return;
+	}
+	const int32 Voices = Device->GetNumActiveSources();
+	const int32 Most = Device->GetMaxChannels();
+	const bool bMusic = Music != nullptr && Music->IsPlaying();
+	FAudioDevice* Raw = Device.GetAudioDevice();
+	// The sounds themselves are the audio thread's to count.
+	FAudioThread::RunCommandOnAudioThread([Raw, Voices, Most, bMusic]()
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("Sounds: %d voices of %d play, %d sounds; the music %s"), Voices, Most, Raw != nullptr ? Raw->GetActiveSounds().Num() : -1, bMusic ? TEXT("plays") : TEXT("doesn't play"));
+	});
+}
+
 void ACheeseStrikePlayerController::CheeseStrikeBots()
 {
 	for (TActorIterator<ACheeseStrikeBotController> It(GetWorld()); It; ++It)
@@ -1064,6 +1150,11 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 	else if (Page.Equals(TEXT("Themes"), ESearchCase::IgnoreCase))
 	{
 		Chosen = EMenuPage::Themes;
+	}
+	else if (Page.Equals(TEXT("LobbyMenu"), ESearchCase::IgnoreCase) || Page.Equals(TEXT("Menu"), ESearchCase::IgnoreCase))
+	{
+		// The lobby's menu, over it, as Escape puts it.
+		Chosen = EMenuPage::LobbyMenu;
 	}
 	else if (Page.Equals(TEXT("Pause"), ESearchCase::IgnoreCase))
 	{
@@ -1334,7 +1425,7 @@ void ACheeseStrikePlayerController::MenuPressed()
 	}
 	else if (IsInAMatch() || bLeaving)
 	{
-		// In the lobby: the settings over it, and from them back to it.
+		// In the lobby: its menu over it, from that back to it, and from the settings or the loadout back to the menu.
 		ChosenPage = CheeseStrikeMenu::LobbyMenuKey(ChosenPage);
 	}
 	else if (ChosenPage != EMenuPage::Main)

@@ -1,0 +1,17 @@
+# The pause menu and the settings in Cave Aged's looks (wave 16), at 1920 x
+# 1080: a match's pause menu, then its settings, two tabs. Run with
+# tools/play.ps1 (no lobby: the match is on at once).
+wait 2
+cmd r.SetRes 1920x1080w
+wait 1
+cmd CheeseStrikePage Pause
+wait 1
+shot settings_w16_1_pause
+cmd CheeseStrikePage Settings Aiming
+wait 1
+shot settings_w16_2_aiming
+cmd CheeseStrikePage Settings Graphics
+wait 1
+shot settings_w16_3_graphics
+wait 1
+quit

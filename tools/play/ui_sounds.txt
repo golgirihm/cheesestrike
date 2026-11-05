@@ -1,0 +1,28 @@
+# The menu's sounds never stop its music (wave 16). On the front end with
+# sound (tools/play.ps1 -Lobby -Sound): how many voices play with the music
+# alone; then forty hover sounds played as every sound made in code was until
+# wave 16 (a procedural wave fed through its queue, whose playings never end)
+# and how many voices are left playing two seconds later, and whether the
+# music still plays; then the same with the menu's own hover sound now (a wave
+# that ends with its samples), and two hundred more.
+wait 6
+cmd CheeseStrikeSoundsPlaying
+cmd CheeseStrikeUISound Hover 40
+wait 2
+log after forty of the menu's hover sounds (ending)
+cmd CheeseStrikeSoundsPlaying
+cmd CheeseStrikeUISound Hover 200
+wait 3
+log after two hundred more (ending)
+cmd CheeseStrikeSoundsPlaying
+cmd CheeseStrikeUISound Hover 40 Queued
+wait 2
+log after forty played as before wave 16 (queued, never ending)
+cmd CheeseStrikeSoundsPlaying
+cmd CheeseStrikeUISound Hover 40 Queued
+wait 2
+log after eighty played as before wave 16
+cmd CheeseStrikeSoundsPlaying
+wait 2
+cmd CheeseStrikeSoundsPlaying
+quit
