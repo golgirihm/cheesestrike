@@ -16,13 +16,15 @@ class UMaterialInterface;
  * world that draws, made the first time it is asked for (For), never on a
  * dedicated server, never replicated. It flies drops of molten cheese, all
  * one instanced mesh (a small teardrop, drawn out along its flight the faster
- * it goes), by simple ballistics, each traced against the level as it goes
- * (never players), and leaves a splat (a decal) where one in a few lands; it
- * puffs soft mist (another instanced mesh, flat cards turned to this
- * machine's camera, each faded by its custom data); and it spreads pools. Its
- * looks (M_CheeseBlood, M_CheeseMist, M_CheeseBloodDecal and SM_CheeseDrop in
- * /Game/CheeseStrike/Effects, made by tools/art/cheese_blood.py) are loaded
- * by path, so the script can rebuild them.
+ * it goes; the stomp's bright yellow jet a second instance of it in a
+ * brighter look, FSpray::bBright), by simple ballistics, each traced against
+ * the level as it goes (never players), and leaves a splat (a decal) where
+ * one in a few lands; it puffs soft mist (another instanced mesh, flat cards
+ * turned to this machine's camera, each faded by its custom data); and it
+ * spreads pools. Its looks (M_CheeseBlood, M_CheeseMist, M_CheeseBloodDecal
+ * and SM_CheeseDrop in /Game/CheeseStrike/Effects, made by
+ * tools/art/cheese_blood.py) are loaded by path, so the script can rebuild
+ * them; the jet's is M_CheeseBlood with its colours set brighter.
  */
 UCLASS(NotPlaceable, Transient)
 class ACheeseStrikeCheeseBlood : public AActor
@@ -45,6 +47,8 @@ public:
 	 * rather than clumps a frame apart.
 	 */
 	void Spray(const FVector& At, const FVector& Way, int32 Count, float Speed, float SpeedJitter, float ConeDegrees, float Size, float Life = CheeseStrikeBlood::DropLife, float Over = 0.0f);
+	/** The same, `Count` drops as `Spray` has them (its Drops count aside). */
+	void Spray(const FVector& At, const FVector& Way, int32 Count, const CheeseStrikeBlood::FSpray& Spray, float Over = 0.0f);
 	/** A puff of mist at `At`, drifting at `Drift`, growing and fading as `Mist` says (past the cap, the oldest goes). */
 	void Puff(const FVector& At, const FVector& Drift, const CheeseStrikeBlood::FMist& Mist);
 	/** A hit's misty spray (CheeseStrikeBlood::ShotSpray, ShotMist) at `At` along `Way`. */
@@ -71,6 +75,8 @@ private:
 		float Size = 1.0f;
 		float Age = 0.0f;
 		float Life = CheeseStrikeBlood::DropLife;
+		float Stretch = CheeseStrikeBlood::MostStretch;
+		bool bBright = false;
 	};
 	struct FPuff
 	{
@@ -91,10 +97,15 @@ private:
 	void Land(const FDrop& Drop, const FHitResult& Hit);
 	UDecalComponent* MakeDecal(const FVector& At, const FVector& Normal, float Radius, float Depth);
 	void ShowDrops();
+	/** Puts `Transforms` on `Meshes` as its instances, afresh if their number changed. */
+	static void ShowInstances(UInstancedStaticMeshComponent* Meshes, const TArray<FTransform>& Transforms);
 	void ShowMist(float DeltaSeconds);
 
 	UPROPERTY()
 	TObjectPtr<UInstancedStaticMeshComponent> DropMeshes;
+	/** The stomp's jet: the same drop in the brighter look. */
+	UPROPERTY()
+	TObjectPtr<UInstancedStaticMeshComponent> JetMeshes;
 	UPROPERTY()
 	TObjectPtr<UInstancedStaticMeshComponent> MistMeshes;
 	UPROPERTY()
@@ -104,6 +115,7 @@ private:
 	TArray<FSplat> Splats;
 	TArray<FPuff> Puffs;
 	TArray<FTransform> Shown;
+	TArray<FTransform> JetShown;
 	TArray<FTransform> MistShown;
 	TArray<float> MistFades;
 	/** The drop mesh's radius at a scale of 1 (from its bounds: the script's teardrop, or the engine's sphere without it), and half the mist card's width. */

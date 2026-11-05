@@ -9,7 +9,7 @@
  * cheese, each drawn out along its flight the faster it goes, and soft
  * puffs of mist where it leaves the body. A hit throws a brief misty spray
  * along the shot, a stab a big fan of spray and spurts and a pool, a stomp
- * a fire-hydrant jet from the head and a pool. Only for show, on every
+ * a fire-hydrant jet of bright yellow from where the head was and a pool. Only for show, on every
  * machine that draws (never a dedicated server), by ACheeseStrikeCheeseBlood
  * (Effects/). Its numbers, as plain arithmetic tested without a world
  * (CheeseStrike.Blood.*): how many drops a hit throws, how fast and how
@@ -30,9 +30,27 @@ namespace CheeseStrikeBlood
 	constexpr float Gravity = 980.0f;
 	constexpr float DropLife = 2.5f;
 
+	/** Each drop's size is its spray's times somewhere from 1 - SizeJitter to 1 + SizeJitter. */
+	constexpr float SizeJitter = 0.25f;
+	/** The drop's shape: a teardrop DropShapeLength radii long, its round head ahead (SM_CheeseDrop). */
+	constexpr float DropShapeLength = 3.0f;
 	/**
-	 * One burst of drops: how many, how fast (and how much faster or slower each may be), how wide a cone, how big (the
-	 * drop's radius: its length is DropLength of it), and how long each lives.
+	 * How much longer than its shape a drop is drawn at `Speed`: not at all at rest, up to `Most` times (MostStretch,
+	 * unless its spray says otherwise: the stomp's jet draws its drops out further) as it flies fast, so that a spray
+	 * reads as streaks of liquid, not balls.
+	 */
+	constexpr float MostStretch = 2.5f;
+	float DropStretch(float Speed, float Most = MostStretch);
+	/** How long a drop of radius `Size` is drawn flying at `Speed`, nose to tail. */
+	float DropLength(float Size, float Speed, float Most = MostStretch);
+
+	/**
+	 * One burst of drops: how many, how fast (and how much faster or slower each may be), how wide a cone (ConeDegrees
+	 * either side of its line), how big (the drop's radius: its length is DropLength of it), how long each lives, how far
+	 * each is drawn out along its flight at the most (Stretch), how much the drops crowd the cone's line (Core: 0 spread
+	 * evenly over the cone, as a fan is; 1 nearly all along its line with a thin halo out to the cone's edge, as a jet
+	 * is: ConeShare), and whether they are the bright cheese yellow of the stomp's jet (bBright, in a look of its own)
+	 * rather than the deep molten orange of a wound's.
 	 */
 	struct FSpray
 	{
@@ -42,20 +60,12 @@ namespace CheeseStrikeBlood
 		float ConeDegrees = 0.0f;
 		float Size = 0.0f;
 		float Life = DropLife;
+		float Stretch = MostStretch;
+		float Core = 0.0f;
+		bool bBright = false;
 	};
-
-	/** Each drop's size is its spray's times somewhere from 1 - SizeJitter to 1 + SizeJitter. */
-	constexpr float SizeJitter = 0.25f;
-	/** The drop's shape: a teardrop DropShapeLength radii long, its round head ahead (SM_CheeseDrop). */
-	constexpr float DropShapeLength = 3.0f;
-	/**
-	 * How much longer than its shape a drop is drawn at `Speed`: not at all at rest, up to MostStretch times as it flies
-	 * fast, so that a spray reads as streaks of liquid, not balls.
-	 */
-	constexpr float MostStretch = 2.5f;
-	float DropStretch(float Speed);
-	/** How long a drop of radius `Size` is drawn flying at `Speed`, nose to tail. */
-	float DropLength(float Size, float Speed);
+	/** How much of a spray's cone a drop drawn at `Roll` (0 to 1, evenly) is thrown within, for the spray's `Core`. */
+	float ConeShare(float Roll, float Core);
 
 	/**
 	 * A hit for `Damage`: a brief misty spray along the shot: 20 to 40 tiny drops (none longer than 2 cm), gone in
@@ -101,15 +111,23 @@ namespace CheeseStrikeBlood
 	bool StabMistDue(float From, float To);
 
 	/**
-	 * The stomp: as the boot lands, a fire-hydrant jet from where the head was for HoseSeconds: a dense stream of fine
-	 * drops, never fewer than 400 a second until it slackens at its end, at 8 to 12 m/s in a narrow cone (HoseCone),
-	 * falling as they fly, with a sheath of mist at its source. Drops a second, how fast, and how big.
+	 * The stomp: as the boot lands, a fire-hydrant jet from where the head was for HoseSeconds, read as one liquid
+	 * stream and not chunks: HoseRate small drops a second, steadily until it slackens over its last HoseSlackSeconds
+	 * (StompRate); each about 1.5 cm long at rest (HoseDropSize, the radius) and drawn out three to five times along
+	 * its flight (HoseStretch), bright cheese yellow in a look of their own (HoseSpray: the spray a moment's drops are
+	 * thrown as); at 12 m/s easing to 9 (StompSpeed) in a cone 2 x HoseCone degrees wide, each placed by its own
+	 * moment within the frame so that the stream is unbroken, falling in arcs onto the floor; with a sheath of mist at
+	 * its source.
 	 */
 	constexpr float HoseSeconds = 2.0f;
-	constexpr float HoseCone = 7.0f;
+	constexpr float HoseRate = 600.0f;
+	constexpr float HoseSlackSeconds = 0.3f;
+	constexpr float HoseCone = 5.0f;
+	constexpr float HoseDropSize = 0.55f;
+	constexpr float HoseStretch = 5.0f;
 	float StompRate(float Elapsed);
 	float StompSpeed(float Elapsed);
-	float StompDropSize(float Elapsed);
+	FSpray HoseSpray(float Elapsed);
 	/** The jet's sheath of mist: a puff every HoseMistEvery seconds while it runs. */
 	constexpr float HoseMistEvery = 0.08f;
 	FMist HoseMist();

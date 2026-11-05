@@ -30,6 +30,8 @@ bool FAHitSpraysCheeseByItsDamage::RunTest(const FString& Parameters)
 	TestEqual(TEXT("at rest, unstretched"), DropStretch(0.0f), 1.0f);
 	TestTrue(TEXT("flying, stretched"), DropStretch(600.0f) > 1.5f && DropStretch(600.0f) < DropStretch(900.0f));
 	TestEqual(TEXT("to a limit"), DropStretch(5000.0f), MostStretch);
+	TestEqual(TEXT("or the limit its spray gives"), DropStretch(5000.0f, 4.0f), 4.0f);
+	TestEqual(TEXT("which a spray's drops don't have unless it says"), ShotSpray(50.0f).Stretch, MostStretch);
 	const float Biggest = Heavy.Size * (1.0f + SizeJitter);
 	const float Fastest = Heavy.Speed * (1.0f + Heavy.SpeedJitter);
 	TestTrue(FString::Printf(TEXT("a shot's drops are tiny: none longer than 2 cm (%.2f)"), DropLength(Biggest, Fastest)), DropLength(Biggest, Fastest) <= 2.0f);
@@ -89,27 +91,40 @@ bool FAnExecutionBleedsCheese::RunTest(const FString& Parameters)
 	}
 	TestTrue(FString::Printf(TEXT("with a puff of mist at each spurt and the gush (%d)"), Puffs), Puffs >= 3 && Puffs <= 8);
 
-	// The stomp: a firehose for HoseSeconds from the blow, far more than the stab.
+	// The stomp: a fire-hydrant jet for HoseSeconds from the blow, one dense steady stream of small bright drops, far
+	// more than the stab, and no chunks.
 	TestEqual(TEXT("nothing before the boot lands"), StompRate(StompLands - 0.05f), 0.0f);
 	float Hose = 0.0f;
 	float Least = TNumericLimits<float>::Max();
 	for (float Time = StompLands; Time < StompLands + HoseSeconds; Time += 0.01f)
 	{
 		Hose += StompRate(Time) * 0.01f;
-		if (Time < StompLands + HoseSeconds - 0.5f)
+		if (Time < StompLands + HoseSeconds - HoseSlackSeconds)
 		{
 			Least = FMath::Min(Least, StompRate(Time));
 		}
 	}
-	TestTrue(FString::Printf(TEXT("a fire-hydrant jet for two seconds (%.0f drops, never under %.0f a second until it slackens)"), Hose, Least), Hose > 2.0f * Drops && Least >= 400.0f);
-	TestTrue(TEXT("within the cap at any moment (drops live at most DropLife)"), Hose <= MostDrops);
+	TestTrue(FString::Printf(TEXT("a dense jet for two seconds (%.0f drops, never under %.0f a second until it slackens)"), Hose, Least), Hose > 2.0f * Drops && Hose >= 1000.0f && Least >= 590.0f);
+	TestTrue(TEXT("one steady stream, not throbbing"), FMath::IsNearlyEqual(StompRate(StompLands + 0.4f), StompRate(StompLands + 1.0f), 1.0f) && FMath::IsNearlyEqual(StompRate(StompLands + 1.0f), HoseRate, 1.0f));
+	TestTrue(TEXT("slackening only at its end"), StompRate(StompLands + HoseSeconds - 0.1f) < HoseRate * 0.5f);
+	TestTrue(TEXT("within the cap at any moment (drops live at most DropLife)"), HoseRate * DropLife <= MostDrops);
 	TestEqual(TEXT("then it stops"), StompRate(StompLands + HoseSeconds + 0.01f), 0.0f);
-	TestTrue(FString::Printf(TEXT("at 8 to 12 m/s (%.0f to %.0f cm/s)"), StompSpeed(StompLands), StompSpeed(StompLands + HoseSeconds)), StompSpeed(StompLands) <= 1200.0f && StompSpeed(StompLands + HoseSeconds) >= 800.0f);
-	TestTrue(TEXT("slackening"), StompSpeed(StompLands) > StompSpeed(StompLands + HoseSeconds));
-	TestTrue(TEXT("in a narrow cone"), HoseCone <= 10.0f);
-	TestTrue(TEXT("of small drops, bigger than a shot's"), StompDropSize(StompLands) > ShotSpray(100.0f).Size && StompDropSize(StompLands) <= 0.5f);
+	const FSpray First = HoseSpray(StompLands);
+	const FSpray Last = HoseSpray(StompLands + HoseSeconds);
+	TestTrue(FString::Printf(TEXT("at 9 to 12 m/s (%.0f to %.0f cm/s)"), First.Speed, Last.Speed), First.Speed <= 1200.0f && First.Speed >= 900.0f && Last.Speed >= 900.0f && Last.Speed <= 1200.0f);
+	TestTrue(TEXT("easing"), First.Speed > Last.Speed);
+	TestTrue(TEXT("nearly all at one speed"), First.SpeedJitter <= 0.15f);
+	// Crowded along the cone's line: half the drops within a tenth of the cone, a few out to its edge; a fan is even.
+	TestTrue(TEXT("a jet crowds its line"), First.Core >= 0.9f && ConeShare(0.5f, First.Core) <= 0.1f && FMath::IsNearlyEqual(ConeShare(1.0f, First.Core), 1.0f));
+	TestTrue(TEXT("a wound's fan is spread evenly"), ShotSpray(50.0f).Core == 0.0f && FMath::IsNearlyEqual(ConeShare(0.5f, 0.0f), 0.5f));
+	TestTrue(FString::Printf(TEXT("in a cone 10 degrees wide (%.0f)"), First.ConeDegrees * 2.0f), First.ConeDegrees > 0.0f && First.ConeDegrees * 2.0f <= 10.0f);
+	TestTrue(FString::Printf(TEXT("of small drops, about 1.5 cm at rest (%.2f), bigger than a shot's"), DropLength(First.Size, 0.0f, First.Stretch)), FMath::IsNearlyEqual(DropLength(First.Size, 0.0f, First.Stretch), 1.5f, 0.3f) && First.Size > ShotSpray(100.0f).Size);
+	const float Slowest = Last.Speed * (1.0f - Last.SpeedJitter);
+	TestTrue(FString::Printf(TEXT("drawn out three to five times along their flight (%.1f to %.1f)"), DropStretch(Slowest, Last.Stretch), DropStretch(First.Speed, First.Stretch)), DropStretch(Slowest, Last.Stretch) >= 3.0f && DropStretch(First.Speed, First.Stretch) <= 5.0f);
+	TestTrue(TEXT("so longer than any shot's drop"), DropLength(First.Size, First.Speed, First.Stretch) > 2.0f);
+	TestTrue(TEXT("bright cheese yellow, in a look of their own, which a wound's drops aren't"), First.bBright && Last.bBright && !ShotSpray(100.0f).bBright);
 	TestTrue(TEXT("with a sheath of mist several times a second"), HoseMistEvery <= 0.1f && HoseMist().Life > HoseMistEvery);
-	TestTrue(TEXT("far faster than the stab's spurts"), StompSpeed(StompLands) > StabSpeed(StabOut));
+	TestTrue(TEXT("far faster than the stab's spurts"), First.Speed > StabSpeed(StabOut));
 
 	// Its pool: spreads quickly then slowly to its full size, stays, then fades and is gone.
 	TestEqual(TEXT("a pool starts small"), PoolRadiusAt(0.0f), PoolStart);
