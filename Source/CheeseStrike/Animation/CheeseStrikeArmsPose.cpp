@@ -160,10 +160,10 @@ namespace CheeseStrikeArms
 		};
 		// At rest the head over the right shoulder; wound further back over it; brought down and across to straight ahead;
 		// on round to the lower left; and back up onto the shoulder.
-		const FVector SledgeResting = FVector(-0.35f, 0.6f, 0.72f).GetSafeNormal();
+		const FVector SledgeResting = FVector(-0.45f, 0.65f, 0.6f).GetSafeNormal();
 		const FSledgeKey SledgeKeys[] = {
 			{0.0f, FVector(0.0f, 0.0f, 0.0f), SledgeResting},
-			{0.2f, FVector(-6.0f, 8.0f, 10.0f), FVector(-0.65f, 0.35f, 0.68f).GetSafeNormal()},
+			{0.2f, FVector(-6.0f, 8.0f, 10.0f), FVector(-0.8f, 0.4f, 0.5f).GetSafeNormal()},
 			{SwipeContactPhase, FVector(14.0f, -10.0f, -4.0f), FVector::ForwardVector},
 			{0.58f, FVector(8.0f, -28.0f, -14.0f), FVector(0.25f, -0.8f, -0.55f).GetSafeNormal()},
 			{1.0f, FVector(0.0f, 0.0f, 0.0f), SledgeResting},
