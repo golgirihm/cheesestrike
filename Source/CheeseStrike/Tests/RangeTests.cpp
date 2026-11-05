@@ -15,6 +15,7 @@
 #include "Rules/CheeseStrikeStart.h"
 #include "Rules/CheeseStrikeMice.h"
 #include "Weapons/CheeseStrikeArsenal.h"
+#include "Movement/CheeseStrikeMovement.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -48,6 +49,17 @@ bool FThePracticeRange::RunTest(const FString& Parameters)
 	TestEqual(TEXT("and after it"), DummySpotFor({0, 1, 2}, 4), 3);
 	TestEqual(TEXT("more dummies than spots share them"), DummySpotFor({0, 1, 2, 3}, 4), 0);
 	TestEqual(TEXT("a map with none has none"), DummySpotFor({}, 0), static_cast<int32>(INDEX_NONE));
+	// Wave 16: two of them strafe in their lanes, for trying the Gouda Overload's slowdown on: the 10 m one at a walk, the
+	// 20 m one at a sprint; the 5 m and 40 m ones, and any dummy of a map without spots, stand still.
+	TestTrue(TEXT("the 5 m and 40 m dummies stand still"), DummyMotion(0) == EDummyMotion::Still && DummyMotion(3) == EDummyMotion::Still && DummyMotion(INDEX_NONE) == EDummyMotion::Still);
+	TestTrue(TEXT("the 10 m one strafes"), DummyMotion(1) == EDummyMotion::Strafe);
+	TestTrue(TEXT("the 20 m one sprint-strafes"), DummyMotion(2) == EDummyMotion::SprintStrafe);
+	TestTrue(TEXT("a sprint's lane wider than a walk's, a few metres"), StrafeHalfWidth(EDummyMotion::SprintStrafe) > StrafeHalfWidth(EDummyMotion::Strafe) && StrafeHalfWidth(EDummyMotion::Strafe) >= 150.0f && StrafeHalfWidth(EDummyMotion::SprintStrafe) <= 500.0f);
+	TestEqual(TEXT("none for one standing still"), StrafeHalfWidth(EDummyMotion::Still), 0.0f);
+	TestEqual(TEXT("going right, it keeps on"), StrafeWay(100.0f, 1.0f, 250.0f), 1.0f);
+	TestEqual(TEXT("going left, too"), StrafeWay(100.0f, -1.0f, 250.0f), -1.0f);
+	TestEqual(TEXT("turned back at the right end"), StrafeWay(251.0f, 1.0f, 250.0f), -1.0f);
+	TestEqual(TEXT("and at the left"), StrafeWay(-251.0f, -1.0f, 250.0f), 1.0f);
 
 	// A stand that is instant is back as soon as it is taken; any other after its seconds.
 	TestEqual(TEXT("an instant stand is never empty"), CheeseStrikePickups::BackAt(100.0f, 60.0f, true), 0.0f);
@@ -118,6 +130,14 @@ namespace RangeTests
 
 	/** Where each dummy came in, by its spot. */
 	TMap<int32, FVector> CameIn;
+	/** How far each strafing dummy went either way across its lane (cm), and its fastest (cm/s). */
+	struct FStrafe
+	{
+		float Least = 0.0f;
+		float Most = 0.0f;
+		float Fastest = 0.0f;
+	};
+	TMap<int32, FStrafe> Strafed;
 	TWeakObjectPtr<ACheeseStrikeBotController> Killed;
 	TWeakObjectPtr<APawn> KilledBody;
 	TWeakObjectPtr<ACheeseStrikeTarget> Target;
@@ -130,6 +150,7 @@ bool FThePracticeRangeNeverEmpties::RunTest(const FString& Parameters)
 	using namespace PlayTesting;
 	using namespace RangeTests;
 	CameIn.Reset();
+	Strafed.Reset();
 	FSession Session;
 	Session.Level = CheeseStrikeRange::Level;
 	Session.Options = CheeseStrikeRange::PracticeOptions();
@@ -185,17 +206,57 @@ bool FThePracticeRangeNeverEmpties::RunTest(const FString& Parameters)
 			}
 		}
 	});
-	// The dummies don't move, turn or fire.
-	Wait(2.0f);
+	// The dummies never fire; two stand still, and two strafe left and right in their lanes, one at a walk and one at a
+	// sprint, turning back at either end. Watched for four seconds.
+	for (int32 Look = 0; Look < 20; ++Look)
+	{
+		Wait(0.2f);
+		Then([this, Look]()
+		{
+			for (const ACheeseStrikeBotController* Bot : Dummies())
+			{
+				const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(Bot->GetPawn());
+				const FVector* Was = CameIn.Find(Bot->GetDummySpot());
+				if (Body == nullptr || Was == nullptr)
+				{
+					AddError(TEXT("a dummy lost"));
+					return;
+				}
+				const CheeseStrikeRange::EDummyMotion Motion = CheeseStrikeRange::DummyMotion(Bot->GetDummySpot());
+				const FVector Moved = Body->GetActorLocation() - *Was;
+				const float Along = FVector::DotProduct(Moved, Bot->GetDummyRight());
+				TestTrue(TEXT("its trigger never held"), Body->GetWeapon() == nullptr || !Body->GetWeapon()->IsFiring());
+				if (Motion == CheeseStrikeRange::EDummyMotion::Still)
+				{
+					TestTrue(FString::Printf(TEXT("dummy %d stays where it came in"), Bot->GetDummySpot()), Moved.Size2D() < 20.0f && Body->GetVelocity().Size2D() < 5.0f);
+					continue;
+				}
+				const float Half = CheeseStrikeRange::StrafeHalfWidth(Motion);
+				TestTrue(FString::Printf(TEXT("dummy %d keeps to its lane (%.0f across, %.0f along it)"), Bot->GetDummySpot(), Along, (Moved - Bot->GetDummyRight() * Along).Size2D()),
+					FMath::Abs(Along) < Half + 120.0f && (Moved - Bot->GetDummyRight() * Along).Size2D() < 30.0f);
+				Strafed.FindOrAdd(Bot->GetDummySpot()).Least = FMath::Min(Strafed.FindOrAdd(Bot->GetDummySpot()).Least, Along);
+				Strafed.FindOrAdd(Bot->GetDummySpot()).Most = FMath::Max(Strafed.FindOrAdd(Bot->GetDummySpot()).Most, Along);
+				Strafed.FindOrAdd(Bot->GetDummySpot()).Fastest = FMath::Max(Strafed.FindOrAdd(Bot->GetDummySpot()).Fastest, Body->GetVelocity().Size2D());
+			}
+		});
+	}
 	Then([this]()
 	{
 		for (const ACheeseStrikeBotController* Bot : Dummies())
 		{
-			const ACheeseStrikeCharacter* Body = Cast<ACheeseStrikeCharacter>(Bot->GetPawn());
-			const FVector* Was = CameIn.Find(Bot->GetDummySpot());
-			TestTrue(FString::Printf(TEXT("dummy %d stays where it came in"), Bot->GetDummySpot()), Body != nullptr && Was != nullptr && FVector::Dist2D(Body->GetActorLocation(), *Was) < 20.0f);
-			TestTrue(TEXT("its trigger never held"), Body != nullptr && (Body->GetWeapon() == nullptr || !Body->GetWeapon()->IsFiring()));
-			TestTrue(TEXT("still"), Body != nullptr && Body->GetVelocity().Size2D() < 5.0f);
+			const CheeseStrikeRange::EDummyMotion Motion = CheeseStrikeRange::DummyMotion(Bot->GetDummySpot());
+			if (Motion == CheeseStrikeRange::EDummyMotion::Still)
+			{
+				continue;
+			}
+			const FStrafe* Seen = Strafed.Find(Bot->GetDummySpot());
+			const float Half = CheeseStrikeRange::StrafeHalfWidth(Motion);
+			TestTrue(FString::Printf(TEXT("dummy %d strafed both ways, from %.0f to %.0f"), Bot->GetDummySpot(), Seen != nullptr ? Seen->Least : 0.0f, Seen != nullptr ? Seen->Most : 0.0f),
+				Seen != nullptr && Seen->Least < -Half * 0.7f && Seen->Most > Half * 0.7f);
+			const bool bSprint = Motion == CheeseStrikeRange::EDummyMotion::SprintStrafe;
+			const float Walk = CheeseStrikeMovement::WalkSpeed;
+			TestTrue(FString::Printf(TEXT("dummy %d at a %s (%.0f cm/s at most)"), Bot->GetDummySpot(), bSprint ? TEXT("sprint") : TEXT("walk"), Seen != nullptr ? Seen->Fastest : 0.0f),
+				Seen != nullptr && (bSprint ? Seen->Fastest > Walk * 1.2f : Seen->Fastest > Walk * 0.8f && Seen->Fastest < Walk * 1.1f));
 		}
 	});
 
@@ -253,7 +314,7 @@ bool FThePracticeRangeNeverEmpties::RunTest(const FString& Parameters)
 	{
 		const APawn* Body = Killed->GetPawn();
 		const FVector* Was = CameIn.Find(Killed->GetDummySpot());
-		TestTrue(FString::Printf(TEXT("back where it stood (%s)"), *Body->GetActorLocation().ToCompactString()), Was != nullptr && FVector::Dist2D(Body->GetActorLocation(), *Was) < 60.0f);
+		TestTrue(FString::Printf(TEXT("back where it stood (%s)"), *Body->GetActorLocation().ToCompactString()), Was != nullptr && FVector::Dist2D(Body->GetActorLocation(), *Was) < 60.0f + CheeseStrikeRange::StrafeHalfWidth(CheeseStrikeRange::DummyMotion(Killed->GetDummySpot())));
 		TestTrue(TEXT("still a dummy"), Killed->IsDummy());
 	});
 

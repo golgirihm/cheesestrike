@@ -11,9 +11,11 @@
  * `Instant`: taken, it is back at once, so the row is never empty), markers
  * at 5, 10, 20 and 40 m, a wall of cheese targets that shots break and that
  * grow back (ACheeseStrikeTarget), and four dummies: bots that stand where
- * the map puts them (its `DummySpot` points) and never move, aim or fire,
- * and come back where they stood when killed (`?BotSkill=dummy`,
- * CheeseStrikeBots::DummiesFrom). The front end's PRACTICE plays it alone,
+ * the map puts them (its `DummySpot` points) and never aim or fire, and come
+ * back where they stood when killed (`?BotSkill=dummy`,
+ * CheeseStrikeBots::DummiesFrom): two stand still, the 10 m one strafes left
+ * and right in its lane and the 20 m one sprint-strafes (wave 16, for trying
+ * the Gouda Overload's slowdown on, DummyMotion). The front end's PRACTICE plays it alone,
  * with no lobby, a free-for-all with no mice that never ends by itself.
  */
 namespace CheeseStrikeRange
@@ -39,6 +41,20 @@ namespace CheeseStrikeRange
 	 * share them in turn (`Taken.Num()` round them). INDEX_NONE with none.
 	 */
 	int32 DummySpotFor(const TArray<int32>& Taken, int32 Spots);
+
+	/** How a dummy moves: standing still, strafing left and right in its lane at a walk, or at a sprint. */
+	enum class EDummyMotion : uint8
+	{
+		Still,
+		Strafe,
+		SprintStrafe,
+	};
+	/** How the dummy at spot `Spot` (in ChooseDummySpot's order: 5, 10, 20 and 40 m on the range) moves: the 10 m one strafes, the 20 m one sprint-strafes, the rest stand still (and any dummy of a map without spots, INDEX_NONE). */
+	EDummyMotion DummyMotion(int32 Spot);
+	/** How far either side of its spot a dummy strafes (cm): a walk's 2.5 m, a sprint's 4 m; none for one standing still. */
+	float StrafeHalfWidth(EDummyMotion Motion);
+	/** Which way (+1 to its right, -1 to its left) a dummy `Offset` cm to the right of its spot strafes now, having gone `Way`: turned back at either end. */
+	float StrafeWay(float Offset, float Way, float HalfWidth);
 
 	/** A cheese target's health: a burst of the Colby Carbine, two shots of the Blaster, a shotgun's blast break it. */
 	constexpr float TargetHealth = 40.0f;
