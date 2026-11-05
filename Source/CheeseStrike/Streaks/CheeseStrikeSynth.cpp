@@ -3,6 +3,12 @@
 #include "CheeseStrikeSynth.h"
 #include "Sound/SoundWaveProcedural.h"
 #include "CheeseStrikeSynthWave.h"
+#include "HAL/IConsoleManager.h"
+
+#if !UE_BUILD_SHIPPING
+/** For showing the cause of wave 16's silent gunfire again: every sound made in code queued on a plain procedural wave as before, so that each holds a voice for ever. */
+static TAutoConsoleVariable<int32> CVarQueuedSynth(TEXT("CheeseStrike.QueuedSynth"), 0, TEXT("1: make the sounds made in code as before wave 16 (each holds a voice playing silence for ever), to show what that did (development)."));
+#endif
 
 namespace CheeseStrikeSynth
 {
@@ -617,6 +623,18 @@ namespace CheeseStrikeSynth
 	{
 		// A wave whose every playing ends with its samples (UCheeseStrikeSynthWave), never one fed through the procedural
 		// queue, which the mixer never sees end: each would hold a voice playing silence for as long as it lived.
+#if !UE_BUILD_SHIPPING
+		if (CVarQueuedSynth.GetValueOnAnyThread() != 0)
+		{
+			USoundWaveProcedural* Queued = NewObject<USoundWaveProcedural>(Outer);
+			Queued->SetSampleRate(SampleRate);
+			Queued->NumChannels = 1;
+			Queued->Duration = static_cast<float>(Samples.Num()) / SampleRate;
+			Queued->bLooping = false;
+			Queued->QueueAudio(reinterpret_cast<const uint8*>(Samples.GetData()), Samples.Num() * sizeof(int16));
+			return Queued;
+		}
+#endif
 		UCheeseStrikeSynthWave* Wave = NewObject<UCheeseStrikeSynthWave>(Outer);
 		Wave->SetSamples(Samples, SampleRate);
 		return Wave;
