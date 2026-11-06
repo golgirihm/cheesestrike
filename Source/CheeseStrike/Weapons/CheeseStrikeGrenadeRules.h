@@ -76,8 +76,8 @@ namespace CheeseStrikeGrenades
 	/** How far before the core the veil stands (cm; more than the cards' soft depth fade, so it is whole over anyone in the core), and how near the eye it comes at the nearest (cm: from inside the core, nothing further is seen). */
 	constexpr float CloudVeilAhead = 100.0f;
 	constexpr float CloudVeilNearest = 80.0f;
-	/** How much of a solid card's radius is whole (M_SmokeMist with its custom data 1 at 1): the veil's cards are made this much bigger than what they must hide. */
-	constexpr float CloudVeilWhole = 0.75f;
+	/** How much of a solid card's radius is whole (M_SmokeMist with its custom data 1 at 1; past it, since wave 17, it frays into its puff's wisps): the veil's cards are made this much bigger than what they must hide. */
+	constexpr float CloudVeilWhole = 0.6f;
 	/**
 	 * The veil for an eye at `Eye` (from the cloud's middle) at `Age`: a card turned to the eye, its middle at `Middle`
 	 * (from the cloud's middle) and its axes `Right` and `Up`, which must be whole over `HalfRight` by `HalfUp` (cm) about
