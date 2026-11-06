@@ -13,6 +13,12 @@ import array, math, os, sys, traceback, wave
 #   "thock": a hard click at its front, the ring of a struck wooden block (four modes of 380-1700 Hz dying in 10-45 ms), a
 #   slap of mid noise, and under them a body thump (a tone from 130 Hz down to 55) and a knock of low noise, driven into
 #   saturation for its intensity, 0.45 s.
+# The execution's head stomp landing (/Game/CheeseStrike/Sounds/SW_StompSplat, group 5's), made from nothing: a gross wet
+#   splat and crush in place of a thud: the boot's heavy thump (a tone from 95 Hz down to 42 and a knock of low noise), a
+#   crunch of a dozen sharp cracks of 1.5-9 kHz noise over its first 90 ms (bone and gristle giving), a squelch of noise
+#   through two resonances sweeping down from about 1.3 kHz and 700 Hz to 450 and 260 (flesh and melted cheese squeezed
+#   out), wet pops (little rising chirps of 250-900 Hz) scattered over its first 0.4 s, and a sloppy, dying slosh of low
+#   noise wavering under it all, driven into saturation, 0.9 s.
 #
 # Two steps, from the repository's root:
 #   1. C:\Hamid\code\FabDownloads\piper\venv\Scripts\python.exe -I tools/art/wave17_sounds.py prepare
@@ -29,7 +35,7 @@ FIREARMS = os.environ.get("CHEESESTRIKE_FIREARMS", os.path.join(DOWNLOADS, "fire
 BLASTS = [os.path.join("Mossberg", "N_30P.wav"), os.path.join("Nova", "O_21P.wav"), os.path.join("Model 12", "K_22P.wav")]
 RATE = 48000
 SOUNDS = [(f"SW_ShotgunBlast{i}.wav", "/Game/OpenGameArt/Shotgun", f"SW_ShotgunBlast{i}") for i in range(1, 4)] \
-    + [("SW_StickThock.wav", "/Game/CheeseStrike/Sounds", "SW_StickThock")]
+    + [("SW_StickThock.wav", "/Game/CheeseStrike/Sounds", "SW_StickThock")]     + [("SW_StompSplat.wav", "/Game/CheeseStrike/Sounds", "SW_StompSplat")]
 # The editor's step imports only the sounds whose names hold one of these words, if any are given in the environment
 # (e.g. CHEESESTRIKE_ONLY="Thock"); all of them otherwise.
 ONLY = os.environ.get("CHEESESTRIKE_ONLY", "").split()
@@ -149,6 +155,53 @@ def prepare():
     knock = biquad(biquad(rng.uniform(-1, 1, count), "low", RATE, 250.0), "low", RATE, 250.0) * 7.0 * np.exp(-t / 0.04)
     thock = np.tanh(1.8 * attack * (click * 1.0 + block * 1.4 + slap * 0.8 + thump * 0.6 + knock * 0.35))
     save("SW_StickThock", shaped(thock, RATE, 0.45, 0.0002, 0.15, 0.97), RATE)
+
+    # The stomp's splat.
+    count = int(0.9 * RATE)
+    t = np.arange(count) / RATE
+    stomp = np.zeros(count)
+    # The boot's thump.
+    thump = np.sin(np.cumsum(2 * math.pi * (42.0 + 53.0 * np.exp(-t / 0.03)) / RATE)) * np.minimum(1.0, t / 0.002) * np.exp(-t / 0.09)
+    knock = biquad(biquad(rng.uniform(-1, 1, count), "low", RATE, 300.0), "low", RATE, 300.0) * 6.0 * np.exp(-t / 0.035)
+    # The crunch: sharp cracks, thick at first and thinning out.
+    crunch = np.zeros(count)
+    cracks = biquad(biquad(rng.uniform(-1, 1, count), "high", RATE, 1500.0), "low", RATE, 9000.0)
+    for _ in range(13):
+        at = int(abs(rng.normal(0.0, 0.03)) * RATE) + int(0.001 * RATE)
+        length = int(rng.uniform(0.001, 0.005) * RATE)
+        if at + length >= count:
+            continue
+        crunch[at:at + length] += cracks[at:at + length] * np.exp(-np.arange(length) / (length * 0.3)) * rng.uniform(0.5, 1.4)
+    # The squelch: noise through two resonances sweeping down, swelling in and dying away.
+    noise = rng.uniform(-1, 1, count)
+    squelch = np.zeros(count)
+    for top, bottom, share in ((1300.0, 450.0, 1.0), (700.0, 260.0, 0.9)):
+        out = np.zeros(count)
+        step = int(0.004 * RATE)
+        for start in range(0, count, step):
+            # Stepped through the sweep, a few milliseconds at a time.
+            frequency = bottom + (top - bottom) * math.exp(-(start / RATE) / 0.09)
+            block = noise[max(0, start - 64):start + step]
+            filtered = biquad(block, "band", RATE, frequency, q=6.0)
+            out[start:start + step] = filtered[-min(step, count - start):]
+        squelch += out * share
+    squelch *= 5.0 * np.minimum(1.0, t / 0.008) * np.exp(-t / 0.13)
+    # Wet pops: little rising chirps.
+    pops = np.zeros(count)
+    for _ in range(9):
+        at = int(rng.uniform(0.02, 0.4) * RATE)
+        length = int(rng.uniform(0.008, 0.022) * RATE)
+        if at + length >= count:
+            continue
+        u = np.arange(length) / RATE
+        f0 = rng.uniform(250.0, 600.0)
+        chirp = np.sin(np.cumsum(2 * math.pi * f0 * (1.0 + 1.5 * u / u[-1]) / RATE)) * np.sin(math.pi * u / u[-1]) ** 2
+        pops[at:at + length] += chirp * rng.uniform(0.3, 0.8) * math.exp(-at / RATE / 0.25)
+    # The slosh: low noise wavering as it dies.
+    slosh = biquad(biquad(rng.uniform(-1, 1, count), "low", RATE, 500.0), "high", RATE, 120.0) * 3.0
+    slosh *= (0.6 + 0.4 * np.sin(2 * math.pi * 7.0 * t + 1.0) * np.sin(2 * math.pi * 3.1 * t)) * np.minimum(1.0, t / 0.03) * np.exp(-t / 0.28)
+    splat = np.tanh(1.6 * (thump * 0.8 + knock * 0.4 + crunch * 2.4 + squelch * 2.2 + pops * 0.9 + slosh * 0.6))
+    save("SW_StompSplat", shaped(splat, RATE, 0.9, 0.0002, 0.25, 0.97), RATE)
 
 
 def import_sounds():
