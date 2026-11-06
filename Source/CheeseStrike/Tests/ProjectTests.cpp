@@ -296,6 +296,43 @@ bool FTheSpinnerIsACheeseWedge::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCoverIsUpFromTheWindowsFirstFrame, "CheeseStrike.Project.TheCoverIsUpFromTheWindowsFirstFrame", ProjectTests::Flags)
+
+bool FTheCoverIsUpFromTheWindowsFirstFrame::RunTest(const FString& Parameters)
+{
+	// Wave 17: the engine makes the game's window as its movie player starts, seconds before the game's module is loaded, and
+	// left it black until the first level's loading screen. The cover is in a module of its own, loaded before the engine
+	// plays its startup loading screen (PreLoadingScreen), which gives it the cover.
+	FString Text;
+	TSharedPtr<FJsonObject> Project;
+	if (!TestTrue(TEXT("the .uproject reads"), FFileHelper::LoadFileToString(Text, *FPaths::GetProjectFilePath())) || !TestTrue(TEXT("as JSON"), FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Project) && Project.IsValid()))
+	{
+		return false;
+	}
+	bool bStartupModule = false;
+	for (const TSharedPtr<FJsonValue>& Module : Project->GetArrayField(TEXT("Modules")))
+	{
+		const TSharedPtr<FJsonObject> Fields = Module->AsObject();
+		bStartupModule |= Fields.IsValid() && Fields->GetStringField(TEXT("Name")) == TEXT("CheeseStrikeStartup") && Fields->GetStringField(TEXT("LoadingPhase")) == TEXT("PreLoadingScreen");
+	}
+	TestTrue(TEXT("the startup cover's module loads before the engine's startup loading screen plays"), bStartupModule);
+	// The startup cover, made before there is a window, is drawn at the size the game's UI would have in the window it gets.
+	TestTrue(TEXT("at 1920 x 1080, the cover's own size"), FMath::IsNearlyEqual(SCheeseStrikeSteadyScale::TargetForSize(FVector2D(1920.0, 1080.0), 1.0f), 1.0f));
+	TestTrue(TEXT("at 3440 x 1440, by its height"), FMath::IsNearlyEqual(SCheeseStrikeSteadyScale::TargetForSize(FVector2D(3440.0, 1440.0), 1.0f), 1440.0f / 1080.0f));
+	TestTrue(TEXT("at 1280 x 720, two thirds"), FMath::IsNearlyEqual(SCheeseStrikeSteadyScale::TargetForSize(FVector2D(1280.0, 720.0), 1.0f), 720.0f / 1080.0f));
+	TestTrue(TEXT("times the window's DPI"), FMath::IsNearlyEqual(SCheeseStrikeSteadyScale::TargetForSize(FVector2D(1920.0, 1080.0), 1.5f), 1.5f));
+	// NVIDIA's overlay reads its frame rate from Reflex's PC Latency stats: the engine's Reflex plugin is on (the game turns its
+	// markers on as the engine starts, FCheeseStrikeModule::StartLatencyMarkers).
+	bool bReflex = false;
+	for (const TSharedPtr<FJsonValue>& Plugin : Project->GetArrayField(TEXT("Plugins")))
+	{
+		const TSharedPtr<FJsonObject> Fields = Plugin->AsObject();
+		bReflex |= Fields.IsValid() && Fields->GetStringField(TEXT("Name")) == TEXT("Reflex") && Fields->GetBoolField(TEXT("Enabled"));
+	}
+	TestTrue(TEXT("the Reflex plugin is enabled"), bReflex);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheVolumesKeepTheSoundClassesTheySet, "CheeseStrike.Project.TheVolumesKeepTheSoundClassesTheySet", ProjectTests::Flags)
 
 bool FTheVolumesKeepTheSoundClassesTheySet::RunTest(const FString& Parameters)
