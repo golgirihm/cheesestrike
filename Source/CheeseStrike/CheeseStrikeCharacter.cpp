@@ -55,6 +55,7 @@
 #include "Weapons/CheeseStrikeInventory.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Effects/CheeseStrikeCheeseBlood.h"
+#include "Effects/CheeseStrikeGooSplats.h"
 #include "Weapons/CheeseStrikeWeapon.h"
 #include "Weapons/CheeseStrikeWeaponLooks.h"
 #include "Streaks/CheeseStrikeSynth.h"
@@ -685,6 +686,11 @@ float ACheeseStrikeCharacter::HasteFactorNow() const
 
 void ACheeseStrikeCharacter::OnRep_Splat()
 {
+	// Every machine that draws lays melted gouda at its feet while it is slowed (ACheeseStrikeGooSplats, which finds it).
+	if (SplatAt > 0.0f)
+	{
+		ACheeseStrikeGooSplats::For(GetWorld());
+	}
 	// Heard by the one splatted only, at once and close: a heavy, wet slap, low and dull.
 	if (IsLocallyControlled() && IsPlayerControlled() && GetNetMode() != NM_DedicatedServer && SplatAt > 0.0f)
 	{
