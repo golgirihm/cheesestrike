@@ -241,6 +241,66 @@ bool FTheArmsHoldEveryWeapon::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAWeaponDrawnComesUpFromBelow, "CheeseStrike.Play.AWeaponDrawnComesUpFromBelow", ArmsPlayTests::Flags)
+
+bool FAWeaponDrawnComesUpFromBelow::RunTest(const FString& Parameters)
+{
+	// Wave 17: in its own player's view a weapon drawn comes up from below in code, the arms not swung by the equip (which
+	// the body others see still plays); the Curd Pistol and the two guns keep their equip.
+	using namespace PlayTesting;
+	using namespace ArmsPlayTests;
+	static FVector Rest = FVector::ZeroVector;
+	const auto HandInView = [](const ACheeseStrikeCharacter* Character)
+	{
+		return ViewOf(Character).InverseTransformPosition(Character->GetFirstPersonMesh()->GetBoneLocation(TEXT("hand_r")));
+	};
+	const auto Equipping = [](const USkeletalMeshComponent* Body)
+	{
+		const UAnimInstance* Instance = Body != nullptr ? Body->GetAnimInstance() : nullptr;
+		return Instance != nullptr && Instance->IsAnyMontagePlaying();
+	};
+	StartPlaying({1});
+	PutAt(0, Spot, SpotYaw);
+	Play(0, TEXT("cmd CheeseStrikeArm blaster\nwait 1"));
+	Then([this, HandInView]()
+	{
+		if (const ACheeseStrikeCharacter* Character = Pawn(0))
+		{
+			Rest = HandInView(Character);
+		}
+	});
+	Play(0, TEXT("tap Sidearm\nwait 0.1"));
+	Then([this, Equipping]()
+	{
+		if (const ACheeseStrikeCharacter* Character = Pawn(0))
+		{
+			TestTrue(TEXT("the Curd Pistol is drawn by its equip in view"), Equipping(Character->GetFirstPersonMesh()));
+		}
+	});
+	Play(0, TEXT("wait 0.8\ntap Primary\nwait 0.1"));
+	Then([this, HandInView, Equipping]()
+	{
+		if (const ACheeseStrikeCharacter* Character = Pawn(0))
+		{
+			const FVector At = HandInView(Character);
+			TestTrue(TEXT("the Cheddar Blaster drawn: no equip swings the arms in view"), !Equipping(Character->GetFirstPersonMesh()));
+			TestTrue(TEXT("the body others see plays its equip"), Equipping(Character->GetMesh()));
+			TestTrue(FString::Printf(TEXT("it is coming up from below (%.0f cm under its rest)"), Rest.Z - At.Z), Rest.Z - At.Z > 10.0f);
+		}
+	});
+	Play(0, TEXT("wait 0.5"));
+	Then([this, HandInView]()
+	{
+		if (const ACheeseStrikeCharacter* Character = Pawn(0))
+		{
+			const FVector At = HandInView(Character);
+			TestTrue(FString::Printf(TEXT("and up at the hip (%.1f cm from its rest)"), FVector::Dist(At, Rest)), FVector::Dist(At, Rest) < 3.0f);
+		}
+	});
+	StopPlaying();
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheWeaponIsSteadyInView, "CheeseStrike.Play.TheWeaponIsSteadyInView", ArmsPlayTests::Flags)
 
 bool FTheWeaponIsSteadyInView::RunTest(const FString& Parameters)

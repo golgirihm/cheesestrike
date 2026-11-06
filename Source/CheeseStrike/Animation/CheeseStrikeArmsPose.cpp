@@ -14,6 +14,17 @@ namespace CheeseStrikeArms
 		return DeltaSeconds > 0.0f ? 1.0f - FMath::Exp(-Rate * DeltaSeconds) : 0.0f;
 	}
 
+	float RaiseLowered(float SinceDrawn, float DrawTime)
+	{
+		const float Seconds = FMath::Min(RaiseSeconds, DrawTime);
+		if (Seconds <= 0.0f)
+		{
+			return 0.0f;
+		}
+		const float Up = FMath::Clamp(SinceDrawn / Seconds, 0.0f, 1.0f);
+		return 1.0f - Up * Up * (3.0f - 2.0f * Up);
+	}
+
 	FFist FistOf(const FVector (&Knuckles)[4], bool bRight)
 	{
 		const FVector Roots = (Knuckles[0] + Knuckles[1] + Knuckles[2] + Knuckles[3]) * 0.25;
@@ -372,6 +383,11 @@ void FCheeseStrikeViewHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 		const FVector Shoulder = Unview.RotateVector(Pose.GetComponentSpaceTransform(UpperArm.GetCompactPoseIndex(Bones)).GetLocation() - Eye);
 		const FVector Elbow = Shoulder - Unview.RotateVector(FVector::UpVector) * FistElbowDrop;
 		TargetTurn = (Swaying * FistTurn(Fist, Along, TargetAt - Elbow)).GetNormalized();
+		if (!bSledge)
+		{
+			// The knife's flat toward the eye rather than its edge (wave 17): turned about its blade.
+			TargetTurn = (FQuat(Along.GetSafeNormal(), FMath::DegreesToRadians(ViewKnifeTurn)) * TargetTurn).GetNormalized();
+		}
 	}
 	else if (bHasSight)
 	{
@@ -531,7 +547,7 @@ void FCheeseStrikeKnifeHold::EvaluateComponentSpace_AnyThread(FComponentSpacePos
 	ArmsBlendIn(Pose, Alpha, [this, &Bones](FCSPose<FCompactPose>& Posed)
 	{
 		const auto IndexOf = [&Bones](const FBoneReference& Reference) { return Reference.GetCompactPoseIndex(Bones); };
-		if (bPlaceHand)
+		if (bPlaceHand && !bFingersOnly)
 		{
 			// The frame the guard and the swipe are in: the way the body faces, tipped a little with the aim.
 			const FVector Flat = FVector(Forward.X, Forward.Y, 0.0).GetSafeNormal();
@@ -571,7 +587,7 @@ void FCheeseStrikeKnifeHold::EvaluateComponentSpace_AnyThread(FComponentSpacePos
 		{
 			CheeseStrikeCloseFist(Posed, Hand, Fingers[0], Thumb[0], true);
 		}
-		if (bSledge && bFingers[1])
+		if (bSledge && !bFingersOnly && bFingers[1])
 		{
 			CheeseStrikeCloseFist(Posed, OtherHand, Fingers[1], Thumb[1], false);
 		}

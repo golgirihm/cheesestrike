@@ -217,6 +217,7 @@ void UCheeseStrikeAnimInstance::HoldWithoutCharacter(const FWeaponLook& Look, bo
 	ModelInHand = Model != nullptr ? Model->GetRelativeTransform() : FTransform::Identity;
 	ModelAlong = Look.Along;
 	bSledge = Look.bSledge;
+	bFistGrip = Look.bFistGrip;
 	bLeftHandHolds = ACheeseStrikeWeapon::LeftHandHoldOn(Look, Model, LeftHandHold);
 }
 
@@ -268,6 +269,7 @@ void UCheeseStrikeAnimInstance::ReadCharacter(float DeltaSeconds)
 		SwipePhase = Weapon != nullptr ? Weapon->SwipePhase() : -1.0f;
 		SwipeSize = Weapon != nullptr ? Weapon->GetStats().SwipeSize : 1.0f;
 		bSledge = Weapon != nullptr && Weapon->IsSledge();
+		bFistGrip = Weapon != nullptr && Weapon->IsFistGrip();
 		// Its own player's body: the arms placed in view.
 		const bool bOwnView = bFirstPersonBody && Character->IsLocallyControlled() && Character->IsAlive();
 		View.bPlace = bOwnView && Weapon != nullptr && CVarHipHold.GetValueOnGameThread() != 0;
@@ -286,9 +288,13 @@ void UCheeseStrikeAnimInstance::ReadCharacter(float DeltaSeconds)
 		{
 			View.bHasSight = Character->WeaponSight(View.Sight);
 			View.Aimed = Character->GetAimFraction();
-			View.Lowered = FMath::Max(FMath::Square(1.0f - Weapon->DrawnFraction()), CheeseStrikeGrenades::WeaponDown(Switch));
+			// Coming up as it is drawn: with the equip (the pistol, the two guns), or in code alone, smoothly (wave 17).
+			const float DrawTime = Weapon->GetStats().DrawTime;
+			const float Drawing = Weapon->DrawsByItsAnimation() ? FMath::Square(1.0f - Weapon->DrawnFraction()) : CheeseStrikeArms::RaiseLowered(Weapon->DrawnFraction() * DrawTime, DrawTime);
+			View.Lowered = FMath::Max(Drawing, CheeseStrikeGrenades::WeaponDown(Switch));
 			View.Kick = Weapon->KickShare();
 			View.KickBack = Weapon->GetStats().KickBack;
+			View.HipShift = Weapon->GetHipShift();
 			const UCheeseStrikeMovementComponent* Movement = Character->GetCheeseStrikeMovement();
 			View.bSprinting = Movement != nullptr && Movement->IsSprinting();
 		}
@@ -516,6 +522,7 @@ void FCheeseStrikeAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float Delt
 		SwipePhase = Instance->SwipePhase;
 		SwipeSize = Instance->SwipeSize;
 		bSledge = Instance->bSledge;
+		bFistGrip = Instance->bFistGrip;
 		View = Instance->View;
 		Grenade = Instance->Grenade;
 		// A change of weapon to one held another way: its animations on the same nodes (and the left hand's grip on it,
@@ -656,6 +663,13 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	KnifeBlend = FMath::FInterpTo(KnifeBlend, bKnife ? 1.0f : 0.0f, DeltaSeconds, BlendRate * 2.0f);
 	KnifeHold.Alpha = (bKnife ? KnifeBlend : 0.0f) * Up * SourceWeight;
 	KnifeHold.bPlaceHand = !bFirstPersonBody;
+	// Or only the right fist closed round a handle (the BabyBomb's haft), the hand where the hold has it.
+	FistGripBlend = FMath::FInterpTo(FistGripBlend, bFistGrip && !bKnife ? 1.0f : 0.0f, DeltaSeconds, BlendRate * 2.0f);
+	KnifeHold.bFingersOnly = !bKnife;
+	if (!bKnife)
+	{
+		KnifeHold.Alpha = FistGripBlend * Up * SourceWeight;
+	}
 	KnifeHold.Forward = BodyForward;
 	KnifeHold.AimPitch = AimPitch;
 	KnifeHold.SwipePhase = SwipePhase;
@@ -671,6 +685,7 @@ void FCheeseStrikeAnimProxy::Update(float DeltaSeconds)
 	ViewHold.Sight = View.Sight;
 	ViewHold.bHasSight = View.bHasSight;
 	ViewHold.HipFromAimed = CheeseStrikeWeaponLooks::HipFromAimed(Hold);
+	ViewHold.HipFromAimed.AddToTranslation(View.HipShift);
 	ViewHold.KnifeHand = CheeseStrikeWeaponLooks::KnifeHand();
 	ViewHold.Aimed = View.Aimed;
 	ViewHold.Lowered = View.Lowered;

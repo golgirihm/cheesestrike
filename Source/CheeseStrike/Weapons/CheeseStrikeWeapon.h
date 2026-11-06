@@ -127,6 +127,12 @@ public:
 	FVector GetModelAlong() const;
 	/** Whether it is held and swung as a sledgehammer, in both hands (FWeaponLook::bSledge: the Cheese Stick). */
 	bool IsSledge() const;
+	/** Whether its own player's view draws it by the animations' equip (FWeaponLook::bDrawAnimation), or raises it in code. */
+	bool DrawsByItsAnimation() const;
+	/** Whether the right fist closes round its handle (FWeaponLook::bFistGrip: the BabyBomb's haft). */
+	bool IsFistGrip() const;
+	/** Its own shift in its player's view at the hip, over its hold's (FWeaponLook::HipShift). */
+	FVector GetHipShift() const;
 	/** The barrels' turn (degrees a second) now, on this machine: the Gouda Gatling's spinner. */
 	float GetBarrelSpeed() const { return BarrelSpeed; }
 	/** Where `Body`'s left hand closes round this weapon, in the space of the bone the weapon rides (cm); false if it is held in one hand. */
@@ -179,8 +185,8 @@ public:
 	 * end's figure (ACheeseStrikeMenuFigure) are placed by this alike.
 	 */
 	static bool PutInOffHand(USceneComponent* OffHand, USkeletalMeshComponent* Body, const USceneComponent* First);
-	/** Where `Look`'s left hand closes on its model `Model` (riding the right hand's bone, PutInHand), in that bone's space; false if it leaves the hand free. */
-	static bool LeftHandHoldOn(const FWeaponLook& Look, const USceneComponent* Model, FVector& OutHold);
+	/** Where `Look`'s left hand closes on its model `Model` (riding the right hand's bone, PutInHand), in that bone's space (`bInView`: in its own player's view, FWeaponLook::ViewLeftHand); false if it leaves the hand free. */
+	static bool LeftHandHoldOn(const FWeaponLook& Look, const USceneComponent* Model, FVector& OutHold, bool bInView = false);
 	/** The second gun, in its player's view or on the body, if it has one in hand. */
 	UStaticMeshComponent* GetOffHandModel(bool bFirstPerson) const { return bFirstPerson ? FirstPersonOffHand : ThirdPersonOffHand; }
 	/** Hides any weapon a body's mesh was modelled holding (Belica's own guns), so only ours shows. */
@@ -264,8 +270,8 @@ protected:
 	/** `bCallOut`: the reloader calls it out to teammates near by (CheeseStrikeVoice::CallsReload). */
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastReload(bool bCallOut);
-	/** Plays each body's own copy of an animation of the set (`Which` picks it), at `PlayRate` (from `RateFor` its length, if given). */
-	void PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAnimSet::* Which, TFunction<float(const UAnimSequence*)> RateFor = nullptr);
+	/** Plays each body's own copy of an animation of the set (`Which` picks it), at `PlayRate` (from `RateFor` its length, if given); `bOthersOnly`: the body others see alone. */
+	void PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAnimSet::* Which, TFunction<float(const UAnimSequence*)> RateFor = nullptr, bool bOthersOnly = false);
 	/** Plays one of its sounds: the reload's and the dry click from the weapon, as heard there. */
 	void PlaySound(USoundBase* Sound) const;
 	/**

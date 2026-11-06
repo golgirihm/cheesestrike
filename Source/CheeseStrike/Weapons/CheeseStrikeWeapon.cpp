@@ -503,6 +503,21 @@ bool ACheeseStrikeWeapon::IsSledge() const
 	return Look != nullptr && Look->bSledge;
 }
 
+bool ACheeseStrikeWeapon::DrawsByItsAnimation() const
+{
+	return Look != nullptr && Look->bDrawAnimation;
+}
+
+bool ACheeseStrikeWeapon::IsFistGrip() const
+{
+	return Look != nullptr && Look->bFistGrip;
+}
+
+FVector ACheeseStrikeWeapon::GetHipShift() const
+{
+	return Look != nullptr ? Look->HipShift : FVector::ZeroVector;
+}
+
 void ACheeseStrikeWeapon::UpdateSpinner(float DeltaSeconds)
 {
 	if (Look == nullptr || Look->SpinningPart == nullptr || Stats == nullptr || GetWorld() == nullptr)
@@ -551,17 +566,17 @@ bool ACheeseStrikeWeapon::GetSight(FVector& Out) const
 bool ACheeseStrikeWeapon::LeftHandHoldFor(const USkeletalMeshComponent* Body, FVector& OutHold) const
 {
 	const UPrimitiveComponent* Model = Holder != nullptr ? GetModel(Body == Holder->GetFirstPersonMesh()) : nullptr;
-	return Look != nullptr && LeftHandHoldOn(*Look, Model, OutHold);
+	return Look != nullptr && LeftHandHoldOn(*Look, Model, OutHold, Holder != nullptr && Body == Holder->GetFirstPersonMesh());
 }
 
-bool ACheeseStrikeWeapon::LeftHandHoldOn(const FWeaponLook& Look, const USceneComponent* Model, FVector& OutHold)
+bool ACheeseStrikeWeapon::LeftHandHoldOn(const FWeaponLook& Look, const USceneComponent* Model, FVector& OutHold, bool bInView)
 {
 	if (!Look.LeftHand.IsSet() || Model == nullptr)
 	{
 		return false;
 	}
 	// The model rides the bone the hand follows (hand_r, or the mannequin's weapon_r): from its space into the bone's.
-	OutHold = Model->GetRelativeTransform().TransformPosition(Look.LeftHand.GetValue());
+	OutHold = Model->GetRelativeTransform().TransformPosition(bInView && Look.ViewLeftHand.IsSet() ? Look.ViewLeftHand.GetValue() : Look.LeftHand.GetValue());
 	return true;
 }
 
@@ -658,7 +673,18 @@ void ACheeseStrikeWeapon::ShowDraw(bool bSound)
 		return;
 	}
 	const float DrawTime = Stats->DrawTime;
-	PlayOnBodies(&FCheeseStrikeAnimSet::Equip, [DrawTime](const UAnimSequence* Equip) { return Equip->GetPlayLength() > 0.0f ? Equip->GetPlayLength() / DrawTime : 1.0f; });
+	// In its own player's view only the pistol and the two guns are drawn by the equip (wave 17): every other weapon comes up
+	// from below in code (CheeseStrikeArms::RaiseLowered), the arms still, and whatever the slot played (a reload) is let go.
+	const bool bOthersOnly = !DrawsByItsAnimation();
+	PlayOnBodies(&FCheeseStrikeAnimSet::Equip, [DrawTime](const UAnimSequence* Equip) { return Equip->GetPlayLength() > 0.0f ? Equip->GetPlayLength() / DrawTime : 1.0f; }, bOthersOnly);
+	if (bOthersOnly)
+	{
+		USkeletalMeshComponent* Own = Holder->GetFirstPersonMesh();
+		if (UAnimInstance* Instance = Own != nullptr ? Own->GetAnimInstance() : nullptr)
+		{
+			Instance->StopSlotAnimation(0.1f, UCheeseStrikeAnimInstance::SlotName());
+		}
+	}
 	if (bSound)
 	{
 		PlaySound(AnyOf(DrawSounds));
@@ -848,14 +874,14 @@ void ACheeseStrikeWeapon::HideBuiltInWeapons(USkeletalMeshComponent* Body)
 	}
 }
 
-void ACheeseStrikeWeapon::PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAnimSet::* Which, TFunction<float(const UAnimSequence*)> RateFor)
+void ACheeseStrikeWeapon::PlayOnBodies(TObjectPtr<UAnimSequence> FCheeseStrikeAnimSet::* Which, TFunction<float(const UAnimSequence*)> RateFor, bool bOthersOnly)
 {
 	if (Holder == nullptr)
 	{
 		return;
 	}
 	// Each body plays its own skeleton's copy, from the set for how this weapon is held (the body may not have caught up).
-	for (USkeletalMeshComponent* Body : {Holder->GetFirstPersonMesh(), Holder->GetMesh()})
+	for (USkeletalMeshComponent* Body : {bOthersOnly ? nullptr : Holder->GetFirstPersonMesh(), Holder->GetMesh()})
 	{
 		UCheeseStrikeAnimInstance* Instance = Body != nullptr ? Cast<UCheeseStrikeAnimInstance>(Body->GetAnimInstance()) : nullptr;
 		UAnimSequence* Animation = Instance != nullptr ? (Instance->GetSet(GetHold()).*Which).Get() : nullptr;

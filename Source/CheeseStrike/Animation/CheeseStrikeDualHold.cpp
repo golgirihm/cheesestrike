@@ -106,7 +106,7 @@ void FCheeseStrikeDualHold::CacheBones_AnyThread(const FAnimationCacheBonesConte
 		Correction = LeftInBody.GetRelativeTransform(MirroredRight);
 		Correction.SetScale3D(FVector::OneVector);
 	}
-	// And each finger's joint likewise, for closing the left hand's fingers as the right's are.
+	// And each hand's fingers, for closing them round the grips.
 	const TCHAR* const FingerNames[] = {TEXT("thumb"), TEXT("index"), TEXT("middle"), TEXT("ring"), TEXT("pinky")};
 	bFingers = true;
 	for (int32 Finger = 0; Finger < 5; ++Finger)
@@ -115,14 +115,6 @@ void FCheeseStrikeDualHold::CacheBones_AnyThread(const FAnimationCacheBonesConte
 		{
 			const FString Name = FString::Printf(TEXT("%s_0%d"), FingerNames[Finger], Joint + 1);
 			bFingers &= DualBone(Fingers[0][Finger][Joint], *(Name + TEXT("_r")), Bones) && DualBone(Fingers[1][Finger][Joint], *(Name + TEXT("_l")), Bones);
-			FingerCorrection[Finger][Joint] = FQuat::Identity;
-			const int32 RightJoint = Skeleton.FindBoneIndex(Fingers[0][Finger][Joint].BoneName);
-			const int32 LeftJoint = Skeleton.FindBoneIndex(Fingers[1][Finger][Joint].BoneName);
-			if (RightJoint != INDEX_NONE && LeftJoint != INDEX_NONE)
-			{
-				const FTransform MirroredJoint = CheeseStrikeDual::Mirrored(FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, RightJoint), FVector::ZeroVector, FVector::XAxisVector);
-				FingerCorrection[Finger][Joint] = FAnimationRuntime::GetComponentSpaceTransformRefPose(Skeleton, LeftJoint).GetRelativeTransform(MirroredJoint).GetRotation();
-			}
 		}
 	}
 }
@@ -186,37 +178,26 @@ void FCheeseStrikeDualHold::EvaluateComponentSpace_AnyThread(FComponentSpacePose
 	const FVector LeftStancePole = LeftElbowNow + (LeftElbowNow - (Pose.GetComponentSpaceTransform(UpperL.GetCompactPoseIndex(Bones)).GetLocation() + LeftNow.GetLocation()) * 0.5).GetSafeNormal() * 50.0;
 	const FVector LeftPole = FMath::Lerp(LeftStancePole, DualMirrored(RightElbow, Middle, Across), static_cast<double>(Alpha));
 	DualReach(Pose, UpperL.GetCompactPoseIndex(Bones), LowerL.GetCompactPoseIndex(Bones), LeftHand, LeftTarget, LeftPole);
-	// The right hand's fingers closed round its gun's grip, the index on the trigger (the stance's hold a two-handed
-	// pistol's, its fingers loose); and the left's closed round its own as the right's are: each joint the mirror of the
-	// right's, parent first, keeping its own length.
+	// Each hand's fingers closed round its gun's grip, the index on the trigger (the stance's hold a two-handed pistol's,
+	// its fingers loose), each by its own bones (wave 17: the left's joints mirrored
+	// one by one from the right's came out twisted).
 	if (bFingers)
 	{
-		FBoneReference Closing[4][3];
-		FBoneReference Thumb[3];
-		for (int32 Joint = 0; Joint < 3; ++Joint)
-		{
-			Thumb[Joint] = Fingers[0][0][Joint];
-			for (int32 Finger = 0; Finger < 4; ++Finger)
-			{
-				Closing[Finger][Joint] = Fingers[0][Finger + 1][Joint];
-			}
-		}
 		if (Alpha >= 0.999f)
 		{
-			CheeseStrikeCloseFist(Pose, HandR, Closing, Thumb, true, true);
-		}
-		for (int32 Finger = 0; Finger < 5; ++Finger)
-		{
-			for (int32 Joint = 0; Joint < 3; ++Joint)
+			for (int32 Side = 0; Side < 2; ++Side)
 			{
-				const FCompactPoseBoneIndex Right = Fingers[0][Finger][Joint].GetCompactPoseIndex(Bones);
-				const FCompactPoseBoneIndex Left = Fingers[1][Finger][Joint].GetCompactPoseIndex(Bones);
-				const FTransform Parent = Pose.GetComponentSpaceTransform(Bones.GetParentBoneIndex(Left));
-				FTransform Closed = Bones.GetRefPoseTransform(Left) * Parent;
-				const FQuat Wanted = FingerCorrection[Finger][Joint] * CheeseStrikeDual::Mirrored(Pose.GetComponentSpaceTransform(Right), Middle, Across).GetRotation();
-				Closed.SetRotation(FQuat::Slerp(Pose.GetComponentSpaceTransform(Left).GetRotation(), Wanted, Alpha).GetNormalized());
-				const FBoneTransform Set(Left, Closed);
-				Pose.SafeSetCSBoneTransforms(MakeArrayView(&Set, 1));
+				FBoneReference Closing[4][3];
+				FBoneReference Thumb[3];
+				for (int32 Joint = 0; Joint < 3; ++Joint)
+				{
+					Thumb[Joint] = Fingers[Side][0][Joint];
+					for (int32 Finger = 0; Finger < 4; ++Finger)
+					{
+						Closing[Finger][Joint] = Fingers[Side][Finger + 1][Joint];
+					}
+				}
+				CheeseStrikeCloseFist(Pose, Side == 0 ? HandR : HandL, Closing, Thumb, Side == 0, true);
 			}
 		}
 	}
