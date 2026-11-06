@@ -59,8 +59,8 @@ namespace CheeseStrikeDual
  * mirror, so that the two converge. In its own player's view the mirror is
  * the view's own middle (the upright plane through the eye along the view,
  * bAboutEye), so that the pair sits evenly either side of the crosshair
- * whatever the head's lean. The left hand's fingers close round its gun as
- * the right's round theirs (mirrored joint by joint). After the first-person
+ * whatever the head's lean. Each hand's fingers close round its own gun's
+ * grip, by its own bones (CheeseStrikeCloseFist). After the first-person
  * hold, so that it moves the hand placed in view; the left hand's grip
  * (FCheeseStrikeGripIK) has nothing to do then, the weapon being held in one
  * hand each.
@@ -103,8 +103,7 @@ private:
 	bool bBones = false;
 	/** The left hand's frame against the right's mirrored, from the reference pose. */
 	FTransform Correction = FTransform::Identity;
-	/** Each finger's joints (thumb, index, middle, ring, little; three each) on both hands (right, left), and each left joint's frame against its right one's mirrored. */
+	/** Each finger's joints (thumb, index, middle, ring, little; three each) on both hands (right, left). */
 	FBoneReference Fingers[2][5][3];
-	FQuat FingerCorrection[5][3];
 	bool bFingers = false;
 };

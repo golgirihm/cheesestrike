@@ -32,6 +32,14 @@ namespace CheeseStrikeArms
 	/** A weapon just drawn comes up from this far below (cm), tipped down this much (degrees). */
 	constexpr float DrawDrop = 25.0f;
 	constexpr float DrawTip = 30.0f;
+	/**
+	 * Wave 17: a weapon drawn in its own player's view without its animation (FWeaponLook::bDrawAnimation, which only the
+	 * one-handed pistol and the two guns keep: Lyra's equip swung the arms about) comes up from below in code alone, over
+	 * this long (or its draw time, if shorter), easing in and out.
+	 */
+	constexpr float RaiseSeconds = 0.35f;
+	/** How far still to come up (1 to 0: DrawDrop and DrawTip for 1) `SinceDrawn` seconds after a weapon whose draw takes `DrawTime` was drawn. */
+	float RaiseLowered(float SinceDrawn, float DrawTime);
 	/** Sprinting, the weapon is carried across the body, its muzzle turned in and up and its top canted in (a turn about the hand: pitch, yaw, roll in degrees; and a shift in cm: forward, right, up). */
 	inline const FRotator SprintTurn(8.0f, -10.0f, -22.0f);
 	inline const FVector SprintShift(-1.0f, 0.0f, -2.0f);
@@ -92,6 +100,8 @@ namespace CheeseStrikeArms
 	constexpr float GuardYaw = -10.0f;
 	/** In its own player's view the knife's blade is tipped up this many degrees more than on the body. */
 	constexpr float ViewKnifeTip = 5.0f;
+	/** In its own player's view the knife is turned this many degrees about its blade (wave 17), so that its flat and its holes face the eye rather than its edge. */
+	constexpr float ViewKnifeTurn = 35.0f;
 	/** Where the knife hand is at `Phase` (0 to 1) of a swipe, from where it is on guard (cm: forward, right, up), and which way the blade points and its spine faces (unit vectors in the same axes), for a frame scaled by `Size` (1 for the body, smaller for the view). */
 	struct FKnifeAt
 	{
@@ -237,6 +247,8 @@ struct FCheeseStrikeKnifeHold : public FAnimNode_Base
 	float Alpha = 0.0f;
 	/** Whether to place the hand (not for the first-person body). */
 	bool bPlaceHand = true;
+	/** Only the right fist closed round a handle, the hand left where the hold has it (FWeaponLook::bFistGrip: the BabyBomb). */
+	bool bFingersOnly = false;
 	/** The way the body faces in component space, and its aim's pitch (degrees). */
 	FVector Forward = FVector(0.0, 1.0, 0.0);
 	float AimPitch = 0.0f;

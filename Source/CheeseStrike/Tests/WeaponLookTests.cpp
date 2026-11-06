@@ -2,8 +2,8 @@
 
 // The weapons' looks (CheeseStrikeWeaponLooks): every weapon has its own
 // model, cheese materials, sounds and HUD picture, which all load; its
-// muzzle and sights are on its model; and the hand that holds it has a place
-// in view for each way of holding.
+// muzzle and sights are on its model; the hand that holds it has a place in
+// view for each way of holding; and wave 17's grips and draws.
 
 #include "Misc/AutomationTest.h"
 #include "Engine/SkeletalMesh.h"
@@ -11,6 +11,7 @@
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInterface.h"
 #include "Sound/SoundBase.h"
+#include "Animation/CheeseStrikeArmsPose.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 #include "Weapons/CheeseStrikeShot.h"
 #include "Weapons/CheeseStrikeWeaponLooks.h"
@@ -182,6 +183,62 @@ bool FEveryHoldHasAPlaceInView::RunTest(const FString& Parameters)
 	}
 	const FVector Knife = CheeseStrikeWeaponLooks::KnifeHand();
 	TestTrue(FString::Printf(TEXT("the knife is on guard in front, low on the right (%.0f, %.0f, %.0f)"), Knife.X, Knife.Y, Knife.Z), Knife.X > 10.0f && Knife.Y > 0.0f && Knife.Z < -5.0f && Knife.Size() < 60.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWave17SetsTheGripsAndTheDraws, "CheeseStrike.Weapons.Wave17SetsTheGripsAndTheDraws", WeaponLookTests::Flags)
+
+bool FWave17SetsTheGripsAndTheDraws::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeArms;
+	const auto LookOf = [](const TCHAR* Id) -> const FWeaponLook& { return CheeseStrikeWeaponLooks::For(Id); };
+	// Only the Curd Pistol and the two guns are drawn by the equip in their own player's view; the rest come up from below.
+	for (const FWeaponStats* Weapon : CheeseStrikeArsenal::All())
+	{
+		const FWeaponLook& Look = CheeseStrikeWeaponLooks::For(Weapon->Id);
+		const bool bKept = Weapon->Id == FName(TEXT("pistol")) || Weapon->bDual;
+		TestEqual(FString::Printf(TEXT("%s: drawn by the equip only if the pistol or two guns"), *Weapon->Id.ToString()), Look.bDrawAnimation, bKept);
+		TestEqual(FString::Printf(TEXT("%s: the fist round a handle only for the BabyBomb"), *Weapon->Id.ToString()), Look.bFistGrip, Weapon->Id == FName(TEXT("babybomb")));
+	}
+	// The raise: from all the way down to all the way up in RaiseSeconds (or a shorter draw time), easing in and out.
+	const float Rise = RaiseSeconds;
+	TestTrue(FString::Printf(TEXT("a short, simple raise (%.2f s)"), Rise), Rise >= 0.3f && Rise <= 0.4f);
+	TestEqual(TEXT("drawn: all the way down"), RaiseLowered(0.0f, 0.6f), 1.0f, 1.0e-4f);
+	TestEqual(TEXT("halfway up halfway through"), RaiseLowered(Rise * 0.5f, 0.6f), 0.5f, 1.0e-3f);
+	TestEqual(TEXT("up once the raise is over, before the draw time"), RaiseLowered(Rise, 0.6f), 0.0f, 1.0e-4f);
+	TestEqual(TEXT("a quicker draw (the knife's 0.2 s) is up by its draw time"), RaiseLowered(0.2f, 0.2f), 0.0f, 1.0e-4f);
+	TestTrue(TEXT("it starts gently"), RaiseLowered(Rise * 0.05f, 0.6f) > 0.99f);
+	TestTrue(TEXT("and ends gently"), RaiseLowered(Rise * 0.95f, 0.6f) < 0.01f);
+	float Was = 1.0f;
+	float MostStep = 0.0f;
+	for (int32 Frame = 1; Frame <= 60; ++Frame)
+	{
+		const float Now = RaiseLowered(Rise * Frame / 60.0f, 0.6f);
+		TestTrue(TEXT("it only comes up"), Now <= Was + 1.0e-5f);
+		MostStep = FMath::Max(MostStep, Was - Now);
+		Was = Now;
+	}
+	TestTrue(FString::Printf(TEXT("smoothly: never more than 3%% of the way in a sixtieth of the raise (%.3f)"), MostStep), MostStep < 0.03f);
+	// The grips: the Curd Pistol and the Dual Burratas forward in the hand; the knife turned to show its flat in view; the
+	// Cheddar Blaster and the Swiss Shotgun brought back and up at the hip so that the left arm bends to the fore-end; the
+	// Munster Twin SMGs up at the hip, the hands round their grips showing; the left hand under a thick fore-end on the
+	// body, up on its near side in view.
+	TestTrue(TEXT("the Curd Pistol forward and to its left in the hand"), LookOf(TEXT("pistol")).Model.GetLocation().Y > 1.0f && LookOf(TEXT("pistol")).Model.GetLocation().X > 0.0f);
+	TestTrue(TEXT("the Dual Burratas forward in the hand"), LookOf(TEXT("burratas")).Model.GetLocation().Y > 1.0f);
+	TestTrue(FString::Printf(TEXT("the knife turned about its blade in view (%.0f degrees)"), ViewKnifeTurn), ViewKnifeTurn >= 20.0f && ViewKnifeTurn <= 60.0f);
+	for (const TCHAR* Id : {TEXT("blaster"), TEXT("shotgun")})
+	{
+		const FVector Shift = LookOf(Id).HipShift;
+		TestTrue(FString::Printf(TEXT("%s: back and up at the hip (%.0f, %.0f, %.0f)"), Id, Shift.X, Shift.Y, Shift.Z), Shift.X < -5.0f && Shift.Z > 0.0f && Shift.Size() < 15.0f);
+	}
+	TestTrue(TEXT("the Munster Twin SMGs up at the hip"), LookOf(TEXT("munster")).HipShift.Z > 0.0f);
+	for (const TCHAR* Id : {TEXT("blaster"), TEXT("carbine")})
+	{
+		const FWeaponLook& Look = LookOf(Id);
+		TestTrue(FString::Printf(TEXT("%s: the left hand under the fore-end on the body, higher in view"), Id), Look.LeftHand.IsSet() && Look.ViewLeftHand.IsSet() && Look.ViewLeftHand->Z > Look.LeftHand->Z + 2.0f
+			&& FMath::IsNearlyEqual(Look.ViewLeftHand->Y, Look.LeftHand->Y));
+	}
+	TestTrue(TEXT("the Roquefort's hold is as it was"), !LookOf(TEXT("roquefort")).ViewLeftHand.IsSet() && LookOf(TEXT("roquefort")).HipShift.IsZero());
 	return true;
 }
 

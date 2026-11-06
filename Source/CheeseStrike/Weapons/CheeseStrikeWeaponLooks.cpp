@@ -71,7 +71,13 @@ namespace
 			Look.Materials[5] = Material(TEXT("MI_BabyStrip"));
 			Look.Sight = FVector(-0.25f, -13.0f, 16.2f);
 			Look.Muzzle = FVector(0.0f, 69.0f, 4.0f);
-			Look.LeftHand = FVector(0.0f, 33.0f, 3.5f);
+			// The left hand under the handguard's block, its fingers round its bottom rather than through it (wave 17: in the
+			// block's middle, they came out of its far side, on the loadout page's figure most of all).
+			Look.LeftHand = FVector(0.0f, 35.0f, -1.0f);
+			Look.ViewLeftHand = FVector(0.0f, 35.0f, 3.5f);
+			// Brought back and up at the hip (wave 17), so that the left arm reaches the fore-end bent, as on the Roquefort,
+			// rather than stretched straight across the bottom of the view.
+			Look.HipShift = FVector(-10.0f, 0.0f, 4.0f);
 			RifleSounds(Look, 1.0f, 1.0f);
 			Looks.Add(Look);
 		}
@@ -87,7 +93,9 @@ namespace
 			// Aimed along the rail, the HUD's dot the sight.
 			Look.Sight = FVector(0.0f, -11.2f, 13.4f);
 			Look.Muzzle = FVector(0.0f, 46.4f, 4.5f);
-			Look.LeftHand = FVector(0.0f, 26.9f, 4.5f);
+			// Under the handguard's log of Colby, the fingers round its bottom rather than through it (wave 17).
+			Look.LeftHand = FVector(0.0f, 26.9f, 1.0f);
+			Look.ViewLeftHand = FVector(0.0f, 26.9f, 4.5f);
 			RifleSounds(Look, 0.95f, 1.08f);
 			Looks.Add(Look);
 		}
@@ -125,17 +133,22 @@ namespace
 			Look.Id = TEXT("munster");
 			Look.Hold = ECheeseStrikeHold::Pistol;
 			Look.PlainModel = Model(TEXT("Munster"), TEXT("MunsterSMG"));
+			// Drawn as the two guns are, by the pistol's equip (the Dual Burratas have it from the Curd Pistol's look).
+			Look.bDrawAnimation = true;
 			Look.Materials[0] = Material(TEXT("MI_MunsterCheese"));
 			Look.Materials[1] = Material(TEXT("MI_MunsterRind"));
 			Look.Materials[2] = Material(TEXT("MI_GunSteel"));
 			Look.Materials[3] = Material(TEXT("MI_GunBlack"));
 			// Aimed, the eye between the two guns (FCheeseStrikeDualHold brings them up side by side either side of it), over
 			// their tops and far enough behind them that the hands sit clear of the middle of the view.
-			Look.Sight = FVector(CheeseStrikeDual::AimHalfApart, -32.0f, 16.0f);
-			Look.Muzzle = FVector(0.0f, 25.3f, 6.0f);
+			Look.Sight = FVector(CheeseStrikeDual::AimHalfApart, -32.0f, 19.1f);
+			// Its block on top of the grip, the hand round the grip under it (wave 17: lifted 3.1 cm in the model).
+			Look.Muzzle = FVector(0.0f, 25.3f, 9.1f);
 			Look.FlashSize = 0.7f;
-			// Each hand holds its own.
+			// Each hand holds its own; at the hip the two a little higher and further out than a pistol, so that the hands
+			// round their grips show under the blocks (wave 17).
 			Look.LeftHand.Reset();
+			Look.HipShift = FVector(8.0f, 0.0f, 5.0f);
 			RifleSounds(Look, 0.8f, 1.3f);
 			Looks.Add(Look);
 		}
@@ -153,6 +166,8 @@ namespace
 			Look.Muzzle = FVector(0.0f, 48.0f, 3.0f);
 			Look.FlashSize = 1.5f;
 			Look.LeftHand = FVector(0.0f, 40.0f, 0.8f);
+			// Brought back and up at the hip (wave 17), the left arm bent to the fore-end, as on the Roquefort.
+			Look.HipShift = FVector(-10.0f, 0.0f, 4.0f);
 			// Real pump shotguns' blasts (OpenGameArt, CC0), not Lyra's, made big and boomy as the Roquefort's report is (wave
 			// 17, tools/art/wave17_sounds.py): a sub punch and a thump under each crack, a body of low-mid noise, a rumble and
 			// two far echoes in a 3 s tail.
@@ -193,6 +208,9 @@ namespace
 			FWeaponLook Look;
 			Look.Id = TEXT("pistol");
 			Look.Hold = ECheeseStrikeHold::Pistol;
+			Look.bDrawAnimation = true;
+			// Forward and a little to its left in the hand (wave 17), so that the curds sit in the grip rather than in the palm.
+			Look.Model = FTransform(FVector(1.0f, 4.0f, 0.0f));
 			Look.PlainModel = Model(TEXT("Pistol"), TEXT("CurdPistol"));
 			Look.Materials[0] = Material(TEXT("MI_Curd"));
 			Look.Materials[1] = Material(TEXT("MI_GunSteel"));
@@ -218,7 +236,8 @@ namespace
 			FWeaponLook Look = Looks.Last();
 			Look.Id = TEXT("burratas");
 			Look.PlainModel = Model(TEXT("Burratas"), TEXT("Burrata"));
-			Look.Model = FTransform::Identity;
+			// Forward in the hand (wave 17), so that each grip slots into its fist.
+			Look.Model = FTransform(FVector(0.0f, 2.5f, 0.0f));
 			Look.Materials[0] = Material(TEXT("MI_Burratas"));
 			Look.Materials[1] = Material(TEXT("MI_BurratasCream"));
 			Look.Materials[2] = Material(TEXT("MI_SwissRind"));
@@ -274,8 +293,9 @@ namespace
 			Look.Sight = FVector(0.0f, -20.0f, 12.6f);
 			Look.Muzzle = FVector(0.0f, 59.5f, 5.5f);
 			Look.FlashSize = 1.6f;
-			// Ahead on the haft.
+			// Ahead on the haft; the right fist closed round the haft's end, bent down into the hand (wave 17).
 			Look.LeftHand = FVector(0.0f, 22.0f, -1.0f);
+			Look.bFistGrip = true;
 			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot1.SW_ShotgunShot1");
 			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunShot2.SW_ShotgunShot2");
 			Look.DryFire = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_DryFire_01.Weapons_Shotgun_DryFire_01");

@@ -156,6 +156,8 @@ struct FCheeseStrikeAnimInstanceView
 	/** A heavy shot's kick in view (0 to 1, CheeseStrikeWeapons::KickAt), and how far back toward the eye a whole one throws the weapon (cm). */
 	float Kick = 0.0f;
 	float KickBack = 0.0f;
+	/** The weapon's own shift at the hip, over its hold's (FWeaponLook::HipShift: cm forward, right, up in view). */
+	FVector HipShift = FVector::ZeroVector;
 };
 
 /** A grenade in hand (FCheeseStrikeGrenadeHold), read from the character's UCheeseStrikeGrenades each frame. */
@@ -242,8 +244,10 @@ struct FCheeseStrikeAnimProxy : public FAnimInstanceProxy
 	float SwipePhase = -1.0f;
 	float SwipeSize = 1.0f;
 	bool bSledge = false;
+	bool bFistGrip = false;
 	FCheeseStrikeAnimInstanceView View;
 	float SprintBlend = 0.0f;
+	float FistGripBlend = 0.0f;
 	float SlideBlend = 0.0f;
 	/** A grenade in hand (UCheeseStrikeAnimInstance's). */
 	FCheeseStrikeAnimInstanceGrenade Grenade;
@@ -427,6 +431,8 @@ public:
 	float SwipePhase = -1.0f;
 	float SwipeSize = 1.0f;
 	bool bSledge = false;
+	/** Whether the right fist closes round the weapon's handle (FWeaponLook::bFistGrip). */
+	bool bFistGrip = false;
 	/** The arms in view, for its own player's body. */
 	FCheeseStrikeAnimInstanceView View;
 	/** A grenade in hand. */

@@ -45,10 +45,21 @@ struct FWeaponLook
 	 * fingers), rather than in the rifle's grip frame by `Model` (which a stand still shows it by).
 	 */
 	bool bInFist = false;
+	/**
+	 * Drawn in its own player's view by the animations' equip, the arms swung through it (the Curd Pistol and the two guns,
+	 * whose draws look right); every other weapon comes up from below in code alone (wave 17: CheeseStrikeArms::RaiseLowered),
+	 * as Lyra's rifle equip flung the arms about. The body others see plays the equip whichever.
+	 */
+	bool bDrawAnimation = false;
 	/** Held in the fist, how far along it from its grip's origin the fist closes (cm, toward its business end). */
 	float FistAlong = 0.0f;
 	/** A melee weapon held and swung as a sledgehammer, in both hands (the Cheese Stick: CheeseStrikeArms::SledgeRest, SledgeSwing). */
 	bool bSledge = false;
+	/**
+	 * Held by a handle in the right fist, every finger closed round it and the thumb over them (CheeseStrikeCloseFist), not
+	 * by a gun's grip with the index on its trigger: the BabyBomb's haft (wave 17).
+	 */
+	bool bFistGrip = false;
 	/**
 	 * A part of the model that turns while it fires (the Gouda Gatling's barrels): a second plain model in the same frame,
 	 * its materials slot by slot, and the axis it turns about (a direction and a point on it, in the model's space).
@@ -67,6 +78,18 @@ struct FWeaponLook
 	 * Curd Pistol) or holding its own (two guns).
 	 */
 	TOptional<FVector> LeftHand;
+	/**
+	 * In its own player's view, where the other hand holds it instead, if not at LeftHand (wave 17: on a thick fore-end, the
+	 * body others see, and the loadout page's figure, hold it under it, the fingers round its bottom; the view keeps the
+	 * hand up on its near side, where it shows, as on the Roquefort).
+	 */
+	TOptional<FVector> ViewLeftHand;
+	/**
+	 * At the hip in its own player's view, moved this far over its hold's place (CheeseStrikeWeaponLooks::HipFromAimed; cm
+	 * forward, right, up in the view): a long gun whose fore-end is far from its grip brought back and up (wave 17: the
+	 * Cheddar Blaster and the Swiss Shotgun), so that the other arm reaches it bent, the elbow down, as on the Roquefort.
+	 */
+	FVector HipShift = FVector::ZeroVector;
 	/**
 	 * Its sounds: shots (one at random; a melee weapon's swings, or none for the knife's), the dry click, a reload's three,
 	 * and how loud and how high its shots are (every shot is also kept down by CheeseStrikeGunfire::Loudness).

@@ -388,9 +388,11 @@ def pistol_grip(mat, half=1.45):
     prism(mat, GRIP_PISTOL, -half, half, round_by=0.55, segments=3)
 
 
-def pistol_trigger():
-    tube("Steel", [(0, -0.4, 3.4), (0, 1.6, 1.4), (0, 4.0, 1.6), (0, 4.6, 3.4), (0, 4.4, 5.0)], 0.28)
-    prism("Steel", [(2.3, 4.6), (2.5, 3.6), (2.0, 2.5), (1.6, 2.5), (1.8, 3.6), (1.6, 4.6)], -0.28, 0.28)
+def pistol_trigger(top=5.0):
+    """The trigger and its guard, the guard's front reaching up to `top` (to meet the frame over it)."""
+    tube("Steel", [(0, -0.4, 3.4), (0, 1.6, 1.4), (0, 4.0, 1.6), (0, 4.6, 3.4), (0, 4.4, top)], 0.28)
+    up = min(top - 5.0, 1.0)
+    prism("Steel", [(2.3, 4.6 + up), (2.5, 3.6 + up), (2.0, 2.5 + up), (1.6, 2.5 + up), (1.8, 3.6 + up), (1.6, 4.6 + up)], -0.28, 0.28)
 
 
 def bore_end(centre_x, centre_z, y0, y1, outer, inner, deep=3.0, sides=24):
@@ -599,22 +601,25 @@ def shotgun():
 
 def munster():
     """One of the Munster Twin SMGs: a stubby block of Munster, its orange rind round it and its pale paste at the cut
-    ends, a short steel barrel, and a belt of cheese slices hanging from it in place of a magazine."""
-    body = box("MunsterRind", (0, 6.0, 6.2), (5.2, 22.0, 7.6), 1.0, 3)
+    ends, a short steel barrel, and a belt of cheese slices hanging from it in place of a magazine. The block sits on top
+    of the grip (wave 17: lifted 3.1 cm, it had sat down over the hand round the grip)."""
+    lift = 3.1
+    body = box("MunsterRind", (0, 6.0, 6.2 + lift), (5.2, 22.0, 7.6), 1.0, 3)
     faces_facing(body, (0, 1, 0), "Munster", 0.9)
     faces_facing(body, (0, -1, 0), "Munster", 0.9)
-    cut(body, [sphere(None, (2.6, 9.0, 8.4), 0.9, cutter=True), sphere(None, (-2.5, 2.0, 4.0), 0.7, cutter=True), sphere(None, (1.0, 17.1, 7.6), 0.8, cutter=True)])
-    lathe("Steel", [(0.0, 16.6), (1.3, 16.6), (1.3, 22.6), (0.0, 22.6)], centre=(0.0, 0.0, 6.0), sides=20)
+    cut(body, [sphere(None, (2.6, 9.0, 8.4 + lift), 0.9, cutter=True), sphere(None, (-2.5, 2.0, 4.0 + lift), 0.7, cutter=True), sphere(None, (1.0, 17.1, 7.6 + lift), 0.8, cutter=True)])
+    bore = 6.0 + lift
+    lathe("Steel", [(0.0, 16.6), (1.3, 16.6), (1.3, 22.6), (0.0, 22.6)], centre=(0.0, 0.0, bore), sides=20)
     for y in (18.0, 19.5, 21.0):
-        lathe("Black", [(0.0, y), (1.38, y), (1.38, y + 0.5), (0.0, y + 0.5)], centre=(0.0, 0.0, 6.0), sides=20)
-    bore_end(0.0, 6.0, 22.0, 25.3, 0.65, 0.35, 1.5)
+        lathe("Black", [(0.0, y), (1.38, y), (1.38, y + 0.5), (0.0, y + 0.5)], centre=(0.0, 0.0, bore), sides=20)
+    bore_end(0.0, bore, 22.0, 25.3, 0.65, 0.35, 1.5)
     pistol_grip("Black")
-    pistol_trigger()
+    pistol_trigger(5.0 + lift)
     # The belt: slices of Munster hung edge to edge on two steel wires, in a curve down from under the barrel.
     path = []
     for k in range(10):
         t = k / 9.0
-        path.append(Vector((0.0, 11.0 + 3.2 * math.sin(math.pi * t * 0.8) - 1.5 * t, 2.6 - 10.5 * t)))
+        path.append(Vector((0.0, 11.0 + 3.2 * math.sin(math.pi * t * 0.8) - 1.5 * t, 2.6 + lift - 10.5 * t)))
     for x in (-2.0, 2.0):
         tube("Steel", [(x, p.y, p.z) for p in path], 0.14)
     for k in range(9):
@@ -625,7 +630,7 @@ def munster():
         s = box("Munster", (0, 0, 0), (3.7, 3.5, 0.55), 0.12, 1)
         s.matrix_world = Matrix.Translation(mid) @ turn
         faces_facing(s, (0, 1, 0), "MunsterRind", 0.8)
-    mark("munster", sight=(0, -14.0, 11.0), muzzle=(0, 25.3, 6.0))
+    mark("munster", sight=(0, -14.0, 11.0 + lift), muzzle=(0, 25.3, bore))
     return ["Munster", "MunsterRind", "Steel", "Black"]
 
 
