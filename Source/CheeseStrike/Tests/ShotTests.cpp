@@ -29,7 +29,8 @@ bool FDamageFallsOffWithDistanceAndDoublesOnTheHead::RunTest(const FString& Para
 	const float Halfway = (Weapon.FalloffStart + Weapon.FalloffEnd) / 2.0f;
 	TestEqual(TEXT("halfway between"), CheeseStrikeWeapons::DamageAt(Weapon, Halfway, false), Weapon.Damage * (1.0f + Weapon.FalloffFloor) / 2.0f);
 	TestEqual(TEXT("the head takes more"), CheeseStrikeWeapons::DamageAt(Weapon, 100.0f, true), Weapon.Damage * Weapon.HeadMultiplier);
-	TestTrue(TEXT("five body shots to kill, in about half a second"), CheeseStrikeWeapons::TimeToKill(Weapon) > 0.4f && CheeseStrikeWeapons::TimeToKill(Weapon) < 0.6f);
+	TestEqual(TEXT("seven body shots to kill"), CheeseStrikeWeapons::ShotsToKill(Weapon), 7);
+	TestTrue(TEXT("in about seven tenths of a second"), CheeseStrikeWeapons::TimeToKill(Weapon) > 0.65f && CheeseStrikeWeapons::TimeToKill(Weapon) < 0.8f);
 	TestTrue(TEXT("falloff starts beyond a room and ends across a yard"), Weapon.FalloffStart > 1000.0f && Weapon.FalloffEnd < 4000.0f);
 	return true;
 }
