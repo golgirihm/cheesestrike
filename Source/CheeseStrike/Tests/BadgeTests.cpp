@@ -5,6 +5,7 @@
 // CheeseStrike.Play.WeaponsWorkOverTheNetwork (an assassination).
 
 #include "Misc/AutomationTest.h"
+#include "Rules/CheeseStrikeAchievements.h"
 #include "Rules/CheeseStrikeBadges.h"
 #include "Weapons/CheeseStrikeArsenal.h"
 
@@ -31,6 +32,12 @@ bool FAKillEarnsItsBadges::RunTest(const FString& Parameters)
 	Knife.bFromBehind = true;
 	Knife.bOneHit = true;
 	TestEqual(TEXT("from behind, an ASSASSINATION only (not ONE SHOT)"), BadgesFor(Knife), static_cast<uint8>(1 << static_cast<uint8>(EBadge::Assassination)));
+	// Wave 17: the knife's alone; a blow of the Cheese Stick's from behind earned it, and the knife's achievements with it.
+	FKillFacts Stick = Shot(CheeseStrikeWeapons::Stick(), 200.0f);
+	Stick.bFromBehind = true;
+	Stick.bOneHit = true;
+	TestEqual(TEXT("the Cheese Stick from behind earns nothing: no ASSASSINATION"), BadgesFor(Stick), static_cast<uint8>(0));
+	TestEqual(TEXT("so no knife's stat counts it"), CheeseStrikeAchievements::StatsFor(CheeseStrikeAchievements::ERecord::Badge, static_cast<uint8>(EBadge::Assassination)), TArray<FString>({CheeseStrikeAchievements::Stat::Assassinations}));
 
 	FKillFacts Executed;
 	Executed.bExecuted = true;

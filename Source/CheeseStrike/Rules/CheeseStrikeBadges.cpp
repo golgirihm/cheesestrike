@@ -20,7 +20,9 @@ namespace CheeseStrikeBadges
 		{
 			Add(EBadge::Headshot);
 		}
-		if (bBlade && Facts.bFromBehind)
+		// The knife's alone (wave 17: a blow of the Cheese Stick's from behind was counted as one, and its achievements with it).
+		const bool bKnife = Stats != nullptr && Stats->Slot == EWeaponSlot::Knife;
+		if (bKnife && Facts.bFromBehind)
 		{
 			Add(EBadge::Assassination);
 		}
