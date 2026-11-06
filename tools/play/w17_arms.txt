@@ -1,0 +1,294 @@
+# Wave 17's grips, as every hero: each weapon in first person at the hip (the Curd Pistol forward in the grip, the
+# knife's flat showing, the left arm bent to the Cheddar Blaster's and the shotgun's fore-end as to the Roquefort's, the
+# BabyBomb's haft in the right fist, the Munster Twin SMGs and the Dual Burratas held by their grips, each fist closed
+# by its own bones), the carbine and the blaster from outside on either side (the figure on the loadout page holds
+# them so), then a weapon drawn coming up from below (the blaster from the pistol, the knife, at 0.1 s steps).
+# tools/play.ps1 -Script tools/play/w17_arms.txt -Tag w17arms -FixedFps 30 -Res 1280x720
+wait 3
+cmd CheeseStrikeBody 0 0
+wait 0.5
+cmd CheeseStrikeArm pistol
+wait 1
+shot w17a_0_pistol
+cmd CheeseStrikeArm knife
+wait 1
+shot w17a_0_knife
+cmd CheeseStrikeArm blaster
+wait 1
+shot w17a_0_blaster
+cmd CheeseStrikeArm shotgun
+wait 1
+shot w17a_0_shotgun
+cmd CheeseStrikeArm roquefort
+wait 1
+shot w17a_0_roquefort
+cmd CheeseStrikeArm babybomb
+wait 1
+shot w17a_0_babybomb
+cmd CheeseStrikeArm munster
+wait 1
+shot w17a_0_munster
+cmd CheeseStrikeArm burratas
+wait 1
+shot w17a_0_burratas
+cmd CheeseStrikeArm carbine
+wait 1
+shot w17a_0_carbine
+cmd CheeseStrikeArm carbine
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_0_carbine_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_0_carbine_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm blaster
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_0_blaster_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_0_blaster_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm burratas
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_0_burratas_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_0_burratas_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm blaster
+wait 0.8
+tap Sidearm
+wait 1
+tap Primary
+wait 0.08
+shot w17a_0_draw_1
+wait 0.08
+shot w17a_0_draw_2
+wait 0.08
+shot w17a_0_draw_3
+wait 0.08
+shot w17a_0_draw_4
+wait 0.08
+shot w17a_0_draw_5
+wait 0.5
+tap Knife
+wait 0.08
+shot w17a_0_drawknife_1
+wait 0.08
+shot w17a_0_drawknife_2
+wait 0.08
+shot w17a_0_drawknife_3
+wait 0.08
+shot w17a_0_drawknife_4
+wait 0.5
+cmd CheeseStrikeBody 1 1
+wait 0.5
+cmd CheeseStrikeArm pistol
+wait 1
+shot w17a_1_pistol
+cmd CheeseStrikeArm knife
+wait 1
+shot w17a_1_knife
+cmd CheeseStrikeArm blaster
+wait 1
+shot w17a_1_blaster
+cmd CheeseStrikeArm shotgun
+wait 1
+shot w17a_1_shotgun
+cmd CheeseStrikeArm roquefort
+wait 1
+shot w17a_1_roquefort
+cmd CheeseStrikeArm babybomb
+wait 1
+shot w17a_1_babybomb
+cmd CheeseStrikeArm munster
+wait 1
+shot w17a_1_munster
+cmd CheeseStrikeArm burratas
+wait 1
+shot w17a_1_burratas
+cmd CheeseStrikeArm carbine
+wait 1
+shot w17a_1_carbine
+cmd CheeseStrikeArm carbine
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_1_carbine_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_1_carbine_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm blaster
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_1_blaster_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_1_blaster_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm burratas
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_1_burratas_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_1_burratas_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeBody 2 0
+wait 0.5
+cmd CheeseStrikeArm pistol
+wait 1
+shot w17a_2_pistol
+cmd CheeseStrikeArm knife
+wait 1
+shot w17a_2_knife
+cmd CheeseStrikeArm blaster
+wait 1
+shot w17a_2_blaster
+cmd CheeseStrikeArm shotgun
+wait 1
+shot w17a_2_shotgun
+cmd CheeseStrikeArm roquefort
+wait 1
+shot w17a_2_roquefort
+cmd CheeseStrikeArm babybomb
+wait 1
+shot w17a_2_babybomb
+cmd CheeseStrikeArm munster
+wait 1
+shot w17a_2_munster
+cmd CheeseStrikeArm burratas
+wait 1
+shot w17a_2_burratas
+cmd CheeseStrikeArm carbine
+wait 1
+shot w17a_2_carbine
+cmd CheeseStrikeArm carbine
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_2_carbine_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_2_carbine_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm blaster
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_2_blaster_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_2_blaster_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm burratas
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_2_burratas_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_2_burratas_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeBody 3 1
+wait 0.5
+cmd CheeseStrikeArm pistol
+wait 1
+shot w17a_3_pistol
+cmd CheeseStrikeArm knife
+wait 1
+shot w17a_3_knife
+cmd CheeseStrikeArm blaster
+wait 1
+shot w17a_3_blaster
+cmd CheeseStrikeArm shotgun
+wait 1
+shot w17a_3_shotgun
+cmd CheeseStrikeArm roquefort
+wait 1
+shot w17a_3_roquefort
+cmd CheeseStrikeArm babybomb
+wait 1
+shot w17a_3_babybomb
+cmd CheeseStrikeArm munster
+wait 1
+shot w17a_3_munster
+cmd CheeseStrikeArm burratas
+wait 1
+shot w17a_3_burratas
+cmd CheeseStrikeArm carbine
+wait 1
+shot w17a_3_carbine
+cmd CheeseStrikeArm carbine
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_3_carbine_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_3_carbine_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm blaster
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_3_blaster_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_3_blaster_right
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeArm burratas
+wait 1
+cmd CheeseStrikeOutside 75 -80 40
+wait 0.4
+shot w17a_3_burratas_left
+cmd CheeseStrikeOutside
+wait 0.1
+cmd CheeseStrikeOutside 75 80 40
+wait 0.4
+shot w17a_3_burratas_right
+cmd CheeseStrikeOutside
+wait 0.1
+quit
