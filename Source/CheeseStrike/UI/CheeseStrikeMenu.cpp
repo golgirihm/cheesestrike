@@ -18,6 +18,7 @@
 #include "Styling/SlateTypes.h"
 #include "Widgets/Images/SImage.h"
 #include "CheeseStrikeLoader.h"
+#include "Rules/CheeseStrikeHeroTurn.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SMenuAnchor.h"
 #include "Widgets/Input/SSlider.h"
@@ -2502,14 +2503,108 @@ const FSlateBrush* SCheeseStrikeMenu::HeroViewBrush()
 	return HeroViewPicture.Get();
 }
 
+namespace
+{
+	/**
+	 * Takes a drag across what it holds: the mouse pressed on it (the left button) and moved turns the loadout page's hero by
+	 * the distance across (CheeseStrikeHeroTurn::DragDegreesPerUnit), the mouse held to it until let go; an open hand over it, a
+	 * closed one while dragging.
+	 */
+	class SCheeseStrikeDragToTurn : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SCheeseStrikeDragToTurn) {}
+			SLATE_EVENT(TDelegate<void(float)>, OnTurn)
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			OnTurn = InArgs._OnTurn;
+			ChildSlot [ InArgs._Content.Widget ];
+		}
+
+		virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+		{
+			if (MouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+			{
+				return FReply::Unhandled();
+			}
+			bDragging = true;
+			return FReply::Handled().CaptureMouse(SharedThis(this));
+		}
+
+		virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+		{
+			if (!bDragging || MouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+			{
+				return FReply::Unhandled();
+			}
+			bDragging = false;
+			return FReply::Handled().ReleaseMouseCapture();
+		}
+
+		virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override
+		{
+			if (!bDragging || !HasMouseCapture())
+			{
+				return FReply::Unhandled();
+			}
+			// The cursor's move in screen pixels, in this widget's own units, as far across as the picture shows it.
+			const float Across = MouseEvent.GetCursorDelta().X / FMath::Max(0.01f, MyGeometry.Scale);
+			if (Across != 0.0f)
+			{
+				OnTurn.ExecuteIfBound(Across * CheeseStrikeHeroTurn::DragDegreesPerUnit);
+			}
+			return FReply::Handled();
+		}
+
+		virtual void OnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEvent) override
+		{
+			bDragging = false;
+		}
+
+		virtual FCursorReply OnCursorQuery(const FGeometry& MyGeometry, const FPointerEvent& CursorEvent) const override
+		{
+			return FCursorReply::Cursor(bDragging ? EMouseCursor::GrabHandClosed : EMouseCursor::GrabHand);
+		}
+
+	private:
+		TDelegate<void(float)> OnTurn;
+		bool bDragging = false;
+	};
+}
+
+FReply SCheeseStrikeMenu::OnAnalogValueChanged(const FGeometry& MyGeometry, const FAnalogInputEvent& InAnalogInputEvent)
+{
+	if (InAnalogInputEvent.GetKey() == EKeys::Gamepad_RightX)
+	{
+		HeroStickX = InAnalogInputEvent.GetAnalogValue();
+		if (GetHeroStick() != 0.0f)
+		{
+			return FReply::Handled();
+		}
+	}
+	return SCompoundWidget::OnAnalogValueChanged(MyGeometry, InAnalogInputEvent);
+}
+
+float SCheeseStrikeMenu::GetHeroStick() const
+{
+	return Page == EMenuPage::Loadout || GetLobbyOverlay() == EMenuPage::Loadout ? HeroStickX : 0.0f;
+}
+
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeHeroView()
 {
 	// The picture read as it is drawn (it comes a frame after the page, as the view starts capturing), over a plain card of
 	// the fog's grey, a hairline round it.
 	static const FSlateRoundedBoxBrush Card(FLinearColor(0.78f, 0.79f, 0.8f, 1.0f), 10.0f);
 	static const FSlateRoundedBoxBrush Edge(FLinearColor::Transparent, 10.0f, FLinearColor(Hairline.R, Hairline.G, Hairline.B, 0.55f), CheeseStrikeMenu::HairlineWidth);
+	// A drag across it turns the hero (CheeseStrikeHeroTurn), which turns by itself again a few seconds after.
+	TWeakObjectPtr<ACheeseStrikePlayerController> Player = Controller;
 	return SNew(SBox).WidthOverride(CheeseStrikeMenu::HeroViewWidth).HeightOverride(CheeseStrikeMenu::HeroViewHeight)
 		[
+			SNew(SCheeseStrikeDragToTurn).OnTurn_Lambda([Player](float Degrees) { if (Player.IsValid()) Player->TurnHeroView(Degrees); })
+			[
 			SNew(SOverlay)
 			+ SOverlay::Slot() [ SNew(SBorder).BorderImage(&Card) ]
 			+ SOverlay::Slot()
@@ -2521,6 +2616,7 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeHeroView()
 				})
 			]
 			+ SOverlay::Slot() [ SNew(SBorder).BorderImage(&Edge) ]
+			]
 		];
 }
 

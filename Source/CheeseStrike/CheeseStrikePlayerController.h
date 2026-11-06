@@ -65,6 +65,8 @@ public:
 	/** The loadout page's picture of the hero, its loadout in hand (ACheeseStrikeHeroView), while the page is up; null otherwise. */
 	UTextureRenderTarget2D* GetHeroPicture() const;
 	const ACheeseStrikeHeroView* GetHeroView() const { return HeroView; }
+	/** Turns the loadout page's hero by `Degrees` by hand (a drag across its picture, the right stick; CheeseStrikeHeroTurn), while the page shows. */
+	void TurnHeroView(float Degrees);
 	/** Whether this player has been told to follow the server to another level (and is waiting to): the lobby says where to. */
 	bool IsLeaving() const { return bLeaving; }
 	/** The map (CheeseStrikeRules::Maps) this player was told to follow the server to, or INDEX_NONE. */
@@ -254,6 +256,9 @@ public:
 	/** From the console or a play script: opens the lobby's nth dropdown (0 the map, then the mode and on down), for looking at it; -1 shuts it. */
 	UFUNCTION(Exec)
 	void CheeseStrikeDropdown(int32 Number = 0);
+	/** From the console or a play script: turns the loadout page's hero by `Degrees`, as a drag across its picture does; it turns by itself again 3 s later. 0 only logs which way it faces. */
+	UFUNCTION(Exec)
+	void CheeseStrikeTurnHero(float Degrees = 90.0f);
 	/** From the console or a play script: goes over to the other side in the lobby, as its button does. */
 	UFUNCTION(Exec)
 	void CheeseStrikeSwitchSide();

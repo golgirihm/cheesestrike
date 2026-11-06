@@ -50,6 +50,8 @@
 #include "UI/CheeseStrikeCurtain.h"
 #include "UI/CheeseStrikeMenuFigure.h"
 #include "UI/CheeseStrikeHeroView.h"
+#include "Rules/CheeseStrikeHeroTurn.h"
+#include "Misc/App.h"
 #include "UI/CheeseStrikeMenuMouse.h"
 #include "UI/CheeseStrikeMusic.h"
 #include "UI/CheeseStrikePostGame.h"
@@ -211,7 +213,31 @@ void ACheeseStrikePlayerController::UpdateHeroView()
 	{
 		const FWantedLoadout Loadout = WantedLoadout();
 		HeroView->Show(Loadout.Hero, CheeseStrikeLoadout::PrimaryOrDefault(Loadout.Primary));
+		// The right stick held over turns the hero (the menu keeps what Slate tells it of the stick).
+		const float Stick = CheeseStrikeHeroTurn::StickTurn(Menu.IsValid() ? Menu->GetHeroStick() : 0.0f, static_cast<float>(FApp::GetDeltaTime()));
+		if (Stick != 0.0f)
+		{
+			HeroView->TurnBy(Stick);
+		}
 	}
+}
+
+void ACheeseStrikePlayerController::TurnHeroView(float Degrees)
+{
+	if (HeroView != nullptr && HeroView->IsShown())
+	{
+		HeroView->TurnBy(Degrees);
+	}
+}
+
+void ACheeseStrikePlayerController::CheeseStrikeTurnHero(float Degrees)
+{
+	// 0 turns nothing (and so doesn't hold the hero still): it only logs where it faces.
+	if (Degrees != 0.0f)
+	{
+		TurnHeroView(Degrees);
+	}
+	UE_LOG(LogCheeseStrike, Display, TEXT("Hero view: turned by %.0f, its yaw now %.1f"), Degrees, HeroView != nullptr ? HeroView->GetFigureYaw() : 0.0f);
 }
 
 UTextureRenderTarget2D* ACheeseStrikePlayerController::GetHeroPicture() const
