@@ -258,8 +258,8 @@ bool FEveryStreakHasAnIconInCheese::RunTest(const FString& Parameters)
 #if WITH_EDITORONLY_DATA
 			// The source picture's size (the headless editor may not have built the texture for the renderer).
 			TestTrue(FString::Printf(TEXT("%s's icon is 128 pixels square"), Info(Kind).Name), Picture->Source.GetSizeX() == 128 && Picture->Source.GetSizeY() == 128);
-#endif
 			TestFalse(FString::Printf(TEXT("%s's icon keeps its alpha"), Info(Kind).Name), Picture->CompressionNoAlpha);
+#endif
 		}
 	}
 	// Lit once made, dim until then.
