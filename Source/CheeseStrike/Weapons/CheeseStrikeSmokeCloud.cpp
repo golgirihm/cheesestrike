@@ -22,12 +22,14 @@
 
 namespace
 {
-	/** The blood's mist card (a plane a metre across) and the smoke's own look for it. */
+	/** The blood's mist card (a plane a metre across) and the smoke's own look for it (a puff of smoke, since wave 17). */
 	const TCHAR* const SmokeCardPath = TEXT("/Engine/BasicShapes/Plane.Plane");
 	const TCHAR* const SmokeLookPath = TEXT("/Game/CheeseStrike/Effects/M_SmokeMist.M_SmokeMist");
 	/** How big a card is against the cloud's radius (its half width as a share), and how slowly the swirl turns (degrees a second, about). */
 	constexpr float SmokeCardShare = 0.55f;
 	constexpr float SmokeSwirlDegrees = 14.0f;
+	/** How fast each card rolls over on the view (degrees a second, about), so that its billows turn as smoke's do. */
+	constexpr float SmokeRollDegrees = 6.0f;
 	/** The veil's lobes round its edge, which make its outline lumpy (how many, how far out as a share of its half size, and how big as a share of it). */
 	constexpr int32 VeilLobes = 7;
 	constexpr float VeilLobeOut = 0.78f;
@@ -186,6 +188,7 @@ void ACheeseStrikeSmokeCloud::MakeCards()
 		Card.Size = Random.FRandRange(0.7f, 1.3f);
 		Card.Turn = FMath::DegreesToRadians(SmokeSwirlDegrees * Random.FRandRange(0.6f, 1.4f)) * (Random.FRand() < 0.5f ? -1.0f : 1.0f);
 		Card.Phase = Random.FRandRange(0.0f, 2.0f * PI);
+		Card.Spin = FMath::DegreesToRadians(SmokeRollDegrees * Random.FRandRange(0.5f, 1.5f)) * (Random.FRand() < 0.5f ? -1.0f : 1.0f);
 		Card.Shade = Random.FRandRange(0.72f, 1.25f);
 		Swirl.Add(Card);
 	}
@@ -229,7 +232,7 @@ void ACheeseStrikeSmokeCloud::ShowCards()
 		const float Breath = 1.0f + 0.08f * FMath::Sin(At * 0.9f + Card.Phase);
 		const FVector Place = Middle + Turned * Radius * Card.Share * Breath;
 		const FVector Facing = bCamera ? (Camera - Place).GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector) : FVector::UpVector;
-		const FQuat Turn = FRotationMatrix::MakeFromZ(Facing).ToQuat() * FQuat(FVector::UpVector, Card.Phase);
+		const FQuat Turn = FRotationMatrix::MakeFromZ(Facing).ToQuat() * FQuat(FVector::UpVector, Card.Phase + Card.Spin * At);
 		Shown.Add(FTransform(Turn, Place, FVector(CardScale * Card.Size, CardScale * Card.Size, 1.0f)));
 	}
 	if (Shown.Num() != Cards->GetInstanceCount())

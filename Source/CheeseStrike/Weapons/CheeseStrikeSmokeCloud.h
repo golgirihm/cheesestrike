@@ -15,8 +15,10 @@ class USphereComponent;
  * The Smoked Gouda's cloud (CheeseStrikeGrenades: EGrenadeKind::Smoke, the
  * Cloud* numbers): spawned by the server where the round went off, and
  * shown on every machine that draws: a hundred or so mist cards (the
- * blood's card, in a smoky grey with a faint gouda tint, M_SmokeMist from
- * tools/art/smoke_cloud.py) swirling slowly round an invisible sphere,
+ * blood's card in M_SmokeMist from tools/art/smoke_cloud.py: since wave 17
+ * each one of eight soft, billowing puffs of smoke drawn from noise, lit
+ * from the sky through their billows, each rolling slowly over on the view)
+ * swirling slowly round an invisible sphere,
  * growing to about ten metres across in a second, lasting twelve and
  * thinning away over the last three, with a soft hiss while it smokes
  * (CheeseStrikeSynth::Hiss); and before its core, between it and this
@@ -59,7 +61,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-	/** Each card's own place in the swirl: its direction out from the middle (unit), how far out (a share of the radius), its size (a share) and its turn about the up axis a second. */
+	/** Each card's own place in the swirl: its direction out from the middle (unit), how far out (a share of the radius), its size (a share), its turn about the up axis a second, and its roll on the view a second (radians: its billows turning slowly over). */
 	struct FCard
 	{
 		FVector Out = FVector::ForwardVector;
@@ -67,6 +69,7 @@ protected:
 		float Size = 1.0f;
 		float Turn = 0.0f;
 		float Phase = 0.0f;
+		float Spin = 0.0f;
 		float Shade = 1.0f;
 	};
 	void MakeCards();
