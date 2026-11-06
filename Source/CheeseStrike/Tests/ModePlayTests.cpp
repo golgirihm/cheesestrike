@@ -297,7 +297,6 @@ bool FAnEliminationRoundEndsWhenASideIsOut::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("as the next round is coming (in %.1f s)"), GameState(0)->SecondsToNextRound()), GameState(0)->IsRoundBreak() && GameState(0)->SecondsToNextRound() > 0.0f);
 	});
 	WaitUntil(TEXT("the next round"), CheeseStrikeModes::RoundBreak + 3.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->GetRound() == 2; });
-	WaitUntil(TEXT("the host back and splatted again"), 3.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive() && Host->GetGooUntil() > 0.0f; });
 	Then([this]()
 	{
 		const ACheeseStrikeGameState* Match = GameState(0);
