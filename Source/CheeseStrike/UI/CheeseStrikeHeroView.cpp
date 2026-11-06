@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Hamid Golgiri. All rights reserved.
 
 #include "CheeseStrikeHeroView.h"
+#include "Rules/CheeseStrikeHeroTurn.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -40,7 +41,9 @@ const FVector ACheeseStrikeHeroView::StageAt(0.0f, 40000.0f, 45000.0f);
 
 ACheeseStrikeHeroView::ACheeseStrikeHeroView()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	// Ticks while shown, for the figure's turn by itself to stop and come back about a turn by hand.
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = false;
 	Stage = CreateDefaultSubobject<USceneComponent>(TEXT("Stage"));
 	RootComponent = Stage;
@@ -171,9 +174,34 @@ void ACheeseStrikeHeroView::Show(int32 Hero, FName Id)
 	}
 }
 
+void ACheeseStrikeHeroView::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (Figure != nullptr)
+	{
+		Figure->SetTurnShare(CheeseStrikeHeroView::TurnShare * CheeseStrikeHeroTurn::AutoShare(TurnedAt < 0.0 ? -1.0 : FPlatformTime::Seconds() - TurnedAt));
+	}
+}
+
+void ACheeseStrikeHeroView::TurnBy(float Degrees)
+{
+	TurnedAt = FPlatformTime::Seconds();
+	if (Figure != nullptr)
+	{
+		Figure->SetTurnShare(0.0f);
+		Figure->AddActorWorldRotation(FRotator(0.0f, Degrees, 0.0f));
+	}
+}
+
+float ACheeseStrikeHeroView::GetFigureYaw() const
+{
+	return Figure != nullptr ? Figure->GetActorRotation().Yaw : 0.0f;
+}
+
 void ACheeseStrikeHeroView::SetShown(bool bInShown)
 {
 	bShown = bInShown;
+	SetActorTickEnabled(bShown);
 	Capture->bCaptureEveryFrame = bShown;
 	SetActorHiddenInGame(!bShown);
 	if (Figure != nullptr)

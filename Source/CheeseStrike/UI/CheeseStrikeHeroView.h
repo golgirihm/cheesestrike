@@ -19,8 +19,11 @@ namespace CheeseStrikeHeroView
 	/** The picture's size in pixels: upright, a little over half as wide as it is tall, sharp at 1440p. */
 	constexpr int32 PictureWidth = 520;
 	constexpr int32 PictureHeight = 900;
-	/** How much of the picture's height the hero (feet to the top of the head, about 1.8 m) takes: the whole of them, with a little fog round. */
-	constexpr float HeroShare = 0.8f;
+	/**
+	 * How much of the picture's height the hero (feet to the top of the head, about 1.8 m) takes: the whole of them, with fog
+	 * round, and room either side for a gun held out (wave 17: at 0.8 a gun held across the view ran off its sides).
+	 */
+	constexpr float HeroShare = 0.6f;
 	/** How tall a hero stands (cm), and how far the camera is from them. */
 	constexpr float HeroHeight = 185.0f;
 	constexpr float CameraDistance = 600.0f;
@@ -56,6 +59,11 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	virtual void Tick(float DeltaSeconds) override;
+	/** Turns the figure by `Degrees` by hand (a drag across the picture, the right stick): it stops turning by itself until left alone a while (CheeseStrikeHeroTurn). */
+	void TurnBy(float Degrees);
+	/** The figure's yaw now (degrees), for the tests and the log. */
+	float GetFigureYaw() const;
 	/** Wears hero `Hero` and holds primary `Id`, as the front end's figure does. */
 	void Show(int32 Hero, FName Id);
 	/** Captures (and its figure shows) while the loadout page is up; neither while it isn't. */
@@ -85,4 +93,6 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UTextureRenderTarget2D> Picture;
 	bool bShown = false;
+	/** When it was last turned by hand (FPlatformTime), or negative for never. */
+	double TurnedAt = -1.0;
 };

@@ -1,0 +1,30 @@
+# Wave 17's menus: the loadout page's hero zoomed out (a gun held across it inside
+# the picture), turned by hand (as a drag across it does) and turning by itself
+# again three seconds after; then the kill-streak count at three figures in its
+# tile. Run with tools/play.ps1 -Lobby -Res 1280x720 (the smallest window).
+wait 3
+cmd CheeseStrikePage Loadout
+cmd CheeseStrikeLoadout blaster
+wait 1.5
+shot w17_1_loadout_blaster
+cmd CheeseStrikeLoadout munster
+wait 1.5
+shot w17_2_loadout_munster
+cmd CheeseStrikeLoadout carbine twinblast
+wait 1.5
+shot w17_3_loadout_carbine
+cmd CheeseStrike.FigureTurn 1
+cmd CheeseStrikeTurnHero 90
+wait 0.1
+shot w17_4_turned_by_hand
+wait 2
+cmd CheeseStrikeTurnHero 0
+shot w17_5_still_two_seconds_on
+wait 4.5
+cmd CheeseStrikeTurnHero 0
+shot w17_6_turning_again
+cmd CheeseStrikeLoadout
+cmd CheeseStrikePage Main
+wait 1
+shot w17_7_front_end
+quit

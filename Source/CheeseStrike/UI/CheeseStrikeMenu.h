@@ -327,6 +327,10 @@ public:
 	virtual FReply OnPreviewKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	virtual FReply OnKeyUp(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	virtual FNavigationReply OnNavigation(const FGeometry& MyGeometry, const FNavigationEvent& InNavigationEvent) override;
+	/** The right stick's across (Gamepad_RightX), kept for the loadout page's hero to be turned by (GetHeroStick); everything else as Slate has it. */
+	virtual FReply OnAnalogValueChanged(const FGeometry& MyGeometry, const FAnalogInputEvent& InAnalogInputEvent) override;
+	/** The right stick's across as last told (-1 to 1), on the loadout page; 0 elsewhere. */
+	float GetHeroStick() const;
 
 	/** The page's items that can take the focus, by name, in the order they show. */
 	TArray<FString> GetFocusableNames() const;
@@ -605,6 +609,8 @@ private:
 	EMenuPage Page = EMenuPage::None;
 	/** The page last built afresh: a page shown in its place fades in, the same one drawn again doesn't. */
 	EMenuPage BuiltPage = EMenuPage::None;
+	/** The right stick's across as Slate last told it (OnAnalogValueChanged). */
+	float HeroStickX = 0.0f;
 	EOptionsTab OptionsTab = EOptionsTab::Controls;
 	FString ShownLobbyKey;
 	int32 ShownLobbyStatus = INDEX_NONE;
