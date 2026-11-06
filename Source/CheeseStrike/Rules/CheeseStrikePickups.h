@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "Rules/CheeseStrikeModes.h"
 
+struct FWeaponStats;
+
 /**
  * Weapon pickups, as plain functions over plain values (the user's,
  * October 2026). Everyone comes in with a weak primary, the Colby Carbine
@@ -88,6 +90,13 @@ namespace CheeseStrikePickups
 	ETake HowToTake(FName Carried, FName Offered, bool bRoundsFull, bool bDropped = false);
 	/** The rounds taken by topping up from a stand (its weapon's usual reserve, `StandReserve`) or from a weapon on the floor (all it has). */
 	int32 TopUpRounds(bool bDropped, int32 StandReserve, int32 DroppedMagazine, int32 DroppedReserve);
+	/** A stand's rounds for TopUpRounds: a gun's usual reserve; a weapon of swings' (the Cheese Stick's, HasSwings) a whole set of swings, its magazine. */
+	int32 StandRounds(const FWeaponStats& Weapon);
+	/**
+	 * What RoundsFull counts of a primary, as (rounds, the most): a gun's reserve; a weapon of swings' (the Cheese Stick's,
+	 * which has no reserve) its swings left of its magazine.
+	 */
+	FIntPoint PrimaryRounds(const FWeaponStats& Weapon, int32 Magazine, int32 Reserve);
 	/**
 	 * The rounds the sidearm (the Curd Pistol, no longer endless since wave 16) gets from any press that takes a weapon or
 	 * its rounds, at a stand or on the floor: its usual reserve, `SidearmReserve` (up to the most it holds).

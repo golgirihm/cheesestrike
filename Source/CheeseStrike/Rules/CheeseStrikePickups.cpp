@@ -65,6 +65,17 @@ namespace CheeseStrikePickups
 		return bDropped ? FMath::Max(0, DroppedMagazine) + FMath::Max(0, DroppedReserve) : FMath::Max(0, StandReserve);
 	}
 
+	int32 StandRounds(const FWeaponStats& Weapon)
+	{
+		return Weapon.HasSwings() ? Weapon.MagazineSize : FMath::Max(0, Weapon.Reserve);
+	}
+
+	FIntPoint PrimaryRounds(const FWeaponStats& Weapon, int32 Magazine, int32 Reserve)
+	{
+		// An endless reserve (below 0) is full whatever the swings.
+		return Weapon.HasSwings() && Reserve >= 0 ? FIntPoint(Magazine, Weapon.MagazineSize) : FIntPoint(Reserve, Weapon.ReserveMax);
+	}
+
 	int32 SidearmTopUp(int32 SidearmReserve)
 	{
 		return FMath::Max(0, SidearmReserve);

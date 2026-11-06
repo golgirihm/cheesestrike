@@ -1,0 +1,54 @@
+# Wave 17's weapons (tools/play/w17_weapons.txt): the Swiss Shotgun's kick a moment after a shot and once it has eased
+# back; the Cheese Stick's swings on the HUD as its rounds, its last swing, and the pistol drawn once that swing is over.
+# Run with tools/play.ps1 -StartAt 1150,-1450,100,117 -Res 1280x720 (open ground on the shooter level).
+wait 3.5
+cmd CheeseStrikeArm shotgun
+wait 1.2
+shot w17_shotgun_rest
+tap Fire
+wait 0.04
+shot w17_shotgun_kick
+wait 0.6
+shot w17_shotgun_after
+state
+cmd CheeseStrikeArm stick
+wait 1.2
+shot w17_stick_swings
+state
+tap Fire
+wait 1.6
+shot w17_stick_one_spent
+state
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+tap Fire
+wait 1.5
+shot w17_stick_low
+state
+tap Fire
+wait 0.3
+shot w17_stick_last_swing
+state
+wait 1.5
+shot w17_stick_spent
+state
+tap Fire
+wait 0.5
+state
+quit

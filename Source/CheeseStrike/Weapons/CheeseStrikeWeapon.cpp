@@ -1278,7 +1278,7 @@ FString ACheeseStrikeWeapon::DescribeRounds() const
 	{
 		return FString();
 	}
-	if (HasEndlessReserve())
+	if (HasEndlessReserve() || Stats->HasSwings())
 	{
 		return FString::Printf(TEXT("%d"), Magazine);
 	}
@@ -1300,7 +1300,7 @@ bool ACheeseStrikeWeapon::IsReady() const
 	const float Now = ServerTime(GetWorld());
 	return bInHand && !IsDrawing() && !IsReloading() && BurstLeft <= 0
 		&& Now - LastShotAt >= CheeseStrikeWeapons::Cooldown(FiringStats(), LastInBurst) * 0.9f
-		&& (Stats->IsMelee() || Magazine > 0);
+		&& (!Stats->UsesRounds() || Magazine > 0);
 }
 
 bool ACheeseStrikeWeapon::IsDry() const
@@ -1413,6 +1413,12 @@ void ACheeseStrikeWeapon::TryFire(bool bOnTheBeat, float ShowDelay)
 	}
 	if (Stats->IsMelee())
 	{
+		// Wave 17: a weapon of swings (the Cheese Stick) out of them is put away rather than swung.
+		if (IsSpent())
+		{
+			DrawSpent();
+			return;
+		}
 		Strike(Now);
 		return;
 	}
@@ -1506,8 +1512,39 @@ void ACheeseStrikeWeapon::Strike(float Now)
 	LastShotIndex = 0;
 	LastInBurst = 0;
 	++ShotsFired;
+	// A swing spent (the server counts its own, ServerStrike; on the server this is that).
+	if (Stats->HasSwings() && !HasEndlessReserve() && !HasAuthority())
+	{
+		--Magazine;
+	}
 	ShowShot();
 	ServerStrike(Origin, Aim, Now);
+	// The last swing: once it is over (its blow landed, which putting it away sooner would stop), another weapon in hand.
+	if (IsSpent())
+	{
+		GetWorldTimerManager().SetTimer(SpentTimer, this, &ACheeseStrikeWeapon::DrawSpent, CheeseStrikeWeapons::SwipeSecondsOf(*Stats), false);
+	}
+}
+
+bool ACheeseStrikeWeapon::IsSpent() const
+{
+	return Stats->HasSwings() && !HasEndlessReserve() && Magazine <= 0;
+}
+
+void ACheeseStrikeWeapon::DrawSpent()
+{
+	UCheeseStrikeInventory* Inventory = Holder != nullptr ? Holder->GetInventory() : nullptr;
+	if (Inventory == nullptr || !bInHand || !IsSpent() || !Holder->IsLocallyControlled())
+	{
+		return;
+	}
+	const ACheeseStrikeWeapon* Sidearm = Inventory->GetInSlot(EWeaponSlot::Sidearm);
+	EWeaponSlot Slot;
+	if (CheeseStrikeWeapons::DrawWhenSpent(Inventory->CanDraw(EWeaponSlot::Sidearm) && Sidearm != nullptr, Sidearm != nullptr && Sidearm->IsDry(), Inventory->CanDraw(EWeaponSlot::Knife), Slot))
+	{
+		UE_LOG(LogCheeseStrike, Display, TEXT("%s's %s is spent: the %s drawn"), *Holder->GetName(), *Stats->DisplayName.ToString(), Slot == EWeaponSlot::Sidearm ? TEXT("sidearm") : TEXT("knife"));
+		Inventory->Draw(Slot);
+	}
 }
 
 bool ACheeseStrikeWeapon::ServerAllowsShot(float Now)
@@ -1701,6 +1738,11 @@ void ACheeseStrikeWeapon::ServerStrike_Implementation(FVector_NetQuantize Origin
 	}
 	ServerLastStrike = Now;
 	Holder->EndProtection();
+	// A weapon of swings (the Cheese Stick) spends one; ServerAllowsShot refused it if none was left.
+	if (Stats->HasSwings() && !HasEndlessReserve())
+	{
+		--Magazine;
+	}
 	MulticastShot();
 	if (Stats->ArcDegrees > 0.0f)
 	{
@@ -1944,6 +1986,12 @@ void ACheeseStrikeWeapon::AddReserve(int32 Rounds)
 {
 	if (HasAuthority() && Stats->UsesRounds() && !HasEndlessReserve())
 	{
+		// A weapon of swings has no reserve: its swings are topped up (the Cheese Stick's, wave 17).
+		if (Stats->HasSwings())
+		{
+			Magazine = FMath::Clamp(Magazine + Rounds, 0, Stats->MagazineSize);
+			return;
+		}
 		Reserve = FMath::Clamp(Reserve + Rounds, 0, Stats->ReserveMax);
 	}
 }

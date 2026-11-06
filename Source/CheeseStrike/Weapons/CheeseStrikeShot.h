@@ -158,8 +158,14 @@ struct FWeaponStats
 	bool IsProjectile() const { return ProjectileSpeed > 0.0f; }
 	/** Whether it never runs out of rounds to reload with. */
 	bool HasEndlessReserve() const { return Reserve < 0; }
-	/** Whether it fires rounds at all: the knife doesn't. */
+	/** Whether it fires rounds at all: the knife doesn't; the Cheese Stick's swings are its rounds (HasSwings). */
 	bool UsesRounds() const { return MagazineSize > 0; }
+	/**
+	 * A melee weapon with so many swings (the Cheese Stick's, wave 17): its magazine is its swings, with no reserve and no
+	 * reload; a stand's or a dropped one's swings top it up (CheeseStrikePickups::StandRounds), a kill doesn't, and out of
+	 * them it is put away for another weapon (CheeseStrikeWeapons::DrawWhenSpent).
+	 */
+	bool HasSwings() const { return IsMelee() && UsesRounds(); }
 };
 
 namespace CheeseStrikeWeapons
@@ -234,6 +240,11 @@ namespace CheeseStrikeWeapons
 	bool InArc(const FWeaponStats& Weapon, const FVector& Aim, const FVector& ToThem);
 	/** How long a melee weapon's swing is shown (s). */
 	float SwipeSecondsOf(const FWeaponStats& Weapon);
+	/**
+	 * Which weapon is drawn when a weapon of swings (FWeaponStats::HasSwings, the Cheese Stick) has spent its last, once that
+	 * swing is over: the sidearm if it may be drawn and has rounds, else the knife if it may be, else none (false).
+	 */
+	bool DrawWhenSpent(bool bSidearm, bool bSidearmDry, bool bKnife, EWeaponSlot& OutSlot);
 	/**
 	 * Seconds from a melee arc's stroke (the Cheese Stick's) to the moment its head comes round to the aim
 	 * (CheeseStrikeArms::SwipeContactPhase of its swing), when it strikes whoever is in its arc then; 0 for the knife, whose

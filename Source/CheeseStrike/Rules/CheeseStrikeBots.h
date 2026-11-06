@@ -113,7 +113,7 @@ namespace CheeseStrikeBots
 		/** Rounds left in the primary's magazine, and whether there are any more to reload it with. */
 		int32 PrimaryMagazine = 0;
 		bool bPrimaryReserve = false;
-		/** A melee primary (the Cheese Stick) and its reach (cm), which needs no rounds. */
+		/** A melee primary (the Cheese Stick) and its reach (cm); its swings are its magazine (none left and no reserve: spent). */
 		bool bPrimaryMelee = false;
 		float PrimaryReach = 0.0f;
 		/** The nearest the primary is fired at someone (the BabyBomb's, whose burst would hurt the bot; 0 for none). */

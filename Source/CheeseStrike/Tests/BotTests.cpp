@@ -185,6 +185,7 @@ bool FBotChoosesItsWeapons::RunTest(const FString& Parameters)
 	Stick.bKnife = true;
 	Stick.bPrimaryMelee = true;
 	Stick.PrimaryReach = CheeseStrikeWeapons::Stick().Reach;
+	Stick.PrimaryMagazine = CheeseStrikeWeapons::Stick().MagazineSize;
 	TestTrue(TEXT("the stick for someone close, not the knife"), ChooseWeapon(Stick, true, 200.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
 	TestTrue(TEXT("drawn as they come within a few metres"), ChooseWeapon(Stick, true, 400.0f, EWeaponSlot::Sidearm) == EWeaponSlot::Primary);
 	TestTrue(TEXT("kept out as they step back a little"), ChooseWeapon(Stick, true, 600.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
@@ -192,6 +193,14 @@ bool FBotChoosesItsWeapons::RunTest(const FString& Parameters)
 	TestTrue(TEXT("and the stick again after the fight"), ChooseWeapon(Stick, false, 0.0f, EWeaponSlot::Sidearm) == EWeaponSlot::Primary);
 	Stick.bSidearm = false;
 	TestTrue(TEXT("with no pistol, the stick even far off, to close in with"), ChooseWeapon(Stick, true, 2000.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
+	// Wave 17: its swings spent, it is no choice: the knife close, the pistol further.
+	Stick.bSidearm = true;
+	Stick.PrimaryMagazine = 0;
+	TestTrue(TEXT("a spent stick: the knife for someone close"), ChooseWeapon(Stick, true, 150.0f, EWeaponSlot::Primary) == EWeaponSlot::Knife);
+	TestTrue(TEXT("the pistol further off"), ChooseWeapon(Stick, true, 600.0f, EWeaponSlot::Primary) == EWeaponSlot::Sidearm);
+	TestTrue(TEXT("and out of a fight too"), ChooseWeapon(Stick, false, 0.0f, EWeaponSlot::Primary) == EWeaponSlot::Sidearm);
+	Stick.bPrimaryReserve = true;
+	TestTrue(TEXT("endless (Gun Game), still the stick"), ChooseWeapon(Stick, true, 200.0f, EWeaponSlot::Primary) == EWeaponSlot::Primary);
 	// The BabyBomb: the pistol for someone too close for its burst.
 	FArmed Bomb = Armed;
 	Bomb.PrimaryMagazine = 2;

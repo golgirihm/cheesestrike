@@ -712,9 +712,10 @@ void ACheeseStrikeGameMode::Killed(ACheeseStrikeCharacter* Killer, ACheeseStrike
 		{
 			State->AddTeamScore(KillerState->GetTeam(), 1);
 		}
-		// Until there are ammunition crates to go to (docs/unreal/design.md, "Pickups"), a kill brings a magazine's worth, so that nobody runs dry.
+		// Until there are ammunition crates to go to (docs/unreal/design.md, "Pickups"), a kill brings a magazine's worth, so that nobody runs dry;
+		// but not a swing (wave 17: the Cheese Stick's swings, which a kill every blow would never let run out, come only from a stand or the floor).
 		ACheeseStrikeCharacter* KillerBody = Killer != nullptr ? Killer : KillerState->GetPawn<ACheeseStrikeCharacter>();
-		if (ACheeseStrikeWeapon* Weapon = KillerBody != nullptr ? KillerBody->GetWeapon() : nullptr)
+		if (ACheeseStrikeWeapon* Weapon = KillerBody != nullptr ? KillerBody->GetWeapon() : nullptr; Weapon != nullptr && !Weapon->GetStats().HasSwings())
 		{
 			Weapon->AddReserve(Weapon->GetStats().MagazineSize);
 		}
