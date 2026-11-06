@@ -311,27 +311,46 @@ bool FTheGoudaOverloadSlowsTheEnemyAndArmsItsCaller::RunTest(const FString& Para
 	TestFalse(TEXT("nor the dead"), IsSplatted(true, false));
 	TestEqual(TEXT("the warning gives them three seconds"), OverloadWarning, 3.0f);
 
-	// The goo: a quarter of their speed at once, all of it back in a straight line over fifteen seconds.
+	// The goo (wave 17: slower than wave 14's quarter): 15% of their speed at once, held there for the first quarter of
+	// its fifteen seconds, then all of it back in a straight line by the end.
 	const float At = 100.0f;
 	const float Until = At + GooSeconds;
 	TestEqual(TEXT("fifteen seconds of it"), GooSeconds, 15.0f);
 	TestEqual(TEXT("never splatted, full speed"), GooFactor(50.0f, 0.0f, 0.0f), 1.0f);
 	TestEqual(TEXT("a moment before it, on a machine whose clock is behind, as at the splat"), GooFactor(At - 0.1f, At, Until), GooSlowest);
-	TestEqual(TEXT("splatted: a quarter"), GooFactor(At, At, Until), 0.25f);
-	TestTrue(TEXT("halfway: halfway back"), FMath::IsNearlyEqual(GooFactor(At + GooSeconds / 2.0f, At, Until), 0.625f, 0.001f));
-	TestTrue(TEXT("rising steadily"), FMath::IsNearlyEqual(GooFactor(At + 3.0f, At, Until) - GooFactor(At + 2.0f, At, Until), 0.75f / GooSeconds, 0.001f));
+	TestTrue(TEXT("splatted: 15%"), FMath::IsNearlyEqual(GooFactor(At, At, Until), 0.15f));
+	TestTrue(TEXT("still 15% at three seconds"), FMath::IsNearlyEqual(GooFactor(At + 3.0f, At, Until), 0.15f));
+	TestTrue(TEXT("and at the end of the hold (3.75 s)"), FMath::IsNearlyEqual(GooFactor(At + GooSeconds * GooHoldShare, At, Until), 0.15f, 0.001f));
+	TestTrue(TEXT("halfway through the rest, halfway back"), FMath::IsNearlyEqual(GooFactor(At + GooSeconds * (GooHoldShare + 1.0f) / 2.0f, At, Until), 0.575f, 0.001f));
+	TestTrue(TEXT("rising steadily after the hold"), FMath::IsNearlyEqual(GooFactor(At + 8.0f, At, Until) - GooFactor(At + 7.0f, At, Until), 0.85f / (GooSeconds * (1.0f - GooHoldShare)), 0.001f));
 	TestEqual(TEXT("all of it back at the end"), GooFactor(Until, At, Until), 1.0f);
 	TestEqual(TEXT("and after"), GooFactor(Until + 5.0f, At, Until), 1.0f);
-	// No sprint or slide under 60%: the first seven seconds.
+	// Slower than wave 16's goo all the way: the average share of speed over the fifteen seconds, under half (it was 0.625).
+	float Sum = 0.0f;
+	for (int32 Step = 0; Step < 150; ++Step)
+	{
+		Sum += GooFactor(At + (Step + 0.5f) * 0.1f, At, Until);
+	}
+	TestTrue(FString::Printf(TEXT("on average %.2f of their speed over the goo, under half"), Sum / 150.0f), Sum / 150.0f < 0.5f && Sum / 150.0f > 0.4f);
+	// No sprint or slide under 60%: the first 9.7 seconds.
 	TestFalse(TEXT("no sprint just splatted"), MaySprintInGoo(GooFactor(At + 0.5f, At, Until)));
-	TestFalse(TEXT("nor at six seconds"), MaySprintInGoo(GooFactor(At + 6.0f, At, Until)));
-	TestTrue(TEXT("but from seven (60% of the way from a quarter)"), MaySprintInGoo(GooFactor(At + 7.01f, At, Until)));
+	TestFalse(TEXT("nor at nine seconds"), MaySprintInGoo(GooFactor(At + 9.0f, At, Until)));
+	TestTrue(TEXT("but from about ten (60% of the way back from 15%)"), MaySprintInGoo(GooFactor(At + 9.8f, At, Until)));
 	TestTrue(TEXT("and without goo"), MaySprintInGoo(1.0f));
 	// The smear over the view: thick at once, clearing as the goo does.
 	TestEqual(TEXT("the smear thick at the splat"), GooWash(At, At, Until), 1.0f);
 	TestTrue(TEXT("thinner as it goes"), GooWash(At + 10.0f, At, Until) < GooWash(At + 5.0f, At, Until));
 	TestEqual(TEXT("gone with the goo"), GooWash(Until, At, Until), 0.0f);
 	TestEqual(TEXT("none unsplatted"), GooWash(At, 0.0f, 0.0f), 0.0f);
+
+	// Killed and back (or newly come) while the Overload lasts, its thirty seconds from the splat: gouda again as they
+	// arrive, for its fifteen seconds or to the Overload's end; none in its last second, nor after.
+	const float End = At + HasteSeconds;
+	TestEqual(TEXT("back early: the whole goo again"), GooAgainUntil(At + 6.0f, GooSeconds, End), At + 6.0f + GooSeconds);
+	TestEqual(TEXT("back late: to the Overload's end"), GooAgainUntil(At + 25.0f, GooSeconds, End), End);
+	TestEqual(TEXT("shortened for the tests too"), GooAgainUntil(At + 2.0f, 6.0f, At + 6.0f), At + 6.0f);
+	TestEqual(TEXT("none in its last second"), GooAgainUntil(End - 0.5f, GooSeconds, End), 0.0f);
+	TestEqual(TEXT("nor after it"), GooAgainUntil(End + 3.0f, GooSeconds, End), 0.0f);
 
 	// The caller: half as fast again for thirty seconds, and the Gatling for as long.
 	TestEqual(TEXT("the caller runs 1.5 times as fast"), HasteAt(10.0f, 10.0f + HasteSeconds), 1.5f);

@@ -297,7 +297,7 @@ bool FAnEliminationRoundEndsWhenASideIsOut::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("as the next round is coming (in %.1f s)"), GameState(0)->SecondsToNextRound()), GameState(0)->IsRoundBreak() && GameState(0)->SecondsToNextRound() > 0.0f);
 	});
 	WaitUntil(TEXT("the next round"), CheeseStrikeModes::RoundBreak + 3.0f, []() { const ACheeseStrikeGameState* Match = GameState(0); return Match != nullptr && Match->GetRound() == 2; });
-	WaitUntil(TEXT("the host back"), 3.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive(); });
+	WaitUntil(TEXT("the host back and splatted again"), 3.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive() && Host->GetGooUntil() > 0.0f; });
 	Then([this]()
 	{
 		const ACheeseStrikeGameState* Match = GameState(0);
@@ -572,11 +572,12 @@ bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Paramete
 	{
 		const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0));
 		TestTrue(TEXT("the enemy splatted"), Bombs != nullptr && Bombs->GetHits() == 1);
-		TestTrue(TEXT("to a quarter of their speed"), Character(0)->GooFactorNow() < 0.3f);
+		TestTrue(TEXT("to 15% of their speed"), Character(0)->GooFactorNow() < 0.2f);
 		TestEqual(TEXT("not the caller"), CharacterOf(1, 0)->GetGooUntil(), 0.0f);
 	});
 	WaitUntil(TEXT("the joiner's machine seeing the host splatted"), 2.0f, []() { const ACheeseStrikeCharacter* Host = CharacterOf(0, 1); return Host != nullptr && Host->GooFactorNow() < 0.6f; });
-	Play(0, TEXT("hold Sprint\nhold Move 0 1\nwait 0.6"));
+	// (Long enough for a second puddle where they wade: at 15% of their speed they hardly go a step.)
+	Play(0, TEXT("hold Sprint\nhold Move 0 1\nwait 1.3"));
 	Then([this]()
 	{
 		const ACheeseStrikeCharacter* Host = Character(0);
@@ -590,9 +591,38 @@ bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Paramete
 			const ACheeseStrikeCharacter* Seen = CharacterOf(0, Machine);
 			const int32 Near = Goo != nullptr && Seen != nullptr ? Goo->CountNear(Seen->GetActorLocation(), 150.0f) : 0;
 			TestTrue(FString::Printf(TEXT("gouda puddles at the host's feet on machine %d (%d near, %d laid)"), Machine, Near, Goo != nullptr ? Goo->GetLaid() : 0), Near >= 1 && Goo->GetLaid() >= 2);
+			// Thick globs of it, not only a wet floor (wave 17).
+			float Tallest = 0.0f;
+			const int32 Blobs = Goo != nullptr && Seen != nullptr ? Goo->CountBlobsNear(Seen->GetActorLocation(), 150.0f, &Tallest) : 0;
+			TestTrue(FString::Printf(TEXT("globs of gouda at the host's feet on machine %d (%d, the tallest %.1f cm)"), Machine, Blobs, Tallest), Blobs >= 1 && Tallest >= 5.0f);
 		}
 	});
 	Play(0, TEXT("release Move\nrelease Sprint"));
+	// Killed while the Overload lasts, the host comes back splatted again, the gouda at their feet again (wave 17).
+	Then([]() { Mode()->SetRules(Mode()->GetKillLimit(), 1.0f); });
+	Play(0, TEXT("cmd CheeseStrikeDie\nwait 0.3"));
+	WaitUntil(TEXT("the host back and splatted again"), 3.0f, []() { const ACheeseStrikeCharacter* Host = Character(0); return Host != nullptr && Host->IsAlive() && Host->GetGooUntil() > 0.0f; });
+	Then([this]()
+	{
+		const ACheeseStrikeCharacter* Host = Character(0);
+		const ACheeseStrikeBombs* Bombs = First<ACheeseStrikeBombs>(World(0));
+		TestTrue(TEXT("the Overload still on"), Bombs != nullptr && Bombs->GetSplattedAgain() == 1);
+		TestTrue(FString::Printf(TEXT("the host splatted again as they came back (%.2f of their speed)"), Host->GooFactorNow()), Host->GetGooUntil() > 0.0f && Host->GooFactorNow() < 0.3f);
+	});
+	WaitUntil(TEXT("the gouda at the host's feet again, on both machines"), 2.0f, []()
+	{
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			const ACheeseStrikeGooSplats* Goo = ACheeseStrikeGooSplats::Find(World(Machine));
+			const ACheeseStrikeCharacter* Seen = CharacterOf(0, Machine);
+			if (Goo == nullptr || Seen == nullptr || Goo->CountBlobsNear(Seen->GetActorLocation(), 150.0f) < 1)
+			{
+				return false;
+			}
+		}
+		return true;
+	});
+	PutAt(0, HostSpot, HostYaw);
 	// Back to normal: the Gatling gone and the primary back, the haste over, then the gouda.
 	WaitUntil(TEXT("the Gatling spent"), OverloadTest + 1.0f, []() { return HeldId(CharacterOf(1, 0)) == CheeseStrikeWeapons::Blaster().Id; });
 	WaitUntil(TEXT("the primary back on the joiner's machine"), 2.0f, []() { return HeldId(Character(1)) == CheeseStrikeWeapons::Blaster().Id; });

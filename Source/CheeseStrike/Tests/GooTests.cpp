@@ -36,6 +36,15 @@ bool FASlowedFoeLeavesMeltedGoudaUnderfoot::RunTest(const FString& Parameters)
 	TestTrue(TEXT("fading after"), OpacityAt(PuddleStays + PuddleFades * 0.5f) > 0.3f && OpacityAt(PuddleStays + PuddleFades * 0.5f) < 0.7f);
 	TestTrue(TEXT("gone at the end"), OpacityAt(PuddleStays + PuddleFades) == 0.0f && IsGone(PuddleStays + PuddleFades) && !IsGone(PuddleStays));
 	TestTrue(TEXT("gone within ten seconds of being laid"), PuddleStays + PuddleFades <= 10.0f);
+	// Wave 17: each is a glob with volume, as tall as a thick liquid's puddle is for its width: landing as a heap, slumping
+	// as it spreads, melting flat as it fades.
+	const float Wide = FirstRadius / BlobRadius;
+	TestTrue(FString::Printf(TEXT("the first glob stands %.0f cm at its humps once it has spread"), 20.0f * Wide * BlobThick), 20.0f * Wide * BlobThick >= 12.0f && 20.0f * Wide * BlobThick <= 25.0f);
+	TestTrue(TEXT("a heap as it lands"), BlobHeightAt(0.0f) == BlobHeap && BlobHeap > 1.0f);
+	TestTrue(TEXT("slumping as it spreads"), BlobHeightAt(PuddleGrowSeconds * 0.5f) < BlobHeightAt(0.0f) && FMath::IsNearlyEqual(BlobHeightAt(PuddleGrowSeconds), 1.0f));
+	TestEqual(TEXT("its height while it stays"), BlobHeightAt(PuddleStays), 1.0f);
+	TestTrue(TEXT("melting down as it fades"), BlobHeightAt(PuddleStays + PuddleFades * 0.5f) < 0.7f && BlobHeightAt(PuddleStays + PuddleFades) == 0.0f);
+	TestTrue(TEXT("lying in a wet film a little wider than itself"), FilmShare > 1.0f && FilmShare < 1.5f);
 	// Capped: a walk through the whole goo leaves no more than the cap (and the oldest go first past it).
 	const int32 Walk = FMath::CeilToInt32(CheeseStrikeStreaks::GooSeconds / PuddleRenew + 1.0f);
 	TestTrue(FString::Printf(TEXT("a foe standing in it the whole time leaves %d, within the cap"), Walk), Walk <= MostPuddles);

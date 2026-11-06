@@ -252,8 +252,8 @@ public:
 	/** Server only: ends that, as firing, striking with the knife and calling in a streak do; its ghostly look fades from now on every machine. */
 	void EndProtection();
 	/**
-	 * Server only: the Gouda Overload's melted gouda splats it now, until `Until` (the server's time): slowed to a quarter
-	 * of its speed, coming back to all of it by then, no sprint or slide under GooNoSprint (CheeseStrikeStreaks::GooFactor,
+	 * Server only: the Gouda Overload's melted gouda splats it now, until `Until` (the server's time): slowed to GooSlowest
+	 * of its speed, held there a while and coming back to all of it by then, no sprint or slide under GooNoSprint (CheeseStrikeStreaks::GooFactor,
 	 * worked out from the replicated times on every machine, so that its moves agree), and its player's view smeared yellow.
 	 */
 	void Splat(float Until);

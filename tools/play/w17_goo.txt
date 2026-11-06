@@ -1,0 +1,31 @@
+# Wave 17's globs of melted gouda at the feet of the Gouda Overload's slowed
+# foes: on the Practice Range, the host calls in a Gouda Overload on the four
+# dummies and looks low and close at the 5 m one standing still (one glob
+# heaped up and slumping out under it), then at the 10 m one strafing at a
+# walk (a trail of smaller globs), from above and low, and late in the goo.
+# (An enemy splatted again as they come back is checked by
+# CheeseStrike.Play.StreaksAreCalledInAndScoreForTheirCallers.) Run with
+#   tools/play.ps1 -Script tools/play/w17_goo.txt -Map /Game/CheeseStrike/Maps/Lvl_Range -Bots -Extra "?Mode=FreeForAll?Bots=4?BotSkill=dummy?KillLimit=1000" -StartAt -300,-200,100,0 -Res 1600x900
+wait 18
+cmd CheeseStrikeProtect 120
+cmd CheeseStrikeGiveStreak 3
+wait 0.3
+tap Streak
+wait 3.4
+cmd CheeseStrikeViewFrom 330 -800 150 -25 75
+wait 0.3
+shot goo17_1_landing_low
+wait 1.5
+shot goo17_2_still_low
+cmd CheeseStrikeViewFrom 250 -950 330 -38 50
+wait 0.3
+shot goo17_3_still_above
+cmd CheeseStrikeViewFrom 700 -150 200 -25 50
+wait 1
+shot goo17_4_walking_low
+cmd CheeseStrikeViewFrom 650 -250 380 -38 50
+wait 0.5
+shot goo17_5_walking_above
+wait 10
+shot goo17_6_late
+quit

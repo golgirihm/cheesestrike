@@ -133,8 +133,18 @@ namespace CheeseStrikeStreaks
 		{
 			return 1.0f;
 		}
+		// Held at its slowest a while, then back steadily.
 		const float Through = FMath::Clamp((Now - SplatAt) / (GooUntil - SplatAt), 0.0f, 1.0f);
-		return FMath::Lerp(GooSlowest, 1.0f, Through);
+		return FMath::Lerp(GooSlowest, 1.0f, FMath::Clamp((Through - GooHoldShare) / (1.0f - GooHoldShare), 0.0f, 1.0f));
+	}
+
+	float GooAgainUntil(float Now, float GooLength, float OverloadEnd)
+	{
+		if (Now > OverloadEnd - GooAgainLeast)
+		{
+			return 0.0f;
+		}
+		return FMath::Min(Now + GooLength, OverloadEnd);
 	}
 
 	bool MaySprintInGoo(float Factor)
