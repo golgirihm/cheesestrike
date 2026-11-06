@@ -215,7 +215,9 @@ void ACheeseStrikeHUD::DrawStreak(const ACheeseStrikeCharacter* Character)
 	const float GrownRound = Round * Pop;
 	// The number is drawn in a font of the size it is shown at, not a small one scaled up, so that its edges stay smooth: the size
 	// in steps of four pixels (fewer sizes for the font's cache to keep), the rest of the way a slight stretch.
-	const float NumberPixels = 30.0f * U * Pop;
+	// Three figures are drawn smaller, to fit the tile (measured at rest, so that it pops and shrinks as the tile does).
+	const float Fit = CheeseStrikeHUD::StreakCountScale(static_cast<float>(HudDraw::Measure(Number, HudDraw::Font(FMath::RoundToFloat(CheeseStrikeHUD::StreakCountSize * U))).X), Tile);
+	const float NumberPixels = CheeseStrikeHUD::StreakCountSize * U * Pop * Fit;
 	const float FontPixels = Pop > 1.0f ? FMath::Max(1.0f, 4.0f * FMath::RoundToFloat(NumberPixels / 4.0f)) : FMath::RoundToFloat(NumberPixels);
 	const FSlateFontInfo Count = HudDraw::Font(FontPixels);
 	const float Stretch = NumberPixels / FMath::Max(1.0f, static_cast<float>(Count.Size));

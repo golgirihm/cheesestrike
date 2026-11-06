@@ -430,6 +430,15 @@ namespace CheeseStrikeHUD
 	constexpr float StreakPopPeak = 250.0f / 58.0f;
 	/** How big the count and its tile are drawn `Seconds` after a kill (1 at rest, and before 0): StreakPopPeak from the kill, held, eased down to 1 by StreakPopTime. */
 	float StreakPop(float Seconds);
+	/**
+	 * The count in its tile: StreakCountSize high at rest (at a unit's scale), and no wider than StreakCountRoom of the tile; a
+	 * count too wide for that (three figures, a hundred kills at the Practice Range) is drawn smaller to fit (StreakCountScale,
+	 * wave 17: 104 ran over the tile's edges).
+	 */
+	constexpr float StreakCountSize = 30.0f;
+	constexpr float StreakCountRoom = 0.78f;
+	/** How much smaller than StreakCountSize the count is drawn, `Width` wide at that size in a tile `Tile` wide: 1 if it fits, else what makes it fit. */
+	float StreakCountScale(float Width, float Tile);
 	/** The gap left under the grown count's tile, over the kill-streak panel, at its peak (at a unit's scale, as the HUD's sizes are). */
 	constexpr float StreakPopClear = 8.0f;
 	/**

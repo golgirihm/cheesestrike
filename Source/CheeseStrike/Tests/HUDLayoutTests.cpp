@@ -346,3 +346,47 @@ bool FTheVerminWordsComeInBigAndAHitThumpsSoftly::RunTest(const FString& Paramet
 }
 
 #endif
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheStreakCountFitsItsTile, "CheeseStrike.HUD.TheStreakCountFitsItsTile", HUDLayoutTests::Flags)
+
+bool FTheStreakCountFitsItsTile::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeHUD;
+	// The rule: a count that fits is drawn at its size, a wider one smaller to fit.
+	TestEqual(TEXT("a count that fits is its size"), StreakCountScale(20.0f, 58.0f), 1.0f);
+	TestTrue(TEXT("a wider one is made to fit"), FMath::IsNearlyEqual(StreakCountScale(58.0f, 58.0f) * 58.0f, 58.0f * StreakCountRoom, 0.01f));
+	// (The font's hinting makes a smaller size a little wider than its share; the check below allows 2 px for it, and keeps the
+	// number clear of the tile's edges.)
+	// In the HUD's own font, at the tile's own size (ACheeseStrikeHUD::DrawStreak, the panel's height), at 1280 x 720 and 1920 x
+	// 1080: one and two figures at their full size, and three (104 at the Practice Range, wave 17) inside the tile.
+	if (FSlateApplication::IsInitialized() && CheeseStrikeHUDDraw::Measure(TEXT("M"), CheeseStrikeHUDDraw::Font(14.0f)).X > 0.0)
+	{
+		constexpr float PanelHeight = 58.0f;
+		for (const float U : {720.0f / 1080.0f, 1.0f})
+		{
+			const float Tile = PanelHeight * U;
+			const FSlateFontInfo AtRest = CheeseStrikeHUDDraw::Font(FMath::RoundToFloat(StreakCountSize * U));
+			for (const int32 Kills : {7, 42, 104, 999})
+			{
+				const FString Number = FString::FromInt(Kills);
+				const float Width = static_cast<float>(CheeseStrikeHUDDraw::Measure(Number, AtRest).X);
+				const float Scale = StreakCountScale(Width, Tile);
+				// Drawn as DrawStreak draws it: a font of the size shown (rounded) stretched the rest of the way.
+				const float Pixels = StreakCountSize * U * Scale;
+				const FSlateFontInfo Shown = CheeseStrikeHUDDraw::Font(FMath::RoundToFloat(Pixels));
+				const float Drawn = static_cast<float>(CheeseStrikeHUDDraw::Measure(Number, Shown).X) * Pixels / FMath::Max(1.0f, static_cast<float>(Shown.Size));
+				AddInfo(FString::Printf(TEXT("%d at %.0f high: %.1f wide in a tile %.1f wide (scale %.2f)"), Kills, 1080.0f * U, Drawn, Tile, Scale));
+				TestTrue(FString::Printf(TEXT("%d fits its tile at %.0f high (%.1f of %.1f)"), Kills, 1080.0f * U, Drawn, Tile), Drawn <= Tile * StreakCountRoom + 2.0f && Drawn < Tile - 4.0f);
+				if (Kills < 100)
+				{
+					TestEqual(FString::Printf(TEXT("%d is drawn at its full size"), Kills), Scale, 1.0f);
+				}
+			}
+		}
+	}
+	else
+	{
+		AddWarning(TEXT("No font to measure with (no Slate): only the rule was checked"));
+	}
+	return true;
+}
