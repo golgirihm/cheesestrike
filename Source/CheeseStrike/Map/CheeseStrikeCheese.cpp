@@ -3,6 +3,7 @@
 #include "CheeseStrikeCheese.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "PhysicsEngine/BodySetup.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -67,6 +68,38 @@ void ACheeseStrikeCheese::ShowStage()
 	{
 		Mesh->SetCustomPrimitiveDataFloat(0, Stage);
 	}
+}
+
+FBox ACheeseStrikeCheese::GetBlockBox() const
+{
+	if (Mesh == nullptr)
+	{
+		return FBox(ForceInit);
+	}
+	const UStaticMesh* Shown = Mesh->GetStaticMesh();
+	if (LocalBlockBoxOf.Get() != Shown || (Shown == nullptr && LocalBlockBox.IsValid))
+	{
+		LocalBlockBoxOf = Shown;
+		const UBodySetup* Body = Shown != nullptr ? Shown->GetBodySetup() : nullptr;
+		LocalBlockBox = Body != nullptr && Body->AggGeom.GetElementCount() > 0 ? Body->AggGeom.CalcAABB(FTransform::Identity) : FBox(ForceInit);
+	}
+	// No collision of its own (none here): what is drawn.
+	return LocalBlockBox.IsValid ? LocalBlockBox.TransformBy(Mesh->GetComponentTransform()) : Mesh->Bounds.GetBox();
+}
+
+FBox ACheeseStrikeCheese::BoxOf(const UPrimitiveComponent* Component)
+{
+	if (Component == nullptr)
+	{
+		return FBox(ForceInit);
+	}
+	const ACheeseStrikeCheese* Cheese = Cast<ACheeseStrikeCheese>(Component->GetOwner());
+	return Cheese != nullptr && Cheese->Mesh == Component ? Cheese->GetBlockBox() : Component->Bounds.GetBox();
+}
+
+FBox ACheeseStrikeCheese::GetComponentsBoundingBox(bool bNonColliding, bool bIncludeFromChildActors) const
+{
+	return GetBlockBox();
 }
 
 int32 ACheeseStrikeCheese::CountEdible(const UWorld* World)
@@ -173,7 +206,7 @@ bool ACheeseStrikeCheese::IsHeld(FString* Why) const
 		{
 			continue;
 		}
-		const FBox Bounds = Component->Bounds.GetBox();
+		const FBox Bounds = BoxOf(Component);
 		// Its top at this one's bottom: something beside it, reaching lower, doesn't hold it.
 		if (Bounds.Max.Z > Box.Min.Z + Resting)
 		{
@@ -356,11 +389,11 @@ void ACheeseStrikeCheese::Tick(float DeltaSeconds)
 			continue;
 		}
 		// Coming down onto this: what else it would be on there, the tops within Resting of this one's.
-		const float Top = Hits[First].GetComponent()->Bounds.GetBox().Max.Z;
+		const float Top = BoxOf(Hits[First].GetComponent()).Max.Z;
 		TArray<FBox2D> Contacts;
 		for (const FHitResult& Each : Hits)
 		{
-			const FBox Bounds = Holds(Each.GetComponent()) ? Each.GetComponent()->Bounds.GetBox() : FBox(ForceInit);
+			const FBox Bounds = Holds(Each.GetComponent()) ? BoxOf(Each.GetComponent()) : FBox(ForceInit);
 			if (Bounds.IsValid && FMath::Abs(Bounds.Max.Z - Top) < Resting)
 			{
 				Contacts.Add(FBox2D(FVector2D(Bounds.Min.X, Bounds.Min.Y), FVector2D(Bounds.Max.X, Bounds.Max.Y)));

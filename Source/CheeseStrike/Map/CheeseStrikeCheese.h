@@ -6,7 +6,9 @@
 #include "GameFramework/Actor.h"
 #include "CheeseStrikeCheese.generated.h"
 
+class UStaticMesh;
 class UStaticMeshComponent;
+class UPrimitiveComponent;
 
 /**
  * One block of cheese in a map: cover, and what the mice eat
@@ -54,6 +56,17 @@ public:
 	/** The blocks in `World` that nothing under them holds up, and that aren't falling (the console's CheeseStrikeUnheld lists them). */
 	static TArray<ACheeseStrikeCheese*> Unheld(const UWorld* World);
 
+	/**
+	 * The block's box: its collision, where it is now, not what is drawn. A rounded block's mesh stands 2 cm proud of
+	 * its collision on every face (tools/art/block_mesh.py), and its bounds are the mesh's, so that the renderer culls
+	 * it by what it draws; what rests on what, the mice's holds and what hangs near what are measured by this box.
+	 */
+	FBox GetBlockBox() const;
+	/** `Component`'s box as the cheese measures it: a block's GetBlockBox, anything else's bounds. */
+	static FBox BoxOf(const UPrimitiveComponent* Component);
+	/** The block's box (GetBlockBox), whatever is asked: a block has its mesh and nothing else. */
+	virtual FBox GetComponentsBoundingBox(bool bNonColliding = false, bool bIncludeFromChildActors = false) const override;
+
 	/** Server only: takes `Amount` of eating out of it; at none, it is gone, and what rested on it falls. */
 	void Bite(float Amount);
 
@@ -93,4 +106,8 @@ protected:
 	uint8 Stage = 0;
 	bool bFalling = false;
 	float FallSpeed = 0.0f;
+
+	/** The collision's box in the mesh's own space, and the mesh it was read from (GetBlockBox). */
+	mutable FBox LocalBlockBox = FBox(ForceInit);
+	mutable TWeakObjectPtr<const UStaticMesh> LocalBlockBoxOf;
 };
