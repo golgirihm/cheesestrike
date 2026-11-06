@@ -153,11 +153,12 @@ namespace
 			Look.Muzzle = FVector(0.0f, 48.0f, 3.0f);
 			Look.FlashSize = 1.5f;
 			Look.LeftHand = FVector(0.0f, 40.0f, 0.8f);
-			// Real shotgun blasts (OpenGameArt, CC0), not Lyra's, with a thump of 60-120 Hz laid under each crack and a
-			// longer rumbling tail (tools/art/wave15_sounds.py).
-			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBoom1.SW_ShotgunBoom1");
-			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBoom2.SW_ShotgunBoom2");
-			Look.Shots[2] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBoom3.SW_ShotgunBoom3");
+			// Real pump shotguns' blasts (OpenGameArt, CC0), not Lyra's, made big and boomy as the Roquefort's report is (wave
+			// 17, tools/art/wave17_sounds.py): a sub punch and a thump under each crack, a body of low-mid noise, a rumble and
+			// two far echoes in a 3 s tail.
+			Look.Shots[0] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBlast1.SW_ShotgunBlast1");
+			Look.Shots[1] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBlast2.SW_ShotgunBlast2");
+			Look.Shots[2] = TEXT("/Game/OpenGameArt/Shotgun/SW_ShotgunBlast3.SW_ShotgunBlast3");
 			Look.DryFire = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_DryFire_01.Weapons_Shotgun_DryFire_01");
 			Look.ReloadSounds[0] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_ClipOut_01.Weapons_Shotgun_ClipOut_01");
 			Look.ReloadSounds[1] = TEXT("/Game/Audio/Sounds/Weapons/Shotgun/Weapons_Shotgun_ClipIn_01.Weapons_Shotgun_ClipIn_01");
@@ -310,12 +311,12 @@ namespace
 			Look.Materials[1] = Material(TEXT("MI_KnifeWax"));
 			Look.FlashSize = 0.0f;
 			// A heavy, slow whoosh for its swing (about 350 ms of body, for the slower stroke, tools/art/wave15_sounds.py), in
-			// place of the knife's; and (wave 16) a deep, heavy pound as its blow lands on someone, heard by everyone from there
-			// (tools/art/wave16_sounds.py).
+			// place of the knife's; and as its blow lands on someone, heard by everyone from there, a loud, intense "thock", a
+			// hard wooden smack over a body thump (wave 17, tools/art/wave17_sounds.py; wave 16's deep pound was too soft).
 			Look.Shots[0] = Sound(TEXT("SW_StickSwing1"));
 			Look.Shots[1] = Sound(TEXT("SW_StickSwing2"));
 			Look.Shots[2] = Sound(TEXT("SW_StickSwing3"));
-			Look.StrikeSound = Sound(TEXT("SW_StickPound"));
+			Look.StrikeSound = Sound(TEXT("SW_StickThock"));
 			Look.ShotVolume = 1.0f;
 			Look.ShotPitch = 1.0f;
 			Looks.Add(Look);
