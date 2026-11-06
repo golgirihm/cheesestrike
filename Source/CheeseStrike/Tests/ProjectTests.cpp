@@ -22,6 +22,7 @@
 #include "Settings/CheeseStrikeSettings.h"
 #include "Sound/SoundClass.h"
 #include "Rules/CheeseStrikeRules.h"
+#include "Dev/CheeseStrikeLoadWatch.h"
 #include "UObject/Linker.h"
 #include "UObject/LinkerLoad.h"
 #include "UObject/ObjectResource.h"
@@ -31,6 +32,25 @@
 namespace ProjectTests
 {
 	constexpr EAutomationTestFlags Flags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheCoverWaitsForTheRendererToWarmUp, "CheeseStrike.Project.TheCoverWaitsForTheRendererToWarmUp", ProjectTests::Flags)
+
+bool FTheCoverWaitsForTheRendererToWarmUp::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeLoadWatch;
+	// A first load compiles the pipeline states the renderer precaches for the level's materials, at a few frames a
+	// second: the loading cover stays over it, and the match waits for it, but never for ever.
+	TestFalse(TEXT("pipeline states compiling just after a load: the cover stays"), IsWarm(120, 1.0f));
+	TestFalse(TEXT("a few still compiling a while later: it stays"), IsWarm(3, MostWarmingSeconds - 1.0f));
+	TestTrue(TEXT("none compiling: it lifts at once"), IsWarm(0, 0.0f));
+	TestTrue(TEXT("still compiling after the longest wait: it lifts anyway"), IsWarm(40, MostWarmingSeconds));
+	TestTrue(TEXT("the longest wait is well inside the cover's own"), MostWarmingSeconds > 5.0f && MostWarmingSeconds < 30.0f);
+	TestEqual(TEXT("a second's frames as the log says them"), DescribeSecond({0.1f, 0.1f, 0.3f}), FString(TEXT("6 fps (mean 167 ms, worst 300 ms)")));
+	bool bSlow = false;
+	DescribeSecond({0.1f, 0.1f, 0.3f}, &bSlow);
+	TestTrue(TEXT("and slow"), bSlow);
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FOpensOnTheShooterLevel, "CheeseStrike.Project.OpensOnTheShooterLevel", ProjectTests::Flags)
