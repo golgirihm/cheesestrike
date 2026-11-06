@@ -15,6 +15,7 @@
 #include "CheeseStrikeGameMode.h"
 #include "Misc/App.h"
 #include "Misc/ConfigCacheIni.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "UI/CheeseStrikeCredits.h"
@@ -222,6 +223,23 @@ bool FTheSoundPlaysOnWithoutFocus::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Config/DefaultEngine.ini sets the unfocused volume"), File.GetFloat(TEXT("Audio"), TEXT("UnfocusedVolumeMultiplier"), Multiplier));
 	TestEqual(TEXT("to full"), Multiplier, 1.0f);
 	TestEqual(TEXT("and the engine has it so"), FApp::GetUnfocusedVolumeMultiplier(), 1.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNoAsyncCompute, "CheeseStrike.Project.NoAsyncCompute", ProjectTests::Flags)
+
+bool FNoAsyncCompute::RunTest(const FString& Parameters)
+{
+	// The GPU faulted in the virtual shadow maps' passes while Lumen ran beside them on the async compute queue (DefaultEngine.ini
+	// says how), so the game runs every pass on the graphics queue, and Nanite streams into ordinary buffers.
+	FConfigFile File;
+	File.Read(FPaths::ProjectConfigDir() / TEXT("DefaultEngine.ini"));
+	int32 Async = -1;
+	TestTrue(TEXT("Config/DefaultEngine.ini turns async compute off"), File.GetInt(TEXT("SystemSettings"), TEXT("r.RDG.AsyncCompute"), Async) && Async == 0);
+	int32 Reserved = -1;
+	TestTrue(TEXT("and Nanite's reserved resources"), File.GetInt(TEXT("SystemSettings"), TEXT("r.Nanite.Streaming.ReservedResources"), Reserved) && Reserved == 0);
+	const IConsoleVariable* Variable = IConsoleManager::Get().FindConsoleVariable(TEXT("r.RDG.AsyncCompute"));
+	TestTrue(TEXT("and the engine has it so"), Variable != nullptr && Variable->GetInt() == 0);
 	return true;
 }
 
