@@ -1,16 +1,17 @@
 """Renders the game's spinner: a 3D wedge of cheese with rounded corners
-turning about its vertical axis, from left to right, as a loop of 48 frames
-(one turn), 64 x 64 pixels each (or as big as asked) on a clear background, lit as the countdown's
+turning about its vertical axis, from left to right, as a loop of 72 frames
+(one turn, 5 degrees a frame), 64 x 64 pixels each (or as big as asked) on a clear background, lit as the countdown's
 glyphs are (tools/art/countdown_glyphs.py: a warm key from the upper left, a
 cool fill, a rim from behind). Cheese gold, with the wheel's rind along the
 wedge's outer edge, a few holes in its cut faces. Run by Blender, headless:
 
     blender.exe -b --factory-startup -P tools/art/spinner_frames.py -- <out folder> [size]
 
-It writes spinner_00.png to spinner_47.png into the folder (Content/UI/Spinner
+It writes spinner_00.png to spinner_71.png into the folder (Content/UI/Spinner
 by default, next to this repository's root), where the game reads them as
-files (UI/CheeseStrikeLoader.cpp: SCheeseStrikeLoader shows them at 24 a
-second, the menu's spinners and the post-game wait), and spinner_frames.txt
+files (UI/CheeseStrikeLoader.cpp: SCheeseStrikeLoader shows them at 36 a
+second, each blended into the next by the clock so that the turn is smooth at
+any frame rate; the menu's spinners and the post-game wait), and spinner_frames.txt
 saying what it did. The loading screen's big spinner, a fifth of the screen's
 height, is the same loop rendered at 320 pixels into Content/UI/Spinner/Large
 (`-- Content/UI/Spinner/Large 320`), so that it is sharp.
@@ -25,7 +26,7 @@ import bpy
 import bmesh
 from mathutils import Matrix, Vector
 
-FRAMES = 48
+FRAMES = 72
 SIZE = 64
 # The wedge: a sector of a wheel this wide (degrees), of this radius and height (Blender units), its corners rounded this much.
 ANGLE = 58.0

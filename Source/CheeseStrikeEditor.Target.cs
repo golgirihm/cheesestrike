@@ -11,6 +11,7 @@ public class CheeseStrikeEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 		ExtraModuleNames.Add("CheeseStrike");
+		ExtraModuleNames.Add("CheeseStrikeStartup");
 
 		// Unreal 5.8 builds with the 14.50 compiler; 14.51, which a Visual Studio
 		// update brings in, breaks the engine's headers (a removed hash_map).

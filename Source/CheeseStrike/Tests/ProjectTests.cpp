@@ -17,9 +17,12 @@
 #include "Misc/ConfigCacheIni.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/FileHelper.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 #include "Misc/Paths.h"
 #include "UI/CheeseStrikeCredits.h"
-#include "UI/CheeseStrikeLoader.h"
+#include "CheeseStrikeLoader.h"
 #include "Settings/CheeseStrikeSettings.h"
 #include "Sound/SoundClass.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -247,19 +250,31 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTheSpinnerIsACheeseWedge, "CheeseStrike.Projec
 
 bool FTheSpinnerIsACheeseWedge::RunTest(const FString& Parameters)
 {
-	// The spinner's frames (tools/art/spinner_frames.py): a loop of 48 PNGs of 64 x 64 in Content/UI/Spinner, read as files so
-	// that the loading screen can draw them before any asset is loaded, shown at 24 a second; and the same loop at 320 x 320
+	// The spinner's frames (tools/art/spinner_frames.py): a loop of 72 PNGs of 64 x 64 in Content/UI/Spinner, read as files so
+	// that the loading screen can draw them before any asset is loaded, shown at 36 a second, each blended into the next; and the same loop at 320 x 320
 	// in Spinner/Large for the loading screen's big spinner, a fifth of the screen's height (of the cover's 1080 units).
 	using namespace CheeseStrikeLoader;
 	TestTrue(TEXT("the loading screen's spinner is about a fifth of the screen's height (of the cover's 1080 units)"), LargeRadius * 2.0f >= 1080.0f * 0.2f && LargeRadius * 2.0f <= 1080.0f * 0.25f);
 	TestTrue(TEXT("drawn from frames at least as big as it is drawn at 1080p"), LargeFrameSize >= LargeRadius * 2.0f * DrawnOver);
-	TestEqual(TEXT("a loop of 48 frames"), Frames, 48);
-	TestEqual(TEXT("at 24 a second"), FramesPerSecond, 24);
+	TestEqual(TEXT("a loop of 72 frames"), Frames, 72);
+	TestEqual(TEXT("at 36 a second"), FramesPerSecond, 36);
 	TestEqual(TEXT("the first frame at the start"), FrameAt(0.0), 0);
-	TestEqual(TEXT("the next a 24th of a second on"), FrameAt(1.0 / 24.0 + 0.001), 1);
+	TestEqual(TEXT("the next a 36th of a second on"), FrameAt(1.0 / 36.0 + 0.001), 1);
 	TestEqual(TEXT("round in two seconds"), FrameAt(2.0 + 0.001), 0);
-	TestEqual(TEXT("never past the loop"), FrameAt(1.999), 47);
+	TestEqual(TEXT("never past the loop"), FrameAt(1.999), 71);
 	TestTrue(TEXT("never back"), FrameAt(-0.5) >= 0 && FrameAt(-0.5) < Frames);
+	TestTrue(TEXT("halfway between two frames, the next is drawn half over it"), FMath::IsNearlyEqual(FrameBlendAt(0.5 / 36.0), 0.5f, 0.01f));
+	// Smooth: drawn at 58 frames a second (what the loading screen's thread draws, by the log's count), the turn moves on by
+	// the same small step every frame, about 3.1 degrees, never standing still for a frame and then jumping (48 frames at 24 a
+	// second moved 0 or 7.5 degrees from one frame drawn to the next).
+	double Least = 360.0, Most = 0.0;
+	for (int32 Drawn = 1; Drawn < 200; ++Drawn)
+	{
+		const double Step = FMath::Fmod(TurnAt(Drawn / 58.0) - TurnAt((Drawn - 1) / 58.0) + 360.0, 360.0);
+		Least = FMath::Min(Least, Step);
+		Most = FMath::Max(Most, Step);
+	}
+	TestTrue(FString::Printf(TEXT("each frame drawn turns it by the same step (%.2f to %.2f degrees)"), Least, Most), Most - Least < 0.01 && Least > 3.0 && Most < 3.2);
 	for (const bool bLarge : {false, true})
 	{
 		const int32 Size = bLarge ? LargeFrameSize : FrameSize;

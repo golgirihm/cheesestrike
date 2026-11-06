@@ -2,6 +2,7 @@
 
 #include "CheeseStrikeCurtain.h"
 #include "CheeseStrikeLoader.h"
+#include "CheeseStrikeCover.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWindow.h"
 #include "Brushes/SlateDynamicImageBrush.h"
@@ -11,7 +12,6 @@
 #include "Misc/Paths.h"
 #include "MoviePlayer.h"
 #include "Widgets/SLeafWidget.h"
-#include <atomic>
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectGlobals.h"
 #include "Widgets/Images/SImage.h"
@@ -34,12 +34,6 @@ namespace
 {
 	/** Over everything, the menu (100) included. */
 	constexpr int32 CurtainOrder = 1000;
-
-	const FSlateBrush* Tile()
-	{
-		static FSlateDynamicImageBrush Brush(FName(*(FPaths::ProjectContentDir() / TEXT("UI") / TEXT("lobby_tile.png"))), FVector2D(512.0, 512.0), FLinearColor::White, ESlateBrushTileType::Both);
-		return &Brush;
-	}
 
 	/** The scale the game's UI is drawn at in `Viewport` (the DPI curve at its size), which the cover is drawn at too. */
 	float ViewportScale(const UGameViewportClient* Viewport)
@@ -71,62 +65,9 @@ namespace
 		return FSlateApplication::Get().GetApplicationScale() * Window * ViewportScale(Viewport);
 	}
 
-	/** How many times the loading screen has been drawn, on its own thread, since it went up: for the log. */
-	std::atomic<int32> LoadingScreenFrames{0};
-
-	/** Draws nothing; counts the frames it is drawn in (LoadingScreenFrames). */
-	class SCheeseStrikeFrameCounter : public SLeafWidget
-	{
-	public:
-		SLATE_BEGIN_ARGS(SCheeseStrikeFrameCounter) {}
-		SLATE_END_ARGS()
-		void Construct(const FArguments&) {}
-		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D::ZeroVector; }
-		virtual int32 OnPaint(const FPaintArgs&, const FGeometry&, const FSlateRect&, FSlateWindowElementList&, int32 LayerId, const FWidgetStyle&, bool) const override
-		{
-			++LoadingScreenFrames;
-			return LayerId;
-		}
-	};
-
-	/**
-	 * The cover's looks: the lobby's dark tile, the big spinner (the cheese
-	 * wedge turning, a fifth of the screen's height, from the large frames)
-	 * in the middle and `Saying` under it. Made of Slate alone, nothing of the
-	 * game, so that the loading screen can draw it on its own thread while
-	 * the game's is busy loading a level.
-	 */
 	TSharedRef<SWidget> MakeCover(const TAttribute<FText>& Saying, float Target, bool bCountFrames = false)
 	{
-		// The words under the spinner, and as much room again over it, so that the spinner is in the screen's middle.
-		constexpr float WordsGap = 26.0f;
-		constexpr float WordsHigh = 34.0f;
-		return SNew(SOverlay)
-			+ SOverlay::Slot() [ bCountFrames ? StaticCastSharedRef<SWidget>(SNew(SCheeseStrikeFrameCounter)) : SNullWidget::NullWidget ]
-			+ SOverlay::Slot()
-			[
-				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.04f, 0.04f, 0.045f, 1.0f))
-			]
-			+ SOverlay::Slot() [ SNew(SImage).Image(Tile()) ]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-			[
-				SNew(SCheeseStrikeSteadyScale).Target(Target)
-				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight() [ SNew(SBox).HeightOverride(WordsGap + WordsHigh) ]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
-					[
-						SNew(SCheeseStrikeLoader).Radius(CheeseStrikeLoader::LargeRadius).Large(true)
-					]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(FMargin(0.0f, WordsGap, 0.0f, 0.0f))
-					[
-						SNew(SBox).HeightOverride(WordsHigh).VAlign(VAlign_Center)
-						[
-							SNew(STextBlock).Text(Saying).Font(FCoreStyle::GetDefaultFontStyle(FName("Bold"), 22)).ColorAndOpacity(FLinearColor(0.92f, 0.9f, 0.86f))
-						]
-					]
-				]
-			];
+		return CheeseStrikeCover::Make(Saying, Target, bCountFrames);
 	}
 }
 
@@ -194,7 +135,14 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoading(const FWorldContext& Context,
 	Screen.bWaitForManualStop = false;
 	Screen.MinimumLoadingScreenDisplayTime = -1.0f;
 	Screen.WidgetLoadingScreen = MakeCover(FText::FromString(LoadingTo), CoverScale, true);
-	LoadingScreenFrames = 0;
+	// The startup cover (CheeseStrikeStartup) is up as the game's first level begins to load: how much it was drawn so far.
+	static bool bToldStartupFrames = false;
+	if (!bToldStartupFrames && CheeseStrikeCover::StartupCoverSince() > 0.0)
+	{
+		bToldStartupFrames = true;
+		UE_LOG(LogCheeseStrike, Display, TEXT("The startup cover was drawn %d times over the %.1f s before the first level began to load"), CheeseStrikeCover::FramesDrawn(), FPlatformTime::Seconds() - CheeseStrikeCover::StartupCoverSince());
+	}
+	CheeseStrikeCover::ResetFramesDrawn();
 	LoadingSince = FPlatformTime::Seconds();
 	GetMoviePlayer()->SetupLoadingScreen(Screen);
 	UE_LOG(LogCheeseStrike, Display, TEXT("The loading screen is up: %s"), *LoadingTo);
@@ -255,7 +203,14 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 	Lift();
 	if (!LoadingTo.IsEmpty() && LoadingSince > 0.0)
 	{
-		UE_LOG(LogCheeseStrike, Display, TEXT("The loading screen was drawn %d times over the %.1f s the level took to load"), LoadingScreenFrames.load(), FPlatformTime::Seconds() - LoadingSince);
+		UE_LOG(LogCheeseStrike, Display, TEXT("The loading screen was drawn %d times over the %.1f s the level took to load"), CheeseStrikeCover::FramesDrawn(), FPlatformTime::Seconds() - LoadingSince);
+	}
+	// The startup cover (the CheeseStrikeStartup module's) has been up since the window was made, the first level's load included.
+	static bool bToldStartup = false;
+	if (!bToldStartup && CheeseStrikeCover::StartupCoverSince() > 0.0)
+	{
+		bToldStartup = true;
+		UE_LOG(LogCheeseStrike, Display, TEXT("The startup cover was up %.1f s before the first level had loaded"), FPlatformTime::Seconds() - CheeseStrikeCover::StartupCoverSince());
 	}
 	// Where to (as the loading screen said it, if there was one), then, on a level the lobby sent everyone to, how many are ready.
 	const FString Where = !LoadingTo.IsEmpty() ? LoadingTo : WhereTo(World->GetOutermost()->GetName(), nullptr);
