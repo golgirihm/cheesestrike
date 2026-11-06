@@ -277,6 +277,27 @@ namespace CheeseStrikeMenu
 }
 
 /**
+ * A box that takes every click on it (a press, a release, a double click, the wheel) that nothing inside it took: the
+ * friends panel's, so that nothing under the panel (the lobby's seats) ever gets one. It stays while what is in it is drawn
+ * again: in the frame after a section is folded, the new content isn't yet in Slate's hit test (made as the frame is
+ * drawn), the old content's widgets are gone, and a click there fell through to whatever was under the panel (wave 17).
+ */
+class SCheeseStrikeClickCatcher : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SCheeseStrikeClickCatcher) {}
+		SLATE_DEFAULT_SLOT(FArguments, Content)
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs);
+	void SetContent(TSharedRef<SWidget> InContent);
+	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	virtual FReply OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+};
+
+/**
  * The menu, drawn with Slate in code, over the level seen from the menu
  * camera: the game's name at the top and a dark panel on the left with the
  * page's choices as buttons, or the lobby across the whole view with the
@@ -650,8 +671,17 @@ private:
 	 * collapse, and the tall content stays until the panel is shut, when it folds to its tile.
 	 */
 	TSharedPtr<SBox> FriendsBox;
+	/** In FriendsBox, filling it: takes every click on the panel that nothing in it took (SCheeseStrikeClickCatcher). */
+	TSharedPtr<SCheeseStrikeClickCatcher> FriendsCatcher;
 	TSharedPtr<SBox> FriendsContent;
 	TSharedPtr<SWidget> FriendsInside;
+	/**
+	 * The open panel's scrolling list, its bar in the panel's right margin (CheeseStrikeFriends::ScrollBarGap), so that the
+	 * list never narrows for it; the next drawing of the panel (a section folded, the party's permission picked) is
+	 * scrolled where this one was. (Weak: kept, the list would stay in Slate's hit test while the tile is shown, under
+	 * parents that are gone, and a click there would reach nothing.)
+	 */
+	TWeakPtr<SScrollBox> FriendsScroll;
 	FCurveSequence FriendsCurve;
 	bool bFriendsClickedOpen = false;
 	bool bFriendsWantOpen = false;

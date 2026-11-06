@@ -312,4 +312,22 @@ namespace CheeseStrikeFriends
 		const float Along = FMath::Clamp(Since / RefreshSpinSeconds, 0.0f, 1.0f);
 		return 360.0f * (1.0f - FMath::Square(1.0f - Along));
 	}
+
+	ETooltipStep TooltipStep(bool bShown, bool bHovered, bool bSameAsShown, double SinceChange, double SinceHidden, float Delay)
+	{
+		if (!bHovered)
+		{
+			// Left for a gap between rows: the card waits a moment for the next.
+			return bShown ? (SinceChange < TooltipLinger ? ETooltipStep::Keep : ETooltipStep::Hide) : ETooltipStep::None;
+		}
+		if (bShown)
+		{
+			return bSameAsShown ? ETooltipStep::Keep : ETooltipStep::Swap;
+		}
+		if (SinceHidden < Delay)
+		{
+			return ETooltipStep::Swap;
+		}
+		return SinceChange >= Delay ? ETooltipStep::FadeIn : ETooltipStep::None;
+	}
 }

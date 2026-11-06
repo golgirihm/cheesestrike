@@ -25,6 +25,7 @@
 #include "Widgets/Layout/SBackgroundBlur.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SScrollBar.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/SBoxPanel.h"
@@ -1089,7 +1090,12 @@ void SCheeseStrikeMenu::Construct(const FArguments& InArgs)
 				SAssignNew(FriendsBox, SBox).WidthOverride(this, &SCheeseStrikeMenu::FriendsWidthNow).HeightOverride(this, &SCheeseStrikeMenu::FriendsHeightNow)
 				.Visibility(EVisibility::Collapsed).Clipping(EWidgetClipping::ClipToBounds)
 				[
-					SAssignNew(FriendsContent, SBox)
+					// Every click on the panel is the panel's, its margins and the gaps between its rows too, and in the frame
+					// after it is drawn again (SCheeseStrikeClickCatcher): none reaches the lobby under it.
+					SAssignNew(FriendsCatcher, SCheeseStrikeClickCatcher)
+					[
+						SAssignNew(FriendsContent, SBox)
+					]
 				]
 			]
 		]
@@ -1613,11 +1619,17 @@ void SCheeseStrikeMenu::UpdateTooltip()
 		TooltipHoveredWidget = HoveredWidget;
 		TooltipHoveredAt = Now;
 	}
-	// Shown after a moment's rest on the widget, or at once from one tooltip to the next; put beside the mouse, kept
-	// within the view (left of the mouse if there is no room right of it, above it if none below); for one held up for
-	// looking at, under its widget's left end.
-	const bool bShow = HoveredWidget.IsValid() && (Forced > 0 || Now - TooltipHoveredAt >= CheeseStrikeMenu::TooltipDelay || Now - TooltipHiddenAt < CheeseStrikeMenu::TooltipDelay);
-	if (!bShow)
+	// Shown after a moment's rest on the widget, or at once from one tooltip to the next, the card up replaced in place (no
+	// fade, no frame without it), and kept a moment over a gap between two (CheeseStrikeFriends::TooltipStep); put beside
+	// the mouse, kept within the view (left of the mouse if there is no room right of it, above it if none below); for one
+	// held up for looking at, under its widget's left end.
+	using CheeseStrikeFriends::ETooltipStep;
+	const bool bHoveredAny = HoveredWidget.IsValid();
+	const ETooltipStep Step = Forced > 0 && bHoveredAny
+		? (bTooltipShown && TooltipShownFor.Pin() == HoveredWidget ? ETooltipStep::Keep : ETooltipStep::Swap)
+		: CheeseStrikeFriends::TooltipStep(bTooltipShown, bHoveredAny, bHoveredAny && TooltipShownFor.Pin() == HoveredWidget,
+			Now - TooltipHoveredAt, Now - TooltipHiddenAt, CheeseStrikeMenu::TooltipDelay);
+	if (Step == ETooltipStep::None || Step == ETooltipStep::Hide)
 	{
 		if (bTooltipShown)
 		{
@@ -1630,20 +1642,24 @@ void SCheeseStrikeMenu::UpdateTooltip()
 		return;
 	}
 	const FGeometry& Mine = GetCachedGeometry();
-	if (!bTooltipShown || TooltipShownFor.Pin() != HoveredWidget)
+	if (Step == ETooltipStep::FadeIn || Step == ETooltipStep::Swap)
 	{
 		TooltipShownFor = HoveredWidget;
 		bTooltipShown = true;
 		TooltipCard = Hovered->Make ? Hovered->Make() : MakeTooltip(Hovered->Text, Hovered->Title);
-		TooltipBox->SetContent(MenuFadeIn(TooltipCard.ToSharedRef()));
+		TooltipBox->SetContent(Step == ETooltipStep::FadeIn ? MenuFadeIn(TooltipCard.ToSharedRef()) : TooltipCard.ToSharedRef());
 		// Measured now, so that it is put right from its first frame.
 		TooltipCard->SlatePrepass(Mine.Scale);
+	}
+	if (!TooltipCard.IsValid())
+	{
+		return;
 	}
 	// (The card's own size: the box's includes the padding that places it.)
 	const FVector2D Room = Mine.GetLocalSize();
 	const FVector2D Wants = TooltipCard->GetDesiredSize();
 	FVector2D At;
-	if (Forced > 0)
+	if (Forced > 0 && HoveredWidget.IsValid())
 	{
 		const FGeometry& Owner = HoveredWidget->GetCachedGeometry();
 		At = Mine.AbsoluteToLocal(Owner.GetAbsolutePosition()) + FVector2D(0.0, Owner.GetLocalSize().Y + 4.0);
@@ -1664,6 +1680,36 @@ void SCheeseStrikeMenu::UpdateTooltip()
 	At.X = FMath::Clamp(At.X, 0.0, FMath::Max(0.0, Room.X - Wants.X));
 	At.Y = FMath::Clamp(At.Y, 0.0, FMath::Max(0.0, Room.Y - Wants.Y));
 	TooltipBox->SetPadding(FMargin(static_cast<float>(At.X), static_cast<float>(At.Y), 0.0f, 0.0f));
+}
+
+void SCheeseStrikeClickCatcher::Construct(const FArguments& InArgs)
+{
+	ChildSlot [ InArgs._Content.Widget ];
+}
+
+void SCheeseStrikeClickCatcher::SetContent(TSharedRef<SWidget> InContent)
+{
+	ChildSlot [ InContent ];
+}
+
+FReply SCheeseStrikeClickCatcher::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return FReply::Handled();
+}
+
+FReply SCheeseStrikeClickCatcher::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return FReply::Handled();
+}
+
+FReply SCheeseStrikeClickCatcher::OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return FReply::Handled();
+}
+
+FReply SCheeseStrikeClickCatcher::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	return FReply::Handled();
 }
 
 int32 SCheeseStrikeMenu::UserIndex() const
@@ -2805,6 +2851,14 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 	{
 		Friends->AddSlot().AutoHeight() [ MakeLine(TEXT("No online service"), true, false) ];
 	}
+	// The list scrolled where the last one was. (A new box: one kept from the last drawing would be in Slate's hit test, in
+	// the frame before this one is drawn, under parents that are gone, and a click there would reach nothing at all.)
+	const TSharedPtr<SScrollBox> LastScroll = FriendsScroll.Pin();
+	const float WasScrolled = LastScroll.IsValid() ? LastScroll->GetScrollOffset() : 0.0f;
+	const TSharedRef<SScrollBar> Bar = SNew(SScrollBar).Thickness(FVector2D(CheeseStrikeFriends::ScrollBarThickness, CheeseStrikeFriends::ScrollBarThickness)).Padding(0.0f);
+	const TSharedRef<SScrollBox> Scroll = SNew(SScrollBox).ExternalScrollbar(Bar) + SScrollBox::Slot() [ Friends ];
+	Scroll->SetScrollOffset(WasScrolled);
+	FriendsScroll = Scroll;
 	// The pages' panel's looks, mirrored: as wide (the box it is in), the same brush, colour and opacity, its left corners
 	// rounded. Its chevron, pointing right to the edge it folds to, is hidden on the find page, where it can't fold. The
 	// content inside is what fades as the panel slides (FriendsInside).
@@ -2838,7 +2892,16 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeFriendsPanel(bool bOpen)
 			]
 		]
 		+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(6.0f, 0.0f, 6.0f, 12.0f)) [ bInGame ? MakePartyPermission(bHost, Sessions) : SNullWidget::NullWidget ]
-		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SScrollBox) + SScrollBox::Slot() [ Friends ] ];
+		// The list's bar outside the list, in the panel's right margin, so that the list is as wide with it as without it.
+		+ SVerticalBox::Slot().FillHeight(1.0f)
+		[
+			SNew(SOverlay)
+			+ SOverlay::Slot() [ Scroll ]
+			+ SOverlay::Slot().HAlign(HAlign_Right).Padding(FMargin(0.0f, 0.0f, -(CheeseStrikeFriends::ScrollBarGap + CheeseStrikeFriends::ScrollBarThickness), 0.0f))
+			[
+				Bar
+			]
+		];
 	FriendsInside = Inside;
 	return SNew(SBorder).BorderImage(&Looks().FriendsPanel).BorderBackgroundColor(PanelColour).Padding(FMargin(20.0f, 24.0f))
 	[
