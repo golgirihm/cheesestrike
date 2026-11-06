@@ -24,6 +24,7 @@
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 #include "CheeseStrike.h"
+#include "Dev/CheeseStrikeLoadWatch.h"
 #include "CheeseStrikeGameState.h"
 #include "CheeseStrikePlayerController.h"
 #include "Rules/CheeseStrikeRules.h"
@@ -250,6 +251,7 @@ void UCheeseStrikeCurtainSubsystem::OnLevelLoaded(UWorld* World)
 	{
 		return;
 	}
+	CheeseStrikeLoadWatch::Start(World);
 	Lift();
 	if (!LoadingTo.IsEmpty() && LoadingSince > 0.0)
 	{
@@ -291,9 +293,12 @@ bool UCheeseStrikeCurtainSubsystem::Watch(float DeltaSeconds)
 {
 	UWorld* World = CoveredWorld.Get();
 	const ACheeseStrikePlayerController* Player = World != nullptr && GetGameInstance() != nullptr ? Cast<ACheeseStrikePlayerController>(GetGameInstance()->GetFirstLocalPlayerController(World)) : nullptr;
-	if (World == nullptr || (Player != nullptr && Player->IsViewReady()) || FPlatformTime::Seconds() - UpSince > CurtainFor)
+	// Over the view until it is ready and the renderer has compiled the pipeline states it precaches for the level's
+	// materials (CheeseStrikeLoadWatch::IsWarm), a first load's few frames a second.
+	const bool bReady = Player != nullptr && Player->IsViewReady() && CheeseStrikeLoadWatch::IsWarm();
+	if (World == nullptr || bReady || FPlatformTime::Seconds() - UpSince > CurtainFor)
 	{
-		UE_LOG(LogCheeseStrike, Display, TEXT("The loading cover is lifted after %.1f s%s"), FPlatformTime::Seconds() - UpSince, Player != nullptr && Player->IsViewReady() ? TEXT("") : TEXT(", the view not ready"));
+		UE_LOG(LogCheeseStrike, Display, TEXT("The loading cover is lifted after %.1f s%s"), FPlatformTime::Seconds() - UpSince, bReady ? TEXT("") : TEXT(", the view not ready"));
 		Ticker.Reset();
 		Lift();
 		return false;

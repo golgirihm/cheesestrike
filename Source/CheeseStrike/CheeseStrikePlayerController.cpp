@@ -2,6 +2,7 @@
 // Begun from Epic Games' First Person template (Copyright Epic Games, Inc.).
 
 #include "CheeseStrikePlayerController.h"
+#include "Dev/CheeseStrikeLoadWatch.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
@@ -687,7 +688,10 @@ bool ACheeseStrikePlayerController::CanSayReady() const
 {
 	const UWorld* World = GetWorld();
 	const ACheeseStrikeGameState* Match = World != nullptr ? World->GetGameState<ACheeseStrikeGameState>() : nullptr;
-	return IsLocalController() && World != nullptr && World->HasBegunPlay() && Match != nullptr && Match->IsWaitingForPlayers() && PlayerState != nullptr;
+	// Ready once the renderer has compiled what it precaches for the level's materials, too (CheeseStrikeLoadWatch::IsWarm):
+	// until then a first load runs at a few frames a second, so the match waits for everyone's.
+	return IsLocalController() && World != nullptr && World->HasBegunPlay() && Match != nullptr && Match->IsWaitingForPlayers() && PlayerState != nullptr
+		&& CheeseStrikeLoadWatch::IsWarm();
 }
 
 void ACheeseStrikePlayerController::ServerReady_Implementation()
