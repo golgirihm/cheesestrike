@@ -56,14 +56,47 @@ namespace CheeseStrikeGrenades
 	constexpr float SmokeFuse = 1.5f;
 	/** Its cloud: how long it grows for, how wide it gets (cm across), how long it lasts, and how long it thins for at its end. */
 	constexpr float CloudGrowSeconds = 1.0f;
-	constexpr float CloudAcross = 500.0f;
+	constexpr float CloudAcross = 1000.0f;
 	constexpr float CloudLife = 12.0f;
 	constexpr float CloudThinSeconds = 3.0f;
 	/** How many mist cards swirl in it (between 80 and 150), and how far up its middle sits over where it burst (cm). */
-	constexpr int32 CloudCards = 120;
+	constexpr int32 CloudCards = 140;
 	constexpr float CloudMiddleUp = 110.0f;
+	/**
+	 * Its core (wave 16): an ellipsoid about its middle, CloudCoreShare of the cloud's radius across and CloudCoreFlat of
+	 * that up and down (the cards lie flattened as smoke rolled out along the ground), in which whoever stands is hidden
+	 * whole from outside at any distance: each machine draws a veil of solid cards (CloudVeil) across its own camera's
+	 * view of it, CloudVeilAhead before it, so that nothing in it is seen through the smoke, the swirling cards round it
+	 * its soft edge.
+	 */
+	constexpr float CloudCoreShare = 0.74f;
+	constexpr float CloudCoreFlat = 0.62f;
+	/** Whether someone whose body runs from `Feet` up `Height` cm (`Feet` measured from where the cloud burst) stands wholly inside the core at `Age`. */
+	bool CloudCoreHides(const FVector& Feet, float Height, float Age);
+	/** How far before the core the veil stands (cm; more than the cards' soft depth fade, so it is whole over anyone in the core), and how near the eye it comes at the nearest (cm: from inside the core, nothing further is seen). */
+	constexpr float CloudVeilAhead = 100.0f;
+	constexpr float CloudVeilNearest = 80.0f;
+	/** How much of a solid card's radius is whole (M_SmokeMist with its custom data 1 at 1): the veil's cards are made this much bigger than what they must hide. */
+	constexpr float CloudVeilWhole = 0.75f;
+	/**
+	 * The veil for an eye at `Eye` (from the cloud's middle) at `Age`: a card turned to the eye, its middle at `Middle`
+	 * (from the cloud's middle) and its axes `Right` and `Up`, which must be whole over `HalfRight` by `HalfUp` (cm) about
+	 * its middle to hide everything of the core behind it: the core's outline as the eye sees it, at the veil's distance.
+	 * From inside the core (or nearer it than CloudVeilAhead), a veil CloudVeilNearest before the eye, wide enough for any
+	 * view. None (HalfRight 0) while the cloud is too thin to block sight.
+	 */
+	struct FVeil
+	{
+		FVector Middle = FVector::ZeroVector;
+		FVector Right = FVector::RightVector;
+		FVector Up = FVector::UpVector;
+		float HalfRight = 0.0f;
+		float HalfUp = 0.0f;
+		bool bAtTheEye = false;
+	};
+	FVeil CloudVeil(const FVector& Eye, float Age);
 	/** The sphere inside it that blocks sight (bots' eyes, name tags): a little inside the cards, which thin at the edge. */
-	constexpr float CloudSightRadius = 190.0f;
+	constexpr float CloudSightRadius = 380.0f;
 	/** How wide the cloud is `Age` seconds after it burst (its radius, cm): growing to its full size over CloudGrowSeconds, easing, and nothing past its life. */
 	float CloudRadiusAt(float Age);
 	/** How thick it is then (0 to 1): whole until its last CloudThinSeconds, then thinning to nothing. */

@@ -210,7 +210,7 @@ bool FTheSmokedGoudaSmokesAndHarmsNobody::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the smoke's a second and a half"), FuseOf(EGrenadeKind::Smoke), 1.5f);
 	TestTrue(TEXT("only the cheese grenade harms"), Harms(EGrenadeKind::Cheese) && !Harms(EGrenadeKind::Smoke));
 	TestTrue(TEXT("between 80 and 150 cards"), CloudCards >= 80 && CloudCards <= 150);
-	TestEqual(TEXT("about five metres across"), CloudAcross, 500.0f);
+	TestEqual(TEXT("about ten metres across (twice wave 15's)"), CloudAcross, 1000.0f);
 	TestEqual(TEXT("for twelve seconds"), CloudLife, 12.0f);
 	TestTrue(TEXT("it grows to its size in a second"), CloudRadiusAt(0.0f) < 1.0f && CloudRadiusAt(0.5f) > CloudAcross * 0.3f && FMath::IsNearlyEqual(CloudRadiusAt(CloudGrowSeconds), CloudAcross * 0.5f, 0.01f));
 	TestTrue(TEXT("and stays"), FMath::IsNearlyEqual(CloudRadiusAt(6.0f), CloudAcross * 0.5f, 0.01f));
@@ -219,6 +219,48 @@ bool FTheSmokedGoudaSmokesAndHarmsNobody::RunTest(const FString& Parameters)
 	TestTrue(TEXT("gone at the end"), CloudOpacityAt(CloudLife) == 0.0f && CloudRadiusAt(CloudLife) == 0.0f);
 	TestTrue(TEXT("it blocks sight while at least half as thick"), CloudBlocksSightAt(0.2f) && CloudBlocksSightAt(CloudLife - CloudThinSeconds * 0.5f) && !CloudBlocksSightAt(CloudLife - 1.0f) && !CloudBlocksSightAt(CloudLife));
 	TestTrue(TEXT("its sphere sits inside its cards"), CloudSightRadius < CloudAcross * 0.5f && CloudSightRadius > CloudAcross * 0.3f);
+	// Its core hides anyone standing in it whole, from the middle out to well over three metres, and nobody outside it.
+	const float Full = CloudGrowSeconds + 1.0f;
+	TestTrue(TEXT("someone standing where it burst is hidden"), CloudCoreHides(FVector::ZeroVector, 180.0f, Full));
+	TestTrue(TEXT("and three metres out, on any side"), CloudCoreHides(FVector(300.0f, 0.0f, 0.0f), 180.0f, Full) && CloudCoreHides(FVector(-210.0f, 210.0f, 0.0f), 180.0f, Full));
+	TestFalse(TEXT("not five metres out"), CloudCoreHides(FVector(500.0f, 0.0f, 0.0f), 180.0f, Full));
+	TestFalse(TEXT("nor someone high over it"), CloudCoreHides(FVector(0.0f, 0.0f, 300.0f), 180.0f, Full));
+	TestFalse(TEXT("nor anyone once it thins"), CloudCoreHides(FVector::ZeroVector, 180.0f, CloudLife - 0.5f));
+	TestTrue(TEXT("the sphere that stops bots' sight reaches as far as the core hides"), CloudSightRadius >= CloudAcross * 0.5f * CloudCoreShare);
+	// Its veil: from any eye outside, near or far, level, low or high, every line from the eye to anything in the core
+	// passes through the veil's whole middle before it gets there, so nothing in the core is seen.
+	const FVector Eyes[] = {FVector(-600.0f, 0.0f, 160.0f), FVector(0.0f, -1000.0f, 170.0f), FVector(2000.0f, 900.0f, 160.0f), FVector(-3900.0f, 300.0f, 200.0f),
+		FVector(-500.0f, -500.0f, 40.0f), FVector(-1300.0f, 0.0f, 1200.0f), FVector(200.0f, 300.0f, 1500.0f), FVector(530.0f, 0.0f, 150.0f)};
+	const float Across = CloudAcross * 0.5f * CloudCoreShare;
+	int32 Missed = 0;
+	int32 Tried = 0;
+	for (const FVector& Eye : Eyes)
+	{
+		const FVeil Veil = CloudVeil(Eye, Full);
+		const FVector Normal = FVector::CrossProduct(Veil.Right, Veil.Up);
+		for (int32 Ring = 0; Ring <= 23; ++Ring)
+		{
+			for (int32 Turn = 0; Turn < 47; ++Turn)
+			{
+				// A point on the core's surface (the hardest to hide), finer than the veil is worked out by.
+				const float Pitch = PI * Ring / 23.0f - HALF_PI;
+				const float Yaw = 2.0f * PI * Turn / 47.0f;
+				const FVector Point(Across * FMath::Cos(Pitch) * FMath::Cos(Yaw), Across * FMath::Cos(Pitch) * FMath::Sin(Yaw), CloudMiddleUp + Across * CloudCoreFlat * FMath::Sin(Pitch));
+				const float Along = FVector::DotProduct(Veil.Middle - Eye, Normal) / FVector::DotProduct(Point - Eye, Normal);
+				const FVector Crossing = Eye + (Point - Eye) * Along;
+				const float Right = FVector::DotProduct(Crossing - Veil.Middle, Veil.Right) / FMath::Max(Veil.HalfRight, 1.0f);
+				const float Up = FVector::DotProduct(Crossing - Veil.Middle, Veil.Up) / FMath::Max(Veil.HalfUp, 1.0f);
+				const float BeforeIt = FVector::Dist(Point, Eye) * (1.0f - Along);
+				++Tried;
+				// Before the point by more than the cards' soft fade, and within the veil's whole middle.
+				Missed += (Along > 0.0f && BeforeIt >= 60.0f && FMath::Square(Right) + FMath::Square(Up) <= 1.0f) ? 0 : 1;
+			}
+		}
+	}
+	TestEqual(FString::Printf(TEXT("the veil hides the whole core from every eye outside (%d lines tried)"), Tried), Missed, 0);
+	const FVeil Inside = CloudVeil(FVector(100.0f, 50.0f, 160.0f), Full);
+	TestTrue(TEXT("from inside the core, the veil is just before the eye and wide"), Inside.bAtTheEye && FMath::IsNearlyEqual(FVector::Dist(Inside.Middle, FVector(100.0f, 50.0f, 160.0f)), CloudVeilNearest, 1.0f) && Inside.HalfRight >= CloudVeilNearest * 3.0f);
+	TestTrue(TEXT("no veil once it thins"), CloudVeil(FVector(-1000.0f, 0.0f, 160.0f), CloudLife - 0.5f).HalfRight == 0.0f);
 	return true;
 }
 

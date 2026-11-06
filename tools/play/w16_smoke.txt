@@ -1,0 +1,36 @@
+# Wave 16's Smoked Gouda, from outside with a dummy inside it: the Practice
+# Range's 5 m dummy (standing still at 500,-650) seen from the side before
+# any smoke, then the round thrown down at the floor just short of it, and
+# the cloud seen from outside at about 10, 20 and 39 m, from above, and from
+# inside. Run with
+#   tools/play.ps1 -Script tools/play/w16_smoke.txt -Map /Game/CheeseStrike/Maps/Lvl_Range -Bots -Extra "?Mode=FreeForAll?Bots=4?BotSkill=dummy?KillLimit=1000" -StartAt 330,-650,100,0 -Res 1600x900
+wait 18
+cmd CheeseStrikeProtect 120
+cmd CheeseStrikeArm smoke
+cmd CheeseStrikeViewFrom 500 -1650 170 -2 90
+wait 1.5
+shot smoke16_0_before_10m
+look 0 -85
+wait 0.5
+tap Grenade
+wait 0.3
+cmd CheeseStrikeViewFrom 500 -1650 170 -2 90
+wait 3.5
+shot smoke16_1_side_10m
+cmd CheeseStrikeViewFrom -600 -650 170 -2 0
+wait 1
+shot smoke16_2_behind_10m
+cmd CheeseStrikeViewFrom -1600 -650 170 -1 0
+wait 1
+shot smoke16_3_behind_20m
+cmd CheeseStrikeViewFrom 4300 -650 200 -1 180
+wait 1
+shot smoke16_4_ahead_39m
+cmd CheeseStrikeViewFrom 500 -1900 1300 -40 90
+wait 1
+shot smoke16_5_above
+cmd CheeseStrikeViewFrom 500 -1050 170 -2 90
+wait 1
+shot smoke16_6_inside_4m
+state
+quit

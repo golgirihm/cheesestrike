@@ -70,6 +70,104 @@ namespace CheeseStrikeGrenades
 		return Age >= 0.0f && CloudOpacityAt(Age) >= 0.5f;
 	}
 
+	/** How finely the veil's size is found round the core: rings from bottom to top, and points round each. */
+	constexpr int32 VeilRings = 10;
+	constexpr int32 VeilTurns = 18;
+
+	bool CloudCoreHides(const FVector& Feet, float Height, float Age)
+	{
+		if (!CloudBlocksSightAt(Age))
+		{
+			return false;
+		}
+		// The ellipsoid about the middle.
+		const float Across = CloudRadiusAt(Age) * CloudCoreShare;
+		const float Up = Across * CloudCoreFlat;
+		if (Across <= 0.0f)
+		{
+			return false;
+		}
+		const auto Inside = [Across, Up](const FVector& Point)
+		{
+			const FVector FromMiddle = Point - FVector(0.0f, 0.0f, CloudMiddleUp);
+			return FMath::Square(FromMiddle.X / Across) + FMath::Square(FromMiddle.Y / Across) + FMath::Square(FromMiddle.Z / Up) <= 1.0f;
+		};
+		// A body is an upright line: inside if its feet and its head both are (the ellipsoid is convex).
+		return Inside(Feet) && Inside(Feet + FVector(0.0f, 0.0f, Height));
+	}
+
+	FVeil CloudVeil(const FVector& Eye, float Age)
+	{
+		FVeil Veil;
+		const float Across = CloudRadiusAt(Age) * CloudCoreShare;
+		if (!CloudBlocksSightAt(Age) || Across <= 0.0f)
+		{
+			return Veil;
+		}
+		const float Up = Across * CloudCoreFlat;
+		// How far the core reaches along a way (its support): the ellipsoid's, its middle at CloudMiddleUp.
+		const auto Reach = [Across, Up](const FVector& Way)
+		{
+			return FMath::Sqrt(FMath::Square(Across) * (FMath::Square(Way.X) + FMath::Square(Way.Y)) + FMath::Square(Up) * FMath::Square(Way.Z));
+		};
+		const FVector FromMiddle = Eye - FVector(0.0f, 0.0f, CloudMiddleUp);
+		const float Distance = FromMiddle.Size();
+		const FVector Toward = Distance > UE_KINDA_SMALL_NUMBER ? FromMiddle / Distance : FVector::BackwardVector;
+		const FVector Looking = -Toward;
+		Veil.Right = FVector::CrossProduct(FVector::UpVector, Looking).GetSafeNormal();
+		if (Veil.Right.IsNearlyZero())
+		{
+			Veil.Right = FVector::RightVector;
+		}
+		Veil.Up = FVector::CrossProduct(Looking, Veil.Right).GetSafeNormal();
+		// The veil stands CloudVeilAhead before the core along the way to the eye.
+		const float Before = Reach(Toward) + CloudVeilAhead;
+		const float Ahead = Distance - Before;
+		if (Ahead < CloudVeilNearest)
+		{
+			// The eye in the core or at its edge: a veil just before it, over anything it could look at.
+			Veil.bAtTheEye = true;
+			Veil.Middle = FromMiddle + Looking * CloudVeilNearest + FVector(0.0f, 0.0f, CloudMiddleUp);
+			Veil.HalfRight = CloudVeilNearest * 4.0f;
+			Veil.HalfUp = CloudVeilNearest * 4.0f;
+			return Veil;
+		}
+		Veil.Middle = Toward * Before + FVector(0.0f, 0.0f, CloudMiddleUp);
+		// The core's outline as the eye sees it, where the veil stands: its shape from the cone that touches it each way,
+		// then made as big as every point round the core needs (seen from near, an ellipsoid's outline is no simple
+		// ellipse about the middle), and a little over.
+		const auto Half = [Distance, Ahead](float Extent)
+		{
+			const float Tangent = Extent / FMath::Sqrt(FMath::Max(FMath::Square(Distance) - FMath::Square(Extent), FMath::Square(Distance * 0.2f)));
+			return Ahead * Tangent;
+		};
+		Veil.HalfRight = FMath::Max(1.0f, Half(Reach(Veil.Right)));
+		Veil.HalfUp = FMath::Max(1.0f, Half(Reach(Veil.Up)));
+		float Widest = 0.0f;
+		for (int32 Ring = 0; Ring <= VeilRings; ++Ring)
+		{
+			const float Pitch = PI * Ring / VeilRings - HALF_PI;
+			for (int32 Turn = 0; Turn < VeilTurns; ++Turn)
+			{
+				const float Yaw = 2.0f * PI * Turn / VeilTurns;
+				const FVector Point(Across * FMath::Cos(Pitch) * FMath::Cos(Yaw), Across * FMath::Cos(Pitch) * FMath::Sin(Yaw), Up * FMath::Sin(Pitch));
+				// Where the line from the eye to it crosses the veil's plane, in the veil's axes.
+				const FVector Line = Point - FromMiddle;
+				const float Deep = FVector::DotProduct(Line, Looking);
+				if (Deep <= UE_KINDA_SMALL_NUMBER)
+				{
+					continue;
+				}
+				const FVector Crossing = FromMiddle + Line * (Ahead / Deep) - (Veil.Middle - FVector(0.0f, 0.0f, CloudMiddleUp));
+				Widest = FMath::Max(Widest, FMath::Square(FVector::DotProduct(Crossing, Veil.Right) / Veil.HalfRight) + FMath::Square(FVector::DotProduct(Crossing, Veil.Up) / Veil.HalfUp));
+			}
+		}
+		const float Grow = FMath::Sqrt(Widest) * 1.06f;
+		Veil.HalfRight *= Grow;
+		Veil.HalfUp *= Grow;
+		return Veil;
+	}
+
 	float DamageAt(float Distance)
 	{
 		if (Distance < 0.0f || Distance > Radius)
@@ -181,7 +279,7 @@ namespace CheeseStrikeGrenades
 		{
 			return false;
 		}
-		// tan(a) = (v² - sqrt(v⁴ - g(g x² + 2 y v²))) / (g x): the lower arc.
+		// tan(a) = (vÂ² - sqrt(vâ´ - g(g xÂ² + 2 y vÂ²))) / (g x): the lower arc.
 		const double V2 = static_cast<double>(Speed) * Speed;
 		const double Inside = V2 * V2 - Gravity * (static_cast<double>(Gravity) * Across * Across + 2.0 * Rise * V2);
 		if (Inside < 0.0)
