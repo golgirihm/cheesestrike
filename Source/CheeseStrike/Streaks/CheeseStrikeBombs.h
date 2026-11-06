@@ -7,6 +7,7 @@
 #include "Rules/CheeseStrikeStreaks.h"
 #include "CheeseStrikeBombs.generated.h"
 
+class ACheeseStrikeCharacter;
 class ACheeseStrikePlayerState;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
@@ -51,8 +52,10 @@ struct FCheeseStrikeDrop
  * The Gouda Overload is heralded by a siren everyone hears, and as its
  * warning ends the server splats every living enemy of its caller with
  * melted gouda, wherever they are (ACheeseStrikeCharacter::Splat: slowed,
- * their view smeared). The caller's haste and Gatling are the game mode's,
- * at the call.
+ * their view smeared). It lasts as long as its caller's haste (since wave
+ * 17): an enemy who comes back (or in) meanwhile is splatted as they arrive
+ * (CheeseStrikeStreaks::GooAgainUntil). The caller's haste and Gatling are
+ * the game mode's, at the call.
  */
 UCLASS(NotPlaceable)
 class CHEESESTRIKE_API ACheeseStrikeBombs : public AActor
@@ -72,6 +75,8 @@ public:
 	/** Server only: how many wheels have landed, and how many players they have harmed (or the Overload splatted). */
 	int32 GetLanded() const { return Landed; }
 	int32 GetHits() const { return Hits; }
+	/** Server only: how many enemies the Overload has splatted as they came back or in after its splat. */
+	int32 GetSplattedAgain() const { return Again; }
 	/** The server's time the Overload's gouda splats; 0 for a Cheese Strike. */
 	float GetSplatAt() const { return SplatAt; }
 
@@ -102,6 +107,8 @@ public:
 protected:
 	/** Server only: the Overload's gouda on every living enemy of its caller, now. */
 	void SplatEnemies();
+	/** Server only: the gouda on every living enemy not yet splatted by it (come back or come in since), while it lasts. */
+	void SplatArrivals();
 public:
 	/** How long one of the Overload's effects lasts: `Usual` (CheeseStrikeStreaks' GooSeconds, HasteSeconds, GatlingSeconds), or every one of them CheeseStrike.OverloadSeconds when that is set (the play tests). */
 	static float OverloadTime(float Usual);
@@ -134,6 +141,10 @@ protected:
 	bool bSplatted = false;
 	int32 Landed = 0;
 	int32 Hits = 0;
+	int32 Again = 0;
+	/** Server only: the Overload's end (the server's time), and the bodies it has splatted. */
+	float OverloadEnd = 0.0f;
+	TArray<TWeakObjectPtr<ACheeseStrikeCharacter>> Gooed;
 	/** The server's time it is done with, once everything is planned. */
 	float DoneAt = 0.0f;
 

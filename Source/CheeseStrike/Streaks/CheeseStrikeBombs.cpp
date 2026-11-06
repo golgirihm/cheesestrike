@@ -257,7 +257,9 @@ void ACheeseStrikeBombs::StartOverload(ACheeseStrikePlayerState* InCaller)
 	WarnAt = Start;
 	// The gouda splats as the warning ends.
 	SplatAt = Start + CheeseStrikeStreaks::OverloadWarning;
-	DoneAt = SplatAt + 2.0f;
+	// It lasts as long as the caller's haste: an enemy who comes in meanwhile is splatted as they arrive (SplatArrivals).
+	OverloadEnd = SplatAt + OverloadTime(CheeseStrikeStreaks::HasteSeconds);
+	DoneAt = OverloadEnd + 0.5f;
 	UE_LOG(LogCheeseStrike, Display, TEXT("Gouda Overload from %s: the gouda in %.1f s"), InCaller != nullptr ? *InCaller->GetPlayerName() : TEXT("nobody"), SplatAt - Start);
 }
 
@@ -283,9 +285,38 @@ void ACheeseStrikeBombs::SplatEnemies()
 		if (CheeseStrikeStreaks::IsSplatted(Match->AreEnemies(By, It->GetPlayerState()), It->IsAlive()))
 		{
 			It->Splat(Until);
+			Gooed.Add(*It);
 			++Hits;
 			UE_LOG(LogCheeseStrike, Display, TEXT("Gouda Overload: %s splatted %s"), *By->GetPlayerName(), *It->DisplayName());
 		}
+	}
+}
+
+void ACheeseStrikeBombs::SplatArrivals()
+{
+	const ACheeseStrikeGameState* Match = GetWorld() != nullptr ? GetWorld()->GetGameState<ACheeseStrikeGameState>() : nullptr;
+	const ACheeseStrikePlayerState* By = Caller.Get();
+	if (Match == nullptr || By == nullptr)
+	{
+		return;
+	}
+	Gooed.RemoveAll([](const TWeakObjectPtr<ACheeseStrikeCharacter>& Each) { return !Each.IsValid(); });
+	for (TActorIterator<ACheeseStrikeCharacter> It(GetWorld()); It; ++It)
+	{
+		// A body not splatted yet by this Overload: an enemy killed and back (a new body), or one who has just come in.
+		if (Gooed.Contains(*It) || It->GetPlayerState() == nullptr || !CheeseStrikeStreaks::IsSplatted(Match->AreEnemies(By, It->GetPlayerState()), It->IsAlive()))
+		{
+			continue;
+		}
+		const float Until = CheeseStrikeStreaks::GooAgainUntil(Now(), OverloadTime(CheeseStrikeStreaks::GooSeconds), OverloadEnd);
+		if (Until <= 0.0f)
+		{
+			return;
+		}
+		It->Splat(Until);
+		Gooed.Add(*It);
+		++Again;
+		UE_LOG(LogCheeseStrike, Display, TEXT("Gouda Overload: %s splatted %s again as they came back"), *By->GetPlayerName(), *It->DisplayName());
 	}
 }
 
@@ -490,6 +521,10 @@ void ACheeseStrikeBombs::Tick(float DeltaSeconds)
 	if (bServer && GetKind() == CheeseStrikeStreaks::EStreak::GoudaOverload && !bSplatted && SplatAt > 0.0f && Time >= SplatAt)
 	{
 		SplatEnemies();
+	}
+	else if (bServer && bSplatted && Time < OverloadEnd)
+	{
+		SplatArrivals();
 	}
 
 	ShowWarning();

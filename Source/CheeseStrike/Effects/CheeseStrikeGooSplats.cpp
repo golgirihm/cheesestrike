@@ -3,6 +3,8 @@
 #include "CheeseStrikeGooSplats.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/DecalComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameStateBase.h"
@@ -22,6 +24,12 @@ namespace
 	constexpr float GooRoughness = 0.1f;
 	/** How deep a puddle projects, through the floor it lies on (enough for a slope or a step's edge). */
 	constexpr float GooDepth = 30.0f;
+	/** The globs (tools/art/goo_blobs.py), one of them at random for each puddle. */
+	const TCHAR* const GooBlobPaths[] = {
+		TEXT("/Game/CheeseStrike/Effects/SM_GooBlob1.SM_GooBlob1"),
+		TEXT("/Game/CheeseStrike/Effects/SM_GooBlob2.SM_GooBlob2"),
+		TEXT("/Game/CheeseStrike/Effects/SM_GooBlob3.SM_GooBlob3"),
+	};
 }
 
 ACheeseStrikeGooSplats::ACheeseStrikeGooSplats()
@@ -74,6 +82,45 @@ int32 ACheeseStrikeGooSplats::CountNear(const FVector& At, float Reach) const
 	return Count;
 }
 
+int32 ACheeseStrikeGooSplats::CountBlobsNear(const FVector& At, float Reach, float* OutTallest) const
+{
+	int32 Count = 0;
+	float Tallest = 0.0f;
+	for (const FPuddle& Each : Puddles)
+	{
+		if (Each.Blob != nullptr && FVector::Dist2D(Each.Blob->GetComponentLocation(), At) <= Reach)
+		{
+			++Count;
+			Tallest = FMath::Max(Tallest, static_cast<float>(Each.Blob->Bounds.BoxExtent.Z) * 2.0f);
+		}
+	}
+	if (OutTallest != nullptr)
+	{
+		*OutTallest = Tallest;
+	}
+	return Count;
+}
+
+void ACheeseStrikeGooSplats::ShapeBlob(UStaticMeshComponent* Blob, float Radius, float Since)
+{
+	// As wide as the puddle, as tall as the goo is thick for it: a heap as it lands, slumping, then melting flat.
+	const float Wide = Radius / CheeseStrikeGoo::BlobRadius;
+	const float Tall = FMath::Max(0.01f, Wide * CheeseStrikeGoo::BlobThick * CheeseStrikeGoo::BlobHeightAt(Since));
+	Blob->SetRelativeScale3D(FVector(Wide, Wide, Tall));
+}
+
+void ACheeseStrikeGooSplats::Clear(FPuddle& Puddle)
+{
+	if (Puddle.Decal != nullptr)
+	{
+		Puddle.Decal->DestroyComponent();
+	}
+	if (Puddle.Blob != nullptr)
+	{
+		Puddle.Blob->DestroyComponent();
+	}
+}
+
 bool ACheeseStrikeGooSplats::Lay(ACheeseStrikeCharacter* Who, float Full, float Now)
 {
 	UWorld* World = GetWorld();
@@ -81,6 +128,13 @@ bool ACheeseStrikeGooSplats::Lay(ACheeseStrikeCharacter* Who, float Full, float 
 	{
 		bLookLoaded = true;
 		Look = LoadObject<UMaterialInterface>(nullptr, GooDecalLookPath);
+		for (const TCHAR* Path : GooBlobPaths)
+		{
+			if (UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Path))
+			{
+				Blobs.Add(Mesh);
+			}
+		}
 	}
 	if (World == nullptr || Look == nullptr)
 	{
@@ -100,10 +154,7 @@ bool ACheeseStrikeGooSplats::Lay(ACheeseStrikeCharacter* Who, float Full, float 
 	// Past the cap, the oldest goes.
 	while (Puddles.Num() >= CheeseStrikeGoo::MostPuddles)
 	{
-		if (Puddles[0].Decal != nullptr)
-		{
-			Puddles[0].Decal->DestroyComponent();
-		}
+		Clear(Puddles[0]);
 		Puddles.RemoveAt(0);
 	}
 	UDecalComponent* Decal = NewObject<UDecalComponent>(this);
@@ -112,7 +163,7 @@ bool ACheeseStrikeGooSplats::Lay(ACheeseStrikeCharacter* Who, float Full, float 
 	Facing.Roll = FMath::FRandRange(0.0f, 360.0f);
 	Decal->SetWorldLocationAndRotation(Floor.ImpactPoint, Facing);
 	const float Radius = CheeseStrikeGoo::RadiusAt(Full, 0.0f);
-	Decal->DecalSize = FVector(GooDepth, Radius, Radius);
+	Decal->DecalSize = FVector(GooDepth, Radius * CheeseStrikeGoo::FilmShare, Radius * CheeseStrikeGoo::FilmShare);
 	Decal->SetDecalMaterial(Look);
 	// Under the cheese a stomp or a wound leaves on it.
 	Decal->SortOrder = -2;
@@ -125,8 +176,24 @@ bool ACheeseStrikeGooSplats::Lay(ACheeseStrikeCharacter* Who, float Full, float 
 		Goo->SetScalarParameterValue(TEXT("Seed"), FMath::FRandRange(0.0f, 100.0f));
 		Goo->SetScalarParameterValue(TEXT("Opacity"), 1.0f);
 	}
+	// The glob itself, lying on the floor in the film, turned at random about it; seen, lit and shadowed, never hit.
+	UStaticMeshComponent* Blob = nullptr;
+	if (Blobs.Num() > 0)
+	{
+		Blob = NewObject<UStaticMeshComponent>(this);
+		Blob->SetStaticMesh(Blobs[FMath::RandHelper(Blobs.Num())]);
+		Blob->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Blob->SetCanEverAffectNavigation(false);
+		Blob->SetGenerateOverlapEvents(false);
+		Blob->bReceivesDecals = false;
+		const FQuat OnFloor = FQuat::FindBetweenNormals(FVector::UpVector, Floor.ImpactNormal) * FQuat(FVector::UpVector, FMath::FRandRange(0.0f, 2.0f * PI));
+		Blob->SetWorldLocationAndRotation(Floor.ImpactPoint, OnFloor);
+		ShapeBlob(Blob, Radius, 0.0f);
+		Blob->RegisterComponent();
+	}
 	FPuddle Made;
 	Made.Decal = Decal;
+	Made.Blob = Blob;
 	Made.Born = Now;
 	Made.Full = Full;
 	Made.Radius = Radius;
@@ -193,10 +260,7 @@ void ACheeseStrikeGooSplats::Tick(float DeltaSeconds)
 		const float Since = Now - Puddle.Born;
 		if (Puddle.Decal == nullptr || CheeseStrikeGoo::IsGone(Since))
 		{
-			if (Puddle.Decal != nullptr)
-			{
-				Puddle.Decal->DestroyComponent();
-			}
+			Clear(Puddle);
 			Puddles.RemoveAt(Index);
 			continue;
 		}
@@ -204,8 +268,12 @@ void ACheeseStrikeGooSplats::Tick(float DeltaSeconds)
 		if (!FMath::IsNearlyEqual(Radius, Puddle.Radius, 0.25f))
 		{
 			Puddle.Radius = Radius;
-			Puddle.Decal->DecalSize = FVector(GooDepth, Radius, Radius);
+			Puddle.Decal->DecalSize = FVector(GooDepth, Radius * CheeseStrikeGoo::FilmShare, Radius * CheeseStrikeGoo::FilmShare);
 			Puddle.Decal->MarkRenderStateDirty();
+		}
+		if (Puddle.Blob != nullptr && (Since < CheeseStrikeGoo::PuddleGrowSeconds + 0.1f || Since > CheeseStrikeGoo::PuddleStays))
+		{
+			ShapeBlob(Puddle.Blob, Radius, Since);
 		}
 		const float Opacity = CheeseStrikeGoo::OpacityAt(Since);
 		if (!FMath::IsNearlyEqual(Opacity, Puddle.Opacity, 0.01f))

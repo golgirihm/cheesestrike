@@ -30,6 +30,13 @@ namespace CheeseStrikeGoo
 		return FMath::Clamp(1.0f - (Since - PuddleStays) / PuddleFades, 0.0f, 1.0f);
 	}
 
+	float BlobHeightAt(float Since)
+	{
+		const float Grown = FMath::Clamp(Since / PuddleGrowSeconds, 0.0f, 1.0f);
+		const float Slumped = FMath::Lerp(BlobHeap, 1.0f, 1.0f - FMath::Square(1.0f - Grown));
+		return Slumped * OpacityAt(Since);
+	}
+
 	bool IsGone(float Since)
 	{
 		return Since >= PuddleStays + PuddleFades;

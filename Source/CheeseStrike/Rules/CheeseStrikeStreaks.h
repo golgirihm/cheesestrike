@@ -146,22 +146,32 @@ namespace CheeseStrikeStreaks
 
 	/**
 	 * Gouda Overload: the warning (the siren) before the gouda splats. Splatted, a player is slowed to GooSlowest of their
-	 * speed at once, coming back in a straight line to all of it over GooSeconds, and can't sprint or slide while under
+	 * speed at once (since wave 17, from a quarter), held there for the first GooHoldShare of the goo's time, then coming
+	 * back in a straight line to all of it by its end, GooSeconds after the splat, and can't sprint or slide while under
 	 * GooNoSprint of it (CheeseStrikeMovement's speeds times GooFactor). Its caller runs HasteFactor faster for
 	 * HasteSeconds, and has the Gouda Gatling (CheeseStrikeWeapons::Gatling) in hand for GatlingSeconds or until its rounds
 	 * are spent.
 	 */
 	constexpr float OverloadWarning = 3.0f;
 	constexpr float GooSeconds = 15.0f;
-	constexpr float GooSlowest = 0.25f;
+	constexpr float GooSlowest = 0.15f;
+	constexpr float GooHoldShare = 0.25f;
 	constexpr float GooNoSprint = 0.6f;
 	constexpr float HasteFactor = 1.5f;
 	constexpr float HasteSeconds = 30.0f;
 	constexpr float GatlingSeconds = 30.0f;
 	/** Whether the Overload splats a character: every living enemy of its caller, standing or down in a last stand, wherever they are. */
 	bool IsSplatted(bool bEnemy, bool bAlive);
-	/** The share of its speed a character splatted at `SplatAt` until `GooUntil` (the server's times) has at `Now`: GooSlowest at the splat, all of it (1) by GooUntil, and 1 if never splatted. */
+	/** The share of its speed a character splatted at `SplatAt` until `GooUntil` (the server's times) has at `Now`: GooSlowest from the splat through GooHoldShare of the way, then rising steadily to all of it (1) by GooUntil, and 1 if never splatted. */
 	float GooFactor(float Now, float SplatAt, float GooUntil);
+	/**
+	 * The Overload lasts as long as its caller's haste (HasteSeconds from the splat): an enemy who comes in while it lasts
+	 * (killed and back, or newly joined) is splatted as they arrive, the goo on them until GooSeconds (`GooLength`, shortened
+	 * for the tests) after that or the Overload's end (`OverloadEnd`), whichever is sooner. The time their goo runs to, or 0
+	 * for none: the Overload over, or under GooAgainLeast of it left.
+	 */
+	constexpr float GooAgainLeast = 1.0f;
+	float GooAgainUntil(float Now, float GooLength, float OverloadEnd);
 	/** Whether a character at `Factor` of its speed may sprint or slide. */
 	bool MaySprintInGoo(float Factor);
 	/** How much faster the Overload's caller runs at `Now`, hastened until `HasteUntil`: HasteFactor until then, 1 after. */
