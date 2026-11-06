@@ -254,9 +254,6 @@ public:
 	/** From the console or a play script: opens the lobby's nth dropdown (0 the map, then the mode and on down), for looking at it; -1 shuts it. */
 	UFUNCTION(Exec)
 	void CheeseStrikeDropdown(int32 Number = 0);
-	/** TEMPORARY: from the console or a play script, the front end's sampler of UI themes (EMenuPage::Themes, UI/CheeseStrikeThemes.h), as its THEMES button does; `Theme` 1 to 5 shows that theme, 6 all of them, 0 leaves the tab as it is. */
-	UFUNCTION(Exec)
-	void CheeseStrikeThemes(int32 Theme = 0);
 	/** From the console or a play script: goes over to the other side in the lobby, as its button does. */
 	UFUNCTION(Exec)
 	void CheeseStrikeSwitchSide();
