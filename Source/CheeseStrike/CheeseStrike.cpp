@@ -10,6 +10,8 @@
 #include "Misc/Paths.h"
 #include "Widgets/SWindow.h"
 #include "Settings/CheeseStrikeSettings.h"
+#include "Features/IModularFeatures.h"
+#include "Performance/LatencyMarkerModule.h"
 
 #if PLATFORM_WINDOWS
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -29,11 +31,13 @@ public:
 	virtual void StartupModule() override
 	{
 		PostEngineInitHandle = FCoreDelegates::GetOnPostEngineInit().AddStatic(&FCheeseStrikeModule::UseOurIcon);
+		LatencyHandle = FCoreDelegates::GetOnPostEngineInit().AddStatic(&FCheeseStrikeModule::StartLatencyMarkers);
 	}
 
 	virtual void ShutdownModule() override
 	{
 		FCoreDelegates::GetOnPostEngineInit().Remove(PostEngineInitHandle);
+		FCoreDelegates::GetOnPostEngineInit().Remove(LatencyHandle);
 	}
 
 	virtual bool IsGameModule() const override { return true; }
@@ -76,7 +80,34 @@ private:
 #endif
 	}
 
+	/**
+	 * Turns on the latency markers of the engine's Reflex plugin (enabled in the .uproject): NVIDIA's own (NvAPI) and its PC
+	 * Latency stats (PCLStats), which the NVIDIA app's statistics overlay reads its frame rate and latencies from; without
+	 * them it showed FPS, PCL and RLAT as N/A (wave 17). Only the markers: Reflex's low-latency mode, which changes how frames
+	 * are paced, stays off. The plugin keeps them to an NVIDIA GPU under DirectX (its own GetAvailable), and the stats to a
+	 * window drawn on screen. Not in the editor.
+	 */
+	static void StartLatencyMarkers()
+	{
+		if (GIsEditor || IsRunningCommandlet())
+		{
+			return;
+		}
+		int32 Started = 0;
+		const TArray<ILatencyMarkerModule*> Markers = IModularFeatures::Get().GetModularFeatureImplementations<ILatencyMarkerModule>(ILatencyMarkerModule::GetModularFeatureName());
+		for (ILatencyMarkerModule* Marker : Markers)
+		{
+			if (Marker != nullptr && Marker->GetAvailable())
+			{
+				Marker->SetEnabled(true);
+				Started += Marker->GetEnabled() ? 1 : 0;
+			}
+		}
+		UE_LOG(LogCheeseStrike, Display, TEXT("Latency markers: %d of %d on (Reflex's and PCLStats', for NVIDIA's overlay)"), Started, Markers.Num());
+	}
+
 	FDelegateHandle PostEngineInitHandle;
+	FDelegateHandle LatencyHandle;
 };
 
 IMPLEMENT_PRIMARY_GAME_MODULE(FCheeseStrikeModule, CheeseStrike, "CheeseStrike");
