@@ -6,6 +6,7 @@
 #include "Misc/AutomationTest.h"
 #include "Rules/CheeseStrikeFriends.h"
 #include "Sessions/CheeseStrikeSessions.h"
+#include "UI/CheeseStrikeMenu.h"
 
 namespace FriendsTests
 {
@@ -279,3 +280,88 @@ bool FTheFriendsPanelSlidesOpenAndFades::RunTest(const FString& Parameters)
 	TestFalse(TEXT("shut: the tab"), ShowsContent(false, 0.0f));
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FATooltipMovesFromRowToRowInPlace, "CheeseStrike.Friends.TooltipMovesFromRowToRowInPlace", FriendsTests::Flags)
+
+bool FATooltipMovesFromRowToRowInPlace::RunTest(const FString& Parameters)
+{
+	using namespace CheeseStrikeFriends;
+	constexpr float Delay = CheeseStrikeMenu::TooltipDelay;
+	// The first comes after a rest on a row, fading in.
+	TestTrue(TEXT("nothing at once"), TooltipStep(false, true, false, 0.05, 100.0, Delay) == ETooltipStep::None);
+	TestTrue(TEXT("after the rest it fades in"), TooltipStep(false, true, false, Delay + 0.01, 100.0, Delay) == ETooltipStep::FadeIn);
+	TestTrue(TEXT("it stays while its row is hovered"), TooltipStep(true, true, true, 2.0, 100.0, Delay) == ETooltipStep::Keep);
+	// From row A to row B: the card is replaced in place, with no fade and no frame without it.
+	TestTrue(TEXT("straight onto the next row: swapped in place"), TooltipStep(true, true, false, 0.0, 100.0, Delay) == ETooltipStep::Swap);
+	TestTrue(TEXT("over the gap between the rows it stays"), TooltipStep(true, false, false, 0.0, 100.0, Delay) == ETooltipStep::Keep);
+	TestTrue(TEXT("for a moment"), TooltipStep(true, false, false, TooltipLinger * 0.9, 100.0, Delay) == ETooltipStep::Keep);
+	TestTrue(TEXT("the moment long enough for a quick move across a gap (a few frames at 60)"), TooltipLinger >= 0.1f && TooltipLinger < Delay);
+	TestTrue(TEXT("then goes, the mouse having left the rows"), TooltipStep(true, false, false, TooltipLinger + 0.01, 100.0, Delay) == ETooltipStep::Hide);
+	// Just gone (a slower move), the next comes at once and without a fade, as it would have in place.
+	TestTrue(TEXT("just after one went, the next at once, not faded"), TooltipStep(false, true, false, 0.0, 0.1, Delay) == ETooltipStep::Swap);
+	TestTrue(TEXT("nothing hovered and nothing up: nothing"), TooltipStep(false, false, false, 5.0, 0.1, Delay) == ETooltipStep::None);
+	// A whole sweep down a list, a frame at 60 at a time, rows 40 units high with gaps of 6, at 1500 units a second: the
+	// card never goes and never fades in again once up.
+	bool bShown = false;
+	bool bEverGone = false;
+	int32 FadeIns = 0;
+	int32 HoveredRow = INDEX_NONE;
+	int32 ShownRow = INDEX_NONE;
+	double ChangedAt = 0.0;
+	double HiddenAt = -100.0;
+	for (int32 Frame = 0; Frame < 120; ++Frame)
+	{
+		const double Now = Frame / 60.0;
+		// Resting on the first row for the delay, then sweeping down.
+		const double Y = Now < 0.5 ? 20.0 : 20.0 + (Now - 0.5) * 1500.0;
+		const int32 Row = FMath::FloorToInt32(Y / 46.0);
+		const bool bOnRow = FMath::Fmod(Y, 46.0) < 40.0 && Row < 20;
+		const int32 Hovered = bOnRow ? Row : INDEX_NONE;
+		if (Hovered != HoveredRow)
+		{
+			HoveredRow = Hovered;
+			ChangedAt = Now;
+		}
+		const ETooltipStep Step = TooltipStep(bShown, Hovered != INDEX_NONE, Hovered == ShownRow, Now - ChangedAt, Now - HiddenAt, Delay);
+		if (Step == ETooltipStep::FadeIn || Step == ETooltipStep::Swap)
+		{
+			FadeIns += Step == ETooltipStep::FadeIn ? 1 : 0;
+			bShown = true;
+			ShownRow = Hovered;
+		}
+		else if (Step == ETooltipStep::Hide)
+		{
+			bEverGone = bEverGone || Row < 20;
+			bShown = false;
+			ShownRow = INDEX_NONE;
+			HiddenAt = Now;
+		}
+	}
+	TestEqual(TEXT("one fade in, the first"), FadeIns, 1);
+	TestFalse(TEXT("the card never goes while the mouse sweeps over the rows"), bEverGone);
+
+	// The list's bar stands outside it in the panel's margin (20), so that the list never narrows for it.
+	TestTrue(TEXT("the bar fits in the panel's margin"), ScrollBarGap + ScrollBarThickness <= 20.0f && ScrollBarThickness >= 4.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEveryClickOnThePanelIsThePanels, "CheeseStrike.Friends.EveryClickOnThePanelIsThePanels", FriendsTests::Flags)
+
+bool FEveryClickOnThePanelIsThePanels::RunTest(const FString& Parameters)
+{
+	// The box under the whole panel takes a press, a release, a double click and the wheel that nothing in it took, so that
+	// none goes on to what is under the panel (whether it would is a matter of Slate's hit test: a manual test, W17-FRI-03).
+	const TSharedRef<SCheeseStrikeClickCatcher> Catcher = SNew(SCheeseStrikeClickCatcher) [ SNullWidget::NullWidget ];
+	const FGeometry Geometry;
+	const FPointerEvent Press(0, 0, FVector2D(10.0, 10.0), FVector2D(10.0, 10.0), TSet<FKey>({EKeys::LeftMouseButton}), EKeys::LeftMouseButton, 0.0f, FModifierKeysState());
+	const FPointerEvent Release(0, 0, FVector2D(10.0, 10.0), FVector2D(10.0, 10.0), TSet<FKey>(), EKeys::LeftMouseButton, 0.0f, FModifierKeysState());
+	const FPointerEvent Wheel(0, 0, FVector2D(10.0, 10.0), FVector2D(10.0, 10.0), TSet<FKey>(), EKeys::MouseWheelAxis, -1.0f, FModifierKeysState());
+	TestTrue(TEXT("a press is taken"), Catcher->OnMouseButtonDown(Geometry, Press).IsEventHandled());
+	TestTrue(TEXT("a release is taken"), Catcher->OnMouseButtonUp(Geometry, Release).IsEventHandled());
+	TestTrue(TEXT("a double click is taken"), Catcher->OnMouseButtonDoubleClick(Geometry, Press).IsEventHandled());
+	TestTrue(TEXT("the wheel is taken"), Catcher->OnMouseWheel(Geometry, Wheel).IsEventHandled());
+	TestTrue(TEXT("and it is hit by Slate's hit test (not hit-test invisible)"), Catcher->GetVisibility().IsHitTestVisible());
+	TestTrue(TEXT("a right click too"), Catcher->OnMouseButtonDown(Geometry, FPointerEvent(0, 0, FVector2D::ZeroVector, FVector2D::ZeroVector, TSet<FKey>({EKeys::RightMouseButton}), EKeys::RightMouseButton, 0.0f, FModifierKeysState())).IsEventHandled());
+	return true;
+}
+

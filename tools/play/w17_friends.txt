@@ -1,0 +1,34 @@
+# Wave 17's friends panel in the lobby: clicks on the open panel never reach the
+# lobby under it (its seats' second column lies under the open panel), and its
+# list is as wide with its bar as without. The log says what each click was on
+# and what took it ("PlayScript: click at ..."): SCheeseStrikeClickCatcher or
+# the panel's own buttons, never a seat's SBorder. A section's chevron clicked
+# (folding it), the panel drawn again at once (CheeseStrikeFriends 1, as a fold
+# draws it at the next frame), and a click in that same frame on a row and on a
+# gap, which before wave 17 fell through to the seat under them: the panel's
+# widgets there were gone and the new ones not yet in Slate's hit test. Run with
+# tools/play.ps1 -Script tools/play/w17_friends.txt -Lobby -Extra "?listen?Mode=Deathmatch" -Res 1600x900 -Tag w17_friends
+wait 6
+cmd CheeseStrikeSampleFriends 1
+cmd CheeseStrikeFriends 1
+wait 1.5
+shot w17_friends_open
+# The panel's margin and a row's card.
+click 0.99 0.5
+click 0.82 0.43
+# JOINABLE's chevron: folded, drawn again, and clicked on at once where its rows were.
+click 0.797 0.389
+cmd CheeseStrikeFriends 1
+click 0.82 0.43
+click 0.82 0.475
+shot w17_friends_folded_1
+shot w17_friends_folded_2
+wait 0.5
+shot w17_friends_folded
+# And open again (the list as wide, its bar back).
+click 0.797 0.389
+cmd CheeseStrikeFriends 1
+click 0.82 0.43
+wait 0.5
+shot w17_friends_unfolded
+quit

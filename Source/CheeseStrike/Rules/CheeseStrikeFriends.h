@@ -217,4 +217,41 @@ namespace CheeseStrikeFriends
 	bool ShouldAutoRefresh(bool bOpen, bool bJustClickedOpen, double Now, double LastRefresh);
 	/** How far round the refresh glyph has turned `Since` seconds after a refresh, in degrees: once round, eased out, then still. */
 	float RefreshSpinAt(float Since);
+
+	/**
+	 * The menu's tooltips (SCheeseStrikeMenu::UpdateTooltip), the friends' rows' above all: one card, moved from one row to
+	 * the next in place. Crossing the gap between two rows (or a row's edge onto its button) hovers nothing for a frame or
+	 * two; the card stays up TooltipLinger seconds after the mouse leaves everything with a tooltip, so that the next one
+	 * replaces it in place rather than the card going and coming back (wave 17: it flickered).
+	 */
+	constexpr float TooltipLinger = 0.15f;
+	enum class ETooltipStep : uint8
+	{
+		/** Nothing shown, and nothing to show yet. */
+		None,
+		/** The card up stays as it is (its owner still hovered, or lingering). */
+		Keep,
+		/** The card goes. */
+		Hide,
+		/** A card comes, fading in: after a rest of `Delay` on its owner with no tooltip up lately. */
+		FadeIn,
+		/** A card comes at once, no fade: in place of the one up (another owner hovered), or just after one went. */
+		Swap,
+	};
+	/**
+	 * What the tooltip does this frame. `bShown`: a card is up. `bHovered`: something with a tooltip is under the mouse,
+	 * `bSameAsShown` the one whose card is up. `SinceChange`: seconds since what is hovered (something or nothing) last
+	 * changed. `SinceHidden`: seconds since a card last went. `Delay`: the rest before a first card (CheeseStrikeMenu::TooltipDelay).
+	 */
+	ETooltipStep TooltipStep(bool bShown, bool bHovered, bool bSameAsShown, double SinceChange, double SinceHidden, float Delay);
+
+	/**
+	 * The open panel's list scrolls with its bar outside the list, in the panel's right margin (ScrollBarGap past the list's
+	 * right edge, ScrollBarThickness wide), so that the list is as wide whether the bar shows or not: a section folded or
+	 * opened, or the party's permission picked, draws the panel again, and a bar inside the list, unknown for the new list's
+	 * first frame, came and went and the whole list stepped sideways by its width (wave 17). The list drawn again is
+	 * scrolled where the last was (SCheeseStrikeMenu::FriendsScroll).
+	 */
+	constexpr float ScrollBarThickness = 6.0f;
+	constexpr float ScrollBarGap = 6.0f;
 }
