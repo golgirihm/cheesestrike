@@ -43,8 +43,6 @@ enum class EMenuPage : uint8
 	 * (ACheeseStrikePlayerController::IsLoadoutOffered: the HUD's count shows through, the page says the seconds).
 	 */
 	Loadout,
-	/** TEMPORARY: the sampler of UI themes (UI/CheeseStrikeThemes.h), a dev page of the front end's, to pick a look from. */
-	Themes,
 	/**
 	 * The lobby's menu: Escape in the lobby puts it over the lobby (an overlay, CheeseStrikeMenu::LobbyOverlay) in the pages'
 	 * panel on the left, as the pause menu is over a match: SETTINGS and LOADOUT, each over the lobby in its place, and
@@ -195,13 +193,14 @@ namespace CheeseStrikeMenu
 	/** How long a button's glow takes to come up under the mouse, and to go. */
 	constexpr float GlowSeconds = 0.2f;
 	/**
-	 * The menus' sounds: under the mouse the Tactical theme's mechanical click, on a press Cave Aged's stone tap (the theme
-	 * sampler's, CheeseStrikeSynth::ThemeHover and ThemeClick of these themes), each a wave made once and kept, in the
-	 * menu's sound class, whose every playing ends with it (UCheeseStrikeSynthWave), so that none ever keeps a voice the
-	 * music needs.
+	 * The menus' sounds: under the mouse a bright, short tick, on a press a stone tap (CheeseStrikeSynth::MenuHover and
+	 * MenuClick), each a wave made once and kept, in the menu's sound class, whose every playing ends with it
+	 * (UCheeseStrikeSynthWave), so that none ever keeps a voice the music needs. The hover has one voice
+	 * (HoverVoices): a new one cuts the last off rather than playing over it, and none starts within HoverRetrigger
+	 * seconds of the last, so that a quick sweep across the buttons ticks rather than buzzes (wave 17).
 	 */
-	constexpr int32 HoverSoundTheme = 4;
-	constexpr int32 ClickSoundTheme = 2;
+	constexpr int32 HoverVoices = 1;
+	constexpr float HoverRetrigger = 0.045f;
 	USoundBase* UISound(bool bClick);
 	/** The front end's masthead: the game's name and under it the subtitle, their font sizes, and how far down from the top. */
 	constexpr int32 TitleSize = 84;
@@ -393,8 +392,6 @@ public:
 	bool CloseDropdowns();
 	/** Whether the item with the focus is ringed: not while the player uses the mouse, which has its hover. */
 	static bool AreFocusRingsShown();
-	/** TEMPORARY: the theme sampler shows theme `Index` (0 to 4), or all of them stacked for any index past them. */
-	void ShowTheme(int32 Index);
 
 private:
 	enum class EButtonKind : uint8 { Plain, Primary, Danger, Quiet };
@@ -421,18 +418,6 @@ private:
 	/** What the loadout page is made of (the picks, and whether a count-in offers it): drawn again when it changes. */
 	FString LoadoutKey() const;
 	TSharedRef<SWidget> MakeFind();
-	/**
-	 * TEMPORARY (UI/CheeseStrikeThemes.cpp): the sampler of UI themes: tabs across the top for each theme and SHOW ALL,
-	 * then the theme's sample, or every sample stacked in a scroll box; each sample a title, the buttons, a dropdown, a
-	 * slider, a toggle, a text field, tabs, a card with a tooltip and a chip in that theme's looks, with its own hover and
-	 * click sounds. Its picks (ThemeSamples) are read live, so nothing is drawn afresh for them.
-	 */
-	TSharedRef<SWidget> MakeThemes();
-	TSharedRef<SWidget> MakeThemeSample(int32 Theme);
-	/** A dropdown in a theme's looks (as MakeDropdown, kept in Dropdowns likewise), its chosen one of `Choices` read live. */
-	TSharedRef<SWidget> MakeThemedDropdown(int32 Theme, const TArray<FString>& Choices, TFunction<int32()> GetChosen, TFunction<void(int32)> Pick);
-	/** What the themes page is made of: the theme shown, or all. */
-	FString ThemesKey() const;
 	TSharedRef<SWidget> MakeLobby();
 	TSharedRef<SWidget> MakeLobbyRules();
 	TSharedRef<SWidget> MakePause();
@@ -618,20 +603,6 @@ private:
 	TWeakPtr<SScrollBox> CreditsScroll;
 
 	EMenuPage Page = EMenuPage::None;
-	/**
-	 * TEMPORARY: the theme sampler's state (MakeThemes): which theme's sample shows, or all of them, and each sample's own
-	 * picks (its tab, its dropdown's choice, its toggle and its slider), read live by the sample's widgets.
-	 */
-	int32 ThemeShown = 0;
-	bool bAllThemes = false;
-	struct FThemeSample
-	{
-		int32 Tab = 0;
-		int32 Choice = 0;
-		bool bOn = true;
-		float Value = 0.7f;
-	};
-	TArray<FThemeSample> ThemeSamples;
 	/** The page last built afresh: a page shown in its place fades in, the same one drawn again doesn't. */
 	EMenuPage BuiltPage = EMenuPage::None;
 	EOptionsTab OptionsTab = EOptionsTab::Controls;

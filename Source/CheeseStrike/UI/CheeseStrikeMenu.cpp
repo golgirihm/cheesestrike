@@ -60,7 +60,7 @@ namespace CheeseStrikeMenu
 {
 	EMenuPage PageFor(bool bMatchStarted, bool bMatchEnded, bool bInAMatch, bool bPaused, EMenuPage Chosen, bool bTravelling, bool bResultsHeld, bool bLoadoutOffered)
 	{
-		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout || Chosen == EMenuPage::Themes;
+		const bool bFrontEndPage = Chosen == EMenuPage::Find || Chosen == EMenuPage::Credits || Chosen == EMenuPage::Options || Chosen == EMenuPage::Loadout;
 		const EMenuPage FrontEnd = bFrontEndPage ? Chosen : EMenuPage::Main;
 		// Going to the map the host picked: the lobby, saying so. Back to the lobby after the results: the results, held up
 		// until the lobby is there.
@@ -231,8 +231,18 @@ namespace CheeseStrikeMenu
 		{
 			Wave = NewObject<UCheeseStrikeSynthWave>(GetTransientPackage());
 			Wave->AddToRoot();
-			Wave->SetSamples(bClick ? CheeseStrikeSynth::ThemeClick(ClickSoundTheme) : CheeseStrikeSynth::ThemeHover(HoverSoundTheme), CheeseStrikeSynth::SampleRate);
+			Wave->SetSamples(bClick ? CheeseStrikeSynth::MenuClick() : CheeseStrikeSynth::MenuHover(), CheeseStrikeSynth::SampleRate);
 			Wave->SoundClassObject = UCheeseStrikeSettings::MenuSoundClass();
+			if (!bClick)
+			{
+				// One voice for the hover, the newest: a sweep across the buttons cuts each tick off with the next (after a
+				// few milliseconds' fade, so that the cut doesn't click), and a tick within HoverRetrigger of the last isn't played.
+				Wave->bOverrideConcurrency = true;
+				Wave->ConcurrencyOverrides.SetMaxCount(HoverVoices);
+				Wave->ConcurrencyOverrides.ResolutionRule = EMaxConcurrentResolutionRule::StopOldest;
+				Wave->ConcurrencyOverrides.RetriggerTime = HoverRetrigger;
+				Wave->ConcurrencyOverrides.VoiceStealReleaseTime = 0.004f;
+			}
 		}
 		return Wave;
 	}
@@ -284,7 +294,7 @@ struct FChevronTurn
 
 namespace
 {
-	// The menus' look is Cave Aged (wave 16; the third of the theme sampler's, UI/CheeseStrikeThemes.cpp): near-black slate,
+	// The menus' look is Cave Aged (wave 16; the third of wave 15's theme sampler's, removed in wave 17): near-black slate,
 	// thin gold hairlines round what can be pressed, light wide-set capitals, and a gold glow under the mouse.
 	const FLinearColor Ink(0.9f, 0.87f, 0.8f);
 	const FLinearColor Muted(0.55f, 0.53f, 0.48f);
@@ -1324,10 +1334,10 @@ void SCheeseStrikeMenu::Refresh()
 	const bool bLobby = Page == EMenuPage::Lobby;
 	const bool bFrontEnd = Page == EMenuPage::Main || Page == EMenuPage::Find;
 	// The credits, the options, the loadout and the themes are wide: a wider panel, and the game's name out of their way.
-	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options || Page == EMenuPage::Loadout || Page == EMenuPage::Themes;
+	const bool bWide = Page == EMenuPage::Credits || Page == EMenuPage::Options || Page == EMenuPage::Loadout;
 	if (Content.IsValid())
 	{
-		Content->SetWidthOverride(Page == EMenuPage::Options || Page == EMenuPage::Themes ? 900.0f : (Page == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : (bWide ? 640.0f : CheeseStrikeMenu::PanelContentWidth)));
+		Content->SetWidthOverride(Page == EMenuPage::Options ? 900.0f : (Page == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : (bWide ? 640.0f : CheeseStrikeMenu::PanelContentWidth)));
 		// (The front end's main page fills the panel's height: its buttons in the middle, the credits' link at the foot.)
 		Content->SetVAlign((bWide && Page != EMenuPage::Loadout) || Page == EMenuPage::Main ? VAlign_Fill : VAlign_Center);
 	}
@@ -2022,7 +2032,6 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakePage()
 	case EMenuPage::Credits: return MakeCredits();
 	case EMenuPage::Options: return MakeOptions();
 	case EMenuPage::Loadout: return MakeLoadout();
-	case EMenuPage::Themes: return MakeThemes();
 	default: return SNullWidget::NullWidget;
 	}
 }
@@ -2044,7 +2053,7 @@ float SCheeseStrikeMenu::WrapWidth() const
 	{
 		return (LobbyOverlayPage == EMenuPage::Options ? 900.0f : (LobbyOverlayPage == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : CheeseStrikeMenu::PanelContentWidth)) - 24.0f;
 	}
-	return (Page == EMenuPage::Options || Page == EMenuPage::Themes ? 900.0f : (Page == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : (Page == EMenuPage::Credits ? 640.0f : 400.0f))) - 24.0f;
+	return (Page == EMenuPage::Options ? 900.0f : (Page == EMenuPage::Loadout ? CheeseStrikeMenu::LoadoutWidth : (Page == EMenuPage::Credits ? 640.0f : 400.0f))) - 24.0f;
 }
 
 TSharedRef<SWidget> SCheeseStrikeMenu::MakeLine(const FString& Text, bool bDim, bool bWrap, float WrapAt)
@@ -2299,10 +2308,6 @@ TSharedRef<SWidget> SCheeseStrikeMenu::MakeMain()
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("LOADOUT"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Loadout); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("PRACTICE"), [Player]() { if (Player.IsValid()) Player->PracticeFromMenu(); }) ]
 			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("SETTINGS"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Options); }) ]
-#if !UE_BUILD_SHIPPING
-			// TEMPORARY: the sampler of UI themes (UI/CheeseStrikeThemes.h), for picking a look from; never in a shipping build.
-			+ SVerticalBox::Slot().AutoHeight() [ MakeButton(TEXT("THEMES"), [Player]() { if (Player.IsValid()) Player->ChooseMenu(EMenuPage::Themes); }) ]
-#endif
 			+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f)) [ MakeQuitButton() ]
 		]
 		+ SVerticalBox::Slot().FillHeight(1.0f) [ SNew(SSpacer) ]
@@ -3482,10 +3487,6 @@ FString SCheeseStrikeMenu::PageKey() const
 	if (Page == EMenuPage::Options)
 	{
 		Key += TEXT("|") + OptionsKey();
-	}
-	if (Page == EMenuPage::Themes)
-	{
-		Key += TEXT("|") + ThemesKey();
 	}
 	return Key;
 }

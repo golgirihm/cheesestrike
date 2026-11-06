@@ -410,7 +410,7 @@ bool ACheeseStrikePlayerController::IsLobbyReady() const
 
 bool ACheeseStrikePlayerController::IsDoneWithTheResults() const
 {
-	const bool bFrontEnd = ShownPage == EMenuPage::Main || ShownPage == EMenuPage::Find || ShownPage == EMenuPage::Credits || ShownPage == EMenuPage::Options || ShownPage == EMenuPage::Loadout || ShownPage == EMenuPage::Themes;
+	const bool bFrontEnd = ShownPage == EMenuPage::Main || ShownPage == EMenuPage::Find || ShownPage == EMenuPage::Credits || ShownPage == EMenuPage::Options || ShownPage == EMenuPage::Loadout;
 	// A level that skips the lobby (?StartNow, as the play scripts' do) goes straight into a match: the player's in it.
 	const AGameStateBase* State = GetWorld() != nullptr ? GetWorld()->GetGameState() : nullptr;
 	const bool bPlaying = State != nullptr && State->HasMatchStarted() && !State->HasMatchEnded() && GetPawn() != nullptr && GetViewTarget() == GetPawn();
@@ -1061,7 +1061,7 @@ void ACheeseStrikePlayerController::CheeseStrikeUISound(const FString& Which, in
 		if (!Queued.IsEmpty())
 		{
 			// As MakeSound made every sound until wave 16: the samples queued on a plain procedural wave, which the mixer never sees end.
-			const TArray<int16> Samples = bClick ? CheeseStrikeSynth::ThemeClick(2) : CheeseStrikeSynth::ThemeHover(4);
+			const TArray<int16> Samples = bClick ? CheeseStrikeSynth::MenuClick() : CheeseStrikeSynth::MenuHover();
 			USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(this);
 			Wave->SetSampleRate(CheeseStrikeSynth::SampleRate);
 			Wave->NumChannels = 1;
@@ -1176,10 +1176,6 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 	{
 		Chosen = EMenuPage::Loadout;
 	}
-	else if (Page.Equals(TEXT("Themes"), ESearchCase::IgnoreCase))
-	{
-		Chosen = EMenuPage::Themes;
-	}
 	else if (Page.Equals(TEXT("LobbyMenu"), ESearchCase::IgnoreCase) || Page.Equals(TEXT("Menu"), ESearchCase::IgnoreCase))
 	{
 		// The lobby's menu, over it, as Escape puts it.
@@ -1204,15 +1200,6 @@ void ACheeseStrikePlayerController::CheeseStrikePage(const FString& Page, const 
 		{
 			Menu->SetOptionsTab(static_cast<EOptionsTab>(Index));
 		}
-	}
-}
-
-void ACheeseStrikePlayerController::CheeseStrikeThemes(int32 Theme)
-{
-	ChooseMenu(EMenuPage::Themes);
-	if (Menu.IsValid() && Theme > 0)
-	{
-		Menu->ShowTheme(Theme - 1);
 	}
 }
 

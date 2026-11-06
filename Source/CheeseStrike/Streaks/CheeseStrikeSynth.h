@@ -47,13 +47,15 @@ namespace CheeseStrikeSynth
 	/** A soft hiss for `Seconds` (the Smoked Gouda's cloud): band-limited noise, in over a third of a second, wavering gently, and out over the last fifth. Peaks at a quarter of full scale. */
 	TArray<int16> Hiss(float Seconds);
 	/**
-	 * The UI theme sampler's sounds (UI/CheeseStrikeThemes.h, temporary), a hover and a click a theme, each a few tenths of
-	 * a second at most: the Cheese Board's soft wooden tick and wooden knock, the Deli Counter's paper tick and ticket
-	 * punch, Cave Aged's glass ping and low stone tap, Cartoon Cheese's pop and boing, Tactical's mechanical click and radio
-	 * blip. `Theme` is the theme's index (CheeseStrikeThemes::NumThemes); out of range, the first's.
+	 * The menus' sounds: under the mouse a bright, short tick (about 20 ms, its energy over 3 kHz), and on a press a tap
+	 * on stone (80 ms, Cave Aged's). Their peaks (MenuHoverPeak, MenuClickPeak) are near full scale, the hover's a little
+	 * under the press's, so that both are heard plainly over the music at its usual 60% (wave 17; the hover was 0.4 and
+	 * the press 0.6 of full scale).
 	 */
-	TArray<int16> ThemeHover(int32 Theme);
-	TArray<int16> ThemeClick(int32 Theme);
+	constexpr float MenuHoverPeak = 0.8f;
+	constexpr float MenuClickPeak = 0.9f;
+	TArray<int16> MenuHover();
+	TArray<int16> MenuClick();
 	/** A sound, owned by `Outer`, that plays `Samples` each time it is played, each playing ending with them (UCheeseStrikeSynthWave). */
 	USoundWaveProcedural* MakeSound(UObject* Outer, const TArray<int16>& Samples);
 }
