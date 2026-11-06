@@ -21,6 +21,7 @@
 #include "Rules/CheeseStrikeStreaks.h"
 #include "Streaks/CheeseStrikeAerialCheese.h"
 #include "Streaks/CheeseStrikeBombs.h"
+#include "Effects/CheeseStrikeGooSplats.h"
 #include "Modes/CheeseStrikeLastStand.h"
 #include "Rules/CheeseStrikeDowned.h"
 #include "Rules/CheeseStrikeExecution.h"
@@ -582,6 +583,14 @@ bool FStreaksAreCalledInAndScoreForTheirCallers::RunTest(const FString& Paramete
 		const float Speed = Host->GetVelocity().Size2D();
 		TestTrue(FString::Printf(TEXT("the host, sprinting, goes at %.0f cm/s: slower than a walk"), Speed), Speed > 40.0f && Speed < CheeseStrikeMovement::WalkSpeed * 0.55f);
 		TestFalse(TEXT("and doesn't sprint"), Host->GetCheeseStrikeMovement()->IsSprinting());
+		// Melted gouda on the floor at the slowed host's feet, on the host's machine and the joiner's, a trail as they go.
+		for (int32 Machine = 0; Machine < 2; ++Machine)
+		{
+			const ACheeseStrikeGooSplats* Goo = ACheeseStrikeGooSplats::Find(World(Machine));
+			const ACheeseStrikeCharacter* Seen = CharacterOf(0, Machine);
+			const int32 Near = Goo != nullptr && Seen != nullptr ? Goo->CountNear(Seen->GetActorLocation(), 150.0f) : 0;
+			TestTrue(FString::Printf(TEXT("gouda puddles at the host's feet on machine %d (%d near, %d laid)"), Machine, Near, Goo != nullptr ? Goo->GetLaid() : 0), Near >= 1 && Goo->GetLaid() >= 2);
+		}
 	});
 	Play(0, TEXT("release Move\nrelease Sprint"));
 	// Back to normal: the Gatling gone and the primary back, the haste over, then the gouda.
