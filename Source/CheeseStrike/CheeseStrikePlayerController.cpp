@@ -1104,7 +1104,7 @@ void ACheeseStrikePlayerController::CheeseStrikeBots()
 
 void ACheeseStrikePlayerController::CheeseStrikeMice()
 {
-	static const TCHAR* const Doings[] = {TEXT("entering"), TEXT("walking"), TEXT("eating"), TEXT("fleeing")};
+	static const TCHAR* const Doings[] = {TEXT("entering"), TEXT("walking"), TEXT("eating"), TEXT("fleeing"), TEXT("sinking"), TEXT("leaving"), TEXT("exiting")};
 	for (TActorIterator<ACheeseStrikeMouse> It(GetWorld()); It; ++It)
 	{
 		const ACheeseStrikeCheese* Target = It->GetTarget();

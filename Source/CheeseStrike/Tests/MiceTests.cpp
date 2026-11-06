@@ -569,4 +569,109 @@ bool FTheMiceLeaveWhenTheCheeseIsGone::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMiceLeftInTheArchGetOut, "CheeseStrike.Play.MiceLeftInTheGrottosArchGetOut", MiceTests::Flags)
+
+bool FMiceLeftInTheArchGetOut::RunTest(const FString& Parameters)
+{
+	using namespace PlayTesting;
+	using namespace MiceTests;
+	// Gruyere Grotto's arch through the Spine, the middle level's hallway in the cave's middle (tools/art/build_grotto.py:
+	// ARCH, SPINE, L1), reached only over the two bridges: mice in it as the mice eat the bridges are left in it.
+	static const FBox Arch(FVector(-350.0, -700.0, 350.0), FVector(350.0, 700.0, 750.0));
+	static TArray<TWeakObjectPtr<ACheeseStrikeMouse>> Left;
+	static TMap<TWeakObjectPtr<ACheeseStrikeMouse>, int32> EatenThen;
+	static TMap<TWeakObjectPtr<ACheeseStrikeMouse>, int32> LeapsThen;
+	Left.Reset();
+	EatenThen.Reset();
+	LeapsThen.Reset();
+	FSession Session;
+	Session.Level = TEXT("/Game/CheeseStrike/Maps/Lvl_Grotto");
+	Session.Options = TEXT("?Mice=1?MiceAt=2");
+	StartPlaying(Session);
+	WaitUntil(TEXT("the mice in and eating"), 25.0f, []()
+	{
+		const TArray<ACheeseStrikeMouse*> Mice = All<ACheeseStrikeMouse>();
+		for (ACheeseStrikeMouse* Mouse : Mice)
+		{
+			if (Mouse->GetDoing() == EMouseDoing::Entering)
+			{
+				return false;
+			}
+		}
+		return Mice.Num() >= 3;
+	});
+	Then([this]()
+	{
+		// The bridges eaten, and three mice in the arch: one at each end, where they ate the last of them, one in its middle.
+		int32 Spans = 0;
+		for (ACheeseStrikeCheese* Cheese : All<ACheeseStrikeCheese>())
+		{
+			if (Cheese->GetStructure() == FName(TEXT("NorthSpan")) || Cheese->GetStructure() == FName(TEXT("SouthSpan")))
+			{
+				Cheese->Bite(CheeseStrikeRules::CheeseBlockHealth);
+				++Spans;
+			}
+		}
+		TestEqual(TEXT("the two bridges' blocks"), Spans, 12);
+		const TArray<ACheeseStrikeMouse*> Mice = All<ACheeseStrikeMouse>();
+		const FVector Spots[] = {FVector(0.0, 520.0, 400.0), FVector(0.0, -520.0, 400.0), FVector(90.0, 250.0, 400.0)};
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			Mice[Index]->PutAt(Spots[Index]);
+			Left.Add(Mice[Index]);
+			EatenThen.Add(Mice[Index], Mice[Index]->GetEaten());
+			LeapsThen.Add(Mice[Index], Mice[Index]->GetLeaps());
+		}
+	});
+	Wait(1.0f);
+	Then([this]()
+	{
+		for (const TWeakObjectPtr<ACheeseStrikeMouse>& Mouse : Left)
+		{
+			TestTrue(FString::Printf(TEXT("%s stands in the arch"), *GetNameSafe(Mouse.Get())), Mouse.IsValid() && Arch.IsInside(Mouse->GetActorLocation()));
+		}
+	});
+	// Out of it, as out of anywhere a mouse is cut off in (no way leads out of it: ACheeseStrikeMouse::LeadsOut), by a leap
+	// down onto the floor through either end within seconds of its last bite, not by standing about until it is taken for
+	// stuck and comes in again over the edge (15 s), and never through the Spine's rock either side.
+	WaitUntil(TEXT("the mice left in the arch leaping out of it"), 12.0f, []()
+	{
+		for (const TWeakObjectPtr<ACheeseStrikeMouse>& Mouse : Left)
+		{
+			if (!Mouse.IsValid() || Arch.IsInside(Mouse->GetActorLocation()) || Mouse->GetLeaps() <= LeapsThen.FindRef(Mouse))
+			{
+				return false;
+			}
+		}
+		return true;
+	});
+	Then([this]()
+	{
+		for (const TWeakObjectPtr<ACheeseStrikeMouse>& Mouse : Left)
+		{
+			if (Mouse.IsValid())
+			{
+				AddInfo(Mouse->Describe());
+				TestFalse(FString::Printf(TEXT("%s is out of the arch"), *Mouse->GetName()), Arch.IsInside(Mouse->GetActorLocation()));
+				TestTrue(FString::Printf(TEXT("%s leapt out"), *Mouse->GetName()), Mouse->GetLeaps() > LeapsThen.FindRef(Mouse));
+				TestTrue(FString::Printf(TEXT("%s is not in the Spine's rock"), *Mouse->GetName()), FMath::Abs(Mouse->GetActorLocation().X) > 350.0 || FMath::Abs(Mouse->GetActorLocation().Y) > 600.0 || Mouse->GetActorLocation().Z < 50.0);
+			}
+		}
+	});
+	// And eating the cheese left.
+	WaitUntil(TEXT("the mice eating again"), 60.0f, []()
+	{
+		for (const TWeakObjectPtr<ACheeseStrikeMouse>& Mouse : Left)
+		{
+			if (!Mouse.IsValid() || Mouse->GetEaten() <= EatenThen.FindRef(Mouse))
+			{
+				return false;
+			}
+		}
+		return true;
+	});
+	StopPlaying();
+	return true;
+}
+
 #endif

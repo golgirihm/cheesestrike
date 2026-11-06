@@ -1,0 +1,22 @@
+# Mice left in Gruyère Grotto's arch through the Spine as its bridges are eaten: they leap down out of either end onto
+# the floor and go on eating, never staying in it nor leaping through the rock (W16-MAP-02). Run with
+# -Map /Game/CheeseStrike/Maps/Lvl_Grotto -StartAt 4200,-1900,500,180 -Mice -Extra "?MiceAt=2"
+wait 12
+cmd CheeseStrikeEatCheese 1 NorthSpan
+cmd CheeseStrikeEatCheese 1 SouthSpan
+cmd CheeseStrikeMouseTo 0 0 520 400
+cmd CheeseStrikeMouseTo 1 0 -520 400
+cmd CheeseStrikeMouseTo 2 90 250 400
+cmd CheeseStrikeViewFrom 0 1700 600 -8 -90
+wait 0.5
+shot grotto_arch_0
+cmd CheeseStrikeMice
+wait 3
+shot grotto_arch_1
+wait 4
+shot grotto_arch_2
+cmd CheeseStrikeMice
+wait 8
+shot grotto_arch_3
+cmd CheeseStrikeMice
+quit
