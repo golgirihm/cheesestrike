@@ -31,6 +31,9 @@ class UInputAction;
  *                               Gamepad_FaceButton_Right (B), Gamepad_Special_Right (Menu); a stick's axis
  *                               (Gamepad_LeftX, Gamepad_LeftY) held at `value` (1 by default); let go after `seconds`
  *                               (a few frames by default)
+ *   click <x> <y>               click the left mouse button through Slate at that point of the view (0 to 1 across and
+ *                               down), pressed and let go at once, logging what was under it and what took the press
+ *                               ("PlayScript: click at ... on SCheeseStrikeClickCatcher"); the real mouse stays where it is
  *   device <gamepad|keyboard|mouse>  say the player last played with it, as if they had: the prompts and the menu's
  *                               focus follow it (the actions above are injected past Slate, which doesn't see them)
  *   look <yaw> <pitch>          turn the view by so many degrees, at once
@@ -100,6 +103,7 @@ private:
 	};
 	TMap<FKey, FPressed> Pressed;
 	void PressKey(const FKey& Key, bool bDown, float Value);
+	void Click(const FVector2D& Along);
 	int32 SlateUser() const;
 };
 
