@@ -127,7 +127,8 @@ namespace CheeseStrikeBots
 
 	EWeaponSlot ChooseWeapon(const FArmed& Armed, bool bFighting, float Distance, EWeaponSlot Current)
 	{
-		if (Armed.bPrimary && Armed.bPrimaryMelee)
+		// Wave 17: the Cheese Stick has so many swings; spent, it is no choice (the guns' rules below find another).
+		if (Armed.bPrimary && Armed.bPrimaryMelee && (Armed.PrimaryMagazine > 0 || Armed.bPrimaryReserve))
 		{
 			// The Cheese Stick: in hand up close (kept a little further once out); the sidearm meanwhile, if any.
 			const float Reach = FMath::Max(Armed.PrimaryReach, 1.0f);

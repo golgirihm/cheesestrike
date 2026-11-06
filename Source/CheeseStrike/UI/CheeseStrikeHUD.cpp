@@ -867,7 +867,7 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 	const ACheeseStrikeGameState* Match = GetWorld()->GetGameState<ACheeseStrikeGameState>();
 	const bool bTimed = bRounds && Stats.bSpecial && Arms != nullptr && Arms->GetSpecialUntil() > 0.0f && Match != nullptr;
 	const FString Reserve = bTimed ? CheeseStrikeStreaks::GatlingTimeLeft(Arms->GetSpecialUntil() - Match->GetServerWorldTimeSeconds())
-		: bRounds ? CheeseStrikeWeapons::ReserveLabel(Weapon->GetReserve()) : FString();
+		: bRounds && !Stats.HasSwings() ? CheeseStrikeWeapons::ReserveLabel(Weapon->GetReserve()) : FString();
 	const FString Rounds = bRounds ? FString::FromInt(Magazine) : FString();
 	const FVector2D ReserveSize = Reserve.IsEmpty() ? FVector2D::ZeroVector : HudDraw::Measure(Reserve, Small);
 	const FVector2D Line = HudDraw::Measure(TEXT("0"), Big);
@@ -934,7 +934,7 @@ void ACheeseStrikeHUD::DrawWeapon(const ACheeseStrikeCharacter* Character)
 		}
 		else if (Weapon->IsDry() && !Stats.bSpecial)
 		{
-			HudDraw::Text(Canvas, TEXT("NO ROUNDS"), FVector2D(Right, NameTop), Label, HudDraw::Danger, 1.0f);
+			HudDraw::Text(Canvas, Stats.HasSwings() ? TEXT("NO SWINGS") : TEXT("NO ROUNDS"), FVector2D(Right, NameTop), Label, HudDraw::Danger, 1.0f);
 		}
 		else if (Magazine == 0)
 		{

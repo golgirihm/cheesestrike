@@ -102,6 +102,8 @@ public:
 	bool IsReady() const;
 	/** Whether it has nothing left: no round in the magazine or in reserve. The knife never has. */
 	bool IsDry() const;
+	/** Whether this is a weapon of swings (the Cheese Stick's) with none left, and not endless as in Gun Game: no weapon to draw. */
+	bool IsSpent() const;
 	/** How far through its swipe the knife is, 0 to 1, as this machine shows it; below 0 when it isn't swiping. */
 	float SwipePhase() const;
 	/** Which shot of the run of fire the next would be. */
@@ -227,8 +229,11 @@ protected:
 	void FireShot(int32 InBurst, float ShowDelay = 0.0f);
 	/** The rest of a burst, after its first shot. */
 	void FireBurstShot();
-	/** Swings the knife, on the owner's machine. */
+	/** Swings the knife, on the owner's machine; a weapon of swings (the Cheese Stick) spends one, and is put away after its last (DrawSpent). */
 	void Strike(float Now);
+	/** The owner's machine: a weapon of swings is spent: the sidearm (or the knife) drawn in its place (CheeseStrikeWeapons::DrawWhenSpent). */
+	void DrawSpent();
+	FTimerHandle SpentTimer;
 	/** Tells the server a shot was fired from `Origin` along `AimDirection` (before spread), shot `Index` of a run, spread from `Seed`, at the server's time `ClientTime` as the shooter had it. */
 	UFUNCTION(Server, Reliable)
 	void ServerFire(FVector_NetQuantize Origin, FVector_NetQuantizeNormal AimDirection, int32 Seed, int32 Index, bool bWasAimed, float ClientTime);

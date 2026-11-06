@@ -20,7 +20,7 @@ namespace CheeseStrikeWeapons
 	const FWeaponStats& Carbine();
 	/** The Cheese Grater (the Parmesan Grater's id, `grater`): a needler, homing shards; sixteen in one player burst for a kill. */
 	const FWeaponStats& Grater();
-	/** The Munster Twin SMGs: two submachine guns, one in each hand, automatic, firing in turn, a belt of 60 each, no sights. */
+	/** The Munster Twin SMGs: two submachine guns, one in each hand, automatic, firing in turn, 32 rounds each, no sights. */
 	const FWeaponStats& Munster();
 	/** The Swiss Shotgun: twelve pellets a shot, a kill up to about 4 m, weak past 8. */
 	const FWeaponStats& Shotgun();
@@ -30,7 +30,7 @@ namespace CheeseStrikeWeapons
 	const FWeaponStats& Roquefort();
 	/** The BabyBomb: a power weapon, a launcher of red-waxed wheels that burst, its shooter not spared. */
 	const FWeaponStats& BabyBomb();
-	/** The Cheese Stick: a melee power weapon, a slow swing that fells everyone in a wide arc in front. */
+	/** The Cheese Stick: a melee power weapon, a slow swing that fells everyone in a wide arc in front; twelve swings. */
 	const FWeaponStats& Stick();
 	/** The Curd Pistol: the weak sidearm everyone carries, with rounds without end. */
 	const FWeaponStats& Pistol();

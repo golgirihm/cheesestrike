@@ -127,7 +127,9 @@ ACheeseStrikeWeapon* UCheeseStrikeInventory::GetInSlot(EWeaponSlot Slot) const
 
 bool UCheeseStrikeInventory::CanDraw(EWeaponSlot Slot) const
 {
-	return GetInSlot(Slot) != nullptr && IsAllowed(Slot);
+	// Not a weapon of swings with none left (the Cheese Stick spent, wave 17): it waits for a stand's or the floor's.
+	const ACheeseStrikeWeapon* Weapon = GetInSlot(Slot);
+	return Weapon != nullptr && IsAllowed(Slot) && !Weapon->IsSpent();
 }
 
 bool UCheeseStrikeInventory::GetLastSlot(EWeaponSlot& Slot) const
@@ -574,7 +576,7 @@ bool UCheeseStrikeInventory::TakePickup(ACheeseStrikePickup* Pickup)
 	}
 	if (How == ETake::TopUp && Carried != nullptr)
 	{
-		Carried->AddReserve(CheeseStrikePickups::TopUpRounds(Pickup->IsDropped(), Carried->GetStats().Reserve, Pickup->GetDroppedMagazine(), Pickup->GetDroppedReserve()));
+		Carried->AddReserve(CheeseStrikePickups::TopUpRounds(Pickup->IsDropped(), CheeseStrikePickups::StandRounds(Carried->GetStats()), Pickup->GetDroppedMagazine(), Pickup->GetDroppedReserve()));
 	}
 	else
 	{

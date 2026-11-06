@@ -42,9 +42,11 @@ namespace CheeseStrikeWeapons
 		static const FWeaponStats Stats = []
 		{
 			// Wave 16: a tenth less damage (20 to 18: six hits to a kill, not five) and a little less accurate aimed (0.3
-			// degrees to 0.45), which tells at long range.
+			// degrees to 0.45), which tells at long range. Wave 17: a fifth less damage again (18 to 14.4: seven hits to a kill,
+			// not six) and less accurate at long range (aimed, 0.45 degrees to 0.8: at 30 m a shot strays up to 21 cm, at 50 m
+			// up to 35, as wide as a body).
 			FWeaponStats Weapon = MakeWeapon(TEXT("blaster"), NSLOCTEXT("CheeseStrike", "Blaster", "Cheddar Blaster"), EWeaponSlot::Primary);
-			Weapon.Damage = 18.0f;
+			Weapon.Damage = 14.4f;
 			Weapon.HeadMultiplier = 1.75f;
 			Weapon.FireInterval = 0.12f;
 			Weapon.bAutomatic = true;
@@ -53,7 +55,7 @@ namespace CheeseStrikeWeapons
 			Weapon.Reserve = 72;
 			Weapon.ReserveMax = 120;
 			SetReach(Weapon, 150.0f, 40.0f, 90.0f, 0.6f);
-			Weapon.SpreadDegrees = 0.45f;
+			Weapon.SpreadDegrees = 0.8f;
 			Weapon.HipSpreadDegrees = 9.0f;
 			Weapon.BloomShots = 8;
 			SetKick(Weapon, 0.45f, 9.0f, 0.35f, 0.3f);
@@ -101,7 +103,11 @@ namespace CheeseStrikeWeapons
 			// Grater's it replaces. At 5 a shard sixteen (80) leave a full-health player standing, so the supercombine is
 			// what kills. Wave 16: much less accurate at range, so that a kill at 40 m is next to impossible: a wider cone (3
 			// degrees aimed, 7 from the hip), a shard's damage falling from 15 m to 0.4 of it at 35 m, homing only on someone
-			// within 20 m, and only shards that struck within 25 m counting toward the supercombine.
+			// within 20 m, and only shards that struck within 25 m counting toward the supercombine. Wave 17: sure close and
+			// hopeless far: homing much harder (60 degrees a second, from 25, so that a shard follows someone strafing across
+			// 10 m) but only on someone within 16 m (from 20); past that its cone alone (4.5 degrees aimed, from 3) decides, and
+			// only shards that struck within 22 m (from 25) count toward the supercombine. A magazine kills at 10 m nearly
+			// always, at 20 m seldom (standing still, aimed) and at 30 m never (CheeseStrike.Weapons.TheGraterKillsCloseNotFar).
 			FWeaponStats Weapon = MakeWeapon(TEXT("grater"), NSLOCTEXT("CheeseStrike", "Grater", "Cheese Grater"), EWeaponSlot::Primary);
 			Weapon.Damage = 5.0f;
 			Weapon.HeadMultiplier = 1.25f;
@@ -118,13 +124,13 @@ namespace CheeseStrikeWeapons
 			Weapon.FalloffStart = 1500.0f;
 			Weapon.FalloffEnd = 3500.0f;
 			Weapon.FalloffFloor = 0.4f;
-			Weapon.HomingTurn = 25.0f;
+			Weapon.HomingTurn = 60.0f;
 			Weapon.HomingCone = 10.0f;
-			Weapon.HomingReach = 2000.0f;
+			Weapon.HomingReach = 1600.0f;
 			Weapon.SuperShards = 16;
 			Weapon.SuperWindow = 2.0f;
-			Weapon.SuperReach = 2500.0f;
-			Weapon.SpreadDegrees = 3.0f;
+			Weapon.SuperReach = 2200.0f;
+			Weapon.SpreadDegrees = 4.5f;
 			Weapon.HipSpreadDegrees = 7.0f;
 			Weapon.BloomShots = 8;
 			SetKick(Weapon, 0.2f, 8.0f, 0.3f, 0.25f);
@@ -140,17 +146,22 @@ namespace CheeseStrikeWeapons
 		{
 			// Wave 14: the Munster Machine Gun made two submachine guns, one in each hand (the Dual Burratas' two guns),
 			// automatic, firing in turn, a belt of 60 each; no sights, close and loose. Wave 16: less accurate at long range
-			// (aimed, a cone of 2.5 degrees, not 1.5).
+			// (aimed, a cone of 2.5 degrees, not 1.5). Wave 17: too strong for a loadout weapon (eight body hits killed): a hit
+			// of 6.25, not 13, so that it takes 16 body hits from the two guns together, firing a little faster (a shot every
+			// 0.06 s, from 0.075) so that a kill with every hit (0.9 s, from 0.525) is still quicker than the Colby Carbine's
+			// (0.96 s); and a magazine of 64 (32 a gun) in place of 120: four kills a magazine at every hit, about the Cheddar
+			// Blaster's (3.4) and the Colby Carbine's (3.9), where 120 would be seven and a half; a reserve of two magazines,
+			// four at most, as before.
 			FWeaponStats Weapon = MakeWeapon(TEXT("munster"), NSLOCTEXT("CheeseStrike", "Munster", "Munster Twin SMGs"), EWeaponSlot::Primary);
 			Weapon.bDual = true;
-			Weapon.Damage = 13.0f;
+			Weapon.Damage = 6.25f;
 			Weapon.HeadMultiplier = 1.5f;
-			Weapon.FireInterval = 0.075f;
+			Weapon.FireInterval = 0.06f;
 			Weapon.bAutomatic = true;
-			Weapon.MagazineSize = 120;
+			Weapon.MagazineSize = 64;
 			Weapon.ReloadTime = 3.2f;
-			Weapon.Reserve = 120;
-			Weapon.ReserveMax = 240;
+			Weapon.Reserve = 128;
+			Weapon.ReserveMax = 256;
 			SetReach(Weapon, 80.0f, 15.0f, 45.0f, 0.45f);
 			Weapon.SpreadDegrees = 2.5f;
 			Weapon.HipSpreadDegrees = 8.0f;
@@ -169,7 +180,9 @@ namespace CheeseStrikeWeapons
 		{
 			// Wave 14: twelve pellets of 14, the whole of them from 4 m in, falling to 0.15 of it at 12 m: a kill a shot up
 			// to about 4 m, weak past 8. Wave 15: a wider cone (9 degrees aimed, 14 from the hip: most land on a body at
-			// 4 m, few at 8) and a slower shot, 1.19 s between.
+			// 4 m, few at 8) and a slower shot, 1.19 s between. Wave 17: a heavy kick each shot, as the Roquefort's (its shots,
+			// each the first of its run, never had the recoil's climb): the view thrown up 7.5 degrees and eased back over 0.5 s,
+			// 1.8 of them kept, the gun in view thrown back 11 cm and tipped up.
 			FWeaponStats Weapon = MakeWeapon(TEXT("shotgun"), NSLOCTEXT("CheeseStrike", "Shotgun", "Swiss Shotgun"), EWeaponSlot::Primary);
 			Weapon.Damage = 14.0f;
 			Weapon.Pellets = 12;
@@ -188,6 +201,10 @@ namespace CheeseStrikeWeapons
 			Weapon.HipSpreadDegrees = 14.0f;
 			Weapon.BloomShots = 1;
 			SetKick(Weapon, 3.0f, 2.0f, 0.6f, 1.0f);
+			Weapon.KickPitch = 7.5f;
+			Weapon.KickSeconds = 0.5f;
+			Weapon.KickKept = 1.8f;
+			Weapon.KickBack = 11.0f;
 			Weapon.AimZoom = 0.8f;
 			return Weapon;
 		}();
@@ -309,14 +326,17 @@ namespace CheeseStrikeWeapons
 			// in a 120-degree arc in front (down in Execution), never a teammate; no rounds; a little slow to carry. Wave 15:
 			// the swing shown 1.6 times slower (1.28 s, the whoosh's length), so a swing every 1.4 s. Wave 16: the blow lands
 			// as the head comes round to the aim, 0.49 s into the swing (CheeseStrikeWeapons::ContactDelay), on whoever is in
-			// the arc then, not as the swing starts.
+			// the arc then, not as the swing starts. Wave 17: twelve swings (FWeaponStats::HasSwings), shown on the HUD as its
+			// rounds and topped up by a stand's or a dropped stick's as a gun's rounds are, never by a kill; out of them, it
+			// is put away for the sidearm (ACheeseStrikeWeapon::Strike). Twelve, the fewest the user asked for: every one may
+			// fell everyone in its arc.
 			FWeaponStats Weapon = MakeWeapon(TEXT("stick"), NSLOCTEXT("CheeseStrike", "Stick", "Cheese Stick"), EWeaponSlot::Primary);
 			Weapon.Damage = 500.0f;
 			Weapon.BackstabDamage = 500.0f;
 			Weapon.HeadMultiplier = 1.0f;
 			Weapon.FireInterval = 1.4f;
 			Weapon.bAutomatic = false;
-			Weapon.MagazineSize = 0;
+			Weapon.MagazineSize = 12;
 			Weapon.Reserve = 0;
 			Weapon.ReserveMax = 0;
 			Weapon.ReloadTime = 0.0f;

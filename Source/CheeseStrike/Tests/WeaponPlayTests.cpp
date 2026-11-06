@@ -448,6 +448,53 @@ bool FTheNewWeaponsStrikeOverTheNetwork::RunTest(const FString& Parameters)
 	{
 		const ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0);
 		TestTrue(TEXT("its head come round, it felled the joiner at its side"), Joiner == nullptr || !Joiner->IsAlive());
+		// Wave 17: so many swings, one spent with each.
+		const ACheeseStrikeCharacter* Host = CharacterOf(0, 0);
+		const ACheeseStrikeWeapon* Stick = Host != nullptr ? Host->GetWeapon() : nullptr;
+		TestEqual(TEXT("a swing spent"), Stick != nullptr ? Stick->GetMagazine() : -1, CheeseStrikeWeapons::Stick().MagazineSize - 1);
+		TestEqual(TEXT("its swings on the HUD as its rounds"), Stick != nullptr ? Stick->DescribeRounds() : FString(), FString::FromInt(CheeseStrikeWeapons::Stick().MagazineSize - 1));
+	});
+	// The joiner's last two swings: counted on its machine and the server alike, and after the last, once it is over, the
+	// stick put away for the pistol.
+	WaitUntil(TEXT("the joiner coming back to swing"), 6.0f, []() { return CharacterOf(1, 0) != nullptr && CharacterOf(1, 0)->IsAlive() && Character(1) != nullptr; });
+	PutAt(1, JoinerSpot, JoinerYaw);
+	Then([]()
+	{
+		if (ACheeseStrikeCharacter* Joiner = CharacterOf(1, 0))
+		{
+			Joiner->GetInventory()->Give(FCheeseStrikeLoadout::Usual(CheeseStrikeWeapons::Stick().Id));
+			Joiner->EndProtection();
+		}
+	});
+	Wait(0.3f);
+	Then([]()
+	{
+		if (ACheeseStrikeWeapon* Stick = CharacterOf(1, 0) != nullptr ? CharacterOf(1, 0)->GetWeapon() : nullptr)
+		{
+			Stick->SetRounds(2, 0);
+		}
+	});
+	Wait(0.8f);
+	Play(1, TEXT("tap Fire\nwait 1.6\ntap Fire\nwait 0.3"));
+	Then([this]()
+	{
+		const ACheeseStrikeWeapon* Mine = Character(1) != nullptr ? Character(1)->GetWeapon() : nullptr;
+		const ACheeseStrikeWeapon* Servers = CharacterOf(1, 0) != nullptr ? CharacterOf(1, 0)->GetWeapon() : nullptr;
+		TestTrue(TEXT("the joiner's stick in hand through its last swing"), Mine != nullptr && Mine->GetStats().HasSwings());
+		TestEqual(TEXT("spent on the joiner's machine"), Mine != nullptr ? Mine->GetMagazine() : -1, 0);
+		TestEqual(TEXT("and on the server"), Servers != nullptr ? Servers->GetMagazine() : -1, 0);
+		TestTrue(TEXT("no swing left"), Servers != nullptr && Servers->IsDry());
+	});
+	Wait(CheeseStrikeWeapons::SwipeSecondsOf(CheeseStrikeWeapons::Stick()) + 0.5f);
+	Then([this]()
+	{
+		EWeaponSlot Mine = EWeaponSlot::Primary;
+		EWeaponSlot Servers = EWeaponSlot::Primary;
+		const bool bMine = Character(1) != nullptr && Character(1)->GetInventory()->GetHeldSlot(Mine);
+		const bool bServers = CharacterOf(1, 0) != nullptr && CharacterOf(1, 0)->GetInventory()->GetHeldSlot(Servers);
+		TestTrue(TEXT("the swing over, the pistol in the joiner's hand"), bMine && Mine == EWeaponSlot::Sidearm);
+		TestTrue(TEXT("as the server has it"), bServers && Servers == EWeaponSlot::Sidearm);
+		TestFalse(TEXT("and the spent stick can't be drawn again"), Character(1) != nullptr && Character(1)->GetInventory()->CanDraw(EWeaponSlot::Primary));
 	});
 	StopPlaying();
 	return true;

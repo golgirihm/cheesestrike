@@ -269,6 +269,21 @@ namespace CheeseStrikeWeapons
 		return Weapon.bDual && Index % 2 != 0 ? 1 : 0;
 	}
 
+	bool DrawWhenSpent(bool bSidearm, bool bSidearmDry, bool bKnife, EWeaponSlot& OutSlot)
+	{
+		if (bSidearm && !bSidearmDry)
+		{
+			OutSlot = EWeaponSlot::Sidearm;
+			return true;
+		}
+		if (bKnife)
+		{
+			OutSlot = EWeaponSlot::Knife;
+			return true;
+		}
+		return false;
+	}
+
 	float FullBarrelSpeed(const FWeaponStats& Weapon)
 	{
 		if (Weapon.Barrels <= 0 || Weapon.FireInterval <= 0.0f)
