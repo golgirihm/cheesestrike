@@ -66,6 +66,8 @@ namespace
 	constexpr float MouseLeapInTo = 900.0f;
 	/** An island it walks no further than this on (cm) is one it is cut off on. */
 	constexpr float MouseIslandAcross = 500.0f;
+	/** How high over the ground a leap's line is checked for rock in the way (cm): its arc rises at least 1.5 m. */
+	constexpr float MouseFlightOver = 60.0f;
 	/** Not having eaten for this long, nor come nearer the cheese it is after for MouseStuckFor (seconds), it is stuck: it comes in again. */
 	constexpr float MouseStuckAfter = 15.0f;
 	constexpr float MouseStuckFor = 8.0f;
@@ -185,6 +187,25 @@ void ACheeseStrikeMouse::Enter(const FVector& From, const FVector& To)
 	Doing = EMouseDoing::Entering;
 	SetActorLocation(From + FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z));
 	SetActorRotation(FRotator(0.0f, (To - From).Rotation().Yaw, 0.0f));
+	ShowDoing();
+}
+
+void ACheeseStrikeMouse::PutAt(const FVector& Feet)
+{
+	Target = nullptr;
+	LeapTo.Reset();
+	EatsUnderfoot = nullptr;
+	GivenUp.Reset();
+	Path.Reset();
+	FallSpeed = 0.0f;
+	Fear = 0.0f;
+	NextChoiceAt = 0.0f;
+	LastBiteAt = Now();
+	GainedAt = LastBiteAt;
+	Doing = EMouseDoing::Walking;
+	SetActorHiddenInGame(false);
+	SetActorEnableCollision(true);
+	SetActorLocation(Feet + FVector(0.0f, 0.0f, Body->GetScaledBoxExtent().Z));
 	ShowDoing();
 }
 
@@ -341,6 +362,11 @@ bool ACheeseStrikeMouse::FindWay(const FVector& To, bool bLeapAtEnd)
 		}
 		if (Across > 50.0f || FMath::Abs(To.Z - End.Z) > 50.0f)
 		{
+			// Never through rock (out of the Grotto's arch through its side).
+			if (!IsClearFlight(End, To))
+			{
+				return false;
+			}
 			LeapTo = To;
 		}
 	}
@@ -460,7 +486,7 @@ bool ACheeseStrikeMouse::FindWayOnto(const ACheeseStrikeCheese* Cheese)
 				continue;
 			}
 			// (That somewhere may be on the same island as it: then as near it as there is a way.)
-			if (FindWay(From.Location, true) && FVector::Dist2D(Path.Last(), Top) <= MouseLeapInTo && Top.Z - Path.Last().Z <= CheeseStrikeMice::ReachUp)
+			if (FindWay(From.Location, true) && FVector::Dist2D(Path.Last(), Top) <= MouseLeapInTo && Top.Z - Path.Last().Z <= CheeseStrikeMice::ReachUp && IsClearFlight(Path.Last(), Top))
 			{
 				LeapTo = Top;
 				EatsUnderfoot = const_cast<ACheeseStrikeCheese*>(Cheese);
@@ -606,7 +632,58 @@ bool ACheeseStrikeMouse::IsCutOff(const FVector& From) const
 			Furthest = FMath::Max(Furthest, static_cast<float>(FVector::Dist2D(Spot.Location, On.Location)));
 		}
 	}
-	return Furthest < MouseIslandAcross;
+	// On an island, or somewhere bigger that no way leads out of (Gruyere Grotto's arch, twelve metres long, its bridges eaten).
+	return Furthest < MouseIslandAcross || !LeadsOut(On.Location);
+}
+
+bool ACheeseStrikeMouse::LeadsOut(const FVector& From) const
+{
+	UWorld* World = GetWorld();
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	if (Navigation == nullptr)
+	{
+		return true;
+	}
+	bool bAnyWayIn = false;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (!It->ActorHasTag(FName(TEXT("MouseEntry"))))
+		{
+			continue;
+		}
+		// The ground inside the way in, as the mice come in onto it (ComeBack).
+		FNavLocation Ground;
+		if (!Navigation->ProjectPointToNavigation(It->GetActorLocation() + It->GetActorForwardVector() * 500.0f - FVector(0.0f, 0.0f, 1000.0f), Ground, FVector(600.0f, 600.0f, 1000.0f))
+			|| CheeseStrikeFalls::IsBelowKillHeight(World, Ground.Location.Z))
+		{
+			continue;
+		}
+		bAnyWayIn = true;
+		const UNavigationPath* Way = Navigation->FindPathToLocationSynchronously(World, From, Ground.Location, const_cast<ACheeseStrikeMouse*>(this));
+		if (Way != nullptr && Way->IsValid() && !Way->IsPartial())
+		{
+			return true;
+		}
+	}
+	// A map with no ground inside any way in: nothing to tell by.
+	return !bAnyWayIn;
+}
+
+bool ACheeseStrikeMouse::IsClearFlight(const FVector& From, const FVector& To) const
+{
+	// Along the leap a little over the ground: what it hits on the way, other than cheese, stops it (rock round it, a wall).
+	const FVector Up(0.0f, 0.0f, MouseFlightOver);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(MouseFlight), false, this);
+	TArray<FHitResult> Hits;
+	GetWorld()->LineTraceMultiByObjectType(Hits, From + Up, To + Up, FCollisionObjectQueryParams(ECC_WorldStatic), Params);
+	for (const FHitResult& Hit : Hits)
+	{
+		if (Hit.bBlockingHit && Cast<ACheeseStrikeCheese>(Hit.GetActor()) == nullptr)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 bool ACheeseStrikeMouse::LeapOut()
@@ -624,9 +701,10 @@ bool ACheeseStrikeMouse::LeapOut()
 		{
 			const FVector Toward = FRotator(0.0f, GetActorRotation().Yaw + Turn * 22.5f, 0.0f).Vector();
 			FNavLocation There;
-			// Down as far as 3.5 m (off a ledge it was stuck on), up no more than half a metre.
-			if (!Navigation->ProjectPointToNavigation(Feet + Toward * Reach - FVector(0.0f, 0.0f, 150.0f), There, FVector(80.0f, 80.0f, 200.0f)) || FVector::Dist2D(There.Location, Feet) < MouseLeapFrom - 80.0f
-				|| CheeseStrikeFalls::IsBelowKillHeight(GetWorld(), There.Location.Z) || IsCutOff(There.Location))
+			// Down as far as 5.5 m (off a ledge it was stuck on, or out of the Grotto's arch onto the floor 4 m under it), up
+			// no more than half a metre, and never through rock.
+			if (!Navigation->ProjectPointToNavigation(Feet + Toward * Reach - FVector(0.0f, 0.0f, 250.0f), There, FVector(80.0f, 80.0f, 300.0f)) || FVector::Dist2D(There.Location, Feet) < MouseLeapFrom - 80.0f
+				|| CheeseStrikeFalls::IsBelowKillHeight(GetWorld(), There.Location.Z) || !IsClearFlight(Feet, There.Location) || IsCutOff(There.Location))
 			{
 				continue;
 			}

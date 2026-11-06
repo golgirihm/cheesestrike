@@ -58,6 +58,9 @@ public:
 	/** Server only: comes in over the edge, from `From` (on top of the map's wall) down to the ground at `To`. */
 	void Enter(const FVector& From, const FVector& To);
 
+	/** Server only: puts it at `Feet` (a point on the ground), walking, to look for cheese afresh from there (the tests, and the console's CheeseStrikeMouseTo). */
+	void PutAt(const FVector& Feet);
+
 	/** Server only: the mice came at `CameAt` (the server's time) to `FullHealth` of edible cheese; its bites keep to the pace that eats it all in time (CheeseStrikeMice::Pace). Without it, it bites as Bite says. */
 	void SetSchedule(float CameAt, float FullHealth);
 	/** How much its next bite takes. */
@@ -112,10 +115,14 @@ protected:
 	bool StandsOn(const ACheeseStrikeCheese* Cheese) const;
 	/** Server only: back over the edge of the map, at one of its MouseEntry points, after falling in; false if none has ground in. */
 	bool ComeBack();
-	/** Whether `From` is on an island of the navigation mesh, a few metres across, that the cheese round it was eaten from. */
+	/** Whether `From` is cut off: on an island of the navigation mesh a few metres across that the cheese round it was eaten from, or anywhere no way leads out of (LeadsOut: Gruyere Grotto's arch, its bridges eaten). */
 	bool IsCutOff(const FVector& From) const;
 	/** Server only: cut off on an island it ate the floor round, it leaps across to the nearest floor that leads out; false if none is within a leap. */
 	bool LeapOut();
+	/** Whether it can walk from `From` to the ground inside one of the map's ways in (where the mice come in): from anywhere not cut off, it can. */
+	bool LeadsOut(const FVector& From) const;
+	/** Whether a leap from `From` to `To` (points on the ground) flies clear of the level (rock, walls): cheese it may fly past. */
+	bool IsClearFlight(const FVector& From, const FVector& To) const;
 	UFUNCTION()
 	void OnRep_Doing();
 	/** The animation and the sounds for what it is doing, on this machine. */
