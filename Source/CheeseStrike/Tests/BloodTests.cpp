@@ -117,8 +117,13 @@ bool FAnExecutionBleedsCheese::RunTest(const FString& Parameters)
 	// Crowded along the cone's line: half the drops within a tenth of the cone, a few out to its edge; a fan is even.
 	TestTrue(TEXT("a jet crowds its line"), First.Core >= 0.9f && ConeShare(0.5f, First.Core) <= 0.1f && FMath::IsNearlyEqual(ConeShare(1.0f, First.Core), 1.0f));
 	TestTrue(TEXT("a wound's fan is spread evenly"), ShotSpray(50.0f).Core == 0.0f && FMath::IsNearlyEqual(ConeShare(0.5f, 0.0f), 0.5f));
-	TestTrue(FString::Printf(TEXT("in a cone 10 degrees wide (%.0f)"), First.ConeDegrees * 2.0f), First.ConeDegrees > 0.0f && First.ConeDegrees * 2.0f <= 10.0f);
-	TestTrue(FString::Printf(TEXT("of small drops, about 1.5 cm at rest (%.2f), bigger than a shot's"), DropLength(First.Size, 0.0f, First.Stretch)), FMath::IsNearlyEqual(DropLength(First.Size, 0.0f, First.Stretch), 1.5f, 0.3f) && First.Size > ShotSpray(100.0f).Size);
+	TestTrue(FString::Printf(TEXT("in a cone 14 degrees wide (%.0f)"), First.ConeDegrees * 2.0f), First.ConeDegrees > 0.0f && First.ConeDegrees * 2.0f <= 14.0f);
+	TestTrue(FString::Printf(TEXT("of drops about 3 cm at rest (%.2f), bigger than a shot's"), DropLength(First.Size, 0.0f, First.Stretch)), FMath::IsNearlyEqual(DropLength(First.Size, 0.0f, First.Stretch), 3.0f, 0.5f) && First.Size > ShotSpray(100.0f).Size);
+	// Wave 16: a rope twice as thick as wave 15's (drops 0.55 cm across, from within 1.5 cm, in a cone 5 degrees each
+	// way), as dense: twice as wide where it leaves and along its way, with more drops.
+	TestTrue(FString::Printf(TEXT("twice as thick where it leaves (from within %.1f cm, drops %.2f cm)"), First.Spread, First.Size), FMath::IsNearlyEqual(First.Spread, 3.0f) && FMath::IsNearlyEqual(First.Size, 1.1f));
+	TestTrue(TEXT("and a little wider along its way, still one rope"), First.ConeDegrees > 5.0f && First.ConeDegrees < 10.0f);
+	TestTrue(TEXT("a wound's drops leave from where they did"), FMath::IsNearlyEqual(ShotSpray(50.0f).Spread, 1.5f));
 	const float Slowest = Last.Speed * (1.0f - Last.SpeedJitter);
 	TestTrue(FString::Printf(TEXT("drawn out three to five times along their flight (%.1f to %.1f)"), DropStretch(Slowest, Last.Stretch), DropStretch(First.Speed, First.Stretch)), DropStretch(Slowest, Last.Stretch) >= 3.0f && DropStretch(First.Speed, First.Stretch) <= 5.0f);
 	TestTrue(TEXT("so longer than any shot's drop"), DropLength(First.Size, First.Speed, First.Stretch) > 2.0f);
