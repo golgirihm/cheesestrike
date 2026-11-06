@@ -3,6 +3,10 @@
 #include "CheeseStrikePlayScript.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/GameInstance.h"
+#include "Input/HittestGrid.h"
+#include "Widgets/SWindow.h"
+#include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
@@ -170,6 +174,10 @@ bool UCheeseStrikePlayScript::Run(const FCommand& Command)
 		Pressed.Add(Key, {Number(1, 0.1f), Value});
 		PressKey(Key, true, Value);
 	}
+	else if (Command.Verb == TEXT("click"))
+	{
+		Click(FVector2D(Number(0, 0.5f), Number(1, 0.5f)));
+	}
 	else if (Command.Verb == TEXT("device"))
 	{
 		const FString Lower = Name.ToLower();
@@ -253,6 +261,45 @@ void UCheeseStrikePlayScript::PressKey(const FKey& Key, bool bDown, float Value)
 	{
 		Slate.ProcessKeyUpEvent(FKeyEvent(Key, Slate.GetModifierKeys(), User, false, 0, 0));
 	}
+}
+
+void UCheeseStrikePlayScript::Click(const FVector2D& Along)
+{
+	UGameViewportClient* Viewport = GEngine != nullptr ? GEngine->GameViewport : nullptr;
+	const TSharedPtr<SWindow> Window = Viewport != nullptr ? Viewport->GetWindow() : nullptr;
+	const TSharedPtr<SWidget> View = Viewport != nullptr ? Viewport->GetGameViewportWidget() : nullptr;
+	if (!FSlateApplication::IsInitialized() || !Window.IsValid() || !View.IsValid())
+	{
+		UE_LOG(LogCheeseStrike, Error, TEXT("PlayScript: no view to click in"));
+		return;
+	}
+	// Routed through Slate's hit test as the window has it now (as it was drawn last), as a real click is, whether or not
+	// the window is on the screen (offscreen it is not, and Slate would find no window under the point).
+	FSlateApplication& Slate = FSlateApplication::Get();
+	const FGeometry& Geometry = View->GetCachedGeometry();
+	const FVector2D At = FVector2D(Geometry.LocalToAbsolute(FVector2f(Along * FVector2D(Geometry.GetLocalSize()))));
+	const uint32 User = static_cast<uint32>(SlateUser());
+	const auto PathAt = [&Window, &At, User]() { return FWidgetPath(Window->GetHittestGrid().GetBubblePath(At, 0.0f, false, User)); };
+	const auto Describe = [](const FWidgetPath& Path)
+	{
+		TArray<FString> Names;
+		for (int32 Index = Path.Widgets.Num() - 1; Index >= 0 && Names.Num() < 4; --Index)
+		{
+			Names.Add(Path.Widgets[Index].Widget->GetTypeAsString());
+		}
+		return Names.IsEmpty() ? FString(TEXT("nothing")) : FString::Join(Names, TEXT(" in "));
+	};
+	const FWidgetPath Under = PathAt();
+	// The mouse comes onto the point first, so that what is there is hovered, as a button's click asks.
+	Slate.RoutePointerMoveEvent(Under, FPointerEvent(User, 0, At, At, TSet<FKey>(), EKeys::Invalid, 0.0f, Slate.GetModifierKeys()), false);
+	const FPointerEvent Down(User, 0, At, At, TSet<FKey>({EKeys::LeftMouseButton}), EKeys::LeftMouseButton, 0.0f, Slate.GetModifierKeys());
+	const FReply PressReply = Slate.RoutePointerDownEvent(Under, Down);
+	const FWidgetPath UnderUp = PathAt();
+	const FPointerEvent Up(User, 0, At, At, TSet<FKey>(), EKeys::LeftMouseButton, 0.0f, Slate.GetModifierKeys());
+	Slate.RoutePointerUpEvent(UnderUp, Up);
+	const TSharedPtr<SWidget> Taker = PressReply.GetHandler();
+	UE_LOG(LogCheeseStrike, Display, TEXT("PlayScript: click at %.3f, %.3f on %s; pressed %s"), Along.X, Along.Y, *Describe(Under),
+		PressReply.IsEventHandled() ? (Taker.IsValid() ? *Taker->GetTypeAsString() : TEXT("(handled)")) : TEXT("nothing"));
 }
 
 void UCheeseStrikePlayScript::InjectHeld()
