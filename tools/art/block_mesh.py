@@ -9,16 +9,20 @@ there; a size a map no longer uses leaves its mesh behind, harmlessly.
 Each mesh is a box ROUNDING cm rounded along every edge (less on a block too thin for it), standing OVERLAP cm proud
 of its size on every face, so that blocks laid edge to edge (a wall's courses, a floor's tiles) run into each other a
 little and show a shallow seam rather than a slit; its collision is a plain box of the size asked for, used for shots
-too, so that nothing of the game changes (the minimap's outlines, the mice's holds, where a shot lands), and its
-bounds are pulled in to that box (so what rests on what is measured as before). The cheese material carves its holes in
-world space from the mesh's custom primitive data, so it reads on these as on the cube.
+too, so that nothing of the game changes (the minimap's outlines, the mice's holds, where a shot lands). Its bounds are
+the mesh's own, all of what is drawn: the game measures a block by its collision (ACheeseStrikeCheese::GetBlockBox),
+never by its bounds. (Until wave 16 the bounds were pulled in to the box, 2 cm inside what is drawn; the renderer's
+occlusion test then found a block hidden behind its own faces, and blocks vanished for a frame now and then, which
+flickered.) The cheese material carves its holes in world space from the mesh's custom primitive data, so it reads on
+these as on the cube.
 
 Run on its own, with the editor closed, it makes every mesh again (after a change to the rounding), from the names in
 the folder:
 
     UnrealEditor-Cmd.exe <repo>/CheeseStrike.uproject -ExecCmds="py <repo>/tools/art/block_mesh.py" -unattended -nullrhi
 
-and writes what it did to Saved/block_mesh.txt.
+and writes what it did to Saved/block_mesh.txt. With `bounds` as its argument it only gives every mesh in the folder its
+own bounds (no extension), in place, keeping the maps' references to them.
 """
 
 import os
@@ -100,9 +104,9 @@ def make(size, lines=None):
     unreal.GeometryScript_Collision.set_static_mesh_collision_from_mesh(box, made, collision)
     body = made.get_editor_property("body_setup")
     body.set_editor_property("collision_trace_flag", unreal.CollisionTraceFlag.CTF_USE_SIMPLE_AS_COMPLEX)
-    # Its bounds pulled in to that box, so that what rests on what, and what hangs near what, is measured as before.
-    made.set_editor_property("positive_bounds_extension", unreal.Vector(-OVERLAP, -OVERLAP, -OVERLAP))
-    made.set_editor_property("negative_bounds_extension", unreal.Vector(-OVERLAP, -OVERLAP, -OVERLAP))
+    # Its bounds the mesh's own, all that is drawn (never pulled in: the renderer culls by them).
+    made.set_editor_property("positive_bounds_extension", unreal.Vector(0, 0, 0))
+    made.set_editor_property("negative_bounds_extension", unreal.Vector(0, 0, 0))
     made.set_material(0, unreal.load_asset(MATERIAL))
     unreal.EditorAssetLibrary.save_asset(path, False)
     if lines is not None:
@@ -110,6 +114,19 @@ def make(size, lines=None):
         boxes = len(body.get_editor_property("agg_geom").get_editor_property("box_elems"))
         lines.append(f"made {name}: {made.get_num_triangles(0)} triangles, rounded {rounding:.1f}, bounds {b.max.x - b.min.x:.0f} x {b.max.y - b.min.y:.0f} x {b.max.z - b.min.z:.0f}, {boxes} collision box")
     return made
+
+
+def true_bounds(lines):
+    """Every mesh in the folder given its own bounds, in place: no extension either way."""
+    for path in unreal.EditorAssetLibrary.list_assets(FOLDER, recursive=False, include_folder=False):
+        mesh = unreal.load_asset(path)
+        if not isinstance(mesh, unreal.StaticMesh) or size_from(mesh.get_name()) is None:
+            continue
+        mesh.set_editor_property("positive_bounds_extension", unreal.Vector(0, 0, 0))
+        mesh.set_editor_property("negative_bounds_extension", unreal.Vector(0, 0, 0))
+        saved = unreal.EditorAssetLibrary.save_loaded_asset(mesh, False)
+        b = mesh.get_bounds()
+        lines.append(f"{mesh.get_name()}: bounds {2 * b.box_extent.x:.0f} x {2 * b.box_extent.y:.0f} x {2 * b.box_extent.z:.0f}, saved {saved}")
 
 
 def remake_all(lines):
@@ -127,8 +144,10 @@ if __name__ == "__main__":
     out = unreal.Paths.project_saved_dir() + "block_mesh.txt"
     lines = []
     try:
-        sizes = [tuple(float(s) for s in arg.split("x")) for arg in sys.argv[1:]]
-        if sizes:
+        sizes = [tuple(float(s) for s in arg.split("x")) for arg in sys.argv[1:] if arg != "bounds"]
+        if "bounds" in sys.argv[1:]:
+            true_bounds(lines)
+        elif sizes:
             for size in sizes:
                 make(size, lines)
         else:
