@@ -181,6 +181,7 @@ namespace CheeseStrikeBlood
 		Spray.Life = DropLife;
 		Spray.Stretch = HoseStretch;
 		Spray.Core = 1.0f;
+		Spray.Spread = HoseSpread;
 		Spray.bBright = true;
 		return Spray;
 	}

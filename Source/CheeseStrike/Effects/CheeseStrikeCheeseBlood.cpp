@@ -152,7 +152,7 @@ void ACheeseStrikeCheeseBlood::Spray(const FVector& At, const FVector& Way, int3
 	for (int32 Each = 0; Each < Allowed; ++Each)
 	{
 		FDrop Drop;
-		Drop.At = At + FMath::VRand() * 1.5f;
+		Drop.At = At + FMath::VRand() * Made.Spread;
 		Drop.Velocity = FMath::VRandCone(Along, Cone * CheeseStrikeBlood::ConeShare(FMath::FRand(), Made.Core)) * Made.Speed * FMath::FRandRange(1.0f - Made.SpeedJitter, 1.0f + Made.SpeedJitter);
 		Drop.Size = Made.Size * FMath::FRandRange(1.0f - CheeseStrikeBlood::SizeJitter, 1.0f + CheeseStrikeBlood::SizeJitter);
 		Drop.Life = Made.Life;

@@ -49,8 +49,9 @@ namespace CheeseStrikeBlood
 	 * either side of its line), how big (the drop's radius: its length is DropLength of it), how long each lives, how far
 	 * each is drawn out along its flight at the most (Stretch), how much the drops crowd the cone's line (Core: 0 spread
 	 * evenly over the cone, as a fan is; 1 nearly all along its line with a thin halo out to the cone's edge, as a jet
-	 * is: ConeShare), and whether they are the bright cheese yellow of the stomp's jet (bBright, in a look of its own)
-	 * rather than the deep molten orange of a wound's.
+	 * is: ConeShare), how far from its source each drop may leave (Spread, a radius: how thick the stream is where it
+	 * leaves), and whether they are the bright cheese yellow of the stomp's jet (bBright, in a look of its own) rather
+	 * than the deep molten orange of a wound's.
 	 */
 	struct FSpray
 	{
@@ -62,6 +63,7 @@ namespace CheeseStrikeBlood
 		float Life = DropLife;
 		float Stretch = MostStretch;
 		float Core = 0.0f;
+		float Spread = 1.5f;
 		bool bBright = false;
 	};
 	/** How much of a spray's cone a drop drawn at `Roll` (0 to 1, evenly) is thrown within, for the spray's `Core`. */
@@ -112,19 +114,22 @@ namespace CheeseStrikeBlood
 
 	/**
 	 * The stomp: as the boot lands, a fire-hydrant jet from where the head was for HoseSeconds, read as one liquid
-	 * stream and not chunks: HoseRate small drops a second, steadily until it slackens over its last HoseSlackSeconds
-	 * (StompRate); each about 1.5 cm long at rest (HoseDropSize, the radius) and drawn out three to five times along
+	 * stream and not chunks: HoseRate drops a second, steadily until it slackens over its last HoseSlackSeconds
+	 * (StompRate); each about 3 cm long at rest (HoseDropSize, the radius) and drawn out three to five times along
 	 * its flight (HoseStretch), bright cheese yellow in a look of their own (HoseSpray: the spray a moment's drops are
-	 * thrown as); at 12 m/s easing to 9 (StompSpeed) in a cone 2 x HoseCone degrees wide, each placed by its own
-	 * moment within the frame so that the stream is unbroken, falling in arcs onto the floor; with a sheath of mist at
-	 * its source.
+	 * thrown as); at 12 m/s easing to 9 (StompSpeed) in a cone 2 x HoseCone degrees wide, leaving from within
+	 * HoseSpread of its source, each placed by its own moment within the frame so that the stream is unbroken, falling
+	 * in arcs onto the floor; with a sheath of mist at its source. Since wave 16 a rope twice as thick as it was (its
+	 * drops and where they leave from twice as wide, its cone a little wider, which any more would split into strands,
+	 * and a third more drops, so that it is as dense).
 	 */
 	constexpr float HoseSeconds = 2.0f;
-	constexpr float HoseRate = 600.0f;
+	constexpr float HoseRate = 800.0f;
 	constexpr float HoseSlackSeconds = 0.3f;
-	constexpr float HoseCone = 5.0f;
-	constexpr float HoseDropSize = 0.55f;
+	constexpr float HoseCone = 7.0f;
+	constexpr float HoseDropSize = 1.1f;
 	constexpr float HoseStretch = 5.0f;
+	constexpr float HoseSpread = 3.0f;
 	float StompRate(float Elapsed);
 	float StompSpeed(float Elapsed);
 	FSpray HoseSpray(float Elapsed);
