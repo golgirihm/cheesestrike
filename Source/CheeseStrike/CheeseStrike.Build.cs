@@ -22,10 +22,11 @@ public class CheeseStrike : ModuleRules
 			"Slate",
 			"SlateCore",
 			"AnimGraphRuntime",
-			"AnimationCore"
+			"AnimationCore",
+			"CheeseStrikeStartup"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "EngineSettings", "AssetRegistry", "OnlineBase", "OnlineSubsystem", "OnlineSubsystemUtils", "AudioExtensions", "CoreOnline", "AudioMixer", "RenderCore", "RHI", "NetCore", "MoviePlayer" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "EngineSettings", "AssetRegistry", "OnlineBase", "OnlineSubsystem", "OnlineSubsystemUtils", "AudioExtensions", "CoreOnline", "AudioMixer", "RenderCore", "RHI", "NetCore", "MoviePlayer", "Json" });
 
 		// The HUD shows players' Steam pictures (UI/CheeseStrikeAvatars), through the Steamworks API itself.
 		if (Target.Platform == UnrealTargetPlatform.Win64)

@@ -5,6 +5,7 @@
 #include "Rendering/DrawElements.h"
 #include "Layout/ArrangedChildren.h"
 #include "Misc/Paths.h"
+#include "HAL/PlatformApplicationMisc.h"
 
 namespace CheeseStrikeLoader
 {
@@ -12,6 +13,17 @@ namespace CheeseStrikeLoader
 	{
 		const int32 Frame = FMath::FloorToInt32(Seconds * FramesPerSecond) % Frames;
 		return Frame < 0 ? Frame + Frames : Frame;
+	}
+
+	float FrameBlendAt(double Seconds)
+	{
+		const double Position = Seconds * FramesPerSecond;
+		return FMath::Clamp(static_cast<float>(Position - FMath::FloorToDouble(Position)), 0.0f, 1.0f);
+	}
+
+	double TurnAt(double Seconds)
+	{
+		return (FrameAt(Seconds) + FrameBlendAt(Seconds)) * 360.0 / Frames;
 	}
 
 	FString FramePath(int32 Frame, bool bLarge)
@@ -58,20 +70,34 @@ int32 SCheeseStrikeLoader::OnPaint(const FPaintArgs&, const FGeometry& AllottedG
 	// The frame the clock says, drawn a little bigger than the spinner's own box (the wedge fills most of its frame, not
 	// all), in the middle of what it was given.
 	const TArray<TUniquePtr<FSlateDynamicImageBrush>>& Frames = CheeseStrikeLoader::Brushes(bLarge);
-	const int32 Frame = CheeseStrikeLoader::FrameAt(FPlatformTime::Seconds());
+	const double Now = FPlatformTime::Seconds();
+	const int32 Frame = CheeseStrikeLoader::FrameAt(Now);
 	if (!Frames.IsValidIndex(Frame) || !Frames[Frame].IsValid())
 	{
 		return LayerId;
 	}
 	const FVector2f Size(Radius * 2.0f * CheeseStrikeLoader::DrawnOver, Radius * 2.0f * CheeseStrikeLoader::DrawnOver);
 	const FVector2f Corner = (FVector2f(AllottedGeometry.GetLocalSize()) - Size) * 0.5f;
-	FSlateDrawElement::MakeBox(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform(Corner)), Frames[Frame].Get(), ESlateDrawEffect::None, InWidgetStyle.GetColorAndOpacityTint());
+	const FPaintGeometry Geometry = AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform(Corner));
+	FSlateDrawElement::MakeBox(OutDrawElements, LayerId, Geometry, Frames[Frame].Get(), ESlateDrawEffect::None, InWidgetStyle.GetColorAndOpacityTint());
+	// The next frame over it as far as the clock is toward it, so that the wedge turns a little on every frame drawn rather
+	// than jumping a frame's 5 degrees every other one (the frames are 5 degrees apart, so the two nearly coincide).
+	const float Blend = CheeseStrikeLoader::FrameBlendAt(Now);
+	const int32 Next = (Frame + 1) % Frames.Num();
+	if (Blend > 0.01f && Frames[Next].IsValid())
+	{
+		FLinearColor Tint = InWidgetStyle.GetColorAndOpacityTint();
+		Tint.A *= Blend;
+		FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 1, Geometry, Frames[Next].Get(), ESlateDrawEffect::None, Tint);
+		return LayerId + 1;
+	}
 	return LayerId;
 }
 
 void SCheeseStrikeSteadyScale::Construct(const FArguments& InArgs)
 {
 	Target = FMath::Max(0.1f, InArgs._Target);
+	bTargetFromSize = InArgs._TargetFromSize;
 	ChildSlot
 	[
 		InArgs._Content.Widget
@@ -91,6 +117,23 @@ FVector2D SCheeseStrikeSteadyScale::DesiredFor(const FVector2D& Content, float T
 FVector2D SCheeseStrikeSteadyScale::ContentArea(const FVector2D& Allotted, float Target, float Accumulated)
 {
 	return Allotted / RelativeScale(Target, Accumulated);
+}
+
+float SCheeseStrikeSteadyScale::TargetForSize(const FVector2D& Pixels, float WindowDpi)
+{
+	const double Short = FMath::Min(Pixels.X, Pixels.Y);
+	return Short < 1.0 ? 1.0f : static_cast<float>(Short / 1080.0) * FMath::Max(0.1f, WindowDpi);
+}
+
+float SCheeseStrikeSteadyScale::TargetFor(const FGeometry& AllottedGeometry) const
+{
+	if (!bTargetFromSize)
+	{
+		return Target;
+	}
+	const FVector2D Pixels = FVector2D(AllottedGeometry.GetLocalSize()) * AllottedGeometry.GetAccumulatedLayoutTransform().GetScale();
+	const FVector2D Middle = FVector2D(AllottedGeometry.LocalToAbsolute(AllottedGeometry.GetLocalSize() * 0.5f));
+	return TargetForSize(Pixels, FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(static_cast<float>(Middle.X), static_cast<float>(Middle.Y)));
 }
 
 float SCheeseStrikeSteadyScale::GetRelativeLayoutScale(const int32, float LayoutScaleMultiplier) const
@@ -113,6 +156,7 @@ void SCheeseStrikeSteadyScale::OnArrangeChildren(const FGeometry& AllottedGeomet
 		return;
 	}
 	const float Accumulated = AllottedGeometry.GetAccumulatedLayoutTransform().GetScale();
-	const float Relative = RelativeScale(Target, Accumulated);
-	ArrangedChildren.AddWidget(AllottedGeometry.MakeChild(ChildSlot.GetWidget(), FVector2f(ContentArea(FVector2D(AllottedGeometry.GetLocalSize()), Target, Accumulated)), FSlateLayoutTransform(Relative)));
+	const float Wanted = TargetFor(AllottedGeometry);
+	const float Relative = RelativeScale(Wanted, Accumulated);
+	ArrangedChildren.AddWidget(AllottedGeometry.MakeChild(ChildSlot.GetWidget(), FVector2f(ContentArea(FVector2D(AllottedGeometry.GetLocalSize()), Wanted, Accumulated)), FSlateLayoutTransform(Relative)));
 }

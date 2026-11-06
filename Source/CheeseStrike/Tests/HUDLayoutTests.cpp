@@ -14,7 +14,7 @@
 #include "UI/CheeseStrikeHUDRules.h"
 #include "UI/CheeseStrikeHUDDraw.h"
 #include "Framework/Application/SlateApplication.h"
-#include "UI/CheeseStrikeLoader.h"
+#include "CheeseStrikeLoader.h"
 #include "Engine/Texture2D.h"
 
 #if WITH_DEV_AUTOMATION_TESTS

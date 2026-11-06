@@ -5,6 +5,11 @@
 	"Description": "CheeseStrike: Gouda Overload",
 	"Modules": [
 		{
+			"Name": "CheeseStrikeStartup",
+			"Type": "Runtime",
+			"LoadingPhase": "PreLoadingScreen"
+		},
+		{
 			"Name": "CheeseStrike",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
