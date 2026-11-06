@@ -42,12 +42,11 @@ namespace
 	/** The view down: dark, washed of colour and red, blurred past arm's length. */
 	constexpr float HurtViewRate = 2.5f;
 	constexpr float HurtFocus = 90.0f;
-	/** The blows' sounds (the knife's own, in and out, made by tools/art/stab_sound.py), and the cheese of the chunks a supercombine bursts into (ShowCheeseBurst). */
+	/** The blows' sounds (the knife's own, in and out, made by tools/art/stab_sound.py; the stomp's wet splat and crunch, tools/art/wave17_sounds.py), and the cheese of the chunks a supercombine bursts into (ShowCheeseBurst). */
 	const TCHAR* const ExecutionWhooshPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeWhoosh_02.Lyra_MeleeWhoosh_02");
 	const TCHAR* const ExecutionStabInPath = TEXT("/Game/OpenGameArt/Stab/SW_KnifeStabIn.SW_KnifeStabIn");
 	const TCHAR* const ExecutionStabOutPath = TEXT("/Game/OpenGameArt/Stab/SW_KnifeStabOut.SW_KnifeStabOut");
-	const TCHAR* const ExecutionStompPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_03.Lyra_MeleeImpact_03");
-	const TCHAR* const ExecutionBurstPath = TEXT("/Game/Audio/Sounds/SFX/Lyra_MeleeImpact_01.Lyra_MeleeImpact_01");
+	const TCHAR* const ExecutionStompPath = TEXT("/Game/CheeseStrike/Sounds/SW_StompSplat.SW_StompSplat");
 	const TCHAR* const ChunkCheesePath = TEXT("/Game/CheeseStrike/Materials/M_Cheese.M_Cheese");
 	const TCHAR* const ChunkMeshPath = TEXT("/Engine/BasicShapes/Cube.Cube");
 
@@ -70,7 +69,8 @@ namespace
 		}
 		if (Kind == EKind::Stomp)
 		{
-			return {{StompLands - 0.15f, ExecutionWhooshPath, 0.9f, 0.85f, false}, {StompLands, ExecutionStompPath, 1.3f, 0.8f, true}, {StompLands + 0.01f, ExecutionBurstPath, 1.1f, 0.7f, true}};
+			// The boot coming down, and the head giving under it: a gross wet splat and crunch (since wave 17; a thud before).
+			return {{StompLands - 0.15f, ExecutionWhooshPath, 0.9f, 0.85f, false}, {StompLands, ExecutionStompPath, 1.4f, 1.0f, true}};
 		}
 		return {};
 	}
