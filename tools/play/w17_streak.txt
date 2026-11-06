@@ -1,0 +1,19 @@
+# Wave 17: the kill-streak count at one, two and three figures in its tile (104
+# at the Practice Range ran over its edges), at 1280 by 720, the smallest window.
+# Run with tools/play.ps1 -Res 1280x720.
+wait 6
+cmd CheeseStrike.HUD.Streak 7
+wait 1.2
+shot w17_streak_7
+cmd CheeseStrike.HUD.Streak 42
+wait 1.2
+shot w17_streak_42
+cmd CheeseStrike.HUD.Streak 104
+wait 0.1
+shot w17_streak_104_pop
+wait 1.2
+shot w17_streak_104
+cmd CheeseStrike.HUD.Streak 999
+wait 1.2
+shot w17_streak_999
+quit

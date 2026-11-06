@@ -820,6 +820,12 @@ namespace CheeseStrikeHUD
 		return FMath::Max(Target, Shown - Rate * DeltaSeconds);
 	}
 
+	float StreakCountScale(float Width, float Tile)
+	{
+		const float Room = Tile * StreakCountRoom;
+		return Width <= Room || Width <= 0.0f ? 1.0f : Room / Width;
+	}
+
 	float StreakPop(float Seconds)
 	{
 		if (Seconds < 0.0f || Seconds >= StreakPopTime)
