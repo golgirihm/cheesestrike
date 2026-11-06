@@ -28,6 +28,10 @@ namespace
 	/** How big a card is against the cloud's radius (its half width as a share), and how slowly the swirl turns (degrees a second, about). */
 	constexpr float SmokeCardShare = 0.55f;
 	constexpr float SmokeSwirlDegrees = 14.0f;
+	/** The veil's lobes round its edge, which make its outline lumpy (how many, how far out as a share of its half size, and how big as a share of it). */
+	constexpr int32 VeilLobes = 7;
+	constexpr float VeilLobeOut = 0.78f;
+	constexpr float VeilLobeSize = 0.42f;
 	/** How loud the hiss is, and how far it is heard (cm). */
 	constexpr float SmokeHissVolume = 0.5f;
 	constexpr float SmokeHissReach = 2500.0f;
@@ -61,8 +65,23 @@ ACheeseStrikeSmokeCloud::ACheeseStrikeSmokeCloud()
 	Cards->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Cards->SetCastShadow(false);
 	Cards->SetCanEverAffectNavigation(false);
-	Cards->NumCustomDataFloats = 1;
+	// Each card's thickness, how solid it is (the swirl's none, the veil's all) and its shade (lighter or darker).
+	Cards->NumCustomDataFloats = 3;
+	// Sorted by distance with the veil, which is nearer the eye: drawn after it, a card behind someone in the cloud would
+	// be hidden by them where they stand, and so show their outline over the veil.
 	Cards->SetAbsolute(false, true, true);
+
+	// The veil, sorted by its own distance like everything else translucent, so that it is drawn over a ghost or any mist
+	// behind it.
+	Veil = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Veil"));
+	Veil->SetupAttachment(Sight);
+	Veil->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Veil->SetCastShadow(false);
+	Veil->SetCanEverAffectNavigation(false);
+	Veil->NumCustomDataFloats = 3;
+	Veil->SetAbsolute(false, true, true);
+	Veil->SetCullDistances(0, 0);
+	Veil->bUseAsOccluder = false;
 }
 
 void ACheeseStrikeSmokeCloud::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -109,6 +128,11 @@ int32 ACheeseStrikeSmokeCloud::GetCardCount() const
 	return Cards != nullptr ? Cards->GetInstanceCount() : 0;
 }
 
+int32 ACheeseStrikeSmokeCloud::GetVeilCount() const
+{
+	return Veil != nullptr ? Veil->GetInstanceCount() : 0;
+}
+
 void ACheeseStrikeSmokeCloud::BeginPlay()
 {
 	Super::BeginPlay();
@@ -140,11 +164,13 @@ void ACheeseStrikeSmokeCloud::MakeCards()
 	if (UStaticMesh* Card = LoadObject<UStaticMesh>(nullptr, SmokeCardPath))
 	{
 		Cards->SetStaticMesh(Card);
+		Veil->SetStaticMesh(Card);
 		CardHalf = FMath::Max(1.0f, static_cast<float>(Card->GetBounds().BoxExtent.X));
 	}
 	if (UMaterialInterface* Look = LoadObject<UMaterialInterface>(nullptr, SmokeLookPath))
 	{
 		Cards->SetMaterial(0, Look);
+		Veil->SetMaterial(0, Look);
 	}
 	// Each card its own place in the swirl, the same on every machine for the same cloud (seeded by where it is).
 	FRandomStream Random(static_cast<int32>(GetActorLocation().X * 7.0f + GetActorLocation().Y * 13.0f));
@@ -160,6 +186,7 @@ void ACheeseStrikeSmokeCloud::MakeCards()
 		Card.Size = Random.FRandRange(0.7f, 1.3f);
 		Card.Turn = FMath::DegreesToRadians(SmokeSwirlDegrees * Random.FRandRange(0.6f, 1.4f)) * (Random.FRand() < 0.5f ? -1.0f : 1.0f);
 		Card.Phase = Random.FRandRange(0.0f, 2.0f * PI);
+		Card.Shade = Random.FRandRange(0.72f, 1.25f);
 		Swirl.Add(Card);
 	}
 }
@@ -175,6 +202,10 @@ void ACheeseStrikeSmokeCloud::ShowCards()
 		{
 			Cards->ClearInstances();
 		}
+		if (Veil->GetInstanceCount() > 0)
+		{
+			Veil->ClearInstances();
+		}
 		return;
 	}
 	FVector Camera = FVector::ZeroVector;
@@ -183,6 +214,10 @@ void ACheeseStrikeSmokeCloud::ShowCards()
 	{
 		Camera = Player->PlayerCameraManager->GetCameraLocation();
 		bCamera = true;
+	}
+	if (bCamera)
+	{
+		ShowVeil(Camera, At, Opacity);
 	}
 	const FVector Middle = Sight->GetComponentLocation();
 	const float CardScale = Radius * SmokeCardShare / CardHalf;
@@ -210,7 +245,58 @@ void ACheeseStrikeSmokeCloud::ShowCards()
 	for (int32 Index = 0; Index < Shown.Num(); ++Index)
 	{
 		const float Edge = 1.0f - 0.45f * FMath::Square(Swirl[Index].Share);
-		Cards->SetCustomDataValue(Index, 0, Opacity * Edge, Index == Shown.Num() - 1);
+		Cards->SetCustomDataValue(Index, 0, Opacity * Edge, false);
+		Cards->SetCustomDataValue(Index, 1, 0.0f, false);
+		Cards->SetCustomDataValue(Index, 2, Swirl[Index].Shade, Index == Shown.Num() - 1);
+	}
+}
+
+void ACheeseStrikeSmokeCloud::ShowVeil(const FVector& Camera, float At, float Opacity)
+{
+	// Worked out from where it burst (the sphere's middle is CloudMiddleUp over it), for this machine's camera.
+	const FVector Burst = Sight->GetComponentLocation() - FVector(0.0f, 0.0f, CheeseStrikeGrenades::CloudMiddleUp);
+	const CheeseStrikeGrenades::FVeil Made = CheeseStrikeGrenades::CloudVeil(Camera - Burst, At);
+	VeilShown.Reset(VeilLobes + 1);
+	if (Made.HalfRight > 0.0f)
+	{
+		const FVector Facing = FVector::CrossProduct(Made.Right, Made.Up);
+		const FQuat Turn = FRotationMatrix::MakeFromZY(-Facing, Made.Up).ToQuat();
+		// Its whole middle over what it must hide: the card bigger by its whole share.
+		const float Right = Made.HalfRight / (CheeseStrikeGrenades::CloudVeilWhole * CardHalf);
+		const float Up = Made.HalfUp / (CheeseStrikeGrenades::CloudVeilWhole * CardHalf);
+		const FVector Middle = Burst + Made.Middle;
+		VeilShown.Add(FTransform(Turn, Middle, FVector(Right, Up, 1.0f)));
+		if (!Made.bAtTheEye)
+		{
+			// Lobes round its edge, turning slowly, so that its outline is lumpy smoke rather than an ellipse; a little
+			// nearer the eye, so that they lie over it.
+			for (int32 Lobe = 0; Lobe < VeilLobes; ++Lobe)
+			{
+				const float Angle = 2.0f * PI * Lobe / VeilLobes + At * 0.05f * (Lobe % 2 == 0 ? 1.0f : -1.0f) + 0.4f * FMath::Sin(Lobe * 2.3f);
+				const float Out = VeilLobeOut * (0.9f + 0.2f * FMath::Sin(Lobe * 1.7f + At * 0.3f));
+				const FVector Place = Middle + Made.Right * FMath::Cos(Angle) * Made.HalfRight * Out + Made.Up * FMath::Sin(Angle) * Made.HalfUp * Out - Facing * 2.0f;
+				const float Size = VeilLobeSize * (0.85f + 0.3f * FMath::Frac(Lobe * 0.618f));
+				VeilShown.Add(FTransform(Turn, Place, FVector(Right * Size, Right * Size, 1.0f)));
+			}
+		}
+	}
+	if (VeilShown.Num() != Veil->GetInstanceCount())
+	{
+		Veil->ClearInstances();
+		if (VeilShown.Num() > 0)
+		{
+			Veil->AddInstances(VeilShown, false, true, false);
+		}
+	}
+	else if (VeilShown.Num() > 0)
+	{
+		Veil->BatchUpdateInstancesTransforms(0, VeilShown, true, true, true);
+	}
+	for (int32 Index = 0; Index < VeilShown.Num(); ++Index)
+	{
+		Veil->SetCustomDataValue(Index, 0, Opacity, false);
+		Veil->SetCustomDataValue(Index, 1, 1.0f, false);
+		Veil->SetCustomDataValue(Index, 2, 1.0f, Index == VeilShown.Num() - 1);
 	}
 }
 

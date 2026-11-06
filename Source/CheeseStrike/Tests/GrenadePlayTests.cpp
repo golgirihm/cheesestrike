@@ -413,6 +413,7 @@ bool FASmokeGrenadeHidesWhatIsBehindIt::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("it lies between them (%.0f cm from the host)"), FVector::Dist2D(Smoke->GetActorLocation(), Host->GetActorLocation())), FVector::Dist2D(Smoke->GetActorLocation(), Host->GetActorLocation()) < 320.0f);
 		TestTrue(TEXT("it blocks sight while it lasts"), Smoke->BlocksSight());
 		TestTrue(FString::Printf(TEXT("and shows its cards (%d)"), Smoke->GetCardCount()), Smoke->GetCardCount() >= 80);
+		TestTrue(FString::Printf(TEXT("and a veil over its core for this machine's camera (%d cards)"), Smoke->GetVeilCount()), Smoke->GetVeilCount() >= 1);
 		TestFalse(TEXT("the bot can't see the host through it"), Bot->IsValid() && (*Bot)->CanSeeInto(Host));
 		TestTrue(TEXT("nobody was hurt by it"), Host->GetHealth() == CheeseStrikeWeapons::MaxHealth);
 		// A shot goes through the smoke: the host fires at the dummy's chest.
